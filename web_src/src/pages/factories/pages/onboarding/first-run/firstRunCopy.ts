@@ -4,6 +4,10 @@ import {
   githubInstallRequestBody,
 } from "@/lib/githubInstallRequestCopy";
 
+function ticketCount(count: number) {
+  return count === 1 ? "1 ticket" : `${count} tickets`;
+}
+
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
@@ -15,21 +19,26 @@ export const FIRST_RUN_COPY = {
   },
   welcome: {
     greeting: (firstName: string) => `Hi ${firstName}.`,
-    headline: "See what SuperPlane can ship from your backlog",
-    intro: "Each ticket is scored by how confident SuperPlane is that an agent can complete it.",
+    headline: "One-shot the routine work in your backlog",
+    intro:
+      "SuperPlane finds the tickets agents can finish with high confidence and turns them into review-ready pull requests.",
     getStarted: "Get started",
   },
   connect: {
-    headline: "Connect GitHub",
-    body: "SuperPlane reads your repositories. It does not start work yet.",
+    headline: "Connect SuperPlane to GitHub",
+    body: "SuperPlane reads your code and tickets, and returns finished work as pull requests.",
     signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
-    trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
-    selectAccount: "Select a GitHub account",
-    selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
+    connectAction: "Connect",
+    stepConnected: "Connected to GitHub",
+    stepOrganization: "Choose organization",
+    stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
+    stepRepository: "Choose repository",
+    selectAccount: "Choose a GitHub organization",
+    selectAccountBody: "SuperPlane sees only the repositories and tickets in the organization you choose.",
     useAccount: (account: string) => `Use ${account}`,
     missingAccount: "Do not see your GitHub account or organization?",
-    installThere: "Install the GitHub App there.",
+    installThere: "Install SuperPlane on more GitHub organizations.",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
     installRequestedBody: githubInstallRequestBody,
@@ -39,37 +48,28 @@ export const FIRST_RUN_COPY = {
     connectingAccount: (account: string) => `Connecting ${account}…`,
   },
   choose: {
-    headline: "Choose a repository",
+    headline: "Choose your first repository",
     repositoryLabel: "Repository",
-    repositoryHelper: "Select the repository you want SuperPlane to analyze.",
+    repositoryHelper: "SuperPlane scores tickets against this codebase and opens pull requests here for review.",
     searchPlaceholder: "Search repositories",
     missingRepository: "Do not see your repository?",
-    editConnection: "Edit the GitHub connection.",
-    accessHint: "You need admin access to the GitHub App or organization to change the repositories.",
+    editConnection: "Grant access on GitHub.",
     continue: "Choose a repository to continue",
     continueReady: "Continue",
     saving: "Saving repository…",
     loading: "Loading repositories…",
     moreLater: "You can add more repositories later.",
-    missingTitle: "Why is my repository not shown?",
-    missingReasons: [
-      "The repository must be granted to the SuperPlane GitHub App.",
-      "You need admin rights on the GitHub organization to add a repository.",
-      "Editing the connection opens GitHub. A 404 there means you do not have access.",
-    ],
   },
   tickets: {
-    headline: "Connect your ticket system",
-    trust: "SuperPlane does not change any tickets.",
-    scoreHint:
-      "It only analyzes them and shows a confidence score for how likely SuperPlane is to address each ticket.",
+    headline: "Choose the backlog to scan",
+    intro: "SuperPlane reads these tickets and scores each one by how likely an agent can complete it.",
     githubIssues: "GitHub Issues",
     jira: "Jira",
     linear: "Linear",
-    githubIssuesHelper: "Uses GitHub Issues on this repository. No extra setup.",
-    jiraHelper: "Find tickets in your Jira backlog.",
-    linearHelper: "Find tickets in your Linear backlog.",
-    analyze: "Analyze my tickets",
+    githubIssuesHelper: "Issues on this repository. No extra setup.",
+    jiraHelper: "Scan your Jira backlog.",
+    linearHelper: "Scan your Linear backlog.",
+    analyze: "Scan my backlog",
     continue: "Connect agent",
     saving: "Saving ticket source…",
   },
@@ -84,17 +84,36 @@ export const FIRST_RUN_COPY = {
     saving: "Finishing setup…",
   },
   analysis: {
-    headline: "Analyzing your backlog",
-    body: "SuperPlane reads your code and your tickets. This takes a few minutes.",
-    reassurance: "Nothing is changed. No work starts.",
-    stage1: "Reading the repository structure",
-    stage2: "Reading open tickets",
-    stage3: "Scoring each ticket against the codebase",
-    leaveHint: "You can leave this page. SuperPlane opens the board when the analysis finishes.",
-    overrun: "The analysis needs more time than usual. It is still running.",
-    failure: "The analysis did not finish. Try again.",
-    retry: "Run analysis again",
-    retrying: "Trying again…",
+    headline: "Your workspace is running",
+    body: "SuperPlane scores each ticket for how likely an agent can one-shot it. High-confidence work is ready to run. Ambiguous work stays with your team.",
+    stageImporting: "Importing your newest open tickets…",
+    stageImported: (count: number, source = "your backlog") =>
+      count === 1
+        ? `Imported the newest open ticket from ${source}`
+        : `Imported the ${count} newest open tickets from ${source}`,
+    stageScoringPending: "Scoring tickets",
+    stageScoring: "Started scoring. Open your board and run tickets as scores appear.",
+    emptyImport: (source = "your backlog") => `We did not find any issues to import from ${source}`,
+    emptyNext: "You can create a new task on your board.",
+    stageScored: (total: number) => `${ticketCount(total)} scored`,
+    readyCount: (count: number) => (count === 1 ? "1 ready to run" : `${count} ready to run`),
+    goToBoard: "Go to your board",
+    failure: "SuperPlane could not read the scoring progress. Your board still works.",
+  },
+  sphere: {
+    phases: ["01 Plan", "02 Build", "03 Check", "04 Review"],
+    discover: "Discover",
+    verify: "Verify",
+    awaitingCode: "Awaiting code",
+    reviewReadyPr: "Review-ready PR",
+    ticketsFound: (count: number) => `${count} tickets found`,
+    captionSetup: "Awaiting setup",
+    captionConnect: "Awaiting GitHub connection",
+    captionOrganization: "Awaiting organization",
+    captionRepository: (repository: string) => `Repository: ${repository}`,
+    captionAwaitingRepository: "Awaiting repository",
+    captionTickets: "Awaiting ticket source",
+    captionScoring: (repository: string) => `Scoring: ${repository}`,
   },
   results: {
     headline: "Tickets SuperPlane can implement",
@@ -111,9 +130,3 @@ export const FIRST_RUN_COPY = {
       "New issues become tasks here. SuperPlane scores them for how well an agent can complete the work.",
   },
 } as const;
-
-export const FIRST_RUN_STAGES = [
-  FIRST_RUN_COPY.analysis.stage1,
-  FIRST_RUN_COPY.analysis.stage2,
-  FIRST_RUN_COPY.analysis.stage3,
-] as const;
