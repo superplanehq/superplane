@@ -197,11 +197,12 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 	require.NoError(t, err)
 
 	settings := intakeSettings{
-		ConfidencePct:     80,
-		Labels:            []string{"factory", "urgent"},
-		LabelFilterMode:   "include",
-		Assignment:        "assigned",
-		AuthorsWithAccess: true,
+		ConfidencePct:        80,
+		Labels:               []string{"factory", "urgent"},
+		LabelFilterMode:      "include",
+		Assignment:           "assigned",
+		AuthorsWithAccess:    true,
+		SuperplaneLabelAdded: true,
 	}
 	findYAMLNode(t, current, intakeFilterNodeID).Configuration["expression"] = intakeFilterExpressionFor(source, settings)
 
