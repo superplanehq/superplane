@@ -136,7 +136,7 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-workspace-switch"));
     await user.click(screen.getByTestId("first-run-workspace-option-factory-2"));
 
-    expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces/CORE/lines/line-core");
+    expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces/core/lines/line-core");
   });
 
   it("shows Log out and the organization switch when another organization exists", () => {

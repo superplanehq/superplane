@@ -46,12 +46,12 @@ describe("LegacyWorkOrderDetailRedirect", () => {
   it("canonicalizes a legacy id onto the task number permalink", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [ORDER], isLoading: false });
     renderAt("/org-1/workspaces/SP/tasks/wo-open-refunds");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/task/842");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/task/842");
   });
 
   it("preserves the lineId query through the id-to-number redirect", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [ORDER], isLoading: false });
     renderAt("/org-1/workspaces/SP/tasks/wo-open-refunds?lineId=line-hotfix");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/task/842?lineId=line-hotfix");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/task/842?lineId=line-hotfix");
   });
 });
