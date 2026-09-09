@@ -24,6 +24,7 @@ type FindWorkOrderConfiguration struct {
 	By          string `json:"by" mapstructure:"by"`
 	OrderID     string `json:"orderId" mapstructure:"orderId"`
 	ArtifactKey string `json:"artifactKey" mapstructure:"artifactKey"`
+	OriginURL   string `json:"originUrl" mapstructure:"originUrl"`
 }
 
 func (c *FindWorkOrder) Name() string {
@@ -45,6 +46,7 @@ Lookup modes:
 
 - **Task ID** (` + "`by: id`" + `): resolves ` + "`orderId`" + ` directly.
 - **Artifact Key** (` + "`by: artifactKey`" + `): resolves the task that owns the artifact tagged with ` + "`artifactKey`" + ` (set via ` + "`addWorkOrderArtifact`" + `'s ` + "`artifactKey`" + ` field — e.g. the pull request's URL).
+- **Origin URL** (` + "`by: originUrl`" + `): resolves the task that intake created from the external ticket at ` + "`originUrl`" + ` (e.g. a GitHub issue's URL) — the missing piece for a flow that needs to react to the source ticket closing, not just the task it produced.
 
 On a match, emits ` + "`workOrder.found`" + ` with ` + "`{ workOrder }`" + ` on the ` + "`found`" + ` channel, so downstream components can target it with ` + "`orderId: {{ previous().data.workOrder.id }}`" + `. When nothing matches, emits on the ` + "`notFound`" + ` channel instead of failing the run — a PR merge unrelated to any tracked task shouldn't red a flow, and downstream components can wire the ` + "`notFound`" + ` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
 
@@ -86,6 +88,7 @@ func (c *FindWorkOrder) OutputChannels(configuration any) []core.OutputChannel {
 func (c *FindWorkOrder) Configuration() []configuration.Field {
 	byID := []configuration.VisibilityCondition{{Field: "by", Values: []string{"id"}}}
 	byArtifactKey := []configuration.VisibilityCondition{{Field: "by", Values: []string{"artifactKey"}}}
+	byOriginURL := []configuration.VisibilityCondition{{Field: "by", Values: []string{"originUrl"}}}
 
 	return []configuration.Field{
 		{
@@ -100,6 +103,7 @@ func (c *FindWorkOrder) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Task ID", Value: "id"},
 						{Label: "Artifact Key", Value: "artifactKey"},
+						{Label: "Origin URL", Value: "originUrl"},
 					},
 				},
 			},
@@ -126,6 +130,17 @@ func (c *FindWorkOrder) Configuration() []configuration.Field {
 				{Field: "by", Values: []string{"artifactKey"}},
 			},
 		},
+		{
+			Name:                 "originUrl",
+			Label:                "Origin URL",
+			Description:          "The URL of the external ticket the task was created from (e.g. a GitHub issue's URL)",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: byOriginURL,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "by", Values: []string{"originUrl"}},
+			},
+		},
 	}
 }
 
@@ -139,6 +154,7 @@ func (c *FindWorkOrder) Execute(ctx core.ExecutionContext) error {
 		By:          config.By,
 		OrderID:     config.OrderID,
 		ArtifactKey: config.ArtifactKey,
+		OriginURL:   config.OriginURL,
 	})
 	if err != nil {
 		// A PR merge (or similar) unrelated to any tracked order is an
@@ -153,6 +169,7 @@ func (c *FindWorkOrder) Execute(ctx core.ExecutionContext) error {
 					"by":          config.By,
 					"orderId":     config.OrderID,
 					"artifactKey": config.ArtifactKey,
+					"originUrl":   config.OriginURL,
 				}},
 			)
 		}
