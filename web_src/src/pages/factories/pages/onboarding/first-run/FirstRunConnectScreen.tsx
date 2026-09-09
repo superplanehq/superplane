@@ -7,6 +7,7 @@ import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/ho
 import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.connect;
@@ -163,6 +164,7 @@ export function FirstRunConnectScreen({
   connecting = false,
   connectError,
   chrome,
+  sphere,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
@@ -181,6 +183,7 @@ export function FirstRunConnectScreen({
   connecting?: boolean;
   connectError?: string;
   chrome?: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
@@ -198,6 +201,7 @@ export function FirstRunConnectScreen({
       testId="first-run-connect"
       chrome={chrome}
       busy={loading || connecting || bindingInstallationId !== undefined}
+      sphere={sphere}
     >
       <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
 
@@ -219,7 +223,6 @@ export function FirstRunConnectScreen({
             onInstallOther={onInstallOther}
           />
         )}
-        <p className="text-[12px] text-muted-foreground">{copy.trust}</p>
         <ConnectScreenError error={connectError} waitingForApproval={waitingForApproval} />
       </div>
     </FirstRunShell>
