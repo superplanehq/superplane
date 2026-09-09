@@ -35,7 +35,7 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     text: "Review the details. Change anything you need. Then click Start to send it to the line.",
     tone: "draft",
     actions: [
-      { id: "reject", label: "Reject", emphasis: "quiet" },
+      { id: "archive", label: "Archive", emphasis: "quiet" },
       { id: "start", label: "Start", emphasis: "primary" },
     ],
   },
