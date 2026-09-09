@@ -28,15 +28,15 @@ describe("FirstRunFlow", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
     expect(screen.getByTestId("first-run-analysis")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.analysis.reassurance)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.headline)).toBeInTheDocument();
   });
 
-  it("opens the board when analysis finishes", async () => {
-    render(
-      <FirstRunFlow initialScreen="analysis" completeAfterMs={20} board={<div data-testid="first-run-board" />} />,
-    );
+  it("opens the board when the user leaves analysis", async () => {
+    const user = userEvent.setup();
+    render(<FirstRunFlow initialScreen="analysis" board={<div data-testid="first-run-board" />} />);
 
-    expect(await screen.findByTestId("first-run-board")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-go-to-board"));
+    expect(screen.getByTestId("first-run-board")).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.results.headline)).not.toBeInTheDocument();
   });
 });
