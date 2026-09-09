@@ -75,6 +75,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
+When this agent uses OpenRouter, SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation and any model switch.
+
 ## Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.
 
@@ -161,7 +163,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels)
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels, openrouter.FallbackRotateSeed(ctx))
 	if err != nil {
 		return err
 	}
@@ -280,6 +282,7 @@ func buildSuperPlaneBrokerTask(
 	setups []runner.IntegrationSetup,
 	environment []runner.BrokerEnvironmentVariable,
 	fallbackModels []string,
+	rotateSeed string,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
@@ -311,7 +314,7 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := openrouter.ApplyPlanningFollowUp(
-			openrouter.BuildBrokerTask(openRouterSpec, usage, setups, fallbackModels),
+			openrouter.BuildBrokerTask(openRouterSpec, usage, setups, fallbackModels, rotateSeed),
 			environment,
 			openRouterSpec,
 		)
