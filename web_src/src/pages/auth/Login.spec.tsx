@@ -218,3 +218,128 @@ describe("Login magic code signup required", () => {
     expect(screen.queryByText('{"error":"signup_required"}')).not.toBeInTheDocument();
   });
 });
+
+describe("Sign up terms disclosure", () => {
+  beforeEach(() => {
+    authConfig.signupEnabled = true;
+    authConfig.signupsBlockedByEnvironment = false;
+    authConfig.passwordLoginEnabled = true;
+    authConfig.magicCodeEnabled = true;
+    authConfig.providers = [];
+    vi.restoreAllMocks();
+  });
+
+  it("shows the terms disclosure in direct sign-up mode", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") {
+          return mockAuthConfig();
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+
+    renderLogin("/signup", "signup");
+
+    await screen.findByRole("heading", { name: "Create your account" });
+
+    expect(screen.getByText(/By creating an account, you agree to the/)).toBeInTheDocument();
+
+    const tosLink = screen.getByRole("link", { name: "Terms of Service" });
+    expect(tosLink).toHaveAttribute("href", "https://superplane.com/terms/");
+    expect(tosLink).toHaveAttribute("target", "_blank");
+    expect(tosLink).toHaveAttribute("rel", "noopener noreferrer");
+
+    const privacyLink = screen.getByRole("link", { name: "Privacy Policy" });
+    expect(privacyLink).toHaveAttribute("href", "https://superplane.com/privacy/");
+    expect(privacyLink).toHaveAttribute("target", "_blank");
+    expect(privacyLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("hides the terms disclosure on the normal login screen", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") {
+          return mockAuthConfig();
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+
+    renderLogin("/login", "login");
+
+    await screen.findByRole("heading", { name: "Welcome to SuperPlane" });
+
+    expect(screen.queryByText(/By creating an account, you agree to the/)).not.toBeInTheDocument();
+  });
+
+  it("shows the terms disclosure when the create-account prompt appears after account not found", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/auth/config") {
+        return mockAuthConfig();
+      }
+
+      if (url === "/auth/magic-code/request") {
+        return {
+          ok: false,
+          status: 403,
+          text: async () => JSON.stringify({ error: "signup_required" }),
+        } as Response;
+      }
+
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderLogin();
+
+    await screen.findByRole("button", { name: "Continue with email" });
+    await user.type(screen.getByPlaceholderText("you@example.com"), "new@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
+
+    await screen.findByText("No account found");
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
+    expect(screen.getByText(/By creating an account, you agree to the/)).toBeInTheDocument();
+  });
+
+  it("hides the terms disclosure when signups are closed", async () => {
+    authConfig.signupEnabled = false;
+    authConfig.signupsBlockedByEnvironment = true;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") {
+          return mockAuthConfig();
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+
+    renderLogin("/signup", "signup");
+
+    await screen.findByRole("heading", { name: "Signups are closed" });
+
+    expect(screen.queryByText(/By creating an account, you agree to the/)).not.toBeInTheDocument();
+  });
+
+  it("hides the terms disclosure during config loading", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Promise(() => {});
+      }),
+    );
+
+    renderLogin("/signup", "signup");
+
+    expect(screen.queryByText(/By creating an account, you agree to the/)).not.toBeInTheDocument();
+  });
+});
