@@ -36,6 +36,10 @@ func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.CanvasNodeExecutionStateFinished
 }
 
+func (s *ExecutionStateContext) IsCancelling() bool {
+	return s.execution.State == models.CanvasNodeExecutionStateCancelling
+}
+
 func (s *ExecutionStateContext) Pass() error {
 	newEvents, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
 	if err != nil {

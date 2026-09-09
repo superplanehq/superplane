@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -103,4 +104,48 @@ func Test__ExecutionTerminator__InvokesComponentCancel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+}
+
+func Test__ExecutionTerminator__CancelsWaitForPullRequestChecks(t *testing.T) {
+	r := support.Setup(t)
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "wait-pr-checks",
+				Name:   "Wait For Pull Request Checks",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "github.waitForPullRequestChecks"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "wait-pr-checks", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "wait-pr-checks", rootEvent.ID, rootEvent.ID)
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+
+	runAt := time.Now().Add(time.Minute)
+	require.NoError(t, execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{ActionName: "evaluate", Parameters: map[string]any{}},
+	}, &runAt))
+
+	require.NoError(t, execution.RequestCancellation(database.DB(t.Context()), &r.User))
+	require.NoError(t, terminator.LockAndCancelExecution(*execution))
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+
+	pending, err := models.CountPendingRequestsForExecutionsInTransaction(database.Conn(), []uuid.UUID{execution.ID})
+	require.NoError(t, err)
+	assert.Zero(t, pending)
 }
