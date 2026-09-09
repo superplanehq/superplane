@@ -13,10 +13,10 @@ describe("useWorkOrderListState", () => {
     window.localStorage.clear();
   });
 
-  it("defaults to board layout, updated ordering, and all scope", () => {
+  it("defaults to board layout, manual ordering, and all scope", () => {
     const { result } = renderHook(() => useWorkOrderListState("factory-1"));
     expect(result.current.layout).toBe("board");
-    expect(result.current.ordering).toBe("updated");
+    expect(result.current.ordering).toBe("manual");
     expect(result.current.scope).toBe("all");
     expect(result.current.filterCount).toBe(0);
     expect(result.current.search).toBe("");

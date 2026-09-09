@@ -13,6 +13,7 @@ import {
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
+  factoriesReorderWorkOrder,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -38,6 +39,7 @@ import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
 } from "@/pages/factories/lib/workOrderEventsPagination";
+import { applyWorkOrderReorderMove, type WorkOrderReorderMove } from "@/pages/factories/lib/workOrderReorder";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export type FactoryPullRequestFilters = {
@@ -402,6 +404,56 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
       void queryClient.invalidateQueries({
         queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, variables.orderId),
       });
+    },
+  });
+}
+
+/**
+ * Persists a drag-and-drop reorder within one board column (see
+ * `WorkOrdersBoardView`). Applies the new order to the cached task list
+ * immediately so the drop feels instant, and rolls back if the API call
+ * fails.
+ */
+export function useReorderWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+  const ordersKey = workOrdersKey(organizationId, factoryId);
+
+  return useMutation({
+    mutationFn: async (move: WorkOrderReorderMove) => {
+      const response = await factoriesReorderWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: move.orderId },
+          body: {
+            previousOrderId: move.previousOrderId,
+            nextOrderId: move.nextOrderId,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to reorder task");
+      }
+      return response.data.order;
+    },
+    onMutate: async (move) => {
+      await queryClient.cancelQueries({ queryKey: ordersKey });
+
+      const previousOrders = queryClient.getQueryData<FactoriesWorkOrder[]>(ordersKey);
+      queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
+        applyWorkOrderReorderMove(current ?? [], move),
+      );
+
+      return { previousOrders };
+    },
+    onError: (_error, _move, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(ordersKey, context.previousOrders);
+      }
+    },
+    onSuccess: (order) => {
+      queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
+        (current ?? []).map((existing) => (existing.id === order.id ? order : existing)),
+      );
     },
   });
 }

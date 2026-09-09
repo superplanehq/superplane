@@ -554,6 +554,11 @@ func (f *Factory) createWorkOrder(
 		return nil, err
 	}
 
+	position, err := NextFactoryWorkOrderPosition(tx, f.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	order := &FactoryWorkOrder{
 		ID:             uuid.New(),
@@ -566,6 +571,7 @@ func (f *Factory) createWorkOrder(
 		Result:         "",
 		CreatedByID:    createdBy,
 		SourceRunID:    sourceRunID,
+		Position:       position,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -770,9 +776,12 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 			OR factory_work_orders.created_by_id = ?`, *filters.Mine, *filters.Mine)
 	}
 
+	// Position is the manual drag-and-drop order (lower sorts first); id
+	// breaks ties deterministically since two orders never share a
+	// position in practice.
 	var orders []FactoryWorkOrder
 	err := query.
-		Order("factory_work_orders.created_at DESC").
+		Order("factory_work_orders.position ASC").
 		Order("factory_work_orders.id DESC").
 		Find(&orders).
 		Error

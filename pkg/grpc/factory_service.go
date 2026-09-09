@@ -213,6 +213,14 @@ func (s *FactoryService) UpdateWorkOrder(
 	return actions.UpdateWorkOrder(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ReorderWorkOrder(
+	ctx context.Context,
+	req *pb.ReorderWorkOrderRequest,
+) (*pb.ReorderWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ReorderWorkOrder(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DispatchWorkOrder(ctx context.Context, req *pb.DispatchWorkOrderRequest) (*pb.DispatchWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DispatchWorkOrder(ctx, organizationID, req)
