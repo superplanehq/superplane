@@ -20,9 +20,9 @@ export type FirstRunSphereProps = {
   animate?: boolean;
 };
 
-// The bright amber reads well on the dark pane; the light pane needs a
-// deeper amber for enough contrast on small text and dots.
-const AMBER_TEXT = "text-[#a56d06] dark:text-[#f6a821]";
+// The bright amber reads well on the dark pane but washes out on light
+// surfaces, so the light pane uses a copper accent instead.
+const AMBER_TEXT = "text-[#8f4c10] dark:text-[#f6a821]";
 
 /** Concentric rings brighten the sphere as the level rises. */
 function dotAlpha(level: number, edge: number, random: number) {
@@ -56,8 +56,11 @@ function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
       const edge = distance / radius;
       const gapChance = 0.52 - 0.38 * level + edge * (0.5 - 0.22 * level) + (dy > 0 ? (dy / radius) * 0.25 : 0);
       if (random < gapChance) continue;
-      const alpha = dotAlpha(level, edge, random).toFixed(3);
-      context.fillStyle = dark ? `rgba(246, 168, 33, ${alpha})` : `rgba(193, 128, 10, ${alpha})`;
+      const alpha = dotAlpha(level, edge, random);
+      // Copper dots with an alpha floor: low levels stay visible on paper.
+      context.fillStyle = dark
+        ? `rgba(246, 168, 33, ${alpha.toFixed(3)})`
+        : `rgba(146, 74, 17, ${Math.min(1, alpha * 1.2 + 0.1).toFixed(3)})`;
       const dot = cell - 2.4;
       context.fillRect(x - dot / 2, y - dot / 2, dot, dot);
     }
@@ -72,7 +75,7 @@ function SphereChip({ chip, side }: { chip: FirstRunSphereChip; side: "left" | "
         side === "left" ? "left-4 top-[24%]" : "right-4 top-[60%]",
         chip.tone === "ghost" && "border-dashed opacity-40",
         chip.tone === "amber"
-          ? cn("border-[#a56d06]/60 dark:border-[#f6a821]/70", AMBER_TEXT)
+          ? cn("border-[#8f4c10]/50 dark:border-[#f6a821]/70", AMBER_TEXT)
           : "border-border text-muted-foreground",
       )}
     >
@@ -126,7 +129,7 @@ export function FirstRunSpherePane({
         {[340, 440, 540].map((diameter) => (
           <span
             key={diameter}
-            className="absolute rounded-full border border-[#a56d06]/15 dark:border-[#f6a821]/10"
+            className="absolute rounded-full border border-[#8f4c10]/20 dark:border-[#f6a821]/10"
             style={{ width: diameter, height: diameter, top: "47%", left: "50%", transform: "translate(-50%, -50%)" }}
           />
         ))}
@@ -147,7 +150,7 @@ export function FirstRunSpherePane({
               className={cn(
                 "size-1.5 rounded-full",
                 phasesLit
-                  ? "bg-[#a56d06] shadow-[0_0_8px_rgba(165,109,6,0.5)] dark:bg-[#f6a821] dark:shadow-[0_0_8px_rgba(246,168,33,0.7)]"
+                  ? "bg-[#8f4c10] shadow-[0_0_8px_rgba(143,76,16,0.45)] dark:bg-[#f6a821] dark:shadow-[0_0_8px_rgba(246,168,33,0.7)]"
                   : "bg-[#ddd6c6] dark:bg-[#3a382f]",
               )}
             />
