@@ -119,7 +119,7 @@ function withClearedError(state: LogState): LogState {
 // reconnects automatically, and the log stream appears as soon as the
 // runner starts writing to it. Surfacing it as a failure (in the UI or in
 // Sentry) would just be noise, so it's ignored.
-const BENIGN_BROKER_ERROR_PATTERN = /ResourceNotFoundException.*log (stream|group) .*(does not exist|not found)/i;
+const BENIGN_BROKER_ERROR_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
 
 function isBenignBrokerError(message: string): boolean {
   return BENIGN_BROKER_ERROR_PATTERN.test(message);

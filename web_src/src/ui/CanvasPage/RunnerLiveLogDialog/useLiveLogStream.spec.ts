@@ -263,6 +263,37 @@ describe("useLiveLogStream", () => {
     expect(captureExceptionMock).not.toHaveBeenCalled();
   });
 
+  it("reports a CloudWatch log-group-not-found broker error", async () => {
+    const message =
+      "operation error CloudWatch Logs: GetLogEvents, https response error StatusCode: 400, " +
+      "RequestID: bffc49eb-3863-4426-a5e1-dfd28b43bbe3, ResourceNotFoundException: " +
+      "The specified log group does not exist.";
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onOpen?.();
+          handlers.onStreamError(message);
+          resolve();
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe(message));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "broker"],
+      }),
+    );
+  });
+
   it("reports a non-benign broker stream error", async () => {
     pumpMock.mockImplementation(
       (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
