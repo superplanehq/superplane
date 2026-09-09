@@ -483,8 +483,9 @@ type priceJSON struct {
 }
 
 type orderItemJSON struct {
-	Amount       int64     `json:"amount"`
-	ProductPrice priceJSON `json:"product_price"`
+	Amount       int64        `json:"amount"`
+	ProductPrice priceJSON    `json:"product_price"`
+	Product      OrderProduct `json:"product"`
 }
 
 type customerJSON struct {
