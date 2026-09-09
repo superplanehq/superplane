@@ -1403,7 +1403,7 @@ message WorkOrder {
   double position = 18;
   // Ready files for this task. Present on DescribeWorkOrder only.
   // The stored description uses sp-file:// refs, not download URLs.
-  repeated Superplane.Files.File files = 18;
+  repeated Superplane.Files.File files = 19;
 }
 
 message WorkOrderOrigin {
