@@ -341,10 +341,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
   );
   useRepositoryErrorToast(model.repositoriesError);
+  // Recheck while a request waits, and also while the picker is open: an
+  // install request made on GitHub without a callback (for example when the
+  // callback URL was unreachable) only surfaces through this sync.
   useRecheckGitHubInstallRequest(
     organizationId,
-    connection.requestConnection?.id,
-    navigation.screen === "connect" && connection.installRequested,
+    connection.requestConnection?.id ?? connection.accountPicker?.id,
+    navigation.screen === "connect" && (connection.installRequested || navigation.pickerShowing),
   );
 
   return {

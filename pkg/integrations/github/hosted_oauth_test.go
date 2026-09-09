@@ -744,6 +744,52 @@ func Test__Sync_hostedAppReconcilesMultipleRequestsWithoutDependingOnOrder(t *te
 	assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
 }
 
+// A member can request an installation without the request callback reaching
+// this server, for example when the callback URL was unreachable. Sync must
+// still find that member's open requests on GitHub.
+func Test__Sync_hostedAppDiscoversInstallRequestWithoutCallback(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return []common.InstallRequest{
+			{ID: "7", AccountLogin: "kittens-inc-1", RequesterLogin: "member"},
+		}, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByGitHubLogin: "member",
+			GitHubApp:            common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme", AccountType: "Organization"},
+			},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.True(t, metadata.InstallRequested)
+	require.Equal(t, []common.InstallRequest{{ID: "7", AccountLogin: "kittens-inc-1", RequesterLogin: "member"}}, metadata.InstallRequests)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
+}
+
 func Test__Sync_hostedReadyAppReconcilesApprovedRequest(t *testing.T) {
 	setHostedAppOAuthEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
