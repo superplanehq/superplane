@@ -177,5 +177,6 @@ func (s *githubInstallRequestSteps) assertTheOwnerApprovalIsExplained() {
 	require.NotContains(s.t, s.session.Page().URL(), "missing state")
 	s.session.AssertVisible(q.TestID("github-install-approved"))
 	s.session.AssertText("Request approved")
-	s.session.AssertText("The SuperPlane GitHub App is approved. The person who asked can click Connect GitHub again.")
+	s.session.AssertText("The SuperPlane GitHub App is approved.")
+	s.session.AssertVisible(q.TestID("github-install-approved-open"))
 }
