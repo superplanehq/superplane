@@ -6,22 +6,22 @@ import { client } from "@/api-client/client.gen";
 
 import { DEFAULT_CREDIT_GRANTS, MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageIds";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
   DEFAULT_FACTORY_USAGE,
   EXPIRED_WELCOME_USAGE_REPORT,
-  SPENT_CREDIT_USAGE_REPORT,
+  PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+
+const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
 
 describe("OrganizationSettingsBillingPage", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("shows remaining credit, grant history, and a disabled add-credit control when Polar is off", async () => {
+  it("shows remaining welcome credit and trial copy when Polar has no customer", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
@@ -33,19 +33,22 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeDisabled();
+    expect(screen.queryByTestId("workspace-page-header-subtitle")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Buy more" })).toBeDisabled();
 
     const balance = await screen.findByTestId("billing-credit-balance");
+    expect(balance).toHaveTextContent("Hosted credit pays SuperPlane-hosted models for this organization.");
     expect(balance).toHaveTextContent("Remaining hosted credit");
-    expect(balance).toHaveTextContent("$41.24");
-    expect(balance).toHaveTextContent("Organization wallet");
-    expect(balance).toHaveTextContent("SuperPlane grant");
-    expect(balance).toHaveTextContent("$50.00");
-    expect(balance).toHaveTextContent("Welcome and support grants");
-    expect(screen.getByRole("link", { name: "View spending" })).toHaveAttribute(
-      "href",
-      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "spending"),
-    );
+    expect(balance).toHaveTextContent("Trial");
+    expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$41.24");
+    expect(balance).toHaveTextContent("This remaining balance is welcome credit.");
+    expect(balance).toHaveTextContent(`Unused credit expires on ${WELCOME_EXPIRY_LABEL}.`);
+    expect(balance).toHaveTextContent("Purchase hosted credit to keep SuperPlane-hosted runs after the trial.");
+    expect(balance).not.toHaveTextContent("SuperPlane grant");
+    expect(balance).not.toHaveTextContent("Purchased hosted credit");
+    expect(balance).not.toHaveTextContent("Hosted billed spend");
+    expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
+    expect(await screen.findByTestId("factories-sidebar-plan-label")).toHaveTextContent("Trial");
 
     const history = screen.getByTestId("billing-credit-history");
     expect(within(history).getByText("Welcome credit")).toBeInTheDocument();
@@ -72,20 +75,29 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByTestId("billing-credit-history")).toHaveTextContent("No credit grants yet.");
   }, 10000);
 
-  it("shows an empty-credit warning and keeps add-credit disabled when Polar is off", async () => {
+  it("shows $0 and a purchase prompt when Polar has no customer and credit is empty", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
+          organizationWorkspaceUsage: {
+            ...DEFAULT_FACTORY_USAGE,
+            remainingCreditCents: "0",
+            hostedBilledCents: "5000",
+            remainingCreditWarning: true,
+            billingEnabled: true,
+            hasBillingCustomer: false,
+          },
         }}
       />,
     );
 
-    expect(await screen.findByText("Hosted credit is empty. SuperPlane-hosted runs cannot start.")).toBeInTheDocument();
-    // Polar is marked on in the spent fixture, but no packs are configured yet.
-    expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeDisabled();
+    const balance = await screen.findByTestId("billing-credit-balance");
+    expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$0.00");
+    expect(balance).toHaveTextContent("Hosted credit is empty. Click Buy more to purchase hosted credit.");
+    expect(await screen.findByRole("button", { name: "Buy more" })).toBeEnabled();
   }, 10000);
 
   it("explains unused welcome credit after it expires", async () => {
@@ -94,7 +106,11 @@ describe("OrganizationSettingsBillingPage", () => {
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
+          organizationWorkspaceUsage: {
+            ...EXPIRED_WELCOME_USAGE_REPORT,
+            hasBillingCustomer: false,
+          },
           organizationCreditGrants: [
             {
               ...DEFAULT_CREDIT_GRANTS[0],
@@ -105,10 +121,11 @@ describe("OrganizationSettingsBillingPage", () => {
       />,
     );
 
-    expect(await screen.findByText("Welcome credit expired. SuperPlane-hosted runs cannot start.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Welcome credit expired. Unused free credit no longer pays for SuperPlane-hosted runs."),
-    ).toBeInTheDocument();
+    const balance = await screen.findByTestId("billing-credit-balance");
+    expect(balance).toHaveTextContent(
+      "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Buy more to purchase hosted credit.",
+    );
+    expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$0.00");
   }, 10000);
 
   it("opens Polar checkout for a single hosted credit pack", async () => {
@@ -121,7 +138,7 @@ describe("OrganizationSettingsBillingPage", () => {
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[1]],
+          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
           organizationWorkspaceUsage: {
             ...DEFAULT_FACTORY_USAGE,
             billingEnabled: true,
@@ -132,15 +149,18 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Buy more" })).toBeEnabled();
     });
-    await user.click(screen.getByRole("button", { name: "Add hosted credit" }));
+    await user.click(screen.getByRole("button", { name: "Buy more" }));
+    await user.click(await screen.findByRole("menuitem", { name: "$50" }));
 
     expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
     vi.unstubAllGlobals();
   }, 10000);
 
-  it("lists Polar packs in a menu when more than one pack is available", async () => {
+  it("opens Polar checkout from Buy more when billing already has a customer", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
     const user = userEvent.setup();
 
     render(
@@ -150,7 +170,7 @@ describe("OrganizationSettingsBillingPage", () => {
           ...defaultFactoriesFixture,
           hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
           organizationWorkspaceUsage: {
-            ...DEFAULT_FACTORY_USAGE,
+            ...PURCHASED_CREDIT_USAGE_REPORT,
             billingEnabled: true,
             hasBillingCustomer: true,
             invoices: [
@@ -167,14 +187,23 @@ describe("OrganizationSettingsBillingPage", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeEnabled();
-    });
-    await user.click(screen.getByRole("button", { name: "Add hosted credit" }));
-    expect(await screen.findByRole("menuitem", { name: "$25.00" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "$100.00" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "$500.00" })).toBeInTheDocument();
-    await user.keyboard("{Escape}");
+    expect(await screen.findByRole("button", { name: "Buy more" })).toBeEnabled();
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("billing-credit-balance")).getByTestId("billing-remaining-credit"),
+    ).toHaveTextContent("$141.24");
+    expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("billing-credit-balance")).not.toHaveTextContent("welcome credit");
+
+    await user.click(screen.getByRole("button", { name: "Buy more" }));
+    expect(await screen.findByRole("menuitem", { name: "$50" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "$100" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "$500" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "Custom" })).toHaveAttribute("aria-disabled", "true");
+
+    await user.click(screen.getByRole("menuitem", { name: "$50" }));
+    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
+    vi.unstubAllGlobals();
 
     const invoices = await screen.findByTestId("billing-polar-invoices");
     expect(within(invoices).getByText("Hosted credit 25")).toBeInTheDocument();

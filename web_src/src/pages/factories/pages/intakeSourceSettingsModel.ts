@@ -1,31 +1,15 @@
-import type { FactoriesFactoryIntakeRun, FactoriesFactoryIntakeSettings } from "@/api-client";
-import { formatTimeAgo } from "@/lib/date";
+import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
-export type IntakeSettingsTab = "general" | "agent" | "runs" | "automation";
+export type IntakeSettingsTab = "general" | "agent" | "automation";
 
 export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
-  return value === "general" || value === "agent" || value === "runs" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation";
 }
 
 export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
-  return hasAgent ? ["general", "agent", "runs", "automation"] : ["general", "runs", "automation"];
-}
-export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
-export type IntakeLineStage = "implement" | "verify" | "done";
-
-export interface IntakeAutomationRun {
-  id: string;
-  appId?: string;
-  runId?: string;
-  title: string;
-  confidencePct: number;
-  ranMinutesAgo: number;
-  analyzedMinutesAgo: number;
-  placement: IntakeTicketPlacement;
-  stage?: IntakeLineStage;
-  activity?: string;
+  return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
 }
 
 export interface IntakeSourceSettings {
@@ -66,25 +50,6 @@ export const INTAKE_SETTINGS_COPY = {
   automationEmpty: "This intake has no automation yet.",
   automationError: "SuperPlane could not load the automation.",
   retryAutomation: "Try again",
-  runsTab: "Runs",
-  runsEmpty: "No runs yet.",
-  runsLoading: "Runs are loading.",
-  runsError: "SuperPlane could not load the runs.",
-  retryRuns: "Try again",
-  runWhen: "Run",
-  analysisWhen: "Analysis",
-  scoreWhen: "Score",
-  viewRun: "View run",
-  viewRunFor: (title: string) => `View run for ${title}`,
-  inBacklog: "In Backlog",
-  backlogActivity: "Waiting for review.",
-  rejected: "Rejected",
-  rejectedActivity: "A person rejected this ticket.",
-  belowThreshold: "Not moved to Backlog",
-  belowThresholdActivity: "Score is below the minimum confidence.",
-  stageImplement: "Implement",
-  stageVerify: "Verify",
-  stageDone: "Done",
   intakeSection: "Create tasks from",
   filtersLabel: "Filters",
   newIssues: "New and re-opened issues",
@@ -103,12 +68,6 @@ export const INTAKE_SETTINGS_COPY = {
   saveError: "SuperPlane could not save the intake settings. Try again.",
 } as const;
 
-const STAGE_LABEL: Record<IntakeLineStage, string> = {
-  implement: INTAKE_SETTINGS_COPY.stageImplement,
-  verify: INTAKE_SETTINGS_COPY.stageVerify,
-  done: INTAKE_SETTINGS_COPY.stageDone,
-};
-
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
 }
@@ -120,96 +79,6 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   }
   return [...labels, next];
 }
-
-export const GITHUB_INTAKE_RUNS: IntakeAutomationRun[] = [
-  {
-    id: "gh-issue-1",
-    title: "Handle duplicate refunds on retry",
-    confidencePct: 94,
-    ranMinutesAgo: 180,
-    analyzedMinutesAgo: 170,
-    placement: "progressed",
-    stage: "implement",
-    activity: "Writing the retry handler.",
-  },
-  {
-    id: "gh-issue-2",
-    title: "Return 409 when the invoice is already paid",
-    confidencePct: 88,
-    ranMinutesAgo: 120,
-    analyzedMinutesAgo: 110,
-    placement: "progressed",
-    stage: "verify",
-    activity: "Checking the 409 response.",
-  },
-  {
-    id: "gh-issue-3",
-    title: "Show a clearer empty state on the billing page",
-    confidencePct: 81,
-    ranMinutesAgo: 90,
-    analyzedMinutesAgo: 80,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-4",
-    title: "Upgrade the Node 20 base image",
-    confidencePct: 76,
-    ranMinutesAgo: 45,
-    analyzedMinutesAgo: 40,
-    placement: "rejected",
-  },
-  {
-    id: "gh-issue-5",
-    title: "Add a flake retry to the checkout e2e suite",
-    confidencePct: 68,
-    ranMinutesAgo: 20,
-    analyzedMinutesAgo: 15,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-6",
-    title: "Document the refund webhook contract",
-    confidencePct: 52,
-    ranMinutesAgo: 8,
-    analyzedMinutesAgo: 5,
-    placement: "below-threshold",
-  },
-];
-
-export function intakeRelativeTime(minutesAgo: number): string {
-  return formatTimeAgo(new Date(Date.now() - minutesAgo * 60_000));
-}
-
-export function intakeStageLabel(stage: IntakeLineStage): string {
-  return STAGE_LABEL[stage];
-}
-
-export function intakePlacementLabel(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed" && run.stage) {
-    return intakeStageLabel(run.stage);
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejected;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThreshold;
-  }
-  return INTAKE_SETTINGS_COPY.inBacklog;
-}
-
-export function intakePlacementActivity(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed") {
-    return run.activity ?? "";
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejectedActivity;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThresholdActivity;
-  }
-  return INTAKE_SETTINGS_COPY.backlogActivity;
-}
-
 export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
   if (!draft.filterByLabel) {
@@ -262,64 +131,4 @@ function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignmen
     return "unassigned";
   }
   return "any";
-}
-
-const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
-  PLACEMENT_BACKLOG: "backlog",
-  PLACEMENT_REJECTED: "rejected",
-  PLACEMENT_PROGRESSED: "progressed",
-  PLACEMENT_BELOW_THRESHOLD: "below-threshold",
-};
-
-const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
-  plan: "implement",
-  planning: "implement",
-  implement: "implement",
-  implementation: "implement",
-  verify: "verify",
-  verification: "verify",
-  done: "done",
-};
-
-/**
- * The server decides placement, confidence, and stage. This only turns the
- * response into the shape the list renders, and drops runs that are still
- * being analyzed: those belong in the Analyzing list.
- */
-export function intakeRunsFromApi(
-  runs: FactoriesFactoryIntakeRun[],
-  appId: string | undefined,
-  now = new Date(),
-): IntakeAutomationRun[] {
-  return runs.flatMap((run) => {
-    const id = run.id?.trim();
-    const title = run.title?.trim();
-    const placement = run.placement ? PLACEMENT_BY_API[run.placement] : undefined;
-    if (!id || !title || !placement) {
-      return [];
-    }
-
-    const stage = run.stage ? STAGE_BY_NAME[run.stage.trim().toLowerCase()] : undefined;
-    return [
-      {
-        id,
-        runId: id,
-        ...(appId ? { appId } : {}),
-        title,
-        confidencePct: run.confidencePct ?? 0,
-        ranMinutesAgo: minutesAgo(run.createdAt, now),
-        analyzedMinutesAgo: minutesAgo(run.analyzedAt ?? run.createdAt, now),
-        placement,
-        ...(stage ? { stage } : {}),
-      },
-    ];
-  });
-}
-
-function minutesAgo(timestamp: string | undefined, now: Date): number {
-  const value = timestamp ? Date.parse(timestamp) : Number.NaN;
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.floor((now.getTime() - value) / 60_000));
 }

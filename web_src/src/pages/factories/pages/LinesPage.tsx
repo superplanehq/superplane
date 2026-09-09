@@ -136,9 +136,7 @@ import {
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { PlanningReviewPopup } from "./PlanningReviewPopup";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
-import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   ADD_INTAKE_TEMPLATES,
   apiIntakeSource,
@@ -409,17 +407,6 @@ export function LinesPage() {
           repository={factory?.onboarding?.backlogRepository}
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onOpenRun={(run) => {
-            if (!run.appId || !run.runId) {
-              return;
-            }
-            navigate(
-              factoryAppRunPath(organizationId, factoryKey, run.appId, run.runId, {
-                from: "lines",
-                lineId: selectedLine.id,
-              }),
-            );
-          }}
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
@@ -735,19 +722,6 @@ function LineDetail({
       if (href) {
         navigate(href);
       }
-      return;
-    }
-    if (action === "edit-agent") {
-      const href = columnAutomationOpenPath(automation, { organizationId, factoryKey, lineId: line.id });
-      if (href) {
-        navigate(href);
-      }
-      return;
-    }
-    if (action === "edit" && automation.canvasId) {
-      navigate(
-        factoryAppConfigurePath(organizationId, factoryKey, automation.canvasId, { from: "lines", lineId: line.id }),
-      );
       return;
     }
     if (action === "disable") {
@@ -1553,7 +1527,6 @@ function PhaseColumn({
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
-  const agentEditor = useColumnCanvasAgentEditor(organizationId, column.appId);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -1598,14 +1571,7 @@ function PhaseColumn({
             <ColumnAutomationsHeaderSlot
               title={title}
               automations={automations}
-              canEditAgent={Boolean(agentEditor.agentNode)}
-              onRowAction={(automation, action) => {
-                if (action === "edit-agent") {
-                  agentEditor.openEditor?.();
-                  return;
-                }
-                onAutomationRowAction?.(automation, action);
-              }}
+              onRowAction={onAutomationRowAction}
               testId={`lines-phase-${column.stepIndex}-automations`}
             />
             <ColumnLaneMenu
@@ -1642,17 +1608,6 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
-      {agentEditor.editorOpen ? (
-        <PlanningReviewPopup
-          key={agentEditor.agentNode?.id ?? "agent"}
-          onClose={agentEditor.closeEditor}
-          organizationId={organizationId}
-          automationHref={configureHref ?? undefined}
-          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
-          isLoading={agentEditor.isLoading || !agentEditor.draft}
-          onSave={agentEditor.save}
-        />
-      ) : null}
     </>
   );
 }

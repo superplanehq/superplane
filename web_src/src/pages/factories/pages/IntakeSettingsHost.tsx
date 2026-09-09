@@ -3,18 +3,12 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useCallback, useMemo } from "react";
 
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
-import {
-  intakeSettingsToApi,
-  type IntakeAutomationRun,
-  type IntakeSettingsTab,
-  type IntakeSourceSettings,
-} from "./intakeSourceSettingsModel";
+import { intakeSettingsToApi, type IntakeSettingsTab, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
-import { useIntakeAutomationRuns } from "./useIntakeAutomationRuns";
 
 interface IntakeSettingsHostProps {
   organizationId: string;
@@ -27,7 +21,6 @@ interface IntakeSettingsHostProps {
   /** GitHub integration that has access to that repository. */
   vcsIntegrationId?: string;
   initialTab?: IntakeSettingsTab;
-  onOpenRun: (run: IntakeAutomationRun) => void;
   onClose: () => void;
 }
 
@@ -41,12 +34,10 @@ export function IntakeSettingsHost({
   repository,
   vcsIntegrationId,
   initialTab = "general",
-  onOpenRun,
   onClose,
 }: IntakeSettingsHostProps) {
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
   const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
-  const runs = useIntakeAutomationRuns(organizationId, factoryId, intake);
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
   // An empty integration id keeps the query idle, so we never ask for labels
   // without knowing the repository they belong to.
@@ -85,10 +76,6 @@ export function IntakeSettingsHost({
       automationLoading={automation.isLoading}
       automationError={automation.isError}
       onRetryAutomation={automation.refetch}
-      runs={runs.runs}
-      runsLoading={runs.isLoading}
-      runsError={runs.isError}
-      onRetryRuns={runs.retry}
       onSave={saveSettings}
       savePending={updateIntake.isPending || automation.isLoading}
       saveError={
@@ -96,8 +83,13 @@ export function IntakeSettingsHost({
           ? getApiErrorMessage(updateIntake.error, "SuperPlane could not save the intake settings. Try again.")
           : undefined
       }
-      onOpenRun={onOpenRun}
       editAutomationHref={editAutomationHref}
+      canvasId={intake.appId}
+      runHrefFor={
+        intake.appId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, intake.appId, runId, { from: "lines", lineId })
+          : undefined
+      }
       agent={
         agent.agentNode
           ? {

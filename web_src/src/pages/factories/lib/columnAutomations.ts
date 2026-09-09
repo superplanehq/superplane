@@ -451,10 +451,6 @@ export function applyColumnAutomationsOverlay(
     .map((automation) => (disabled.has(automation.id) ? { ...automation, health: "disabled" } : automation));
 }
 
-export function automationOffersAgentEdit(automation: Pick<ColumnAutomation, "kind">): boolean {
-  return automation.kind === "agent-step" || automation.kind === "analysis";
-}
-
 export function catalogEntryToAutomation(
   entry: ColumnAutomationCatalogEntry,
   columnTitle: string,
@@ -492,8 +488,6 @@ export const COLUMN_AUTOMATIONS_COPY = {
   needsRepairLabel: "Needs repair",
   disabledLabel: "Disabled",
   editLabel: "Edit automation",
-  editAgentLabel: "Edit Agent",
-  editAutomationMenuLabel: "Edit Automation",
   tabsLabel: "Automation sections",
   generalTab: "General",
   agentTab: "Agent",

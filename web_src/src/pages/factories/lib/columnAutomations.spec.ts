@@ -4,7 +4,6 @@ import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, Factori
 
 import {
   applyColumnAutomationsOverlay,
-  automationOffersAgentEdit,
   buildColumnAutomations,
   catalogForColumn,
   columnAutomationOpenPath,
@@ -109,15 +108,6 @@ describe("columnTitleForKey", () => {
     expect(columnTitleForKey("backlog")).toBe("Backlog");
     expect(columnTitleForKey("phase-0", [IMPLEMENT_COLUMN])).toBe("Implement");
     expect(columnTitleForKey("phase-3", [IMPLEMENT_COLUMN])).toBe("Phase 4");
-  });
-});
-
-describe("automationOffersAgentEdit", () => {
-  it("offers agent edit for analysis and agent-step automations", () => {
-    expect(automationOffersAgentEdit({ kind: "analysis" })).toBe(true);
-    expect(automationOffersAgentEdit({ kind: "agent-step" })).toBe(true);
-    expect(automationOffersAgentEdit({ kind: "intake" })).toBe(false);
-    expect(automationOffersAgentEdit({ kind: "custom" })).toBe(false);
   });
 });
 

@@ -87,21 +87,10 @@ export const InfoOpen: Story = {
   name: "Info open",
 };
 
-export const PhaseEditActions: Story = {
-  name: "Phase edit actions",
-  args: {
-    automation: ANALYSIS,
-    showEditAgent: true,
-    showEditAutomation: true,
-  },
-};
-
 export const WithActivity: Story = {
   name: "With last-run activity",
   args: {
     automation: ANALYSIS,
-    showEditAgent: true,
-    showEditAutomation: true,
     activity: HEALTHY_ACTIVITY,
   },
 };
@@ -110,8 +99,6 @@ export const WithFailedActivity: Story = {
   name: "With failed last run",
   args: {
     automation: ANALYSIS,
-    showEditAgent: true,
-    showEditAutomation: true,
     activity: FAILED_ACTIVITY,
   },
 };

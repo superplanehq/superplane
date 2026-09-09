@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ErrHostedCreditEmpty        = errors.New("hosted LLM credit is empty")
+	ErrHostedCreditEmpty        = errors.New("hosted credit is empty")
 	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
 	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
 	ErrPolarOrderIDRequired     = errors.New("polar order id is required")
@@ -429,14 +429,14 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 		}
 	}
 
-	billedMicros, err := sumHostedModelBilledMicros(tx, orgID, nil)
+	billedMicros, err := sumHostedBilledMicros(tx, orgID, nil)
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err
 	}
 
 	billedBeforeExpiry := int64(0)
 	if horizon := expiredGrantHorizon(grants, now); horizon != nil {
-		billedBeforeExpiry, err = sumHostedModelBilledMicros(tx, orgID, horizon)
+		billedBeforeExpiry, err = sumHostedBilledMicros(tx, orgID, horizon)
 		if err != nil {
 			return OrganizationLLMCreditSummary{}, err
 		}
@@ -472,10 +472,10 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	}, nil
 }
 
-func sumHostedModelBilledMicros(tx *gorm.DB, orgID uuid.UUID, atOrBefore *time.Time) (int64, error) {
+func sumHostedBilledMicros(tx *gorm.DB, orgID uuid.UUID, atOrBefore *time.Time) (int64, error) {
 	query := tx.Model(&WorkspaceUsageEvent{}).
 		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", orgID, UsageFundingSourceHosted, UsageKindModel)
+		Where("organization_id = ? AND funding_source = ?", orgID, UsageFundingSourceHosted)
 	if atOrBefore != nil {
 		query = query.Where("occurred_at <= ?", *atOrBefore)
 	}
