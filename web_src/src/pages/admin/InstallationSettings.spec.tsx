@@ -31,6 +31,7 @@ const installationSettingsResponse = {
 
 const llmSettingsResponse = {
   welcome_grant_cents: 5000,
+  welcome_grant_ttl_days: 14,
   markup_bps: 2000,
   warning_threshold_bps: 2000,
   default_hosted_provider: "",

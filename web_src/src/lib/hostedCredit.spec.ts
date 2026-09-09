@@ -7,6 +7,7 @@ import {
   hostedCreditRefreshMessage,
   hostedCreditRefreshStatus,
   parseDollarInputToCents,
+  parseDaysInput,
   readHostedCreditGrantSnapshot,
   rememberHostedCreditGrantSnapshot,
 } from "./hostedCredit";
@@ -38,6 +39,23 @@ describe("centsToDollarInput", () => {
   it("formats cents as a two-decimal dollar string", () => {
     expect(centsToDollarInput(0)).toBe("0.00");
     expect(centsToDollarInput(2500)).toBe("25.00");
+  });
+});
+
+describe("parseDaysInput", () => {
+  it("returns null for empty, zero, or invalid input", () => {
+    expect(parseDaysInput("")).toBeNull();
+    expect(parseDaysInput("   ")).toBeNull();
+    expect(parseDaysInput("abc")).toBeNull();
+    expect(parseDaysInput("0")).toBeNull();
+    expect(parseDaysInput("14.5")).toBeNull();
+    expect(parseDaysInput("-7")).toBeNull();
+  });
+
+  it("parses whole days of at least 1", () => {
+    expect(parseDaysInput("1")).toBe(1);
+    expect(parseDaysInput("14")).toBe(14);
+    expect(parseDaysInput("30")).toBe(30);
   });
 });
 

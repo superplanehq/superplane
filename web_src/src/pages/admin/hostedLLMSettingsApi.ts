@@ -8,6 +8,7 @@ export type HostedLLMProvider = {
 
 export type InstallationLLMSettings = {
   welcome_grant_cents: number;
+  welcome_grant_ttl_days: number;
   markup_bps: number;
   warning_threshold_bps: number;
   default_hosted_provider?: string;
@@ -56,6 +57,7 @@ export const fetchInstallationLLMSettings = async (): Promise<InstallationLLMSet
 
 export const patchInstallationLLMPolicy = async (body: {
   welcome_grant_cents?: number;
+  welcome_grant_ttl_days?: number;
   markup_bps?: number;
   warning_threshold_bps?: number;
   default_hosted_provider?: string;

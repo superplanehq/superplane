@@ -20,6 +20,7 @@ import (
 
 type installationLLMSettingsResponse struct {
 	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
+	WelcomeGrantTTLDays   int                         `json:"welcome_grant_ttl_days"`
 	MarkupBPS             int                         `json:"markup_bps"`
 	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
 	DefaultHostedProvider string                      `json:"default_hosted_provider"`
@@ -37,6 +38,7 @@ type hostedLLMProviderResponse struct {
 
 type installationLLMSettingsRequest struct {
 	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
+	WelcomeGrantTTLDays   *int    `json:"welcome_grant_ttl_days"`
 	MarkupBPS             *int    `json:"markup_bps"`
 	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
 	DefaultHostedProvider *string `json:"default_hosted_provider"`
@@ -109,6 +111,12 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		next := *current
 		if req.WelcomeGrantCents != nil {
 			next.WelcomeGrantCents = *req.WelcomeGrantCents
+		}
+		if req.WelcomeGrantTTLDays != nil {
+			if *req.WelcomeGrantTTLDays < 1 {
+				return errors.New("welcome grant duration must be at least 1 day")
+			}
+			next.WelcomeGrantTTLDays = *req.WelcomeGrantTTLDays
 		}
 		if req.MarkupBPS != nil {
 			next.MarkupBPS = *req.MarkupBPS
@@ -386,6 +394,7 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
 		WelcomeGrantCents:     settings.WelcomeGrantCents,
+		WelcomeGrantTTLDays:   settings.WelcomeGrantTTLDays,
 		MarkupBPS:             settings.MarkupBPS,
 		WarningThresholdBPS:   settings.WarningThresholdBPS,
 		DefaultHostedProvider: defaultModel.Provider,

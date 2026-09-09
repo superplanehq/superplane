@@ -29,6 +29,7 @@ func TestAdminLLMSettings(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		WelcomeGrantTTLDays: models.DefaultWelcomeGrantTTLDays,
 		MarkupBPS:           models.DefaultMarkupBPS,
 		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 	})
@@ -36,6 +37,7 @@ func TestAdminLLMSettings(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			WelcomeGrantTTLDays: models.DefaultWelcomeGrantTTLDays,
 			MarkupBPS:           models.DefaultMarkupBPS,
 			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 		})
@@ -68,14 +70,16 @@ func TestAdminLLMSettings(t *testing.T) {
 		var settings installationLLMSettingsResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
+		assert.Equal(t, models.DefaultWelcomeGrantTTLDays, settings.WelcomeGrantTTLDays)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
 		assert.Empty(t, settings.DefaultHostedProvider)
 		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
-			"welcome_grant_cents": 2500,
-			"markup_bps":          1000,
+			"welcome_grant_cents":    2500,
+			"welcome_grant_ttl_days": 7,
+			"markup_bps":             1000,
 		})
 		require.NoError(t, err)
 		response = execRequest(server, requestParams{
@@ -88,7 +92,23 @@ func TestAdminLLMSettings(t *testing.T) {
 		assert.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, int64(2500), settings.WelcomeGrantCents)
+		assert.Equal(t, 7, settings.WelcomeGrantTTLDays)
 		assert.Equal(t, 1000, settings.MarkupBPS)
+	})
+
+	t.Run("admin cannot set welcome grant duration below 1 day", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"welcome_grant_ttl_days": 0,
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
 	t.Run("admin can save a hosted provider", func(t *testing.T) {

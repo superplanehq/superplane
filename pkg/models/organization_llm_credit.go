@@ -108,7 +108,7 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 		return err
 	}
 
-	expiresAt := now.Add(DefaultWelcomeGrantTTL)
+	expiresAt := now.Add(settings.WelcomeGrantTTL())
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,

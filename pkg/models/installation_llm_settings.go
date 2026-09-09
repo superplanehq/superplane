@@ -12,23 +12,36 @@ const (
 	installationLLMSettingsID = 1
 
 	DefaultWelcomeGrantCents   int64 = 5000
-	DefaultWelcomeGrantTTL           = 14 * 24 * time.Hour
 	DefaultMarkupBPS                 = 2000
 	DefaultWarningThresholdBPS       = 2000
 	MarkupBaseBPS                    = 10000
 	MicrosPerCent              int64 = 10_000
 )
 
+const (
+	DefaultWelcomeGrantTTLDays = 14
+	DefaultWelcomeGrantTTL     = DefaultWelcomeGrantTTLDays * 24 * time.Hour
+)
+
 // InstallationLLMSettings is the singleton hosted-LLM catalog policy.
 type InstallationLLMSettings struct {
 	ID                    int `gorm:"primary_key"`
 	WelcomeGrantCents     int64
+	WelcomeGrantTTLDays   int
 	MarkupBPS             int
 	WarningThresholdBPS   int
 	DefaultHostedProvider *string
 	DefaultHostedModel    *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+}
+
+func (s *InstallationLLMSettings) WelcomeGrantTTL() time.Duration {
+	days := DefaultWelcomeGrantTTLDays
+	if s != nil && s.WelcomeGrantTTLDays > 0 {
+		days = s.WelcomeGrantTTLDays
+	}
+	return time.Duration(days) * 24 * time.Hour
 }
 
 func (InstallationLLMSettings) TableName() string {
@@ -47,6 +60,10 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 
 	if settings.WelcomeGrantCents < 0 {
 		return nil, errors.New("welcome grant cannot be negative")
+	}
+	ttlDays, err := resolveWelcomeGrantTTLDays(settings.WelcomeGrantTTLDays, current.WelcomeGrantTTLDays)
+	if err != nil {
+		return nil, err
 	}
 	if settings.MarkupBPS < 0 {
 		return nil, errors.New("markup cannot be negative")
@@ -73,6 +90,7 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 		Where("id = ?", installationLLMSettingsID).
 		Select(
 			"welcome_grant_cents",
+			"welcome_grant_ttl_days",
 			"markup_bps",
 			"warning_threshold_bps",
 			"default_hosted_provider",
@@ -81,6 +99,7 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 		).
 		Updates(map[string]any{
 			"welcome_grant_cents":     settings.WelcomeGrantCents,
+			"welcome_grant_ttl_days":  ttlDays,
 			"markup_bps":              settings.MarkupBPS,
 			"warning_threshold_bps":   settings.WarningThresholdBPS,
 			"default_hosted_provider": provider,
@@ -92,6 +111,7 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 	}
 
 	current.WelcomeGrantCents = settings.WelcomeGrantCents
+	current.WelcomeGrantTTLDays = ttlDays
 	current.MarkupBPS = settings.MarkupBPS
 	current.WarningThresholdBPS = settings.WarningThresholdBPS
 	current.DefaultHostedProvider = provider
@@ -114,6 +134,7 @@ func findOrCreateInstallationLLMSettings(tx *gorm.DB) (*InstallationLLMSettings,
 	settings = InstallationLLMSettings{
 		ID:                  installationLLMSettingsID,
 		WelcomeGrantCents:   DefaultWelcomeGrantCents,
+		WelcomeGrantTTLDays: DefaultWelcomeGrantTTLDays,
 		MarkupBPS:           DefaultMarkupBPS,
 		WarningThresholdBPS: DefaultWarningThresholdBPS,
 		CreatedAt:           now,
@@ -130,6 +151,19 @@ func findOrCreateInstallationLLMSettings(tx *gorm.DB) (*InstallationLLMSettings,
 		return nil, err
 	}
 	return &settings, nil
+}
+
+func resolveWelcomeGrantTTLDays(requested, current int) (int, error) {
+	if requested < 0 {
+		return 0, errors.New("welcome grant duration must be at least 1 day")
+	}
+	if requested == 0 {
+		if current > 0 {
+			return current, nil
+		}
+		return DefaultWelcomeGrantTTLDays, nil
+	}
+	return requested, nil
 }
 
 // ApplyMarkupMicros returns billed micros for SuperPlane-hosted credit.
