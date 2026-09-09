@@ -31,6 +31,11 @@ import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageC
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
 const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
+const ICON_VIEW: FactoryPreviewFlags = {
+  addIntakeControl: false,
+  columnAutomations: true,
+  columnAutomationRows: false,
+};
 
 function renderLinesBoard(
   path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
@@ -418,17 +423,18 @@ describe("LinesPage board", () => {
     expect(within(backlog).queryByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-listener-handler-discussion")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer")).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-icon-handler-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
   });
 
   it("puts backlog automations before the create plus and column menu", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
 
     const backlog = screen.getByTestId("lines-backlog-column");
     const automations = within(backlog).getByTestId("lines-backlog-automations");
@@ -444,7 +450,7 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`));
+    await user.click(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
@@ -458,7 +464,7 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     const location = screen.getByTestId("lines-test-location");
@@ -489,7 +495,7 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
+    await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
 
@@ -505,7 +511,7 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
@@ -532,7 +538,7 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     const { unmount } = renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-handler-discussion"));
+    await user.click(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryPRFeedbackPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, undefined, "handler-discussion"),
@@ -540,7 +546,7 @@ describe("LinesPage board", () => {
 
     unmount();
     renderLinesBoard();
-    await user.click(screen.getByTestId("column-automation-icon-closure-app-pr-closure"));
+    await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-pr-closure"),
@@ -847,7 +853,7 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
@@ -859,7 +865,7 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
     await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
@@ -1032,7 +1038,11 @@ describe("LinesPage board editing", () => {
     expect(filter.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(header).queryByTestId("lines-edit-menu")).not.toBeInTheDocument();
     expect(within(header).queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
-    expect(within(header).queryByTestId("lines-board-view-menu")).not.toBeInTheDocument();
+    expect(within(header).getByTestId("lines-board-view-menu")).toBeInTheDocument();
+    expect(
+      filter.compareDocumentPosition(within(header).getByTestId("lines-board-view-menu")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
 
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
@@ -1065,13 +1075,9 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
   });
 
-  it("shows automation names by default when the column rows preview is on", () => {
+  it("shows automation names and the header view menu by default", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), REFUND_FACTORY, {
-      addIntakeControl: false,
-      columnAutomations: true,
-      columnAutomationRows: true,
-    });
+    renderLinesBoard();
 
     expect(screen.getByTestId("lines-backlog-automation-rows")).toHaveTextContent("Listens to GitHub issues");
     expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
@@ -1081,17 +1087,7 @@ describe("LinesPage board editing", () => {
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    const previewFlags: FactoryPreviewFlags = {
-      addIntakeControl: false,
-      columnAutomations: true,
-      columnAutomationRows: true,
-    };
-    const first = renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
-      vi.fn(),
-      REFUND_FACTORY,
-      previewFlags,
-    );
+    const first = renderLinesBoard();
 
     expect(screen.getByTestId("lines-backlog-automation-rows")).toHaveTextContent("Listens to GitHub issues");
     expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
@@ -1103,12 +1099,7 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();
 
     first.unmount();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
-      vi.fn(),
-      REFUND_FACTORY,
-      previewFlags,
-    );
+    renderLinesBoard();
 
     expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();

@@ -15,7 +15,7 @@ export interface FactoryPreviewFlags {
   columnAutomations?: boolean;
   /**
    * Sentence rows under each column title, plus a header cog that
-   * switches back to the title icons. Storybook only until shipped.
+   * switches back to the title icons. On by default.
    */
   columnAutomationRows?: boolean;
 }
@@ -24,6 +24,7 @@ export const FactoryPreviewFlagsContext = createContext<FactoryPreviewFlags | nu
 
 const SHIPPED_PREVIEW_FLAGS: Partial<FactoryPreviewFlags> = {
   columnAutomations: true,
+  columnAutomationRows: true,
 };
 
 /** Returns the shipped default when no preview provider is present. */
