@@ -84,17 +84,20 @@ export const FIRST_RUN_COPY = {
     saving: "Finishing setup…",
   },
   analysis: {
-    headline: "Finding tickets SuperPlane can one-shot",
-    body: "Each open ticket gets a confidence score. High-confidence work is ready to run. Ambiguous work stays with your team.",
-    stageImporting: "Importing your backlog…",
-    stageImported: (count: number) => `Backlog imported — ${ticketCount(count)}`,
+    headline: "Your workspace is running",
+    body: "SuperPlane scores each ticket for how likely an agent can one-shot it. High-confidence work is ready to run. Ambiguous work stays with your team.",
+    stageImporting: "Importing your newest open tickets…",
+    stageImported: (count: number, source = "your backlog") =>
+      count === 1
+        ? `Imported the newest open ticket from ${source}`
+        : `Imported the ${count} newest open tickets from ${source}`,
     stageScoringPending: "Scoring tickets",
-    stageScoring: (scored: number, total: number) => `Scoring tickets — ${scored} of ${total}`,
-    stageScored: (total: number, ready: number) =>
-      ready > 0 ? `${ticketCount(total)} scored — ${ready} ready to run` : `${ticketCount(total)} scored`,
+    stageScoring: "Started scoring. Open your board and run tickets as scores appear.",
+    emptyImport: (source = "your backlog") => `We did not find any issues to import from ${source}`,
+    emptyNext: "You can create a new task on your board.",
+    stageScored: (total: number) => `${ticketCount(total)} scored`,
+    readyCount: (count: number) => (count === 1 ? "1 ready to run" : `${count} ready to run`),
     goToBoard: "Go to your board",
-    note: "Scoring continues on the board. No work starts until you approve a ticket.",
-    noteDone: "No work starts until you approve a ticket.",
     failure: "SuperPlane could not read the scoring progress. Your board still works.",
   },
   sphere: {

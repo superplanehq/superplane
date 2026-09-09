@@ -1,16 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
+import { analysisSphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
 import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
-import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 
 const STAGE_MS = 900;
 
@@ -57,19 +56,7 @@ export function FirstRunFlow({
     return () => window.clearInterval(stageTimer);
   }, [screen]);
 
-  const analysisSphere: FirstRunSphereProps = {
-    level: 1,
-    animate: true,
-    phasesLit: true,
-    caption: selectedRepository ?? "",
-    captionHighlight: "Scoring:",
-    leftChip: {
-      label: FIRST_RUN_COPY.sphere.discover,
-      value: FIRST_RUN_COPY.sphere.ticketsFound(progress.total),
-      tone: "amber",
-    },
-    rightChip: { label: FIRST_RUN_COPY.sphere.verify, value: FIRST_RUN_COPY.sphere.reviewReadyPr, tone: "amber" },
-  };
+  const analysisSphere = analysisSphereFor(selectedRepository, progress.total);
 
   if (screen === "welcome") {
     return (
@@ -116,6 +103,7 @@ export function FirstRunFlow({
     return (
       <FirstRunAnalysisScreen
         progress={progress}
+        sourceName="GitHub issues"
         chrome={chromeFor(4)}
         sphere={analysisSphere}
         onGoToBoard={() => setScreen("board")}
