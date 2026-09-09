@@ -30,6 +30,7 @@ type LiveLogSessionResponse = {
 };
 
 export type LiveLogStreamHandlers = {
+  onOpen?: () => void;
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
@@ -312,6 +313,7 @@ export class LiveLogStream {
     const { streamUrl, token } = requireLiveLogSession(session);
     const res = await fetchRunnerLiveLogResponse(streamUrl, token, this.abortController.signal);
     const reader = requireBodyReader(res);
+    handlers.onOpen?.();
     await pumpReaderNdjson(reader, handlers);
   }
 }
