@@ -124,14 +124,17 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	// Even a single installation goes through the account picker. A silent
 	// bind would lock the connection to that account (often the user's
 	// personal one) with no way to install the App on an organization.
-	metadata.PendingInstallations = installations
+	metadata.SetPendingInstallations(installations)
 
-	// The picker now offers the requested account, so the install request is
-	// approved and the waiting state must not show next to the picker.
-	if installationsIncludeAccount(installations, metadata.InstallRequestedAccount) {
-		metadata.InstallRequested = false
-		metadata.InstallRequestedAccount = ""
+	// Remove only the requests that the refreshed picker can now offer. Other
+	// organization requests can continue to wait on the same connection.
+	unresolved := []common.InstallRequest{}
+	for _, request := range metadata.CurrentInstallRequests() {
+		if !installationsIncludeAccount(installations, request.AccountLogin) {
+			unresolved = append(unresolved, request)
+		}
 	}
+	metadata.SetInstallRequests(unresolved)
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()

@@ -10,9 +10,12 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubAuthorizeURL,
+  hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
+  pendingGitHubInstallRequests,
   pendingGitHubInstallations,
+  type PendingGitHubInstallRequest,
   type PendingGitHubInstallation,
 } from "@/lib/hostedGitHubInstall";
 import { integrationDetailPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
@@ -32,19 +35,41 @@ export type PendingGitHubAccountPicker = {
   githubLogin: string;
 };
 
+export type PendingGitHubRequestConnection = {
+  id: string;
+  connection: OrganizationsIntegration;
+  requests: PendingGitHubInstallRequest[];
+};
+
 function accountPickerFromItem(item: OrganizationsIntegration | undefined): PendingGitHubAccountPicker | undefined {
   if (!item?.metadata?.id) {
     return undefined;
   }
 
+  const state = hostedGitHubState(item.status?.metadata);
+
   return {
     id: item.metadata.id,
     installations: pendingGitHubInstallations(item.status?.metadata),
-    state: hostedGitHubState(item.status?.metadata),
+    state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: hostedGitHubAuthorizeURL(item.status?.metadata),
+    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
+}
+
+function authorizeURLWithState(authorizeURL: string, state: string): string {
+  if (!authorizeURL || !state) return authorizeURL;
+
+  try {
+    const url = new URL(authorizeURL);
+    if (url.searchParams.get("state") === state) return authorizeURL;
+
+    url.searchParams.set("state", state);
+    return url.toString();
+  } catch {
+    return authorizeURL;
+  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -61,12 +86,28 @@ function isOwnPendingGitHub(item: OrganizationsIntegration, currentUserId?: stri
   return startedBy === "" || startedBy === currentUserId;
 }
 
-function isOwnPendingGitHubItem(item: OrganizationsIntegration, currentUserId?: string): boolean {
-  return (
-    item.metadata?.integrationName === "github" &&
-    item.status?.state !== "ready" &&
-    isOwnPendingGitHub(item, currentUserId)
+function isGitHubInstallRequest(item: OrganizationsIntegration): boolean {
+  return item.metadata?.integrationName === "github" && hostedGitHubInstallRequested(item.status?.metadata);
+}
+
+/** Selects one request connection without combining metadata from different integrations. */
+export function pendingGitHubRequestConnection(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): PendingGitHubRequestConnection | undefined {
+  if (!currentUserId) return undefined;
+
+  const requested = connected.filter(isGitHubInstallRequest);
+  const preferred = requested.find(
+    (item) => item.metadata?.id === preferredIntegrationId && isOwnPendingGitHub(item, currentUserId),
   );
+  const owned = preferred ?? requested.find((item) => startedByUserID(item) === currentUserId);
+  const legacy = owned ?? (requested.length === 1 && startedByUserID(requested[0]) === "" ? requested[0] : undefined);
+  const id = legacy?.metadata?.id;
+  if (!legacy || !id) return undefined;
+
+  return { id, connection: legacy, requests: pendingGitHubInstallRequests(legacy.status?.metadata) };
 }
 
 export function pendingGitHubBrowserAction(
@@ -79,10 +120,24 @@ export function pendingGitHubBrowserAction(
 function pendingOwnGitHubWithAction(
   connected: OrganizationsIntegration[],
   currentUserId?: string,
+  preferredIntegrationId?: string,
 ): OrganizationsIntegration | undefined {
-  return connected.find(
-    (item) => isOwnPendingGitHubItem(item, currentUserId) && Boolean(item.status?.browserAction?.url),
+  const candidates = connected.filter(
+    (item) =>
+      item.metadata?.integrationName === "github" &&
+      item.status?.state !== "ready" &&
+      Boolean(item.status?.browserAction?.url),
   );
+  const preferred = candidates.find(
+    (item) => item.metadata?.id === preferredIntegrationId && isOwnPendingGitHub(item, currentUserId),
+  );
+  if (preferred) return preferred;
+
+  const owned = candidates.find((item) => startedByUserID(item) === currentUserId);
+  if (owned) return owned;
+
+  const legacy = candidates.filter((item) => startedByUserID(item) === "");
+  return legacy.length === 1 ? legacy[0] : undefined;
 }
 
 export function pendingGitHubInstallPicker(
@@ -96,17 +151,30 @@ export function pendingGitHubInstallPicker(
 export function pendingGitHubAccountPicker(
   connected: OrganizationsIntegration[],
   currentUserId?: string,
+  preferredIntegrationId?: string,
 ): PendingGitHubAccountPicker | undefined {
   if (!currentUserId) {
     return undefined;
   }
 
-  const pending = connected.find((item) => {
-    if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
+  const preferredConnection = connected.find((item) => item.metadata?.id === preferredIntegrationId);
+  const preferredPicker = githubAccountPickerFromConnection(preferredConnection, currentUserId);
+  if (preferredPicker) return preferredPicker;
+
+  const candidates = connected.filter((item) => {
+    if (
+      item.metadata?.integrationName !== "github" ||
+      item.status?.state === "ready" ||
+      !item.metadata?.id ||
+      !isOwnPendingGitHub(item, currentUserId)
+    ) {
       return false;
     }
     return pendingGitHubInstallations(item.status?.metadata).length >= 1;
   });
+  const owned = candidates.find((item) => startedByUserID(item) === currentUserId);
+  const legacyCandidates = candidates.filter((item) => startedByUserID(item) === "");
+  const pending = owned ?? (legacyCandidates.length === 1 ? legacyCandidates[0] : undefined);
   return accountPickerFromItem(pending);
 }
 
@@ -189,6 +257,7 @@ type StartDirectGitHubConnectArgs = {
   connected: OrganizationsIntegration[];
   currentUserId?: string;
   forceNew?: boolean;
+  preferredIntegrationId?: string;
   create: (payload: {
     integrationName: string;
     name: string;
@@ -199,7 +268,7 @@ type StartDirectGitHubConnectArgs = {
 };
 
 async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
-  const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId);
+  const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId, args.preferredIntegrationId);
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
@@ -222,7 +291,7 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
     return true;
   }
 
-  const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId);
+  const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId, args.preferredIntegrationId);
   const pendingAction = pending?.status?.browserAction;
   if (!pendingAction) {
     return false;

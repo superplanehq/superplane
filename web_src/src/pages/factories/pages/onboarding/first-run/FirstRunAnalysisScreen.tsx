@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 
@@ -10,18 +10,20 @@ export function FirstRunAnalysisScreen({
   status,
   currentStageIndex,
   chrome,
+  retrying = false,
   onRetry,
 }: {
   status: FirstRunAnalysisStatus;
   /** 0–2 while running. Stages at or below this index are active or done. */
   currentStageIndex: number;
   chrome?: FirstRunChrome;
+  retrying?: boolean;
   onRetry: () => void;
 }) {
   const copy = FIRST_RUN_COPY.analysis;
 
   return (
-    <FirstRunShell testId="first-run-analysis" chrome={chrome}>
+    <FirstRunShell testId="first-run-analysis" chrome={chrome} busy={retrying || status !== "failed"}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.body}</p>
         <p className="text-[13px] text-muted-foreground">{copy.reassurance}</p>
@@ -30,9 +32,15 @@ export function FirstRunAnalysisScreen({
       {status === "failed" ? (
         <div className="mt-8 space-y-4">
           <p className="text-[13px] text-destructive">{copy.failure}</p>
-          <Button type="button" onClick={onRetry} data-testid="first-run-run-again">
+          <LoadingButton
+            type="button"
+            onClick={onRetry}
+            loading={retrying}
+            loadingText={copy.retrying}
+            data-testid="first-run-run-again"
+          >
             {copy.retry}
-          </Button>
+          </LoadingButton>
         </div>
       ) : (
         <FirstRunPanel>

@@ -40,6 +40,7 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.queryByTestId("first-run-github-install-org")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-install-help")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedNext)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
     expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
 
@@ -224,6 +225,15 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-connect-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
+  });
+
+  it("shows progress and prevents another connect while GitHub opens", () => {
+    render(<FirstRunConnectScreen connecting onConnectGitHub={vi.fn()} />);
+
+    const connect = screen.getByTestId("first-run-connect-github");
+    expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
+    expect(connect).toBeDisabled();
   });
 
   it("never shows a connected state; the picker or the connect button always shows", () => {
