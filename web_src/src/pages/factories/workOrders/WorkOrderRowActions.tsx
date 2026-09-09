@@ -42,6 +42,9 @@ export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
 
   const display = resolveUser(owner.id, owner.name);
   const ownerName = display?.name ?? owner.name;
+  if (!ownerName) {
+    return null;
+  }
 
   return (
     <span

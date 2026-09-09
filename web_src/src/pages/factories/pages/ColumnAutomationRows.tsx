@@ -65,12 +65,7 @@ function ColumnAutomationRow({
   const content = (
     <>
       <ColumnAutomationGlyph automation={automation} className="size-3.5" />
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate",
-          onRowAction && "group-hover/automation:text-foreground",
-        )}
-      >
+      <span className={cn("min-w-0 flex-1 truncate", onRowAction && "group-hover/automation:text-foreground")}>
         {headline}
       </span>
       {needsRepair ? (

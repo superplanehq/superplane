@@ -228,8 +228,12 @@ describe("WorkOrdersBoardView layout", () => {
     const title = within(row).getByText(waiting.title);
     const time = within(row).getByText(formatRelative(new Date(waiting.createdAtMs)));
     const owner = within(row).getByTestId(`work-order-row-assignees-${waiting.id}`);
-    expect(title.compareDocumentPosition(chip as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chip!.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chip).toBeInstanceOf(HTMLElement);
+    if (!(chip instanceof HTMLElement)) {
+      throw new Error("expected a status chip");
+    }
+    expect(title.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chip.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(time.parentElement).not.toContainElement(chip);
     expect(within(owner).getByText("Arnold")).toBeInTheDocument();
   });
@@ -469,7 +473,11 @@ describe("WorkOrderCard attention", () => {
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
     const pill = screen.getByText("Waiting for user review").closest("span[title]");
-    expect(pill?.className).toMatch(/rounded-full/);
+    expect(pill).toBeInstanceOf(HTMLElement);
+    if (!(pill instanceof HTMLElement)) {
+      throw new Error("expected a status pill");
+    }
+    expect(pill.className).toMatch(/rounded-full/);
     const time = screen.getByText(formatRelative(new Date(waitingOrder.createdAt ?? "")));
     expect(time.parentElement).not.toContainElement(pill);
   });
