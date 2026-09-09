@@ -338,6 +338,11 @@ describe("scope + filter + search + ordering", () => {
     expect(alex).toEqual(["o-1"]);
   });
 
+  it("ordering=manual keeps the API's position order untouched", () => {
+    // The API returns orders by manual position; manual must not re-sort.
+    expect(applyWorkOrderOrdering(entries, "manual").map((e) => e.id)).toEqual(entries.map((e) => e.id));
+  });
+
   it("ordering=updated puts the newest updated first", () => {
     expect(applyWorkOrderOrdering(entries, "updated").map((e) => e.id)).toEqual([
       "d-1",
