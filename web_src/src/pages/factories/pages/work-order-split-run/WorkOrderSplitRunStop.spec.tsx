@@ -5,17 +5,20 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { handleStopMock, handleRejectMock, handleBackToDraftMock, enabledExperimentalFeatures } = vi.hoisted(() => ({
-  handleStopMock: vi.fn(),
-  handleRejectMock: vi.fn(),
-  handleBackToDraftMock: vi.fn(),
-  enabledExperimentalFeatures: new Set<string>(),
-}));
+const { handleStopMock, handleRejectMock, handleArchiveMock, handleBackToDraftMock, enabledExperimentalFeatures } =
+  vi.hoisted(() => ({
+    handleStopMock: vi.fn(),
+    handleRejectMock: vi.fn(),
+    handleArchiveMock: vi.fn(),
+    handleBackToDraftMock: vi.fn(),
+    enabledExperimentalFeatures: new Set<string>(),
+  }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
+    handleArchive: handleArchiveMock,
     handleBackToDraft: handleBackToDraftMock,
     handleStopAutomation: vi.fn(),
     busy: false,
@@ -72,6 +75,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     enabledExperimentalFeatures.clear();
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
+    handleArchiveMock.mockReset().mockResolvedValue(true);
     handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
@@ -145,7 +149,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onRefine).toHaveBeenCalledTimes(1);
   });
 
-  it("starts and rejects a draft from the note", async () => {
+  it("starts and archives a draft from the note", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
@@ -172,8 +176,31 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(within(note).getByRole("button", { name: "Reject" }));
-    expect(handleRejectMock).toHaveBeenCalledTimes(1);
+    await user.click(within(note).getByRole("button", { name: "Archive" }));
+    expect(handleArchiveMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes the popup only after a draft is archived", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
+
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+
+    expect(handleArchiveMock).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the popup open when a draft cannot be archived", async () => {
+    handleArchiveMock.mockResolvedValue(false);
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
+
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+
+    expect(handleArchiveMock).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("starts a draft with the listed model", async () => {

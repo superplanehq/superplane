@@ -16,6 +16,21 @@ type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   stepIndex?: number;
 };
 
+type RejectedCloseCopy = {
+  success: string;
+  error: string;
+};
+
+const REJECT_COPY: RejectedCloseCopy = {
+  success: "Task closed as rejected.",
+  error: "Failed to close task",
+};
+
+const ARCHIVE_COPY: RejectedCloseCopy = {
+  success: "Task archived.",
+  error: "Failed to archive task",
+};
+
 function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
     return "Task closed as completed.";
@@ -33,10 +48,6 @@ function closeToast(choice: SplitRunStopChoice): string {
     return "Task step started again.";
   }
   return "Task closed as failed.";
-}
-
-function rejectToast(): string {
-  return closeToast("canceled");
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
@@ -96,19 +107,25 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     }
   }, [busy, live, orderId, updateStatus]);
 
-  const handleReject = useCallback(async () => {
-    if (!live || !orderId || busy) {
-      return false;
-    }
-    try {
-      await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
-      showSuccessToast(rejectToast());
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close task"));
-      return false;
-    }
-  }, [busy, closeWorkOrder, live, orderId]);
+  const closeAsRejected = useCallback(
+    async (copy: RejectedCloseCopy) => {
+      if (!live || !orderId || busy) {
+        return false;
+      }
+      try {
+        await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
+        showSuccessToast(copy.success);
+        return true;
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, copy.error));
+        return false;
+      }
+    },
+    [busy, closeWorkOrder, live, orderId],
+  );
+
+  const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
+  const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
@@ -169,6 +186,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStop,
     handleStopAutomation,
     handleReject,
+    handleArchive,
     handleBackToDraft,
     busy,
   };

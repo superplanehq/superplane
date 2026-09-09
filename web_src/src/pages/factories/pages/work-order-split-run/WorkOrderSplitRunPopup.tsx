@@ -52,11 +52,22 @@ function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNu
   return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
 }
 
-function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
+function footerMutationHandlers(
+  canUpdate: boolean,
+  footerActions: SplitRunFooterActions,
+  fixture: SplitRunFixture,
+  onDismiss?: () => void,
+) {
   if (!canUpdate) {
     return {};
   }
   return {
+    onArchive: async () => {
+      const archived = await footerActions.handleArchive();
+      if (archived) {
+        onDismiss?.();
+      }
+    },
     onReject: () => void footerActions.handleReject(),
     onBackToDraft: () => footerActions.handleBackToDraft(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
@@ -277,7 +288,7 @@ export function WorkOrderSplitRunPopup({
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
   const edits = useSplitRunWorkOrderEdits({
     organizationId,
@@ -345,6 +356,7 @@ export function WorkOrderSplitRunPopup({
         canAct={canUpdate}
         canRefine={canRefine}
         onStart={draftStart}
+        onArchive={mutations.onArchive}
         onReject={mutations.onReject}
         onRefine={onRefine}
         onBackToDraft={backToDraft}

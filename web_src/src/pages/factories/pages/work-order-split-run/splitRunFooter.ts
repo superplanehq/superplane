@@ -9,7 +9,15 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "s
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "refine" | "approve" | "rerun" | "reopen" | "back-to-draft";
+export type SplitRunFooterActionKind =
+  | "start"
+  | "archive"
+  | "reject"
+  | "refine"
+  | "approve"
+  | "rerun"
+  | "reopen"
+  | "back-to-draft";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -147,6 +155,7 @@ export interface SplitRunFooter {
 }
 
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
 const REFINE: SplitRunFooterAction = {
   id: "refine",
   kind: "refine",
@@ -275,8 +284,8 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
- * Draft keeps Refine, Reject, and Start. A draft still under Backlog
- * analysis drops Reject; rejecting a task before its analysis finishes
+ * Draft keeps Refine, Archive, and Start. A draft still under Backlog
+ * analysis drops Archive; archiving a task before its analysis finishes
  * makes no sense. Closed failed keeps Reopen. Completed and rejected
  * explain the result only.
  */
@@ -323,7 +332,7 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
     sentence: "This task is a draft.",
     note,
     attentionCard: true,
-    actions: [REFINE, REJECT, START],
+    actions: [REFINE, ARCHIVE, START],
   });
 }
 
