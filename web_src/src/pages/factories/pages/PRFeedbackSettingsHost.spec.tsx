@@ -142,7 +142,7 @@ describe("PRFeedbackSettingsHost", () => {
     });
     expect(edit).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/apps/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
     );
     expect(edit.className).toContain("rounded-md");
     expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
@@ -150,7 +150,7 @@ describe("PRFeedbackSettingsHost", () => {
     const sidebar = within(automation).getByTestId("canvas-runs-sidebar");
     expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/apps/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",
     );
   });
 });

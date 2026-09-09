@@ -164,7 +164,7 @@ describe("RootOrganizationRedirect", () => {
     renderRedirect();
 
     await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent("/acme/workspaces/PAY/setup");
+      expect(screen.getByTestId("location")).toHaveTextContent("/acme/workspaces/pay/setup");
     });
   });
 

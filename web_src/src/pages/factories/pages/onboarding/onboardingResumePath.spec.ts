@@ -5,7 +5,7 @@ import { incompleteWorkspaceSetupPath, onboardingResumePath } from "./onboarding
 
 describe("onboardingResumePath", () => {
   it("maps first-run onboarding to the workspace setup path", () => {
-    expect(onboardingResumePath("acme", "PAY", "")).toBe("/acme/workspaces/PAY/setup");
+    expect(onboardingResumePath("acme", "PAY", "")).toBe("/acme/workspaces/pay/setup");
   });
 
   it("keeps the wizard step and GitHub install-request params", () => {
@@ -15,11 +15,11 @@ describe("onboardingResumePath", () => {
         "PAY",
         "?attempt=attempt-1&step=vcs&pick=newest&githubSetup=request&githubOrg=puppies",
       ),
-    ).toBe("/acme/workspaces/PAY/setup?step=vcs&pick=newest&githubSetup=request&githubOrg=puppies");
+    ).toBe("/acme/workspaces/pay/setup?step=vcs&pick=newest&githubSetup=request&githubOrg=puppies");
   });
 
   it("drops attempt and other first-run-only params", () => {
-    expect(onboardingResumePath("acme", "PAY", "?attempt=attempt-1&auth_error=1")).toBe("/acme/workspaces/PAY/setup");
+    expect(onboardingResumePath("acme", "PAY", "?attempt=attempt-1&auth_error=1")).toBe("/acme/workspaces/pay/setup");
   });
 });
 
@@ -30,7 +30,7 @@ describe("incompleteWorkspaceSetupPath", () => {
         { key: "DONE", onboarding: { completedAt: "2026-09-01T00:00:00.000Z" } } as FactoriesFactory,
         { key: "PAY", onboarding: {} } as FactoriesFactory,
       ]),
-    ).toBe("/acme/workspaces/PAY/setup");
+    ).toBe("/acme/workspaces/pay/setup");
   });
 
   it("returns null when every workspace is complete", () => {
