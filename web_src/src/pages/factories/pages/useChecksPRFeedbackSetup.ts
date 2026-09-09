@@ -1,6 +1,11 @@
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
-import { useCreateFactoryPRFeedbackHandler, useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
+import {
+  useAvailableIntegrations,
+  useConnectedIntegrations,
+  useCreateIntegration,
+  useIntegrationResources,
+} from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useMemo, useState } from "react";
 
@@ -12,7 +17,12 @@ import {
 } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
-export function useChecksPRFeedbackSetup(organizationId: string, factoryId: string, repository: string) {
+export function useChecksPRFeedbackSetup(
+  organizationId: string,
+  factoryId: string,
+  githubIntegrationId: string,
+  repository: string,
+) {
   const [step, setStep] = useState<"checks" | "tools">("checks");
   const [checkNames, setCheckNames] = useState<string[]>([]);
   const [runnerIntegrationIds, setRunnerIntegrationIds] = useState<string[]>([]);
@@ -21,7 +31,13 @@ export function useChecksPRFeedbackSetup(organizationId: string, factoryId: stri
   const [catalogApplied, setCatalogApplied] = useState(false);
   const [connectedApplied, setConnectedApplied] = useState(false);
 
-  const catalogQuery = useFactoryRepositoryStatusChecks(organizationId, factoryId, repository);
+  const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
+  const catalogQuery = useIntegrationResources(
+    organizationId,
+    githubIntegrationId,
+    "status_check",
+    catalogParameters,
+  );
   const catalog = catalogQuery.data ?? [];
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });

@@ -1,89 +1,41 @@
-import { describe, expect, it } from "vitest";
-
 import {
   catalogStatusCheckNames,
-  checksHandlerIntegrationRows,
-  hasSelectedSuggestedIntegration,
-  isChecksHandlerCIIntegration,
-  readyChecksHandlerIntegrationIds,
-  requiredStatusCheckNames,
   suggestedIntegrationsForChecks,
+  suggestIntegrationFromCheckURL,
 } from "./checksPRFeedbackSetup";
 
-describe("checksPRFeedbackSetup", () => {
-  it("collects required check names", () => {
-    expect(
-      requiredStatusCheckNames([
-        { name: "lint", required: true },
-        { name: "unit", required: false },
-        { required: true },
-      ]),
-    ).toEqual(["lint"]);
-  });
-
-  it("collects every catalog check name", () => {
+describe("checksPRFeedbackSetup helpers", () => {
+  it("collects catalog check names", () => {
     expect(
       catalogStatusCheckNames([
-        { name: "lint", required: true },
-        { name: "unit", required: false },
-        { name: "  ", required: false },
-        { required: true },
+        { name: "lint" },
+        { name: "unit" },
+        { name: "  " },
+        {},
       ]),
     ).toEqual(["lint", "unit"]);
   });
 
-  it("suggests integrations only for selected checks", () => {
-    expect(
-      suggestedIntegrationsForChecks(
-        [
-          { name: "lint", suggestedIntegration: "semaphore" },
-          { name: "e2e", suggestedIntegration: "circleci" },
-          { name: "actions", suggestedIntegration: "github" },
-        ],
-        ["lint", "actions"],
-      ),
-    ).toEqual(["semaphore"]);
+  it("suggests integrations from check urls", () => {
+    expect(suggestIntegrationFromCheckURL("https://acme.semaphoreci.com/workflows/abc")).toBe("semaphore");
+    expect(suggestIntegrationFromCheckURL("https://app.circleci.com/pipelines/github/acme/api/12")).toBe("circleci");
+    expect(suggestIntegrationFromCheckURL("https://github.com/acme/api/actions/runs/99")).toBe("");
+    expect(suggestIntegrationFromCheckURL("")).toBe("");
   });
 
   it("keeps only common status-check integrations", () => {
-    expect(isChecksHandlerCIIntegration("Semaphore")).toBe(true);
-    expect(isChecksHandlerCIIntegration("slack")).toBe(false);
-    expect(suggestedIntegrationsForChecks([{ name: "lint", suggestedIntegration: "jenkins" }], ["lint"])).toEqual([]);
-  });
-
-  it("lists connected instances as selectable rows and types without a connection", () => {
     expect(
-      checksHandlerIntegrationRows(
+      suggestedIntegrationsForChecks(
         [
-          { name: "circleci", label: "CircleCI" },
-          { name: "semaphore", label: "Semaphore" },
+          { name: "lint", url: "https://acme.semaphoreci.com/workflows/1" },
+          { name: "e2e", url: "https://app.circleci.com/pipelines/1" },
+          { name: "actions", url: "https://github.com/acme/api/actions/runs/1" },
         ],
-        [
-          {
-            metadata: { id: "int-cci", name: "circleci-prod", integrationName: "circleci" },
-          },
-        ],
+        ["lint", "e2e", "actions"],
       ),
-    ).toEqual([
-      { type: "circleci", displayName: "circleci-prod", instanceId: "int-cci" },
-      { type: "semaphore", displayName: "Semaphore" },
-    ]);
-  });
-
-  it("collects ready CI integration ids", () => {
+    ).toEqual(["semaphore", "circleci"]);
     expect(
-      readyChecksHandlerIntegrationIds([
-        { metadata: { id: "int-cci", integrationName: "circleci" }, status: { state: "ready" } },
-        { metadata: { id: "int-slack", integrationName: "slack" }, status: { state: "ready" } },
-        { metadata: { id: "int-sem", integrationName: "semaphore" }, status: { state: "broken" } },
-      ]),
-    ).toEqual(["int-cci"]);
-  });
-
-  it("detects when a suggested integration is selected", () => {
-    const ready = [{ metadata: { id: "int-cci", integrationName: "circleci" } }];
-    expect(hasSelectedSuggestedIntegration(["circleci"], ["int-cci"], ready)).toBe(true);
-    expect(hasSelectedSuggestedIntegration(["circleci"], [], ready)).toBe(false);
-    expect(hasSelectedSuggestedIntegration([], ["int-cci"], ready)).toBe(false);
+      suggestedIntegrationsForChecks([{ name: "lint", url: "https://ci.example.com/job/lint" }], ["lint"]),
+    ).toEqual([]);
   });
 });

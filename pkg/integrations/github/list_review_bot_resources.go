@@ -1,37 +1,48 @@
-package factories
+package github
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 const (
-	repositoryReviewBotsRecentPRLimit = 5
-	superplaneAgentBotLogin           = "superplaneagent"
+	reviewBotRecentPRLimit  = 5
+	superplaneAgentBotLogin = "superplaneagent"
 )
 
-type githubReviewBotsAPI interface {
+type githubReviewBotAPI interface {
 	ListPullRequests(ctx context.Context, repository string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
 	ListReviews(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestReview, error)
 	ListIssueComments(ctx context.Context, repository string, issueNumber int) ([]*github.IssueComment, error)
 	ListPullRequestComments(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestComment, error)
 }
 
-type repositoryReviewBot struct {
-	Login       string
-	DisplayName string
+func (g *GitHub) listReviewBotResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := strings.TrimSpace(ctx.Parameters["repository"])
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	return listReviewBotResourcesFromClient(context.Background(), client, repository)
 }
 
-func listRepositoryReviewBotsFromClient(ctx context.Context, client githubReviewBotsAPI, repository string) ([]repositoryReviewBot, error) {
+func listReviewBotResourcesFromClient(ctx context.Context, client githubReviewBotAPI, repository string) ([]core.IntegrationResource, error) {
 	pulls, err := recentReviewBotPullRequests(ctx, client, repository)
 	if err != nil {
 		return nil, err
 	}
 
-	bots := map[string]repositoryReviewBot{}
+	bots := map[string]core.IntegrationResource{}
 	for _, pull := range pulls {
 		if pull == nil {
 			continue
@@ -40,17 +51,22 @@ func listRepositoryReviewBotsFromClient(ctx context.Context, client githubReview
 		if number <= 0 {
 			continue
 		}
-		collectReviewBotsFromPull(ctx, client, repository, number, bots)
+		collectReviewBotResourcesFromPull(ctx, client, repository, number, bots)
 	}
-	return serializedReviewBots(bots), nil
+
+	out := make([]core.IntegrationResource, 0, len(bots))
+	for _, bot := range bots {
+		out = append(out, bot)
+	}
+	return out, nil
 }
 
-func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotsAPI, repository string) ([]*github.PullRequest, error) {
-	pulls := make([]*github.PullRequest, 0, repositoryReviewBotsRecentPRLimit)
+func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotAPI, repository string) ([]*github.PullRequest, error) {
+	pulls := make([]*github.PullRequest, 0, reviewBotRecentPRLimit)
 	seen := map[int]struct{}{}
 	add := func(candidates []*github.PullRequest) {
 		for _, pull := range candidates {
-			if pull == nil || len(pulls) >= repositoryReviewBotsRecentPRLimit {
+			if pull == nil || len(pulls) >= reviewBotRecentPRLimit {
 				return
 			}
 			number := pull.GetNumber()
@@ -67,7 +83,7 @@ func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotsAPI
 
 	var firstErr error
 	for _, state := range []string{"closed", "open"} {
-		if len(pulls) >= repositoryReviewBotsRecentPRLimit {
+		if len(pulls) >= reviewBotRecentPRLimit {
 			break
 		}
 		page, _, err := client.ListPullRequests(ctx, repository, &github.PullRequestListOptions{
@@ -75,7 +91,7 @@ func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotsAPI
 			Sort:      "updated",
 			Direction: "desc",
 			ListOptions: github.ListOptions{
-				PerPage: repositoryReviewBotsRecentPRLimit,
+				PerPage: reviewBotRecentPRLimit,
 			},
 		})
 		if err != nil {
@@ -92,19 +108,19 @@ func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotsAPI
 	return pulls, nil
 }
 
-func collectReviewBotsFromPull(
+func collectReviewBotResourcesFromPull(
 	ctx context.Context,
-	client githubReviewBotsAPI,
+	client githubReviewBotAPI,
 	repository string,
 	number int,
-	bots map[string]repositoryReviewBot,
+	bots map[string]core.IntegrationResource,
 ) {
 	if reviews, err := client.ListReviews(ctx, repository, number); err == nil {
 		for _, review := range reviews {
 			if review == nil {
 				continue
 			}
-			collectReviewBotUser(bots, review.GetUser())
+			collectReviewBotResource(bots, review.GetUser())
 		}
 	}
 	if comments, err := client.ListIssueComments(ctx, repository, number); err == nil {
@@ -112,7 +128,7 @@ func collectReviewBotsFromPull(
 			if comment == nil {
 				continue
 			}
-			collectReviewBotUser(bots, comment.GetUser())
+			collectReviewBotResource(bots, comment.GetUser())
 		}
 	}
 	if comments, err := client.ListPullRequestComments(ctx, repository, number); err == nil {
@@ -120,12 +136,12 @@ func collectReviewBotsFromPull(
 			if comment == nil {
 				continue
 			}
-			collectReviewBotUser(bots, comment.GetUser())
+			collectReviewBotResource(bots, comment.GetUser())
 		}
 	}
 }
 
-func collectReviewBotUser(bots map[string]repositoryReviewBot, user *github.User) {
+func collectReviewBotResource(bots map[string]core.IntegrationResource, user *github.User) {
 	if !isReviewBotUser(user) {
 		return
 	}
@@ -137,7 +153,11 @@ func collectReviewBotUser(bots map[string]repositoryReviewBot, user *github.User
 	if _, exists := bots[login]; exists {
 		return
 	}
-	bots[login] = repositoryReviewBot{Login: login, DisplayName: displayName}
+	bots[login] = core.IntegrationResource{
+		Type: "review_bot",
+		Name: displayName,
+		ID:   login,
+	}
 }
 
 func isReviewBotUser(user *github.User) bool {
@@ -159,16 +179,4 @@ func normalizeReviewBotLogin(name string) string {
 	name = strings.TrimPrefix(name, "@")
 	name = strings.TrimSuffix(name, "[bot]")
 	return name
-}
-
-func serializedReviewBots(bots map[string]repositoryReviewBot) []repositoryReviewBot {
-	out := make([]repositoryReviewBot, 0, len(bots))
-	for _, bot := range bots {
-		out = append(out, bot)
-	}
-	return out
-}
-
-func loadReviewBotsFromGitHubClient(ctx context.Context, client *common.Client, repository string) ([]repositoryReviewBot, error) {
-	return listRepositoryReviewBotsFromClient(ctx, client, repository)
 }

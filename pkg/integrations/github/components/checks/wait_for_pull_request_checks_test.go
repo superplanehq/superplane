@@ -321,10 +321,10 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 		startedAt := time.Now().Add(-time.Minute)
 
 		err := component.HandleHook(core.ActionHookContext{
-			Name:          waitChecksEvaluateHook,
-			Configuration: config,
-			HTTP:          httpCtx,
-			Integration:   mocks.IntegrationContextForNewSetupFlow(),
+			Name:           waitChecksEvaluateHook,
+			Configuration:  config,
+			HTTP:           httpCtx,
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: executionState,
 			Metadata: &contexts.MetadataContext{
 				Metadata: WaitForPullRequestChecksMetadata{
@@ -349,10 +349,10 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 		startedAt := time.Now().Add(-time.Minute).UTC().Truncate(time.Second)
 
 		err := component.HandleHook(core.ActionHookContext{
-			Name:          waitChecksEvaluateHook,
-			Configuration: config,
-			HTTP:          httpCtx,
-			Integration:   mocks.IntegrationContextForNewSetupFlow(),
+			Name:           waitChecksEvaluateHook,
+			Configuration:  config,
+			HTTP:           httpCtx,
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: executionState,
 			Metadata: &contexts.MetadataContext{
 				Metadata: persistWaitChecksMetadata(t, WaitForPullRequestChecksMetadata{

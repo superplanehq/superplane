@@ -18,16 +18,16 @@ import (
 )
 
 const (
-	WaitForPullRequestChecksName      = "github.waitForPullRequestChecks"
-	waitChecksEvaluateHook            = "evaluate"
-	waitChecksRefKV                   = "waitChecksRef"
-	waitChecksPayloadType             = "github.pullRequestChecks"
-	waitChecksPassedChannel           = "passed"
-	waitChecksFailedChannel           = "failed"
-	waitChecksTimedOutChannel         = "timedOut"
-	waitChecksDefaultTimeoutSeconds   = 3600
-	waitChecksPollInterval            = 5 * time.Minute
-	waitChecksWebhookDelay            = time.Second
+	WaitForPullRequestChecksName    = "github.waitForPullRequestChecks"
+	waitChecksEvaluateHook          = "evaluate"
+	waitChecksRefKV                 = "waitChecksRef"
+	waitChecksPayloadType           = "github.pullRequestChecks"
+	waitChecksPassedChannel         = "passed"
+	waitChecksFailedChannel         = "failed"
+	waitChecksTimedOutChannel       = "timedOut"
+	waitChecksDefaultTimeoutSeconds = 3600
+	waitChecksPollInterval          = 5 * time.Minute
+	waitChecksWebhookDelay          = time.Second
 )
 
 type WaitForPullRequestChecks struct{}

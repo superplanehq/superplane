@@ -1,9 +1,8 @@
+import type { OrganizationsIntegrationResourceRef } from "@/api-client";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
-
-import type { FactoriesFactoryRepositoryStatusCheck } from "@/api-client";
 
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsModel";
 
@@ -16,7 +15,7 @@ export function StatusCheckPicker({
   hideHeading = false,
 }: {
   names: string[];
-  catalog: FactoriesFactoryRepositoryStatusCheck[];
+  catalog: OrganizationsIntegrationResourceRef[];
   loading?: boolean;
   loadError?: boolean;
   onToggle: (name: string) => void;
@@ -84,11 +83,6 @@ export function StatusCheckPicker({
                       data-testid={`pr-feedback-check-option-${row.name}`}
                     >
                       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{row.name}</span>
-                      {row.required ? (
-                        <span className="text-[11px] text-muted-foreground">
-                          {PR_FEEDBACK_SETTINGS_COPY.checkNamesRequired}
-                        </span>
-                      ) : null}
                       {isSelected ? (
                         <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
                       ) : null}
@@ -116,10 +110,10 @@ export function StatusCheckPicker({
 }
 
 export function statusCheckRows(
-  catalog: FactoriesFactoryRepositoryStatusCheck[],
+  catalog: OrganizationsIntegrationResourceRef[],
   names: string[],
-): Array<{ name: string; required?: boolean }> {
-  const rows: Array<{ name: string; required?: boolean }> = [];
+): Array<{ name: string }> {
+  const rows: Array<{ name: string }> = [];
   const seen = new Set<string>();
 
   for (const check of catalog) {
@@ -132,7 +126,7 @@ export function statusCheckRows(
       continue;
     }
     seen.add(key);
-    rows.push({ name, required: check.required });
+    rows.push({ name });
   }
 
   for (const name of names) {

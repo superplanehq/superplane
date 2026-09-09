@@ -2,8 +2,7 @@ import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useFactoryRepositoryReviewBots, useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { cn } from "@/lib/utils";
@@ -82,19 +81,24 @@ export function PRFeedbackTextField({
 
 export function PRFeedbackChecksFields({
   organizationId,
-  factoryId,
+  githubIntegrationId,
   draft,
   onUpdate,
 }: {
   organizationId?: string;
-  factoryId?: string;
+  githubIntegrationId?: string;
   draft: PRFeedbackDraftSettings;
   onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
 }) {
-  const catalogEnabled = Boolean(organizationId && factoryId);
-  const catalogQuery = useFactoryRepositoryStatusChecks(organizationId ?? "", factoryId ?? "", draft.repository, {
-    enabled: catalogEnabled,
-  });
+  const catalogEnabled = Boolean(organizationId && githubIntegrationId);
+  const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
+  const catalogQuery = useIntegrationResources(
+    organizationId ?? "",
+    githubIntegrationId ?? "",
+    "status_check",
+    catalogParameters,
+    { enabled: catalogEnabled },
+  );
   return (
     <>
       <StatusCheckPicker
@@ -125,21 +129,26 @@ export function PRFeedbackChecksFields({
 
 export function PRFeedbackDiscussionFields({
   organizationId,
-  factoryId,
+  githubIntegrationId,
   draft,
   onUpdate,
 }: {
   organizationId?: string;
-  factoryId?: string;
+  githubIntegrationId?: string;
   draft: PRFeedbackDraftSettings;
   onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
 }) {
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
-  const catalogEnabled = Boolean(organizationId && factoryId);
-  const catalogQuery = useFactoryRepositoryReviewBots(organizationId ?? "", factoryId ?? "", draft.repository, {
-    enabled: catalogEnabled && botMode === "address",
-  });
+  const catalogEnabled = Boolean(organizationId && githubIntegrationId);
+  const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
+  const catalogQuery = useIntegrationResources(
+    organizationId ?? "",
+    githubIntegrationId ?? "",
+    "review_bot",
+    catalogParameters,
+    { enabled: catalogEnabled && botMode === "address" },
+  );
   const catalog = catalogReviewBots(catalogQuery.data ?? []);
 
   const setBotModeAndDraft = (mode: DiscussionBotMode) => {

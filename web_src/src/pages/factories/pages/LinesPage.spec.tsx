@@ -127,8 +127,6 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: createFactoryPRFeedbackHandler, isPending: false }),
   useUpdateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useFactoryRepositoryStatusChecks: () => ({ data: [], isLoading: false, isError: false }),
-  useFactoryRepositoryReviewBots: () => ({ data: [], isLoading: false, isError: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({

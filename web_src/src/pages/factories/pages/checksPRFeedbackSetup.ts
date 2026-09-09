@@ -1,4 +1,4 @@
-import type { FactoriesFactoryRepositoryStatusCheck } from "@/api-client";
+import type { OrganizationsIntegrationResourceRef } from "@/api-client";
 
 export type ChecksPRFeedbackSetupStep = "checks" | "tools";
 
@@ -8,16 +8,42 @@ export function isChecksHandlerCIIntegration(name: string | undefined): boolean 
   return CHECKS_HANDLER_CI_INTEGRATIONS.has(name?.trim().toLowerCase() ?? "");
 }
 
-export function requiredStatusCheckNames(catalog: FactoriesFactoryRepositoryStatusCheck[]): string[] {
-  return catalog.flatMap((check) => (check.required && check.name ? [check.name] : []));
-}
-
-export function catalogStatusCheckNames(catalog: FactoriesFactoryRepositoryStatusCheck[]): string[] {
+export function catalogStatusCheckNames(catalog: OrganizationsIntegrationResourceRef[]): string[] {
   return catalog.flatMap((check) => (check.name?.trim() ? [check.name.trim()] : []));
 }
 
+export function suggestIntegrationFromCheckURL(rawURL: string | undefined): string {
+  const value = rawURL?.trim();
+  if (!value) {
+    return "";
+  }
+  let host = "";
+  try {
+    host = new URL(value).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+  if (!host) {
+    return "";
+  }
+  if (hostHasSuffix(host, "semaphoreci.com") || hostHasSuffix(host, "semaphore.com")) {
+    return "semaphore";
+  }
+  if (hostHasSuffix(host, "circleci.com")) {
+    return "circleci";
+  }
+  if (hostHasSuffix(host, "harness.io")) {
+    return "harness";
+  }
+  return "";
+}
+
+function hostHasSuffix(host: string, suffix: string): boolean {
+  return host === suffix || host.endsWith(`.${suffix}`);
+}
+
 export function suggestedIntegrationsForChecks(
-  catalog: FactoriesFactoryRepositoryStatusCheck[],
+  catalog: OrganizationsIntegrationResourceRef[],
   selectedNames: string[],
 ): string[] {
   const selected = new Set(selectedNames.map((name) => name.toLowerCase()));
@@ -26,7 +52,7 @@ export function suggestedIntegrationsForChecks(
     if (!check.name || !selected.has(check.name.toLowerCase())) {
       continue;
     }
-    const integration = check.suggestedIntegration?.trim().toLowerCase();
+    const integration = suggestIntegrationFromCheckURL(check.url);
     if (!isChecksHandlerCIIntegration(integration)) {
       continue;
     }

@@ -3,10 +3,9 @@ import {
   useCreateFactoryPRFeedbackHandler,
   useDeleteFactoryPRFeedbackHandler,
   useFactoryPRFeedbackHandlers,
-  useFactoryRepositoryReviewBots,
-  useFactoryRepositoryStatusChecks,
   useUpdateFactoryPRFeedbackHandler,
 } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
@@ -32,6 +31,8 @@ interface PRFeedbackSettingsHostProps {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  githubIntegrationId?: string;
+  repository?: string;
   lineId?: string;
   canUpdate: boolean;
   handlerId?: string | null;
@@ -44,6 +45,8 @@ export function PRFeedbackSettingsHost({
   organizationId,
   factoryId,
   factoryKey,
+  githubIntegrationId = "",
+  repository = "",
   lineId,
   canUpdate,
   handlerId,
@@ -54,11 +57,12 @@ export function PRFeedbackSettingsHost({
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const [pickerOpen, setPickerOpen] = useState(false);
-  useFactoryRepositoryStatusChecks(organizationId, factoryId, "", {
-    enabled: pickerOpen,
+  const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
   });
-  useFactoryRepositoryReviewBots(organizationId, factoryId, "", {
-    enabled: pickerOpen,
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
   });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
@@ -130,6 +134,7 @@ export function PRFeedbackSettingsHost({
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
+      githubIntegrationId={githubIntegrationId}
       lineId={lineId}
       canUpdate={canUpdate}
       initialTab={initialTab}
@@ -146,6 +151,7 @@ function PRFeedbackSettingsLoaded({
   organizationId,
   factoryId,
   factoryKey,
+  githubIntegrationId,
   lineId,
   canUpdate,
   initialTab,
@@ -158,6 +164,7 @@ function PRFeedbackSettingsLoaded({
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  githubIntegrationId: string;
   lineId?: string;
   canUpdate: boolean;
   initialTab?: PRFeedbackSettingsTab;
@@ -179,7 +186,7 @@ function PRFeedbackSettingsLoaded({
   return (
     <PRFeedbackSettingsPopup
       organizationId={organizationId}
-      factoryId={factoryId}
+      githubIntegrationId={githubIntegrationId}
       settings={settings}
       healthy={healthy}
       automationGraph={automation.graph}

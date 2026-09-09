@@ -10,19 +10,22 @@ const mocks = vi.hoisted(() => ({
   createHandler: vi.fn(),
   fetching: false,
   catalog: [
-    { login: "coderabbitai", displayName: "coderabbitai[bot]" },
-    { login: "bugbot", displayName: "bugbot[bot]" },
+    { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+    { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
   ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
-  useFactoryRepositoryReviewBots: () => ({
+  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: mocks.createHandler, isPending: false }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
     data: mocks.catalog,
     isPending: false,
     isFetching: mocks.fetching,
     isError: false,
   }),
-  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: mocks.createHandler, isPending: false }),
 }));
 
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
@@ -34,8 +37,8 @@ Element.prototype.scrollIntoView ??= () => undefined;
 const discussionSource = PR_FEEDBACK_SOURCES.find((source) => source.id === "discussion")!;
 
 const defaultCatalog = [
-  { login: "coderabbitai", displayName: "coderabbitai[bot]" },
-  { login: "bugbot", displayName: "bugbot[bot]" },
+  { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+  { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
 ];
 
 async function openBotsStep(user: ReturnType<typeof userEvent.setup>) {
@@ -76,6 +79,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       <DiscussionPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/app"
         source={discussionSource}
         onClose={onClose}
@@ -114,6 +118,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       <DiscussionPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/app"
         source={discussionSource}
         onClose={vi.fn()}
@@ -148,6 +153,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       <DiscussionPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/app"
         source={discussionSource}
         onClose={onClose}
@@ -180,6 +186,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       <DiscussionPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/app"
         source={discussionSource}
         onClose={vi.fn()}

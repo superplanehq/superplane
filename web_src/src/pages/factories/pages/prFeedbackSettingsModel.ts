@@ -116,7 +116,6 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   checkNamesLoading: "Loading status checks",
   checkNamesLoadingDetail: "Reading recent pull requests and the required status checks for this repository...",
   checkNamesLoadingMore: "Loading other status checks...",
-  checkNamesRequired: "Required",
   checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
   wizardTitle: "Fix pull request checks",
   wizardPageTitleComments: "How should pull request comments be handled?",

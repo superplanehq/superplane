@@ -287,32 +287,6 @@ service Factories {
     };
   }
 
-  rpc ListFactoryRepositoryStatusChecks(
-    ListFactoryRepositoryStatusChecksRequest
-  ) returns (ListFactoryRepositoryStatusChecksResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/repository-status-checks"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory repository status checks";
-      description: "Returns required and recently observed GitHub status checks for a factory repository";
-      tags: "Factory";
-    };
-  }
-
-  rpc ListFactoryRepositoryReviewBots(
-    ListFactoryRepositoryReviewBotsRequest
-  ) returns (ListFactoryRepositoryReviewBotsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/repository-review-bots"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory repository review bots";
-      description: "Returns bot authors from recent pull request reviews and comments for a factory repository";
-      tags: "Factory";
-    };
-  }
-
   rpc ListFactoryPullRequests(
     ListFactoryPullRequestsRequest
   ) returns (ListFactoryPullRequestsResponse) {
@@ -1181,38 +1155,6 @@ message DeleteFactoryPRFeedbackHandlerRequest {
 }
 
 message DeleteFactoryPRFeedbackHandlerResponse {}
-
-message FactoryRepositoryStatusCheck {
-  string name = 1;
-  bool required = 2;
-  string details_url = 3;
-  string suggested_integration = 4;
-}
-
-message ListFactoryRepositoryStatusChecksRequest {
-  string factory_id = 1;
-  string repository = 2;
-}
-
-message ListFactoryRepositoryStatusChecksResponse {
-  string repository = 1;
-  repeated FactoryRepositoryStatusCheck checks = 2;
-}
-
-message FactoryRepositoryReviewBot {
-  string login = 1;
-  string display_name = 2;
-}
-
-message ListFactoryRepositoryReviewBotsRequest {
-  string factory_id = 1;
-  string repository = 2;
-}
-
-message ListFactoryRepositoryReviewBotsResponse {
-  string repository = 1;
-  repeated FactoryRepositoryReviewBot bots = 2;
-}
 
 message FactoryPullRequestRun {
   string description = 1;

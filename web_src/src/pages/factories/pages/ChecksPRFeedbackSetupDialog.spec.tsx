@@ -9,8 +9,13 @@ const mocks = vi.hoisted(() => ({
   createHandler: vi.fn(),
   fetching: false,
   catalog: [
-    { name: "lint", required: true },
-    { name: "e2e", required: false, suggestedIntegration: "circleci" },
+    { type: "status_check", id: "lint", name: "lint" },
+    {
+      type: "status_check",
+      id: "e2e",
+      name: "e2e",
+      url: "https://app.circleci.com/pipelines/github/acme/api/1",
+    },
   ],
   connected: [] as Array<{
     metadata: { id: string; name: string; integrationName: string };
@@ -19,16 +24,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
-  useFactoryRepositoryStatusChecks: () => ({
+  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: mocks.createHandler, isPending: false }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
     data: mocks.catalog,
     isPending: false,
     isFetching: mocks.fetching,
     isError: false,
   }),
-  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: mocks.createHandler, isPending: false }),
-}));
-
-vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: () => ({
     data: mocks.connected,
     isPending: false,
@@ -60,8 +65,13 @@ Element.prototype.scrollIntoView ??= () => undefined;
 const checksSource = PR_FEEDBACK_SOURCES.find((source) => source.id === "checks")!;
 
 const defaultCatalog = [
-  { name: "lint", required: true },
-  { name: "e2e", required: false, suggestedIntegration: "circleci" },
+  { type: "status_check", id: "lint", name: "lint" },
+  {
+    type: "status_check",
+    id: "e2e",
+    name: "e2e",
+    url: "https://app.circleci.com/pipelines/github/acme/api/1",
+  },
 ];
 
 describe("ChecksPRFeedbackSetupDialog", () => {
@@ -80,6 +90,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -96,13 +107,14 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-continue")).toBeDisabled();
   });
 
-  it("preselects required checks and creates the handler after the tools step", async () => {
+  it("preselects catalog checks and creates the handler after the tools step", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     render(
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -129,12 +141,18 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("integration-create-dialog")).toBeInTheDocument();
   });
 
-  it("preselects observed checks when none are required", async () => {
-    mocks.catalog.splice(0, mocks.catalog.length, { name: "e2e", required: false, suggestedIntegration: "circleci" });
+  it("preselects observed checks from the catalog", async () => {
+    mocks.catalog.splice(0, mocks.catalog.length, {
+      type: "status_check",
+      id: "e2e",
+      name: "e2e",
+      url: "https://app.circleci.com/pipelines/github/acme/api/1",
+    });
     render(
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -155,6 +173,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -178,6 +197,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -212,11 +232,12 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
   it("warns when no CI tool is suggested and still lets the user finish", async () => {
     const user = userEvent.setup();
-    mocks.catalog.splice(0, mocks.catalog.length, { name: "lint", required: true });
+    mocks.catalog.splice(0, mocks.catalog.length, { type: "status_check", id: "lint", name: "lint" });
     render(
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}
@@ -244,6 +265,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        githubIntegrationId="gh-1"
         repository="acme/api"
         source={checksSource}
         onClose={vi.fn()}

@@ -1,4 +1,5 @@
-import { useCreateFactoryPRFeedbackHandler, useFactoryRepositoryReviewBots } from "@/hooks/useFactoryPRFeedbackData";
+import { useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useState } from "react";
 
@@ -9,11 +10,11 @@ export const DISCUSSION_MENTION = "@superplaneagent";
 
 export type DiscussionBotMode = "ignore" | "address";
 
-export function catalogReviewBots(catalog: Array<{ login?: string; displayName?: string }>): ReviewBotOption[] {
+export function catalogReviewBots(catalog: Array<{ id?: string; name?: string }>): ReviewBotOption[] {
   const seen = new Set<string>();
   const bots: ReviewBotOption[] = [];
   for (const bot of catalog) {
-    const login = bot.login?.trim();
+    const login = bot.id?.trim();
     if (!login) {
       continue;
     }
@@ -22,7 +23,7 @@ export function catalogReviewBots(catalog: Array<{ login?: string; displayName?:
       continue;
     }
     seen.add(key);
-    bots.push({ login, displayName: bot.displayName?.trim() || login });
+    bots.push({ login, displayName: bot.name?.trim() || login });
   }
   return bots;
 }
@@ -37,7 +38,12 @@ export function discussionBotSettings(
   return { ignoreBots: true, allowedBots: [] };
 }
 
-export function useDiscussionPRFeedbackSetup(organizationId: string, factoryId: string, repository: string) {
+export function useDiscussionPRFeedbackSetup(
+  organizationId: string,
+  factoryId: string,
+  githubIntegrationId: string,
+  repository: string,
+) {
   const [step, setStep] = useState<"mention" | "bots">("mention");
   const [mentionRequired, setMentionRequired] = useState(true);
   const [botMode, setBotMode] = useState<DiscussionBotMode>("ignore");
@@ -45,7 +51,13 @@ export function useDiscussionPRFeedbackSetup(organizationId: string, factoryId: 
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
 
-  const catalogQuery = useFactoryRepositoryReviewBots(organizationId, factoryId, repository);
+  const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
+  const catalogQuery = useIntegrationResources(
+    organizationId,
+    githubIntegrationId,
+    "review_bot",
+    catalogParameters,
+  );
   const catalog = catalogReviewBots(catalogQuery.data ?? []);
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);

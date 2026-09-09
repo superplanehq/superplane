@@ -14,6 +14,7 @@ import {
 interface DiscussionPRFeedbackSetupDialogProps {
   organizationId: string;
   factoryId: string;
+  githubIntegrationId: string;
   repository: string;
   source: PRFeedbackSource;
   onClose: () => void;
@@ -21,7 +22,12 @@ interface DiscussionPRFeedbackSetupDialogProps {
 }
 
 export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetupDialogProps) {
-  const setup = useDiscussionPRFeedbackSetup(props.organizationId, props.factoryId, props.repository);
+  const setup = useDiscussionPRFeedbackSetup(
+    props.organizationId,
+    props.factoryId,
+    props.githubIntegrationId,
+    props.repository,
+  );
   const canLeaveStep = setup.step === "bots";
 
   return (

@@ -15,9 +15,8 @@ import {
 } from "@/hooks/useFactoryData";
 import {
   useFactoryPRFeedbackHandlers,
-  useFactoryRepositoryReviewBots,
-  useFactoryRepositoryStatusChecks,
 } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
@@ -247,11 +246,13 @@ export function LinesPage() {
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
-  useFactoryRepositoryStatusChecks(organizationId, factoryId, appRepository, {
-    enabled: addPRFeedbackOpen,
+  const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const catalogParameters = appRepository ? { repository: appRepository } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
   });
-  useFactoryRepositoryReviewBots(organizationId, factoryId, appRepository, {
-    enabled: addPRFeedbackOpen,
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -469,12 +470,15 @@ export function LinesPage() {
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          githubIntegrationId={githubIntegrationId}
+          repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
-        />      ) : null}
+        />
+      ) : null}
       <div className={factoryKanbanPageClassName}>
         <div className="shrink-0">
           <LineDetailHeader

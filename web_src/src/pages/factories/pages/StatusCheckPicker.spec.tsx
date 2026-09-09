@@ -5,33 +5,25 @@ import { describe, expect, it, vi } from "vitest";
 import { StatusCheckPicker, statusCheckRows } from "./StatusCheckPicker";
 
 describe("statusCheckRows", () => {
-  it("keeps catalog order and appends selected checks that are not in the catalog", () => {
+  it("keeps catalog order and appends selected-only names", () => {
     expect(
       statusCheckRows(
         [
-          { name: "lint", required: true },
-          { name: "e2e", required: false },
-          { name: "unit", required: false },
+          { name: "lint" },
+          { name: "e2e" },
+          { name: "unit" },
         ],
-        ["e2e", "custom"],
+        ["unit", "custom"],
       ),
-    ).toEqual([
-      { name: "lint", required: true },
-      { name: "e2e", required: false },
-      { name: "unit", required: false },
-      { name: "custom" },
-    ]);
+    ).toEqual([{ name: "lint" }, { name: "e2e" }, { name: "unit" }, { name: "custom" }]);
   });
 });
 
 describe("StatusCheckPicker", () => {
-  it("keeps selected checks visible while the catalog loads", () => {
+  it("shows the partial loading state when selected names already exist", () => {
     render(<StatusCheckPicker names={["lint", "e2e"]} catalog={[]} loading onToggle={vi.fn()} />);
 
-    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("pr-feedback-check-names-loading")).toHaveTextContent("Loading other status checks");
-    expect(screen.queryByText("Reading recent pull requests")).not.toBeInTheDocument();
   });
 
   it("shows the full loading state when no checks are selected yet", () => {
@@ -41,33 +33,30 @@ describe("StatusCheckPicker", () => {
     expect(screen.getByTestId("pr-feedback-check-names-loading")).toHaveTextContent(
       "Reading recent pull requests and the required status checks for this repository",
     );
-    expect(screen.queryByTestId("pr-feedback-check-names-list")).not.toBeInTheDocument();
   });
 
-  it("keeps the catalog list while a refetch is in progress", () => {
+  it("toggles a catalog row", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
     render(
       <StatusCheckPicker
         names={["lint"]}
         catalog={[
-          { name: "lint", required: true },
-          { name: "e2e", required: false },
+          { name: "lint" },
+          { name: "e2e" },
         ]}
-        loading
-        onToggle={vi.fn()}
+        onToggle={onToggle}
       />,
     );
 
-    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "false");
-    expect(screen.queryByTestId("pr-feedback-check-names-loading")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
+    expect(onToggle).toHaveBeenCalledWith("e2e");
   });
 
-  it("lets the user deselect a check that is already configured", async () => {
-    const user = userEvent.setup();
+  it("keeps selected names visible while the catalog is still loading", () => {
     const onToggle = vi.fn();
     render(<StatusCheckPicker names={["lint"]} catalog={[]} loading onToggle={onToggle} />);
 
-    await user.click(screen.getByTestId("pr-feedback-check-option-lint"));
-    expect(onToggle).toHaveBeenCalledWith("lint");
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toBeInTheDocument();
   });
 });

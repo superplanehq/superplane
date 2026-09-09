@@ -27,6 +27,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
   const line = factory?.lines?.find((entry) => entry.id === lineId);
   const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
   const repository = factory?.onboarding?.appRepository?.trim() ?? "";
+  const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
   const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
   const pageTitle =
     kind === "checks"
@@ -57,6 +58,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
           <ChecksPRFeedbackSetupDialog
             organizationId={organizationId}
             factoryId={factoryId}
+            githubIntegrationId={githubIntegrationId}
             repository={repository}
             source={source}
             onClose={close}
@@ -66,6 +68,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
           <DiscussionPRFeedbackSetupDialog
             organizationId={organizationId}
             factoryId={factoryId}
+            githubIntegrationId={githubIntegrationId}
             repository={repository}
             source={source}
             onClose={close}

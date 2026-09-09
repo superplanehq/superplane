@@ -5,8 +5,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -27,18 +26,8 @@ vi.mock("@monaco-editor/react", () => ({
 
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: vi.fn(() => ({ data: [] })),
-}));
-
-vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
-  useFactoryRepositoryStatusChecks: vi.fn(() => ({
+  useIntegrationResources: vi.fn(() => ({
     data: [],
-    isLoading: false,
-    isPending: false,
-    isFetching: false,
-    isError: false,
-  })),
-  useFactoryRepositoryReviewBots: vi.fn(() => ({
-    data: [{ login: "coderabbitai", displayName: "coderabbitai[bot]" }],
     isLoading: false,
     isPending: false,
     isFetching: false,
@@ -58,6 +47,17 @@ function mockConnectedIntegrations(data: unknown[] = []) {
     isLoading: false,
     error: null,
   } as unknown as ReturnType<typeof useConnectedIntegrations>;
+}
+
+function mockIntegrationResources(data: unknown[] = [], overrides: Record<string, unknown> = {}) {
+  return {
+    data,
+    isLoading: false,
+    isPending: false,
+    isFetching: false,
+    isError: false,
+    ...overrides,
+  } as unknown as ReturnType<typeof useIntegrationResources>;
 }
 
 function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedbackDraftSettings {
@@ -92,27 +92,21 @@ function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedba
 
 beforeEach(() => {
   vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
-  vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
-    data: [],
-    isLoading: false,
-    isPending: false,
-    isFetching: false,
-    isError: false,
-  } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
+  vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources());
 });
 
 function renderChecksPopup(
   onSave = vi.fn(),
   settings: PRFeedbackDraftSettings = checksDraft(),
   organizationId?: string,
-  factoryId?: string,
+  githubIntegrationId?: string,
 ) {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <PRFeedbackSettingsPopup
           organizationId={organizationId}
-          factoryId={factoryId}
+          githubIntegrationId={githubIntegrationId}
           settings={settings}
           healthy
           onSave={onSave}
@@ -193,12 +187,20 @@ function renderAutomationPopup() {
 }
 
 describe("PRFeedbackSettingsPopup discussion", () => {
+  beforeEach(() => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
+        { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+      ]),
+    );
+  });
+
   it("uses the same mention and bot choices as setup", () => {
     renderChecksPopup(
       vi.fn(),
       discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }),
       "org-1",
-      "factory-1",
+      "gh-1",
     );
 
     expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
@@ -212,7 +214,7 @@ describe("PRFeedbackSettingsPopup discussion", () => {
 
   it("switches mention and bot modes without free-text fields", async () => {
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "factory-1");
+    const { onSave } = renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1");
 
     expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
@@ -236,7 +238,7 @@ describe("PRFeedbackSettingsPopup discussion", () => {
 
 describe("PRFeedbackSettingsPopup check names", () => {
   it("does not offer name or repository fields because those come from setup", () => {
-    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "factory-1");
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "gh-1");
 
     expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
@@ -244,14 +246,10 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("shows configured checks while other catalog checks are loading", () => {
-    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
-      data: [],
-      isLoading: true,
-      isPending: true,
-      isFetching: true,
-      isError: false,
-    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
-    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "e2e"] }), "org-1", "factory-1");
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([], { isLoading: true, isPending: true, isFetching: true }),
+    );
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "e2e"] }), "org-1", "gh-1");
 
     expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
@@ -259,18 +257,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("selects a check from the repository catalog", async () => {
-    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
-      data: [
-        { name: "lint", required: true },
-        { name: "e2e", required: false },
-      ],
-      isLoading: false,
-      isPending: false,
-      isFetching: false,
-      isError: false,
-    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
+    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "e2e", name: "e2e" },
+      ]));
     const user = userEvent.setup();
-    renderChecksPopup(vi.fn(), checksDraft(), "org-1", "factory-1");
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
 
     const e2e = screen.getByTestId("pr-feedback-check-option-e2e");
     expect(e2e).toHaveAttribute("aria-selected", "false");
@@ -281,18 +273,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("deselects a selected check from the catalog list", async () => {
-    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
-      data: [
-        { name: "lint", required: true },
-        { name: "unit", required: false },
-      ],
-      isLoading: false,
-      isPending: false,
-      isFetching: false,
-      isError: false,
-    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
+    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "unit", name: "unit" },
+      ]));
     const user = userEvent.setup();
-    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "unit"] }), "org-1", "factory-1");
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "unit"] }), "org-1", "gh-1");
 
     await user.click(screen.getByTestId("pr-feedback-check-option-lint"));
 
@@ -301,18 +287,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("saves only the selected catalog checks", async () => {
-    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
-      data: [
-        { name: "lint", required: true },
-        { name: "e2e", required: false },
-      ],
-      isLoading: false,
-      isPending: false,
-      isFetching: false,
-      isError: false,
-    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
+    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "e2e", name: "e2e" },
+      ]));
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "factory-1");
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
 
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
@@ -350,7 +330,7 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
 
   it("selects an integration with the same picker as status checks", async () => {
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "factory-1");
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "gh-1");
 
     const row = screen.getByTestId("pr-feedback-integration-int-circleci");
     expect(row).toHaveAttribute("aria-selected", "false");

@@ -24,6 +24,7 @@ import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } 
 interface ChecksPRFeedbackSetupDialogProps {
   organizationId: string;
   factoryId: string;
+  githubIntegrationId: string;
   repository: string;
   source: PRFeedbackSource;
   onClose: () => void;
@@ -31,7 +32,12 @@ interface ChecksPRFeedbackSetupDialogProps {
 }
 
 export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogProps) {
-  const setup = useChecksPRFeedbackSetup(props.organizationId, props.factoryId, props.repository);
+  const setup = useChecksPRFeedbackSetup(
+    props.organizationId,
+    props.factoryId,
+    props.githubIntegrationId,
+    props.repository,
+  );
 
   return (
     <>
