@@ -212,7 +212,7 @@ describe("IntakeSettingsHost", () => {
     expect(within(sidebar).getByText("On mention on Issue")).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: "On mention on Issue" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-intake-1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/apps/app-github-issues-intake?run=run-intake-1&from=lines&lineId=line-plan",
     );
   });
 
