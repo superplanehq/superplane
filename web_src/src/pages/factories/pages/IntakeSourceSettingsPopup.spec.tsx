@@ -159,14 +159,14 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("radio", { name: /Listen for new issues/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: /Run on a schedule/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Create tasks from" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "New issues" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Re-opened issues" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: 'Issues you label "superplane"' })).not.toBeChecked();
+    expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "New issue is opened" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: 'The "superplane" label is added to the issue' })).toBeChecked();
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Only issues with any of these labels" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Issue has one of these labels" })).not.toBeChecked();
     expect(screen.queryByTestId("intake-label-options")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Only issues from people with repository access" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Author has repository access" })).not.toBeChecked();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ labelOptions: ["bug", "needs design"] });
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
 
     const options = screen.getByTestId("intake-label-options");
     expect(within(options).getByRole("checkbox", { name: "bug" })).not.toBeChecked();
@@ -193,7 +193,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ labelOptions: [] });
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
 
     expect(screen.getByText("No labels found in the repository. Add a label name.")).toBeInTheDocument();
   });
@@ -202,7 +202,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     expect(screen.queryByRole("textbox", { name: "Issue label" })).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("intake-label-new"));
@@ -219,7 +219,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(screen.getByTestId("intake-label-new"));
     await user.type(screen.getByRole("textbox", { name: "Issue label" }), "needs-triage{Enter}");
 
@@ -230,7 +230,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(screen.getByTestId("intake-label-new"));
     await user.type(screen.getByRole("textbox", { name: "Issue label" }), "needs-triage");
     await user.click(screen.getByTestId("intake-label-cancel"));
@@ -305,11 +305,10 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ onSave, onClose });
 
-    await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
-    await user.click(screen.getByRole("checkbox", { name: "Re-opened issues" }));
-    await user.click(screen.getByRole("checkbox", { name: 'Issues you label "superplane"' }));
-    await user.click(screen.getByRole("checkbox", { name: "Only issues from people with repository access" }));
+    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByRole("checkbox", { name: "Author has repository access" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() =>

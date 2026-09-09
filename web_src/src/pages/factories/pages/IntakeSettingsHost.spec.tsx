@@ -181,8 +181,11 @@ describe("IntakeSettingsHost", () => {
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("checkbox", { name: "New issues" })).toBeChecked();
-    expect(within(dialog).getByRole("checkbox", { name: "Re-opened issues" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "New issue is opened" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(
+      within(dialog).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).toBeChecked();
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -262,7 +265,7 @@ describe("IntakeSettingsHost", () => {
         authorsWithAccess: false,
         newIssues: true,
         reopenedIssues: true,
-        superplaneLabelAdded: false,
+        superplaneLabelAdded: true,
       },
     });
   });

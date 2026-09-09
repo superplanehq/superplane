@@ -125,6 +125,7 @@ func applyIntakeSettings(
 		expression := intakeFilterExpressionFor(intake.Source, updated)
 
 		nodes := slices.Clone(liveVersion.Nodes)
+		edges := slices.Clone(liveVersion.Edges)
 		for i := range nodes {
 			switch nodes[i].ID {
 			case graph.TriggerNodeID:
@@ -147,6 +148,13 @@ func applyIntakeSettings(
 			}
 		}
 
+		if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+			nodes, edges, err = configureIntakeAuthorAccess(nodes, edges, graph, updated.AuthorsWithAccess)
+			if err != nil {
+				return invalidArgument(err.Error())
+			}
+		}
+
 		return canvases.PublishGeneratedCanvasNodes(
 			ctx,
 			tx,
@@ -154,7 +162,7 @@ func applyIntakeSettings(
 			uuid.MustParse(userID),
 			"Update intake settings",
 			nodes,
-			slices.Clone(liveVersion.Edges),
+			edges,
 			changesets.CanvasPublisherOptions{
 				Registry:       deps.Registry,
 				OrgID:          canvas.OrganizationID,

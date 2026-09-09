@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,9 @@ const (
 	intakeFilterNodeID  = "filter"
 	intakeCreateNodeID  = "create-work-order"
 
+	intakeAuthorPermissionNodeID = "get-author-permission"
+	intakeAuthorFilterNodeID     = "author-has-repository-access"
+
 	// Legacy node identifiers. A graph generated before intake became
 	// create-only still resolves so settings and health keep working.
 	intakeAnalysisNodeID         = "analyze"
@@ -30,6 +34,7 @@ const (
 	intakeCreateNodeName   = "Create Task"
 
 	intakeFilterComponent           = "if"
+	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
 	intakeReportConfidenceComponent = "reportWorkOrderCheck"
@@ -94,7 +99,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a GitHub issue is opened.",
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
-		triggerConfiguration: map[string]any{"actions": []any{"opened", "reopened"}},
+		triggerConfiguration: map[string]any{"actions": intakeTriggerActionsFor(defaultIntakeSettings())},
 		analysisSubject:      "GitHub issue",
 		createTitle:          "{{ root().data.issue.title }}",
 		createDescription:    "{{ root().data.issue.body }}",
@@ -234,6 +239,116 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 func intakeConcurrency() *yaml.ConcurrencySpec {
 	max := intakeConcurrencyMax
 	return &yaml.ConcurrencySpec{Max: &max}
+}
+
+func configureIntakeAuthorAccess(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+	enabled bool,
+) ([]models.Node, []models.Edge, error) {
+	if !enabled {
+		nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
+			return node.ID == graph.AuthorPermissionNodeID || node.ID == graph.AuthorFilterNodeID
+		})
+		edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+			return edge.SourceID == graph.AuthorPermissionNodeID ||
+				edge.TargetID == graph.AuthorPermissionNodeID ||
+				edge.SourceID == graph.AuthorFilterNodeID ||
+				edge.TargetID == graph.AuthorFilterNodeID
+		})
+		return nodes, ensureIntakeEdge(edges, models.Edge{
+			Channel:  "true",
+			SourceID: graph.FilterNodeID,
+			TargetID: graph.CreateNodeID,
+		}), nil
+	}
+
+	trigger := findIntakeNode(nodes, graph.TriggerNodeID)
+	if trigger == nil {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub trigger")
+	}
+	repository, _ := trigger.Configuration["repository"].(string)
+	if strings.TrimSpace(repository) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub repository")
+	}
+	if trigger.IntegrationID == nil || strings.TrimSpace(*trigger.IntegrationID) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub integration")
+	}
+
+	permissionNode := models.Node{
+		ID:   intakeAuthorPermissionNodeID,
+		Name: "Get Author Repository Permission",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeAuthorPermissionComponent},
+		},
+		Configuration: map[string]any{
+			"repository": repository,
+			"username":   "{{ root().data.issue.user.login }}",
+		},
+		Position:      models.Position{X: 160, Y: 440},
+		Concurrency:   intakeModelConcurrency(),
+		IntegrationID: trigger.IntegrationID,
+	}
+	authorFilterNode := models.Node{
+		ID:   intakeAuthorFilterNodeID,
+		Name: "Author Has Repository Access?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": `root().data.permission != "none"`,
+		},
+		Position:    models.Position{X: 160, Y: 620},
+		Concurrency: intakeModelConcurrency(),
+	}
+	nodes = upsertIntakeNode(nodes, permissionNode)
+	nodes = upsertIntakeNode(nodes, authorFilterNode)
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.FilterNodeID &&
+			(edge.TargetID == graph.CreateNodeID || edge.TargetID == intakeAuthorPermissionNodeID)
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: graph.FilterNodeID,
+		TargetID: intakeAuthorPermissionNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: intakeAuthorPermissionNodeID,
+		TargetID: intakeAuthorFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeAuthorFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, nil
+}
+
+func intakeModelConcurrency() *models.ConcurrencySpec {
+	max := intakeConcurrencyMax
+	return &models.ConcurrencySpec{Max: &max}
+}
+
+func upsertIntakeNode(nodes []models.Node, updated models.Node) []models.Node {
+	for i := range nodes {
+		if nodes[i].ID == updated.ID {
+			nodes[i] = updated
+			return nodes
+		}
+	}
+	return append(nodes, updated)
+}
+
+func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
+	if slices.Contains(edges, expected) {
+		return edges
+	}
+	return append(edges, expected)
 }
 
 // intakeTriggerConfiguration lays the binding over the template so the trigger

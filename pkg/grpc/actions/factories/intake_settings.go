@@ -57,12 +57,13 @@ type intakeSettings struct {
 
 func defaultIntakeSettings() intakeSettings {
 	return intakeSettings{
-		ConfidencePct:   DefaultIntakeConfidencePct,
-		Labels:          []string{},
-		LabelFilterMode: intakeLabelFilterInclude,
-		Assignment:      intakeAssignmentAny,
-		NewIssues:       true,
-		ReopenedIssues:  true,
+		ConfidencePct:        DefaultIntakeConfidencePct,
+		Labels:               []string{},
+		LabelFilterMode:      intakeLabelFilterInclude,
+		Assignment:           intakeAssignmentAny,
+		NewIssues:            true,
+		ReopenedIssues:       true,
+		SuperplaneLabelAdded: true,
 		// AuthorsWithAccess is off by default: false.
 	}
 }
@@ -116,9 +117,6 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		conditions = append(conditions, intakeUnassignedCondition)
 	}
 
-	if settings.AuthorsWithAccess {
-		conditions = append(conditions, intakeAuthorAccessCondition)
-	}
 	if settings.SuperplaneLabelAdded {
 		conditions = append(conditions, intakeSuperplaneLabelCondition)
 	}
@@ -225,7 +223,8 @@ func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) inta
 		settings.Assignment = intakeAssignmentAssigned
 	}
 
-	settings.AuthorsWithAccess = strings.Contains(expression, intakeAuthorAccessCondition)
+	settings.AuthorsWithAccess = graph.AuthorPermissionNodeID != "" ||
+		strings.Contains(expression, intakeAuthorAccessCondition)
 
 	return settings.normalized()
 }

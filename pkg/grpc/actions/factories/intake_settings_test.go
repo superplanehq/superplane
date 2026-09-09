@@ -11,15 +11,15 @@ func Test__intakeFilterExpressionFor_AuthorsWithAccess(t *testing.T) {
 	t.Run("off by default", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
-		assert.Equal(t, "true", expression)
+		assert.NotContains(t, expression, intakeAuthorAccessCondition)
 	})
 
-	t.Run("appends the author access condition when on", func(t *testing.T) {
+	t.Run("does not use webhook author association when on", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 		settings.AuthorsWithAccess = true
 
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
-		assert.Contains(t, expression, intakeAuthorAccessCondition)
+		assert.NotContains(t, expression, "author_association")
 	})
 
 	t.Run("ignored for a source other than GitHub issues", func(t *testing.T) {
@@ -45,13 +45,12 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 		}
 	}
 
-	t.Run("round-trips true through build and parse", func(t *testing.T) {
-		settings := defaultIntakeSettings()
-		settings.AuthorsWithAccess = true
-		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
-
-		graph := intakeGraph{FilterNodeID: "filter"}
-		parsed := intakeSettingsFromGraph(graph, newSpec(expression))
+	t.Run("reads true from the repository permission node", func(t *testing.T) {
+		graph := intakeGraph{
+			FilterNodeID:           "filter",
+			AuthorPermissionNodeID: intakeAuthorPermissionNodeID,
+		}
+		parsed := intakeSettingsFromGraph(graph, newSpec("true"))
 
 		assert.True(t, parsed.AuthorsWithAccess)
 	})
@@ -72,18 +71,26 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 
 		assert.False(t, parsed.AuthorsWithAccess)
 	})
+
+	t.Run("reads the legacy webhook condition", func(t *testing.T) {
+		graph := intakeGraph{FilterNodeID: "filter"}
+		parsed := intakeSettingsFromGraph(graph, newSpec(intakeAuthorAccessCondition))
+
+		assert.True(t, parsed.AuthorsWithAccess)
+	})
 }
 
 func Test__intakeTriggerActionsFor(t *testing.T) {
 	t.Run("listens for opened and reopened issues by default", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 
-		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
+		assert.Equal(t, []any{"opened", "reopened", "labeled"}, intakeTriggerActionsFor(settings))
 	})
 
 	t.Run("listens only for opened issues", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 		settings.ReopenedIssues = false
+		settings.SuperplaneLabelAdded = false
 
 		assert.Equal(t, []any{"opened"}, intakeTriggerActionsFor(settings))
 	})
@@ -91,15 +98,16 @@ func Test__intakeTriggerActionsFor(t *testing.T) {
 	t.Run("listens only for reopened issues", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 		settings.NewIssues = false
+		settings.SuperplaneLabelAdded = false
 
 		assert.Equal(t, []any{"reopened"}, intakeTriggerActionsFor(settings))
 	})
 
-	t.Run("also listens for added labels", func(t *testing.T) {
+	t.Run("can turn the label trigger off", func(t *testing.T) {
 		settings := defaultIntakeSettings()
-		settings.SuperplaneLabelAdded = true
+		settings.SuperplaneLabelAdded = false
 
-		assert.Equal(t, []any{"opened", "reopened", "labeled"}, intakeTriggerActionsFor(settings))
+		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
 	})
 
 	t.Run("can listen only for added labels", func(t *testing.T) {

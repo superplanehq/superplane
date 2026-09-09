@@ -84,10 +84,11 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.reopenedIssues).toBe(false);
   });
 
-  it("defaults both issue event toggles on when the API omits them", () => {
+  it("defaults the GitHub issue event toggles on when the API omits them", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {});
 
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(true);
   });
 });
