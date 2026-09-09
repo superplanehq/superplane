@@ -94,7 +94,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a GitHub issue is opened.",
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
-		triggerConfiguration: map[string]any{"actions": []any{"opened"}},
+		triggerConfiguration: map[string]any{"actions": []any{"opened", "reopened"}},
 		analysisSubject:      "GitHub issue",
 		createTitle:          "{{ root().data.issue.title }}",
 		createDescription:    "{{ root().data.issue.body }}",

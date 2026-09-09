@@ -59,7 +59,13 @@ const GITHUB_INTAKE_CANVAS = {
   metadata: { id: "app-github-issues-intake", name: "GitHub issues" },
   spec: {
     nodes: [
-      { id: "github-issues-trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
+      {
+        id: "github-issues-trigger",
+        name: "On Issue",
+        type: "TYPE_TRIGGER",
+        component: "github.onIssue",
+        configuration: { repository: "puppies-inc/front" },
+      },
       {
         id: "github-issues-filter",
         name: "Matches filters?",
@@ -136,8 +142,8 @@ describe("IntakeSettingsHost", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Name")).toHaveValue("GitHub issues");
-    expect(within(dialog).getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
+    expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio", { name: /Listen for new issues/ })).not.toBeInTheDocument();
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -204,23 +210,22 @@ describe("IntakeSettingsHost", () => {
     );
   });
 
-  it("saves the name and filters through the intake API", async () => {
+  it("saves the filters through the intake API without renaming the canvas", async () => {
     const user = userEvent.setup();
     renderHost();
 
-    await user.clear(screen.getByLabelText("Name"));
-    await user.type(screen.getByLabelText("Name"), "Acme issues");
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-github",
-      name: "Acme issues",
       settings: {
         confidencePct: 65,
         labels: [],
         labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
         assignment: "ASSIGNMENT_ANY",
         authorsWithAccess: false,
+        newIssues: true,
+        assignedToAgent: false,
       },
     });
   });

@@ -383,6 +383,41 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, expression, "author_association")
 	})
 
+	t.Run("issue event settings reach the trigger and filter", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		newIssues := false
+		assignedToAgent := true
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues:       &newIssues,
+				AssignedToAgent: &assignedToAgent,
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.False(t, settings.GetNewIssues())
+		assert.True(t, settings.GetAssignedToAgent())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		for _, node := range liveVersion.Nodes {
+			switch node.ID {
+			case intakeTriggerNodeID:
+				assert.Equal(t, []any{"assigned"}, node.Configuration["actions"])
+			case intakeFilterNodeID:
+				assert.Contains(t, node.Configuration["expression"], intakeAssignedToAgentCondition)
+			}
+		}
+	})
+
 	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})

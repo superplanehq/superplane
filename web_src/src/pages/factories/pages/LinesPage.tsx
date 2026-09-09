@@ -406,6 +406,8 @@ export function LinesPage() {
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           intake={settingsIntake}
+          repository={factory?.onboarding?.backlogRepository}
+          vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
           onOpenRun={(run) => {
             if (!run.appId || !run.runId) {

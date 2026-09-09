@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   GITHUB_INTAKE_RUNS,
   isIntakeSettingsTab,
@@ -20,14 +21,18 @@ describe("intakeSourceSettingsModel", () => {
     expect(toggleIntakeLabel(["bug", "enhancement"], "bug")).toEqual(["enhancement"]);
   });
 
-  it("keeps a default name when the draft name is empty", () => {
+  it("adds a typed label once and ignores blank input", () => {
+    expect(addIntakeLabel(["bug"], "  needs-triage  ")).toEqual(["bug", "needs-triage"]);
+    expect(addIntakeLabel(["bug"], "bug")).toEqual(["bug"]);
+    expect(addIntakeLabel(["bug"], "   ")).toEqual(["bug"]);
+  });
+
+  it("clamps the confidence score", () => {
     const next = normalizeIntakeSourceSettings({
       ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-      name: "   ",
       confidencePct: 140.6,
     });
 
-    expect(next.name).toBe("GitHub issues");
     expect(next.confidencePct).toBe(100);
   });
 
@@ -69,5 +74,19 @@ describe("intakeSourceSettingsModel", () => {
     const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
     expect(off.authorsWithAccess).toBe(false);
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
+  });
+
+  it("round-trips GitHub issue events through the API shape", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: false,
+      assignedToAgent: true,
+    });
+
+    expect(settings.newIssues).toBe(false);
+    expect(settings.assignedToAgent).toBe(true);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      newIssues: false,
+      assignedToAgent: true,
+    });
   });
 });
