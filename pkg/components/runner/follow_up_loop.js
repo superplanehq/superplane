@@ -87,8 +87,19 @@ async function requestJSON(method, urlPath) {
   );
 }
 
+function waitResponseMessage(parsed, text) {
+  return String((parsed && (parsed.message || parsed.error)) || text || "");
+}
+
+function isPlanningSessionGone(status, parsed, text) {
+  if (status !== 404) {
+    return false;
+  }
+  return /planning session not found/i.test(waitResponseMessage(parsed, text));
+}
+
 function isTransientWaitFailure(status, parsed) {
-  if (status === 401) {
+  if (status === 401 || status === 400) {
     return false;
   }
   if (status >= 400) {
@@ -98,7 +109,7 @@ function isTransientWaitFailure(status, parsed) {
 }
 
 function interpretWaitResponse(status, parsed, text) {
-  if (status === 409) {
+  if (status === 409 || isPlanningSessionGone(status, parsed, text)) {
     return { status: "ended" };
   }
   if (status >= 200 && status < 300) {
@@ -107,7 +118,7 @@ function interpretWaitResponse(status, parsed, text) {
   if (isTransientWaitFailure(status, parsed)) {
     return { status: "pending" };
   }
-  throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
+  throw new Error(waitResponseMessage(parsed, text) || `HTTP ${status}`);
 }
 
 async function waitOnce() {

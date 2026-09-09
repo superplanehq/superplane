@@ -261,6 +261,24 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *tes
 	assert.Regexp(t, `✗ failed`, result.output)
 }
 
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithUsageOnly(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "google/gemma-4-31b-it",
+		fallback: []string{"google/gemma-4-31b-it"},
+		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithoutReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model:    "google/gemma-4-31b-it",

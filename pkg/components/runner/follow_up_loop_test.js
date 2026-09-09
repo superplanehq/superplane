@@ -122,7 +122,17 @@ test("interpretWaitResponse throws on 401", () => {
 
 test("interpretWaitResponse retries 404 and 403 as idle pending", () => {
   assert.deepEqual(interpretWaitResponse(404, { message: "ngrok" }), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "ERR_NGROK_3200"), { status: "pending" });
   assert.deepEqual(interpretWaitResponse(403, { message: "forbidden" }), { status: "pending" });
+});
+
+test("interpretWaitResponse ends when the planning session is gone", () => {
+  assert.deepEqual(interpretWaitResponse(404, { message: "planning session not found" }), { status: "ended" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "planning session not found\n"), { status: "ended" });
+});
+
+test("interpretWaitResponse throws on 400", () => {
+  assert.throws(() => interpretWaitResponse(400, { message: "invalid" }), /invalid/);
 });
 
 test("interpretWaitResponse retries a generic 500 as idle pending", () => {

@@ -409,10 +409,7 @@ function defaultSpawnOpenCode(args, options) {
   });
 }
 
-function spawnHasAssistantReply(spawnResult, formatter) {
-  if (tokenTotal(spawnResult && spawnResult.usage) > 0) {
-    return true;
-  }
+function spawnHasAssistantReply(formatter) {
   const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
   return Boolean(String(text || "").trim());
 }
@@ -431,7 +428,7 @@ function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
   if (!allowSoftExitWithReply) {
     return true;
   }
-  return !spawnHasAssistantReply(spawnResult, formatter);
+  return !spawnHasAssistantReply(formatter);
 }
 
 async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
