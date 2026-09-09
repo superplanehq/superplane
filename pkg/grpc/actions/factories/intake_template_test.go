@@ -135,7 +135,7 @@ func Test__IntakeFilterExpression(t *testing.T) {
 			Assignment:      intakeAssignmentUnassigned,
 		})
 		assert.NotContains(t, expression, ">=")
-		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
+		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
 		assert.Contains(t, expression, intakeUnassignedCondition)
 	})
 }

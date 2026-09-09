@@ -319,8 +319,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			}
 		}
 		assert.NotContains(t, expression, ">=")
-		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
-		assert.Contains(t, expression, "size(root().data.issue.assignees) == 0")
+		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
+		assert.Contains(t, expression, "len(root().data.issue.assignees) == 0")
 	})
 
 	t.Run("the authors filter reaches the filter expression when on", func(t *testing.T) {
