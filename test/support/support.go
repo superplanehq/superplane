@@ -144,6 +144,12 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
 	organization, err = models.FindOrganizationByIDInTransaction(tx, organization.ID.String())
 	if !assert.NoError(t, err) {
 		tx.Rollback()
@@ -216,6 +222,19 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
+	}
+
+	if r.Account != nil {
+		err = models.SetOrganizationCreatedByAccount(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+		err = models.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
 	}
 
 	err = tx.Commit().Error

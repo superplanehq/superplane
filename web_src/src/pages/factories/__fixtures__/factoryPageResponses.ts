@@ -306,6 +306,7 @@ export interface FactoriesFixture {
     actorName?: string;
     polarOrderId?: string;
     createdAt?: string;
+    expiresAt?: string;
   }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /**
