@@ -183,7 +183,8 @@ describe("FactoriesHarness tasks", () => {
     expect(componentsToggle).toHaveAttribute("aria-pressed", "false");
   }, 15000);
 
-  it("lets the signed-in user open workspace settings from the sidebar cog", async () => {
+  it("lets the signed-in user open workspace settings from the workspace menu", async () => {
+    const user = userEvent.setup();
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
@@ -191,13 +192,12 @@ describe("FactoriesHarness tasks", () => {
       />,
     );
 
-    const settingsLink = await screen.findByTestId("factories-workspace-settings-link", {}, { timeout: 8000 });
-    await waitFor(() => {
-      expect(settingsLink).toHaveAttribute(
-        "href",
-        factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY),
-      );
-    });
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    const settingsLink = await screen.findByTestId("factories-workspace-settings-link");
+    expect(settingsLink).toHaveAttribute(
+      "href",
+      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY),
+    );
     expect(settingsLink).not.toHaveClass("pointer-events-none");
   }, 10000);
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
 function renderNav(path: string) {
@@ -15,8 +15,6 @@ function renderNav(path: string) {
           organizationId={FACTORIES_ORGANIZATION_ID}
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
-          canOpenSettings
-          permissionsLoading={false}
         />
       </TooltipProvider>
     </MemoryRouter>,
@@ -27,27 +25,20 @@ const org = FACTORIES_ORGANIZATION_ID;
 const key = REFUND_FACTORY.key!;
 
 describe("FactoriesSidebarNav", () => {
-  it("places Board and Settings under the switcher", () => {
+  it("places Board and Velocity under the switcher", () => {
     renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`);
 
     const nav = screen.getByTestId("factories-sidebar-nav");
-    const controls = [
-      screen.getByTestId("factories-nav-board"),
-      screen.getByTestId("factories-nav-velocity"),
-      screen.getByTestId("factories-workspace-settings-link"),
-    ];
+    const controls = [screen.getByTestId("factories-nav-board"), screen.getByTestId("factories-nav-velocity")];
 
-    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true]);
+    expect(controls.map((node) => nav.contains(node))).toEqual([true, true]);
+    expect(screen.queryByTestId("factories-workspace-settings-link")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-sidebar-create-work-order")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-intake")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-pr-feedback")).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-nav-board")).toHaveAttribute(
       "href",
       factoryHomePath(org, key, REFUND_LINE_PLAN_ID),
-    );
-    expect(screen.getByTestId("factories-workspace-settings-link")).toHaveAttribute(
-      "href",
-      factorySettingsWorkspaceGeneralPath(org, key),
     );
   });
 
