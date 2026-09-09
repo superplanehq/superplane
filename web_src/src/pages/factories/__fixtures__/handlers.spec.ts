@@ -36,12 +36,24 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
-  it("serves factory usage and organization workspace usage reports", async () => {
+  it("serves factory usage, usage history, and organization workspace usage reports", async () => {
     const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
     await expect(usage.json()).resolves.toMatchObject({
       totalTokens: "25600",
       totalCostCents: "876",
       byModel: expect.arrayContaining([expect.objectContaining({ provider: "anthropic" })]),
+    });
+
+    const history = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage-history`);
+    await expect(history.json()).resolves.toMatchObject({
+      totalCount: 3,
+      rows: expect.arrayContaining([
+        expect.objectContaining({
+          workOrderKey: "RF-101",
+          models: [],
+          byokModels: ["anthropic/claude-sonnet-4-6"],
+        }),
+      ]),
     });
 
     const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/workspace-usage`);

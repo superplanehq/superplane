@@ -20,7 +20,7 @@ const ORGANIZATION_GENERAL: FactorySettingsDestination = { scope: "organization"
 const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   general: { scope: "workspace", section: "general" },
   models: { scope: "workspace", section: "models" },
-  usage: { scope: "organization", section: "spending" },
+  usage: { scope: "organization", section: "usage" },
   spending: { scope: "organization", section: "spending" },
   repositories: { scope: "workspace", section: "repository" },
   repository: { scope: "workspace", section: "repository" },
@@ -39,6 +39,7 @@ const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> =
   "api-keys": { scope: "organization", section: "api-keys" },
   integrations: { scope: "organization", section: "integrations" },
   spending: { scope: "organization", section: "spending" },
+  usage: { scope: "organization", section: "usage" },
   billing: { scope: "organization", section: "billing" },
   "llm-spend": { scope: "organization", section: "spending" },
   "workspace-usage": { scope: "organization", section: "spending" },
@@ -187,9 +188,16 @@ export function LegacyFactorySettingsIndexRedirect() {
 /** Old workspace Spending URLs. Send the user to Organization Spending. */
 export function WorkspaceSpendingRedirect() {
   const { pathname, search } = useLocation();
+  const target = pathname.replace(/\/workspace\/spending\/?$/, "/organization/spending");
+  return <Navigate to={`${target}${search}`} replace />;
+}
+
+/** Old workspace Usage URLs. Send the user to Organization Usage. */
+export function WorkspaceUsageRedirect() {
+  const { pathname, search } = useLocation();
   const target = pathname
-    .replace(/\/workspace\/(spending|usage)\/?$/, "/organization/spending")
-    .replace(/\/settings\/usage\/?$/, "/settings/organization/spending");
+    .replace(/\/workspace\/usage\/?$/, "/organization/usage")
+    .replace(/\/settings\/usage\/?$/, "/settings/organization/usage");
   return <Navigate to={`${target}${search}`} replace />;
 }
 

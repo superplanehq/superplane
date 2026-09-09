@@ -10,6 +10,7 @@ import {
   Key,
   KeyRound,
   Plug,
+  Receipt,
   Settings,
   Users,
 } from "lucide-react";
@@ -24,6 +25,7 @@ export type FactorySettingsSection =
   | "repository"
   | "models"
   | "spending"
+  | "usage"
   | "billing"
   | "members"
   | "integrations"
@@ -291,6 +293,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "purchased hosted credit",
           "buy more",
         ],
+      },
+      {
+        id: "organization-usage",
+        label: "Usage",
+        Icon: Receipt,
+        scope: "organization",
+        section: "usage",
+        permission: { resource: "org", action: "read" },
+        keywords: ["usage", "cost", "tokens", "vm time", "task spend", "your keys", "model", "machine"],
       },
       {
         id: "organization-spending",

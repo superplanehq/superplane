@@ -193,6 +193,7 @@ describe("FactorySettingsLayout sidebar", () => {
     ["Secrets", "secrets", "factory-settings-secrets"],
     ["LLM Models", "models", "factory-settings-llm-models"],
     ["Billing", "billing", "billing-credit-balance"],
+    ["Usage", "usage", "organization-usage-history"],
   ])(
     "renders the Organization %s page in the factory settings shell",
     async (_title, path, pageTestId) => {
