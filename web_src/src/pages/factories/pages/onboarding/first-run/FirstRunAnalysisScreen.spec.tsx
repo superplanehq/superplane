@@ -37,7 +37,9 @@ describe("FirstRunAnalysisScreen", () => {
   });
 
   it("shows the import stage before any runs arrive", () => {
-    render(<FirstRunAnalysisScreen progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0 }} onGoToBoard={vi.fn()} />);
+    render(
+      <FirstRunAnalysisScreen progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0 }} onGoToBoard={vi.fn()} />,
+    );
 
     expect(screen.getByText(FIRST_RUN_COPY.analysis.stageImporting)).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.analysis.stageScoringPending)).toBeInTheDocument();
