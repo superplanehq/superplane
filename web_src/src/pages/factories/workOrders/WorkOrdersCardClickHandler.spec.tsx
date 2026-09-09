@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
+import { formatRelative } from "@/lib/datetime";
+
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
@@ -143,19 +145,55 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows a status dot, title, start time, and owner", () => {
+  it("shows a status dot, title, created time, and owner", () => {
     const { row } = renderView(WorkOrdersBoardView);
 
     expect(within(row).getByLabelText("Running")).toBeInTheDocument();
     expect(within(row).queryByText("Running")).not.toBeInTheDocument();
     expect(within(row).getByText(entry.title)).toBeInTheDocument();
-    expect(within(row).getByText(/\d+[smhd] ago$/)).toBeInTheDocument();
+    expect(within(row).getByText(formatRelative(new Date(entry.createdAtMs)))).toBeInTheDocument();
     const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
     expect(owner).toBeInTheDocument();
+    expect(within(owner).getByText("Ada")).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
     expect(effectivePointerEvents(owner)).toBe("none");
     expect(within(row).queryByText(entry.displayKey)).not.toBeInTheDocument();
     expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
+  });
+
+  it("puts created time on the left and the first name with the avatar on the right", () => {
+    const createdAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = buildWorkOrderListEntry(
+      {
+        id: "wo-recent",
+        number: "9",
+        title: "Add refund reconciliation test",
+        state: "STATE_OPEN",
+        createdAt: createdAt.toISOString(),
+        updatedAt: createdAt.toISOString(),
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+          },
+        ],
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [recent]);
+    const createdLabel = formatRelative(createdAt);
+    const time = within(row).getByText(createdLabel);
+    const owner = within(row).getByTestId(`work-order-row-assignees-${recent.id}`);
+
+    expect(time).toBeInTheDocument();
+    expect(within(owner).getByText("Ada")).toBeInTheDocument();
+    expect(time.compareDocumentPosition(owner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(time.parentElement?.className).not.toMatch(/ml-auto/);
+    expect(owner.parentElement?.className).toMatch(/ml-auto/);
   });
 
   it("shows a Run failed label on a waiting card after a failed step", () => {
@@ -184,7 +222,16 @@ describe("WorkOrdersBoardView layout", () => {
 
     const chip = within(row).getByText("Run failed").closest("span[title]");
     expect(chip?.querySelector("svg")).toBeTruthy();
+    expect(chip?.className).toMatch(/rounded-full/);
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+
+    const title = within(row).getByText(waiting.title);
+    const time = within(row).getByText(formatRelative(new Date(waiting.createdAtMs)));
+    const owner = within(row).getByTestId(`work-order-row-assignees-${waiting.id}`);
+    expect(title.compareDocumentPosition(chip as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chip!.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(time.parentElement).not.toContainElement(chip);
+    expect(within(owner).getByText("Arnold")).toBeInTheDocument();
   });
 
   it("shows a Start button on a draft backlog card", () => {
@@ -421,6 +468,10 @@ describe("WorkOrderCard attention", () => {
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    const pill = screen.getByText("Waiting for user review").closest("span[title]");
+    expect(pill?.className).toMatch(/rounded-full/);
+    const time = screen.getByText(formatRelative(new Date(waitingOrder.createdAt ?? "")));
+    expect(time.parentElement).not.toContainElement(pill);
   });
 
   it("shows Waiting on status checks when a check wait is active", () => {

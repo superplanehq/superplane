@@ -121,12 +121,11 @@ describe("ColumnAutomationViewPopup", () => {
     expect(canvas).toHaveAccessibleName("Automation");
     expect(within(canvas).getAllByText("On run").length).toBeGreaterThan(0);
     expect(within(canvas).getAllByText("Implement From Task Description").length).toBeGreaterThan(0);
-    const edit = within(screen.getByTestId("settings-automation-header-row")).getByTestId(
-      "column-automation-view-edit",
-    );
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(canvas).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute("href", EDIT_HREF);
-    expect(edit.className).toContain("rounded-md");
-    expect(within(canvas).queryByTestId("column-automation-view-edit")).not.toBeInTheDocument();
+    expect(edit.className).toMatch(/absolute/);
+    expect(edit.className).toMatch(/right-2/);
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
   });
@@ -188,7 +187,9 @@ describe("ColumnAutomationViewPopup", () => {
 
     await user.click(screen.getByTestId("column-automation-view-tab-automation"));
     expect(screen.getByTestId("column-automation-view-canvas")).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute("href", EDIT_HREF);
+    expect(
+      within(screen.getByTestId("column-automation-view-canvas")).getByRole("link", { name: "Edit automation" }),
+    ).toHaveAttribute("href", EDIT_HREF);
   });
 
   it("puts General first when a form and an agent exist", () => {

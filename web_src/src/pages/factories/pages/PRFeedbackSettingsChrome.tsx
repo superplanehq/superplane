@@ -1,7 +1,7 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 
-import { SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -106,6 +106,7 @@ export function PRFeedbackAutomationTab({
   graph,
   canvasId,
   runHrefFor,
+  editHref,
   loading,
   error,
   onRetry,
@@ -113,6 +114,7 @@ export function PRFeedbackAutomationTab({
   graph?: IntakeAutomationGraph;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
   loading: boolean;
   error: boolean;
   onRetry?: () => void;
@@ -122,6 +124,7 @@ export function PRFeedbackAutomationTab({
       <PRFeedbackAutomationEmpty
         message={automationEmptyMessage(loading, error)}
         onRetry={error ? onRetry : undefined}
+        editHref={editHref}
       />
     );
   }
@@ -133,6 +136,8 @@ export function PRFeedbackAutomationTab({
       canvasId={canvasId}
       runHrefFor={runHrefFor}
       workflowNodes={graph.specNodes}
+      editHref={editHref}
+      editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
     />
   );
 }
@@ -144,10 +149,18 @@ function automationEmptyMessage(loading: boolean, error: boolean): string {
   return error ? PR_FEEDBACK_SETTINGS_COPY.automationError : PR_FEEDBACK_SETTINGS_COPY.automationEmpty;
 }
 
-function PRFeedbackAutomationEmpty({ message, onRetry }: { message: string; onRetry?: () => void }) {
+function PRFeedbackAutomationEmpty({
+  message,
+  onRetry,
+  editHref,
+}: {
+  message: string;
+  onRetry?: () => void;
+  editHref?: string;
+}) {
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
       aria-label="Automation"
       data-testid="pr-feedback-automation"
     >
@@ -156,6 +169,13 @@ function PRFeedbackAutomationEmpty({ message, onRetry }: { message: string; onRe
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
           {PR_FEEDBACK_SETTINGS_COPY.retryAutomation}
         </Button>
+      ) : null}
+      {editHref ? (
+        <SettingsAutomationCanvasEdit
+          href={editHref}
+          label={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
+          testId="settings-automation-edit"
+        />
       ) : null}
     </section>
   );

@@ -123,6 +123,22 @@ export function welcomeCreditExpirySentence(expiresAt: Date, now: Date = new Dat
   return `It expires in ${days} days.`;
 }
 
+/** Duration segment in the title chip, e.g. "13 days". */
+export function welcomeCreditHeaderLabel(expiresAt: Date, now: Date = new Date()): string {
+  const ms = expiresAt.getTime() - now.getTime();
+  if (ms <= 0) {
+    return "Ended";
+  }
+  if (ms < ONE_DAY_MS) {
+    return "Ends today";
+  }
+  const days = Math.ceil(ms / ONE_DAY_MS);
+  if (days === 1) {
+    return "1 day";
+  }
+  return `${days} days`;
+}
+
 /** Short expiry label for scannable trial chrome. */
 export function welcomeCreditExpiryLabel(expiresAt: Date, now: Date = new Date()): string {
   const ms = expiresAt.getTime() - now.getTime();
