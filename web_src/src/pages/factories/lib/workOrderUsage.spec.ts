@@ -3,11 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   firstPositiveWorkOrderMetric,
   formatDurationSeconds,
-  formatUsageOccurredAtUtc,
-  formatUsageRunResources,
+  formatUsageMachineTypes,
+  formatUsageModels,
+  formatUsageOccurredAt,
+  formatUsageSpend,
+  formatUsageTaskKey,
   formatUsageTaskName,
   formatUsageTokensAndTime,
   formatWorkOrderExecutionUsage,
+  usageTokenSpendCents,
+  usageVmSpendCents,
 } from "./workOrderUsage";
 
 describe("firstPositiveWorkOrderMetric", () => {
@@ -71,6 +76,17 @@ describe("formatUsageTaskName", () => {
   });
 });
 
+describe("formatUsageTaskKey", () => {
+  it("returns the work-order key without the title", () => {
+    expect(formatUsageTaskKey("RF-101")).toBe("RF-101");
+  });
+
+  it("falls back to Untitled task when the key is empty", () => {
+    expect(formatUsageTaskKey("  ")).toBe("Untitled task");
+    expect(formatUsageTaskKey(undefined)).toBe("Untitled task");
+  });
+});
+
 describe("formatUsageTokensAndTime", () => {
   it("joins tokens and VM time with the board separator", () => {
     expect(formatUsageTokensAndTime(22000, 90)).toBe("22k tokens · 1 min 30 s");
@@ -83,48 +99,78 @@ describe("formatUsageTokensAndTime", () => {
   });
 });
 
-describe("formatUsageRunResources", () => {
+describe("formatUsageModels", () => {
   it("notes your keys on the model when your keys paid the model", () => {
-    expect(
-      formatUsageRunResources({
-        byokModels: ["anthropic/claude-sonnet-4-6"],
-        machineTypes: ["e1-large-amd64"],
-      }),
-    ).toBe("anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64");
+    expect(formatUsageModels(undefined, ["anthropic/claude-sonnet-4-6"])).toBe(
+      "anthropic/claude-sonnet-4-6 (your keys)",
+    );
   });
 
   it("keeps hosted models without the your-keys note", () => {
-    expect(
-      formatUsageRunResources({
-        models: ["anthropic/claude-sonnet-4-6"],
-        machineTypes: ["e1-large-amd64"],
-      }),
-    ).toBe("anthropic/claude-sonnet-4-6 · e1-large-amd64");
+    expect(formatUsageModels(["anthropic/claude-sonnet-4-6"])).toBe("anthropic/claude-sonnet-4-6");
   });
 
   it("notes your keys on only the your-keys models of a mixed run", () => {
-    expect(
-      formatUsageRunResources({
-        models: ["anthropic/claude-sonnet-4-6"],
-        byokModels: ["openai/gpt-5"],
-      }),
-    ).toBe("anthropic/claude-sonnet-4-6 · openai/gpt-5 (your keys)");
+    expect(formatUsageModels(["anthropic/claude-sonnet-4-6"], ["openai/gpt-5"])).toBe(
+      "anthropic/claude-sonnet-4-6 · openai/gpt-5 (your keys)",
+    );
   });
 
-  it("shows only the parts that exist", () => {
-    expect(formatUsageRunResources({ models: ["anthropic/claude-sonnet-4-6"] })).toBe("anthropic/claude-sonnet-4-6");
-    expect(formatUsageRunResources({ machineTypes: ["e1-large-amd64"] })).toBe("e1-large-amd64");
-    expect(formatUsageRunResources({})).toBe("—");
+  it("returns an em dash when no models exist", () => {
+    expect(formatUsageModels()).toBe("—");
   });
 });
 
-describe("formatUsageOccurredAtUtc", () => {
-  it("formats an ISO timestamp in UTC", () => {
-    expect(formatUsageOccurredAtUtc("2026-09-08T15:04:00Z")).toBe("Sep 8, 2026 15:04 UTC");
+describe("formatUsageMachineTypes", () => {
+  it("joins unique machine types", () => {
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-large-amd64"])).toBe("e1-large-amd64");
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-standard-amd64"])).toBe("e1-large-amd64 · e1-standard-amd64");
+  });
+
+  it("returns an em dash when no machine types exist", () => {
+    expect(formatUsageMachineTypes()).toBe("—");
+    expect(formatUsageMachineTypes([])).toBe("—");
+  });
+});
+
+describe("formatUsageSpend", () => {
+  it("formats a positive amount in USD", () => {
+    expect(formatUsageSpend(123)).toBe("$1.23");
+  });
+
+  it("returns an em dash when there is no spend", () => {
+    expect(formatUsageSpend(0)).toBe("—");
+  });
+});
+
+describe("usageTokenSpendCents", () => {
+  it("sums hosted and your-keys model spend", () => {
+    expect(usageTokenSpendCents(120, 3)).toBe(123);
+  });
+});
+
+describe("usageVmSpendCents", () => {
+  it("returns the remainder after model spend", () => {
+    expect(usageVmSpendCents(175, 150, 0)).toBe(25);
+    expect(usageVmSpendCents(53, 0, 3)).toBe(50);
+  });
+
+  it("returns zero when model spend covers the total", () => {
+    expect(usageVmSpendCents(123, 120, 3)).toBe(0);
+  });
+});
+
+describe("formatUsageOccurredAt", () => {
+  it("formats an ISO timestamp without the year or UTC suffix", () => {
+    expect(formatUsageOccurredAt("2026-09-08T15:04:00Z")).toBe("Sep 8, 3:04 PM");
+  });
+
+  it("uses 12-hour time at morning hours", () => {
+    expect(formatUsageOccurredAt("2026-09-09T07:57:00Z")).toBe("Sep 9, 7:57 AM");
   });
 
   it("returns an em dash for missing or invalid values", () => {
-    expect(formatUsageOccurredAtUtc(undefined)).toBe("—");
-    expect(formatUsageOccurredAtUtc("not-a-date")).toBe("—");
+    expect(formatUsageOccurredAt(undefined)).toBe("—");
+    expect(formatUsageOccurredAt("not-a-date")).toBe("—");
   });
 });

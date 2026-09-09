@@ -10,12 +10,16 @@ import type { FactoriesWorkOrderRunUsageRow } from "@/api-client";
 
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import {
-  formatUsdCents,
-  formatUsageOccurredAtUtc,
-  formatUsageRunResources,
-  formatUsageTaskName,
-  formatUsageTokensAndTime,
+  formatUsageDuration,
+  formatUsageMachineTypes,
+  formatUsageModels,
+  formatUsageOccurredAt,
+  formatUsageSpend,
+  formatUsageTaskKey,
+  formatUsageTokenCount,
   parseWorkOrderMetric,
+  usageTokenSpendCents,
+  usageVmSpendCents,
 } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { useFactorySettingsLayout } from "../settings/factorySettingsLayoutContext";
@@ -66,6 +70,7 @@ export function OrganizationSettingsUsagePage() {
     <FactorySettingsPageFrame
       title="Usage"
       subtitle="Review task spend for this workspace."
+      wide
       actions={
         <SpendingPeriodControls
           customOpen={customOpen}
@@ -160,28 +165,33 @@ function UsageHistoryBody({
 
   return (
     <>
-      <table className="mt-1 w-full text-left text-[13px]">
-        <thead>
-          <tr className="border-b border-border text-muted-foreground">
-            <th className="py-2 pr-3 font-medium">Date (UTC)</th>
-            <th className="py-2 pr-3 font-medium">User</th>
-            <th className="py-2 pr-3 font-medium">Task</th>
-            <th className="py-2 pr-3 font-medium">Tokens | time</th>
-            <th className="py-2 pr-3 font-medium">Cost</th>
-            <th className="py-2 font-medium">Model | machine</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <UsageHistoryRow
-              key={row.workOrderExecutionId ?? `${row.workOrderId}-${row.lastOccurredAt}`}
-              factoryKey={factoryKey}
-              organizationId={organizationId}
-              row={row}
-            />
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="mt-1 w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-border text-muted-foreground">
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Date</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">User</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Task</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Model</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Tokens</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Token price</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">VM type</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">Time</th>
+              <th className="py-2 font-medium whitespace-nowrap">VM price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <UsageHistoryRow
+                key={row.workOrderExecutionId ?? `${row.workOrderId}-${row.lastOccurredAt}`}
+                factoryKey={factoryKey}
+                organizationId={organizationId}
+                row={row}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
       <UsageHistoryPagination
         offset={offset}
         pageSize={WORK_ORDER_RUN_USAGE_PAGE_SIZE}
@@ -201,30 +211,36 @@ function UsageHistoryRow({
   organizationId: string;
   row: FactoriesWorkOrderRunUsageRow;
 }) {
-  const taskName = formatUsageTaskName(row.workOrderKey, row.title);
+  const taskKey = formatUsageTaskKey(row.workOrderKey);
   const href = workOrderDetailPath(organizationId, factoryKey, row.workOrderNumber ?? "");
+  const hostedCostCents = parseWorkOrderMetric(row.hostedCostCents);
+  const byokCostCents = parseWorkOrderMetric(row.byokCostCents);
+  const totalCostCents = parseWorkOrderMetric(row.costCents);
 
   return (
     <tr className="border-b border-border last:border-0" data-testid="organization-usage-row">
-      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-        {formatUsageOccurredAtUtc(row.lastOccurredAt)}
-      </td>
+      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">{formatUsageOccurredAt(row.lastOccurredAt)}</td>
       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">{row.userName || row.userEmail || "—"}</td>
-      <td className="py-2 pr-3">
+      <td className="py-2 pr-3 whitespace-nowrap">
         <Link className="font-medium text-foreground underline-offset-2 hover:underline" to={href}>
-          {taskName}
+          {taskKey}
         </Link>
       </td>
       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-        {formatUsageTokensAndTime(parseWorkOrderMetric(row.totalTokens), parseWorkOrderMetric(row.durationSeconds))}
+        {formatUsageModels(row.models, row.byokModels)}
       </td>
-      <td className="py-2 pr-3 whitespace-nowrap">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
-      <td className="py-2 text-muted-foreground">
-        {formatUsageRunResources({
-          models: row.models,
-          byokModels: row.byokModels,
-          machineTypes: row.machineTypes,
-        })}
+      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+        {formatUsageTokenCount(parseWorkOrderMetric(row.totalTokens))}
+      </td>
+      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+        {formatUsageSpend(usageTokenSpendCents(hostedCostCents, byokCostCents))}
+      </td>
+      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">{formatUsageMachineTypes(row.machineTypes)}</td>
+      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+        {formatUsageDuration(parseWorkOrderMetric(row.durationSeconds))}
+      </td>
+      <td className="py-2 whitespace-nowrap">
+        {formatUsageSpend(usageVmSpendCents(totalCostCents, hostedCostCents, byokCostCents))}
       </td>
     </tr>
   );

@@ -1,4 +1,4 @@
-import { formatCompactTokenLabel } from "@/lib/formatTokenCount";
+import { formatCompactTokenLabel, formatCompactTokenValue } from "@/lib/formatTokenCount";
 
 export function parseWorkOrderMetric(value: string | number | undefined): number {
   const parsed = Number(value ?? 0);
@@ -17,6 +17,29 @@ export function firstPositiveWorkOrderMetric(...values: Array<string | number | 
 
 export function formatCompactTokens(tokens: number): string {
   return formatCompactTokenLabel(tokens);
+}
+
+export function formatUsageTokenCount(tokens: number): string {
+  return tokens > 0 ? formatCompactTokenValue(tokens) : "—";
+}
+
+export function formatUsageDuration(seconds: number): string {
+  return seconds > 0 ? formatDurationSeconds(seconds) : "—";
+}
+
+/** Dollar amount for a usage column. Zero spend is an em dash. */
+export function formatUsageSpend(cents: number): string {
+  return cents > 0 ? formatUsdCents(cents) : "—";
+}
+
+/** Hosted model spend plus your-keys model spend. */
+export function usageTokenSpendCents(hostedCostCents: number, byokCostCents: number): number {
+  return hostedCostCents + byokCostCents;
+}
+
+/** VM spend is the remainder after model spend. */
+export function usageVmSpendCents(totalCostCents: number, hostedCostCents: number, byokCostCents: number): number {
+  return Math.max(0, totalCostCents - hostedCostCents - byokCostCents);
 }
 
 export function formatUsdCents(cents: number): string {
@@ -61,17 +84,16 @@ export function formatUsageTokensAndTime(tokens: number, durationSeconds: number
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
-export interface UsageRunResources {
-  /** Models the hosted credit paid for. */
-  models?: string[];
-  /** Models your own provider keys paid for. */
-  byokModels?: string[];
-  machineTypes?: string[];
+export function formatUsageModels(models?: string[], byokModels?: string[]): string {
+  return usageModelLabel(models, byokModels) || "—";
 }
 
-export function formatUsageRunResources({ models, byokModels, machineTypes }: UsageRunResources): string {
-  const parts = [usageModelLabel(models, byokModels), uniqueUsageLabels(machineTypes).join(" · ")].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "—";
+export function formatUsageMachineTypes(machineTypes?: string[]): string {
+  return uniqueUsageLabels(machineTypes).join(" · ") || "—";
+}
+
+export function formatUsageTaskKey(workOrderKey: string | undefined): string {
+  return workOrderKey?.trim() || "Untitled task";
 }
 
 /** Notes your keys only on the models your keys paid for, so a mixed run stays accurate. */
@@ -88,7 +110,7 @@ function usageModelLabel(models: string[] | undefined, byokModels: string[] | un
   return `${hosted.join(" · ")} · ${byokLabel}`;
 }
 
-export function formatUsageOccurredAtUtc(value: string | undefined): string {
+export function formatUsageOccurredAt(value: string | undefined): string {
   if (!value) {
     return "—";
   }
@@ -99,12 +121,17 @@ export function formatUsageOccurredAtUtc(value: string | undefined): string {
   const date = parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
     timeZone: "UTC",
   });
-  const hours = String(parsed.getUTCHours()).padStart(2, "0");
-  const minutes = String(parsed.getUTCMinutes()).padStart(2, "0");
-  return `${date} ${hours}:${minutes} UTC`;
+  const time = parsed
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "UTC",
+    })
+    .replace(/\u202f/g, " ");
+  return `${date}, ${time}`;
 }
 
 function uniqueUsageLabels(values: string[] | undefined): string[] {

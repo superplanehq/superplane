@@ -34,28 +34,48 @@ describe("OrganizationSettingsUsagePage", () => {
     ).toBeInTheDocument();
 
     const table = await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 });
+    expect(within(table).getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "User" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Task" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Model" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Tokens" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Token price" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "VM type" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Time" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "VM price" })).toBeInTheDocument();
+
     const rows = within(table).getAllByTestId("organization-usage-row");
     expect(rows).toHaveLength(3);
 
-    expect(rows[0]).toHaveTextContent("RF-101 · Reconcile duplicate refunds in ledger");
-    expect(rows[0]).toHaveTextContent("22k tokens · 1 min 30 s");
+    expect(rows[0]).toHaveTextContent("RF-101");
+    expect(rows[0]).not.toHaveTextContent("Reconcile duplicate refunds in ledger");
+    expect(rows[0]).toHaveTextContent("22k");
+    expect(rows[0]).toHaveTextContent("1 min 30 s");
     expect(rows[0]).toHaveTextContent("$0.03");
-    expect(rows[0]).toHaveTextContent("anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64");
+    expect(rows[0]).toHaveTextContent("$0.50");
+    expect(rows[0]).toHaveTextContent("anthropic/claude-sonnet-4-6 (your keys)");
+    expect(rows[0]).toHaveTextContent("e1-large-amd64");
     expect(rows[0]).toHaveTextContent("Leonardo DiCaprio");
-    expect(
-      within(rows[0]).getByRole("link", { name: "RF-101 · Reconcile duplicate refunds in ledger" }),
-    ).toHaveAttribute("href", workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "101"));
+    expect(within(rows[0]).getByRole("link", { name: "RF-101" })).toHaveAttribute(
+      "href",
+      workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "101"),
+    );
 
-    expect(rows[1]).toHaveTextContent("RF-103 · Add refund reconciliation test");
-    expect(rows[1]).toHaveTextContent("1.8k tokens · 12 s");
+    expect(rows[1]).toHaveTextContent("RF-103");
+    expect(rows[1]).not.toHaveTextContent("Add refund reconciliation test");
+    expect(rows[1]).toHaveTextContent("1.8k");
+    expect(rows[1]).toHaveTextContent("12 s");
     expect(rows[1]).toHaveTextContent("$1.50");
-    expect(rows[1]).toHaveTextContent("anthropic/claude-sonnet-4-6 · e1-standard-amd64");
+    expect(rows[1]).toHaveTextContent("$0.25");
+    expect(rows[1]).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(rows[1]).toHaveTextContent("e1-standard-amd64");
     expect(rows[1]).not.toHaveTextContent("your keys");
     expect(rows[1]).toHaveTextContent("Arnold Schwarzenegger");
 
-    expect(rows[2]).toHaveTextContent(
-      "anthropic/claude-haiku-4-5 · anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64",
-    );
+    expect(rows[2]).toHaveTextContent("anthropic/claude-haiku-4-5 · anthropic/claude-sonnet-4-6 (your keys)");
+    expect(rows[2]).toHaveTextContent("e1-large-amd64");
+    expect(rows[2]).toHaveTextContent("$1.23");
+    expect(rows[2]).toHaveTextContent("$0.17");
   }, 10000);
 
   it("shows an empty state when the period has no task spend", async () => {
