@@ -3,9 +3,11 @@ import type { FactoriesFactoryIntakeRun } from "@/api-client";
 export type FirstRunAnalysisProgress = {
   total: number;
   scored: number;
-  /** Scored above the threshold: on the backlog or already on a line. */
+  /** Scored and on the board (or already on a line), so it can run. */
   ready: number;
   stageIndex: 0 | 1 | 2;
+  /** The import finished and the ticket source had no open tickets. */
+  empty?: boolean;
 };
 
 // Intake decisions that only exist after a score: the item was gated out,
@@ -31,11 +33,18 @@ function isScored(run: FactoriesFactoryIntakeRun, scoredOrderIds: ReadonlySet<st
 export function firstRunAnalysisProgress(
   runs: FactoriesFactoryIntakeRun[] | undefined,
   scoredOrderIds: ReadonlySet<string> = new Set(),
+  importSettled = false,
 ): FirstRunAnalysisProgress {
-  if (!runs || runs.length === 0) return { total: 0, scored: 0, ready: 0, stageIndex: 0 };
+  // A loaded but empty run list only means "no tickets" once the import had
+  // time to seed (`importSettled`); before that it means "still importing".
+  if (!runs || runs.length === 0) {
+    return { total: 0, scored: 0, ready: 0, stageIndex: 0, empty: Boolean(runs) && importSettled };
+  }
   const scored = runs.filter((run) => isScored(run, scoredOrderIds)).length;
-  // Only an intake analysis reports the score with the run, so `ready` stays
-  // zero when the Backlog automation scores, and the result line omits it.
-  const ready = runs.filter((run) => run.confidencePct != null && READY.includes(String(run.placement))).length;
+  // Ready means scored and on the board, whichever path produced the score:
+  // an intake confidence percentage or a finished Backlog analysis run.
+  const ready = runs.filter(
+    (run) => READY.includes(String(run.placement)) && isScored(run, scoredOrderIds),
+  ).length;
   return { total: runs.length, scored, ready, stageIndex: scored === runs.length ? 2 : 1 };
 }

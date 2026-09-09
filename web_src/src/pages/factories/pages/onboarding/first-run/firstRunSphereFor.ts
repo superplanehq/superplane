@@ -16,6 +16,23 @@ function discoverChip(value: string | null | undefined): FirstRunSphereProps["le
   return { label: copy.discover, value };
 }
 
+/** Sphere for the analysis screen: fully lit, flickering while scoring runs. */
+export function analysisSphereFor(selectedRepo: string | null, total: number): FirstRunSphereProps {
+  const copy = FIRST_RUN_COPY.sphere;
+  return {
+    level: 1,
+    animate: true,
+    phasesLit: true,
+    caption: selectedRepo ?? "",
+    captionHighlight: "Scoring:",
+    leftChip:
+      total > 0
+        ? { label: copy.discover, value: copy.ticketsFound(total), tone: "amber" }
+        : { label: copy.discover, value: copy.awaitingCode, tone: "ghost" },
+    rightChip: { label: copy.verify, value: copy.reviewReadyPr, tone: "amber" },
+  };
+}
+
 export function sphereFor(
   screen: FirstRunSphereScreen,
   selectedRepo: string | null,

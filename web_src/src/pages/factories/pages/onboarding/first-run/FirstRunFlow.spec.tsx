@@ -28,7 +28,7 @@ describe("FirstRunFlow", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
     expect(screen.getByTestId("first-run-analysis")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.analysis.note)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.headline)).toBeInTheDocument();
   });
 
   it("opens the board when the user leaves analysis", async () => {
