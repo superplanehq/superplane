@@ -145,6 +145,9 @@ describe("CanvasToolSidebar", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentAvailable })} />);
 
     expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-attach-image-button")).toHaveAttribute("data-size", "icon-xs");
+    expect(screen.getByTestId("agent-clear-chat-button")).toHaveAttribute("data-size", "icon-xs");
+    expect(screen.getByTestId("agent-send-message-button")).toHaveAttribute("data-size", "icon-xs");
     await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
   });
 

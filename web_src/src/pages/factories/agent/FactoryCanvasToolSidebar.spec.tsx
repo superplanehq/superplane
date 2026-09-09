@@ -127,6 +127,9 @@ describe("FactoryCanvasToolSidebar", () => {
       expect(message).toHaveClass("font-normal");
     }
     expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-attach-image-button")).toHaveAttribute("data-size", "icon-xs");
+    expect(screen.getByTestId("agent-clear-chat-button")).toHaveAttribute("data-size", "icon-xs");
+    expect(screen.getByTestId("agent-send-message-button")).toHaveAttribute("data-size", "icon-xs");
   });
 
   it("does not render while the sidebar is closed", () => {

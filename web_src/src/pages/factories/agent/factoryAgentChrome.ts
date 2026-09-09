@@ -10,4 +10,4 @@ export const factoryAgentComposerTextClassName =
   "factory-agent-message px-3 py-2.5 font-inter text-[15px] font-normal leading-[22.5px] tracking-[-0.01em]";
 
 export const factoryAgentIconButtonClassName =
-  "size-7 shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground";
+  "text-muted-foreground hover:bg-accent hover:text-foreground";
