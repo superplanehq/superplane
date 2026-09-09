@@ -63,6 +63,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"github.com/superplanehq/superplane/pkg/usage/pricesync"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	"google.golang.org/grpc/codes"
@@ -100,6 +101,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	usageService          usage.Service
+	newPriceBookScanner   func() pricesync.Scanner
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -729,6 +731,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}/models", s.adminListHostedLLMProviderModels).Methods("POST")
+	adminRoute.HandleFunc("/installation/price-book", s.adminGetPriceBook).Methods("GET")
+	adminRoute.HandleFunc("/installation/price-book/scan", s.adminScanPriceBook).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")

@@ -31,6 +31,11 @@ type Rate struct {
 	Reasoning  int64
 }
 
+type ExactRate struct {
+	Key  string
+	Rate Rate
+}
+
 type PrefixRate struct {
 	Prefix string
 	Rate   Rate
@@ -44,6 +49,7 @@ type FamilyRate struct {
 // Book is one versioned catalog of model and compute rates.
 type Book struct {
 	Version      string
+	ExactRates   []ExactRate
 	PrefixRates  []PrefixRate
 	FamilyRates  []FamilyRate
 	ComputeRates map[string]int64
@@ -106,6 +112,7 @@ func defaultComputeRates() map[string]int64 {
 
 type bookState struct {
 	version      string
+	exact        map[string]Rate
 	rates        []entry
 	familyRates  []familyEntry
 	computeRates map[string]int64
@@ -114,20 +121,48 @@ type bookState struct {
 func defaultBook() bookState {
 	return bookState{
 		version:      FallbackVersion,
+		exact:        map[string]Rate{},
 		rates:        defaultPrefixRates(),
 		familyRates:  defaultFamilyRates(),
 		computeRates: defaultComputeRates(),
 	}
 }
 
+// CatalogFallbacks returns the compiled-in prefix, family, and compute rates.
+// Scans overlay exact vendor rates on top of this catalog.
+func CatalogFallbacks() Book {
+	prefixes := defaultPrefixRates()
+	families := defaultFamilyRates()
+	book := Book{
+		PrefixRates:  make([]PrefixRate, 0, len(prefixes)),
+		FamilyRates:  make([]FamilyRate, 0, len(families)),
+		ComputeRates: defaultComputeRates(),
+	}
+	for _, item := range prefixes {
+		book.PrefixRates = append(book.PrefixRates, PrefixRate{Prefix: item.prefix, Rate: item.rate})
+	}
+	for _, item := range families {
+		book.FamilyRates = append(book.FamilyRates, FamilyRate{Token: item.token, Rate: item.rate})
+	}
+	return book
+}
+
 // Replace installs a database-backed book as the in-memory catalog.
 func Replace(book Book) {
 	next := bookState{
 		version:      strings.TrimSpace(book.Version),
+		exact:        map[string]Rate{},
 		computeRates: map[string]int64{},
 	}
 	if next.version == "" {
 		next.version = FallbackVersion
+	}
+	for _, item := range book.ExactRates {
+		key := strings.ToLower(strings.TrimSpace(item.Key))
+		if key == "" {
+			continue
+		}
+		next.exact[key] = item.Rate
 	}
 	for _, item := range book.PrefixRates {
 		prefix := strings.ToLower(strings.TrimSpace(item.Prefix))
@@ -246,11 +281,30 @@ func MicrosToCents(micros int64) int64 {
 }
 
 func lookup(model string) (Rate, bool) {
+	full := strings.ToLower(strings.TrimSpace(model))
+	if rate, ok := lookupExact(full); ok {
+		return rate, true
+	}
 	normalized := normalizeModelID(model)
+	if normalized != full {
+		if rate, ok := lookupExact(normalized); ok {
+			return rate, true
+		}
+	}
 	if rate, ok := lookupPrefix(normalized); ok {
 		return rate, true
 	}
 	return lookupFamilyToken(normalized)
+}
+
+func lookupExact(key string) (Rate, bool) {
+	if key == "" {
+		return Rate{}, false
+	}
+	mu.RLock()
+	defer mu.RUnlock()
+	rate, ok := current.exact[key]
+	return rate, ok
 }
 
 func normalizeModelID(model string) string {

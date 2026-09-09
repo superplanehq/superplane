@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,6 +78,11 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 				Reasoning:  row.ReasoningCentsPerMillion,
 			}
 			switch row.MatchMode {
+			case UsagePriceBookMatchExact:
+				loaded.ExactRates = append(loaded.ExactRates, pricebook.ExactRate{
+					Key:  row.MatchKey,
+					Rate: rate,
+				})
 			case UsagePriceBookMatchPrefix:
 				loaded.PrefixRates = append(loaded.PrefixRates, pricebook.PrefixRate{
 					Prefix: row.MatchKey,
@@ -94,4 +101,76 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 
 	pricebook.Replace(loaded)
 	return nil
+}
+
+// FindLatestPriceBook returns the newest catalog version by effective_at.
+func FindLatestPriceBook(tx *gorm.DB) (*UsagePriceBook, error) {
+	var book UsagePriceBook
+	err := tx.Order("effective_at DESC").First(&book).Error
+	if err != nil {
+		return nil, err
+	}
+	return &book, nil
+}
+
+// ListPriceBookRates returns every match rule for one catalog version.
+func ListPriceBookRates(tx *gorm.DB, version string) ([]UsagePriceBookRate, error) {
+	var rows []UsagePriceBookRate
+	err := tx.Where("version = ?", version).
+		Order("usage_kind ASC, match_mode ASC, match_key ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// NextPriceBookVersion returns date.N for today in UTC, starting at .1.
+func NextPriceBookVersion(tx *gorm.DB, now time.Time) (string, error) {
+	prefix := now.UTC().Format("2006-01-02") + "."
+	var versions []string
+	err := tx.Model(&UsagePriceBook{}).
+		Where("version LIKE ?", prefix+"%").
+		Pluck("version", &versions).Error
+	if err != nil {
+		return "", err
+	}
+
+	max := 0
+	for _, version := range versions {
+		n, parseErr := strconv.Atoi(strings.TrimPrefix(version, prefix))
+		if parseErr != nil {
+			continue
+		}
+		if n > max {
+			max = n
+		}
+	}
+	return fmt.Sprintf("%s%d", prefix, max+1), nil
+}
+
+// InsertPriceBook writes one catalog version and its rates in the caller transaction.
+func InsertPriceBook(tx *gorm.DB, book UsagePriceBook, rates []UsagePriceBookRate) error {
+	if strings.TrimSpace(book.Version) == "" {
+		return fmt.Errorf("price book version is required")
+	}
+	if book.EffectiveAt.IsZero() {
+		book.EffectiveAt = time.Now().UTC()
+	}
+	if book.CreatedAt.IsZero() {
+		book.CreatedAt = book.EffectiveAt
+	}
+	if err := tx.Create(&book).Error; err != nil {
+		return err
+	}
+	if len(rates) == 0 {
+		return nil
+	}
+	for i := range rates {
+		if rates[i].ID == uuid.Nil {
+			rates[i].ID = uuid.New()
+		}
+		rates[i].Version = book.Version
+	}
+	return tx.Create(&rates).Error
 }
