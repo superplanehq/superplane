@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
+
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -72,6 +74,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
@@ -133,7 +137,7 @@ describe("FirstRunSetup reliability", () => {
     expect(requestConnect).toHaveBeenCalledTimes(1);
 
     navigation.resolve(true);
-    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub));
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
   });
 
   it("keeps repository and ticket screens locked until their saves finish", async () => {
@@ -186,6 +190,25 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
   });
 
+  // An install request made on GitHub without a callback only surfaces
+  // through the recheck sync, so the sync must also run while the picker
+  // is open without a known request.
+  it("rechecks GitHub for install requests while the account picker is open", () => {
+    const picker = githubConnection("int-1", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+    });
+    renderSetup(
+      pageModel({ openSection: "vcs", githubConnections: githubConnections([picker]) }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
+  });
+
   it("opens the waiting screen from a GitHub request return", () => {
     const request = githubConnection("int-1", { startedByUserID: "user-1", installRequested: true });
     renderSetup(
@@ -210,8 +233,9 @@ describe("FirstRunSetup reliability", () => {
       pageModel({ openSection: "vcs", githubConnections: githubConnections([request]) }),
       "/org-1/workspaces/PAY/setup?step=vcs&githubOrg=wrong&githubIntegrationId=int-1",
     );
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("octo");
+    const waiting = screen.getByTestId("first-run-github-install-requested");
+    expect(waiting).toHaveTextContent("acme");
+    expect(waiting).toHaveTextContent("octo");
     expect(screen.queryByText("wrong")).not.toBeInTheDocument();
   });
 

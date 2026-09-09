@@ -1,10 +1,13 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
 import { OnboardingGate } from "./OnboardingGate";
+import { holdSetupAfterThisVisitCompletes } from "./onboardingGateState";
 
 let factory: FactoriesFactory;
 
@@ -77,6 +80,54 @@ describe("OnboardingGate", () => {
 
   // Setup finishes with its own redirect to the line board. This redirect can
   // land after it, so both must open the same board.
+  // Finish writes completedAt before analysis mounts. This visit must stay
+  // on setup; a later visit still leaves (the tests above).
+  it("holds setup when this visit started incomplete", () => {
+    expect(holdSetupAfterThisVisitCompletes(true, true)).toBe(true);
+    expect(holdSetupAfterThisVisitCompletes(false, true)).toBe(false);
+    expect(holdSetupAfterThisVisitCompletes(true, false)).toBe(false);
+  });
+
+  it("keeps setup mounted after this visit marks onboarding complete", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [, setTick] = useState(0);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              factory = {
+                id: "factory-1",
+                lines: [{ id: "line-plan" }],
+                onboarding: { completedAt: "2026-08-17T12:00:00Z" },
+              };
+              setTick((n) => n + 1);
+            }}
+          >
+            complete
+          </button>
+          <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+            <Routes>
+              <Route path="/org-1/workspaces/PAY" element={<Layout />}>
+                <Route element={<OnboardingGate />}>
+                  <Route path="setup" element={<CurrentPath />} />
+                  <Route path="lines/:lineId" element={<CurrentPath />} />
+                </Route>
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </>
+      );
+    }
+
+    render(<Harness />);
+    expect(screen.getByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "complete" }));
+    expect(screen.getByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    expect(screen.queryByText("/org-1/workspaces/PAY/lines/line-plan")).not.toBeInTheDocument();
+  });
+
   it("opens the line board when a completed workspace leaves setup", async () => {
     factory = {
       id: "factory-1",

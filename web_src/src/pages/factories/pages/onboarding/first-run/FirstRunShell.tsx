@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { FirstRunSpherePane, type FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
@@ -18,12 +19,14 @@ export function FirstRunShell({
   chrome,
   busy = false,
   width = "narrow",
+  sphere,
 }: {
   children: ReactNode;
   testId: string;
   chrome?: FirstRunChrome;
   busy?: boolean;
   width?: "narrow" | "wide";
+  sphere?: FirstRunSphereProps;
 }) {
   useFactoriesThemeClass();
   const controlsDisabled = busy || Boolean(chrome?.busy);
@@ -36,12 +39,24 @@ export function FirstRunShell({
     >
       <FirstRunTopBar chrome={chrome} disabled={controlsDisabled} />
 
-      <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
-        <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>
-          {children}
-          <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
+      {sphere ? (
+        <div className="flex h-full">
+          <div className="flex flex-1 items-center overflow-y-auto px-8 py-24 lg:px-12">
+            <div className="w-full max-w-lg text-left">
+              {children}
+              <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
+            </div>
+          </div>
+          <FirstRunSpherePane {...sphere} />
         </div>
-      </div>
+      ) : (
+        <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
+          <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>
+            {children}
+            <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
+          </div>
+        </div>
+      )}
 
       <FirstRunWorkspaceSwitch switcher={chrome?.workspaceSwitch} disabled={controlsDisabled} />
       <FirstRunProgress chrome={chrome} />
@@ -164,7 +179,7 @@ export function FirstRunHeading({
   children?: ReactNode;
 }) {
   return (
-    <header className="mx-auto max-w-lg space-y-3">
+    <header className="max-w-lg space-y-3">
       {greeting ? <p className="text-[15px] font-medium tracking-[-0.01em]">{greeting}</p> : null}
       <h1
         className={cn(
