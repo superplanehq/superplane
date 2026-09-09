@@ -12,7 +12,6 @@ import {
   Plug,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
@@ -23,7 +22,6 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "automations"
   | "models"
   | "spending"
   | "billing"
@@ -158,15 +156,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "pull request automations",
           "save repository",
         ],
-      },
-      {
-        id: "workspace-automations",
-        label: "Automations",
-        Icon: Workflow,
-        scope: "workspace",
-        section: "automations",
-        permission: { resource: "factories", action: "update" },
-        keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
       },
       {
         id: "workspace-models",
