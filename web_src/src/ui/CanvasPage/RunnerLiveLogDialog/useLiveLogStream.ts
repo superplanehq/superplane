@@ -111,6 +111,20 @@ function withClearedError(state: LogState): LogState {
   return { ...state, error: null };
 }
 
+// CloudWatch Logs raises ResourceNotFoundException for GetLogEvents when the
+// runner hasn't created its log stream yet (e.g. right after an execution
+// starts, or during the brief window between reconnect attempts). The
+// broker relays that as a stream error, but it's an expected, self-healing
+// condition rather than an application bug: the live log session already
+// reconnects automatically, and the log stream appears as soon as the
+// runner starts writing to it. Surfacing it as a failure (in the UI or in
+// Sentry) would just be noise, so it's ignored.
+const BENIGN_BROKER_ERROR_PATTERN = /ResourceNotFoundException.*log (stream|group) .*(does not exist|not found)/i;
+
+function isBenignBrokerError(message: string): boolean {
+  return BENIGN_BROKER_ERROR_PATTERN.test(message);
+}
+
 type StreamHandlerContext = {
   reconnecting: boolean;
   replayLineSkip: Map<number, number>;
@@ -129,6 +143,9 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
     },
     onStreamError: (message) => {
+      if (isBenignBrokerError(message)) {
+        return;
+      }
       onFailure(message);
       setState((prev) => applyStreamFailure(prev, message));
     },
