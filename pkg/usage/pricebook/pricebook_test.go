@@ -48,6 +48,25 @@ func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	assert.Equal(t, int64(0), got)
 }
 
+func TestEstimateMicros_ExactMatchBeatsPrefix(t *testing.T) {
+	t.Cleanup(Reset)
+	Replace(Book{
+		Version: "test-exact",
+		ExactRates: []ExactRate{
+			{Key: "anthropic/claude-sonnet-4", Rate: Rate{Input: 999}},
+		},
+		PrefixRates: []PrefixRate{
+			{Prefix: "claude-sonnet", Rate: rateClaudeSonnet},
+		},
+		FamilyRates:  CatalogFallbacks().FamilyRates,
+		ComputeRates: CatalogFallbacks().ComputeRates,
+	})
+
+	assert.Equal(t, int64(9_990_000), EstimateMicros("openrouter", "anthropic/claude-sonnet-4", 1_000_000, 0, 0, 0, 0))
+	assert.Equal(t, int64(3_000_000), EstimateMicros("anthropic", "claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0))
+	assert.True(t, IsPriced("anthropic/claude-sonnet-4"))
+}
+
 func TestIsPriced(t *testing.T) {
 	assert.True(t, IsPriced("claude-sonnet-4-6"))
 	assert.False(t, IsPriced("unknown-lab-model"))

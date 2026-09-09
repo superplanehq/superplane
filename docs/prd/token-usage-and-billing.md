@@ -144,9 +144,13 @@ because the list holds full model ids. Only `PrepareHostedRun` keeps a
 selected-model gate, because hosted spend debits the wallet.
 
 Rates live in `usage_price_books` / `usage_price_book_rates`. The process loads
-the latest book at start. Compute rows for SuperPlane runner fleets write
-`cost_micros` from `micros_per_second`. Fleet `local` is always 0. Compute
-does not debit the hosted credit wallet and does not use markup.
+the latest book at start. Installation admins can scan OpenRouter model prices
+and SuperPlane runner VM rates from the admin **Price book** page. The same
+scan function can run on a worker interval (`START_PRICE_BOOK_SYNC_WORKER`).
+A scan writes a new catalog version and reloads it in memory. Compute rows for
+SuperPlane runner fleets write `cost_micros` from `micros_per_second`. Fleet
+`local` is always 0. Compute does not debit the hosted credit wallet and does
+not use markup.
 
 ### Phase 5 — Polar prepaid checkout
 
