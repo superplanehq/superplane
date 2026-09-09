@@ -311,7 +311,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       lastCost = spawnResult.cost;
     }
     lastErrorText = spawnResult.errorText || "";
-    const spawnFailed = spawnTurnFailed(spawnResult, formatter);
+    const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
     if (!spawnFailed) {
       failed = false;
       exitCode = 0;
@@ -417,7 +417,7 @@ function spawnHasAssistantReply(spawnResult, formatter) {
   return Boolean(String(text || "").trim());
 }
 
-function spawnTurnFailed(spawnResult, formatter) {
+function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
   if (spawnResult.resultFailed) {
     return true;
   }
@@ -426,6 +426,9 @@ function spawnTurnFailed(spawnResult, formatter) {
   }
   const kind = classifyOpenRouterError(spawnResult.errorText || "");
   if (kind === "rate_limit" || kind === "hard") {
+    return true;
+  }
+  if (!allowSoftExitWithReply) {
     return true;
   }
   return !spawnHasAssistantReply(spawnResult, formatter);

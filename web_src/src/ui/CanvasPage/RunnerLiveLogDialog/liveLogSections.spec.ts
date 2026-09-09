@@ -5,6 +5,7 @@ import {
   completeCommandSection,
   endToolOnLatestSection,
   sectionTitle,
+  shouldSkipUnindexedLiveLogReplay,
   startCommandSection,
   startToolOnLatestSection,
 } from "./liveLogSections";
@@ -129,6 +130,29 @@ describe("liveLogSections", () => {
     }
     expect(first.tools).toHaveLength(1);
     expect(first.tools[0]).toMatchObject({ status: "passed", duration_ms: 5 });
+    expect(state.sections[1].events).toEqual([]);
+  });
+
+  it("does not attach a replayed tool id to a later running command", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 2,
+      text: "Plan with the user",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "Greet the user",
+    });
+    state = startToolOnLatestSection(state, "bash", "ls", "call_1");
+    state = endToolOnLatestSection(state, "passed", 5, "call_1");
+    state = completeCommandSection(state, 2, "passed", 20);
+    state = startCommandSection(state, {
+      index: 1000,
+      text: "Wait for the next message",
+      startedAtMs: 2,
+      kind: "prompt",
+      preview: "Wait for the next user message",
+    });
+    state = startToolOnLatestSection(state, "bash", "ls", "call_1");
+
     expect(state.sections[1].events).toEqual([]);
   });
 
@@ -266,6 +290,28 @@ describe("liveLogSections", () => {
     ]);
   });
 
+  it("keeps the same status line on a later prompt during the first stream", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 2,
+      text: "Greet",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "Greet the user",
+    });
+    state = appendLineToLatestSection(state, "OpenCode started");
+    state = completeCommandSection(state, 2, "passed", 20);
+    state = startCommandSection(state, {
+      index: 1000,
+      text: "Follow up",
+      startedAtMs: 2,
+      kind: "prompt",
+      preview: "Continue",
+    });
+    state = appendLineToLatestSection(state, "OpenCode started");
+
+    expect(state.sections[1].lines).toEqual(["OpenCode started"]);
+  });
+
   it("drops replayed clone and greet lines that already belong to earlier commands", () => {
     let state = startCommandSection(emptyState(), {
       index: 0,
@@ -303,9 +349,6 @@ describe("liveLogSections", () => {
     });
     state = appendLineToLatestSection(state, "I've proposed a draft.");
 
-    state = appendLineToLatestSection(state, "Agent ready");
-    state = appendLineToLatestSection(state, "Cloning into 'repo'...");
-    state = appendLineToLatestSection(state, "Hello! How can I help you today?");
     state = appendLineToLatestSection(state, "Agent ready", undefined, 0);
     state = appendLineToLatestSection(state, "Cloning into 'repo'...", undefined, 1);
     state = appendLineToLatestSection(state, "Hello! How can I help you today?", undefined, 2);
@@ -328,5 +371,15 @@ describe("liveLogSections", () => {
 
     expect(state.sections[0].lines).toEqual(["Turn 1 · 3 tokens"]);
     expect(state.sections[0].events).toEqual([{ kind: "note", text: "Turn 1 · 3 tokens" }]);
+  });
+});
+
+describe("shouldSkipUnindexedLiveLogReplay", () => {
+  it("skips unindexed reconnect lines only after an earlier command has finished", () => {
+    expect(shouldSkipUnindexedLiveLogReplay(false, undefined, true)).toBe(false);
+    expect(shouldSkipUnindexedLiveLogReplay(true, undefined, false)).toBe(false);
+    expect(shouldSkipUnindexedLiveLogReplay(true, undefined, true)).toBe(true);
+    expect(shouldSkipUnindexedLiveLogReplay(true, 0, true)).toBe(false);
+    expect(shouldSkipUnindexedLiveLogReplay(false, 1000, true)).toBe(false);
   });
 });

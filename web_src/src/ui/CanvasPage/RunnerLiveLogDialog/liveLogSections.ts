@@ -83,9 +83,6 @@ export function appendLineToLatestSection(
   if (section.status !== "running") {
     return state;
   }
-  if (lineOwnedByOtherSection(state, text, section.index)) {
-    return state;
-  }
   const skipLeft = replayLineSkip?.get(section.index) ?? 0;
   if (skipLeft > 0) {
     replayLineSkip?.set(section.index, skipLeft - 1);
@@ -115,7 +112,7 @@ export function startToolOnLatestSection(
   if (section.status !== "running") {
     return state;
   }
-  if (sourceId && findToolInSection(section, sourceId)) {
+  if (sourceId && state.sections.some((candidate) => findToolInSection(candidate, sourceId))) {
     return state;
   }
   const nextSections = [...state.sections];
@@ -146,19 +143,19 @@ export function endToolOnLatestSection(
   return { ...state, sections: nextSections };
 }
 
+export function shouldSkipUnindexedLiveLogReplay(
+  reconnecting: boolean,
+  commandIndex: number | undefined,
+  hasFinishedSection: boolean,
+): boolean {
+  return reconnecting && commandIndex === undefined && hasFinishedSection;
+}
+
 function commandSectionPosition(state: LogState, commandIndex?: number): number {
   if (commandIndex === undefined) {
     return state.sections.length - 1;
   }
   return state.sections.findIndex((section) => section.index === commandIndex);
-}
-
-function lineOwnedByOtherSection(state: LogState, text: string, commandIndex: number): boolean {
-  const needle = text.trim();
-  if (!needle) {
-    return false;
-  }
-  return state.sections.some((section) => section.index !== commandIndex && section.lines.includes(text));
 }
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
