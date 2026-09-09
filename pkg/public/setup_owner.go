@@ -105,7 +105,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
+			return err
+		}
+		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	})
 
 	if err != nil {
