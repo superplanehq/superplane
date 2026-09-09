@@ -95,6 +95,14 @@ export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   hasBillingCustomer: true,
 };
 
+/** Welcome credit remains, but the balance is at or below $20. */
+export const LOW_TRIAL_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "432",
+  hostedBilledCents: "4568",
+  remainingCreditWarning: true,
+};
+
 export const EXPIRED_WELCOME_USAGE_REPORT: StorybookUsageReport = {
   ...SPENT_CREDIT_USAGE_REPORT,
   welcomeCreditExpiresAt: "2026-08-15T12:00:00.000Z",

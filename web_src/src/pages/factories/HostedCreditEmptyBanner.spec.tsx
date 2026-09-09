@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
+import { HOSTED_CREDIT_RUNS_STOP_HINT } from "./lib/hostedCreditEmpty";
 
 const billingHref = "/org/workspaces/RF/settings/organization/billing";
 
@@ -59,7 +60,28 @@ describe("HostedCreditEmptyBanner", () => {
     expect(banner).toHaveTextContent("$41.24 remaining");
     expect(banner).toHaveTextContent("14 days remaining");
     expect(banner).toHaveAttribute("data-tone", "info");
+    expect(banner).not.toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+  });
+
+  it("warns that tasks stop when remaining trial credit is low", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditEmptyBanner
+          billingEnabled
+          kind="trial"
+          remainingCreditCents={432}
+          welcomeCreditExpiresAt={new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()}
+          spendingHref={billingHref}
+        />
+      </MemoryRouter>,
+    );
+
+    const banner = screen.getByTestId("hosted-credit-empty-banner");
+    expect(banner).toHaveTextContent("Trial");
+    expect(banner).toHaveTextContent("$4.32 remaining");
+    expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
+    expect(banner).toHaveAttribute("data-tone", "warning");
   });
 
   it("warns when the trial expires today", () => {
@@ -111,6 +133,7 @@ describe("HostedCreditEmptyBanner", () => {
     const banner = screen.getByTestId("hosted-credit-empty-banner");
     expect(banner).toHaveTextContent("Hosted credit is low");
     expect(banner).toHaveTextContent("$15.00 remaining");
+    expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(banner).toHaveAttribute("data-tone", "warning");
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
   });
