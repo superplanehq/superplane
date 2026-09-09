@@ -133,10 +133,10 @@ function resolveGitHubConnection(model: OnboardingPageModel, userId?: string, ca
   const selectedConnection = model.githubConnections.readyInstances.find(
     (item) => item.metadata?.id === model.selectedVcsConnectionId,
   );
-  const accountPicker =
-    githubAccountPickerFromConnection(preferredConnection, userId) ??
-    pendingGitHubAccountPicker(model.githubConnections.allInstances, userId, requestConnection?.id) ??
-    githubAccountPickerFromConnection(selectedConnection, userId);
+  const accountPicker = preferredId
+    ? githubAccountPickerFromConnection(preferredConnection, userId)
+    : (pendingGitHubAccountPicker(model.githubConnections.allInstances, userId) ??
+      githubAccountPickerFromConnection(selectedConnection, userId));
   return { requestConnection, accountPicker };
 }
 

@@ -100,8 +100,12 @@ function githubConnections(instances: OrganizationsIntegration[]) {
   return { name: "github", readyInstances: [], allInstances: instances };
 }
 
-function githubConnection(id: string, metadata: Record<string, unknown>): OrganizationsIntegration {
-  return { metadata: { id, integrationName: "github" }, status: { state: "pending", metadata } };
+function githubConnection(
+  id: string,
+  metadata: Record<string, unknown>,
+  state: "pending" | "ready" = "pending",
+): OrganizationsIntegration {
+  return { metadata: { id, integrationName: "github" }, status: { state, metadata } };
 }
 
 describe("FirstRunSetup reliability", () => {
@@ -219,6 +223,49 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
     );
+  });
+
+  it("does not use another GitHub identity's installations for a pending request", () => {
+    const request = githubConnection("request-integration", {
+      startedByUserID: "user-1",
+      startedByGitHubLogin: "requester",
+      state: "request-csrf",
+      githubApp: { slug: "superplane" },
+      installRequests: [{ id: "1", accountLogin: "requested-org", requesterLogin: "requester" }],
+    });
+    const existing = githubConnection(
+      "github-1",
+      {
+        startedByUserID: "user-1",
+        startedByGitHubLogin: "connected-user",
+        state: "existing-csrf",
+        githubApp: { slug: "superplane" },
+        pendingInstallations: [
+          { id: "11", accountLogin: "connected-user" },
+          { id: "22", accountLogin: "requested-org" },
+        ],
+      },
+      "ready",
+    );
+
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          allInstances: [request, existing],
+          readyInstances: [existing],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=request-integration",
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("requested-org");
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("connected-user") }),
+    ).not.toBeInTheDocument();
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "request-integration", true);
   });
 
   it("uses server metadata for every requested organization", () => {
