@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Gauge, Kanban } from "lucide-react";
+import { ChartLine, Home } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
@@ -56,14 +56,14 @@ export function FactoriesSidebarNav({ organizationId, factoryKey, lineId }: Fact
       <RailNavLink
         to={boardHref}
         label="Board"
-        Icon={Kanban}
+        Icon={Home}
         testId="factories-nav-board"
         isCurrent={isBoardPath(pathname)}
       />
       <RailNavLink
         to={velocityHref}
         label="Velocity"
-        Icon={Gauge}
+        Icon={ChartLine}
         testId="factories-nav-velocity"
         isCurrent={isVelocityPath(pathname)}
       />
