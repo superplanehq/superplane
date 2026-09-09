@@ -182,6 +182,58 @@ describe("WorkOrderDescriptionEditor", () => {
     });
   });
 
+  it("resolves an existing sp-file image ref to its download URL when the editor opens", async () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={`![bug](sp-file://${fileId})`}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: "https://cdn.example/bug.png" }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await waitFor(() => {
+      expect(input.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example/bug.png");
+    });
+  });
+
+  it("resolves an sp-file image ref once the download URL loads after mount", async () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+    const { rerender } = render(
+      <WorkOrderDescriptionEditor
+        value={`![bug](sp-file://${fileId})`}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await waitFor(() => {
+      expect(input.querySelector("img")).not.toBeNull();
+    });
+    expect(input.querySelector("img")?.getAttribute("src")).toBe(`sp-file://${fileId}`);
+
+    rerender(
+      <WorkOrderDescriptionEditor
+        value={`![bug](sp-file://${fileId})`}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: "https://cdn.example/bug.png" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(input.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example/bug.png");
+    });
+  });
+
   it("turns selected text into a heading from the heading menu", async () => {
     const user = userEvent.setup();
 
