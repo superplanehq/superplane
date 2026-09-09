@@ -76,6 +76,28 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderResultRejected, closeNode.Configuration["result"])
 	})
 
+	t.Run("the close trigger listens for closed even when the binding carries the create trigger's actions", func(t *testing.T) {
+		binding := &intakeBinding{
+			Integration: &yaml.IntegrationRef{ID: "integration-1", Name: "acme-github"},
+			Configuration: map[string]any{
+				"repository": "acme/backlog",
+				"actions":    []any{"opened"},
+			},
+		}
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Binding: binding})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeCloseTriggerNodeID)
+		assert.Equal(t, []any{"closed"}, trigger.Configuration["actions"])
+		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
+
+		// The shared binding configuration must not be mutated: the create
+		// trigger still listens for `opened`.
+		assert.Equal(t, []any{"opened"}, binding.Configuration["actions"])
+		createTrigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"opened"}, createTrigger.Configuration["actions"])
+	})
+
 	t.Run("only GitHub issue intakes get an issue-closed branch", func(t *testing.T) {
 		for _, source := range []string{
 			models.FactoryIntakeSourceSentryExceptions,

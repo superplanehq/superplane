@@ -329,10 +329,17 @@ func buildIntakeCloseBranch(binding *intakeBinding) ([]yaml.Node, []yaml.Edge) {
 // configured actions (e.g. just `opened`) must not gain `closed` as a side
 // effect of enabling this branch.
 func intakeCloseTriggerConfiguration(binding *intakeBinding) map[string]any {
-	configuration := map[string]any{"actions": []any{"closed"}}
+	configuration := make(map[string]any, len(binding.configuration())+1)
 	for name, value := range binding.configuration() {
 		configuration[name] = value
 	}
+
+	// Set `actions` after copying the binding so the close branch always
+	// listens for `closed`, even when the binding carries the create
+	// trigger's `actions` (e.g. `opened`). Writing into this fresh map
+	// keeps the shared binding configuration untouched, so the create
+	// trigger is unaffected.
+	configuration["actions"] = []any{"closed"}
 
 	return configuration
 }
