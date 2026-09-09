@@ -49,6 +49,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "API keys",
       "Secrets",
       "Billing",
+      "Usage",
       "Spending",
     ]);
   });
@@ -128,6 +129,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
       "organization-general",
       "organization-models",
       "organization-billing",
+      "organization-usage",
       "organization-spending",
     ]);
   });
