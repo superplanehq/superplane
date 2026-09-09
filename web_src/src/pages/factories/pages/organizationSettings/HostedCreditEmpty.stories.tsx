@@ -4,6 +4,7 @@ import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
   EXPIRED_WELCOME_USAGE_REPORT,
+  LOW_TRIAL_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
@@ -47,6 +48,23 @@ export const Trial: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
         factoriesFixture={defaultFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Tasks list when remaining trial credit is low. The banner names the stop outcome. */
+export const TrialLowCredit: Story = {
+  name: "Trial low credit",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LOW_TRIAL_USAGE_REPORT,
+        }}
       />
     );
   },
