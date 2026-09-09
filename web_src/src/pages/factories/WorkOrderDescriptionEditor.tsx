@@ -3,12 +3,12 @@ import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
 
-import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
+import { setWorkOrderImageDownloadUrls, WorkOrderImage } from "./lib/workOrderDescriptionImage";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
@@ -145,14 +145,11 @@ export function WorkOrderDescriptionEditor({
     editor.setEditable(!disabled);
   }, [disabled, editor]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editor) {
       return;
     }
-    editor.storage.image = {
-      ...(editor.storage.image ?? {}),
-      downloadUrls: fileUrls ?? {},
-    };
+    setWorkOrderImageDownloadUrls(editor, fileUrls ?? {});
   }, [editor, fileUrls]);
 
   useEffect(() => {
