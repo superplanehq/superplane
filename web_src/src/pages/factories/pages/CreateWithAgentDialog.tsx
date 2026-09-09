@@ -230,10 +230,10 @@ function CreateWithAgentStream({
                 }
               }
             }}
-            className="min-h-[44px] resize-none text-[13px]"
+            className="min-h-11 resize-none text-[13px]"
             rows={2}
           />
-          <Button type="submit" size="sm" disabled={failed || !view.composer.trim()}>
+          <Button type="submit" size="sm" className="h-11 px-4" disabled={failed || !view.composer.trim()}>
             {CREATE_WITH_AGENT_COPY.send}
           </Button>
         </div>
