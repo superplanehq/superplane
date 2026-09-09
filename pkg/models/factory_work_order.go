@@ -354,6 +354,8 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	}
 
 	fromResult := o.Result
+	fromUpdatedAt := o.UpdatedAt
+	fromStatusNote := o.StatusNote
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -446,6 +448,8 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		if errors.Is(err, errWorkOrderStateMismatch) {
 			o.State = fromState
 			o.Result = fromResult
+			o.UpdatedAt = fromUpdatedAt
+			o.StatusNote = fromStatusNote
 			return false, nil
 		}
 		return false, err

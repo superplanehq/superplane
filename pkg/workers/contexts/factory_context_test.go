@@ -91,9 +91,21 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{
 			"type": "github.issue",
 			"data": map[string]any{
+				"action": "opened",
+				"installation": map[string]any{
+					"id":       1,
+					"html_url": "https://github.com/organizations/acme/settings/installations/1",
+				},
 				"issue": map[string]any{
 					"html_url": "https://github.com/acme/payments/issues/12",
+					"url":      "https://api.github.com/repos/acme/payments/issues/12",
 					"title":    "Handle duplicate refunds",
+				},
+				"repository": map[string]any{
+					"html_url": "https://github.com/acme/payments",
+				},
+				"sender": map[string]any{
+					"html_url": "https://github.com/octocat",
 				},
 			},
 		})

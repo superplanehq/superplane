@@ -332,6 +332,9 @@ func TestFactoryWorkOrder_UpdateStatusExpectedStateGuard(t *testing.T) {
 			Update("state", FactoryWorkOrderStateOpen).
 			Error)
 
+		fromUpdatedAt := order.UpdatedAt
+		fromStatusNote := order.StatusNote
+
 		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState:       FactoryWorkOrderStateClosed,
 			Result:        FactoryWorkOrderResultRejected,
@@ -341,6 +344,10 @@ func TestFactoryWorkOrder_UpdateStatusExpectedStateGuard(t *testing.T) {
 		})
 		require.NoError(t, err, "a lost guard race is a no-op, not a failure")
 		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+		assert.Empty(t, order.Result)
+		assert.Equal(t, fromUpdatedAt, order.UpdatedAt)
+		assert.Equal(t, fromStatusNote, order.StatusNote)
 
 		// The dispatched task is left untouched, not rejected.
 		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
