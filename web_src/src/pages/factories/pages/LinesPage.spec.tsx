@@ -871,56 +871,14 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
-  it("offers full-screen automation editing and inline agent editing", async () => {
+  it("hides Edit Agent and Edit Automation on the automation menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit")).toHaveTextContent(
-      "Edit Automation",
-    );
-    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).toHaveTextContent(
-      "Edit Agent",
-    );
-    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit"));
-
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
-    );
-  });
-
-  it("opens the agent editor with the canvas agent name and steps", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent"));
-
-    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
-    expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-settings")).toBeInTheDocument();
-    expect(screen.getByText("Concurrency")).toBeInTheDocument();
-    expect(screen.getByText("Model used")).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-step-kind-0")).toHaveTextContent("Bash");
-    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
-    expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");
-    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
-    expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue("Clone Repo");
-    expect(screen.getByTestId("planning-review-step-body-0-editor")).toBeInTheDocument();
-  });
-
-  it("hides Edit Agent when the column canvas has no agent", async () => {
-    useCanvasMock.mockReturnValue(canvasQuery(canvasWithoutAgent));
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit")).toHaveTextContent(
-      "Edit Automation",
-    );
+    expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).not.toBeInTheDocument();
   });
 
@@ -929,7 +887,7 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent"));
+    await user.click(screen.getByTestId("column-automation-row-step-0-app-refund-implementer"));
     await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
@@ -945,7 +903,7 @@ describe("LinesPage board editing", () => {
       );
     });
     expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update agent");
-    expect(screen.queryByTestId("lines-planning-review")).not.toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
   });
 
   it("keeps Backlog Edit as the only edit action", async () => {
