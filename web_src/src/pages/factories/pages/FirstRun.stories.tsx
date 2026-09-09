@@ -77,7 +77,7 @@ export const AnalysisFailed: Story = {
   name: "5b Analysis (failed)",
   render: () => (
     <FirstRunAnalysisScreen
-      progress={{ total: 0, scored: 0, stageIndex: 0 }}
+      progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0 }}
       failed
       chrome={firstRunStoryChrome(4)}
       onGoToBoard={() => undefined}

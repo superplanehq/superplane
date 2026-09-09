@@ -4,6 +4,10 @@ import {
   githubInstallRequestBody,
 } from "@/lib/githubInstallRequestCopy";
 
+function ticketCount(count: number) {
+  return count === 1 ? "1 ticket" : `${count} tickets`;
+}
+
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
@@ -83,11 +87,14 @@ export const FIRST_RUN_COPY = {
     headline: "Finding tickets SuperPlane can one-shot",
     body: "Each open ticket gets a confidence score. High-confidence work is ready to run. Ambiguous work stays with your team.",
     stageImporting: "Importing your backlog…",
-    stageImported: (count: number) => `Backlog imported — ${count} tickets`,
-    stageScoring: (scored: number, total: number) => `Scoring tickets… ${scored} of ${total}`,
-    stageBoard: "Building your board",
+    stageImported: (count: number) => `Backlog imported — ${ticketCount(count)}`,
+    stageScoringPending: "Scoring tickets",
+    stageScoring: (scored: number, total: number) => `Scoring tickets — ${scored} of ${total}`,
+    stageScored: (total: number, ready: number) =>
+      ready > 0 ? `${ticketCount(total)} scored — ${ready} ready to run` : `${ticketCount(total)} scored`,
     goToBoard: "Go to your board",
     note: "Scoring continues on the board. No work starts until you approve a ticket.",
+    noteDone: "No work starts until you approve a ticket.",
     failure: "SuperPlane could not read the scoring progress. Your board still works.",
   },
   sphere: {

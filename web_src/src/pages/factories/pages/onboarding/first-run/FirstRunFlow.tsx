@@ -34,7 +34,7 @@ export function FirstRunFlow({
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
-  const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, stageIndex: 1 });
+  const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
 
   const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
@@ -49,7 +49,9 @@ export function FirstRunFlow({
     const stageTimer = window.setInterval(() => {
       setProgress((current) => {
         const scored = Math.min(current.scored + 1, current.total);
-        return { total: current.total, scored, stageIndex: scored === current.total ? 2 : 1 };
+        // Roughly two of three demo tickets score above the threshold.
+        const ready = Math.ceil((scored * 2) / 3);
+        return { total: current.total, scored, ready, stageIndex: scored === current.total ? 2 : 1 };
       });
     }, STAGE_MS);
     return () => window.clearInterval(stageTimer);
@@ -103,7 +105,7 @@ export function FirstRunFlow({
         onSelectTicketSource={setTicketSource}
         onAnalyzeTickets={() => {
           if (!ticketSource) return;
-          setProgress({ total: 12, scored: 0, stageIndex: 1 });
+          setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
           setScreen("analysis");
         }}
       />
