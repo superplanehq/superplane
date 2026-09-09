@@ -72,7 +72,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-If OpenRouter rate-limits the selected model, SuperPlane continues the session on the next allowed OpenRouter model.
+SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation, the start model, and each switch. A rate limit or a temporary provider error starts a new OpenCode session on the next model.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -151,7 +151,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, byokOpenRouterFallbackModels(ctx, spec.Model))
+	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, byokOpenRouterAllowedModels(ctx), FallbackRotateSeed(ctx))
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{

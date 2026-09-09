@@ -1784,7 +1784,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-If OpenRouter rate-limits the selected model, SuperPlane continues the session on the next allowed OpenRouter model.
+SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation, the start model, and each switch. A rate limit or a temporary provider error starts a new OpenCode session on the next model.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -1890,6 +1890,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+When this agent uses OpenRouter, SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation and any model switch.
 
 ### Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.

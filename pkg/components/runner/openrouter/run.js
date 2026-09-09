@@ -18,6 +18,8 @@ const NEW_ACCOUNT_RPM_WAIT_MS = 60_000;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
 const FALLBACK_MODELS_FILE = "openrouter_models.json";
 const SESSION_FILE = "opencode_session";
+const MODEL_FILE = "opencode_model";
+const RETRYABLE_WAIT_MS = 5_000;
 
 const PLANNING_SYSTEM_PROMPT =
   "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
@@ -71,6 +73,14 @@ function classifyOpenRouterError(text) {
   ) {
     return "rate_limit";
   }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|no endpoints|no available provider|temporarily|capacity|timeout|econnreset|fetch failed|provider returned error|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
   return "other";
 }
 
@@ -94,15 +104,21 @@ function rateLimitWaitMs(errorText) {
   return NEW_ACCOUNT_RPM_WAIT_MS;
 }
 
-function orderedFallbackModels(selected, allowed) {
-  const first = catalogModelId(selected);
+function retryWaitMs(kind, errorText) {
+  if (kind === "rate_limit") {
+    return rateLimitWaitMs(errorText);
+  }
+  const fromHeader = parseRetryAfterMs(errorText);
+  if (fromHeader != null) {
+    return fromHeader;
+  }
+  return RETRYABLE_WAIT_MS;
+}
+
+function uniqueCatalogModels(ids) {
   const seen = new Set();
   const out = [];
-  if (first) {
-    out.push(first);
-    seen.add(first);
-  }
-  const list = Array.isArray(allowed) ? allowed : [];
+  const list = Array.isArray(ids) ? ids : [];
   for (const raw of list) {
     const id = catalogModelId(raw);
     if (!id || seen.has(id)) {
@@ -114,17 +130,101 @@ function orderedFallbackModels(selected, allowed) {
   return out;
 }
 
+function orderedFallbackModels(selected, allowed) {
+  return uniqueCatalogModels([selected, ...(Array.isArray(allowed) ? allowed : [])]);
+}
+
 function loadFallbackModels(taskDir, selected) {
   const file = path.join(taskDir, FALLBACK_MODELS_FILE);
+  let fromFile = [];
+  if (fs.existsSync(file)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (Array.isArray(parsed)) {
+        fromFile = parsed;
+      }
+    } catch (_err) {
+      fromFile = [];
+    }
+  }
+  const ordered = uniqueCatalogModels(fromFile);
+  const selectedId = catalogModelId(selected);
+  if (selectedId && !ordered.includes(selectedId)) {
+    ordered.push(selectedId);
+  }
+  if (ordered.length === 0 && selectedId) {
+    return [selectedId];
+  }
+  return ordered;
+}
+
+function readPersistedModel(taskDir) {
+  const file = path.join(taskDir, MODEL_FILE);
   if (!fs.existsSync(file)) {
-    return orderedFallbackModels(selected, []);
+    return "";
   }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-    return orderedFallbackModels(selected, parsed);
-  } catch (_err) {
-    return orderedFallbackModels(selected, []);
+  return catalogModelId(fs.readFileSync(file, "utf8"));
+}
+
+function writePersistedModel(taskDir, model) {
+  const id = catalogModelId(model);
+  if (!id) {
+    return;
   }
+  fs.writeFileSync(path.join(taskDir, MODEL_FILE), `${id}\n`);
+}
+
+function clearSession(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+function waitSecondsLabel(ms) {
+  const seconds = Math.max(1, Math.round(Number(ms) / 1000));
+  return `${seconds} seconds`;
+}
+
+function logRotationPlan(models, selected, continuing) {
+  const selectedId = catalogModelId(selected);
+  if (!models.length) {
+    return;
+  }
+  if (models.length === 1) {
+    if (!continuing) {
+      println(`OpenRouter model: ${models[0]}. No other allowed models are available to rotate to.`);
+    }
+    return;
+  }
+  println(`OpenRouter model rotation: ${models.join(" → ")}`);
+  if (continuing) {
+    return;
+  }
+  if (selectedId && models[0] !== selectedId) {
+    println(`This run starts on ${models[0]}. Selected model ${selectedId} is later in the rotation.`);
+  }
+}
+
+function switchReasonLine(kind, fromModel, toModel) {
+  const from = catalogModelId(fromModel);
+  if (kind === "rate_limit") {
+    return `Rate limit on ${from}. Switching to ${toModel}.`;
+  }
+  if (kind === "retryable") {
+    return `Temporary error on ${from}. Switching to ${toModel}.`;
+  }
+  return `Error on ${from}. Switching to ${toModel}.`;
+}
+
+function kindWaitLabel(kind) {
+  if (kind === "rate_limit") {
+    return "rate limit";
+  }
+  if (kind === "retryable") {
+    return "temporary error";
+  }
+  return "error";
 }
 
 function readSessionID(taskDir) {
@@ -159,7 +259,7 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
   return args;
 }
 
-function buildOpenCodeConfig({ taskDir, env = process.env, planning = false } = {}) {
+function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     permission: planning
@@ -175,8 +275,26 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false } = 
   if (baseURL) {
     options.baseURL = baseURL;
   }
-  if (Object.keys(options).length > 0) {
-    config.provider = { openrouter: { options } };
+  const modelIds = uniqueCatalogModels(models);
+  const modelEntries = {};
+  for (const id of modelIds) {
+    modelEntries[id] = {
+      options: {
+        provider: {
+          allow_fallbacks: true,
+          sort: "throughput",
+        },
+      },
+    };
+  }
+  if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
+    config.provider = { openrouter: {} };
+    if (Object.keys(options).length > 0) {
+      config.provider.openrouter.options = options;
+    }
+    if (Object.keys(modelEntries).length > 0) {
+      config.provider.openrouter.models = modelEntries;
+    }
   }
   if (planning && taskDir) {
     config.mcp = {
@@ -190,11 +308,12 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false } = 
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env) {
+function writeOpenCodeConfig(taskDir, env, models) {
   const config = buildOpenCodeConfig({
     taskDir,
     env,
     planning: planningEnabled(env),
+    models,
   });
   fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
@@ -260,25 +379,34 @@ async function runPrompt(promptFile, model, helpers = {}) {
   }
 
   ensureXdgDirs(sp);
-  writeOpenCodeConfig(sp, env);
+
+  const catalog = loadFallbackModels(sp, model);
+  const persisted = readPersistedModel(sp);
+  let models = catalog;
+  if (persisted && catalog.includes(persisted)) {
+    models = orderedFallbackModels(persisted, catalog);
+  }
+  let currentModel = models[0] || catalogModelId(model);
+  writeOpenCodeConfig(sp, env, models);
   const childEnv = openCodeProcessEnv(sp, env);
 
-  const models = loadFallbackModels(sp, model);
-  let currentModel = models[0] || catalogModelId(model);
   const usedThisWindow = new Set();
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
   let lastUsage = emptyUsage();
   let lastCost = 0;
   let sessionID = readSessionID(sp);
-  if (promptCount > 0 && sessionID) {
-    println("Continuing OpenCode session");
-  }
-  const startModel = openRouterModelId(currentModel) || model;
-  if (startModel) {
-    println(`Starting OpenCode · ${startModel}`);
+  const continuing = promptCount > 0 && Boolean(sessionID);
+  logRotationPlan(models, model, continuing);
+  if (continuing) {
+    println(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
   } else {
-    println("Starting OpenCode");
+    const startModel = openRouterModelId(currentModel) || model;
+    if (startModel) {
+      println(`Starting OpenCode · ${startModel}`);
+    } else {
+      println("Starting OpenCode");
+    }
   }
 
   const telemetry = loadTurnTelemetry();
@@ -290,8 +418,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let failed = false;
   let exitCode = 0;
   let lastErrorText = "";
+  let attemptLabel = "";
+  let switchedModel = false;
 
   while (true) {
+    if (attemptLabel) {
+      println(attemptLabel);
+      attemptLabel = "";
+    }
     const args = opencodeRunArgs({
       model: currentModel,
       sessionID: sessionID || undefined,
@@ -315,14 +449,21 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (!spawnFailed) {
       failed = false;
       exitCode = 0;
+      writePersistedModel(sp, currentModel);
+      if (switchedModel) {
+        println(`OpenCode finished on ${catalogModelId(currentModel)}`);
+      }
       break;
     }
     const classKind = classifyOpenRouterError(lastErrorText);
-    if (classKind !== "rate_limit") {
+    if (classKind === "hard") {
       failed = true;
       exitCode = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
       if (lastErrorText) {
         println(truncateText(lastErrorText));
+      }
+      if (models.length > 1) {
+        println("This error does not rotate to another model.");
       }
       break;
     }
@@ -330,23 +471,56 @@ async function runPrompt(promptFile, model, helpers = {}) {
     usedThisWindow.add(catalogModelId(currentModel));
     const nextModel = models.find((id) => !usedThisWindow.has(id));
     if (nextModel) {
-      println(`Rate limit on ${catalogModelId(currentModel)} — switching to ${nextModel}`);
+      println(switchReasonLine(classKind, currentModel, nextModel));
+      if (lastErrorText) {
+        println(truncateText(lastErrorText));
+      }
+      println(`Starting a new OpenCode session on ${nextModel}.`);
+      clearSession(sp);
+      sessionID = "";
       currentModel = nextModel;
+      switchedModel = true;
       continue;
     }
 
-    const waitMs = rateLimitWaitMs(lastErrorText);
-    const remaining = deadline == null ? waitMs : Math.max(0, deadline - now());
-    if (remaining <= 0) {
-      failed = true;
-      exitCode = 1;
-      println("Rate limit wait exceeded the execution timeout");
-      break;
+    if (classKind === "rate_limit" || classKind === "retryable") {
+      const waitMs = retryWaitMs(classKind, lastErrorText);
+      const remaining = deadline == null ? waitMs : Math.max(0, deadline - now());
+      if (remaining <= 0) {
+        failed = true;
+        exitCode = 1;
+        println("Rate limit wait exceeded the execution timeout");
+        break;
+      }
+      if (lastErrorText) {
+        println(truncateText(lastErrorText));
+      }
+      const retryModel = models[0] || currentModel;
+      const waitFor = waitSecondsLabel(Math.min(waitMs, remaining));
+      if (models.length <= 1) {
+        const label = classKind === "rate_limit" ? "Rate limit" : "Temporary error";
+        println(`${label} on ${catalogModelId(retryModel)}. Waiting ${waitFor}, then retrying.`);
+      } else {
+        println(
+          `All models in the rotation returned a ${kindWaitLabel(classKind)}. Waiting ${waitFor}, then retrying ${catalogModelId(retryModel)}.`,
+        );
+      }
+      await sleep(Math.min(waitMs, remaining));
+      usedThisWindow.clear();
+      currentModel = retryModel;
+      attemptLabel = `Retrying OpenCode · ${openRouterModelId(currentModel)}`;
+      continue;
     }
-    println("Rate limit notice — waiting to continue…");
-    await sleep(Math.min(waitMs, remaining));
-    usedThisWindow.clear();
-    currentModel = models[0] || currentModel;
+
+    failed = true;
+    exitCode = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
+    if (lastErrorText) {
+      println(truncateText(lastErrorText));
+    }
+    if (models.length > 1) {
+      println("All models in the rotation failed.");
+    }
+    break;
   }
 
   formatter.flush(failed);
@@ -428,7 +602,7 @@ function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
     return false;
   }
   const kind = classifyOpenRouterError(spawnResult.errorText || "");
-  if (kind === "rate_limit" || kind === "hard") {
+  if (kind === "rate_limit" || kind === "hard" || kind === "retryable") {
     return true;
   }
   if (!allowSoftExitWithReply) {
@@ -552,16 +726,40 @@ function usageFromStepFinish(part) {
   return usage;
 }
 
+function collectErrorText(value, parts, depth) {
+  if (value == null || depth > 5) {
+    return;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    const text = String(value).trim();
+    if (text) {
+      parts.push(text);
+    }
+    return;
+  }
+  if (typeof value !== "object") {
+    return;
+  }
+  for (const key of ["message", "name", "code", "status", "statusCode", "type", "responseBody"]) {
+    if (value[key] != null && value[key] !== value) {
+      collectErrorText(value[key], parts, depth + 1);
+    }
+  }
+  if (value.data && value.data !== value) {
+    collectErrorText(value.data, parts, depth + 1);
+  }
+  if (value.error && value.error !== value) {
+    collectErrorText(value.error, parts, depth + 1);
+  }
+  if (value.cause && value.cause !== value) {
+    collectErrorText(value.cause, parts, depth + 1);
+  }
+}
+
 function errorTextFromEvent(event) {
-  if (!event) {
-    return "";
-  }
-  if (typeof event.error === "string") {
-    return event.error;
-  }
-  const err = event.error && typeof event.error === "object" ? event.error : event;
-  const data = err.data && typeof err.data === "object" ? err.data : {};
-  return String(err.message || data.message || err.name || "").trim();
+  const parts = [];
+  collectErrorText(event, parts, 0);
+  return [...new Set(parts)].join(" ");
 }
 
 function resultTextFrom(lastEvent, formatter) {
@@ -734,7 +932,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
         case "error": {
           const text = errorTextFromEvent(event);
           errorText = text;
-          if (classifyOpenRouterError(text) !== "rate_limit") {
+          if (classifyOpenRouterError(text) === "hard") {
             resultFailed = true;
           }
           break;
@@ -972,7 +1170,11 @@ module.exports = {
   openRouterModelId,
   buildOpenCodeConfig,
   orderedFallbackModels,
+  loadFallbackModels,
   rateLimitWaitMs,
+  retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,
+  switchReasonLine,
+  logRotationPlan,
 };

@@ -77,7 +77,7 @@ type OpenRouterBrokerTask struct {
 	Files    []runner.BrokerTaskFile
 }
 
-func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, fallbackModels []string) OpenRouterBrokerTask {
+func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, fallbackModels []string, rotateSeed string) OpenRouterBrokerTask {
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare OpenRouter agent",
 		PrepareScript:    runner.NodePrepareScript("opencode", opencodeMissingMessage, spec.WorkingDirectory),
@@ -96,12 +96,12 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 			)
 		},
 	})
-	files = append(files, FallbackModelsFile(spec.Model, fallbackModels))
+	files = append(files, FallbackModelsFile(FallbackModelList(spec.Model, fallbackModels, rotateSeed)))
 	return OpenRouterBrokerTask{Commands: commands, Files: files}
 }
 
-func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, fallbackModels []string) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups, fallbackModels)
+func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, fallbackModels []string, rotateSeed string) OpenRouterBrokerTask {
+	return buildOpenRouterBrokerTask(spec, usage, setups, fallbackModels, rotateSeed)
 }
 
 func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {

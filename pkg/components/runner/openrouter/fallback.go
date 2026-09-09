@@ -3,6 +3,7 @@ package openrouter
 import (
 	"context"
 	"encoding/json"
+	"hash/fnv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -39,9 +40,45 @@ func OrderedFallbackModels(selected string, allowed []string) []string {
 	return out
 }
 
-// FallbackModelsFile is the JSON list run.js reads when OpenRouter rate-limits.
-func FallbackModelsFile(selected string, allowed []string) runner.BrokerTaskFile {
-	models := OrderedFallbackModels(selected, allowed)
+// RotateFallbackModels moves the start of the list by a hash of seed so
+// concurrent runs do not all call the same model first. An empty seed keeps
+// the original order.
+func RotateFallbackModels(models []string, seed string) []string {
+	n := len(models)
+	if n <= 1 || strings.TrimSpace(seed) == "" {
+		return models
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(seed))
+	offset := int(h.Sum32() % uint32(n))
+	if offset == 0 {
+		return models
+	}
+	out := make([]string, n)
+	copy(out, models[offset:])
+	copy(out[n-offset:], models[:offset])
+	return out
+}
+
+// FallbackModelList is the ordered OpenRouter model chain shipped to the runner.
+func FallbackModelList(selected string, allowed []string, seed string) []string {
+	return RotateFallbackModels(OrderedFallbackModels(selected, allowed), seed)
+}
+
+// FallbackRotateSeed spreads concurrent executions. Tests that omit IDs keep
+// a stable selected-first order.
+func FallbackRotateSeed(ctx core.ExecutionContext) string {
+	if ctx.ID == uuid.Nil && ctx.RunID == uuid.Nil {
+		return ""
+	}
+	return ctx.ID.String() + ":" + ctx.RunID.String()
+}
+
+// FallbackModelsFile is the JSON list run.js reads for OpenRouter model rotation.
+func FallbackModelsFile(models []string) runner.BrokerTaskFile {
+	if models == nil {
+		models = []string{}
+	}
 	raw, err := json.Marshal(models)
 	if err != nil {
 		raw = []byte("[]")
@@ -58,10 +95,10 @@ func catalogModelID(model string) string {
 	return strings.TrimPrefix(trimmed, "openrouter/")
 }
 
-func byokOpenRouterFallbackModels(ctx core.ExecutionContext, selected string) []string {
+func byokOpenRouterAllowedModels(ctx core.ExecutionContext) []string {
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
-		return OrderedFallbackModels(selected, nil)
+		return nil
 	}
 	ids, err := models.ResolveSelectableLLMModels(
 		database.DB(context.Background()),
@@ -71,7 +108,7 @@ func byokOpenRouterFallbackModels(ctx core.ExecutionContext, selected string) []
 		models.UsageFundingSourceBYOK,
 	)
 	if err != nil {
-		return OrderedFallbackModels(selected, nil)
+		return nil
 	}
-	return OrderedFallbackModels(selected, ids)
+	return ids
 }
