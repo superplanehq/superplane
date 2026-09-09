@@ -411,6 +411,8 @@ func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.W
 		order, err = f.FindWorkOrder(c.tx, orderID)
 	case "artifactKey":
 		order, err = f.FindWorkOrderByArtifactKey(c.tx, params.ArtifactKey)
+	case "originUrl":
+		order, err = f.FindWorkOrderByOriginURL(c.tx, params.OriginURL)
 	default:
 		return nil, fmt.Errorf("unknown findWorkOrder lookup %q", params.By)
 	}

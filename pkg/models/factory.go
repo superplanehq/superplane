@@ -634,6 +634,33 @@ func (f *Factory) FindWorkOrderByArtifactKey(tx *gorm.DB, key string) (*FactoryW
 	return f.FindWorkOrder(tx, artifact.WorkOrderID)
 }
 
+// FindWorkOrderByOriginURL resolves a work order from the external ticket URL
+// it was created from (see WorkOrderOrigin). Origin URLs are not enforced
+// unique, so a re-created ticket resolves to its most recent work order.
+// Delegates to FindWorkOrder so the result gets the same preloads/scoping as
+// every other lookup path.
+func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*FactoryWorkOrder, error) {
+	trimmedURL := strings.TrimSpace(originURL)
+	if trimmedURL == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+
+	var order FactoryWorkOrder
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND origin_url = ?", f.OrganizationID, f.ID, trimmedURL).
+		Order("created_at DESC").
+		First(&order).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return f.FindWorkOrder(tx, order.ID)
+}
+
 // ListWorkOrdersByArtifactKeys resolves work orders from artifact keys in one
 // query. Missing keys are omitted rather than reported as not found.
 func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[string]FactoryWorkOrder, error) {

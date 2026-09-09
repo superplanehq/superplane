@@ -950,6 +950,7 @@ Lookup modes:
 
 - **Task ID** (`by: id`): resolves `orderId` directly.
 - **Artifact Key** (`by: artifactKey`): resolves the task that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
+- **Origin URL** (`by: originUrl`): resolves the task that intake created from the external ticket at `originUrl` (e.g. a GitHub issue's URL) — the missing piece for a flow that needs to react to the source ticket closing, not just the task it produced.
 
 On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked task shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
 
