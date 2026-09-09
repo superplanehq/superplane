@@ -1,12 +1,6 @@
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
-import { Bot, LoaderCircle, Pencil, Sparkles, Workflow } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Bot, LoaderCircle, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { type ColumnAutomationActivity, type ColumnAutomationLastRunStatus } from "../lib/columnAutomationActivity";
@@ -14,7 +8,7 @@ import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation, type ColumnAutomationKi
 
 export type { ColumnAutomationActivity, ColumnAutomationLastRunStatus };
 
-export type ColumnAutomationRowAction = "settings" | "edit" | "edit-agent" | "disable" | "enable" | "remove";
+export type ColumnAutomationRowAction = "settings" | "disable" | "enable" | "remove";
 
 const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
   analysis: Sparkles,
@@ -25,25 +19,20 @@ const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
 interface ColumnAutomationsPopupProps {
   automation: ColumnAutomation;
   onAction: (action: ColumnAutomationRowAction) => void;
-  showEditAgent?: boolean;
-  showEditAutomation?: boolean;
   activity?: ColumnAutomationActivity;
   /** Open the menu on first render. Used by stories. */
   defaultOpen?: boolean;
 }
 
-/** Header icon. Click opens a menu with the automation summary and edit actions. */
+/** Header icon. Click opens a menu with the automation summary. */
 export function ColumnAutomationsPopup({
   automation,
   onAction,
-  showEditAgent = false,
-  showEditAutomation = false,
   activity,
   defaultOpen = false,
 }: ColumnAutomationsPopupProps) {
   const needsRepair = automation.health === "needs-repair";
   const disabled = automation.health === "disabled";
-  const hasEditActions = showEditAgent || showEditAutomation;
 
   return (
     <DropdownMenu defaultOpen={defaultOpen}>
@@ -76,31 +65,6 @@ export function ColumnAutomationsPopup({
             onOpenSettings={() => onAction("settings")}
           />
         </div>
-        {hasEditActions ? (
-          <>
-            <DropdownMenuSeparator className="my-0" />
-            <div className="p-1">
-              {showEditAgent ? (
-                <DropdownMenuItem
-                  onSelect={() => onAction("edit-agent")}
-                  data-testid={`column-automation-${automation.id}-edit-agent`}
-                >
-                  <Bot className="h-3.5 w-3.5" aria-hidden />
-                  {COLUMN_AUTOMATIONS_COPY.editAgentLabel}
-                </DropdownMenuItem>
-              ) : null}
-              {showEditAutomation ? (
-                <DropdownMenuItem
-                  onSelect={() => onAction("edit")}
-                  data-testid={`column-automation-${automation.id}-edit`}
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                  {COLUMN_AUTOMATIONS_COPY.editAutomationMenuLabel}
-                </DropdownMenuItem>
-              ) : null}
-            </div>
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
