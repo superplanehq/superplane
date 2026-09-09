@@ -117,7 +117,7 @@ export function MentionTextarea({
         placeholder={placeholder}
         data-testid="agent-input"
         className={cn(
-          "relative min-h-9 w-full resize-none border-0 bg-transparent shadow-none",
+          "relative min-h-7 w-full resize-none border-0 bg-transparent shadow-none",
           composerTextMetrics,
           "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
           "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",

@@ -46,7 +46,7 @@ function AttachImageButton({
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size="icon-xs"
         className={factoryAgentIconButtonClassName}
         onClick={() => fileInputRef.current?.click()}
         disabled={!canAttach}
@@ -67,7 +67,7 @@ function ClearChatButton({ onClearChat, clearing }: { onClearChat: () => void; c
         <Button
           type="button"
           variant="ghost"
-          size="icon"
+          size="icon-xs"
           className={factoryAgentIconButtonClassName}
           onClick={onClearChat}
           disabled={clearing}
@@ -110,8 +110,8 @@ export const FactoryComposerToolbar = memo(function FactoryComposerToolbar({
           <Button
             type="button"
             variant="outline"
-            size="icon"
-            className="size-7 shrink-0 rounded-full border-border bg-background text-foreground hover:bg-accent"
+            size="icon-xs"
+            className="border-border bg-background text-foreground hover:bg-accent"
             onClick={onStop}
             disabled={stopping}
             aria-label={stopping ? "Stopping" : "Stop"}
@@ -128,8 +128,7 @@ export const FactoryComposerToolbar = memo(function FactoryComposerToolbar({
         <Button
           type="button"
           variant="default"
-          size="icon"
-          className="size-7 shrink-0 rounded-full"
+          size="icon-xs"
           onClick={onSend}
           disabled={!canSend}
           aria-label="Send message"

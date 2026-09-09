@@ -45,8 +45,8 @@ function AttachImageButton({
       <Button
         type="button"
         variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        size="icon-xs"
+        className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
         onClick={() => fileInputRef.current?.click()}
         disabled={!canAttach}
         aria-label="Attach image"
@@ -66,8 +66,8 @@ function ClearChatButton({ onClearChat, clearing }: { onClearChat: () => void; c
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          size="icon-xs"
+          className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
           onClick={onClearChat}
           disabled={clearing}
           aria-label="Clear chat"
@@ -109,8 +109,8 @@ export const ComposerToolbar = memo(function ComposerToolbar({
           <Button
             type="button"
             variant="outline"
-            size="icon"
-            className="size-7 shrink-0 rounded-full border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            size="icon-xs"
+            className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             onClick={onStop}
             disabled={stopping}
             aria-label={stopping ? "Stopping" : "Stop"}
@@ -127,8 +127,7 @@ export const ComposerToolbar = memo(function ComposerToolbar({
         <Button
           type="button"
           variant="default"
-          size="icon"
-          className="size-7 shrink-0 rounded-full"
+          size="icon-xs"
           onClick={onSend}
           disabled={!canSend}
           aria-label="Send message"
