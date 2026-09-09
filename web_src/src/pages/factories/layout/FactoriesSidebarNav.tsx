@@ -1,21 +1,14 @@
 import { cn } from "@/lib/utils";
-import { Gauge, Kanban, Settings } from "lucide-react";
+import { Gauge, Kanban } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import {
-  factoryHomePath,
-  factorySettingsSectionPath,
-  factorySettingsWorkspaceGeneralPath,
-  factoryVelocityPath,
-} from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
+import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, isBoardPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
-  canOpenSettings: boolean;
-  permissionsLoading: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -50,37 +43,29 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: the line board, the Velocity link,
- * then settings. Intakes and PR feedback open from their listener rows on
- * the board, so they do not need a rail icon.
+ * Icon rail under the workspace switcher: the line board and Velocity.
+ * Workspace settings open from the workspace switcher.
  */
-export function FactoriesSidebarNav({ organizationId, factoryKey, lineId, canOpenSettings }: FactoriesSidebarNavProps) {
+export function FactoriesSidebarNav({ organizationId, factoryKey, lineId }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
-  const settingsHref = canOpenSettings
-    ? factorySettingsWorkspaceGeneralPath(organizationId, factoryKey)
-    : factorySettingsSectionPath(organizationId, factoryKey, "account", "profile");
-  const boardCurrent = isBoardPath(pathname);
-  const velocityCurrent = isVelocityPath(pathname);
-  const settingsCurrent = isSettingsPath(pathname);
 
   return (
     <nav className="flex flex-col items-center gap-1 px-1.5" aria-label="Workspace" data-testid="factories-sidebar-nav">
-      <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
+      <RailNavLink
+        to={boardHref}
+        label="Board"
+        Icon={Kanban}
+        testId="factories-nav-board"
+        isCurrent={isBoardPath(pathname)}
+      />
       <RailNavLink
         to={velocityHref}
         label="Velocity"
         Icon={Gauge}
         testId="factories-nav-velocity"
-        isCurrent={velocityCurrent}
-      />
-      <RailNavLink
-        to={settingsHref}
-        label="Workspace settings"
-        Icon={Settings}
-        testId="factories-workspace-settings-link"
-        isCurrent={settingsCurrent}
+        isCurrent={isVelocityPath(pathname)}
       />
     </nav>
   );

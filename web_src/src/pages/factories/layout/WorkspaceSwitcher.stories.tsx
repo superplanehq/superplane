@@ -41,6 +41,7 @@ export const Default: Story = {
     factory: REFUND_FACTORY,
     factories: [REFUND_FACTORY, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY],
     canCreateFactory: true,
+    canOpenSettings: true,
     permissionsLoading: false,
     onCreateFactory: () => console.log("create workspace"),
   },
