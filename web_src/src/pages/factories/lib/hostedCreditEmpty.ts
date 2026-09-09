@@ -1,6 +1,9 @@
 import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 
-export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "empty";
+export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "low" | "empty";
+
+/** At or below this remaining balance, paid organizations see a low-credit warning. */
+export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
 
 export interface HostedCreditBannerInput {
   remainingCreditCents?: string | number;
@@ -36,6 +39,15 @@ export function isHostedCreditTrialOrg(
   return expiresAt != null && purchased === 0;
 }
 
+function hasHadHostedCredit(args: HostedCreditBannerInput, purchased: number): boolean {
+  return (
+    parseWorkOrderMetric(args.grantTotalCents) > 0 ||
+    parseWorkOrderMetric(args.superplaneGrantCents) > 0 ||
+    purchased > 0 ||
+    args.billingEnabled === true
+  );
+}
+
 export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCreditBannerKind | null {
   const remaining = parseWorkOrderMetric(args.remainingCreditCents);
   const purchased = parseWorkOrderMetric(args.purchasedCreditCents);
@@ -53,20 +65,15 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
     return "trial";
   }
 
-  if (remaining > 0) {
+  if (remaining > LOW_HOSTED_CREDIT_THRESHOLD_CENTS) {
     return null;
   }
 
-  if (
-    parseWorkOrderMetric(args.grantTotalCents) > 0 ||
-    parseWorkOrderMetric(args.superplaneGrantCents) > 0 ||
-    purchased > 0 ||
-    args.billingEnabled === true
-  ) {
-    return "empty";
+  if (!hasHadHostedCredit(args, purchased)) {
+    return null;
   }
 
-  return null;
+  return remaining <= 0 ? "empty" : "low";
 }
 
 export function shouldShowHostedCreditEmptyBanner(args: HostedCreditBannerInput): boolean {
@@ -121,8 +128,12 @@ export function hostedCreditBannerTone(
   kind: HostedCreditBannerKind,
   welcomeCreditExpiresAt?: Date,
   now: Date = new Date(),
+  remainingCreditCents?: number,
 ): HostedCreditBannerTone {
   if (kind !== "trial") {
+    return "warning";
+  }
+  if (remainingCreditCents != null && remainingCreditCents <= LOW_HOSTED_CREDIT_THRESHOLD_CENTS) {
     return "warning";
   }
   if (!welcomeCreditExpiresAt) {
@@ -142,7 +153,7 @@ export function hostedCreditBannerCopy(args: {
   now?: Date;
 }): HostedCreditBannerCopy {
   const now = args.now ?? new Date();
-  const tone = hostedCreditBannerTone(args.kind, args.welcomeCreditExpiresAt, now);
+  const tone = hostedCreditBannerTone(args.kind, args.welcomeCreditExpiresAt, now, args.remainingCreditCents);
 
   if (args.kind === "trial") {
     const remaining = formatUsdCents(args.remainingCreditCents ?? 0);
@@ -175,6 +186,30 @@ export function hostedCreditBannerCopy(args: {
     return {
       title: "Trial ended",
       description: "Free hosted credit expired. SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone,
+    };
+  }
+
+  if (args.kind === "low") {
+    const lowCreditBudget = formatUsdCents(LOW_HOSTED_CREDIT_THRESHOLD_CENTS);
+    const remainingLabel =
+      args.remainingCreditCents != null && args.remainingCreditCents > 0
+        ? `${formatUsdCents(args.remainingCreditCents)} remaining`
+        : undefined;
+    if (args.billingEnabled) {
+      return {
+        title: "Hosted credit is low",
+        description: `Less than ${lowCreditBudget} remains. Add hosted credit to keep SuperPlane-hosted runs.`,
+        remainingLabel,
+        actionLabel: "Add credits",
+        tone,
+      };
+    }
+    return {
+      title: "Hosted credit is low",
+      description: `Less than ${lowCreditBudget} remains. Ask an installation admin to add hosted credit.`,
+      remainingLabel,
       actionLabel: "Add credits",
       tone,
     };

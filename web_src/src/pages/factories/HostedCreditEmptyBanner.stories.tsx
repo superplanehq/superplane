@@ -6,8 +6,9 @@ import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
  * Status banner for hosted credit. A healthy trial uses quiet chrome.
- * Empty or expired credit uses an amber warning. Tasks shows this above
- * the board. The action opens Organization Billing.
+ * Low, empty, or expired credit uses an amber warning. Tasks and the
+ * workspace board show this in the page header. The action opens
+ * Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -79,5 +80,15 @@ export const TrialEnded: Story = {
   args: {
     billingEnabled: true,
     kind: "trial-expired",
+  },
+};
+
+/** Purchased hosted credit remains at or below $20. The action opens Billing. */
+export const LowCredit: Story = {
+  name: "Low credit",
+  args: {
+    billingEnabled: true,
+    kind: "low",
+    remainingCreditCents: 1500,
   },
 };
