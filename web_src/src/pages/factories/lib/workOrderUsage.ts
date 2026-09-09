@@ -44,6 +44,68 @@ export function formatDurationSeconds(seconds: number): string {
   return `${hours} h ${minutes} min`;
 }
 
+export function formatUsageTaskName(workOrderKey: string | undefined, title: string | undefined): string {
+  const key = workOrderKey?.trim() ?? "";
+  const name = title?.trim() || "Untitled task";
+  return key ? `${key} · ${name}` : name;
+}
+
+export function formatUsageTokensAndTime(tokens: number, durationSeconds: number): string {
+  const parts: string[] = [];
+  if (tokens > 0) {
+    parts.push(formatCompactTokens(tokens));
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+export function formatUsageRunResources(
+  models: string[] | undefined,
+  machineTypes: string[] | undefined,
+  usedByok: boolean,
+): string {
+  const modelLabel = uniqueUsageLabels(models).join(" · ");
+  const machineLabel = uniqueUsageLabels(machineTypes).join(" · ");
+  const modelPart = modelLabel && usedByok ? `${modelLabel} (your keys)` : modelLabel;
+  const parts = [modelPart, machineLabel].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+export function formatUsageOccurredAtUtc(value: string | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+  const date = parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const hours = String(parsed.getUTCHours()).padStart(2, "0");
+  const minutes = String(parsed.getUTCMinutes()).padStart(2, "0");
+  return `${date} ${hours}:${minutes} UTC`;
+}
+
+function uniqueUsageLabels(values: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const value of values ?? []) {
+    const label = value.trim();
+    if (!label || seen.has(label)) {
+      continue;
+    }
+    seen.add(label);
+    labels.push(label);
+  }
+  return labels;
+}
+
 export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number, durationSeconds = 0): string | null {
   const parts: string[] = [];
   if (totalCostCents > 0) {

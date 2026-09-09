@@ -48,6 +48,22 @@ describe("legacy factory organization settings routes", () => {
     ).toBeInTheDocument();
   }, 10000);
 
+  it("redirects workspace usage into Organization Usage", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-usage")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
+  }, 10000);
+
   it("redirects the old LLM spend URL into Organization Spending", async () => {
     render(
       <FactoriesHarness pathSuffix="settings/llm-spend?credit=added" factoriesFixture={defaultFactoriesFixture} />,

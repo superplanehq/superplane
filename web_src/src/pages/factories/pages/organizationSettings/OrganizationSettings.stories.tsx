@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
 import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
@@ -124,6 +128,25 @@ export const BillingEmptyCredit: Story = {
         ...defaultFactoriesFixture,
         hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+      }}
+    />
+  ),
+};
+
+export const Usage: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("usage")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const UsageEmpty: Story = {
+  name: "Usage (empty)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("usage")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        usageHistoryByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
       }}
     />
   ),
