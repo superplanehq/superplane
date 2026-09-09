@@ -141,7 +141,7 @@ func Test__RunFinalizer_EndsPlanningSessionWhenRunFails(t *testing.T) {
 	require.NotNil(t, reloaded.EndedAt)
 }
 
-func Test__RunFinalizer_KeepsPlanningSessionWhenRunPasses(t *testing.T) {
+func Test__RunFinalizer_EndsPlanningSessionWhenRunPasses(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -165,7 +165,8 @@ func Test__RunFinalizer_KeepsPlanningSessionWhenRunPasses(t *testing.T) {
 
 	reloaded, err := models.FindPlanningSession(database.Conn(), session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.PlanningSessionStateRunning, reloaded.State)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+	require.NotNil(t, reloaded.EndedAt)
 }
 
 func Test__RunFinalizer_LeavesEndedPlanningSessionEnded(t *testing.T) {

@@ -212,6 +212,7 @@ func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {
 	assert.Contains(t, runScript, "--pure")
 	assert.Contains(t, runScript, "openrouter/")
 	assert.Contains(t, runScript, "OPENCODE_CONFIG")
+	assert.Contains(t, runScript, "OPENCODE_DISABLE_MODELS_FETCH")
 	assert.Contains(t, runScript, "OPENROUTER_BASE_URL")
 	assert.NotContains(t, runScript, "/chat/completions")
 	assert.NotContains(t, runScript, "--agent")

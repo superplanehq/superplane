@@ -10,7 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
@@ -21,6 +21,8 @@ const SESSION_FILE = "opencode_session";
 
 const PLANNING_SYSTEM_PROMPT =
   "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
+  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
+  "After you show a draft, tell the user it is on the right and ask them to review it. " +
   "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
   "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
   "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
@@ -203,6 +205,9 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
     ...baseEnv,
     OPENCODE_CONFIG: path.join(taskDir, "opencode.json"),
     OPENCODE_DISABLE_AUTOUPDATE: "1",
+    OPENCODE_DISABLE_MODELS_FETCH: "1",
+    OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
+    OPENCODE_DISABLE_CLAUDE_CODE: "1",
     OPENCODE_PURE: "1",
     XDG_DATA_HOME: path.join(xdg, "data"),
     XDG_CONFIG_HOME: path.join(xdg, "config"),
@@ -269,6 +274,12 @@ async function runPrompt(promptFile, model, helpers = {}) {
   if (promptCount > 0 && sessionID) {
     println("Continuing OpenCode session");
   }
+  const startModel = openRouterModelId(currentModel) || model;
+  if (startModel) {
+    println(`Starting OpenCode · ${startModel}`);
+  } else {
+    println("Starting OpenCode");
+  }
 
   const telemetry = loadTurnTelemetry();
   const formatter = createOpenCodeFormatter(telemetry, (id) => {
@@ -300,10 +311,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
       lastCost = spawnResult.cost;
     }
     lastErrorText = spawnResult.errorText || "";
-    const spawnFailed = spawnResult.exitCode !== 0 || spawnResult.resultFailed;
+    const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
     if (!spawnFailed) {
       failed = false;
-      exitCode = spawnResult.exitCode;
+      exitCode = 0;
       break;
     }
     const classKind = classifyOpenRouterError(lastErrorText);
@@ -379,12 +390,48 @@ function defaultSleep(ms) {
   });
 }
 
+function commandExists(name) {
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  return result.status === 0;
+}
+
 function defaultSpawnOpenCode(args, options) {
-  return spawn("opencode", args, {
-    stdio: ["ignore", "pipe", "pipe"],
+  let command = "opencode";
+  let spawnArgs = args;
+  if (commandExists("stdbuf")) {
+    command = "stdbuf";
+    spawnArgs = ["-oL", "-eL", "opencode", ...args];
+  }
+  return spawn(command, spawnArgs, {
+    stdio: ["pipe", "pipe", "pipe"],
     env: options.env,
     cwd: options.cwd,
   });
+}
+
+function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
+  const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
+  if (!String(text || "").trim()) {
+    return false;
+  }
+  return tokenTotal(spawnResult && spawnResult.usage) > 0;
+}
+
+function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
+  if (spawnResult.resultFailed) {
+    return true;
+  }
+  if (spawnResult.exitCode === 0) {
+    return false;
+  }
+  const kind = classifyOpenRouterError(spawnResult.errorText || "");
+  if (kind === "rate_limit" || kind === "hard") {
+    return true;
+  }
+  if (!allowSoftExitWithReply) {
+    return true;
+  }
+  return !spawnHasCompleteAssistantTurn(spawnResult, formatter);
 }
 
 async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
@@ -393,10 +440,14 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
   }
   const spawnOpenCode = helpers.spawnOpenCode || defaultSpawnOpenCode;
   const child = spawnOpenCode(args, { env, cwd });
+  if (child.stdin && typeof child.stdin.end === "function") {
+    child.stdin.end();
+  }
   let stderrText = "";
   if (child.stderr) {
     child.stderr.on("data", (chunk) => {
       stderrText += String(chunk);
+      process.stderr.write(chunk);
     });
   }
 
@@ -561,6 +612,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
   let usage = emptyUsage();
   let cost = 0;
   let roundOpen = false;
+  let announcedStart = false;
 
   function rememberSession(event) {
     const id = String((event && event.sessionID) || (event && event.part && event.part.sessionID) || "").trim();
@@ -582,6 +634,10 @@ function createOpenCodeFormatter(telemetry, onSession) {
     beginSpawn() {
       resultFailed = false;
       errorText = "";
+      announcedStart = false;
+      lastText = "";
+      usage = emptyUsage();
+      cost = 0;
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -607,6 +663,10 @@ function createOpenCodeFormatter(telemetry, onSession) {
       const part = event.part && typeof event.part === "object" ? event.part : {};
       switch (type) {
         case "step_start":
+          if (!announcedStart) {
+            announcedStart = true;
+            println("OpenCode started");
+          }
           beginRound(undefined, {});
           break;
         case "text": {
