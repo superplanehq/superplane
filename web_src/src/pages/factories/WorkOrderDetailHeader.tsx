@@ -1,23 +1,9 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { Ellipsis } from "lucide-react";
-import { Fragment } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
-import {
-  applyWorkOrderStatusAction,
-  buildWorkOrderStatusActions,
-  type WorkOrderStatusActionKind,
-} from "./lib/workOrderStatusActions";
+import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
+import { WorkOrderOverflowMenu } from "./WorkOrderOverflowMenu";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;
@@ -33,12 +19,15 @@ interface WorkOrderDetailHeaderProps {
   isClosed: boolean;
   canClose: boolean;
   canManage: boolean;
+  canCreate: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
   isUpdatingStatus: boolean;
+  isDuplicating?: boolean;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onDuplicate: () => void;
   className?: string;
 }
 
@@ -65,57 +54,19 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
   );
 }
 
-const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
-  complete: "work-order-complete-button",
-  reject: "work-order-reject-button",
-  "reject-draft": "work-order-reject-draft-button",
-  "back-to-draft": "work-order-back-to-draft-button",
-  reopen: "work-order-reopen-open-button",
-};
-
 function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
   const actions = buildWorkOrderStatusActions(props);
-  if (actions.length === 0) {
-    return null;
-  }
-
   const disabled = props.isClosing || props.isUpdatingStatus || props.isCompleting || props.isRejecting;
 
   return (
-    <DropdownMenu>
-      <PermissionTooltip
-        allowed={props.canClose || props.canManage}
-        message="You don't have permission to manage this task."
-      >
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:bg-accent hover:text-foreground"
-            disabled={disabled}
-            aria-label="More actions"
-            data-testid="work-order-actions-button"
-          >
-            <Ellipsis className="size-3.5" aria-hidden />
-          </Button>
-        </DropdownMenuTrigger>
-      </PermissionTooltip>
-
-      <DropdownMenuContent align="end" className="w-48">
-        {actions.map((action) => (
-          <Fragment key={action.kind}>
-            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem
-              disabled={action.disabled}
-              onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
-              data-testid={HEADER_ACTION_TEST_ID[action.kind]}
-            >
-              {action.label}
-            </DropdownMenuItem>
-          </Fragment>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <WorkOrderOverflowMenu
+      canCreate={props.canCreate}
+      isDuplicating={props.isDuplicating}
+      onDuplicate={props.onDuplicate}
+      actions={actions}
+      onClose={props.onClose}
+      onStatusChange={props.onStatusChange}
+      disabled={disabled}
+    />
   );
 }

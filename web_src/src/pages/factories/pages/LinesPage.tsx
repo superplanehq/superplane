@@ -831,6 +831,7 @@ function LineDetail({
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
           canUpdate={workOrderCardContext.canAssign}
+          canCreate={canCreateWorkOrder}
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
@@ -905,6 +906,7 @@ function LineBoardSplitRunPopup({
   peekOrder,
   canDispatch,
   canUpdate,
+  canCreate,
   isDispatching,
   onDispatch,
   analysisRuns,
@@ -921,6 +923,7 @@ function LineBoardSplitRunPopup({
   peekOrder: FactoriesWorkOrder;
   canDispatch: boolean;
   canUpdate: boolean;
+  canCreate: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
@@ -937,6 +940,7 @@ function LineBoardSplitRunPopup({
   const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
+  const navigate = useNavigate();
   return (
     <WorkOrderSplitRunPopup
       key={peekOrderId}
@@ -960,6 +964,15 @@ function LineBoardSplitRunPopup({
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
+      canCreate={canCreate}
+      onCreated={(order) => {
+        if (!order.number) {
+          return;
+        }
+        navigate(workOrderDetailPath(organizationId, factoryKey, order.number, lineId), {
+          state: { peekOrder: order },
+        });
+      }}
       isDispatching={isDispatching}
       onDispatch={
         resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined

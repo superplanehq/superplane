@@ -248,6 +248,25 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	return result, nil
 }
 
+func (o *FactoryWorkOrder) CopyRepositoryFrom(tx *gorm.DB, source *FactoryWorkOrder) error {
+	if source == nil || (source.Repository == nil && source.DefaultBranch == nil) {
+		return nil
+	}
+
+	now := time.Now()
+	updates := map[string]any{"updated_at": now}
+	if source.Repository != nil {
+		o.Repository = source.Repository
+		updates["repository"] = *source.Repository
+	}
+	if source.DefaultBranch != nil {
+		o.DefaultBranch = source.DefaultBranch
+		updates["default_branch"] = *source.DefaultBranch
+	}
+	o.UpdatedAt = now
+	return tx.Model(o).Updates(updates).Error
+}
+
 func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description *string) error {
 	if title == nil && description == nil {
 		return nil

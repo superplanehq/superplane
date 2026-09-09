@@ -58,6 +58,7 @@ interface WorkOrderDetailLoadedViewProps {
   canClose: boolean;
   canAssign: boolean;
   canManage: boolean;
+  canCreate: boolean;
   permissionsLoading: boolean;
   isDispatching: boolean;
   isCompleting: boolean;
@@ -65,11 +66,13 @@ interface WorkOrderDetailLoadedViewProps {
   isClosing: boolean;
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
+  isDuplicating?: boolean;
   isAddingComment: boolean;
   onDispatch: (input: { lineName: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onDuplicate: () => void;
   onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
   /** Page chrome includes the back link. Dialog chrome is the card overlay. */
   chrome?: "page" | "dialog";
@@ -91,12 +94,15 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         isClosed={props.isClosed}
         canClose={props.canClose}
         canManage={props.canManage}
+        canCreate={props.canCreate}
         isCompleting={props.isCompleting}
         isRejecting={props.isRejecting}
         isClosing={props.isClosing}
         isUpdatingStatus={props.isUpdatingStatus}
+        isDuplicating={props.isDuplicating}
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
+        onDuplicate={props.onDuplicate}
         className={isDialog ? "max-w-none px-6 pt-4 pb-3 pr-12" : undefined}
       />
       <WorkOrderDetailBody {...props} />
