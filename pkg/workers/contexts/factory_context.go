@@ -779,6 +779,43 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 	return c.activityResult(pullRequest, created.Activity, created.Revision, created.CurrentRevision, created.Outcome)
 }
 
+// ResolveWorkOrderAssigneeAccounts resolves the work order's assignees to
+// their linked identity for params.Provider (only "github" is currently
+// supported). Assignees with no linked identity are counted in Unlinked
+// instead of erroring — the caller decides how to surface that (e.g. a
+// status note prompting them to link their account).
+func (c *FactoryContext) ResolveWorkOrderAssigneeAccounts(params core.ResolveWorkOrderAssigneeAccountsParams) (*core.WorkOrderAssigneeAccounts, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	assigneeIDs := order.AssigneeIDs()
+	result := &core.WorkOrderAssigneeAccounts{}
+	if len(assigneeIDs) == 0 {
+		return result, nil
+	}
+
+	linked, err := models.FindLinkedAccountsForUsers(c.tx, assigneeIDs, params.Provider)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, userID := range assigneeIDs {
+		account, ok := linked[userID]
+		login := ""
+		if ok {
+			login = account.NormalizedUsername()
+		}
+		if login == "" {
+			result.Unlinked++
+			continue
+		}
+		result.Logins = append(result.Logins, login)
+	}
+	return result, nil
+}
+
 func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
 	if c.execution == nil {
 		return nil, errors.New("run is required to update pull request activity")

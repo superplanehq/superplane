@@ -7,10 +7,16 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
+
+// assigneeLinkNoticeKey identifies the status note set on a work order when
+// one or more of its assignees have no linked GitHub account, so they could
+// not be added as pull request assignees.
+const assigneeLinkNoticeKey = "github-assignee-unlinked"
 
 type CreatePullRequest struct{}
 
@@ -21,6 +27,11 @@ type CreatePullRequestConfiguration struct {
 	Title      string `mapstructure:"title" json:"title"`
 	Body       string `mapstructure:"body" json:"body"`
 	Draft      bool   `mapstructure:"draft" json:"draft"`
+	// OrderID optionally identifies the work order (task) this pull
+	// request is being opened for. When set, the created pull request is
+	// assigned to the work order's assignees who have linked a GitHub
+	// account. Assignment is best-effort: it never fails PR creation.
+	OrderID string `mapstructure:"orderId" json:"orderId"`
 }
 
 func (c *CreatePullRequest) Name() string {
@@ -52,6 +63,7 @@ func (c *CreatePullRequest) Documentation() string {
 - **Title**: The pull request title (supports expressions)
 - **Body**: Optional pull request description (supports markdown and expressions)
 - **Draft**: Whether to create the pull request as a draft
+- **Task ID**: Optional. When set (e.g. to a factory task id), the created pull request is assigned to the task's assignees who have linked their GitHub account. Assignment is best-effort and never fails pull request creation; an assignee without a linked GitHub account surfaces a status note on the task instead.
 
 ## Output
 
@@ -151,6 +163,14 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			Default:     false,
 			Description: "Create the pull request as a draft",
 		},
+		{
+			Name:        "orderId",
+			Label:       "Task ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional task (work order) id. When set, the created pull request is assigned to the task's assignees who have linked their GitHub account. This component can only resolve assignees in a factory-owned app.",
+		},
 	}
 }
 
@@ -241,11 +261,54 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
 	}
 
+	if config.OrderID != "" {
+		c.assignWorkOrderAssignees(ctx, client, config.OrderID, config.Repository, pr.GetNumber())
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.pullRequest",
 		[]any{pr},
 	)
+}
+
+// assignWorkOrderAssignees best-effort assigns the work order's assignees
+// to the just-created pull request, resolved to their linked GitHub logins.
+// It never returns an error: PR creation must succeed even when assignee
+// resolution or assignment fails. An assignee with no linked GitHub account
+// surfaces a status note on the work order instead of failing silently; an
+// assignee GitHub rejects (e.g. not a repo collaborator) is skipped.
+func (c *CreatePullRequest) assignWorkOrderAssignees(ctx core.ExecutionContext, client *common.Client, orderID, repository string, pullNumber int) {
+	if ctx.Factory == nil {
+		return
+	}
+
+	resolved, err := ctx.Factory.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+		OrderID:  orderID,
+		Provider: "github",
+	})
+	if err != nil {
+		log.WithError(err).Warnf("Failed to resolve GitHub assignees for work order %s", orderID)
+		return
+	}
+
+	if resolved.Unlinked > 0 {
+		if _, err := ctx.Factory.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
+			OrderID:  orderID,
+			NoteKey:  assigneeLinkNoticeKey,
+			Headline: "Link your GitHub account to be assigned on pull requests",
+			Body:     "One or more assignees have not linked a GitHub account, so they were not added as assignees on the pull request. Link a GitHub account from your profile settings so future pull requests assign you automatically.",
+		}); err != nil {
+			log.WithError(err).Warnf("Failed to set unlinked GitHub assignee notice for work order %s", orderID)
+		}
+	}
+
+	for _, login := range resolved.Logins {
+		if _, _, err := client.AddIssueAssignees(context.Background(), repository, pullNumber, []string{login}); err != nil {
+			log.WithError(err).Warnf("Failed to assign %s to pull request #%d in %s", login, pullNumber, repository)
+			continue
+		}
+	}
 }
 
 func (c *CreatePullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
