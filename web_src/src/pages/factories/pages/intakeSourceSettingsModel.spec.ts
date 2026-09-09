@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
@@ -16,14 +17,18 @@ describe("intakeSourceSettingsModel", () => {
     expect(toggleIntakeLabel(["bug", "enhancement"], "bug")).toEqual(["enhancement"]);
   });
 
-  it("keeps a default name when the draft name is empty", () => {
+  it("adds a typed label once and ignores blank input", () => {
+    expect(addIntakeLabel(["bug"], "  needs-triage  ")).toEqual(["bug", "needs-triage"]);
+    expect(addIntakeLabel(["bug"], "bug")).toEqual(["bug"]);
+    expect(addIntakeLabel(["bug"], "   ")).toEqual(["bug"]);
+  });
+
+  it("clamps the confidence score", () => {
     const next = normalizeIntakeSourceSettings({
       ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-      name: "   ",
       confidencePct: 140.6,
     });
 
-    expect(next.name).toBe("GitHub issues");
     expect(next.confidencePct).toBe(100);
   });
 
@@ -50,5 +55,39 @@ describe("intakeSourceSettingsModel", () => {
     const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
     expect(off.authorsWithAccess).toBe(false);
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
+  });
+
+  it("round-trips GitHub issue events through the API shape", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: false,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
+    });
+
+    expect(settings.newIssues).toBe(false);
+    expect(settings.reopenedIssues).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(true);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      newIssues: false,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
+    });
+  });
+
+  it("keeps the new and re-opened toggles apart", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: true,
+      reopenedIssues: false,
+    });
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(false);
+  });
+
+  it("defaults both issue event toggles on when the API omits them", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {});
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(true);
   });
 });

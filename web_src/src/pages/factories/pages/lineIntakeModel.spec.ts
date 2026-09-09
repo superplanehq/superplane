@@ -66,6 +66,7 @@ describe("lineIntakeModel", () => {
       name: "GitHub issues",
       confidencePct: 80,
       labels: ["bug"],
+      filterByLabel: true,
       labelFilterMode: "exclude",
       assignment: "unassigned",
     });

@@ -30,6 +30,9 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "default_branch":
 		return g.listDefaultBranchResource(ctx)
 
+	case "label":
+		return g.listLabelResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -92,6 +95,56 @@ func toDefaultBranchResources(repo *github.Repository) []core.IntegrationResourc
 			ID:   branch,
 		},
 	}
+}
+
+// listLabelResources lists the issue labels that exist in the repository
+// identified by ctx.Parameters["repository"].
+func (g *GitHub) listLabelResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := ctx.Parameters["repository"]
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	var allLabels []*github.Label
+	opts := &github.ListOptions{PerPage: 100}
+
+	for {
+		labels, resp, err := client.ListLabelsForRepository(context.Background(), repository, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list labels: %w", err)
+		}
+
+		allLabels = append(allLabels, labels...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opts.Page = resp.NextPage
+	}
+
+	return toLabelResources(allLabels), nil
+}
+
+func toLabelResources(labels []*github.Label) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(labels))
+	for _, label := range labels {
+		name := label.GetName()
+		if name == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "label",
+			Name: name,
+			ID:   name,
+		})
+	}
+	return resources
 }
 
 func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
