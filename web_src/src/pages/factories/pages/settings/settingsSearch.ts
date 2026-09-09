@@ -91,9 +91,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · Automations
-  entry("workspace", "automations", "Automations", undefined, ["new automation", "triggers", "lines", "canvas"]),
-
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
     "llm",

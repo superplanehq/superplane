@@ -13,7 +13,6 @@ import {
   Plug,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -55,7 +54,6 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     items: [
       { id: "workspace-general", label: "General", Icon: Grid3x3 },
       { id: "workspace-repository", label: "Repository", Icon: Blocks },
-      { id: "workspace-automations", label: "Automations", Icon: Workflow },
       { id: "workspace-models", label: "Models", Icon: Cpu },
       { id: "workspace-spending", label: "Spending", Icon: BarChart3 },
     ],
