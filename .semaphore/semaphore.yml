@@ -105,6 +105,7 @@ blocks:
 
         - name: EsLint
           commands:
+            - make check.fast.security
             - make check.lint.ui
 
         - name: Knip (dead files check)
