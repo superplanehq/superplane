@@ -4,7 +4,12 @@ import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
-import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
+import {
+  DEFAULT_FACTORY_USAGE,
+  PURCHASED_CREDIT_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+  STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+} from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
@@ -78,7 +83,7 @@ export const Billing: Story = {
         hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationCreditGrants: MIXED_CREDIT_GRANTS,
         organizationWorkspaceUsage: {
-          ...defaultFactoriesFixture.organizationWorkspaceUsage!,
+          ...PURCHASED_CREDIT_USAGE_REPORT,
           billingEnabled: true,
           hasBillingCustomer: true,
           invoices: [
@@ -97,7 +102,7 @@ export const Billing: Story = {
 };
 
 export const BillingEmptyHistory: Story = {
-  name: "Billing (empty history)",
+  name: "Billing (trial welcome)",
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
@@ -115,8 +120,29 @@ export const BillingEmptyHistory: Story = {
   ),
 };
 
+export const BillingEmptyNoCard: Story = {
+  name: "Billing (empty credit, no card)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationWorkspaceUsage: {
+          ...DEFAULT_FACTORY_USAGE,
+          remainingCreditCents: "0",
+          hostedBilledCents: "5000",
+          remainingCreditWarning: true,
+          billingEnabled: true,
+          hasBillingCustomer: false,
+        },
+      }}
+    />
+  ),
+};
+
 export const BillingEmptyCredit: Story = {
-  name: "Billing (empty credit)",
+  name: "Billing (empty credit, card on file)",
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}

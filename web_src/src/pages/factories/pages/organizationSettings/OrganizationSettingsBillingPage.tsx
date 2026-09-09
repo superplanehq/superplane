@@ -1,5 +1,5 @@
-import { ExternalLink } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import { useParams } from "react-router";
 
 import type {
   OrganizationsHostedCreditInvoice,
@@ -12,170 +12,92 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { cn } from "@/lib/utils";
 import {
-  creditGrantDetails,
-  creditGrantSourceLabel,
-  formatCreditGrantAmount,
-  hostedCreditBalanceWarning,
-  welcomeCreditUnusedExpiryNote,
-} from "../../lib/hostedCreditGrants";
-import { isWelcomeCreditExpired } from "../../lib/hostedCreditEmpty";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+
+import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
+import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } from "../../lib/hostedCreditGrants";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
+const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
+const HOSTED_CREDIT_EXPLANATION = "Hosted credit pays SuperPlane-hosted models for this organization.";
+
 export function OrganizationSettingsBillingPage() {
-  const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
+  const { organizationId = "" } = useParams<{ organizationId: string }>();
   const model = useOrganizationBillingPageModel(organizationId);
+  const packs = model.billing.products;
 
   usePageTitle(["Billing", model.organizationName]);
   useReportPageReady(!model.isLoading, { failed: Boolean(model.error) });
 
   return (
-    <FactorySettingsPageFrame
-      title="Billing"
-      subtitle="Hosted credit pays SuperPlane-hosted models for this organization."
-      actions={
-        <AddHostedCreditAction
-          canManageBilling={model.canManageBilling}
-          checkoutPending={model.billing.checkoutPending}
-          products={model.billing.products}
-          onAddCredit={model.billing.startCheckout}
-        />
-      }
-    >
+    <FactorySettingsPageFrame title="Billing">
       <BillingPageBody
-        billed={model.billed}
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
         canManageBilling={model.canManageBilling}
+        checkoutPending={model.billing.checkoutPending}
         creditRefreshStatus={model.creditRefreshStatus}
         error={model.error}
-        factoryKey={factoryKey}
         grants={model.grants}
         hasBillingCustomer={model.hasBillingCustomer}
         invoices={model.invoices}
         isLoading={model.isLoading}
-        organizationId={organizationId}
+        packs={packs}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
-        remainingCreditWarning={model.remainingCreditWarning}
-        superplaneGrant={model.superplaneGrant}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
+        onAddCredit={model.billing.startCheckout}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
   );
 }
 
-function AddHostedCreditAction({
-  canManageBilling,
-  checkoutPending,
-  products,
-  onAddCredit,
-}: {
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  products: OrganizationsHostedCreditProduct[];
-  onAddCredit: (productId: string) => void | Promise<void>;
-}) {
-  if (!canManageBilling) {
-    return null;
-  }
-
-  const packs = sortHostedCreditPacks(products);
-  const label = checkoutPending ? "Opening checkout..." : "Add hosted credit";
-
-  if (packs.length === 0) {
-    return (
-      <Button type="button" disabled>
-        {label}
-      </Button>
-    );
-  }
-
-  if (packs.length === 1) {
-    const productId = packs[0].id ?? "";
-    return (
-      <Button
-        type="button"
-        disabled={!productId || checkoutPending}
-        onClick={() => productId && void onAddCredit(productId)}
-      >
-        {label}
-      </Button>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" disabled={checkoutPending}>
-          {label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {packs.map((product) => {
-          const productId = product.id ?? "";
-          const amount = parseWorkOrderMetric(product.amountCents);
-          return (
-            <DropdownMenuItem
-              key={productId || amount}
-              disabled={!productId || checkoutPending}
-              onClick={() => productId && void onAddCredit(productId)}
-            >
-              {formatUsdCents(amount)}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 function BillingPageBody({
-  billed,
   billingContactMessage,
   billingEnabled,
   canManageBilling,
+  checkoutPending,
   creditRefreshStatus,
   error,
-  factoryKey,
   grants,
   hasBillingCustomer,
   invoices,
   isLoading,
-  organizationId,
+  packs,
   portalPending,
   purchased,
   remaining,
-  remainingCreditWarning,
-  superplaneGrant,
   welcomeCreditExpiresAt,
+  onAddCredit,
   onManageInvoices,
 }: {
-  billed: number;
   billingContactMessage?: string;
   billingEnabled: boolean;
   canManageBilling: boolean;
+  checkoutPending: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
   error: unknown;
-  factoryKey: string;
   grants: OrganizationsOrganizationCreditGrant[];
   hasBillingCustomer: boolean;
   invoices: OrganizationsHostedCreditInvoice[];
   isLoading: boolean;
-  organizationId: string;
+  packs: OrganizationsHostedCreditProduct[];
   portalPending: boolean;
   purchased: number;
   remaining: number;
-  remainingCreditWarning: boolean;
-  superplaneGrant: number;
   welcomeCreditExpiresAt?: string;
+  onAddCredit: (productId: string) => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
 }) {
   if (isLoading) {
@@ -194,81 +116,189 @@ function BillingPageBody({
     );
   }
 
-  const warning = hostedCreditBalanceWarning(
-    remaining,
-    remainingCreditWarning,
-    isWelcomeCreditExpired(welcomeCreditExpiresAt) && purchased === 0,
-  );
-  const expiryNote = welcomeCreditUnusedExpiryNote({
-    remainingCents: remaining,
-    purchasedCents: purchased,
-    welcomeCreditExpiresAt,
-  });
-  const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
-  const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending");
   const showInvoices = billingEnabled && canManageBilling && hasBillingCustomer;
 
   return (
     <>
-      <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <CreditMetric label="Remaining hosted credit" value={remaining} hint="Organization wallet" />
-          <CreditMetric label="SuperPlane grant" value={superplaneGrant} hint="Welcome and support grants" />
-          <CreditMetric label="Purchased hosted credit" value={purchased} hint="Polar credit packs" />
-          <CreditMetric label="Hosted billed spend" value={billed} hint="SuperPlane-hosted models" />
-        </div>
-        {creditRefreshMessage ? (
-          <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
-        ) : null}
-        {warning ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warning}</p> : null}
-        {expiryNote ? <p className="mt-3 text-sm text-muted-foreground">{expiryNote}</p> : null}
-        {!canManageBilling && billingContactMessage ? (
-          <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
-        ) : null}
-        <p className="mt-3 text-sm text-muted-foreground">
-          <Link className="underline underline-offset-2" to={spendingHref}>
-            View spending
-          </Link>
-        </p>
-      </FactorySettingsCard>
-
+      <HostedCreditRemainingCard
+        billingContactMessage={billingContactMessage}
+        billingEnabled={billingEnabled}
+        canManageBilling={canManageBilling}
+        checkoutPending={checkoutPending}
+        creditRefreshStatus={creditRefreshStatus}
+        hasBillingCustomer={hasBillingCustomer}
+        packs={packs}
+        purchased={purchased}
+        remaining={remaining}
+        welcomeCreditExpiresAt={welcomeCreditExpiresAt}
+        onAddCredit={onAddCredit}
+      />
       {showInvoices ? (
-        <FactorySettingsCard
-          title="Polar invoices"
-          data-testid="billing-polar-invoices"
-          action={
-            <Button type="button" variant="ghost" disabled={portalPending} onClick={() => void onManageInvoices()}>
-              {portalPending ? "Opening invoices..." : "Manage invoices"}
-              <ExternalLink className="size-3.5" aria-hidden />
-            </Button>
-          }
-        >
-          {invoices.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No Polar invoices yet.</p>
-          ) : (
-            <InvoiceTable invoices={invoices} />
-          )}
-        </FactorySettingsCard>
+        <PolarInvoicesCard invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
       ) : null}
-
-      <FactorySettingsCard title="Credit history" data-testid="billing-credit-history">
-        {grants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No credit grants yet.</p>
-        ) : (
-          <CreditGrantTable grants={grants} />
-        )}
-      </FactorySettingsCard>
+      <CreditHistoryCard grants={grants} />
     </>
   );
 }
 
-function CreditMetric({ label, value, hint }: { label: string; value: number; hint: string }) {
+function HostedCreditRemainingCard({
+  billingContactMessage,
+  billingEnabled,
+  canManageBilling,
+  checkoutPending,
+  creditRefreshStatus,
+  hasBillingCustomer,
+  packs,
+  purchased,
+  remaining,
+  welcomeCreditExpiresAt,
+  onAddCredit,
+}: {
+  billingContactMessage?: string;
+  billingEnabled: boolean;
+  canManageBilling: boolean;
+  checkoutPending: boolean;
+  creditRefreshStatus: HostedCreditRefreshStatus;
+  hasBillingCustomer: boolean;
+  packs: OrganizationsHostedCreditProduct[];
+  purchased: number;
+  remaining: number;
+  welcomeCreditExpiresAt?: string;
+  onAddCredit: (productId: string) => void | Promise<void>;
+}) {
+  const copy = hostedCreditBillingBalanceCopy({
+    remainingCents: remaining,
+    purchasedCents: purchased,
+    hasBillingCustomer,
+    billingEnabled,
+    welcomeCreditExpiresAt,
+  });
+  const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
+
   return (
-    <div>
-      <p className="workspace-section-label">{label}</p>
-      <p className="workspace-page-title mt-1">{formatUsdCents(value)}</p>
-      <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p>
-    </div>
+    <FactorySettingsCard
+      title="Hosted credit"
+      data-testid="billing-credit-balance"
+      action={
+        canManageBilling ? (
+          <HostedCreditBuyMoreMenu checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+        ) : undefined
+      }
+    >
+      <p className="text-sm text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
+      <div className="mt-4 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="workspace-section-label">Remaining hosted credit</p>
+          {copy.badge ? (
+            <Badge variant="outline" className="text-muted-foreground">
+              {copy.badge}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="workspace-page-title mt-1" data-testid="billing-remaining-credit">
+          {formatUsdCents(remaining)}
+        </p>
+        {creditRefreshMessage ? (
+          <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
+        ) : null}
+        {copy.description ? (
+          <p
+            className={cn(
+              "mt-3 text-sm",
+              remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+            )}
+          >
+            {copy.description}
+          </p>
+        ) : null}
+        {!canManageBilling && billingContactMessage ? (
+          <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
+        ) : null}
+      </div>
+    </FactorySettingsCard>
+  );
+}
+
+function HostedCreditBuyMoreMenu({
+  checkoutPending,
+  packs,
+  onAddCredit,
+}: {
+  checkoutPending: boolean;
+  packs: OrganizationsHostedCreditProduct[];
+  onAddCredit: (productId: string) => void | Promise<void>;
+}) {
+  const hasPurchasablePack = BUY_MORE_PACK_CENTS.some((cents) => findPackForCents(packs, cents));
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" disabled={checkoutPending || !hasPurchasablePack} data-testid="billing-buy-more">
+          {checkoutPending ? "Opening checkout..." : "Buy more"}
+          <ChevronDown className="size-3.5" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {BUY_MORE_PACK_CENTS.map((cents) => {
+          const product = findPackForCents(packs, cents);
+          const productId = product?.id ?? "";
+          return (
+            <DropdownMenuItem
+              key={cents}
+              disabled={!productId || checkoutPending}
+              onClick={() => productId && void onAddCredit(productId)}
+            >
+              {formatUsdPackLabel(cents)}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled title="Custom amounts are not available yet.">
+          Custom
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function PolarInvoicesCard({
+  invoices,
+  portalPending,
+  onManageInvoices,
+}: {
+  invoices: OrganizationsHostedCreditInvoice[];
+  portalPending: boolean;
+  onManageInvoices: () => void | Promise<void>;
+}) {
+  return (
+    <FactorySettingsCard
+      title="Polar invoices"
+      data-testid="billing-polar-invoices"
+      action={
+        <Button type="button" variant="ghost" disabled={portalPending} onClick={() => void onManageInvoices()}>
+          {portalPending ? "Opening invoices..." : "Manage invoices"}
+          <ExternalLink className="size-3.5" aria-hidden />
+        </Button>
+      }
+    >
+      {invoices.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No Polar invoices yet.</p>
+      ) : (
+        <InvoiceTable invoices={invoices} />
+      )}
+    </FactorySettingsCard>
+  );
+}
+
+function CreditHistoryCard({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
+  return (
+    <FactorySettingsCard title="Credit history" data-testid="billing-credit-history">
+      {grants.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No credit grants yet.</p>
+      ) : (
+        <CreditGrantTable grants={grants} />
+      )}
+    </FactorySettingsCard>
   );
 }
 
@@ -326,10 +356,16 @@ function InvoiceTable({ invoices }: { invoices: OrganizationsHostedCreditInvoice
   );
 }
 
-function sortHostedCreditPacks(products: OrganizationsHostedCreditProduct[]) {
-  return products
-    .slice()
-    .sort((left, right) => parseWorkOrderMetric(left.amountCents) - parseWorkOrderMetric(right.amountCents));
+function findPackForCents(packs: OrganizationsHostedCreditProduct[], cents: number) {
+  return packs.find((product) => Boolean(product.id) && parseWorkOrderMetric(product.amountCents) === cents);
+}
+
+function formatUsdPackLabel(cents: number): string {
+  const dollars = cents / 100;
+  if (Number.isInteger(dollars)) {
+    return `$${dollars}`;
+  }
+  return formatUsdCents(cents);
 }
 
 function creditRefreshClassName(status: HostedCreditRefreshStatus) {
