@@ -44,11 +44,22 @@ type FactoryContext interface {
 	// it. Any lifecycle transition clears the whole set. The order must
 	// be open.
 	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
+	// ClearWorkOrderStatusNote removes the status note identified by NoteKey,
+	// so a note stops showing once the condition that raised it no longer
+	// holds (e.g. every assignee has since linked their account). Clearing an
+	// absent note is a no-op. The order must be open.
+	ClearWorkOrderStatusNote(params ClearWorkOrderStatusNoteParams) error
 	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
 	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
 	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
 	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
+	// ResolveWorkOrderAssigneeAccounts resolves the work order's assignees
+	// to their linked identity for the given provider (currently only
+	// "github" is supported). Assignees without a linked identity for that
+	// provider are counted in Unlinked rather than erroring, so a caller
+	// like PR creation can still proceed and surface a notice separately.
+	ResolveWorkOrderAssigneeAccounts(params ResolveWorkOrderAssigneeAccountsParams) (*WorkOrderAssigneeAccounts, error)
 }
 
 type WorkOrderParams struct {
@@ -131,6 +142,16 @@ type SetWorkOrderStatusNoteParams struct {
 	ShowOnlyWhenWaiting bool
 }
 
+// ClearWorkOrderStatusNoteParams configures
+// FactoryContext.ClearWorkOrderStatusNote.
+type ClearWorkOrderStatusNoteParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// NoteKey identifies the note to remove (e.g. "pr-closure").
+	NoteKey string
+}
+
 type WorkOrder struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -210,6 +231,26 @@ type AddPullRequestActivityParams struct {
 type UpdatePullRequestActivityParams struct {
 	Description *string
 	Access      string
+}
+
+// ResolveWorkOrderAssigneeAccountsParams configures
+// FactoryContext.ResolveWorkOrderAssigneeAccounts. OrderID identifies the
+// work order to target; see UpdateWorkOrderStatusParams.OrderID.
+type ResolveWorkOrderAssigneeAccountsParams struct {
+	OrderID string
+	// Provider is the linked account provider to resolve against (e.g.
+	// "github"). Only "github" is currently supported.
+	Provider string
+}
+
+// WorkOrderAssigneeAccounts is the result of resolving a work order's
+// assignees to their linked identity for one provider.
+type WorkOrderAssigneeAccounts struct {
+	// Logins are the resolved external usernames for assignees that have
+	// a linked account for the provider, in assignment order.
+	Logins []string
+	// Unlinked counts assignees with no linked account for the provider.
+	Unlinked int
 }
 
 type PullRequestRevision struct {

@@ -686,6 +686,61 @@ func TestFactoryContext_SetWorkOrderStatusNote_EmitsNotification(t *testing.T) {
 	assert.Equal(t, "Still waiting on review", notifications[1].StatusNoteHeadline)
 }
 
+func TestFactoryContext_ClearWorkOrderStatusNote(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Note target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	_, err = ctx.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
+		OrderID:  order.ID.String(),
+		NoteKey:  "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.NoError(t, err)
+
+	reloaded, err := factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+
+	require.NoError(t, ctx.ClearWorkOrderStatusNote(core.ClearWorkOrderStatusNoteParams{
+		OrderID: order.ID.String(),
+		NoteKey: "pr-closure",
+	}))
+
+	reloaded, err = factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	notes, err = reloaded.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
+
+	// Clearing an absent note is a no-op that still succeeds.
+	require.NoError(t, ctx.ClearWorkOrderStatusNote(core.ClearWorkOrderStatusNoteParams{
+		OrderID: order.ID.String(),
+		NoteKey: "pr-closure",
+	}))
+}
+
 func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -852,4 +907,78 @@ func setupFactoryAppExecutionWithPayload(
 	require.NoError(t, database.Conn().Save(nodeExecution).Error)
 
 	return canvas, nodeExecution, run
+}
+
+func TestFactoryContext_ResolveWorkOrderAssigneeAccounts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "1", "Octocat", "Octo Cat", ""),
+	))
+
+	unlinkedAccount, err := models.CreateAccount("Unlinked", support.RandomName("unlinked")+"@example.com")
+	require.NoError(t, err)
+	unlinkedUser, err := models.CreateUser(r.Organization.ID, unlinkedAccount.ID, unlinkedAccount.Email, unlinkedAccount.Name)
+	require.NoError(t, err)
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(
+		database.Conn(),
+		"Assign me",
+		"",
+		&r.User,
+		[]uuid.UUID{r.User, unlinkedUser.ID},
+		nil,
+	)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("resolves linked assignees and counts unlinked ones", func(t *testing.T) {
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  order.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"octocat"}, result.Logins)
+		assert.Equal(t, 1, result.Unlinked)
+	})
+
+	t.Run("returns no unlinked assignees for a work order with none", func(t *testing.T) {
+		soloOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "Solo", "", &r.User, []uuid.UUID{r.User}, nil)
+		require.NoError(t, err)
+
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  soloOrder.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"octocat"}, result.Logins)
+		assert.Equal(t, 0, result.Unlinked)
+	})
+
+	t.Run("returns zero values for a work order with no assignees", func(t *testing.T) {
+		emptyOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "No assignees", "", &r.User, nil, nil)
+		require.NoError(t, err)
+
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  emptyOrder.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, result.Logins)
+		assert.Equal(t, 0, result.Unlinked)
+	})
+
+	t.Run("rejects an empty orderId", func(t *testing.T) {
+		_, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			Provider: models.ProviderGitHub,
+		})
+		require.Error(t, err)
+	})
 }

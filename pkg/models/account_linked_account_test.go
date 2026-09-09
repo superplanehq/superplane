@@ -3,6 +3,7 @@ package models
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -74,5 +75,48 @@ func TestAccountLinkedAccount(t *testing.T) {
 		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
 		require.NoError(t, err)
 		assert.Empty(t, linked)
+	})
+}
+
+func TestFindLinkedAccountsForUsers(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org, err := CreateOrganization("linked-accounts-org", "")
+	require.NoError(t, err)
+
+	linkedAccount, err := CreateAccount("Linked", "linked@example.com")
+	require.NoError(t, err)
+	linkedUser, err := CreateUser(org.ID, linkedAccount.ID, "linked@example.com", "Linked User")
+	require.NoError(t, err)
+	require.NoError(t, SaveAccountLinkedAccount(
+		database.Conn(),
+		NewAccountLinkedAccount(linkedAccount.ID, ProviderGitHub, "1", "Octocat", "Octo Cat", ""),
+	))
+
+	unlinkedAccount, err := CreateAccount("Unlinked", "unlinked@example.com")
+	require.NoError(t, err)
+	unlinkedUser, err := CreateUser(org.ID, unlinkedAccount.ID, "unlinked@example.com", "Unlinked User")
+	require.NoError(t, err)
+
+	t.Run("resolves only users with a linked account for the provider", func(t *testing.T) {
+		result, err := FindLinkedAccountsForUsers(database.Conn(), []uuid.UUID{linkedUser.ID, unlinkedUser.ID}, ProviderGitHub)
+		require.NoError(t, err)
+
+		require.Contains(t, result, linkedUser.ID)
+		found := result[linkedUser.ID]
+		assert.Equal(t, "octocat", found.NormalizedUsername())
+		assert.NotContains(t, result, unlinkedUser.ID)
+	})
+
+	t.Run("ignores linked accounts for other providers", func(t *testing.T) {
+		result, err := FindLinkedAccountsForUsers(database.Conn(), []uuid.UUID{linkedUser.ID}, "gitlab")
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("returns an empty map for no user ids", func(t *testing.T) {
+		result, err := FindLinkedAccountsForUsers(database.Conn(), nil, ProviderGitHub)
+		require.NoError(t, err)
+		assert.Empty(t, result)
 	})
 }

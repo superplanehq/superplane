@@ -219,7 +219,9 @@ func TestFactoryWorkOrder_ClearStatusNote_RemovesOneKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, order.ClearStatusNote(database.Conn(), "pr-closure"))
+	removed, err := order.ClearStatusNote(database.Conn(), "pr-closure")
+	require.NoError(t, err)
+	assert.True(t, removed)
 
 	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
 	require.NoError(t, err)
@@ -228,6 +230,11 @@ func TestFactoryWorkOrder_ClearStatusNote_RemovesOneKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, notes, 1)
 	assert.Equal(t, "deploy-window", notes[0].Key)
+
+	// Clearing an absent key is a no-op that reports no removal.
+	removed, err = order.ClearStatusNote(database.Conn(), "pr-closure")
+	require.NoError(t, err)
+	assert.False(t, removed)
 }
 
 func TestFactoryWorkOrder_SetStatusNote_MergesKeysFromStaleSnapshot(t *testing.T) {
