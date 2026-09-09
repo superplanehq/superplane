@@ -77,7 +77,7 @@ function getChipStyle(node: SuperplaneComponentsNode | undefined, component?: st
   if (!node && !component) return "bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-300";
   return trigger
     ? "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:hover:bg-violet-900"
-    : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900";
+    : "bg-blue-50 text-gray-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900";
 }
 
 function NodeIconInline({ component, isTrigger }: { component?: string; isTrigger: boolean }) {

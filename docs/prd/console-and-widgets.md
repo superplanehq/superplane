@@ -459,7 +459,7 @@ content:
 | Field | Notes |
 | --- | --- |
 | `groupBy` | Required. Row field (dot path or `{{ expr }}`) used to place each row into a lane. Values are matched case-insensitively and trimmed. |
-| `lanes` | Required, at least one entry. Each lane has `value` (required, non-empty), optional `label` (defaults to `value`), and optional `color` from the shared palette: `neutral`, `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`. |
+| `lanes` | Required, at least one entry. Each lane has `value` (required, non-empty) and optional `label` (defaults to `value`). Legacy `color` keys are ignored. |
 | `otherLane` | Optional boolean. When `true`, rows whose `groupBy` value does not match any configured lane render in a trailing **Other** lane instead of being hidden. Defaults to hiding unmatched rows. |
 | `card.titleField` | Required. Row field rendered as the card title. Falls back to the `groupBy` value (or row `id`) when the field resolves to an empty value. |
 | `card.fields` | Optional list. Each entry reuses compact `WidgetTableColumn` semantics (`field`, `label?`, `format?`, `show?`, `href?`) and renders as a meta line under the title. Supported formats are `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, and `link`; table-only `avatar`, `progress`, and `trend` formats are not supported. Unlabelled fields render the value alone. |
@@ -471,7 +471,7 @@ content:
 ### Renderer behavior
 
 - Rows first pass through `where` filters and `sort`, then are grouped by the normalized `groupBy` value.
-- Lanes render in configured order with a count badge in the header and a colored left strip so lanes remain readable when the panel scrolls horizontally.
+- Lanes render in configured order with a count badge in the header.
 - Cards show the title in bold on the first line and card fields underneath. Row actions render at the bottom-right of each card; trigger-node visibility, permission gating, and per-row `show` expressions match the table panel exactly.
 - Horizontal scroll kicks in when lanes overflow the panel width; each lane has its own vertical scroll. An empty lane shows a subtle placeholder row.
 - Live updates come free from `useWidgetData` invalidations — the same memory / run websocket signals that drive the table refresh the board.

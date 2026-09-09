@@ -101,7 +101,7 @@ const defaultConsoleYaml =
               showFieldLabels: false,
               showNodeLabel: false,
               showRun: true,
-              submitLabel: "Work on it",
+              submitLabel: "Start Factory",
               triggerName: "Create Task",
             },
           ],
@@ -135,10 +135,10 @@ const defaultConsoleYaml =
    ("Mark PR Ready" in $) ? "Human review" :
    "In progress" }}`,
             lanes: [
-              { value: "In progress", color: "blue" },
-              { value: "Human review", color: "yellow", label: "Human review" },
-              { value: "Failed", color: "red" },
-              { value: "Done", color: "green" },
+              { value: "In progress" },
+              { value: "Human review", label: "Human review" },
+              { value: "Failed" },
+              { value: "Done" },
             ],
             otherLane: false,
             sort: { field: "updatedAt", order: "desc" },

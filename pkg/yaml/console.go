@@ -1043,19 +1043,6 @@ func validateTableRowActions(panelID string, raw any) error {
 	return nil
 }
 
-// AllowedBoardLaneColors mirrors `WIDGET_BOARD_LANE_COLORS` on the FE.
-// Keep in lockstep with `web_src/src/pages/app/console/widget/types.ts`.
-var AllowedBoardLaneColors = []string{
-	"neutral",
-	"gray",
-	"blue",
-	"green",
-	"yellow",
-	"orange",
-	"red",
-	"purple",
-}
-
 var allowedBoardCardFormats = []string{
 	"text",
 	"number",
@@ -1138,12 +1125,7 @@ func validateBoardLanes(panelID string, raw any) error {
 		if err := validateOptionalString(panelID, fmt.Sprintf("render.lanes[%d].label", i), lane["label"]); err != nil {
 			return err
 		}
-		if rawColor, ok := lane["color"]; ok && rawColor != nil {
-			color, isString := rawColor.(string)
-			if !isString || !slices.Contains(AllowedBoardLaneColors, color) {
-				return fmt.Errorf("panel %q render.lanes[%d].color must be one of %s", panelID, i, strings.Join(AllowedBoardLaneColors, "/"))
-			}
-		}
+		// Legacy `color` keys are ignored — lane chrome is uncolored.
 	}
 	return nil
 }

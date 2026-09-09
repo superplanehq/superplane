@@ -8,7 +8,7 @@ const validBoardBody = () => ({
   render: {
     kind: "board",
     groupBy: "status",
-    lanes: [{ value: "Todo" }, { value: "Done", color: "green" }],
+    lanes: [{ value: "Todo" }, { value: "Done" }],
     card: { titleField: "title" },
   },
 });
@@ -78,12 +78,12 @@ describe("validateBoardContent — rejections", () => {
     expect(validateBoardContent(body)).toMatch(/render\.lanes\[1\]\.value must be unique/);
   });
 
-  it("rejects unknown lane colors", () => {
+  it("ignores legacy lane color keys", () => {
     const body = {
       ...validBoardBody(),
       render: { ...validBoardBody().render, lanes: [{ value: "Todo", color: "fuchsia" }] },
     };
-    expect(validateBoardContent(body)).toMatch(/render\.lanes\[0\]\.color must be one of/);
+    expect(validateBoardContent(body)).toBeNull();
   });
 
   it("requires a card with a non-empty titleField", () => {
@@ -155,8 +155,8 @@ describe("normalizeBoardPanelContent", () => {
       },
     });
     expect(normalized.render.lanes).toEqual([
-      { value: "Todo", label: undefined, color: "gray" },
-      { value: "Done", label: undefined, color: undefined },
+      { value: "Todo", label: undefined },
+      { value: "Done", label: undefined },
     ]);
     expect(normalized.render.card.fields).toEqual([
       { field: "pr_url", format: "link", label: undefined, show: undefined, href: undefined },
