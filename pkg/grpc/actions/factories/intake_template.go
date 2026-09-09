@@ -24,15 +24,33 @@ const (
 	intakeThresholdNodeID        = "threshold"
 	intakeReportConfidenceNodeID = "report-confidence"
 
+	// Node identifiers of the GitHub issue-closed branch: closing the source
+	// issue on GitHub closes the task intake created from it, as long as the
+	// task never left the backlog (still `draft`). Fixed for the same reason
+	// as the create branch above.
+	intakeCloseTriggerNodeID = "close-trigger"
+	intakeCloseFindNodeID    = "close-find-work-order"
+	intakeCloseCheckNodeID   = "close-check-backlog"
+	intakeCloseNodeID        = "close-work-order"
+
+	intakeCloseTriggerName = "On Issue Closed"
+	intakeCloseFindName    = "Find Task"
+	intakeCloseCheckName   = "Task Still In Backlog?"
+	intakeCloseName        = "Close Task"
+
 	// The analysis node name is part of the generated backlog graph's contract:
 	// the report-check fields read the score by this name.
 	intakeAnalysisNodeName = "Analyze intake"
 	intakeCreateNodeName   = "Create Task"
 
-	intakeFilterComponent           = "if"
-	intakeThresholdComponent        = intakeFilterComponent
-	intakeCreateComponent           = "createWorkOrder"
-	intakeReportConfidenceComponent = "reportWorkOrderCheck"
+	intakeFilterComponent                = "if"
+	intakeThresholdComponent             = intakeFilterComponent
+	intakeCreateComponent                = "createWorkOrder"
+	intakeReportConfidenceComponent      = "reportWorkOrderCheck"
+	intakeCloseFindWorkOrderComponent    = "findWorkOrder"
+	intakeCloseUpdateStatusComponent     = "updateWorkOrderStatus"
+	intakeCloseFindWorkOrderFoundChannel = "found"
+	intakeCloseCheckTrueChannel          = "true"
 
 	intakeConfidenceCheckKey  = "confidence"
 	intakeConfidenceCheckName = "Confidence score"
@@ -214,6 +232,12 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		Position:    yaml.Position{X: 160, Y: createY},
 	})
 
+	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+		closeNodes, closeEdges := buildIntakeCloseBranch(request.Binding)
+		nodes = append(nodes, closeNodes...)
+		edges = append(edges, closeEdges...)
+	}
+
 	return &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
@@ -234,6 +258,83 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 func intakeConcurrency() *yaml.ConcurrencySpec {
 	max := intakeConcurrencyMax
 	return &yaml.ConcurrencySpec{Max: &max}
+}
+
+// buildIntakeCloseBranch returns the nodes and edges that close a GitHub
+// intake's task when the source issue closes on GitHub before the task
+// leaves the backlog. A task that was already dispatched to a line (state
+// no longer `draft`) is left alone: planning, implementation, and verify all
+// happen after dispatch, and none of them should be undone by an issue
+// closing.
+func buildIntakeCloseBranch(binding *intakeBinding) ([]yaml.Node, []yaml.Edge) {
+	nodes := []yaml.Node{
+		{
+			ID:            intakeCloseTriggerNodeID,
+			Name:          intakeCloseTriggerName,
+			Type:          yaml.NodeTypeTrigger,
+			Component:     intakeSpecsBySource[models.FactoryIntakeSourceGitHubIssues].triggerComponent,
+			Configuration: intakeCloseTriggerConfiguration(binding),
+			Integration:   binding.integrationRef(),
+			Position:      yaml.Position{X: 560, Y: 80},
+		},
+		{
+			ID:        intakeCloseFindNodeID,
+			Name:      intakeCloseFindName,
+			Type:      yaml.NodeTypeAction,
+			Component: intakeCloseFindWorkOrderComponent,
+			Configuration: map[string]any{
+				"by":        "originUrl",
+				"originUrl": "{{ root().data.issue.html_url }}",
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 560, Y: 260},
+		},
+		{
+			ID:        intakeCloseCheckNodeID,
+			Name:      intakeCloseCheckName,
+			Type:      yaml.NodeTypeAction,
+			Component: intakeFilterComponent,
+			Configuration: map[string]any{
+				"expression": fmt.Sprintf(`$[%q].data.workOrder.state == "draft"`, intakeCloseFindName),
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 560, Y: 440},
+		},
+		{
+			ID:        intakeCloseNodeID,
+			Name:      intakeCloseName,
+			Type:      yaml.NodeTypeAction,
+			Component: intakeCloseUpdateStatusComponent,
+			Configuration: map[string]any{
+				"orderId": fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCloseFindName),
+				"status":  models.FactoryWorkOrderStateClosed,
+				"result":  models.FactoryWorkOrderResultRejected,
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 560, Y: 620},
+		},
+	}
+
+	edges := []yaml.Edge{
+		{Channel: "default", SourceID: intakeCloseTriggerNodeID, TargetID: intakeCloseFindNodeID},
+		{Channel: intakeCloseFindWorkOrderFoundChannel, SourceID: intakeCloseFindNodeID, TargetID: intakeCloseCheckNodeID},
+		{Channel: intakeCloseCheckTrueChannel, SourceID: intakeCloseCheckNodeID, TargetID: intakeCloseNodeID},
+	}
+
+	return nodes, edges
+}
+
+// intakeCloseTriggerConfiguration listens on the same repository as the
+// create branch, but only for the closed action — the create branch's
+// configured actions (e.g. just `opened`) must not gain `closed` as a side
+// effect of enabling this branch.
+func intakeCloseTriggerConfiguration(binding *intakeBinding) map[string]any {
+	configuration := map[string]any{"actions": []any{"closed"}}
+	for name, value := range binding.configuration() {
+		configuration[name] = value
+	}
+
+	return configuration
 }
 
 // intakeTriggerConfiguration lays the binding over the template so the trigger

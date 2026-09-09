@@ -33,6 +33,9 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
 			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeCloseTriggerNodeID, TargetID: intakeCloseFindNodeID},
+			{Channel: "found", SourceID: intakeCloseFindNodeID, TargetID: intakeCloseCheckNodeID},
+			{Channel: "true", SourceID: intakeCloseCheckNodeID, TargetID: intakeCloseNodeID},
 		}, canvas.Spec.Edges)
 		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAnalysisNodeID))
 		assert.Nil(t, findSpecNodeOrNil(canvas, intakeReportConfidenceNodeID))
@@ -40,6 +43,49 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
+	})
+
+	t.Run("closing the GitHub issue closes the task while it's still in the backlog", func(t *testing.T) {
+		binding := &intakeBinding{
+			Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "acme-github"},
+			Configuration: map[string]any{"repository": "acme/backlog"},
+		}
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Binding: binding})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeCloseTriggerNodeID)
+		assert.Equal(t, "github.onIssue", trigger.Component)
+		assert.Equal(t, yaml.NodeTypeTrigger, trigger.Type)
+		assert.Equal(t, []any{"closed"}, trigger.Configuration["actions"])
+		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
+		assert.Equal(t, binding.Integration, trigger.Integration)
+
+		find := findSpecNode(t, canvas, intakeCloseFindNodeID)
+		assert.Equal(t, intakeCloseFindWorkOrderComponent, find.Component)
+		assert.Equal(t, "originUrl", find.Configuration["by"])
+		assert.Equal(t, "{{ root().data.issue.html_url }}", find.Configuration["originUrl"])
+
+		check := findSpecNode(t, canvas, intakeCloseCheckNodeID)
+		assert.Equal(t, intakeFilterComponent, check.Component)
+		assert.Equal(t, `$["Find Task"].data.workOrder.state == "draft"`, check.Configuration["expression"])
+
+		closeNode := findSpecNode(t, canvas, intakeCloseNodeID)
+		assert.Equal(t, intakeCloseUpdateStatusComponent, closeNode.Component)
+		assert.Equal(t, `{{ $["Find Task"].data.workOrder.id }}`, closeNode.Configuration["orderId"])
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, closeNode.Configuration["status"])
+		assert.Equal(t, models.FactoryWorkOrderResultRejected, closeNode.Configuration["result"])
+	})
+
+	t.Run("only GitHub issue intakes get an issue-closed branch", func(t *testing.T) {
+		for _, source := range []string{
+			models.FactoryIntakeSourceSentryExceptions,
+			models.FactoryIntakeSourcePagerDutyIncidents,
+			models.FactoryIntakeSourceProductiveTasks,
+		} {
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
+			require.NoError(t, err)
+			assert.Nil(t, findSpecNodeOrNil(canvas, intakeCloseTriggerNodeID))
+		}
 	})
 
 	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
