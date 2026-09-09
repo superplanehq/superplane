@@ -194,4 +194,17 @@ describe("HostedLLMSettings", () => {
       );
     });
   });
+
+  it("disables save when welcome duration is below 1 day", async () => {
+    mockSettingsFetch();
+    const user = userEvent.setup();
+
+    render(<HostedLLMSettings />);
+
+    const duration = await screen.findByTestId("installation-llm-welcome-ttl");
+    await user.clear(duration);
+    await user.type(duration, "0");
+
+    expect(screen.getByTestId("installation-llm-policy-save")).toBeDisabled();
+  });
 });
