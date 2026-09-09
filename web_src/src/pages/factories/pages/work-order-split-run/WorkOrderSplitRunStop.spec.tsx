@@ -84,15 +84,17 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
-  it("rejects and approves a waiting task from the note", async () => {
+  it("rejects and approves a waiting pull request task from the More menu", async () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "Reject" }));
+    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
-    await user.click(within(note).getByRole("button", { name: "Approve" }));
+    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Approve" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "completed",
       expect.objectContaining({ kind: "waiting", status: "waiting" }),

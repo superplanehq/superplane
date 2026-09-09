@@ -454,14 +454,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
-  it("pins a review note and keeps Update manually off the note", () => {
+  it("pins a pull request review strip with one call to action and a More menu", async () => {
+    const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
-    expect(note).toHaveTextContent("The pull request is open and waiting for user review.");
-    expect(note).toHaveTextContent("Mention @superplaneagent in a pull request comment or review to request changes.");
-    expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(within(note).queryByText("Waiting for user review")).not.toBeInTheDocument();
+    expect(within(note).getAllByRole("listitem")).toHaveLength(3);
+    expect(note).toHaveTextContent("Mention @superplaneagent");
+    expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
     expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
       "href",
       "https://github.com/superplanehq/superplane/pull/6812",
@@ -469,9 +472,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+
+    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "To Backlog" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Reject" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
