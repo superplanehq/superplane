@@ -253,7 +253,7 @@ function createLiveLogFailureReporter(context: LiveLogFailureContext) {
   const reportedFailures = new Set<LiveLogFailureSource>();
 
   return (source: LiveLogFailureSource, error: Error): void => {
-    if (reportedFailures.has(source)) {
+    if (reportedFailures.has(source) || isBenignLiveLogStreamError(error)) {
       return;
     }
     reportedFailures.add(source);
@@ -271,6 +271,10 @@ function createLiveLogFailureReporter(context: LiveLogFailureContext) {
 
 function errorFromUnknown(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+export function isBenignLiveLogStreamError(error: Error): boolean {
+  return error.message.includes("ResourceNotFoundException") && error.message.includes("The specified log stream does not exist");
 }
 
 async function waitForLiveLogReconnect(
