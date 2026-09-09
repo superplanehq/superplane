@@ -1010,6 +1010,51 @@ func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	})
 }
 
+func TestFactory_FindWorkOrderByOriginURL(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-origin")
+	order, err := factoryModel.CreateWorkOrderWithOrigin(
+		database.Conn(),
+		"Find target",
+		"",
+		&userID,
+		nil,
+		nil,
+		WorkOrderOrigin{URL: "https://github.com/example/repo/issues/7"},
+	)
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its origin url", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/7")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("trims the lookup url", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "  https://github.com/example/repo/issues/7  ")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown url", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/999")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank url", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a url belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-origin-other")
+
+		_, err := otherFactory.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/7")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+}
+
 func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userID uuid.UUID, factoryModel *Factory) {
 	t.Helper()
 

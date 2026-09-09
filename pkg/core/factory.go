@@ -58,11 +58,14 @@ type WorkOrderParams struct {
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects
 // the lookup strategy: "id" resolves OrderID directly, "artifactKey"
-// resolves the work order that owns the artifact tagged with ArtifactKey.
+// resolves the work order that owns the artifact tagged with ArtifactKey,
+// and "originUrl" resolves the work order created from the external ticket
+// at OriginURL (e.g. the GitHub issue that intake created it from).
 type FindWorkOrderParams struct {
 	By          string
 	OrderID     string
 	ArtifactKey string
+	OriginURL   string
 }
 
 type UpdateWorkOrderStatusParams struct {
