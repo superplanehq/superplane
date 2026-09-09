@@ -307,7 +307,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       >
                         <span
                           className={cn(
-                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800",
+                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800 dark:text-gray-100",
                             isItemOpen && "sr-only",
                           )}
                         >
