@@ -116,6 +116,24 @@ export function useFactoryBacklogAnalysis(organizationId: string, factoryId: str
 }
 
 /**
+ * Work orders whose Backlog analysis finished: they have at least one run
+ * and none still in flight. The first-run analysis screen counts these as
+ * scored tickets.
+ */
+export function useBacklogAnalysisScoredOrderIds(organizationId: string, factoryId: string): ReadonlySet<string> {
+  const { analyzingOrderIds, runsByWorkOrder } = useFactoryBacklogAnalysis(organizationId, factoryId);
+  return useMemo(() => {
+    const scored = new Set<string>();
+    for (const workOrderId of runsByWorkOrder.keys()) {
+      if (!analyzingOrderIds.has(workOrderId)) {
+        scored.add(workOrderId);
+      }
+    }
+    return scored;
+  }, [analyzingOrderIds, runsByWorkOrder]);
+}
+
+/**
  * Whether some draft has no Backlog run yet but was created recently
  * enough that one might still be created asynchronously (typically an
  * order created through the API rather than the UI). Used only to widen
