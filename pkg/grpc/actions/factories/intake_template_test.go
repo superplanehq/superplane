@@ -74,6 +74,10 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, `{{ $["Find Task"].data.workOrder.id }}`, closeNode.Configuration["orderId"])
 		assert.Equal(t, models.FactoryWorkOrderStateClosed, closeNode.Configuration["status"])
 		assert.Equal(t, models.FactoryWorkOrderResultRejected, closeNode.Configuration["result"])
+		// The close write carries an atomic expectedState guard: even if a
+		// dispatch (draft → open) slips in after the filter node reads
+		// `draft`, the close no-ops instead of rejecting an active task.
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, closeNode.Configuration["expectedState"])
 	})
 
 	t.Run("the close trigger listens for closed even when the binding carries the create trigger's actions", func(t *testing.T) {

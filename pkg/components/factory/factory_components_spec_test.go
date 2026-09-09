@@ -196,6 +196,53 @@ func TestUpdateWorkOrderStatus_Execute_PassesThroughOrderID(t *testing.T) {
 	assert.Equal(t, "wo-1", factoryCtx.lastStatusParams.OrderID)
 }
 
+// The intake close branch relies on the expectedState guard reaching the
+// factory so the close can be scoped atomically to a still-draft task.
+func TestUpdateWorkOrderStatus_Execute_PassesThroughExpectedState(t *testing.T) {
+	component := &UpdateWorkOrderStatus{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "closed"}
+
+	t.Run("forwards expectedState to the factory", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{nextChanged: true, returnOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":       "wo-1",
+				"status":        "closed",
+				"result":        "rejected",
+				"expectedState": "draft",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "draft", factoryCtx.lastStatusParams.ExpectedState)
+	})
+
+	// A guarded close that lost the race comes back as changed=false; the
+	// component must pass silently instead of fanning out a phantom
+	// statusUpdated for a task it did not actually close.
+	t.Run("passes silently when the guard makes the close a no-op", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{nextChanged: false, returnOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":       "wo-1",
+				"status":        "closed",
+				"result":        "rejected",
+				"expectedState": "draft",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		assert.Empty(t, stateCtx.Channel, "no-op must not emit on any channel")
+	})
+}
+
 func TestFindWorkOrder_Execute(t *testing.T) {
 	component := &FindWorkOrder{}
 	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "open"}

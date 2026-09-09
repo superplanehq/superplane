@@ -2183,6 +2183,8 @@ The Update Task Status component transitions a task through the lifecycle: draft
 
 `orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
+`expectedState` is an optional guard: when set, the transition only applies if the task is still in that state at write time, checked atomically against the row. A mismatch is a silent no-op rather than a failure. Use it when an earlier, separate node observed the state (for example, a filter checking the task is still `draft`) so a concurrent transition in between can't force a stale update.
+
 ### Example Output
 
 ```json

@@ -266,6 +266,13 @@ func intakeConcurrency() *yaml.ConcurrencySpec {
 // no longer `draft`) is left alone: planning, implementation, and verify all
 // happen after dispatch, and none of them should be undone by an issue
 // closing.
+//
+// The backlog check is defended twice: the filter node skips the close when
+// it already sees a non-draft task, and the close node carries an
+// `expectedState: draft` guard so the actual write no-ops if a dispatch
+// slips in between the filter read and the close write. The guard is what
+// makes the branch race-free; the filter just avoids a pointless close
+// attempt in the common case.
 func buildIntakeCloseBranch(binding *intakeBinding) ([]yaml.Node, []yaml.Edge) {
 	nodes := []yaml.Node{
 		{
@@ -309,6 +316,14 @@ func buildIntakeCloseBranch(binding *intakeBinding) ([]yaml.Node, []yaml.Edge) {
 				"orderId": fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCloseFindName),
 				"status":  models.FactoryWorkOrderStateClosed,
 				"result":  models.FactoryWorkOrderResultRejected,
+				// Guard the close atomically on the task still being in the
+				// backlog. The filter node above already checks `draft`, but
+				// that read and this write happen in separate steps: a
+				// dispatch (draft -> open) in between would otherwise let this
+				// reject an actively processed task. The expectedState guard
+				// makes the close a no-op unless the row is still draft at
+				// write time, closing that race.
+				"expectedState": models.FactoryWorkOrderStateDraft,
 			},
 			Concurrency: intakeConcurrency(),
 			Position:    yaml.Position{X: 560, Y: 620},
