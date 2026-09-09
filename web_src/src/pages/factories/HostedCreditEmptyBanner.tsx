@@ -5,9 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { formatUsdCents } from "./lib/workOrderUsage";
 import {
   hostedCreditBannerCopy,
   parseWelcomeCreditExpiresAt,
+  welcomeCreditHeaderLabel,
   type HostedCreditBannerKind,
 } from "./lib/hostedCreditEmpty";
 
@@ -81,6 +83,49 @@ export function HostedCreditEmptyBanner({
         <Link to={spendingHref}>{copy.actionLabel}</Link>
       </Button>
     </div>
+  );
+}
+
+/** Compact trial chip to the right of the workspace page title. */
+export function HostedCreditHeaderKicker({
+  spendingHref,
+  welcomeCreditExpiresAt,
+  remainingCreditCents = 0,
+}: {
+  spendingHref: string;
+  welcomeCreditExpiresAt?: string;
+  remainingCreditCents?: number;
+}) {
+  const expiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
+  const duration = expiresAt ? welcomeCreditHeaderLabel(expiresAt) : "14 days";
+  const remaining = formatUsdCents(remainingCreditCents);
+
+  return (
+    <Link
+      to={spendingHref}
+      aria-label="Add credits"
+      data-testid="hosted-credit-header-kicker"
+      className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-violet-100 py-1 pl-2.5 pr-1.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900"
+    >
+      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">Trial</span>
+      <ChipDot />
+      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">{duration}</span>
+      <ChipDot />
+      <span className="whitespace-nowrap font-semibold tabular-nums text-violet-950 dark:text-violet-50">
+        {remaining}
+      </span>
+      <span className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white">
+        Add credits
+      </span>
+    </Link>
+  );
+}
+
+function ChipDot() {
+  return (
+    <span className="select-none text-violet-400 dark:text-violet-600" aria-hidden>
+      ·
+    </span>
   );
 }
 
