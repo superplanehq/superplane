@@ -99,6 +99,8 @@ describe("FirstRunChooseScreen", () => {
     expect(screen.getByTestId("first-run-repositories-loading")).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.choose.loading);
+    expect(screen.getByTestId("first-run-repositories-spinner")).toBeInTheDocument();
   });
 
   it("disables continue until a repository is selected", () => {
@@ -131,5 +133,23 @@ describe("FirstRunChooseScreen", () => {
     const continueButton = screen.getByTestId("first-run-continue-to-tickets");
     expect(continueButton).toBeEnabled();
     expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.choose.continueReady);
+  });
+
+  it("locks repository controls while the selection saves", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository="octo/repo"
+        saving
+        chrome={{ stepIndex: 2, onBack: vi.fn() }}
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toHaveTextContent(FIRST_RUN_COPY.choose.saving);
+    expect(screen.getByRole("option", { name: /octo\/repo/ })).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.choose.editConnection)).toBeDisabled();
   });
 });
