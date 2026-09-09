@@ -52,7 +52,7 @@ describe("OnboardingGate", () => {
   it("redirects an incomplete workspace to setup", async () => {
     renderRoute("/org-1/workspaces/PAY/overview");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/pay/setup")).toBeInTheDocument();
   });
 
   it("sends an incomplete initial workspace from the org path to account onboarding", async () => {
@@ -72,7 +72,7 @@ describe("OnboardingGate", () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/pay/overview")).toBeInTheDocument();
   });
 
   // Setup finishes with its own redirect to the line board. This redirect can
@@ -85,6 +85,6 @@ describe("OnboardingGate", () => {
     };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/lines/line-plan")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/pay/lines/line-plan")).toBeInTheDocument();
   });
 });

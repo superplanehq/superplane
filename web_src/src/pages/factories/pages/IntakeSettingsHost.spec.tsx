@@ -203,7 +203,7 @@ describe("IntakeSettingsHost", () => {
     const edit = within(screen.getByTestId("intake-source-settings")).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
     );
     expect(edit.className).toContain("rounded-md");
     expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();

@@ -17,7 +17,7 @@ describe("AutomationLink", () => {
     );
 
     const link = getByRole("link", { name: "Deploy bot" });
-    expect(link).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-1");
+    expect(link).toHaveAttribute("href", "/org-1/workspaces/rf/apps/app-1");
     expect(link.querySelector("svg")).not.toBeNull();
   });
 

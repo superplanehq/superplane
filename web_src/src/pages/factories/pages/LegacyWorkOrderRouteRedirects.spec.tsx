@@ -26,28 +26,28 @@ function renderAt(path: string) {
 describe("LegacyWorkOrdersRedirect", () => {
   it("sends the bare list to the tasks list", () => {
     renderAt("/org-1/workspaces/SP/work-orders");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/tasks");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/tasks");
   });
 
   it("forwards the new child segment", () => {
     renderAt("/org-1/workspaces/SP/work-orders/new");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/tasks/new");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/tasks/new");
   });
 
   it("forwards an id segment and the query string", () => {
     renderAt("/org-1/workspaces/SP/work-orders/order-uuid?foo=bar");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/tasks/order-uuid?foo=bar");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/tasks/order-uuid?foo=bar");
   });
 });
 
 describe("LegacyWorkOrderPermalinkRedirect", () => {
   it("sends the singular permalink to the task permalink", () => {
     renderAt("/org-1/workspaces/SP/work-order/42");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/task/42");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/task/42");
   });
 
   it("preserves the query string", () => {
     renderAt("/org-1/workspaces/SP/work-order/42?lineId=line-hotfix");
-    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/SP/task/42?lineId=line-hotfix");
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/sp/task/42?lineId=line-hotfix");
   });
 });

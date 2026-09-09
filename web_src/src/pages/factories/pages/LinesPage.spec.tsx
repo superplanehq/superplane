@@ -293,7 +293,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -301,7 +301,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
     );
   });
 
@@ -356,7 +356,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
@@ -364,7 +364,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_HOTFIX_ID}`,
     );
   });
 
@@ -597,7 +597,7 @@ describe("LinesPage board", () => {
     await user.click(within(verify).getByTestId("lines-verify-listener-handler-checks"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
     );
   });
 
@@ -668,7 +668,7 @@ describe("LinesPage board", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/apps/canvas-new`,
       );
     });
   });
@@ -703,7 +703,7 @@ describe("LinesPage board", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/apps/canvas-new`,
       );
     });
   });
