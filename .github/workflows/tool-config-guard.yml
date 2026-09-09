@@ -1,0 +1,22 @@
+# Static scan of JS/TS tool configs. Do not add Node, npm, or ESLint here.
+# Those tools load eslint.config.js and would run a dropper like PR 7318.
+name: Tool config guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Scan tool configs without executing them
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail on PolinRider-style eslint/vite payloads
+        run: bash ./scripts/check_tool_config_guard.sh
