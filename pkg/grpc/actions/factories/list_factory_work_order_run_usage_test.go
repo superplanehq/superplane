@@ -78,7 +78,7 @@ func Test__ListFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Equal(t, execution.ID.String(), row.WorkOrderExecutionId)
 	assert.Equal(t, factory.WorkOrderKey(order.Number), row.WorkOrderKey)
 	assert.Equal(t, "Publish draft", row.Title)
-	assert.Equal(t, r.User.GetEmail(), row.UserEmail)
+	assert.Equal(t, r.UserModel.GetEmail(), row.UserEmail)
 	assert.Equal(t, int64(1_000_000), row.TotalTokens)
 	assert.Equal(t, int64(90), row.DurationSeconds)
 	assert.True(t, row.UsedByok)

@@ -684,7 +684,7 @@ func Test__ListWorkOrderRunUsage__GroupsModelAndComputeForOneRun(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, execution.ID, rows[0].WorkOrderExecutionID)
 	assert.Equal(t, "Publish draft", rows[0].Title)
-	assert.Equal(t, r.User.GetEmail(), rows[0].UserEmail)
+	assert.Equal(t, r.UserModel.GetEmail(), rows[0].UserEmail)
 	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
 	assert.Equal(t, int64(90), rows[0].DurationSeconds)
 	assert.True(t, rows[0].UsedBYOK)
