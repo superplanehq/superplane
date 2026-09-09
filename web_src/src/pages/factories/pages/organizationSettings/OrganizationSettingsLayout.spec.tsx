@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -57,10 +57,12 @@ describe("legacy factory organization settings routes", () => {
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-nav-organization-usage")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
     expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
   }, 10000);
 
