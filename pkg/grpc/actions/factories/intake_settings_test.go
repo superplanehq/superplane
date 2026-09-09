@@ -73,3 +73,53 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 		assert.False(t, parsed.AuthorsWithAccess)
 	})
 }
+
+func Test__intakeTriggerActionsFor(t *testing.T) {
+	t.Run("listens for opened and reopened issues", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+
+		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
+	})
+
+	t.Run("also listens for assignments", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.AssignedToAgent = true
+
+		assert.Equal(t, []any{"opened", "reopened", "assigned"}, intakeTriggerActionsFor(settings))
+	})
+
+	t.Run("can listen only for assignments", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.NewIssues = false
+		settings.AssignedToAgent = true
+
+		assert.Equal(t, []any{"assigned"}, intakeTriggerActionsFor(settings))
+	})
+}
+
+func Test__intakeSettingsFromGraph_TriggerActions(t *testing.T) {
+	spec := models.LiveCanvasSpec{
+		Nodes: []models.Node{
+			{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"actions": []any{"assigned"},
+				},
+			},
+		},
+	}
+
+	settings := intakeSettingsFromGraph(intakeGraph{TriggerNodeID: intakeTriggerNodeID}, spec)
+
+	assert.False(t, settings.NewIssues)
+	assert.True(t, settings.AssignedToAgent)
+}
+
+func Test__intakeFilterExpressionFor_AssignedToAgent(t *testing.T) {
+	settings := defaultIntakeSettings()
+	settings.AssignedToAgent = true
+
+	expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
+
+	assert.Contains(t, expression, intakeAssignedToAgentCondition)
+}

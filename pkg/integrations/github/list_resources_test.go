@@ -54,3 +54,33 @@ func Test__toDefaultBranchResources__fallsBackToMainWhenEmpty(t *testing.T) {
 	assert.Equal(t, "main", resources[0].Name)
 	assert.Equal(t, "main", resources[0].ID)
 }
+
+func Test__toLabelResources__usesLabelName(t *testing.T) {
+	bug := "bug"
+	needsTriage := "needs triage"
+
+	resources := toLabelResources([]*github.Label{
+		{Name: &bug},
+		{Name: &needsTriage},
+	})
+
+	require.Len(t, resources, 2)
+	assert.Equal(t, "label", resources[0].Type)
+	assert.Equal(t, "bug", resources[0].Name)
+	assert.Equal(t, "bug", resources[0].ID)
+	assert.Equal(t, "needs triage", resources[1].Name)
+}
+
+func Test__toLabelResources__skipsLabelsWithoutName(t *testing.T) {
+	empty := ""
+	bug := "bug"
+
+	resources := toLabelResources([]*github.Label{
+		{},
+		{Name: &empty},
+		{Name: &bug},
+	})
+
+	require.Len(t, resources, 1)
+	assert.Equal(t, "bug", resources[0].Name)
+}

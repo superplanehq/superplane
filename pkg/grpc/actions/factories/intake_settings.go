@@ -9,6 +9,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -22,7 +23,8 @@ const (
 	intakeAssignedCondition   = "size(root().data.issue.assignees) > 0"
 	intakeUnassignedCondition = "size(root().data.issue.assignees) == 0"
 
-	intakeAuthorAccessCondition = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
+	intakeAuthorAccessCondition    = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
+	intakeAssignedToAgentCondition = `root().data.action != "assigned" || (root().data.issue.state == "open" && root().data.assignee.login == "superplaneagent")`
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -34,6 +36,8 @@ type intakeSettings struct {
 	LabelFilterMode   string
 	Assignment        string
 	AuthorsWithAccess bool
+	NewIssues         bool
+	AssignedToAgent   bool
 }
 
 func defaultIntakeSettings() intakeSettings {
@@ -42,6 +46,7 @@ func defaultIntakeSettings() intakeSettings {
 		Labels:          []string{},
 		LabelFilterMode: intakeLabelFilterInclude,
 		Assignment:      intakeAssignmentAny,
+		NewIssues:       true,
 		// AuthorsWithAccess is off by default: false.
 	}
 }
@@ -98,6 +103,9 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	if settings.AuthorsWithAccess {
 		conditions = append(conditions, intakeAuthorAccessCondition)
 	}
+	if settings.AssignedToAgent {
+		conditions = append(conditions, intakeAssignedToAgentCondition)
+	}
 
 	if len(conditions) == 0 {
 		return "true"
@@ -106,7 +114,25 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+func intakeTriggerActionsFor(settings intakeSettings) []any {
+	actions := []any{}
+	if settings.NewIssues {
+		actions = append(actions, "opened", "reopened")
+	}
+	if settings.AssignedToAgent {
+		actions = append(actions, "assigned")
+	}
+	return actions
+}
+
+func intakeSettingsChangeTrigger(current, updated intakeSettings) bool {
+	return current.NewIssues != updated.NewIssues || current.AssignedToAgent != updated.AssignedToAgent
+}
+
 func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
+	if current.AssignedToAgent != updated.AssignedToAgent {
+		return true
+	}
 	if current.LabelFilterMode != updated.LabelFilterMode {
 		return true
 	}
@@ -135,6 +161,13 @@ var intakeLabelsPattern = regexp.MustCompile(`(!\()?root\(\)\.data\.issue\.label
 func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.ConfidencePct = graph.ConfidencePct
+
+	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
+	if trigger != nil {
+		actions := configurationStrings(trigger.Configuration["actions"])
+		settings.NewIssues = slices.Contains(actions, "opened") || slices.Contains(actions, "reopened")
+		settings.AssignedToAgent = slices.Contains(actions, "assigned")
+	}
 
 	filter := findIntakeNode(spec.Nodes, graph.FilterNodeID)
 	if filter == nil {
@@ -175,6 +208,8 @@ func serializeIntakeSettings(settings intakeSettings) *pb.FactoryIntake_Settings
 		LabelFilterMode:   serializeIntakeLabelFilterMode(settings.LabelFilterMode),
 		Assignment:        serializeIntakeAssignment(settings.Assignment),
 		AuthorsWithAccess: settings.AuthorsWithAccess,
+		NewIssues:         proto.Bool(settings.NewIssues),
+		AssignedToAgent:   proto.Bool(settings.AssignedToAgent),
 	}
 }
 
@@ -196,8 +231,31 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.Assignment = parseIntakeAssignment(assignment)
 	}
 	updated.AuthorsWithAccess = requested.GetAuthorsWithAccess()
+	if requested.NewIssues != nil {
+		updated.NewIssues = requested.GetNewIssues()
+	}
+	if requested.AssignedToAgent != nil {
+		updated.AssignedToAgent = requested.GetAssignedToAgent()
+	}
 
 	return updated.normalized()
+}
+
+func configurationStrings(value any) []string {
+	switch values := value.(type) {
+	case []string:
+		return values
+	case []any:
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			if text, ok := value.(string); ok {
+				result = append(result, text)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 func serializeIntakeLabelFilterMode(mode string) pb.FactoryIntake_Settings_LabelFilterMode {

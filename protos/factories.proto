@@ -963,6 +963,11 @@ message FactoryIntake {
     // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
     // GitHub issue intakes only. Off by default.
     bool authors_with_access = 5;
+    // Listen for opened and reopened GitHub issues.
+    optional bool new_issues = 6;
+    // Listen for open GitHub issues when they are assigned to
+    // @superplaneagent.
+    optional bool assigned_to_agent = 7;
   }
 
   string id = 1;

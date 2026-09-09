@@ -111,28 +111,40 @@ func applyIntakeSettings(
 		graph := resolveIntakeGraph(intake.Source, spec)
 		current := intakeSettingsFromGraph(graph, spec)
 		updated := parseIntakeSettings(current, settings)
+		if intake.Source == models.FactoryIntakeSourceGitHubIssues &&
+			intakeSettingsChangeTrigger(current, updated) &&
+			graph.TriggerNodeID == "" {
+			return invalidArgument("intake automation has no trigger to update")
+		}
 		if graph.FilterNodeID == "" {
 			if intake.Source == models.FactoryIntakeSourceGitHubIssues && intakeSettingsChangeFilters(current, updated) {
 				return invalidArgument("intake automation has no filter to update")
 			}
-			return nil
 		}
 
 		expression := intakeFilterExpressionFor(intake.Source, updated)
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
-			if nodes[i].ID != graph.FilterNodeID {
-				continue
+			switch nodes[i].ID {
+			case graph.TriggerNodeID:
+				if intake.Source != models.FactoryIntakeSourceGitHubIssues {
+					continue
+				}
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["actions"] = intakeTriggerActionsFor(updated)
+				nodes[i].Configuration = configuration
+			case graph.FilterNodeID:
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["expression"] = expression
+				nodes[i].Configuration = configuration
 			}
-			// Copy the configuration so the edit does not reach into the live
-			// version's map, which the publisher still compares against.
-			configuration := maps.Clone(nodes[i].Configuration)
-			if configuration == nil {
-				configuration = map[string]any{}
-			}
-			configuration["expression"] = expression
-			nodes[i].Configuration = configuration
 		}
 
 		return canvases.PublishGeneratedCanvasNodes(
