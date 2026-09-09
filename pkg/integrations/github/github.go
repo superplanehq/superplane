@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -461,11 +462,27 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
 		metadata.State = state
+		metadata.PendingInstallations = slices.DeleteFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+			return installation.ID == installationID
+		})
+		metadata.AuthorizeURL = ""
+
+		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
+		actionDescription := appInstallationDescription
+		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
+				app.ClientID,
+				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+				state,
+			)
+			actionURL = metadata.AuthorizeURL
+			actionDescription = hostedOAuthDescription
+		}
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appInstallationDescription,
-			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+			Description: actionDescription,
+			URL:         actionURL,
 			Method:      "GET",
 		})
 

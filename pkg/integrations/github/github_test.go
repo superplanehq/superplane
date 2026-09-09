@@ -185,6 +185,35 @@ func Test__isInstallationRequestSetupAction(t *testing.T) {
 	assert.False(t, isInstallationRequestSetupAction(""))
 }
 
+func Test__handleInstallationDeletion_refreshesHostedOAuthState(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	integration := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:          "old-state",
+			HostedApp:      true,
+			AuthorizeURL:   common.HostedAppAuthorizeURL("Iv1.abc", common.HostedAppOAuthCallbackURL("https://app.example"), "old-state"),
+			InstallationID: "11",
+			GitHubApp:      common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme"},
+				{ID: "22", AccountLogin: "octo"},
+			},
+		},
+	}
+	ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/webhook", nil)
+
+	(&GitHub{}).handleInstallationDeletion(ctx, "11")
+
+	metadata := integration.Metadata.(common.Metadata)
+	assert.NotEqual(t, "old-state", metadata.State)
+	assert.Contains(t, metadata.AuthorizeURL, "state="+url.QueryEscape(metadata.State))
+	assert.NotContains(t, metadata.AuthorizeURL, "state=old-state")
+	require.NotNil(t, integration.BrowserAction)
+	assert.Equal(t, metadata.AuthorizeURL, integration.BrowserAction.URL)
+	assert.Equal(t, hostedOAuthDescription, integration.BrowserAction.Description)
+	assert.Equal(t, []common.PendingInstallation{{ID: "22", AccountLogin: "octo"}}, metadata.PendingInstallations)
+}
+
 func Test__afterAppInstallation_installRequest(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		NewSetupFlow:  true,

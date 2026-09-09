@@ -48,7 +48,7 @@ describe("startDirectGitHubConnect request selection", () => {
   });
 
   it("reuses an exact ready connection that has another installation request", async () => {
-    const authorizeAction = "https://github.com/login/oauth/authorize?state=ready";
+    const authorizeAction = "https://github.com/login/oauth/authorize?state=csrf";
     const create = vi.fn();
 
     await startDirectGitHubConnect({
@@ -77,5 +77,42 @@ describe("startDirectGitHubConnect request selection", () => {
 
     expect(create).not.toHaveBeenCalled();
     expect(follow).toHaveBeenCalledWith({ method: "GET", url: authorizeAction });
+  });
+
+  it("repairs a stale authorize URL after GitHub access is revoked", async () => {
+    const create = vi.fn();
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "error",
+            browserAction: {
+              method: "GET",
+              url: "https://github.com/apps/superplane/installations/new?state=current-state",
+            },
+            metadata: {
+              state: "current-state",
+              startedByUserID: "user-1",
+              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=revoked-state",
+              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+            },
+          },
+        },
+      ],
+      currentUserId: "user-1",
+      create,
+    });
+
+    expect(started).toBe(true);
+    expect(create).not.toHaveBeenCalled();
+    expect(follow).toHaveBeenCalledWith({
+      method: "GET",
+      url: "https://github.com/login/oauth/authorize?client_id=abc&state=current-state",
+    });
   });
 });

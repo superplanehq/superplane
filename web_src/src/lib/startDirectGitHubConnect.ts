@@ -46,14 +46,30 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     return undefined;
   }
 
+  const state = hostedGitHubState(item.status?.metadata);
+
   return {
     id: item.metadata.id,
     installations: pendingGitHubInstallations(item.status?.metadata),
-    state: hostedGitHubState(item.status?.metadata),
+    state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: hostedGitHubAuthorizeURL(item.status?.metadata),
+    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
+}
+
+function authorizeURLWithState(authorizeURL: string, state: string): string {
+  if (!authorizeURL || !state) return authorizeURL;
+
+  try {
+    const url = new URL(authorizeURL);
+    if (url.searchParams.get("state") === state) return authorizeURL;
+
+    url.searchParams.set("state", state);
+    return url.toString();
+  } catch {
+    return authorizeURL;
+  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
