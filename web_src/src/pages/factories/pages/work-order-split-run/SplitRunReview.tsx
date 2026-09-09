@@ -56,6 +56,7 @@ export function SplitRunReview({
   factoryKey,
   orderNumber,
   canAct = true,
+  canRefine = true,
   onStart,
   onReject,
   onRefine,
@@ -72,6 +73,7 @@ export function SplitRunReview({
   factoryKey?: string;
   orderNumber?: string;
   canAct?: boolean;
+  canRefine?: boolean;
   onStart?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
   onRefine?: () => void;
@@ -86,7 +88,7 @@ export function SplitRunReview({
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
-  const actions = canAct ? footer.actions : [];
+  const actions = canAct ? footer.actions.filter((action) => canRefine || action.kind !== "refine") : [];
   const onAction = (action: SplitRunFooterAction) => {
     if (action.kind === "start") {
       void onStart?.();
