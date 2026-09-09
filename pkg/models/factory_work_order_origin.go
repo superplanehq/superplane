@@ -8,6 +8,29 @@ import (
 
 var preferredIntakeOriginURLKeys = []string{"html_url", "permalink", "web_url", "url"}
 
+// preferredIntakeOriginObjectKeys are payload objects that carry the ticket
+// permalink. Search these before walking remaining keys so a sibling such as
+// `installation` cannot win.
+var preferredIntakeOriginObjectKeys = []string{"issue", "incident", "pull_request", "task"}
+
+// intakeOriginContextKeys are webhook envelope objects. They describe the
+// delivery, not the ticket. A GitHub App issues webhook puts
+// installation.html_url before issue alphabetically; walking those first
+// would stamp the App installation URL as origin.
+var intakeOriginContextKeys = []string{
+	"account",
+	"agent",
+	"actor",
+	"assignee",
+	"assignees",
+	"enterprise",
+	"installation",
+	"organization",
+	"repository",
+	"sender",
+	"user",
+}
+
 // WorkOrderOrigin is the external ticket a work order was created from.
 type WorkOrderOrigin struct {
 	URL   string
@@ -83,24 +106,17 @@ func firstHTTPURL(value any, depth int) string {
 			return strings.TrimSpace(current)
 		}
 	case map[string]any:
-		for _, key := range preferredIntakeOriginURLKeys {
-			if found := firstHTTPURL(current[key], depth+1); found != "" {
-				return found
-			}
+		if found := firstHTTPURLInKeys(current, preferredIntakeOriginURLKeys, depth); found != "" {
+			return found
+		}
+		if found := firstHTTPURLInKeys(current, preferredIntakeOriginObjectKeys, depth); found != "" {
+			return found
 		}
 
-		keys := make([]string, 0, len(current))
-		for key := range current {
-			if slices.Contains(preferredIntakeOriginURLKeys, key) {
-				continue
-			}
-			keys = append(keys, key)
-		}
+		keys := remainingIntakeOriginKeys(current)
 		slices.Sort(keys)
-		for _, key := range keys {
-			if found := firstHTTPURL(current[key], depth+1); found != "" {
-				return found
-			}
+		if found := firstHTTPURLInKeys(current, keys, depth); found != "" {
+			return found
 		}
 	case []any:
 		for _, child := range current {
@@ -111,6 +127,32 @@ func firstHTTPURL(value any, depth int) string {
 	}
 
 	return ""
+}
+
+func firstHTTPURLInKeys(current map[string]any, keys []string, depth int) string {
+	for _, key := range keys {
+		if found := firstHTTPURL(current[key], depth+1); found != "" {
+			return found
+		}
+	}
+	return ""
+}
+
+func remainingIntakeOriginKeys(current map[string]any) []string {
+	keys := make([]string, 0, len(current))
+	for key := range current {
+		if slices.Contains(preferredIntakeOriginURLKeys, key) {
+			continue
+		}
+		if slices.Contains(preferredIntakeOriginObjectKeys, key) {
+			continue
+		}
+		if slices.Contains(intakeOriginContextKeys, key) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func isHTTPURL(raw string) bool {
