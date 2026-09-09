@@ -20,7 +20,9 @@ import {
   creditGrantSourceLabel,
   formatCreditGrantAmount,
   hostedCreditBalanceWarning,
+  welcomeCreditUnusedExpiryNote,
 } from "../../lib/hostedCreditGrants";
+import { isWelcomeCreditExpired } from "../../lib/hostedCreditEmpty";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
@@ -63,6 +65,7 @@ export function OrganizationSettingsBillingPage() {
         remaining={model.remaining}
         remainingCreditWarning={model.remainingCreditWarning}
         superplaneGrant={model.superplaneGrant}
+        welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
@@ -152,6 +155,7 @@ function BillingPageBody({
   remaining,
   remainingCreditWarning,
   superplaneGrant,
+  welcomeCreditExpiresAt,
   onManageInvoices,
 }: {
   billed: number;
@@ -171,6 +175,7 @@ function BillingPageBody({
   remaining: number;
   remainingCreditWarning: boolean;
   superplaneGrant: number;
+  welcomeCreditExpiresAt?: string;
   onManageInvoices: () => void | Promise<void>;
 }) {
   if (isLoading) {
@@ -189,7 +194,16 @@ function BillingPageBody({
     );
   }
 
-  const warning = hostedCreditBalanceWarning(remaining, remainingCreditWarning);
+  const warning = hostedCreditBalanceWarning(
+    remaining,
+    remainingCreditWarning,
+    isWelcomeCreditExpired(welcomeCreditExpiresAt) && purchased === 0,
+  );
+  const expiryNote = welcomeCreditUnusedExpiryNote({
+    remainingCents: remaining,
+    purchasedCents: purchased,
+    welcomeCreditExpiresAt,
+  });
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending");
   const showInvoices = billingEnabled && canManageBilling && hasBillingCustomer;
@@ -207,6 +221,7 @@ function BillingPageBody({
           <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
         ) : null}
         {warning ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warning}</p> : null}
+        {expiryNote ? <p className="mt-3 text-sm text-muted-foreground">{expiryNote}</p> : null}
         {!canManageBilling && billingContactMessage ? (
           <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
         ) : null}

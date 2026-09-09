@@ -5,8 +5,9 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
- * Compact amber banner for empty hosted credit. Tasks shows this above the
- * board. The action opens Organization Billing.
+ * Status banner for hosted credit. A healthy trial uses quiet chrome.
+ * Empty or expired credit uses an amber warning. Tasks shows this above
+ * the board. The action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -39,4 +40,44 @@ export const BillingOn: Story = {
 export const BillingOff: Story = {
   name: "Billing off",
   args: { billingEnabled: false },
+};
+
+/** Welcome credit remains. The action opens Billing. */
+export const Trial: Story = {
+  name: "Trial",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit expires today. The banner uses warning chrome. */
+export const TrialEndsToday: Story = {
+  name: "Trial ends today",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is spent. The action opens Billing. */
+export const TrialEmpty: Story = {
+  name: "Trial empty",
+  args: {
+    billingEnabled: true,
+    kind: "trial-empty",
+  },
+};
+
+/** Welcome credit expired. The action opens Billing. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  args: {
+    billingEnabled: true,
+    kind: "trial-expired",
+  },
 };

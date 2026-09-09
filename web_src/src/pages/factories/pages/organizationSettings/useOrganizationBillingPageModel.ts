@@ -38,6 +38,7 @@ export type OrganizationBillingPageModel = {
   remaining: number;
   remainingCreditWarning: boolean;
   superplaneGrant: number;
+  welcomeCreditExpiresAt?: string;
   hasBillingCustomer: boolean;
   invoices: OrganizationsHostedCreditInvoice[];
   grants: OrganizationsOrganizationCreditGrant[];
@@ -50,6 +51,7 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
     remaining: parseWorkOrderMetric(spend?.remainingCreditCents),
     remainingCreditWarning: spend?.remainingCreditWarning === true,
     superplaneGrant: parseWorkOrderMetric(spend?.superplaneGrantCents),
+    welcomeCreditExpiresAt: spend?.welcomeCreditExpiresAt,
     hasBillingCustomer: spend?.hasBillingCustomer === true,
     invoices: spend?.invoices ?? [],
     grantTotalCents: parseWorkOrderMetric(spend?.grantTotalCents),
@@ -97,6 +99,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     remaining: metrics.remaining,
     remainingCreditWarning: metrics.remainingCreditWarning,
     superplaneGrant: metrics.superplaneGrant,
+    welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,
     hasBillingCustomer: metrics.hasBillingCustomer,
     invoices: metrics.invoices,
     grants: grantsQuery.data?.grants ?? [],

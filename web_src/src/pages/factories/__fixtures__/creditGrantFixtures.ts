@@ -7,6 +7,7 @@ export const DEFAULT_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
     kind: "welcome",
     amountCents: "5000",
     createdAt: "2026-08-01T12:00:00.000Z",
+    expiresAt: "2026-09-22T12:00:00.000Z",
   },
 ];
 
@@ -38,5 +39,6 @@ export const MIXED_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
     kind: "welcome",
     amountCents: "5000",
     createdAt: "2026-08-01T12:00:00.000Z",
+    expiresAt: "2026-09-22T12:00:00.000Z",
   },
 ];
