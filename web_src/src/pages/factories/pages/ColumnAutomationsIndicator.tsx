@@ -1,5 +1,5 @@
 import { emptyColumnAutomationActivity } from "../lib/columnAutomationActivity";
-import { automationOffersAgentEdit, type ColumnAutomation } from "../lib/columnAutomations";
+import type { ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationsPopup, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 
 /** One header icon for each configured automation. */
@@ -7,14 +7,11 @@ export function ColumnAutomationsHeaderSlot({
   title,
   automations,
   onRowAction,
-  canEditAgent,
   testId,
 }: {
   title: string;
   automations?: ColumnAutomation[];
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  /** When set, overrides the default agent-edit offer for every icon in this slot. */
-  canEditAgent?: boolean;
   testId: string;
 }) {
   if (!onRowAction || !automations || automations.length === 0) {
@@ -28,8 +25,6 @@ export function ColumnAutomationsHeaderSlot({
             automation={automation}
             activity={automation.activity ?? emptyColumnAutomationActivity(automation.runningCount)}
             onAction={(action) => onRowAction(automation, action)}
-            showEditAgent={canEditAgent ?? automationOffersAgentEdit(automation)}
-            showEditAutomation={Boolean(automation.canvasId)}
           />
         </div>
       ))}
