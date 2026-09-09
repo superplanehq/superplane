@@ -7,7 +7,6 @@ import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
-  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsModelsPage,
   FactorySettingsRepositoryPage,
@@ -32,6 +31,7 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
+  WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 
@@ -80,14 +80,11 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
+  // Automations moved to the factory nav Automations tab; this URL now forwards there.
   <Route
     key="factory-settings-workspace-automations"
     path="workspace/automations"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsAutomationsPage />
-      </RequirePermission>
-    }
+    element={<WorkspaceAutomationsSettingsRedirect />}
   />,
   <Route
     key="factory-settings-workspace-models"
