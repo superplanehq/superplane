@@ -1,76 +1,42 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { ReviewBotPicker } from "./ReviewBotPicker";
+import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSource } from "./prFeedbackSettingsModel";
-import { useDiscussionPRFeedbackSetup, type DiscussionPRFeedbackSetupModel } from "./useDiscussionPRFeedbackSetup";
+import {
+  useDiscussionPRFeedbackSetup,
+  type DiscussionBotMode,
+  type DiscussionPRFeedbackSetupModel,
+} from "./useDiscussionPRFeedbackSetup";
 
 interface DiscussionPRFeedbackSetupDialogProps {
-  open: boolean;
   organizationId: string;
   factoryId: string;
   repository: string;
   source: PRFeedbackSource;
   onClose: () => void;
   onCreated: (handlerId: string) => void;
-  /** Dialog overlay (default) or inline card for a dedicated setup page. */
-  presentation?: "dialog" | "page";
 }
 
 export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetupDialogProps) {
-  const presentation = props.presentation ?? "dialog";
-  const setup = useDiscussionPRFeedbackSetup(
-    props.organizationId,
-    props.factoryId,
-    props.repository,
-    props.open || presentation === "page",
-  );
-  const body = (
-    <DiscussionSetupBody setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
-  );
-
-  if (presentation === "page") {
-    return (
-      <div
-        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-border bg-background"
-        data-testid="discussion-pr-feedback-setup"
-      >
-        {body}
-      </div>
-    );
-  }
+  const setup = useDiscussionPRFeedbackSetup(props.organizationId, props.factoryId, props.repository);
+  const canLeaveStep = setup.step === "bots";
 
   return (
-    <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
-      <DialogContent
-        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-xl"
-        showCloseButton
-        data-testid="discussion-pr-feedback-setup"
-      >
-        {body}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DiscussionSetupBody({
-  setup,
-  source,
-  onClose,
-  onCreated,
-}: {
-  setup: DiscussionPRFeedbackSetupModel;
-  source: PRFeedbackSource;
-  onClose: () => void;
-  onCreated: (handlerId: string) => void;
-}) {
-  return (
-    <>
-      <SetupHeader step={setup.step} onBack={() => setup.setStep("mention")} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+    <div className="space-y-6" data-testid="discussion-pr-feedback-setup">
+      <SetupHeader
+        step={setup.step}
+        onBack={() => {
+          if (canLeaveStep) {
+            setup.setStep("mention");
+            return;
+          }
+          props.onClose();
+        }}
+      />
+      <div>
         {setup.step === "mention" ? <MentionStep setup={setup} /> : <BotsStep setup={setup} />}
         {setup.error ? (
           <p className="workspace-body-text mt-4 text-destructive" role="alert">
@@ -78,82 +44,108 @@ function DiscussionSetupBody({
           </p>
         ) : null}
       </div>
-      <SetupFooter setup={setup} source={source} onClose={onClose} onCreated={onCreated} />
-    </>
+      <SetupFooter setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
+    </div>
   );
 }
 
 function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () => void }) {
+  const stepTitle =
+    step === "mention"
+      ? PR_FEEDBACK_SETTINGS_COPY.wizardStepHumanComments
+      : PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments;
+  const stepIntro = step === "bots" ? PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro : undefined;
+
   return (
-    <header className="shrink-0 border-b border-border px-5 py-4 text-left">
-      <div className="flex items-center gap-2.5">
-        {step === "bots" ? (
-          <button
-            type="button"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={onBack}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-        ) : null}
-        <IntegrationIcon integrationName="github" className="size-5 shrink-0" size={20} />
-        <h2 className="min-w-0 text-[15px] font-semibold leading-5">
-          {PR_FEEDBACK_SETTINGS_COPY.wizardCommentsTitle}
-        </h2>
-      </div>
-      <p className="sr-only">
-        {step === "bots"
-          ? PR_FEEDBACK_SETTINGS_COPY.wizardBotsHelper
-          : PR_FEEDBACK_SETTINGS_COPY.wizardMentionDescription}
-      </p>
+    <header className="text-left">
+      <button
+        type="button"
+        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+        onClick={onBack}
+        data-testid="discussion-setup-back"
+      >
+        <ArrowLeft className="size-4 shrink-0" aria-hidden />
+        <span>
+          {step === "bots" ? PR_FEEDBACK_SETTINGS_COPY.wizardBack : PR_FEEDBACK_SETTINGS_COPY.wizardBackToBoard}
+        </span>
+      </button>
+      <h1 className={factoryPageTitleClassName}>{stepTitle}</h1>
+      {stepIntro ? <p className="workspace-body-text mt-2 text-muted-foreground">{stepIntro}</p> : null}
     </header>
   );
 }
 
 function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
   return (
-    <section>
-      <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-        {PR_FEEDBACK_SETTINGS_COPY.wizardMentionDescription}
-      </p>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardMentionHelper}</p>
-      <div className="mt-2 rounded-lg border border-border" role="listbox" aria-multiselectable="false">
-        <button
-          type="button"
-          role="option"
-          aria-selected={setup.mentionRequired}
-          onClick={() => setup.setMentionRequired(!setup.mentionRequired)}
-          className={cn(
-            "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-            setup.mentionRequired ? "bg-accent/50" : "hover:bg-accent/30",
-          )}
-          data-testid="discussion-setup-mention"
-        >
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-            {PR_FEEDBACK_SETTINGS_COPY.wizardMentionOption}
-          </span>
-          <span className="flex size-3.5 shrink-0 items-center justify-center">
-            {setup.mentionRequired ? (
-              <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
-            ) : null}
-          </span>
-        </button>
-      </div>
+    <section
+      className="flex flex-col gap-2"
+      role="radiogroup"
+      aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepHumanComments}
+    >
+      <IntakeSettingsRadioOption
+        name="discussion-setup-mention"
+        value="require"
+        checked={setup.mentionRequired}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
+        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
+        onChange={() => setup.setMentionRequired(true)}
+      />
+      <IntakeSettingsRadioOption
+        name="discussion-setup-mention"
+        value="any"
+        checked={!setup.mentionRequired}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionAnyOption}
+        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionAnyHelper}
+        onChange={() => setup.setMentionRequired(false)}
+      />
     </section>
   );
 }
 
+const BOT_MODE_OPTIONS: Array<{ value: DiscussionBotMode; title: string; helper: string }> = [
+  {
+    value: "ignore",
+    title: PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption,
+    helper: PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper,
+  },
+  {
+    value: "address",
+    title: PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption,
+    helper: PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper,
+  },
+];
+
 function BotsStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
   return (
-    <ReviewBotPicker
-      selected={setup.allowedBots}
-      catalog={setup.catalog}
-      loading={setup.catalogLoading}
-      loadError={setup.catalogQuery.isError}
-      onToggle={setup.toggleBot}
-      onAdd={setup.addBot}
-    />
+    <div className="space-y-5">
+      <section
+        className="flex flex-col gap-2"
+        role="radiogroup"
+        aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
+      >
+        {BOT_MODE_OPTIONS.map((option) => (
+          <IntakeSettingsRadioOption
+            key={option.value}
+            name="discussion-setup-bot-mode"
+            value={option.value}
+            checked={setup.botMode === option.value}
+            title={option.title}
+            helper={option.helper}
+            onChange={() => setup.setBotMode(option.value)}
+          />
+        ))}
+      </section>
+      {setup.botMode === "address" ? (
+        <ReviewBotPicker
+          selected={setup.allowedBots}
+          catalog={setup.catalog}
+          loading={setup.catalogLoading}
+          loadError={setup.catalogQuery.isError}
+          onToggle={setup.toggleBot}
+          onAdd={setup.addBot}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -169,7 +161,7 @@ function SetupFooter({
   onCreated: (handlerId: string) => void;
 }) {
   return (
-    <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+    <footer className="flex items-center justify-between gap-3 pt-2">
       <span className="text-[12px] text-muted-foreground">
         {setup.step === "mention"
           ? PR_FEEDBACK_SETTINGS_COPY.wizardStepMention

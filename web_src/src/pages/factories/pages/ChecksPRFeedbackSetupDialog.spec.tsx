@@ -31,6 +31,8 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: () => ({
     data: mocks.connected,
+    isPending: false,
+    isFetching: false,
     isLoading: false,
     refetch: vi.fn(),
   }),
@@ -76,7 +78,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     mocks.catalog.splice(0);
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -100,7 +101,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     const onCreated = vi.fn();
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -110,17 +110,17 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       />,
     );
 
-    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
-    const frame = screen.getByTestId("checks-pr-feedback-setup").className;
-    expect(frame).toContain("h-[min(36rem,80vh)]");
     await waitFor(() => {
       expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint");
     });
     expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("e2e");
 
+    expect(screen.getByTestId("checks-setup-back")).toHaveTextContent("Back to board");
+    expect(screen.getByRole("heading", { name: "Which status checks should be fixed?" })).toBeInTheDocument();
+
     await user.click(screen.getByTestId("checks-setup-continue"));
 
-    expect(screen.getByTestId("checks-pr-feedback-setup").className).toBe(frame);
+    expect(screen.getByRole("heading", { name: "Which tools report these checks?" })).toBeInTheDocument();
     expect(screen.getByText("Suggested from the selected checks")).toBeInTheDocument();
     expect(screen.getByText("CircleCI")).toBeInTheDocument();
     expect(screen.getByText("Semaphore")).toBeInTheDocument();
@@ -133,7 +133,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     mocks.catalog.splice(0, mocks.catalog.length, { name: "e2e", required: false, suggestedIntegration: "circleci" });
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -154,7 +153,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     const user = userEvent.setup();
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -178,7 +176,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     const onCreated = vi.fn();
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -218,7 +215,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     mocks.catalog.splice(0, mocks.catalog.length, { name: "lint", required: true });
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"
@@ -246,7 +242,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     });
     render(
       <ChecksPRFeedbackSetupDialog
-        open
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/api"

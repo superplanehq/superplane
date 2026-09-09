@@ -186,7 +186,12 @@ function PRFeedbackGeneralTab({
               onUpdate={onUpdate}
             />
           ) : (
-            <PRFeedbackDiscussionFields draft={draft} onUpdate={onUpdate} />
+            <PRFeedbackDiscussionFields
+              organizationId={organizationId}
+              factoryId={factoryId}
+              draft={draft}
+              onUpdate={onUpdate}
+            />
           )}
         </div>
       </div>

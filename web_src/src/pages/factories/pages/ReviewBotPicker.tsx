@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -88,16 +87,12 @@ export function ReviewBotPicker({
   };
 
   return (
-    <section>
-      <Label>{PR_FEEDBACK_SETTINGS_COPY.wizardBotsLabel}</Label>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsHelper}</p>
+    <section className="space-y-3">
       {loadError ? (
-        <p className="workspace-body-text mt-1 text-muted-foreground">
-          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoadError}
-        </p>
+        <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoadError}</p>
       ) : null}
       <div
-        className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border"
+        className="max-h-56 overflow-y-auto rounded-lg border border-border"
         role="listbox"
         aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsLabel}
         aria-multiselectable="true"
@@ -105,14 +100,11 @@ export function ReviewBotPicker({
       >
         {showFullLoading ? (
           <div
-            className="flex flex-col items-center gap-2 px-4 py-6 text-center"
+            className="flex items-center justify-center gap-2 px-4 py-6 text-muted-foreground"
             data-testid="discussion-setup-bots-loading"
           >
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-            <p className="text-[13px] font-medium text-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoading}</p>
-            <p className="workspace-body-text text-muted-foreground">
-              {PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoadingDetail}
-            </p>
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            <span className="text-[13px]">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoading}</span>
           </div>
         ) : rows.length === 0 ? (
           <p
@@ -151,37 +143,30 @@ export function ReviewBotPicker({
           </ul>
         )}
       </div>
-      <div className="mt-3">
-        <Label htmlFor="discussion-setup-bot-manual" className="text-[13px] font-medium">
-          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
-        </Label>
-        <p className="workspace-body-text mt-1 text-muted-foreground">
-          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddHelper}
-        </p>
-        <div className="mt-2 flex gap-2">
-          <Input
-            id="discussion-setup-bot-manual"
-            value={draft}
-            placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitDraft();
-              }
-            }}
-            data-testid="discussion-setup-bot-manual"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={normalizeReviewBotLogin(draft).length === 0}
-            onClick={submitDraft}
-            data-testid="discussion-setup-bot-add"
-          >
-            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAdd}
-          </Button>
-        </div>
+      <div className="flex gap-2">
+        <Input
+          id="discussion-setup-bot-manual"
+          value={draft}
+          placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
+          aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitDraft();
+            }
+          }}
+          data-testid="discussion-setup-bot-manual"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={normalizeReviewBotLogin(draft).length === 0}
+          onClick={submitDraft}
+          data-testid="discussion-setup-bot-add"
+        >
+          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAdd}
+        </Button>
       </div>
     </section>
   );

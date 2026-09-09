@@ -13,12 +13,14 @@ export function StatusCheckPicker({
   loading,
   loadError,
   onToggle,
+  hideHeading = false,
 }: {
   names: string[];
   catalog: FactoriesFactoryRepositoryStatusCheck[];
   loading?: boolean;
   loadError?: boolean;
   onToggle: (name: string) => void;
+  hideHeading?: boolean;
 }) {
   const selected = useMemo(() => new Set(names.map((name) => name.toLowerCase())), [names]);
   const rows = useMemo(() => statusCheckRows(catalog, names), [catalog, names]);
@@ -27,15 +29,19 @@ export function StatusCheckPicker({
 
   return (
     <section>
-      <Label>{PR_FEEDBACK_SETTINGS_COPY.checkNamesLabel}</Label>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper}</p>
+      {hideHeading ? null : (
+        <>
+          <Label>{PR_FEEDBACK_SETTINGS_COPY.checkNamesLabel}</Label>
+          <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper}</p>
+        </>
+      )}
       {loadError ? (
         <p className="workspace-body-text mt-1 text-muted-foreground">
           {PR_FEEDBACK_SETTINGS_COPY.checkNamesLoadError}
         </p>
       ) : null}
       <div
-        className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border"
+        className={cn("max-h-56 overflow-y-auto rounded-lg border border-border", hideHeading ? undefined : "mt-2")}
         role="listbox"
         aria-label={PR_FEEDBACK_SETTINGS_COPY.checkNamesLabel}
         aria-multiselectable="true"
@@ -115,28 +121,6 @@ export function statusCheckRows(
 ): Array<{ name: string; required?: boolean }> {
   const rows: Array<{ name: string; required?: boolean }> = [];
   const seen = new Set<string>();
-  const catalogByName = new Map<string, FactoriesFactoryRepositoryStatusCheck>();
-  for (const check of catalog) {
-    const key = check.name?.trim().toLowerCase();
-    if (!key || catalogByName.has(key)) {
-      continue;
-    }
-    catalogByName.set(key, check);
-  }
-
-  for (const name of names) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    const catalogCheck = catalogByName.get(key);
-    rows.push({ name: catalogCheck?.name?.trim() || trimmed, required: catalogCheck?.required });
-  }
 
   for (const check of catalog) {
     const name = check.name?.trim();
@@ -149,6 +133,19 @@ export function statusCheckRows(
     }
     seen.add(key);
     rows.push({ name, required: check.required });
+  }
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    rows.push({ name: trimmed });
   }
 
   return rows;

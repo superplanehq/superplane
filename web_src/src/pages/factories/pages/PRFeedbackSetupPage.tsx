@@ -1,7 +1,5 @@
-import { Link } from "@/components/Link/link";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { ArrowLeft } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -9,7 +7,7 @@ import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../l
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
-import { prFeedbackSourceById } from "./prFeedbackSettingsModel";
+import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById } from "./prFeedbackSettingsModel";
 
 export function DiscussionPRFeedbackSetupPage() {
   return <PRFeedbackSetupPage kind="comments" />;
@@ -30,7 +28,10 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
   const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
   const repository = factory?.onboarding?.appRepository?.trim() ?? "";
   const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
-  const pageTitle = kind === "checks" ? "Fix pull request checks" : "Address PR feedback";
+  const pageTitle =
+    kind === "checks"
+      ? PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks
+      : PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments;
 
   usePageTitle([pageTitle, factory?.name ?? "Workspace"]);
 
@@ -51,36 +52,24 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
 
   return (
     <div className={factoryContentBodyClassName} data-testid={`pr-feedback-setup-page-${kind}`}>
-      <Link
-        href={returnHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Board
-      </Link>
-
-      <div className="mx-auto w-full max-w-xl">
+      <div className="mx-auto w-full max-w-2xl">
         {kind === "checks" ? (
           <ChecksPRFeedbackSetupDialog
-            open
             organizationId={organizationId}
             factoryId={factoryId}
             repository={repository}
             source={source}
             onClose={close}
             onCreated={onCreated}
-            presentation="page"
           />
         ) : (
           <DiscussionPRFeedbackSetupDialog
-            open
             organizationId={organizationId}
             factoryId={factoryId}
             repository={repository}
             source={source}
             onClose={close}
             onCreated={onCreated}
-            presentation="page"
           />
         )}
       </div>

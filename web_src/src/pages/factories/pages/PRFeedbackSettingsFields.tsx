@@ -1,20 +1,26 @@
 import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFactoryRepositoryReviewBots, useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { cn } from "@/lib/utils";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-
-import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
+import { useMemo, useState } from "react";
 
 import { isChecksHandlerCIIntegration } from "./checksPRFeedbackSetup";
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import {
+  catalogReviewBots,
+  DISCUSSION_MENTION,
+  discussionBotSettings,
+  type DiscussionBotMode,
+} from "./useDiscussionPRFeedbackSetup";
+import { normalizeReviewBotLogin, ReviewBotPicker } from "./ReviewBotPicker";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 
 export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
@@ -118,99 +124,122 @@ export function PRFeedbackChecksFields({
 }
 
 export function PRFeedbackDiscussionFields({
+  organizationId,
+  factoryId,
   draft,
   onUpdate,
 }: {
+  organizationId?: string;
+  factoryId?: string;
   draft: PRFeedbackDraftSettings;
   onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
 }) {
+  const mentionRequired = draft.mention.trim().length > 0;
+  const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
+  const catalogEnabled = Boolean(organizationId && factoryId);
+  const catalogQuery = useFactoryRepositoryReviewBots(organizationId ?? "", factoryId ?? "", draft.repository, {
+    enabled: catalogEnabled && botMode === "address",
+  });
+  const catalog = catalogReviewBots(catalogQuery.data ?? []);
+
+  const setBotModeAndDraft = (mode: DiscussionBotMode) => {
+    setBotMode(mode);
+    const next = discussionBotSettings(mode, mode === "address" ? draft.allowedBots : []);
+    onUpdate("ignoreBots", next.ignoreBots);
+    onUpdate("allowedBots", next.allowedBots);
+  };
+
   return (
     <>
-      <PRFeedbackTextField
-        id="pr-feedback-mention"
-        label={PR_FEEDBACK_SETTINGS_COPY.mentionLabel}
-        helper={PR_FEEDBACK_SETTINGS_COPY.mentionHelper}
-        value={draft.mention}
-        onChange={(value) => onUpdate("mention", value)}
-      />
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardStepHumanComments}
+        </h3>
+        <div
+          className="flex flex-col gap-2"
+          role="radiogroup"
+          aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepHumanComments}
+        >
+          <IntakeSettingsRadioOption
+            name="pr-feedback-mention-mode"
+            value="require"
+            checked={mentionRequired}
+            title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
+            helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
+            onChange={() => onUpdate("mention", DISCUSSION_MENTION)}
+          />
+          <IntakeSettingsRadioOption
+            name="pr-feedback-mention-mode"
+            value="any"
+            checked={!mentionRequired}
+            title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionAnyOption}
+            helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionAnyHelper}
+            onChange={() => onUpdate("mention", "")}
+          />
+        </div>
+      </section>
 
-      <div className="flex items-start gap-3">
-        <Checkbox
-          id="pr-feedback-ignore-bots"
-          className="mt-0.5 cursor-pointer"
-          checked={draft.ignoreBots}
-          onChange={(event) => onUpdate("ignoreBots", event.currentTarget.checked)}
-          data-testid="pr-feedback-ignore-bots"
-        />
-        <Label htmlFor="pr-feedback-ignore-bots" className="flex-col items-start cursor-pointer">
-          <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
-            {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
-          </span>
-          <span className="workspace-body-text mt-1 block text-muted-foreground">
-            {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsHelper}
-          </span>
-        </Label>
-      </div>
-
-      <PRFeedbackListField
-        id="pr-feedback-allowed-bots"
-        label={PR_FEEDBACK_SETTINGS_COPY.allowedBotsLabel}
-        helper={PR_FEEDBACK_SETTINGS_COPY.allowedBotsHelper}
-        placeholder="coderabbitai, bugbot"
-        value={draft.allowedBots}
-        onChange={(value) => onUpdate("allowedBots", value)}
-      />
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
+            {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
+          </h3>
+          <p className="workspace-body-text mt-1 text-muted-foreground">
+            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro}
+          </p>
+        </div>
+        <div
+          className="flex flex-col gap-2"
+          role="radiogroup"
+          aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
+        >
+          <IntakeSettingsRadioOption
+            name="pr-feedback-bot-mode"
+            value="ignore"
+            checked={botMode === "ignore"}
+            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
+            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper}
+            onChange={() => setBotModeAndDraft("ignore")}
+          />
+          <IntakeSettingsRadioOption
+            name="pr-feedback-bot-mode"
+            value="address"
+            checked={botMode === "address"}
+            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
+            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper}
+            onChange={() => setBotModeAndDraft("address")}
+          />
+        </div>
+        {botMode === "address" ? (
+          <ReviewBotPicker
+            selected={draft.allowedBots}
+            catalog={catalog}
+            loading={catalogEnabled && (catalogQuery.isPending || catalogQuery.isFetching)}
+            loadError={catalogQuery.isError}
+            onToggle={(login) => onUpdate("allowedBots", toggleUniqueString(draft.allowedBots, login))}
+            onAdd={(login) => {
+              const normalized = normalizeReviewBotLogin(login);
+              if (!normalized) {
+                return false;
+              }
+              if (draft.allowedBots.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+                return true;
+              }
+              onUpdate("allowedBots", [...draft.allowedBots, normalized]);
+              return true;
+            }}
+          />
+        ) : null}
+      </section>
     </>
   );
 }
 
-function PRFeedbackListField({
-  id,
-  label,
-  helper,
-  extraHelper,
-  placeholder,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  helper: string;
-  extraHelper?: string;
-  placeholder?: string;
-  value: string[];
-  onChange: (value: string[]) => void;
-}) {
-  const [text, setText] = useState(value.join(", "));
-
-  useEffect(() => {
-    setText(value.join(", "));
-  }, [value]);
-
-  function commit(nextText: string) {
-    const items = nextText
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-    onChange(items);
+export function discussionBotModeFromDraft(draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">): DiscussionBotMode {
+  if (!draft.ignoreBots || draft.allowedBots.length > 0) {
+    return "address";
   }
-
-  return (
-    <section>
-      <Label htmlFor={id}>{label}</Label>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{helper}</p>
-      {extraHelper ? <p className="workspace-body-text mt-1 text-muted-foreground">{extraHelper}</p> : null}
-      <Input
-        id={id}
-        className="mt-2"
-        placeholder={placeholder}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={(event) => commit(event.target.value)}
-        data-testid={id}
-      />
-    </section>
-  );
+  return "ignore";
 }
 
 function PRFeedbackIntegrationsField({

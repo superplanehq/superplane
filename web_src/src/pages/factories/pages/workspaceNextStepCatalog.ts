@@ -1,4 +1,4 @@
-import { type PRFeedbackSourceId } from "./prFeedbackSettingsModel";
+import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSourceId } from "./prFeedbackSettingsModel";
 
 export type WorkspaceNextStepId = "pr-comments-handler" | "pr-checks-handler";
 
@@ -10,10 +10,8 @@ export interface WorkspaceNextStep {
   title: string;
   /** Banner header when this step is the next action. */
   bannerTitle: string;
-  /** What already works before this step is configured. */
-  worksCopy: string;
-  /** What stays missing until the user configures this step. */
-  missingCopy: string;
+  /** Banner body when this step is the next action. */
+  description: string;
   ctaLabel: string;
   action: WorkspaceNextStepAction;
   done: boolean;
@@ -31,8 +29,7 @@ export interface WorkspaceNextStepBanner {
   /** First incomplete step; drives the single CTA. */
   activeStep: WorkspaceNextStep;
   title: string;
-  worksCopy: string;
-  missingCopy: string;
+  description: string;
   ctaLabel: string;
 }
 
@@ -42,21 +39,20 @@ const WORKSPACE_NEXT_STEPS: Array<
   {
     id: "pr-comments-handler",
     title: "Comments handler",
-    bannerTitle: "How should pull request comments be handled?",
-    worksCopy:
-      "This SuperPlane workspace can implement tasks and open pull requests for them, but it will not start fixes from pull request reviews yet.",
-    missingCopy: "Configure how pull request reviews should be handled next.",
-    ctaLabel: "Configure comments",
+    bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments,
+    description:
+      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
+    ctaLabel: "Configure",
     action: { type: "open-pr-feedback-setup", sourceId: "discussion" },
     isDone: (ctx) => ctx.takenPRFeedbackSources.includes("discussion"),
   },
   {
     id: "pr-checks-handler",
     title: "Status checks handler",
-    bannerTitle: "How should failing status checks be handled?",
-    worksCopy: "Pull request comments and reviews can start a fix.",
-    missingCopy: "SuperPlane will not wait for failing status checks until you configure this.",
-    ctaLabel: "Configure status checks",
+    bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks,
+    description:
+      "SuperPlane can automatically fix failing status checks. Configure how to handle them next.",
+    ctaLabel: "Configure",
     action: { type: "open-pr-feedback-setup", sourceId: "checks" },
     isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
   },
@@ -90,8 +86,7 @@ export function workspaceNextStepBanner(steps: WorkspaceNextStep[]): WorkspaceNe
     totalCount: steps.length,
     activeStep,
     title: activeStep.bannerTitle,
-    worksCopy: activeStep.worksCopy,
-    missingCopy: activeStep.missingCopy,
+    description: activeStep.description,
     ctaLabel: activeStep.ctaLabel,
   };
 }

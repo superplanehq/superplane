@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { cn } from "@/lib/utils";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
@@ -14,6 +13,7 @@ import {
   type ChecksHandlerIntegrationRow,
 } from "./checksPRFeedbackSetup";
 import { StatusCheckPicker } from "./StatusCheckPicker";
+import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import {
   integrationDefinitionLabel,
   useChecksPRFeedbackSetup,
@@ -22,35 +22,56 @@ import {
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
 interface ChecksPRFeedbackSetupDialogProps {
-  open: boolean;
   organizationId: string;
   factoryId: string;
   repository: string;
   source: PRFeedbackSource;
   onClose: () => void;
   onCreated: (handlerId: string) => void;
-  /** Dialog overlay (default) or inline card for a dedicated setup page. */
-  presentation?: "dialog" | "page";
 }
 
 export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogProps) {
-  const presentation = props.presentation ?? "dialog";
-  const setup = useChecksPRFeedbackSetup(
-    props.organizationId,
-    props.factoryId,
-    props.repository,
-    props.open || presentation === "page",
-  );
+  const setup = useChecksPRFeedbackSetup(props.organizationId, props.factoryId, props.repository);
+
   return (
     <>
-      <ChecksSetupView
-        open={(props.open || presentation === "page") && !setup.connectName}
-        presentation={presentation}
-        setup={setup}
-        source={props.source}
-        onClose={props.onClose}
-        onCreated={props.onCreated}
-      />
+      {setup.connectName ? null : (
+        <div className="space-y-6" data-testid="checks-pr-feedback-setup">
+          <SetupHeader
+            step={setup.step}
+            onBack={() => {
+              if (setup.step === "tools") {
+                setup.setStep("checks");
+                return;
+              }
+              props.onClose();
+            }}
+          />
+          <div>
+            {setup.step === "checks" ? (
+              <StatusCheckPicker
+                names={setup.checkNames}
+                catalog={setup.catalog}
+                loading={setup.catalogLoading}
+                loadError={setup.catalogQuery.isError}
+                onToggle={setup.toggleCheckName}
+                hideHeading
+              />
+            ) : (
+              <ToolsStep setup={setup} />
+            )}
+            {setup.error ? (
+              <p className="workspace-body-text mt-4 text-destructive" role="alert">
+                {setup.error}
+              </p>
+            ) : null}
+          </div>
+          <div className="space-y-3">
+            {setup.step === "tools" ? <ToolsAccessWarning warning={toolsAccessWarning(setup)} /> : null}
+            <SetupFooter setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
+          </div>
+        </div>
+      )}
       <IntegrationCreateDialog
         open={Boolean(setup.connectName)}
         onOpenChange={(next) => {
@@ -79,98 +100,31 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
   );
 }
 
-function ChecksSetupView({
-  open,
-  presentation,
-  setup,
-  source,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  presentation: "dialog" | "page";
-  setup: ChecksPRFeedbackSetupModel;
-  source: PRFeedbackSource;
-  onClose: () => void;
-  onCreated: (handlerId: string) => void;
-}) {
-  const body = (
-    <>
-      <SetupHeader step={setup.step} onBack={() => setup.setStep("checks")} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-        {setup.step === "checks" ? (
-          <StatusCheckPicker
-            names={setup.checkNames}
-            catalog={setup.catalog}
-            loading={setup.catalogLoading}
-            loadError={setup.catalogQuery.isError}
-            onToggle={setup.toggleCheckName}
-          />
-        ) : (
-          <ToolsStep setup={setup} />
-        )}
-        {setup.error ? (
-          <p className="workspace-body-text mt-4 text-destructive" role="alert">
-            {setup.error}
-          </p>
-        ) : null}
-      </div>
-      <div className="shrink-0 border-t border-border">
-        {setup.step === "tools" ? <ToolsAccessWarning warning={toolsAccessWarning(setup)} /> : null}
-        <SetupFooter setup={setup} source={source} onClose={onClose} onCreated={onCreated} />
-      </div>
-    </>
-  );
-
-  if (presentation === "page") {
-    if (!open) {
-      return null;
-    }
-    return (
-      <div
-        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-border bg-background"
-        data-testid="checks-pr-feedback-setup"
-      >
-        {body}
-      </div>
-    );
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-xl"
-        showCloseButton
-        data-testid="checks-pr-feedback-setup"
-      >
-        {body}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () => void }) {
+  const stepTitle =
+    step === "checks"
+      ? PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichChecks
+      : PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichTools;
+  const stepHelper =
+    step === "checks"
+      ? PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper
+      : PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription;
+
   return (
-    <header className="shrink-0 border-b border-border px-5 py-4 text-left">
-      <div className="flex items-center gap-2.5">
-        {step === "tools" ? (
-          <button
-            type="button"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={onBack}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-        ) : null}
-        <IntegrationIcon integrationName="github" className="size-5 shrink-0" size={20} />
-        <h2 className="min-w-0 text-[15px] font-semibold leading-5">{PR_FEEDBACK_SETTINGS_COPY.wizardTitle}</h2>
-      </div>
-      {step === "tools" ? (
-        <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription}</p>
-      ) : (
-        <p className="sr-only">{PR_FEEDBACK_SETTINGS_COPY.wizardChecksDescription}</p>
-      )}
+    <header className="text-left">
+      <button
+        type="button"
+        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+        onClick={onBack}
+        data-testid="checks-setup-back"
+      >
+        <ArrowLeft className="size-4 shrink-0" aria-hidden />
+        <span>
+          {step === "tools" ? PR_FEEDBACK_SETTINGS_COPY.wizardBack : PR_FEEDBACK_SETTINGS_COPY.wizardBackToBoard}
+        </span>
+      </button>
+      <h1 className={factoryPageTitleClassName}>{stepTitle}</h1>
+      <p className="workspace-body-text mt-2 text-muted-foreground">{stepHelper}</p>
     </header>
   );
 }
@@ -245,7 +199,7 @@ function ToolsAccessWarning({ warning }: { warning: ToolsAccessWarningContent | 
   return (
     <div
       role="status"
-      className="flex items-start gap-2 bg-amber-50/70 px-5 py-2.5 dark:bg-amber-950/25"
+      className="flex items-start gap-2 rounded-md bg-amber-50/70 px-3 py-2.5 dark:bg-amber-950/25"
       data-testid={warning.testId}
     >
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
@@ -363,7 +317,7 @@ function SetupFooter({
   onCreated: (handlerId: string) => void;
 }) {
   return (
-    <footer className="flex items-center justify-between gap-3 px-5 py-3">
+    <footer className="flex items-center justify-between gap-3 pt-2">
       <span className="text-[12px] text-muted-foreground">
         {setup.step === "checks"
           ? PR_FEEDBACK_SETTINGS_COPY.wizardStepChecks

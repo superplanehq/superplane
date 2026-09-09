@@ -37,6 +37,13 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
     isFetching: false,
     isError: false,
   })),
+  useFactoryRepositoryReviewBots: vi.fn(() => ({
+    data: [{ login: "coderabbitai", displayName: "coderabbitai[bot]" }],
+    isLoading: false,
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  })),
 }));
 
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
@@ -186,13 +193,44 @@ function renderAutomationPopup() {
 }
 
 describe("PRFeedbackSettingsPopup discussion", () => {
-  it("does not offer name or repository fields and keeps mention and allowed bots", () => {
-    renderChecksPopup(vi.fn(), discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }));
+  it("uses the same mention and bot choices as setup", () => {
+    renderChecksPopup(
+      vi.fn(),
+      discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }),
+      "org-1",
+      "factory-1",
+    );
 
     expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
-    expect(screen.getByTestId("pr-feedback-mention")).toHaveValue("");
-    expect(screen.getByTestId("pr-feedback-allowed-bots")).toHaveValue("coderabbitai");
+    expect(screen.queryByTestId("pr-feedback-mention")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Start from any human comment/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /Address bot comments/ })).toBeChecked();
+    expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("switches mention and bot modes without free-text fields", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "factory-1");
+
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+    expect(screen.queryByTestId("discussion-setup-bots-list")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /Start from any human comment/ }));
+    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "false");
+    await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mention: "",
+        ignoreBots: true,
+        allowedBots: ["coderabbitai"],
+      }),
+    );
   });
 });
 

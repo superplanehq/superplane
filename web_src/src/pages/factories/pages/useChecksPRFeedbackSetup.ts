@@ -12,7 +12,7 @@ import {
 } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
-export function useChecksPRFeedbackSetup(organizationId: string, factoryId: string, repository: string, open: boolean) {
+export function useChecksPRFeedbackSetup(organizationId: string, factoryId: string, repository: string) {
   const [step, setStep] = useState<"checks" | "tools">("checks");
   const [checkNames, setCheckNames] = useState<string[]>([]);
   const [runnerIntegrationIds, setRunnerIntegrationIds] = useState<string[]>([]);
@@ -21,44 +21,30 @@ export function useChecksPRFeedbackSetup(organizationId: string, factoryId: stri
   const [catalogApplied, setCatalogApplied] = useState(false);
   const [connectedApplied, setConnectedApplied] = useState(false);
 
-  const catalogQuery = useFactoryRepositoryStatusChecks(organizationId, factoryId, repository, { enabled: open });
+  const catalogQuery = useFactoryRepositoryStatusChecks(organizationId, factoryId, repository);
   const catalog = catalogQuery.data ?? [];
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
-  const connectedQuery = useConnectedIntegrations(organizationId, { enabled: open && Boolean(organizationId) });
-  const availableQuery = useAvailableIntegrations({ enabled: open && Boolean(organizationId), organizationId });
+  const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });
+  const availableQuery = useAvailableIntegrations({ enabled: Boolean(organizationId), organizationId });
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-    setStep("checks");
-    setCheckNames([]);
-    setRunnerIntegrationIds([]);
-    setConnectName(null);
-    setError(undefined);
-    setCatalogApplied(false);
-    setConnectedApplied(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || catalogApplied || catalogLoading) {
+    if (catalogApplied || catalogLoading) {
       return;
     }
     setCheckNames(catalogStatusCheckNames(catalog));
     setCatalogApplied(true);
-  }, [catalog, catalogApplied, catalogLoading, open]);
+  }, [catalog, catalogApplied, catalogLoading]);
 
   const connectedLoading = connectedQuery.isPending || connectedQuery.isFetching;
   useEffect(() => {
-    if (!open || connectedApplied || connectedLoading) {
+    if (connectedApplied || connectedLoading) {
       return;
     }
     setRunnerIntegrationIds(readyChecksHandlerIntegrationIds(connectedQuery.data ?? []));
     setConnectedApplied(true);
-  }, [connectedApplied, connectedLoading, connectedQuery.data, open]);
-
+  }, [connectedApplied, connectedLoading, connectedQuery.data]);
   const suggestedNames = useMemo(() => suggestedIntegrationsForChecks(catalog, checkNames), [catalog, checkNames]);
   const connected = connectedQuery.data ?? [];
   const available = (availableQuery.data ?? []).filter((integration) => isChecksHandlerCIIntegration(integration.name));

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StatusCheckPicker, statusCheckRows } from "./StatusCheckPicker";
 
 describe("statusCheckRows", () => {
-  it("puts selected checks first and then the rest of the catalog", () => {
+  it("keeps catalog order and appends selected checks that are not in the catalog", () => {
     expect(
       statusCheckRows(
         [
@@ -13,12 +13,13 @@ describe("statusCheckRows", () => {
           { name: "e2e", required: false },
           { name: "unit", required: false },
         ],
-        ["e2e"],
+        ["e2e", "custom"],
       ),
     ).toEqual([
-      { name: "e2e", required: false },
       { name: "lint", required: true },
+      { name: "e2e", required: false },
       { name: "unit", required: false },
+      { name: "custom" },
     ]);
   });
 });

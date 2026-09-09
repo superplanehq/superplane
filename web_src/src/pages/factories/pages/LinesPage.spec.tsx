@@ -131,58 +131,6 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useFactoryRepositoryReviewBots: () => ({ data: [], isLoading: false, isError: false }),
 }));
 
-vi.mock("./ChecksPRFeedbackSetupDialog", () => ({
-  ChecksPRFeedbackSetupDialog: ({
-    open,
-    onCreated,
-    onClose,
-  }: {
-    open: boolean;
-    onCreated: (handlerId: string) => void;
-    onClose: () => void;
-  }) =>
-    open ? (
-      <div data-testid="checks-pr-feedback-setup">
-        <button
-          type="button"
-          data-testid="checks-setup-finish"
-          onClick={() => {
-            onCreated("handler-checks");
-            onClose();
-          }}
-        >
-          Finish
-        </button>
-      </div>
-    ) : null,
-}));
-
-vi.mock("./DiscussionPRFeedbackSetupDialog", () => ({
-  DiscussionPRFeedbackSetupDialog: ({
-    open,
-    onCreated,
-    onClose,
-  }: {
-    open: boolean;
-    onCreated: (handlerId: string) => void;
-    onClose: () => void;
-  }) =>
-    open ? (
-      <div data-testid="discussion-pr-feedback-setup">
-        <button
-          type="button"
-          data-testid="discussion-setup-finish"
-          onClick={() => {
-            onCreated("handler-discussion");
-            onClose();
-          }}
-        >
-          Finish
-        </button>
-      </div>
-    ) : null,
-}));
-
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));
@@ -670,7 +618,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
   });
 
-  it("opens the comments setup wizard instead of creating the handler immediately", async () => {
+  it("opens the comments setup page instead of creating the handler immediately", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -678,10 +626,13 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("add-pr-feedback-template-discussion"));
 
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}/setup/comments`,
+    );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
-  it("opens the checks setup wizard instead of creating the handler immediately", async () => {
+  it("opens the checks setup page instead of creating the handler immediately", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -689,6 +640,9 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}/setup/checks`,
+    );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
@@ -700,12 +654,9 @@ describe("LinesPage board", () => {
     );
     expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("0/2");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "This SuperPlane workspace can implement tasks and open pull requests for them, but it will not start fixes from pull request reviews yet.",
+      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "Configure how pull request reviews should be handled next.",
-    );
-    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure comments");
+    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure");
   });
 
   it("shows the provisioned comments handler as done and status checks as open", () => {
@@ -719,14 +670,9 @@ describe("LinesPage board", () => {
     );
     expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("1/2");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "Pull request comments and reviews can start a fix.",
+      "SuperPlane can automatically fix failing status checks. Configure how to handle them next.",
     );
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "SuperPlane will not wait for failing status checks until you configure this.",
-    );
-    expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent(
-      "Configure status checks",
-    );
+    expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
   });
 
   it("hides next steps when the status-check handler is configured", () => {

@@ -10,11 +10,10 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryPRFeedbackSetupPath, prFeedbackSetupKindFromSourceId } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
-import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
-import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
@@ -49,34 +48,29 @@ export function PRFeedbackSettingsHost({
   canUpdate,
   handlerId,
   initialTab = "general",
-  onCreated,
   onClose,
 }: PRFeedbackSettingsHostProps) {
+  const navigate = useNavigate();
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [checksSource, setChecksSource] = useState<PRFeedbackSource | null>(null);
-  const [discussionSource, setDiscussionSource] = useState<PRFeedbackSource | null>(null);
   useFactoryRepositoryStatusChecks(organizationId, factoryId, "", {
-    enabled: pickerOpen || Boolean(checksSource),
+    enabled: pickerOpen,
   });
   useFactoryRepositoryReviewBots(organizationId, factoryId, "", {
-    enabled: pickerOpen || Boolean(discussionSource),
+    enabled: pickerOpen,
   });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
   const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
 
   const createFromSource = (source: PRFeedbackSource) => {
-    if (takenSourceIds.includes(source.id)) {
+    if (takenSourceIds.includes(source.id) || !lineId) {
       return;
     }
     setPickerOpen(false);
-    if (source.id === "checks") {
-      setChecksSource(source);
-      return;
-    }
-    setDiscussionSource(source);
+    onClose();
+    navigate(factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)));
   };
 
   if (handlersQuery.isPending) {
@@ -127,34 +121,6 @@ export function PRFeedbackSettingsHost({
           onSelect={createFromSource}
           takenSourceIds={takenSourceIds}
         />
-        {checksSource ? (
-          <ChecksPRFeedbackSetupDialog
-            open
-            organizationId={organizationId}
-            factoryId={factoryId}
-            repository=""
-            source={checksSource}
-            onClose={() => setChecksSource(null)}
-            onCreated={(id) => {
-              setChecksSource(null);
-              onCreated?.(id);
-            }}
-          />
-        ) : null}
-        {discussionSource ? (
-          <DiscussionPRFeedbackSetupDialog
-            open
-            organizationId={organizationId}
-            factoryId={factoryId}
-            repository=""
-            source={discussionSource}
-            onClose={() => setDiscussionSource(null)}
-            onCreated={(id) => {
-              setDiscussionSource(null);
-              onCreated?.(id);
-            }}
-          />
-        ) : null}
       </>
     );
   }

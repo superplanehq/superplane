@@ -42,8 +42,6 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
-import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
-import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { NextStepsPanel } from "./NextStepsPanel";
 import { runWorkspaceNextStepAction, workspaceNextSteps } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
@@ -248,14 +246,12 @@ export function LinesPage() {
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
-  const [checksPRFeedbackSource, setChecksPRFeedbackSource] = useState<PRFeedbackSource | null>(null);
-  const [discussionPRFeedbackSource, setDiscussionPRFeedbackSource] = useState<PRFeedbackSource | null>(null);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   useFactoryRepositoryStatusChecks(organizationId, factoryId, appRepository, {
-    enabled: addPRFeedbackOpen || Boolean(checksPRFeedbackSource),
+    enabled: addPRFeedbackOpen,
   });
   useFactoryRepositoryReviewBots(organizationId, factoryId, appRepository, {
-    enabled: addPRFeedbackOpen || Boolean(discussionPRFeedbackSource),
+    enabled: addPRFeedbackOpen,
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -360,11 +356,14 @@ export function LinesPage() {
       return;
     }
     setAddPRFeedbackOpen(false);
-    if (source.id === "checks") {
-      setChecksPRFeedbackSource(source);
-      return;
-    }
-    setDiscussionPRFeedbackSource(source);
+    navigate(
+      factoryPRFeedbackSetupPath(
+        organizationId,
+        factoryKey,
+        selectedLine.id,
+        prFeedbackSetupKindFromSourceId(source.id),
+      ),
+    );
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
@@ -455,28 +454,6 @@ export function LinesPage() {
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
       />
-      {checksPRFeedbackSource ? (
-        <ChecksPRFeedbackSetupDialog
-          open
-          organizationId={organizationId}
-          factoryId={factoryId}
-          repository={appRepository}
-          source={checksPRFeedbackSource}
-          onClose={() => setChecksPRFeedbackSource(null)}
-          onCreated={() => setChecksPRFeedbackSource(null)}
-        />
-      ) : null}
-      {discussionPRFeedbackSource ? (
-        <DiscussionPRFeedbackSetupDialog
-          open
-          organizationId={organizationId}
-          factoryId={factoryId}
-          repository={appRepository}
-          source={discussionPRFeedbackSource}
-          onClose={() => setDiscussionPRFeedbackSource(null)}
-          onCreated={() => setDiscussionPRFeedbackSource(null)}
-        />
-      ) : null}
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
           organizationId={organizationId}
@@ -496,14 +473,8 @@ export function LinesPage() {
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onCreated={(handlerId) =>
-            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId), {
-              replace: true,
-            })
-          }
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
-        />
-      ) : null}
+        />      ) : null}
       <div className={factoryKanbanPageClassName}>
         <div className="shrink-0">
           <LineDetailHeader

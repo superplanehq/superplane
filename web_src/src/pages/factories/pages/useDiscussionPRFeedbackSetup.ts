@@ -7,6 +7,8 @@ import { normalizeReviewBotLogin, type ReviewBotOption } from "./ReviewBotPicker
 
 export const DISCUSSION_MENTION = "@superplaneagent";
 
+export type DiscussionBotMode = "ignore" | "address";
+
 export function catalogReviewBots(catalog: Array<{ login?: string; displayName?: string }>): ReviewBotOption[] {
   const seen = new Set<string>();
   const bots: ReviewBotOption[] = [];
@@ -25,41 +27,36 @@ export function catalogReviewBots(catalog: Array<{ login?: string; displayName?:
   return bots;
 }
 
-export function useDiscussionPRFeedbackSetup(
-  organizationId: string,
-  factoryId: string,
-  repository: string,
-  open: boolean,
-) {
+export function discussionBotSettings(
+  mode: DiscussionBotMode,
+  allowedBots: string[],
+): { ignoreBots: boolean; allowedBots: string[] } {
+  if (mode === "address") {
+    return { ignoreBots: true, allowedBots };
+  }
+  return { ignoreBots: true, allowedBots: [] };
+}
+
+export function useDiscussionPRFeedbackSetup(organizationId: string, factoryId: string, repository: string) {
   const [step, setStep] = useState<"mention" | "bots">("mention");
   const [mentionRequired, setMentionRequired] = useState(true);
+  const [botMode, setBotMode] = useState<DiscussionBotMode>("ignore");
   const [allowedBots, setAllowedBots] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
 
-  const catalogQuery = useFactoryRepositoryReviewBots(organizationId, factoryId, repository, { enabled: open });
+  const catalogQuery = useFactoryRepositoryReviewBots(organizationId, factoryId, repository);
   const catalog = catalogReviewBots(catalogQuery.data ?? []);
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-    setStep("mention");
-    setMentionRequired(true);
-    setAllowedBots([]);
-    setError(undefined);
-    setCatalogApplied(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || catalogApplied || catalogLoading) {
+    if (catalogApplied || catalogLoading) {
       return;
     }
     setAllowedBots(catalog.map((bot) => bot.login));
     setCatalogApplied(true);
-  }, [catalog, catalogApplied, catalogLoading, open]);
+  }, [catalog, catalogApplied, catalogLoading]);
 
   const toggleBot = (login: string) => {
     setAllowedBots((current) => toggleUniqueString(current, login));
@@ -82,6 +79,7 @@ export function useDiscussionPRFeedbackSetup(
   const finish = async (source: PRFeedbackSource) => {
     setError(undefined);
     try {
+      const bots = discussionBotSettings(botMode, allowedBots);
       return await createHandler.mutateAsync({
         source: "SOURCE_PULL_REQUEST_DISCUSSION",
         name: source.defaultName,
@@ -89,8 +87,8 @@ export function useDiscussionPRFeedbackSetup(
           subject: repository ? { repository } : undefined,
           discussion: {
             mention: mentionRequired ? DISCUSSION_MENTION : "",
-            ignoreBots: true,
-            allowedBots,
+            ignoreBots: bots.ignoreBots,
+            allowedBots: bots.allowedBots,
           },
         },
       });
@@ -105,6 +103,8 @@ export function useDiscussionPRFeedbackSetup(
     setStep,
     mentionRequired,
     setMentionRequired,
+    botMode,
+    setBotMode,
     allowedBots,
     toggleBot,
     addBot,

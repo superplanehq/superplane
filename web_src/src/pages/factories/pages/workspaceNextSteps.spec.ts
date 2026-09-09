@@ -54,11 +54,10 @@ describe("workspaceNextStepBanner", () => {
     expect(banner?.activeStep.id).toBe("pr-comments-handler");
     expect(banner?.doneCount).toBe(0);
     expect(banner?.title).toBe("How should pull request comments be handled?");
-    expect(banner?.worksCopy).toBe(
-      "This SuperPlane workspace can implement tasks and open pull requests for them, but it will not start fixes from pull request reviews yet.",
+    expect(banner?.description).toBe(
+      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
-    expect(banner?.missingCopy).toBe("Configure how pull request reviews should be handled next.");
-    expect(banner?.ctaLabel).toBe("Configure comments");
+    expect(banner?.ctaLabel).toBe("Configure");
   });
 
   it("personalizes the banner for status checks after comments are done", () => {
@@ -71,9 +70,10 @@ describe("workspaceNextStepBanner", () => {
     expect(banner?.activeStep.id).toBe("pr-checks-handler");
     expect(banner?.doneCount).toBe(1);
     expect(banner?.title).toBe("How should failing status checks be handled?");
-    expect(banner?.worksCopy).toBe("Pull request comments and reviews can start a fix.");
-    expect(banner?.missingCopy).toContain("will not wait for failing status checks");
-    expect(banner?.ctaLabel).toBe("Configure status checks");
+    expect(banner?.description).toBe(
+      "SuperPlane can automatically fix failing status checks. Configure how to handle them next.",
+    );
+    expect(banner?.ctaLabel).toBe("Configure");
   });
 });
 
