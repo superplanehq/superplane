@@ -160,6 +160,9 @@ describe("useSplitRunFooterActions", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders", "wo-1"],
     });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+    });
   });
 
   it("cancels the canvas run before closing a running order", async () => {
