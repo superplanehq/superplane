@@ -20,6 +20,17 @@ export type FirstRunSphereProps = {
   animate?: boolean;
 };
 
+// The bright amber reads well on the dark pane; the light pane needs a
+// deeper amber for enough contrast on small text and dots.
+const AMBER_TEXT = "text-[#a56d06] dark:text-[#f6a821]";
+
+/** Concentric rings brighten the sphere as the level rises. */
+function dotAlpha(level: number, edge: number, random: number) {
+  const ring = 0.5 + 0.5 * Math.cos(edge * Math.PI * 7);
+  const structure = 1 - 0.55 * level * level * (1 - ring);
+  return level * (0.5 + 0.5 * (1 - edge)) * (0.65 + 0.35 * random) * structure;
+}
+
 /**
  * Level drives a visible progression: a low level draws a small, sparse,
  * noisy cloud; a high level draws a large, dense sphere with concentric
@@ -28,6 +39,7 @@ export type FirstRunSphereProps = {
 function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
   const context = canvas.getContext("2d");
   if (!context || typeof context.clearRect !== "function") return;
+  const dark = canvas.closest(".dark") !== null;
   const size = canvas.width;
   const center = size / 2;
   const radius = (size / 2 - 8) * (0.6 + 0.4 * level);
@@ -44,11 +56,8 @@ function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
       const edge = distance / radius;
       const gapChance = 0.52 - 0.38 * level + edge * (0.5 - 0.22 * level) + (dy > 0 ? (dy / radius) * 0.25 : 0);
       if (random < gapChance) continue;
-      const ring = 0.5 + 0.5 * Math.cos(edge * Math.PI * 7);
-      const order = level * level;
-      const structure = 1 - 0.55 * order * (1 - ring);
-      const alpha = level * (0.5 + 0.5 * (1 - edge)) * (0.65 + 0.35 * random) * structure;
-      context.fillStyle = `rgba(246, 168, 33, ${alpha.toFixed(3)})`;
+      const alpha = dotAlpha(level, edge, random).toFixed(3);
+      context.fillStyle = dark ? `rgba(246, 168, 33, ${alpha})` : `rgba(193, 128, 10, ${alpha})`;
       const dot = cell - 2.4;
       context.fillRect(x - dot / 2, y - dot / 2, dot, dot);
     }
@@ -62,11 +71,13 @@ function SphereChip({ chip, side }: { chip: FirstRunSphereChip; side: "left" | "
         "absolute z-10 whitespace-nowrap rounded-lg border bg-background/90 px-3 py-2 font-mono text-[11px]",
         side === "left" ? "left-4 top-[24%]" : "right-4 top-[60%]",
         chip.tone === "ghost" && "border-dashed opacity-40",
-        chip.tone === "amber" ? "border-[#f6a821]/70 text-[#f6a821]" : "border-border text-muted-foreground",
+        chip.tone === "amber"
+          ? cn("border-[#a56d06]/60 dark:border-[#f6a821]/70", AMBER_TEXT)
+          : "border-border text-muted-foreground",
       )}
     >
       {chip.label}
-      <span className={cn("mt-0.5 block text-[12px]", chip.tone === "amber" ? "text-[#f6a821]" : "text-foreground")}>
+      <span className={cn("mt-0.5 block text-[12px]", chip.tone === "amber" ? AMBER_TEXT : "text-foreground")}>
         {chip.value}
       </span>
     </div>
@@ -88,25 +99,34 @@ export function FirstRunSpherePane({
     const canvas = canvasRef.current;
     if (!canvas) return;
     drawSphere(canvas, level, 0);
-    if (!animate) return;
+    // Redraw when the user switches between light and dark themes.
+    const observer = new MutationObserver(() => drawSphere(canvas, level, 0));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    if (!animate) return () => observer.disconnect();
     let tick = 0;
     const timer = window.setInterval(() => {
       tick += 0.7;
       drawSphere(canvas, level, tick);
     }, 260);
-    return () => window.clearInterval(timer);
+    return () => {
+      observer.disconnect();
+      window.clearInterval(timer);
+    };
   }, [level, animate]);
 
   return (
     <div
-      className="relative hidden overflow-hidden border-l border-border lg:flex lg:w-[44%]"
-      style={{ background: "radial-gradient(ellipse at 50% 45%, #14100a 0%, #0d0c08 70%)" }}
+      className={cn(
+        "relative hidden overflow-hidden border-l border-border lg:flex lg:w-[44%]",
+        "bg-[radial-gradient(ellipse_at_50%_45%,#faf6ec_0%,#f2ede1_70%)]",
+        "dark:bg-[radial-gradient(ellipse_at_50%_45%,#14100a_0%,#0d0c08_70%)]",
+      )}
     >
       <div className="absolute inset-0 flex items-center justify-center">
         {[340, 440, 540].map((diameter) => (
           <span
             key={diameter}
-            className="absolute rounded-full border border-[#f6a821]/10"
+            className="absolute rounded-full border border-[#a56d06]/15 dark:border-[#f6a821]/10"
             style={{ width: diameter, height: diameter, top: "47%", left: "50%", transform: "translate(-50%, -50%)" }}
           />
         ))}
@@ -120,13 +140,15 @@ export function FirstRunSpherePane({
             key={phase}
             className={cn(
               "flex flex-col items-center gap-1.5 whitespace-nowrap",
-              phasesLit ? "text-[#f6a821]" : "text-[#4d4a42]",
+              phasesLit ? AMBER_TEXT : "text-[#b3ab9c] dark:text-[#4d4a42]",
             )}
           >
             <i
               className={cn(
                 "size-1.5 rounded-full",
-                phasesLit ? "bg-[#f6a821] shadow-[0_0_8px_rgba(246,168,33,0.7)]" : "bg-[#3a382f]",
+                phasesLit
+                  ? "bg-[#a56d06] shadow-[0_0_8px_rgba(165,109,6,0.5)] dark:bg-[#f6a821] dark:shadow-[0_0_8px_rgba(246,168,33,0.7)]"
+                  : "bg-[#ddd6c6] dark:bg-[#3a382f]",
               )}
             />
             {phase}
@@ -134,7 +156,7 @@ export function FirstRunSpherePane({
         ))}
       </div>
       <p className="absolute bottom-4 right-5 z-10 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-        {captionHighlight ? <span className="text-[#f6a821]">{captionHighlight} </span> : null}
+        {captionHighlight ? <span className={AMBER_TEXT}>{captionHighlight} </span> : null}
         {caption}
       </p>
     </div>
