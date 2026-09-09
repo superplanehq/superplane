@@ -120,6 +120,25 @@ test("interpretWaitResponse throws on 401", () => {
   assert.throws(() => interpretWaitResponse(401, { message: "unauthorized" }), /unauthorized/);
 });
 
+test("interpretWaitResponse retries 404 and 403 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(404, { message: "ngrok" }), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "ERR_NGROK_3200"), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(403, { message: "forbidden" }), { status: "pending" });
+});
+
+test("interpretWaitResponse ends when the planning session is gone", () => {
+  assert.deepEqual(interpretWaitResponse(404, { message: "planning session not found" }), { status: "ended" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "planning session not found\n"), { status: "ended" });
+});
+
+test("interpretWaitResponse throws on 400", () => {
+  assert.throws(() => interpretWaitResponse(400, { message: "invalid" }), /invalid/);
+});
+
+test("interpretWaitResponse retries a generic 500 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(500, { message: "oops" }), { status: "pending" });
+});
+
 test("runLoop sleeps 1s with no log after a Cloudflare 502, then runs the next message", async () => {
   const sleeps = [];
   const logs = [];
@@ -229,6 +248,14 @@ test("safeWaitRequest keeps a delivered user message", async () => {
     text: async () => JSON.stringify({ status: "message", text: "hello" }),
   }));
   assert.deepEqual(got, { status: "message", text: "hello" });
+});
+
+test("safeWaitRequest treats 404 as pending", async () => {
+  const got = await safeWaitRequest(async () => ({
+    status: 404,
+    text: async () => "ERR_NGROK_3200",
+  }));
+  assert.deepEqual(got, { status: "pending" });
 });
 
 test("safeWaitRequest still throws on 401", async () => {
