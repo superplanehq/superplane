@@ -102,7 +102,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
 		assert.Equal(t, binding.Integration, trigger.Integration)
 		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
-		assert.Equal(t, []any{"opened"}, trigger.Configuration["actions"])
+		assert.Equal(t, []any{"opened", "reopened"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
@@ -135,7 +135,7 @@ func Test__IntakeFilterExpression(t *testing.T) {
 			Assignment:      intakeAssignmentUnassigned,
 		})
 		assert.NotContains(t, expression, ">=")
-		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
+		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
 		assert.Contains(t, expression, intakeUnassignedCondition)
 	})
 }
