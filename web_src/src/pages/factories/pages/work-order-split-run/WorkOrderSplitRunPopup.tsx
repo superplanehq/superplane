@@ -26,7 +26,6 @@ import {
 import {
   defaultSplitRunPopupTab,
   type SplitRunPopupTab,
-  splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
 } from "./splitRunPopupModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -237,7 +236,6 @@ function SplitRunPhaseLogItem({
       onStop={onStop}
       onRerun={onRerun}
       runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
-      editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
       actionBusy={actionBusy}
       onToggle={onToggle}
       onUsageOpenChange={setUsageOpen}

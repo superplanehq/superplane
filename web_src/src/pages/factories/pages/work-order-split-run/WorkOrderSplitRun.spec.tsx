@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
+import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
@@ -1057,7 +1057,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
   });
 
-  it("puts View Automation Run and Edit Automation on an expanded log row", async () => {
+  it("puts View Automation Run on an expanded log row", async () => {
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -1068,7 +1068,6 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
     const view = within(prCreation).getByRole("link", { name: "View automation run" });
-    const edit = within(prCreation).getByRole("link", { name: "Edit automation" });
     expect(view).toHaveAttribute(
       "href",
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
@@ -1077,12 +1076,7 @@ describe("WorkOrderSplitRunPopup", () => {
         canvas: "closure",
       }),
     );
-    expect(edit).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
-      }),
-    );
+    expect(within(prCreation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();

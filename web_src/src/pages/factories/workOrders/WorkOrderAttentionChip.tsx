@@ -24,7 +24,7 @@ export function WorkOrderAttentionChip({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+        "inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
         WORK_ORDER_ATTENTION_CHIP_CLASSNAME[reason],
         className,
       )}
@@ -44,7 +44,7 @@ export function WorkOrderAttentionChip({
  *
  * getWorkOrderAttentionReasons only emits "checksPassed" alongside
  * "approval", so this mark sits next to the full Waiting for user review
- * chip. A second full-labeled chip would overflow the footer, so this
+ * pill. A second full-labeled pill would crowd a narrow card, so this
  * keeps the same color and icon but drops the visible label. The label
  * stays available as the accessible name (aria-label) so the meaning is
  * still announced to screen readers, and it is shown on hover/focus via
@@ -58,7 +58,7 @@ export function WorkOrderChecksPassedMark() {
       <TooltipTrigger asChild>
         <span
           className={cn(
-            "inline-flex shrink-0 items-center rounded-md border px-1 py-0.5",
+            "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5",
             WORK_ORDER_ATTENTION_CHIP_CLASSNAME.checksPassed,
           )}
           aria-label={text}

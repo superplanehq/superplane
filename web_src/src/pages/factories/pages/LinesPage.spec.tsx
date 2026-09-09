@@ -6,7 +6,6 @@ import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, Fact
 import type * as canvasData from "@/hooks/useCanvasData";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
-  editFactoryLinePath,
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryPRFeedbackPath,
@@ -512,15 +511,17 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
   });
 
-  it("opens Add automation from the column menu", async () => {
+  it("hides Add automation on step column menus", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    await user.click(screen.getByTestId("lines-phase-menu-0-add-automation"));
-
-    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();
+    const phaseMenus = screen.getAllByTestId(/lines-phase-menu-\d+$/);
+    expect(phaseMenus.length).toBeGreaterThan(0);
+    for (const menu of phaseMenus) {
+      await user.click(menu);
+      expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+    }
   });
 
   it("opens verify and done automations from the header icons", async () => {
@@ -1017,11 +1018,20 @@ describe("LinesPage board editing", () => {
 
     const header = screen.getByTestId("lines-detail-header");
     expect(within(header).queryByText(/→/)).not.toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-scope-all")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
-    expect(within(header).getByTestId("work-orders-scope-my")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-filter-trigger")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-search-trigger")).toBeInTheDocument();
+    const actions = within(header).getByTestId("workspace-page-header-actions");
+    const scopeAll = within(actions).getByTestId("work-orders-scope-all");
+    const filter = within(actions).getByTestId("work-orders-filter-trigger");
+    const search = within(actions).getByTestId("work-orders-search-trigger");
+    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toBeInTheDocument();
+    expect(scopeAll.className).toMatch(/rounded-full/);
+    expect(filter).toHaveAccessibleName("Filter");
+    expect(filter).not.toHaveTextContent("Filter");
+    expect(within(filter).queryByText("F")).not.toBeInTheDocument();
+    expect(scopeAll.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(filter.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(header).queryByTestId("lines-edit-menu")).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
     expect(within(header).queryByTestId("lines-board-view-menu")).not.toBeInTheDocument();
     expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
 
@@ -1048,17 +1058,11 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
-  it("opens Edit from the line overflow menu", async () => {
-    const user = userEvent.setup();
+  it("does not show a line overflow Edit menu", () => {
     renderLinesBoard();
 
-    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-edit-menu"));
-    await user.click(screen.getByTestId("lines-edit-menu-edit"));
-
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      editFactoryLinePath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
-    );
+    expect(screen.queryByTestId("lines-edit-menu")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
   });
 
   it("shows automation names by default when the column rows preview is on", () => {

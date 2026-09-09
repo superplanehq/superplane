@@ -31,8 +31,7 @@ import {
   FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
@@ -40,7 +39,7 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
-import { useHostedCreditEmptyBanner } from "../lib/useHostedCreditEmptyBanner";
+import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
@@ -106,7 +105,6 @@ import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-spl
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
-  editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppRunPath,
   factoryHomePath,
@@ -259,7 +257,10 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
 
-  const hostedCreditEmptyBanner = useHostedCreditEmptyBanner(organizationId, factoryKey);
+  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
+    organizationId,
+    factoryKey,
+  );
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -470,12 +471,12 @@ export function LinesPage() {
           <LineDetailHeader
             organizationId={organizationId}
             factoryId={factoryId}
-            factoryKey={factoryKey}
             line={selectedLine}
             workOrders={workOrders}
             factory={factory}
             state={listState}
             canUpdate={canUpdate}
+            hostedCreditHeaderKicker={hostedCreditHeaderKicker}
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
@@ -550,24 +551,24 @@ export function LinesPage() {
 function LineDetailHeader({
   organizationId,
   factoryId,
-  factoryKey,
   line,
   workOrders,
   factory,
   state,
   canUpdate,
+  hostedCreditHeaderKicker,
   hostedCreditEmptyBanner,
   automationView,
   onAutomationViewChange,
 }: {
   organizationId: string;
   factoryId: string;
-  factoryKey: string;
   line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
   factory: FactoriesFactory | null;
   state: WorkOrderListState;
   canUpdate: boolean;
+  hostedCreditHeaderKicker?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
@@ -577,7 +578,6 @@ function LineDetailHeader({
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
   const title = humanizeLineName(line.name);
-  const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -605,7 +605,8 @@ function LineDetailHeader({
           inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
         />
       }
-      leading={
+      leading={hostedCreditHeaderKicker}
+      actions={
         <>
           <ScopePills
             value={state.scope}
@@ -614,10 +615,6 @@ function LineDetailHeader({
             testIdPrefix="work-orders-scope"
           />
           <FilterMenu state={state} assigneeOptions={assigneeOptions} />
-        </>
-      }
-      actions={
-        <>
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -626,7 +623,6 @@ function LineDetailHeader({
             onChange={state.setSearch}
             onClose={state.closeSearch}
           />
-          {canUpdate && line.id ? <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" /> : null}
           {automationView && onAutomationViewChange ? (
             <LineBoardViewMenu view={automationView} onViewChange={onAutomationViewChange} />
           ) : null}
@@ -1294,7 +1290,6 @@ function PhaseBoard({
               onOpenWorkOrder={onOpenWorkOrder}
               automations={phaseAutomations[index]}
               automationRowCount={automationRowCount}
-              onAddAutomation={showColumnAutomations ? () => onAddAutomation(columnKey) : undefined}
               onAutomationRowAction={onAutomationRowAction}
             />
           </div>
@@ -1525,31 +1520,6 @@ function DoneColumn({
   );
 }
 
-function ColumnConfigureMenu({ title, href, testId }: { title: string; href: string; testId: string }) {
-  const navigate = useNavigate();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={`${title} menu`}
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          data-testid={testId}
-        >
-          <MoreHorizontal className="size-3.5" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem onClick={() => navigate(href)} data-testid={`${testId}-edit`}>
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-          Edit
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /** Phase lanes borrow the Tasks lane tints: blue in flight, grey once closed. */
 const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
   running: "running",
@@ -1577,7 +1547,6 @@ function PhaseColumn({
   onOpenWorkOrder,
   automations,
   automationRowCount,
-  onAddAutomation,
   onAutomationRowAction,
 }: {
   organizationId: string;
@@ -1595,7 +1564,6 @@ function PhaseColumn({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   automations?: ColumnAutomation[];
   automationRowCount?: number;
-  onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
@@ -1662,7 +1630,6 @@ function PhaseColumn({
               testId={`lines-phase-menu-${column.stepIndex}`}
               onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
               parallelism={parallelism}
-              onAddAutomation={onAddAutomation}
               colorId={colorId}
               onColorChange={onColorChange}
             />

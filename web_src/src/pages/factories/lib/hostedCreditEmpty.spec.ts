@@ -13,6 +13,7 @@ import {
   shouldShowHostedCreditEmptyBanner,
   welcomeCreditExpiryLabel,
   welcomeCreditExpirySentence,
+  welcomeCreditHeaderLabel,
 } from "./hostedCreditEmpty";
 
 const now = new Date("2026-09-08T12:00:00.000Z");
@@ -289,6 +290,18 @@ describe("welcomeCreditExpiryLabel", () => {
     expect(welcomeCreditExpiryLabel(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("Expires today");
     expect(welcomeCreditExpiryLabel(new Date("2026-09-09T12:00:00.000Z"), now)).toBe("1 day remaining");
     expect(welcomeCreditExpiryLabel(new Date(inFourteenDays), now)).toBe("14 days remaining");
+  });
+});
+
+describe("welcomeCreditHeaderLabel", () => {
+  it("names today, one day, and many days above the page title", () => {
+    expect(welcomeCreditHeaderLabel(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("Ends today");
+    expect(welcomeCreditHeaderLabel(new Date("2026-09-09T12:00:00.000Z"), now)).toBe("1 day");
+    expect(welcomeCreditHeaderLabel(new Date(inFourteenDays), now)).toBe("14 days");
+  });
+
+  it("names an ended trial", () => {
+    expect(welcomeCreditHeaderLabel(new Date(yesterday), now)).toBe("Ended");
   });
 });
 
