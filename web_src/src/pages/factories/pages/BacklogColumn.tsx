@@ -5,6 +5,7 @@ import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
+import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
@@ -43,6 +44,8 @@ export type BacklogColumnProps = {
   onAddIntake?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
+  /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
+  automationRowCount?: number;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 };
@@ -79,6 +82,7 @@ export function BacklogColumn({
   intakePanel,
   onAddIntake,
   automations,
+  automationRowCount,
   onAddAutomation,
   onAutomationRowAction,
 }: BacklogColumnProps) {
@@ -114,6 +118,7 @@ export function BacklogColumn({
             title={title}
             createPopover={createPopover}
             automations={automations}
+            automationRowCount={automationRowCount}
             onAddAutomation={onAddAutomation}
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
@@ -122,6 +127,13 @@ export function BacklogColumn({
             onColorChange={onColorChange}
           />
         }
+        subheader={columnAutomationRowsSubheader({
+          title,
+          automations,
+          rowCount: automationRowCount,
+          onRowAction: onAutomationRowAction,
+          testId: "lines-backlog-automation-rows",
+        })}
         banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
         testId="lines-backlog-column"
       >
@@ -149,6 +161,7 @@ function BacklogColumnHeaderActions({
   title,
   createPopover,
   automations,
+  automationRowCount,
   onAddAutomation,
   onAutomationRowAction,
   onOpenSettings,
@@ -159,6 +172,7 @@ function BacklogColumnHeaderActions({
   BacklogColumnProps,
   | "title"
   | "automations"
+  | "automationRowCount"
   | "onAddAutomation"
   | "onAutomationRowAction"
   | "onOpenSettings"
@@ -170,12 +184,14 @@ function BacklogColumnHeaderActions({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      <ColumnAutomationsHeaderSlot
-        title={title}
-        automations={automations}
-        onRowAction={onAutomationRowAction}
-        testId="lines-backlog-automations"
-      />
+      {automationRowCount ? null : (
+        <ColumnAutomationsHeaderSlot
+          title={title}
+          automations={automations}
+          onRowAction={onAutomationRowAction}
+          testId="lines-backlog-automations"
+        />
+      )}
       <BacklogCreatePopover {...createPopover} />
       <ColumnLaneMenu
         title={title}
