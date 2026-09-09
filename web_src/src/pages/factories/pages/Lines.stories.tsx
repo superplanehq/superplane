@@ -102,20 +102,6 @@ export const LineBoardIntakeAutomation: Story = {
   },
 };
 
-export const LineBoardIntakeRuns: Story = {
-  name: "Line board — intake runs",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=runs`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
-      />
-    );
-  },
-};
-
 export const LineBoardGithubAndSentry: Story = {
   name: "Line board — GitHub and Sentry listeners",
   render: () => {
@@ -240,7 +226,7 @@ export const LineBoardAddAutomationPicker: Story = {
   parameters: {
     docs: {
       description: {
-        story: "Open the Backlog drawer and press Add automation. Taken catalog entries stay disabled.",
+        story: "Open the column menu and press Add automation. Taken catalog entries stay disabled.",
       },
     },
   },
@@ -307,7 +293,7 @@ export const LineDetailFivePhases: Story = {
   },
 };
 
-/** Remaining hosted credit is empty. The board shows a red banner above the header. */
+/** Welcome credit is empty. The board shows the trial-empty banner in the header. */
 export const LineBoardHostedCreditEmpty: Story = {
   name: "Line board — hosted credit empty",
   render: () => {
@@ -321,7 +307,7 @@ export const LineBoardHostedCreditEmpty: Story = {
   },
 };
 
-/** Remaining hosted credit is above zero but at or below $20. The board shows an amber warning banner. */
+/** Purchased hosted credit remains at or below $20. The board shows a low-credit warning. */
 export const LineBoardHostedCreditLow: Story = {
   name: "Line board — hosted credit low",
   render: () => {

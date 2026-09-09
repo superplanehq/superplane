@@ -9,6 +9,20 @@ global_job_config:
   env_vars:
     - name: DOCKER_BUILDKIT
       value: "1"
+    # Dummy public GitHub App so factory E2E can open workspace setup.
+    # Local development without these values still blocks onboarding.
+    - name: SUPERPLANE_GITHUB_APP_ID
+      value: "1"
+    - name: SUPERPLANE_GITHUB_APP_SLUG
+      value: "superplane-e2e"
+    - name: SUPERPLANE_GITHUB_APP_PRIVATE_KEY
+      value: "-----BEGIN RSA PRIVATE KEY-----\\ne2e\\n-----END RSA PRIVATE KEY-----"
+    - name: SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET
+      value: "e2e-webhook-secret"
+    - name: SUPERPLANE_GITHUB_APP_CLIENT_ID
+      value: "e2e-client-id"
+    - name: SUPERPLANE_GITHUB_APP_CLIENT_SECRET
+      value: "e2e-client-secret"
   prologue:
     commands:
       - checkout

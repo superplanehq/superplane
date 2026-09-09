@@ -275,7 +275,7 @@ import {
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { forEachMapper, FOR_EACH_STATE_REGISTRY } from "./forEach";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { claudeCodeMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
+import { agentHarnessMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
@@ -318,10 +318,10 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runnerJS: runnerMapper,
   runnerBash: runnerMapper,
   runnerPython: runnerMapper,
-  runnerSuperPlane: runnerMapper,
-  runnerClaudeCode: claudeCodeMapper,
-  runnerCodex: runnerMapper,
-  runnerOpenRouter: runnerMapper,
+  runnerSuperPlane: agentHarnessMapper,
+  runnerClaudeCode: agentHarnessMapper,
+  runnerCodex: agentHarnessMapper,
+  runnerOpenRouter: agentHarnessMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   forEach: forEachMapper,

@@ -19,7 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
+import { ArrowRightLeft, CircleDollarSign, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -31,6 +31,7 @@ interface SidebarUserMenuProps {
   userAvatarUrl?: string | null;
   organizationName: string;
   defaultOpen?: boolean;
+  isTrial?: boolean;
 }
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -52,6 +53,7 @@ export function SidebarUserMenu({
   userAvatarUrl,
   organizationName,
   defaultOpen = false,
+  isTrial = false,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
@@ -61,6 +63,10 @@ export function SidebarUserMenu({
   const organizationHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
+  const billingHref = factoryKey
+    ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing")
+    : `/${organizationId}/settings/billing`;
+  const triggerLabel = isTrial ? `${userName}, ${organizationName}, Trial` : `${userName}, ${organizationName}`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -68,25 +74,41 @@ export function SidebarUserMenu({
   };
 
   return (
-    <div className="flex justify-center border-t border-sidebar-border p-1.5" data-testid="factories-sidebar-user-menu">
+    <div
+      className="flex flex-col items-center border-t border-sidebar-border px-1 py-1.5"
+      data-testid="factories-sidebar-user-menu"
+    >
       <DropdownMenu defaultOpen={defaultOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             data-testid="factories-sidebar-user-menu-trigger"
-            aria-label={`${userName}, ${organizationName}`}
-            title={`${userName}, ${organizationName}`}
-            className={cn(factoriesRailControlClassName, "data-[state=open]:bg-sidebar-accent")}
+            aria-label={triggerLabel}
+            title={triggerLabel}
+            className="group flex flex-col items-center gap-0.5 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <Avatar
-              src={userAvatarUrl ?? undefined}
-              initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
-              alt=""
-              className="size-7 text-[10px]"
-            />
-            <span className="sr-only">
-              {userName}, {organizationName}
+            <span
+              className={cn(
+                factoriesRailControlClassName,
+                "pointer-events-none group-hover:bg-sidebar-accent group-hover:text-foreground group-data-[state=open]:bg-sidebar-accent",
+              )}
+            >
+              <Avatar
+                src={userAvatarUrl ?? undefined}
+                initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
+                alt=""
+                className="size-7 text-[10px]"
+              />
             </span>
+            {isTrial ? (
+              <span
+                data-testid="factories-sidebar-plan-label"
+                className="max-w-full px-0.5 text-[9px] leading-none font-medium tracking-wide text-muted-foreground"
+              >
+                Trial
+              </span>
+            ) : null}
+            <span className="sr-only">{triggerLabel}</span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
@@ -94,6 +116,7 @@ export function SidebarUserMenu({
             organizationId={organizationId}
             organizationName={organizationName}
             organizationHref={organizationHref}
+            isTrial={isTrial}
           />
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -103,6 +126,14 @@ export function SidebarUserMenu({
           >
             <UserIcon aria-hidden />
             Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            onClick={() => navigate(billingHref)}
+            data-testid="factories-sidebar-billing"
+          >
+            <CircleDollarSign aria-hidden />
+            Billing
           </DropdownMenuItem>
           {account?.installation_admin ? (
             <DropdownMenuItem
@@ -133,30 +164,39 @@ function OrganizationMenuHeader({
   organizationId,
   organizationName,
   organizationHref,
+  isTrial,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
+  isTrial: boolean;
 }) {
   const navigate = useNavigate();
 
   return (
-    <div className="flex items-center gap-0.5 px-1 py-1" data-testid="factories-sidebar-organization">
-      <p
-        className="min-w-0 flex-1 truncate px-2 py-1 text-[13px] font-medium tracking-[-0.01em] text-foreground"
-        data-testid="factories-sidebar-organization-name"
-      >
-        {organizationName}
-      </p>
-      <DropdownMenuItem
-        aria-label="Organization settings"
-        data-testid="factories-sidebar-organization-settings-link"
-        className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-        onSelect={() => navigate(organizationHref)}
-      >
-        <Settings className="size-3.5" aria-hidden />
-      </DropdownMenuItem>
-      <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
+    <div className="px-1 py-1" data-testid="factories-sidebar-organization">
+      <div className="flex items-center gap-0.5">
+        <p
+          className="min-w-0 flex-1 truncate px-2 py-1 text-[13px] font-medium tracking-[-0.01em] text-foreground"
+          data-testid="factories-sidebar-organization-name"
+        >
+          {organizationName}
+        </p>
+        <DropdownMenuItem
+          aria-label="Organization settings"
+          data-testid="factories-sidebar-organization-settings-link"
+          className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
+          onSelect={() => navigate(organizationHref)}
+        >
+          <Settings className="size-3.5" aria-hidden />
+        </DropdownMenuItem>
+        <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
+      </div>
+      {isTrial ? (
+        <p className="px-2 text-[11px] text-muted-foreground" data-testid="factories-sidebar-plan-status">
+          Trial
+        </p>
+      ) : null}
     </div>
   );
 }

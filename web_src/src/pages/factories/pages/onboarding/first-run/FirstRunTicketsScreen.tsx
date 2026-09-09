@@ -10,6 +10,7 @@ export function FirstRunTicketsScreen({
   chrome,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   saving = false,
+  savingLabel = FIRST_RUN_COPY.finish.saving,
   onSelectTicketSource,
   onAnalyzeTickets,
 }: {
@@ -18,13 +19,14 @@ export function FirstRunTicketsScreen({
   continueLabel?: string;
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
+  savingLabel?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
 
   return (
-    <FirstRunShell testId="first-run-tickets" chrome={chrome}>
+    <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving}>
       <FirstRunHeading headline={copy.headline} />
 
       <div className="mt-8 space-y-4">
@@ -35,6 +37,7 @@ export function FirstRunTicketsScreen({
               title={copy.githubIssues}
               detail={copy.githubIssuesHelper}
               selected={ticketSource === "github-issues"}
+              disabled={saving}
               onSelect={() => onSelectTicketSource("github-issues")}
             />
             <ConnectOptionRow
@@ -42,6 +45,7 @@ export function FirstRunTicketsScreen({
               title={copy.jira}
               detail={copy.jiraHelper}
               soon
+              disabled={saving}
               onSelect={() => undefined}
             />
             <ConnectOptionRow
@@ -49,6 +53,7 @@ export function FirstRunTicketsScreen({
               title={copy.linear}
               detail={copy.linearHelper}
               soon
+              disabled={saving}
               onSelect={() => undefined}
             />
           </div>
@@ -64,7 +69,7 @@ export function FirstRunTicketsScreen({
             className="w-full"
             disabled={!ticketSource}
             loading={saving}
-            loadingText={FIRST_RUN_COPY.finish.saving}
+            loadingText={savingLabel}
             onClick={onAnalyzeTickets}
             data-testid="first-run-analyze-tickets"
           >

@@ -4,6 +4,7 @@ import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, Factori
 
 import {
   applyColumnAutomationsOverlay,
+  automationOffersAgentEdit,
   buildColumnAutomations,
   catalogForColumn,
   columnAutomationOpenPath,
@@ -111,6 +112,15 @@ describe("columnTitleForKey", () => {
   });
 });
 
+describe("automationOffersAgentEdit", () => {
+  it("offers agent edit for analysis and agent-step automations", () => {
+    expect(automationOffersAgentEdit({ kind: "analysis" })).toBe(true);
+    expect(automationOffersAgentEdit({ kind: "agent-step" })).toBe(true);
+    expect(automationOffersAgentEdit({ kind: "intake" })).toBe(false);
+    expect(automationOffersAgentEdit({ kind: "custom" })).toBe(false);
+  });
+});
+
 describe("columnAutomationsEmptyCopy", () => {
   it("explains what is missing for each column", () => {
     expect(columnAutomationsEmptyCopy("Backlog", "backlog")).toBe(
@@ -173,6 +183,7 @@ describe("buildColumnAutomations", () => {
         action: "Run the Implement agent",
         runningCount: 1,
         canvasId: "app-refund-implementer",
+        activity: expect.objectContaining({ runningCount: 1 }),
       }),
     ]);
   });

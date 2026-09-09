@@ -78,17 +78,16 @@ describe("PlanningReviewPopup", () => {
     expect(within(note).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("shows runner fields from the runner navigation item", async () => {
-    const user = userEvent.setup();
+  it("shows concurrency and model at the top of the agent", () => {
     renderPopup();
 
-    await user.click(screen.getByTestId("planning-review-nav-runner"));
-
-    const row = screen.getByTestId("planning-review-environment-model-row");
-    expect(within(row).getByText("Environment")).toBeInTheDocument();
-    expect(within(row).getByText("Model")).toBeInTheDocument();
-    expect(within(row).getByText("Working directory")).toBeInTheDocument();
-    expect(within(row).getByText("Execution timeout (seconds)")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
+    const settings = screen.getByTestId("planning-review-settings");
+    expect(within(settings).getByText("Concurrency")).toBeInTheDocument();
+    expect(within(settings).getByText("Model used")).toBeInTheDocument();
+    expect(within(settings).queryByText("Environment")).not.toBeInTheDocument();
+    expect(within(settings).queryByText("Working directory")).not.toBeInTheDocument();
+    expect(within(settings).queryByText("Credentials")).not.toBeInTheDocument();
   });
 
   it("names the agent once, in the header, and describes it below the name", () => {
@@ -107,12 +106,13 @@ describe("PlanningReviewPopup", () => {
 
     expect(screen.queryByTestId("planning-review-component-toggle-implementation-agent")).not.toBeInTheDocument();
     expect(within(implementation).getByText("Steps")).toBeInTheDocument();
+    expect(within(implementation).getByText("Concurrency")).toBeInTheDocument();
+    expect(within(implementation).getByText("Model used")).toBeInTheDocument();
     expect(within(implementation).queryByText("Working directory")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Credentials")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Environment from")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Environment variables")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Execution timeout (seconds)")).not.toBeInTheDocument();
-    expect(within(implementation).queryByText("Concurrency")).not.toBeInTheDocument();
   });
 
   it("shows every step collapsed with a name and kind badge", () => {
@@ -123,9 +123,12 @@ describe("PlanningReviewPopup", () => {
 
     steps.forEach((step, index) => {
       const row = within(implementation).getByTestId(`planning-review-step-${index}`);
-      expect(within(row).getByTestId(`planning-review-step-summary-${index}`)).toHaveTextContent(step.name);
+      const summary = within(row).getByTestId(`planning-review-step-summary-${index}`);
+      const kind = within(row).getByTestId(`planning-review-step-kind-${index}`);
+      expect(summary).toHaveTextContent(step.name);
       expect(within(row).getByTestId(`planning-review-step-toggle-${index}`)).toHaveAttribute("aria-expanded", "false");
-      expect(within(row).getByText(step.type === "prompt" ? "Prompt" : "Bash")).toBeInTheDocument();
+      expect(kind).toHaveTextContent(step.type === "prompt" ? "Prompt" : "Bash");
+      expect(summary.compareDocumentPosition(kind) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 
@@ -149,30 +152,12 @@ describe("PlanningReviewPopup", () => {
     expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent(steps[1].name);
   });
 
-  it("opens each settings group from the navigation", async () => {
-    const user = userEvent.setup();
-    renderPopup();
-    const implementation = screen.getByTestId("planning-review-component-implementation-agent");
-
-    await user.click(screen.getByTestId("planning-review-nav-credentials"));
-    expect(within(implementation).getByText("Credentials")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("planning-review-nav-environment"));
-    expect(within(implementation).getByText("Environment from")).toBeInTheDocument();
-    expect(within(implementation).getByText("Environment variables")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("planning-review-nav-concurrency"));
-    expect(screen.getByText("Max parallel executions")).toBeInTheDocument();
-    expect(screen.getByText("Key")).toBeInTheDocument();
-  });
-
   it("saves component configuration and closes", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
     const user = userEvent.setup();
     renderPopup({ onClose, onSave });
 
-    await user.click(screen.getByTestId("planning-review-nav-concurrency"));
     const max = screen.getByTestId("planning-review-concurrency-max-implementation-agent");
     await user.clear(max);
     await user.type(max, "8");

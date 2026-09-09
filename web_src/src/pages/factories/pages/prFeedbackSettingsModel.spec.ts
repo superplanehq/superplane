@@ -86,6 +86,35 @@ describe("activePRFeedbackWorkOrderIds", () => {
     ).toEqual(new Set(["wo-1", "wo-3"]));
   });
 
+  it("does not treat a cancelling or cancelled check wait as waiting", () => {
+    expect(
+      waitingOnChecksWorkOrderIds([
+        {
+          workOrderId: "wo-cancelling",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelling", state: "STATE_CANCELLING" }),
+            },
+          ],
+        },
+        {
+          workOrderId: "wo-cancelled",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelled", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }),
+            },
+          ],
+        },
+      ]),
+    ).toEqual(new Set());
+  });
+
   it("does not treat a concurrent check wait as addressing feedback", () => {
     const pullRequests: FactoriesFactoryPullRequest[] = [
       {

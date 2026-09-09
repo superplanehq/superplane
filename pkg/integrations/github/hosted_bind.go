@@ -3,8 +3,10 @@ package github
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/sirupsen/logrus"
@@ -71,8 +73,10 @@ func (g *GitHub) bindHostedInstallationWith(
 	// account picker with them, so the member can move the connection to
 	// another GitHub account.
 	metadata.Repositories = repos
-	metadata.InstallRequested = false
-	metadata.InstallRequestedAccount = ""
+	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
+		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)
+	})
+	metadata.SetInstallRequests(remainingRequests)
 
 	integration.SetMetadata(metadata)
 	integration.RemoveBrowserAction()
@@ -100,84 +104,123 @@ func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.Hos
 		return fmt.Errorf("failed to create app client: %w", err)
 	}
 
-	account := strings.TrimSpace(metadata.InstallRequestedAccount)
-	if account == "" {
-		account, err = listAppInstallationRequests(context.Background(), client, metadata.StartedByGitHubLogin)
+	trackedRequests := metadata.CurrentInstallRequests()
+	if requester := strings.TrimSpace(metadata.StartedByGitHubLogin); requester != "" {
+		trackedRequests = slices.DeleteFunc(trackedRequests, func(request common.InstallRequest) bool {
+			return request.RequesterLogin != "" && !strings.EqualFold(request.RequesterLogin, requester)
+		})
+	}
+	openRequests := trackedRequests
+	if strings.TrimSpace(metadata.StartedByGitHubLogin) != "" {
+		openRequests, err = listAppInstallationRequests(context.Background(), client, metadata.StartedByGitHubLogin)
 		if err != nil {
 			return fmt.Errorf("failed to list app installation requests: %w", err)
 		}
-		if account == "" {
-			return nil
-		}
-		metadata.InstallRequestedAccount = account
 	}
 
-	installation, found, err := listAppInstallations(context.Background(), client, account)
+	installations, err := listAppInstallations(context.Background(), client)
 	if err != nil {
 		return fmt.Errorf("failed to list app installations: %w", err)
 	}
-	if !found {
-		return nil
-	}
 
-	if !metadata.AllowsPendingInstallation(installation.ID) {
-		metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
+	// Put GitHub's current records first so their request IDs and timestamps
+	// replace callback placeholders for the same account during deduplication.
+	candidates := append(slices.Clone(openRequests), trackedRequests...)
+	metadata.SetPendingInstallations(metadata.PendingInstallations)
+	unresolved := make([]common.InstallRequest, 0, len(openRequests))
+	for _, request := range candidates {
+		installation, installed := installationForAccount(installations, request.AccountLogin)
+		if installed {
+			if !metadata.AllowsPendingInstallation(installation.ID) {
+				metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
+			}
+			continue
+		}
+		if installRequestIsOpen(request, openRequests) {
+			unresolved = append(unresolved, request)
+		}
 	}
-	metadata.InstallRequested = false
-	metadata.InstallRequestedAccount = ""
+	metadata.SetInstallRequests(unresolved)
 	return nil
 }
 
-// listAppInstallationRequestsFromGitHub returns the account login of the open
-// App install request made by the requester, or an empty string when the
-// requester has no open request.
-func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) (string, error) {
+func installationForAccount(installations []common.PendingInstallation, account string) (common.PendingInstallation, bool) {
+	if strings.TrimSpace(account) == "" {
+		return common.PendingInstallation{}, false
+	}
+	for _, installation := range installations {
+		if strings.EqualFold(installation.AccountLogin, account) {
+			return installation, true
+		}
+	}
+	return common.PendingInstallation{}, false
+}
+
+func installRequestIsOpen(request common.InstallRequest, open []common.InstallRequest) bool {
+	return slices.ContainsFunc(open, func(candidate common.InstallRequest) bool {
+		if request.ID != "" && candidate.ID != "" {
+			return request.ID == candidate.ID
+		}
+		return request.AccountLogin != "" && strings.EqualFold(request.AccountLogin, candidate.AccountLogin)
+	})
+}
+
+// listAppInstallationRequestsFromGitHub returns every open App install request
+// made by the requester.
+func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) ([]common.InstallRequest, error) {
 	if strings.TrimSpace(requesterLogin) == "" {
-		return "", nil
+		return nil, nil
 	}
 
+	result := []common.InstallRequest{}
 	opts := &github.ListOptions{PerPage: 100}
 	for {
 		requests, response, err := client.Apps.ListInstallationRequests(ctx, opts)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, request := range requests {
 			if strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
-				return request.GetAccount().GetLogin(), nil
+				createdAt := ""
+				if request.CreatedAt != nil {
+					createdAt = request.CreatedAt.Time.UTC().Format(time.RFC3339Nano)
+				}
+				result = append(result, common.InstallRequest{
+					ID:             strconv.FormatInt(request.GetID(), 10),
+					AccountLogin:   request.GetAccount().GetLogin(),
+					RequesterLogin: request.GetRequester().GetLogin(),
+					CreatedAt:      createdAt,
+				})
 			}
 		}
 
 		if response == nil || response.NextPage == 0 {
-			return "", nil
+			return result, nil
 		}
 		opts.Page = response.NextPage
 	}
 }
 
-// listAppInstallationsFromGitHub returns the App installation owned by the
-// account, or found=false when the account has no installation.
-func listAppInstallationsFromGitHub(ctx context.Context, client *github.Client, account string) (common.PendingInstallation, bool, error) {
+func listAppInstallationsFromGitHub(ctx context.Context, client *github.Client) ([]common.PendingInstallation, error) {
+	result := []common.PendingInstallation{}
 	opts := &github.ListOptions{PerPage: 100}
 	for {
 		installations, response, err := client.Apps.ListInstallations(ctx, opts)
 		if err != nil {
-			return common.PendingInstallation{}, false, err
+			return nil, err
 		}
 
 		for _, installation := range installations {
-			if strings.EqualFold(installation.GetAccount().GetLogin(), account) {
-				return common.PendingInstallation{
-					ID:           strconv.FormatInt(installation.GetID(), 10),
-					AccountLogin: installation.GetAccount().GetLogin(),
-					AccountType:  installation.GetAccount().GetType(),
-				}, true, nil
-			}
+			result = append(result, common.PendingInstallation{
+				ID:           strconv.FormatInt(installation.GetID(), 10),
+				AccountLogin: installation.GetAccount().GetLogin(),
+				AccountType:  installation.GetAccount().GetType(),
+			})
 		}
 
 		if response == nil || response.NextPage == 0 {
-			return common.PendingInstallation{}, false, nil
+			return result, nil
 		}
 		opts.Page = response.NextPage
 	}

@@ -9,18 +9,25 @@ import {
   PRIMARY_FACTORY_KEY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { LOW_CREDIT_USAGE_REPORT, SPENT_CREDIT_USAGE_REPORT } from "../__fixtures__/usageReportFixtures";
+import {
+  LOW_CREDIT_USAGE_REPORT,
+  PURCHASED_CREDIT_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+} from "../__fixtures__/usageReportFixtures";
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("hides the banner when remaining hosted credit is comfortably above the low-credit threshold", async () => {
+  it("hides the banner when purchased hosted credit is comfortably above $20", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
-        factoriesFixture={defaultFactoriesFixture}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: PURCHASED_CREDIT_USAGE_REPORT,
+        }}
       />,
     );
 
@@ -28,7 +35,7 @@ describe("LinesPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
   }, 10000);
 
-  it("shows a red out-of-credit banner with a go-to-billing button when remaining credit is empty", async () => {
+  it("shows a trial-empty banner that opens Billing when welcome credit is spent", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
@@ -40,15 +47,15 @@ describe("LinesPage hosted credit banner", () => {
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Hosted credit is empty");
-    expect(banner).toHaveClass("border-red-200");
-    expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
-
-    const button = screen.getByRole("button", { name: "Go to billing" });
-    expect(button).toBeInTheDocument();
+    expect(banner).toHaveTextContent("Trial credit is empty");
+    expect(banner).toHaveAttribute("data-tone", "warning");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/settings/organization/billing"),
+    );
   }, 10000);
 
-  it("shows an amber low-credit banner when remaining credit is above zero but at or below $20", async () => {
+  it("shows a low-credit banner when purchased remaining credit is at or below $20", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
@@ -60,8 +67,12 @@ describe("LinesPage hosted credit banner", () => {
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Hosted credit is running low");
-    expect(banner).toHaveClass("border-amber-200");
-    expect(screen.getByRole("button", { name: "Go to billing" })).toBeInTheDocument();
+    expect(banner).toHaveTextContent("Hosted credit is low");
+    expect(banner).toHaveTextContent("$15.00 remaining");
+    expect(banner).toHaveAttribute("data-tone", "warning");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/settings/organization/billing"),
+    );
   }, 10000);
 });

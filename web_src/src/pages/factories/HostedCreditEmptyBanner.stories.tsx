@@ -5,18 +5,17 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
- * Compact banner warning about hosted credit. Tasks and Missions show this
- * above the board with a link to Organization Spending; the workspace board
- * shows it with a (not yet wired) go-to-billing button. Red styling ("empty")
- * is severe — hosted runs cannot start. Amber styling ("low") warns before
- * that happens.
+ * Status banner for hosted credit. A healthy trial uses quiet chrome.
+ * Low, empty, or expired credit uses an amber warning. Tasks and the
+ * workspace board show this in the page header. The action opens
+ * Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
   component: HostedCreditEmptyBanner,
   parameters: { layout: "padded" },
   args: {
-    spendingHref: "/org/workspaces/RF/settings/organization/spending",
+    spendingHref: "/org/workspaces/RF/settings/organization/billing",
   },
   decorators: [
     withFactoriesTheme,
@@ -32,31 +31,64 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Polar billing is on. The action links to spending. */
+/** Polar billing is on. The action opens Billing. */
 export const BillingOn: Story = {
   name: "Billing on",
-  args: { level: "empty", billingEnabled: true },
+  args: { billingEnabled: true },
 };
 
-/** Polar billing is off. The action opens spending for an installation admin. */
+/** Polar billing is off. The action opens Billing. */
 export const BillingOff: Story = {
   name: "Billing off",
-  args: { level: "empty", billingEnabled: false },
+  args: { billingEnabled: false },
 };
 
-/** Remaining hosted credit is at or below $20. Amber, less severe than empty. */
+/** Welcome credit remains. The action opens Billing. */
+export const Trial: Story = {
+  name: "Trial",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit expires today. The banner uses warning chrome. */
+export const TrialEndsToday: Story = {
+  name: "Trial ends today",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is spent. The action opens Billing. */
+export const TrialEmpty: Story = {
+  name: "Trial empty",
+  args: {
+    billingEnabled: true,
+    kind: "trial-empty",
+  },
+};
+
+/** Welcome credit expired. The action opens Billing. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  args: {
+    billingEnabled: true,
+    kind: "trial-expired",
+  },
+};
+
+/** Purchased hosted credit remains at or below $20. The action opens Billing. */
 export const LowCredit: Story = {
   name: "Low credit",
-  args: { level: "low", billingEnabled: true },
-};
-
-/** The workspace board has no billing page yet, so the action is a no-op button. */
-export const BoardGoToBillingButton: Story = {
-  name: "Board (go to billing button)",
   args: {
-    level: "empty",
     billingEnabled: true,
-    spendingHref: undefined,
-    onGoToBilling: () => console.log("Go to billing"),
+    kind: "low",
+    remainingCreditCents: 1500,
   },
 };

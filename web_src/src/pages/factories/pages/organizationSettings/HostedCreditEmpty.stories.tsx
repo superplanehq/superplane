@@ -2,12 +2,15 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
+import {
+  EXPIRED_WELCOME_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+  STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+} from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 /**
- * Current Organization Spending UI when hosted credit is empty.
- * Hosted runs fail at execute. This page is the recovery screen.
+ * Empty hosted credit on Tasks. The banner action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Pages/Hosted Credit Empty",
@@ -33,6 +36,37 @@ export const OrganizationSpending: Story = {
       }}
     />
   ),
+};
+
+/** Tasks list on the welcome-credit trial. The banner sits above the board. */
+export const Trial: Story = {
+  name: "Trial",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Tasks list after welcome credit expires. The banner sits above the board. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+        }}
+      />
+    );
+  },
 };
 
 /** Tasks list with remaining hosted credit empty. The banner sits above the board. */

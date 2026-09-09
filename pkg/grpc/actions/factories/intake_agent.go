@@ -78,12 +78,17 @@ func defaultIntakeAgentModel(component string) string {
 	return intakeAgentSpecs[index].model
 }
 
-// resolveIntakeAgent picks the workspace agent. Credit without an installation
-// uses Run SuperPlane Agent.
+// resolveIntakeAgent picks the workspace agent. A SuperPlane harness from
+// setup uses Run SuperPlane Agent and ignores organization BYOK keys.
+// Older workspaces with no harness still fall back to those installations.
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
 	if agent := intakeAgentFromSetup(tx, factory, config.AgentIntegrationID); agent != nil {
 		return agent
+	}
+
+	if config.AgentHarness == models.FactoryOnboardingAgentHarnessSuperPlane {
+		return intakeAgentFromHostedProvider(tx, factory)
 	}
 
 	if agent := intakeAgentFromInstallations(tx, factory); agent != nil {

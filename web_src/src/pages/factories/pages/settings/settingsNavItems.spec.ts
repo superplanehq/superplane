@@ -48,6 +48,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "LLM Models",
       "API keys",
       "Secrets",
+      "Billing",
       "Spending",
     ]);
   });
@@ -84,7 +85,7 @@ describe("filterFactorySettingsNavGroups", () => {
 
   it("matches keyword aliases such as billing", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "billing");
-    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-spending"]);
+    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-billing"]);
   });
 
   it("drops groups that have no matching items", () => {
@@ -126,6 +127,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
       "organization-models",
+      "organization-billing",
       "organization-spending",
     ]);
   });

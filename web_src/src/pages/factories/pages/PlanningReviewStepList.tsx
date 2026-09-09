@@ -131,26 +131,28 @@ function StepRow({
         >
           <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} aria-hidden />
         </button>
-        {isOpen ? (
-          <Input
-            value={step.name}
-            onChange={(event) => onChange({ ...step, name: event.target.value })}
-            placeholder="Step name"
-            aria-label={`Name for ${label}`}
-            data-testid={`planning-review-step-name-${position}`}
-            className="h-8 min-w-0 flex-1 border-transparent bg-transparent px-2 text-sm font-medium hover:border-border hover:bg-background focus:bg-background"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={onToggle}
-            className="min-w-0 flex-1 truncate px-2 text-left text-sm font-medium text-foreground"
-            data-testid={`planning-review-step-summary-${position}`}
-          >
-            {step.name || <span className="text-muted-foreground">Untitled step</span>}
-          </button>
-        )}
-        <StepKindMenu step={step} label={label} position={position} onChange={onChange} />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {isOpen ? (
+            <Input
+              value={step.name}
+              onChange={(event) => onChange({ ...step, name: event.target.value })}
+              placeholder="Step name"
+              aria-label={`Name for ${label}`}
+              data-testid={`planning-review-step-name-${position}`}
+              className="h-8 min-w-0 flex-1 border-transparent bg-transparent px-2 text-sm font-medium hover:border-border hover:bg-background focus:bg-background"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="min-w-0 truncate px-2 text-left text-sm font-medium text-foreground"
+              data-testid={`planning-review-step-summary-${position}`}
+            >
+              {step.name || <span className="text-muted-foreground">Untitled step</span>}
+            </button>
+          )}
+          <StepKindMenu step={step} label={label} position={position} onChange={onChange} />
+        </div>
         <button
           type="button"
           aria-label={`Remove ${label}`}

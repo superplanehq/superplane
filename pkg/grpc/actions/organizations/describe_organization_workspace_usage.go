@@ -78,6 +78,7 @@ func DescribeOrganizationWorkspaceUsage(
 		ByMachineType:          serializeUsageByMachineType(byMachine),
 		DefaultHostedProvider:  defaultModel.Provider,
 		DefaultHostedModel:     defaultModel.Model,
+		WelcomeCreditExpiresAt: protoTimestamp(credit.WelcomeCreditExpiresAt),
 	}, nil
 }
 

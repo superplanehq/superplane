@@ -39,6 +39,7 @@ const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> =
   "api-keys": { scope: "organization", section: "api-keys" },
   integrations: { scope: "organization", section: "integrations" },
   spending: { scope: "organization", section: "spending" },
+  billing: { scope: "organization", section: "billing" },
   "llm-spend": { scope: "organization", section: "spending" },
   "workspace-usage": { scope: "organization", section: "spending" },
   secrets: { scope: "organization", section: "secrets" },
