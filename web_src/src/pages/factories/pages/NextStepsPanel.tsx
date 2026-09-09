@@ -48,7 +48,7 @@ export function NextStepsPanel({
 }
 
 function NextStepRow({ step, onSelect }: { step: WorkspaceNextStep; onSelect: (step: WorkspaceNextStep) => void }) {
-  const status = step.done ? WORKSPACE_NEXT_STEPS_COPY.done : WORKSPACE_NEXT_STEPS_COPY.configure;
+  const status = WORKSPACE_NEXT_STEPS_COPY.configure;
   const body = (
     <>
       <NextStepStatusIcon done={step.done} />
@@ -63,29 +63,9 @@ function NextStepRow({ step, onSelect }: { step: WorkspaceNextStep; onSelect: (s
         </span>
         <span className="mt-0.5 block text-[12px] text-muted-foreground">{step.description}</span>
       </span>
-      <span
-        className={cn(
-          "shrink-0 text-[12px] font-medium",
-          step.done ? "text-emerald-700 dark:text-emerald-400" : "text-foreground",
-        )}
-      >
-        {status}
-      </span>
+      <span className="shrink-0 text-[12px] font-medium text-foreground">{status}</span>
     </>
   );
-
-  if (step.done) {
-    return (
-      <div
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
-        data-testid={`workspace-next-step-${step.id}`}
-        data-state="done"
-        aria-label={`${step.title}, ${status}`}
-      >
-        {body}
-      </div>
-    );
-  }
 
   return (
     <button
@@ -93,7 +73,7 @@ function NextStepRow({ step, onSelect }: { step: WorkspaceNextStep; onSelect: (s
       onClick={() => onSelect(step)}
       className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/30"
       data-testid={`workspace-next-step-${step.id}`}
-      data-state="open"
+      data-state={step.done ? "done" : "open"}
       aria-label={`${step.title}, ${status}`}
     >
       {body}

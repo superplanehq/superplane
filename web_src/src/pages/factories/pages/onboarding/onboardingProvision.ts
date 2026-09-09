@@ -3,6 +3,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryApp,
   FactoryLineStep,
@@ -172,6 +173,36 @@ export async function provisionGithubIntake(args: {
   }
 
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+}
+
+export type ListFactoryPRFeedbackHandlers = () => Promise<FactoriesFactoryPrFeedbackHandler[]>;
+
+export type CreateFactoryPRFeedbackHandler = (input: {
+  repository?: string;
+}) => Promise<FactoriesFactoryPrFeedbackHandler>;
+
+function isDiscussionHandlerForRepository(handler: FactoriesFactoryPrFeedbackHandler, repository: string): boolean {
+  if (handler.settings?.subject?.repository !== repository) {
+    return false;
+  }
+  return handler.source !== "SOURCE_PULL_REQUEST_CHECKS";
+}
+
+// The comments handler addresses review comments after a work-order PR
+// opens. Match by repository and source so a retried finish does not add a
+// second copy, and so a status-checks handler does not hide this one.
+export async function provisionPRFeedbackHandler(args: {
+  listHandlers: ListFactoryPRFeedbackHandlers;
+  createHandler: CreateFactoryPRFeedbackHandler;
+  repository: string;
+}): Promise<FactoriesFactoryPrFeedbackHandler> {
+  const handlers = await args.listHandlers();
+  const existing = handlers.find((handler) => isDiscussionHandlerForRepository(handler, args.repository));
+  if (existing) {
+    return existing;
+  }
+
+  return args.createHandler({ repository: args.repository });
 }
 
 export async function provisionLine(args: {

@@ -74,6 +74,13 @@ export function hasAvailablePRFeedbackSource(taken: readonly PRFeedbackSourceId[
   return PR_FEEDBACK_SOURCES.some((source) => !taken.includes(source.id));
 }
 
+export function prFeedbackHandlerForSource<T extends { id?: string; source?: FactoriesFactoryPrFeedbackHandlerSource }>(
+  handlers: readonly T[],
+  sourceId: PRFeedbackSourceId,
+): T | undefined {
+  return handlers.find((handler) => Boolean(handler.id) && prFeedbackSourceId(handler.source) === sourceId);
+}
+
 export interface PRFeedbackDraftSettings {
   source: PRFeedbackSourceId;
   name: string;
@@ -103,35 +110,40 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   allowedBotsLabel: "Allowed bots",
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   checkNamesLabel: "Status checks",
-  checkNamesHelper:
-    "Select the status checks SuperPlane must wait for. SuperPlane starts a fix when a selected check fails.",
+  checkNamesHelper: "Select the status checks SuperPlane must wait for and automatically attempt to fix.",
   checkNamesNone: "Select at least one status check.",
   checkNamesCatalogEmpty: "No status checks found.",
-  checkNamesLoading: "Loading status checks...",
+  checkNamesLoading: "Loading status checks",
+  checkNamesLoadingDetail: "Reading recent pull requests and the required status checks for this repository...",
   checkNamesRequired: "Required",
   checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
   wizardTitle: "Fix pull request checks",
   wizardChecksDescription: "Keep the status checks SuperPlane must wait for and fix.",
-  wizardToolsDescription: "Connect the CI systems that publish these checks so the agent can read their logs.",
+  wizardToolsDescription:
+    "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
   wizardToolsUnknown:
-    "SuperPlane could not tell which tools publish these checks. Connect the systems the agent needs.",
+    "SuperPlane could not match these checks to a CI tool. The agent may not have enough context to fix them.",
+  wizardToolsUnselected:
+    "Some of the checks you selected require additional access that you are not granting.",
+  wizardToolsUnselectedDetail:
+    "That prevents the agent from having enough context to fix issues correctly.",
   wizardContinue: "Continue",
-  wizardFinish: "Create handler",
-  wizardFinishing: "Creating handler...",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
   wizardStepChecks: "Step 1 of 2",
   wizardStepTools: "Step 2 of 2",
   wizardConnect: "Connect",
   wizardSuggested: "Suggested from the selected checks",
-  wizardOtherTools: "Other tools",
+  wizardOtherTools: "Other CI tools",
   maximumAttemptsLabel: "Maximum automatic fix attempts",
   maximumAttemptsHelper:
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
   integrationsLabel: "Additional integration access",
-  integrationsHelper: "Give the agent access to CI logs from other connected integrations.",
+  integrationsHelper: "Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith.",
   integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
   integrationsMissingLink: "Integrations page",
   integrationsMissingAfter: " and connect it.",
-  integrationsEmpty: "No other connected integrations are available.",
+  integrationsEmpty: "None of these CI tools are connected.",
   healthReady: "Ready",
   healthNeedsRepair: "Needs repair",
   healthReadyHelper: "This automation can receive a mention and address it.",

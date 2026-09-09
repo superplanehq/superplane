@@ -282,7 +282,10 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
           metadata: { id: "int-circleci-2", name: "circleci-staging", integrationName: "circleci" },
           status: { state: "ready" },
         },
-        { metadata: { id: "int-slack-1", name: "slack-alerts", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-semaphore-1", name: "semaphore-prod", integrationName: "semaphore" },
+          status: { state: "ready" },
+        },
         {
           metadata: { id: "int-circleci-1", name: "circleci-prod", integrationName: "circleci" },
           status: { state: "ready" },
@@ -294,21 +297,39 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
 
     const list = screen.getByTestId("pr-feedback-integrations");
     const rows = within(list).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual([
-      "circleci-prod",
-      "circleci-staging",
-      "slack-alerts",
-      "slack-eng",
-    ]);
+    expect(rows.map((row) => row.textContent)).toEqual(["circleci-prod", "circleci-staging", "semaphore-prod"]);
+  });
+
+  it("hides connected integrations that are not common status-check tools", () => {
+    vi.mocked(useConnectedIntegrations).mockReturnValue(
+      mockConnectedIntegrations([
+        { metadata: { id: "int-slack-1", name: "slack-alerts", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-cloudflare", name: "cloudflare-prod", integrationName: "cloudflare" },
+          status: { state: "ready" },
+        },
+      ]),
+    );
+
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1");
+
+    const list = screen.getByTestId("pr-feedback-integrations");
+    expect(list).toHaveTextContent("cloudflare-prod");
+    expect(list).not.toHaveTextContent("slack-alerts");
   });
 
   it("links to the organization Integrations page", () => {
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 
     expect(
-      screen.getByText(/Give the agent access to CI logs from other connected integrations/, { exact: false }),
+      screen.getByText(
+        /Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith/,
+        {
+          exact: false,
+        },
+      ),
     ).toHaveTextContent(
-      "Give the agent access to CI logs from other connected integrations. If this list does not include the integration you need, go to the Integrations page and connect it.",
+      "Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith. If this list does not include the integration you need, go to the Integrations page and connect it.",
     );
     const link = screen.getByRole("link", { name: "Integrations page" });
     expect(link).toHaveAttribute("href", organizationIntegrationsPath("org-1"));

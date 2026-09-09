@@ -80,7 +80,19 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
       }
       return response.data.handler;
     },
-    onSuccess: () => {
+    onSuccess: (handler) => {
+      queryClient.setQueryData<FactoriesFactoryPrFeedbackHandler[]>(
+        factoryPRFeedbackHandlersKey(organizationId, factoryId),
+        (current) => {
+          if (!current) {
+            return [handler];
+          }
+          if (current.some((item) => item.id === handler.id)) {
+            return current;
+          }
+          return [...current, handler];
+        },
+      );
       invalidatePRFeedbackQueries(queryClient, organizationId, factoryId);
     },
   });

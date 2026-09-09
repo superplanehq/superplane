@@ -1,6 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
 import type { FactoriesFactoryRepositoryStatusCheck } from "@/api-client";
@@ -40,12 +40,16 @@ export function StatusCheckPicker({
         data-testid="pr-feedback-check-names-picker"
       >
         {loading ? (
-          <p
-            className="px-3 py-6 text-center text-[13px] text-muted-foreground"
+          <div
+            className="flex flex-col items-center gap-2 px-4 py-6 text-center"
             data-testid="pr-feedback-check-names-loading"
           >
-            {PR_FEEDBACK_SETTINGS_COPY.checkNamesLoading}
-          </p>
+            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+            <p className="text-[13px] font-medium text-foreground">{PR_FEEDBACK_SETTINGS_COPY.checkNamesLoading}</p>
+            <p className="workspace-body-text text-muted-foreground">
+              {PR_FEEDBACK_SETTINGS_COPY.checkNamesLoadingDetail}
+            </p>
+          </div>
         ) : rows.length === 0 ? (
           <p
             className="px-3 py-6 text-center text-[13px] text-muted-foreground"

@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
     { name: "lint", required: true },
     { name: "e2e", required: false, suggestedIntegration: "circleci" },
   ],
+  connected: [] as Array<{
+    metadata: { id: string; name: string; integrationName: string };
+    status: { state: string };
+  }>,
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -26,7 +30,7 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
 
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: () => ({
-    data: [],
+    data: mocks.connected,
     isLoading: false,
     refetch: vi.fn(),
   }),
@@ -34,6 +38,7 @@ vi.mock("@/hooks/useIntegrations", () => ({
     data: [
       { name: "circleci", label: "CircleCI" },
       { name: "semaphore", label: "Semaphore" },
+      { name: "slack", label: "Slack" },
     ],
   }),
   useCreateIntegration: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
@@ -63,6 +68,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     mocks.createHandler.mockResolvedValue({ id: "handler-1" });
     mocks.fetching = false;
     mocks.catalog.splice(0, mocks.catalog.length, ...defaultCatalog);
+    mocks.connected.splice(0);
   });
 
   it("waits for the catalog before it offers continue", () => {
@@ -79,7 +85,12 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       />,
     );
 
-    expect(screen.getByTestId("pr-feedback-check-names-loading")).toHaveTextContent("Loading status checks...");
+    const loading = screen.getByTestId("pr-feedback-check-names-loading");
+    expect(loading).toHaveTextContent("Loading status checks");
+    expect(loading).toHaveTextContent(
+      "Reading recent pull requests and the required status checks for this repository",
+    );
+    expect(loading.querySelector("svg.animate-spin")).not.toBeNull();
     expect(screen.getByTestId("checks-setup-continue")).toBeDisabled();
   });
 
@@ -99,6 +110,8 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    const frame = screen.getByTestId("checks-pr-feedback-setup").className;
+    expect(frame).toContain("h-[min(36rem,80vh)]");
     await waitFor(() => {
       expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint");
     });
@@ -106,7 +119,11 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     await user.click(screen.getByTestId("checks-setup-continue"));
 
+    expect(screen.getByTestId("checks-pr-feedback-setup").className).toBe(frame);
     expect(screen.getByText("Suggested from the selected checks")).toBeInTheDocument();
+    expect(screen.getByText("CircleCI")).toBeInTheDocument();
+    expect(screen.getByText("Semaphore")).toBeInTheDocument();
+    expect(screen.queryByText("Slack")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("checks-setup-connect-circleci"));
     expect(screen.getByTestId("integration-create-dialog")).toBeInTheDocument();
   });
@@ -172,6 +189,14 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
     await user.click(screen.getByTestId("checks-setup-continue"));
+    expect(screen.getByTestId("checks-setup-finish")).toHaveTextContent("Finish");
+    expect(screen.getByText(/Connect the external tools reporting the status checks/)).toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
+      "Some of the checks you selected require additional access that you are not granting.",
+    );
+    expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
+      "That prevents the agent from having enough context to fix issues correctly.",
+    );
     await user.click(screen.getByTestId("checks-setup-finish"));
 
     await waitFor(() => {
@@ -185,5 +210,81 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       });
     });
     expect(onCreated).toHaveBeenCalledWith("handler-1");
+  });
+
+  it("warns when no CI tool is suggested and still lets the user finish", async () => {
+    const user = userEvent.setup();
+    mocks.catalog.splice(0, mocks.catalog.length, { name: "lint", required: true });
+    render(
+      <ChecksPRFeedbackSetupDialog
+        open
+        organizationId="org-1"
+        factoryId="factory-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
+    await user.click(screen.getByTestId("checks-setup-continue"));
+
+    expect(screen.getByTestId("checks-setup-tools-unknown")).toHaveTextContent(
+      "The agent may not have enough context to fix them",
+    );
+    expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("preselects a connected integration and hides Connect", async () => {
+    const user = userEvent.setup();
+    mocks.connected.push({
+      metadata: { id: "int-cci", name: "circleci-prod", integrationName: "circleci" },
+      status: { state: "ready" },
+    });
+    render(
+      <ChecksPRFeedbackSetupDialog
+        open
+        organizationId="org-1"
+        factoryId="factory-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
+    await user.click(screen.getByTestId("checks-setup-continue"));
+
+    const row = screen.getByTestId("checks-setup-integration-int-cci");
+    await waitFor(() => expect(row).toHaveAttribute("aria-selected", "true"));
+    expect(row).toHaveTextContent("circleci-prod");
+    expect(screen.queryByTestId("checks-setup-connect-circleci")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-connect-semaphore")).toHaveTextContent("Connect");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checks-setup-tools-unselected")).not.toBeInTheDocument();
+
+    await user.click(row);
+    expect(row).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
+      "Some of the checks you selected require additional access that you are not granting.",
+    );
+    expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
+      "That prevents the agent from having enough context to fix issues correctly.",
+    );
+    expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
+
+    await user.click(screen.getByTestId("checks-setup-finish"));
+    await waitFor(() => {
+      expect(mocks.createHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            checks: expect.objectContaining({ runnerIntegrationIds: [] }),
+          }),
+        }),
+      );
+    });
   });
 });

@@ -163,6 +163,7 @@ import {
   apiPRFeedbackSource,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
+  prFeedbackHandlerForSource,
   prFeedbackListenTitle,
   prFeedbackSourceById,
   takenPRFeedbackSourceIds,
@@ -467,9 +468,7 @@ export function LinesPage() {
           repository={factory.onboarding?.appRepository?.trim() ?? ""}
           source={checksPRFeedbackSource}
           onClose={() => setChecksPRFeedbackSource(null)}
-          onCreated={(handlerId) =>
-            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId))
-          }
+          onCreated={() => setChecksPRFeedbackSource(null)}
         />
       ) : null}
       {automationViewCanvasId ? (
@@ -516,6 +515,13 @@ export function LinesPage() {
             onSelect={(step) =>
               runWorkspaceNextStepAction(step.action, {
                 configurePRFeedback: (sourceId) => {
+                  const existing = prFeedbackHandlerForSource(prFeedbackHandlers, sourceId);
+                  if (existing?.id) {
+                    navigate(
+                      factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, existing.id),
+                    );
+                    return;
+                  }
                   const source = prFeedbackSourceById(sourceId);
                   if (source) {
                     createPRFeedbackFromSource(source);

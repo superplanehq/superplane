@@ -5,8 +5,9 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  CHECKS_HANDLER_SKIP_INTEGRATIONS,
   catalogStatusCheckNames,
+  isChecksHandlerCIIntegration,
+  readyChecksHandlerIntegrationIds,
   suggestedIntegrationsForChecks,
 } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
@@ -18,6 +19,7 @@ export function useChecksPRFeedbackSetup(organizationId: string, factoryId: stri
   const [connectName, setConnectName] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
+  const [connectedApplied, setConnectedApplied] = useState(false);
 
   const catalogQuery = useFactoryRepositoryStatusChecks(organizationId, factoryId, repository, { enabled: open });
   const catalog = catalogQuery.data ?? [];
@@ -37,6 +39,7 @@ export function useChecksPRFeedbackSetup(organizationId: string, factoryId: stri
     setConnectName(null);
     setError(undefined);
     setCatalogApplied(false);
+    setConnectedApplied(false);
   }, [open]);
 
   useEffect(() => {
@@ -47,11 +50,18 @@ export function useChecksPRFeedbackSetup(organizationId: string, factoryId: stri
     setCatalogApplied(true);
   }, [catalog, catalogApplied, catalogLoading, open]);
 
+  const connectedLoading = connectedQuery.isPending || connectedQuery.isFetching;
+  useEffect(() => {
+    if (!open || connectedApplied || connectedLoading) {
+      return;
+    }
+    setRunnerIntegrationIds(readyChecksHandlerIntegrationIds(connectedQuery.data ?? []));
+    setConnectedApplied(true);
+  }, [connectedApplied, connectedLoading, connectedQuery.data, open]);
+
   const suggestedNames = useMemo(() => suggestedIntegrationsForChecks(catalog, checkNames), [catalog, checkNames]);
   const connected = connectedQuery.data ?? [];
-  const available = (availableQuery.data ?? []).filter(
-    (integration) => integration.name && !CHECKS_HANDLER_SKIP_INTEGRATIONS.has(integration.name),
-  );
+  const available = (availableQuery.data ?? []).filter((integration) => isChecksHandlerCIIntegration(integration.name));
   const existingNames = useMemo(
     () => new Set(connected.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name))),
     [connected],

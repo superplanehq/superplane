@@ -15,6 +15,7 @@ import {
   toggleUniqueString,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
+  prFeedbackHandlerForSource,
   prFeedbackSettingsTabs,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
@@ -287,6 +288,20 @@ describe("takenPRFeedbackSourceIds", () => {
     ).toEqual(["discussion", "checks"]);
     expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
     expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
+  });
+});
+
+describe("prFeedbackHandlerForSource", () => {
+  it("returns the handler for a source when it has an id", () => {
+    expect(
+      prFeedbackHandlerForSource(
+        [
+          { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" },
+          { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS" },
+        ],
+        "discussion",
+      ),
+    ).toEqual({ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" });
   });
 });
 

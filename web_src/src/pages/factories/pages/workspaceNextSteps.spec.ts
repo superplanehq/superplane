@@ -20,7 +20,7 @@ describe("workspaceNextSteps", () => {
     ]);
   });
 
-  it("keeps a configured task in the list as done", () => {
+  it("marks the provisioned comments handler as done and keeps status checks open", () => {
     expect(
       workspaceNextSteps({
         ...ready,

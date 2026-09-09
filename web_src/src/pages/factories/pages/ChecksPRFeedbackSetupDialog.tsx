@@ -1,21 +1,25 @@
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { cn } from "@/lib/utils";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check, TriangleAlert } from "lucide-react";
 
-import { CHECKS_HANDLER_SKIP_INTEGRATIONS } from "./checksPRFeedbackSetup";
+import {
+  checksHandlerIntegrationRows,
+  hasSelectedSuggestedIntegration,
+  isChecksHandlerCIIntegration,
+  type ChecksHandlerIntegrationRow,
+} from "./checksPRFeedbackSetup";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 import {
   integrationDefinitionLabel,
   useChecksPRFeedbackSetup,
   type ChecksPRFeedbackSetupModel,
 } from "./useChecksPRFeedbackSetup";
-import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSource } from "./prFeedbackSettingsModel";
+import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
 interface ChecksPRFeedbackSetupDialogProps {
   open: boolean;
@@ -81,9 +85,13 @@ function ChecksSetupView({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="gap-0 p-0 sm:max-w-xl" showCloseButton data-testid="checks-pr-feedback-setup">
+      <DialogContent
+        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-xl"
+        showCloseButton
+        data-testid="checks-pr-feedback-setup"
+      >
         <SetupHeader step={setup.step} onBack={() => setup.setStep("checks")} />
-        <div className="max-h-[min(32rem,65vh)] overflow-y-auto px-5 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {setup.step === "checks" ? (
             <StatusCheckPicker
               names={setup.checkNames}
@@ -101,7 +109,10 @@ function ChecksSetupView({
             </p>
           ) : null}
         </div>
-        <SetupFooter setup={setup} source={source} onClose={onClose} onCreated={onCreated} />
+        <div className="shrink-0 border-t border-border">
+          {setup.step === "tools" ? <ToolsAccessWarning warning={toolsAccessWarning(setup)} /> : null}
+          <SetupFooter setup={setup} source={source} onClose={onClose} onCreated={onCreated} />
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -109,8 +120,8 @@ function ChecksSetupView({
 
 function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () => void }) {
   return (
-    <DialogHeader className="border-b border-border px-5 py-4 text-left">
-      <div className="flex items-center gap-2">
+    <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+      <div className="flex items-center gap-2.5">
         {step === "tools" ? (
           <button
             type="button"
@@ -121,16 +132,18 @@ function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () =>
             <ArrowLeft className="size-4" />
           </button>
         ) : null}
-        <IntegrationIcon integrationName="github" className="size-6" size={24} />
-        <div>
-          <DialogTitle className="text-[15px] font-semibold">{PR_FEEDBACK_SETTINGS_COPY.wizardTitle}</DialogTitle>
-          <DialogDescription className="workspace-body-text mt-1 text-muted-foreground">
-            {step === "checks"
-              ? PR_FEEDBACK_SETTINGS_COPY.wizardChecksDescription
-              : PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription}
-          </DialogDescription>
-        </div>
+        <IntegrationIcon integrationName="github" className="size-5 shrink-0" size={20} />
+        <DialogTitle className="min-w-0 text-[15px] font-semibold leading-5">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardTitle}
+        </DialogTitle>
       </div>
+      {step === "tools" ? (
+        <DialogDescription className="workspace-body-text mt-1 text-muted-foreground">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription}
+        </DialogDescription>
+      ) : (
+        <DialogDescription className="sr-only">{PR_FEEDBACK_SETTINGS_COPY.wizardChecksDescription}</DialogDescription>
+      )}
     </DialogHeader>
   );
 }
@@ -141,7 +154,7 @@ function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
       (integration) =>
         integration.status?.state === "ready" &&
         integration.metadata?.id &&
-        !CHECKS_HANDLER_SKIP_INTEGRATIONS.has(integration.metadata.integrationName?.toLowerCase() ?? ""),
+        isChecksHandlerCIIntegration(integration.metadata.integrationName),
     ),
   );
   const suggested = setup.available.filter((integration) => setup.suggestedNames.includes(integration.name ?? ""));
@@ -149,9 +162,6 @@ function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
 
   return (
     <div className="space-y-5">
-      {setup.suggestedNames.length === 0 ? (
-        <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardToolsUnknown}</p>
-      ) : null}
       {suggested.length > 0 ? (
         <IntegrationChoiceList
           title={PR_FEEDBACK_SETTINGS_COPY.wizardSuggested}
@@ -180,6 +190,47 @@ function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
   );
 }
 
+type ToolsAccessWarningContent = { testId: string; lines: string[] };
+
+function toolsAccessWarning(setup: ChecksPRFeedbackSetupModel): ToolsAccessWarningContent | null {
+  if (setup.suggestedNames.length === 0) {
+    return { testId: "checks-setup-tools-unknown", lines: [PR_FEEDBACK_SETTINGS_COPY.wizardToolsUnknown] };
+  }
+  const ready = (setup.connected ?? []).filter(
+    (integration) =>
+      integration.status?.state === "ready" &&
+      integration.metadata?.id &&
+      isChecksHandlerCIIntegration(integration.metadata.integrationName),
+  );
+  if (hasSelectedSuggestedIntegration(setup.suggestedNames, setup.runnerIntegrationIds, ready)) {
+    return null;
+  }
+  return {
+    testId: "checks-setup-tools-unselected",
+    lines: [PR_FEEDBACK_SETTINGS_COPY.wizardToolsUnselected, PR_FEEDBACK_SETTINGS_COPY.wizardToolsUnselectedDetail],
+  };
+}
+
+function ToolsAccessWarning({ warning }: { warning: ToolsAccessWarningContent | null }) {
+  if (!warning) {
+    return null;
+  }
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2 bg-amber-50/70 px-5 py-2.5 dark:bg-amber-950/25"
+      data-testid={warning.testId}
+    >
+      <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+      <div className="workspace-body-text space-y-1 text-muted-foreground">
+        {warning.lines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function IntegrationChoiceList({
   title,
   definitions,
@@ -195,60 +246,81 @@ function IntegrationChoiceList({
   onToggle: (ids: string[]) => void;
   onConnect: (name: string) => void;
 }) {
+  const labeled = definitions.map((definition) => ({
+    name: definition.name,
+    label: getIntegrationTypeDisplayName(definition.label, definition.name ?? ""),
+  }));
+  const rows = checksHandlerIntegrationRows(labeled, ready);
+
   return (
     <section>
       <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</h3>
-      <ul className="mt-3 flex flex-col gap-2">
-        {definitions.map((definition) => {
-          const type = definition.name ?? "";
-          const instances = ready.filter((item) => item.metadata?.integrationName === type);
-          return (
-            <li key={type} className="rounded-md border border-border px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <IntegrationIcon integrationName={type} className="size-4 shrink-0" size={16} />
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                  {getIntegrationTypeDisplayName(definition.label, type)}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onConnect(type)}
-                  data-testid={`checks-setup-connect-${type}`}
-                >
-                  {PR_FEEDBACK_SETTINGS_COPY.wizardConnect}
-                </Button>
-              </div>
-              {instances.map((instance) => {
-                const id = instance.metadata?.id ?? "";
-                const name = instance.metadata?.name || type;
-                const checked = selectedIds.includes(id);
-                return (
-                  <div key={id} className="mt-2 flex items-center gap-2 pl-6">
-                    <Checkbox
-                      id={`checks-setup-integration-${id}`}
-                      className="cursor-pointer"
-                      checked={checked}
-                      onChange={(event) => {
-                        if (event.currentTarget.checked) {
-                          onToggle([...selectedIds, id]);
-                          return;
-                        }
-                        onToggle(selectedIds.filter((item) => item !== id));
-                      }}
-                      data-testid={`checks-setup-integration-${id}`}
-                    />
-                    <Label htmlFor={`checks-setup-integration-${id}`} className="cursor-pointer">
-                      {name}
-                    </Label>
-                  </div>
-                );
-              })}
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mt-2 rounded-lg border border-border">
+        <ul className="divide-y divide-border">
+          {rows.map((row) => (
+            <IntegrationChoiceRow
+              key={row.instanceId ?? row.type}
+              row={row}
+              selected={Boolean(row.instanceId && selectedIds.includes(row.instanceId))}
+              onToggle={() => {
+                if (!row.instanceId) {
+                  return;
+                }
+                onToggle(toggleUniqueString(selectedIds, row.instanceId));
+              }}
+              onConnect={() => onConnect(row.type)}
+            />
+          ))}
+        </ul>
+      </div>
     </section>
+  );
+}
+
+function IntegrationChoiceRow({
+  row,
+  selected,
+  onToggle,
+  onConnect,
+}: {
+  row: ChecksHandlerIntegrationRow;
+  selected: boolean;
+  onToggle: () => void;
+  onConnect: () => void;
+}) {
+  const selectable = Boolean(row.instanceId);
+
+  return (
+    <li>
+      <div className={cn("flex w-full items-center gap-2 pr-3", selected ? "bg-accent/50" : "hover:bg-accent/30")}>
+        <button
+          type="button"
+          role={selectable ? "option" : undefined}
+          aria-selected={selectable ? selected : undefined}
+          disabled={!selectable}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left disabled:cursor-default disabled:opacity-100"
+          data-testid={row.instanceId ? `checks-setup-integration-${row.instanceId}` : `checks-setup-type-${row.type}`}
+        >
+          <IntegrationIcon integrationName={row.type} className="size-4 shrink-0" size={16} />
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{row.displayName}</span>
+        </button>
+        {selectable ? null : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onConnect}
+            data-testid={`checks-setup-connect-${row.type}`}
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.wizardConnect}
+          </Button>
+        )}
+        <span className="flex size-3.5 shrink-0 items-center justify-center">
+          {selected ? <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -264,7 +336,7 @@ function SetupFooter({
   onCreated: (handlerId: string) => void;
 }) {
   return (
-    <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+    <footer className="flex items-center justify-between gap-3 px-5 py-3">
       <span className="text-[12px] text-muted-foreground">
         {setup.step === "checks"
           ? PR_FEEDBACK_SETTINGS_COPY.wizardStepChecks

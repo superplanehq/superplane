@@ -21,8 +21,7 @@ export interface WorkspaceNextStepContext {
 export const WORKSPACE_NEXT_STEPS_COPY = {
   title: "You finished workspace setup",
   description:
-    "The factory can implement tasks and will open pull requests for them. Configure verification for those pull requests next.",
-  done: "Done",
+    "The factory can implement tasks and will open pull requests for them. Configure status checks for those pull requests next.",
   configure: "Configure...",
 } as const;
 

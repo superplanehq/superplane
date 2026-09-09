@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
 
+import { isChecksHandlerCIIntegration } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 
@@ -223,7 +224,9 @@ function PRFeedbackIntegrationsField({
   const options = useMemo(() => {
     const filtered = (integrationsQuery.data ?? []).filter((integration) => {
       const type = integration.metadata?.integrationName?.toLowerCase();
-      return type !== "github" && integration.status?.state === "ready" && integration.metadata?.id;
+      return (
+        isChecksHandlerCIIntegration(type) && integration.status?.state === "ready" && Boolean(integration.metadata?.id)
+      );
     });
     return sortConnectedIntegrationsByType(filtered);
   }, [integrationsQuery.data]);
