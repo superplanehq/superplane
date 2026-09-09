@@ -208,10 +208,10 @@ describe("OnboardingGate", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "switch workspace" }));
-    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/pay/setup")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "complete" }));
 
-    expect(screen.getByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    expect(screen.getByText("/org-1/workspaces/pay/setup")).toBeInTheDocument();
   });
 
   it("does not retain a completed workspace hold after switching workspaces", async () => {
