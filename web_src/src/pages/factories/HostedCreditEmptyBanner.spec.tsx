@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
-import { HOSTED_CREDIT_RUNS_STOP_HINT } from "./lib/hostedCreditEmpty";
+import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "./HostedCreditEmptyBanner";
+import { HOSTED_CREDIT_RUNS_STOP_HINT, welcomeCreditHeaderLabel } from "./lib/hostedCreditEmpty";
 
 const billingHref = "/org/workspaces/RF/settings/organization/billing";
 
@@ -136,5 +136,38 @@ describe("HostedCreditEmptyBanner", () => {
     expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(banner).toHaveAttribute("data-tone", "warning");
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+  });
+});
+
+describe("HostedCreditHeaderKicker", () => {
+  it("shows remaining trial days and an Add credits action", () => {
+    const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker
+          spendingHref={billingHref}
+          welcomeCreditExpiresAt={expiresAt.toISOString()}
+          remainingCreditCents={4124}
+        />
+      </MemoryRouter>,
+    );
+
+    const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveTextContent("Trial");
+    expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
+    expect(kicker).toHaveTextContent("$41.24");
+    expect(kicker).toHaveTextContent("Add credits");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+  });
+
+  it("falls back to a 14-day trial label when expiry is missing", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker spendingHref={billingHref} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("hosted-credit-header-kicker")).toHaveTextContent("Trial");
+    expect(screen.getByTestId("hosted-credit-header-kicker")).toHaveTextContent("14 days");
   });
 });

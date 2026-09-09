@@ -17,7 +17,11 @@ import {
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { SettingsAutomationHeaderRow, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import {
+  SettingsAutomationCanvasEdit,
+  SettingsAutomationHeaderRow,
+  SettingsAutomationWorkspace,
+} from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -103,8 +107,6 @@ export function IntakeSourceSettingsPopup({
               </TabsList>
             </Tabs>
           }
-          editHref={tab === "automation" ? editAutomationHref : undefined}
-          editLabel={INTAKE_SETTINGS_COPY.editAutomation}
         />
       </PopupHeader>
       <IntakeSettingsTabPanel
@@ -118,6 +120,7 @@ export function IntakeSourceSettingsPopup({
         onRetryAutomation={onRetryAutomation}
         canvasId={canvasId}
         runHrefFor={runHrefFor}
+        editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
         onUpdate={update}
@@ -140,6 +143,7 @@ function IntakeSettingsTabPanel({
   onRetryAutomation,
   canvasId,
   runHrefFor,
+  editAutomationHref,
   savePending,
   saveError,
   onUpdate,
@@ -157,6 +161,7 @@ function IntakeSettingsTabPanel({
   onRetryAutomation?: () => void;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
+  editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
   onUpdate: <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => void;
@@ -170,6 +175,7 @@ function IntakeSettingsTabPanel({
         graph={automationGraph}
         canvasId={canvasId}
         runHrefFor={runHrefFor}
+        editHref={editAutomationHref}
         loading={automationLoading}
         error={automationError}
         onRetry={onRetryAutomation}
@@ -298,6 +304,7 @@ function IntakeAutomationTab({
   graph,
   canvasId,
   runHrefFor,
+  editHref,
   loading,
   error,
   onRetry,
@@ -305,6 +312,7 @@ function IntakeAutomationTab({
   graph?: IntakeAutomationGraph;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
   loading: boolean;
   error: boolean;
   onRetry?: () => void;
@@ -314,6 +322,7 @@ function IntakeAutomationTab({
       <IntakeAutomationEmpty
         message={automationEmptyMessage(loading, error)}
         onRetry={automationRetry(error, onRetry)}
+        editHref={editHref}
       />
     );
   }
@@ -325,6 +334,8 @@ function IntakeAutomationTab({
       canvasId={canvasId}
       runHrefFor={runHrefFor}
       workflowNodes={graph.specNodes}
+      editHref={editHref}
+      editLabel={INTAKE_SETTINGS_COPY.editAutomation}
     />
   );
 }
@@ -340,10 +351,18 @@ function automationRetry(error: boolean, onRetry: (() => void) | undefined): (()
   return error ? onRetry : undefined;
 }
 
-function IntakeAutomationEmpty({ message, onRetry }: { message: string; onRetry?: () => void }) {
+function IntakeAutomationEmpty({
+  message,
+  onRetry,
+  editHref,
+}: {
+  message: string;
+  onRetry?: () => void;
+  editHref?: string;
+}) {
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
       aria-label="Automation"
       data-testid="intake-source-automation"
     >
@@ -352,6 +371,13 @@ function IntakeAutomationEmpty({ message, onRetry }: { message: string; onRetry?
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
           {INTAKE_SETTINGS_COPY.retryAutomation}
         </Button>
+      ) : null}
+      {editHref ? (
+        <SettingsAutomationCanvasEdit
+          href={editHref}
+          label={INTAKE_SETTINGS_COPY.editAutomation}
+          testId="settings-automation-edit"
+        />
       ) : null}
     </section>
   );

@@ -23,12 +23,7 @@ import {
   type SplitRunPhase,
   type SplitRunPhaseId,
 } from "./splitRunMocks";
-import {
-  defaultSplitRunPopupTab,
-  type SplitRunPopupTab,
-  splitRunPhaseAutomationHref,
-  splitRunPhaseRunHref,
-} from "./splitRunPopupModel";
+import { defaultSplitRunPopupTab, type SplitRunPopupTab, splitRunPhaseRunHref } from "./splitRunPopupModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -249,7 +244,6 @@ function SplitRunPhaseLogItem({
       onStop={onStop}
       onRerun={onRerun}
       runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
-      editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
       actionBusy={actionBusy}
       onToggle={onToggle}
       onUsageOpenChange={setUsageOpen}

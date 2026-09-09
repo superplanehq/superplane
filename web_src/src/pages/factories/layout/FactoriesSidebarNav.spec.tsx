@@ -40,6 +40,8 @@ describe("FactoriesSidebarNav", () => {
       "href",
       factoryHomePath(org, key, REFUND_LINE_PLAN_ID),
     );
+    expect(screen.getByTestId("factories-nav-board").querySelector(".lucide-house")).toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-velocity").querySelector(".lucide-chart-line")).toBeInTheDocument();
   });
 
   it("marks the Board icon current on the line board", () => {

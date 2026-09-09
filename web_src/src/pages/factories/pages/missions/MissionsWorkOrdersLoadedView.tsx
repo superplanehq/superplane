@@ -38,6 +38,7 @@ export interface MissionsWorkOrdersLoadedViewProps {
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  hostedCreditHeaderKicker?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
@@ -110,6 +111,7 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
+          hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           hostedCreditEmptyBanner={props.hostedCreditEmptyBanner}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
         />
