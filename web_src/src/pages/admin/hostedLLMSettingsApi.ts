@@ -2,6 +2,7 @@ export type HostedLLMProvider = {
   provider: string;
   enabled: boolean;
   api_key_configured: boolean;
+  management_key_configured: boolean;
   base_url: string;
   allowed_models: string[];
 };
@@ -18,6 +19,7 @@ export type InstallationLLMSettings = {
 export type ProviderForm = {
   enabled: boolean;
   apiKey: string;
+  managementKey: string;
   baseURL: string;
   allowedModels: string[];
   listedModels: string[];
@@ -28,6 +30,7 @@ const SETTINGS_PATH = "/admin/api/installation/llm-settings";
 export const emptyProviderForm = (provider?: HostedLLMProvider): ProviderForm => ({
   enabled: provider?.enabled ?? false,
   apiKey: "",
+  managementKey: "",
   baseURL: provider?.base_url ?? "",
   allowedModels: provider?.allowed_models ?? [],
   listedModels: provider?.allowed_models ?? [],

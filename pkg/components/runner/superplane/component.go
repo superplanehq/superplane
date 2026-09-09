@@ -146,11 +146,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := injectSuperPlaneCredentials(resolved.Variables, runModel.Provider, access)
-	if err != nil {
-		return err
-	}
-
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
 		return fmt.Errorf("webhook setup: %w", err)
@@ -164,10 +159,24 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels)
 	if err != nil {
+		return err
+	}
+
+	if runModel.Provider == models.UsageProviderOpenRouter {
+		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)
+		if err != nil {
+			return err
+		}
+	}
+	environment, err = injectSuperPlaneCredentials(environment, runModel.Provider, access)
+	if err != nil {
+		if runModel.Provider == models.UsageProviderOpenRouter {
+			revokeMintedOpenRouterRunnerKey(ctx)
+		}
 		return err
 	}
 
@@ -182,6 +191,9 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		Labels:         runner.OriginLabelsForTask(ctx),
 	})
 	if err != nil {
+		if runModel.Provider == models.UsageProviderOpenRouter {
+			revokeMintedOpenRouterRunnerKey(ctx)
+		}
 		return fmt.Errorf("create task: %w", err)
 	}
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
