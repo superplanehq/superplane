@@ -6,9 +6,10 @@ import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
  * Status banner for hosted credit. A healthy trial uses quiet chrome.
- * Low, empty, or expired credit uses an amber warning. Tasks and the
- * workspace board show this in the page header. The action opens
- * Organization Billing.
+ * Low remaining credit keeps the same surface and adds a short stop hint.
+ * Empty or expired credit uses a waiting accent, not a full amber wash.
+ * Tasks and the workspace board show this in the page header. The action
+ * opens Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -54,7 +55,7 @@ export const Trial: Story = {
   },
 };
 
-/** Welcome credit expires today. The banner uses warning chrome. */
+/** Welcome credit expires today. The banner uses a waiting accent. */
 export const TrialEndsToday: Story = {
   name: "Trial ends today",
   args: {
@@ -62,6 +63,17 @@ export const TrialEndsToday: Story = {
     kind: "trial",
     remainingCreditCents: 4124,
     welcomeCreditExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is low. The banner names that tasks stop when credit runs out. */
+export const TrialLowCredit: Story = {
+  name: "Trial low credit",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 432,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
   },
 };
 

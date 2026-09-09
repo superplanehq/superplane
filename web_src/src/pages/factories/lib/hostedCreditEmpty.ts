@@ -5,6 +5,20 @@ export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" |
 /** At or below this remaining balance, paid organizations see a low-credit warning. */
 export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
 
+/** Compact helper shown next to remaining credit when the balance is low. */
+export const HOSTED_CREDIT_RUNS_STOP_HINT = "Tasks stop when credit runs out.";
+
+export function isLowHostedCreditRemaining(remainingCents: number | undefined): boolean {
+  return remainingCents != null && remainingCents > 0 && remainingCents <= LOW_HOSTED_CREDIT_THRESHOLD_CENTS;
+}
+
+export function hostedCreditRunsStopHint(remainingCents: number | undefined): string | undefined {
+  if (!isLowHostedCreditRemaining(remainingCents)) {
+    return undefined;
+  }
+  return HOSTED_CREDIT_RUNS_STOP_HINT;
+}
+
 export interface HostedCreditBannerInput {
   remainingCreditCents?: string | number;
   grantTotalCents?: string | number;
@@ -88,6 +102,7 @@ export interface HostedCreditBannerCopy {
   actionLabel: string;
   remainingLabel?: string;
   expiryLabel?: string;
+  consequenceHint?: string;
   tone: HostedCreditBannerTone;
 }
 
@@ -163,14 +178,17 @@ export function hostedCreditBannerCopy(args: {
     const expiryLabel = args.welcomeCreditExpiresAt
       ? welcomeCreditExpiryLabel(args.welcomeCreditExpiresAt, now)
       : "14 days remaining";
-    return {
-      title: "Trial",
-      description: `You have ${remaining} of free hosted credit. ${expirySentence}`,
-      remainingLabel: `${remaining} remaining`,
-      expiryLabel,
-      actionLabel: "Add credits",
-      tone,
-    };
+    return withRunsStopHint(
+      {
+        title: "Trial",
+        description: `You have ${remaining} of free hosted credit. ${expirySentence}`,
+        remainingLabel: `${remaining} remaining`,
+        expiryLabel,
+        actionLabel: "Add credits",
+        tone,
+      },
+      args.remainingCreditCents,
+    );
   }
 
   if (args.kind === "trial-empty") {
@@ -198,21 +216,27 @@ export function hostedCreditBannerCopy(args: {
         ? `${formatUsdCents(args.remainingCreditCents)} remaining`
         : undefined;
     if (args.billingEnabled) {
-      return {
+      return withRunsStopHint(
+        {
+          title: "Hosted credit is low",
+          description: `Less than ${lowCreditBudget} remains. Add hosted credit to keep SuperPlane-hosted runs.`,
+          remainingLabel,
+          actionLabel: "Add credits",
+          tone,
+        },
+        args.remainingCreditCents,
+      );
+    }
+    return withRunsStopHint(
+      {
         title: "Hosted credit is low",
-        description: `Less than ${lowCreditBudget} remains. Add hosted credit to keep SuperPlane-hosted runs.`,
+        description: `Less than ${lowCreditBudget} remains. Ask an installation admin to add hosted credit.`,
         remainingLabel,
         actionLabel: "Add credits",
         tone,
-      };
-    }
-    return {
-      title: "Hosted credit is low",
-      description: `Less than ${lowCreditBudget} remains. Ask an installation admin to add hosted credit.`,
-      remainingLabel,
-      actionLabel: "Add credits",
-      tone,
-    };
+      },
+      args.remainingCreditCents,
+    );
   }
 
   if (args.billingEnabled) {
@@ -309,4 +333,12 @@ function emptyHostedCreditDescription(billingEnabled: boolean): string {
     return "Hosted credit is empty. Click Buy more to purchase hosted credit.";
   }
   return "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
+}
+
+function withRunsStopHint(copy: HostedCreditBannerCopy, remainingCents: number | undefined): HostedCreditBannerCopy {
+  const consequenceHint = hostedCreditRunsStopHint(remainingCents);
+  if (!consequenceHint) {
+    return copy;
+  }
+  return { ...copy, consequenceHint };
 }

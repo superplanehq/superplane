@@ -14,6 +14,7 @@ import {
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
 } from "../__fixtures__/usageReportFixtures";
+import { HOSTED_CREDIT_RUNS_STOP_HINT } from "../lib/hostedCreditEmpty";
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {
@@ -69,6 +70,7 @@ describe("LinesPage hosted credit banner", () => {
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Hosted credit is low");
     expect(banner).toHaveTextContent("$15.00 remaining");
+    expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(banner).toHaveAttribute("data-tone", "warning");
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",

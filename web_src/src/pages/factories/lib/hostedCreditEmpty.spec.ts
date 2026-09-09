@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HOSTED_CREDIT_RUNS_STOP_HINT,
   hostedCreditBannerCopy,
   hostedCreditBannerKind,
   hostedCreditBannerTone,
   hostedCreditBillingBalanceCopy,
   hostedCreditEmptyBannerCopy,
+  hostedCreditRunsStopHint,
   isHostedCreditTrialOrg,
+  isLowHostedCreditRemaining,
   shouldShowHostedCreditEmptyBanner,
   welcomeCreditExpiryLabel,
   welcomeCreditExpirySentence,
@@ -310,6 +313,24 @@ describe("hostedCreditBannerTone", () => {
   });
 });
 
+describe("isLowHostedCreditRemaining", () => {
+  it("is true at or below $20 while credit remains", () => {
+    expect(isLowHostedCreditRemaining(2000)).toBe(true);
+    expect(isLowHostedCreditRemaining(432)).toBe(true);
+    expect(isLowHostedCreditRemaining(2001)).toBe(false);
+    expect(isLowHostedCreditRemaining(0)).toBe(false);
+    expect(isLowHostedCreditRemaining(undefined)).toBe(false);
+  });
+});
+
+describe("hostedCreditRunsStopHint", () => {
+  it("names the stop outcome only while remaining credit is low", () => {
+    expect(hostedCreditRunsStopHint(432)).toBe(HOSTED_CREDIT_RUNS_STOP_HINT);
+    expect(hostedCreditRunsStopHint(4124)).toBeUndefined();
+    expect(hostedCreditRunsStopHint(0)).toBeUndefined();
+  });
+});
+
 describe("hostedCreditBannerCopy", () => {
   it("names remaining trial credit and the expiry window", () => {
     expect(
@@ -327,6 +348,26 @@ describe("hostedCreditBannerCopy", () => {
       expiryLabel: "14 days remaining",
       actionLabel: "Add credits",
       tone: "info",
+    });
+  });
+
+  it("tells the user that tasks stop when trial credit is low", () => {
+    expect(
+      hostedCreditBannerCopy({
+        kind: "trial",
+        billingEnabled: true,
+        remainingCreditCents: 432,
+        welcomeCreditExpiresAt: new Date(inFourteenDays),
+        now,
+      }),
+    ).toEqual({
+      title: "Trial",
+      description: "You have $4.32 of free hosted credit. It expires in 14 days.",
+      remainingLabel: "$4.32 remaining",
+      expiryLabel: "14 days remaining",
+      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 
@@ -359,6 +400,7 @@ describe("hostedCreditBannerCopy", () => {
       title: "Hosted credit is low",
       description: "Less than $20.00 remains. Add hosted credit to keep SuperPlane-hosted runs.",
       remainingLabel: "$15.00 remaining",
+      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
       actionLabel: "Add credits",
       tone: "warning",
     });
@@ -369,6 +411,7 @@ describe("hostedCreditBannerCopy", () => {
       title: "Hosted credit is low",
       description: "Less than $20.00 remains. Ask an installation admin to add hosted credit.",
       remainingLabel: "$15.00 remaining",
+      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
       actionLabel: "Add credits",
       tone: "warning",
     });

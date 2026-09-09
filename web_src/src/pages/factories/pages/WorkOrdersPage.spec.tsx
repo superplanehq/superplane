@@ -11,10 +11,12 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import {
   EXPIRED_WELCOME_USAGE_REPORT,
+  LOW_TRIAL_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
 } from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { HOSTED_CREDIT_RUNS_STOP_HINT } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 describe("WorkOrdersPage hosted credit banner", () => {
@@ -33,10 +35,29 @@ describe("WorkOrdersPage hosted credit banner", () => {
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Trial");
     expect(banner).toHaveTextContent("$41.24");
+    expect(banner).not.toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
+  }, 10000);
+
+  it("tells the user that tasks stop when remaining trial credit is low", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LOW_TRIAL_USAGE_REPORT,
+        }}
+      />,
+    );
+
+    const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
+    expect(banner).toHaveTextContent("Trial");
+    expect(banner).toHaveTextContent("$4.32 remaining");
+    expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
+    expect(banner).toHaveAttribute("data-tone", "warning");
   }, 10000);
 
   it("hides the trial banner after the organization buys credit", async () => {
