@@ -853,3 +853,77 @@ func setupFactoryAppExecutionWithPayload(
 
 	return canvas, nodeExecution, run
 }
+
+func TestFactoryContext_ResolveWorkOrderAssigneeAccounts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "1", "Octocat", "Octo Cat", ""),
+	))
+
+	unlinkedAccount, err := models.CreateAccount("Unlinked", support.RandomName("unlinked")+"@example.com")
+	require.NoError(t, err)
+	unlinkedUser, err := models.CreateUser(r.Organization.ID, unlinkedAccount.ID, unlinkedAccount.Email, unlinkedAccount.Name)
+	require.NoError(t, err)
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(
+		database.Conn(),
+		"Assign me",
+		"",
+		&r.User,
+		[]uuid.UUID{r.User, unlinkedUser.ID},
+		nil,
+	)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("resolves linked assignees and counts unlinked ones", func(t *testing.T) {
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  order.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"octocat"}, result.Logins)
+		assert.Equal(t, 1, result.Unlinked)
+	})
+
+	t.Run("returns no unlinked assignees for a work order with none", func(t *testing.T) {
+		soloOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "Solo", "", &r.User, []uuid.UUID{r.User}, nil)
+		require.NoError(t, err)
+
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  soloOrder.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"octocat"}, result.Logins)
+		assert.Equal(t, 0, result.Unlinked)
+	})
+
+	t.Run("returns zero values for a work order with no assignees", func(t *testing.T) {
+		emptyOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "No assignees", "", &r.User, nil, nil)
+		require.NoError(t, err)
+
+		result, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			OrderID:  emptyOrder.ID.String(),
+			Provider: models.ProviderGitHub,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, result.Logins)
+		assert.Equal(t, 0, result.Unlinked)
+	})
+
+	t.Run("rejects an empty orderId", func(t *testing.T) {
+		_, err := ctx.ResolveWorkOrderAssigneeAccounts(core.ResolveWorkOrderAssigneeAccountsParams{
+			Provider: models.ProviderGitHub,
+		})
+		require.Error(t, err)
+	})
+}
