@@ -267,6 +267,16 @@ describe("CreateWithAgentDialog", () => {
     expect(within(draft).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
+  it("does not create a draft that has no description", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        right: { kind: "draft", draft: { title: "Add flight transportation mode", description: "" } },
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.create })).toBeDisabled();
+  });
+
   it("wraps a long draft title", () => {
     const title = "Add a color field with a visual color picker to the Puppy entity";
     renderDialog(

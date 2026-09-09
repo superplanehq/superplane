@@ -7,8 +7,10 @@ import {
   closeOpenTool,
   completeCommandSection,
   endToolOnLatestSection,
+  shouldSkipUnindexedLiveLogReplay,
   startCommandSection,
   startToolOnLatestSection,
+  type CommandStart,
 } from "./liveLogSections";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
@@ -43,6 +45,10 @@ const initialLogState: LogState = {
 
 function hasRunningCommand(state: LogState): boolean {
   return state.sections.some((section) => section.status === "running");
+}
+
+function hasFinishedCommandSection(state: LogState): boolean {
+  return state.sections.some((section) => section.status !== "running");
 }
 
 export function terminalCommandStatusForExecution(execution: ExecutionInfo): "passed" | "failed" | null {
@@ -101,51 +107,112 @@ function applyStreamFailure(state: LogState, message: string): LogState {
   return { ...state, error: message, isLoading: false, isStreaming: false };
 }
 
-function createStreamHandlers(
-  reconnecting: boolean,
-  replayLineSkip: Map<number, number>,
-  setState: Dispatch<SetStateAction<LogState>>,
-  setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>,
-  onFailure: (message: string) => void,
-): LiveLogStreamHandlers {
+function withClearedError(state: LogState): LogState {
+  return { ...state, error: null };
+}
+
+type StreamHandlerContext = {
+  reconnecting: boolean;
+  replayLineSkip: Map<number, number>;
+  setState: Dispatch<SetStateAction<LogState>>;
+  setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>;
+  commandCursor: { index?: number };
+  onFailure: (message: string) => void;
+};
+
+function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers {
+  const { reconnecting, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
   return {
     onOpen: () => setState((prev) => ({ ...prev, error: null, isLoading: false, isStreaming: true })),
-    onLogLine: (text) =>
-      setState((prev) => ({ ...appendLineToLatestSection(prev, text, replayLineSkip), error: null })),
+    onLogLine: (text, commandIndex) => {
+      const index = commandIndex ?? commandCursor.index;
+      setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
+    },
     onStreamError: (message) => {
       onFailure(message);
       setState((prev) => applyStreamFailure(prev, message));
     },
     onCmdStart: (index, text, startedAtMs, kind, preview) => {
-      setState((prev) => {
-        const existing = prev.sections.find((section) => section.index === index);
-        if (existing) {
-          if (reconnecting) {
-            replayLineSkip.set(index, existing.lines.length);
-          }
-          return { ...prev, error: null };
-        }
-        return { ...startCommandSection(prev, { index, text, startedAtMs, kind, preview }), error: null };
-      });
+      commandCursor.index = index;
+      setState((prev) =>
+        rememberOrStartCommand(prev, { index, text, startedAtMs, kind, preview }, replayLineSkip, reconnecting),
+      );
       if (kind === "prompt") {
         setUsage((prev) => startPromptUsageSeries(prev, text, index));
       }
     },
     onCmdEnd: (index, status, durationMs) =>
-      setState((prev) => ({ ...completeCommandSection(prev, index, status, durationMs), error: null })),
+      setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs))),
     onToolStart: (kind, text, id, turn) => {
-      setState((prev) => ({ ...startToolOnLatestSection(prev, kind, text, id), error: null }));
+      setState((prev) =>
+        startReplayedTool(prev, { kind, text, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
+      );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_start", kind, text, id, turn }));
     },
     onToolEnd: (status, durationMs, id, turn) => {
-      setState((prev) => ({ ...endToolOnLatestSection(prev, status, durationMs, id), error: null }));
+      setState((prev) =>
+        endReplayedTool(prev, { status, durationMs, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
+      );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
     },
     onTurn: (turn, usage, message) => {
-      setState((prev) => ({ ...prev, error: null }));
+      setState((prev) => withClearedError(prev));
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "turn", turn, usage, message }));
     },
   };
+}
+
+function appendReplayedLogLine(
+  state: LogState,
+  text: string,
+  replayLineSkip: Map<number, number>,
+  commandIndex: number | undefined,
+  reconnecting: boolean,
+): LogState {
+  if (shouldSkipUnindexedLiveLogReplay(reconnecting, commandIndex, hasFinishedCommandSection(state))) {
+    return state;
+  }
+  return withClearedError(appendLineToLatestSection(state, text, replayLineSkip, commandIndex));
+}
+
+function rememberOrStartCommand(
+  state: LogState,
+  start: CommandStart,
+  replayLineSkip: Map<number, number>,
+  reconnecting: boolean,
+): LogState {
+  const existing = state.sections.find((section) => section.index === start.index);
+  if (!existing) {
+    return withClearedError(startCommandSection(state, start));
+  }
+  if (reconnecting) {
+    replayLineSkip.set(start.index, existing.lines.length);
+  }
+  return withClearedError(state);
+}
+
+function startReplayedTool(
+  state: LogState,
+  tool: { kind: string; text: string; sourceId?: string; commandIndex?: number },
+  reconnecting: boolean,
+): LogState {
+  if (shouldSkipUnindexedLiveLogReplay(reconnecting, tool.commandIndex, hasFinishedCommandSection(state))) {
+    return state;
+  }
+  return withClearedError(startToolOnLatestSection(state, tool.kind, tool.text, tool.sourceId, tool.commandIndex));
+}
+
+function endReplayedTool(
+  state: LogState,
+  tool: { status: "passed" | "failed"; durationMs: number; sourceId?: string; commandIndex?: number },
+  reconnecting: boolean,
+): LogState {
+  if (shouldSkipUnindexedLiveLogReplay(reconnecting, tool.commandIndex, hasFinishedCommandSection(state))) {
+    return state;
+  }
+  return withClearedError(
+    endToolOnLatestSection(state, tool.status, tool.durationMs, tool.sourceId, tool.commandIndex),
+  );
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -220,50 +287,60 @@ async function waitForLiveLogReconnect(
   return true;
 }
 
-async function runLiveLogSession({
-  organizationId,
-  canvasId,
-  executionId,
-  executionInFlight,
-  terminalCommandStatus,
-  terminalAtMs,
-  sessionAbort,
-  setState,
-  setUsage,
-  setActiveStream,
-}: LiveLogSessionParams): Promise<void> {
+async function pumpLiveLogConnection(
+  params: LiveLogSessionParams,
+  reconnecting: boolean,
+  reportFailure: (source: LiveLogFailureSource, error: Error) => void,
+): Promise<"aborted" | "open"> {
+  const { organizationId, canvasId, executionId, sessionAbort, setState, setUsage, setActiveStream } = params;
+  const stream = new LiveLogStream(organizationId, canvasId, executionId);
+  setActiveStream(stream);
+  try {
+    await stream.pump(
+      createStreamHandlers({
+        reconnecting,
+        replayLineSkip: new Map<number, number>(),
+        setState,
+        setUsage,
+        commandCursor: {},
+        onFailure: (message) => reportFailure("broker", new Error(message)),
+      }),
+    );
+  } catch (error) {
+    const streamError = errorFromUnknown(error);
+    if (streamError.name === "AbortError") {
+      return "aborted";
+    }
+    if (!sessionAbort.signal.aborted) {
+      reportFailure("request", streamError);
+      setState((prev) => applyStreamFailure(prev, streamError.message));
+    }
+  } finally {
+    stream.stop();
+    setActiveStream(null);
+  }
+  return sessionAbort.signal.aborted ? "aborted" : "open";
+}
+
+async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
+  const {
+    organizationId,
+    canvasId,
+    executionId,
+    executionInFlight,
+    terminalCommandStatus,
+    terminalAtMs,
+    sessionAbort,
+    setState,
+  } = params;
   let reconnecting = false;
   const reportFailure = createLiveLogFailureReporter({ organizationId, canvasId, executionId });
 
   while (!sessionAbort.signal.aborted) {
-    const stream = new LiveLogStream(organizationId, canvasId, executionId);
-    setActiveStream(stream);
-    const replayLineSkip = new Map<number, number>();
-
-    try {
-      await stream.pump(
-        createStreamHandlers(reconnecting, replayLineSkip, setState, setUsage, (message) => {
-          reportFailure("broker", new Error(message));
-        }),
-      );
-    } catch (error) {
-      const streamError = errorFromUnknown(error);
-      if (streamError.name === "AbortError") {
-        return;
-      }
-      if (!sessionAbort.signal.aborted) {
-        reportFailure("request", streamError);
-        setState((prev) => applyStreamFailure(prev, streamError.message));
-      }
-    } finally {
-      stream.stop();
-      setActiveStream(null);
-    }
-
-    if (sessionAbort.signal.aborted) {
+    const result = await pumpLiveLogConnection(params, reconnecting, reportFailure);
+    if (result === "aborted") {
       return;
     }
-
     if (!executionInFlight) {
       if (terminalCommandStatus) {
         setState((prev) => finalizeRunningCommandSections(prev, terminalCommandStatus, terminalAtMs));

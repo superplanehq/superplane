@@ -21,6 +21,7 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     replies[1].result.tools.map((tool) => tool.name),
     ["propose_draft", "survey"],
   );
+  assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["title", "description"]);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
