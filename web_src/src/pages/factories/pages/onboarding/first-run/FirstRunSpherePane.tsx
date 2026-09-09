@@ -20,12 +20,17 @@ export type FirstRunSphereProps = {
   animate?: boolean;
 };
 
+/**
+ * Level drives a visible progression: a low level draws a small, sparse,
+ * noisy cloud; a high level draws a large, dense sphere with concentric
+ * rings, so the sphere gains structure with each completed step.
+ */
 function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
   const context = canvas.getContext("2d");
   if (!context || typeof context.clearRect !== "function") return;
   const size = canvas.width;
   const center = size / 2;
-  const radius = (size / 2 - 8) * (0.72 + 0.28 * level);
+  const radius = (size / 2 - 8) * (0.6 + 0.4 * level);
   const cell = 7;
   context.clearRect(0, 0, size, size);
   for (let x = cell / 2; x < size; x += cell) {
@@ -37,9 +42,12 @@ function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
       const seed = Math.sin(x * 12.99 + y * 78.23 + tick) * 43758.55;
       const random = seed - Math.floor(seed);
       const edge = distance / radius;
-      const gapChance = 0.12 + edge * 0.3 + (dy > 0 ? (dy / radius) * 0.25 : 0);
+      const gapChance = 0.52 - 0.38 * level + edge * (0.5 - 0.22 * level) + (dy > 0 ? (dy / radius) * 0.25 : 0);
       if (random < gapChance) continue;
-      const alpha = level * (0.55 + 0.45 * (1 - edge)) * (0.75 + 0.25 * random);
+      const ring = 0.5 + 0.5 * Math.cos(edge * Math.PI * 7);
+      const order = level * level;
+      const structure = 1 - 0.55 * order * (1 - ring);
+      const alpha = level * (0.5 + 0.5 * (1 - edge)) * (0.65 + 0.35 * random) * structure;
       context.fillStyle = `rgba(246, 168, 33, ${alpha.toFixed(3)})`;
       const dot = cell - 2.4;
       context.fillRect(x - dot / 2, y - dot / 2, dot, dot);

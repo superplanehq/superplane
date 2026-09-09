@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
+
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -74,6 +76,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     initialOnboarding: false,
     provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
@@ -186,6 +189,25 @@ describe("FirstRunSetup reliability", () => {
       "/org-1/workspaces/PAY/setup?step=vcs",
     );
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+  });
+
+  // An install request made on GitHub without a callback only surfaces
+  // through the recheck sync, so the sync must also run while the picker
+  // is open without a known request.
+  it("rechecks GitHub for install requests while the account picker is open", () => {
+    const picker = githubConnection("int-1", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+    });
+    renderSetup(
+      pageModel({ openSection: "vcs", githubConnections: githubConnections([picker]) }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
   });
 
   it("opens the waiting screen from a GitHub request return", () => {

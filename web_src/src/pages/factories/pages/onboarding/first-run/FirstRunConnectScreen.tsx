@@ -6,6 +6,7 @@ import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/ho
 
 import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
@@ -59,12 +60,46 @@ function FirstRunInstallRequested({ githubOrganizations }: { githubOrganizations
   );
 }
 
+/**
+ * Requested organizations as rows in the organization list, so a pending
+ * approval reads as one more organization instead of a separate panel. The
+ * connect screen rechecks the request every few seconds; an approved
+ * organization replaces its waiting row with a Use button. The tooltip
+ * carries the detail (who approves, no refresh needed) so the row itself
+ * stays one line.
+ */
+function FirstRunPendingOrganizationRows({ githubOrganizations }: { githubOrganizations: string[] }) {
+  const rows = githubOrganizations.length > 0 ? githubOrganizations : [""];
+  return (
+    <div className="space-y-2 text-left" data-testid="first-run-github-install-requested">
+      {rows.map((account) => (
+        <Tooltip key={account}>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]">
+              <span className="min-w-0 truncate font-medium">{account || copy.installRequested}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                <Clock className="size-3.5" aria-hidden />
+                {account ? copy.installRequested : null}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-md space-y-1 text-left text-pretty">
+            <p>{copy.installRequestedBody(account)}</p>
+            <p>{copy.installRequestedNext}</p>
+          </TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
+  );
+}
+
 function FirstRunGitHubAccountPicker({
   installations,
   githubAppSlug,
   githubState,
   bindingInstallationId,
   disabled,
+  hideIntro = false,
   onUseInstallation,
   onInstallOther,
 }: {
@@ -73,16 +108,20 @@ function FirstRunGitHubAccountPicker({
   githubState: string;
   bindingInstallationId?: string;
   disabled?: boolean;
+  /** The stepper heading already asks the question, so skip the intro panel. */
+  hideIntro?: boolean;
   onUseInstallation: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
 }) {
   const binding = bindingInstallationId !== undefined || disabled;
   return (
     <div className="space-y-3 text-left" data-testid="first-run-github-account-picker">
-      <FirstRunPanel>
-        <p className="text-[13px] font-medium">{copy.selectAccount}</p>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">{copy.selectAccountBody}</p>
-      </FirstRunPanel>
+      {hideIntro ? null : (
+        <FirstRunPanel>
+          <p className="text-[13px] font-medium">{copy.selectAccount}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{copy.selectAccountBody}</p>
+        </FirstRunPanel>
+      )}
       {installations.map((installation) => (
         <LoadingButton
           key={installation.id}
@@ -165,6 +204,7 @@ export function FirstRunConnectScreen({
   connectError,
   chrome,
   sphere,
+  stepper = false,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
@@ -184,6 +224,8 @@ export function FirstRunConnectScreen({
   connectError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
+  /** Renders the GitHub steps on one card (the initial-organization look). */
+  stepper?: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
@@ -203,7 +245,7 @@ export function FirstRunConnectScreen({
       busy={loading || connecting || bindingInstallationId !== undefined}
       sphere={sphere}
     >
-      <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
+      <ConnectScreenHeading stepper={stepper} showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
 
       <div className="mt-8 space-y-6">
         {loading ? (
@@ -218,6 +260,7 @@ export function FirstRunConnectScreen({
             connecting={connecting}
             showAccountPicker={showAccountPicker}
             waitingForApproval={waitingForApproval}
+            stepper={stepper}
             onConnectGitHub={onConnectGitHub}
             onUseInstallation={onUseInstallation}
             onInstallOther={onInstallOther}
@@ -234,7 +277,25 @@ function requestedGitHubOrganizations(organizations: string[] | undefined, legac
   return legacyOrganization ? [legacyOrganization] : [];
 }
 
-function ConnectScreenHeading({ showAccountPicker, githubLogin }: { showAccountPicker: boolean; githubLogin: string }) {
+function ConnectScreenHeading({
+  stepper,
+  showAccountPicker,
+  githubLogin,
+}: {
+  stepper: boolean;
+  showAccountPicker: boolean;
+  githubLogin: string;
+}) {
+  // On the stepper card the picker is the organization step, so the heading
+  // asks the organization question instead of repeating the connect ask.
+  if (stepper && showAccountPicker) {
+    return (
+      <FirstRunHeading headline={copy.selectAccount}>
+        <p className="text-[15px] leading-6 text-muted-foreground">{copy.selectAccountBody}</p>
+        {githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
+      </FirstRunHeading>
+    );
+  }
   return (
     <FirstRunHeading headline={copy.headline}>
       <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
@@ -273,6 +334,7 @@ function ConnectScreenBody({
   connecting,
   showAccountPicker,
   waitingForApproval,
+  stepper,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
@@ -285,24 +347,64 @@ function ConnectScreenBody({
   connecting: boolean;
   showAccountPicker: boolean;
   waitingForApproval: boolean;
+  stepper: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
 }) {
   if (showAccountPicker && onUseInstallation) {
+    const picker = (
+      <FirstRunGitHubAccountPicker
+        installations={pendingInstallations}
+        githubAppSlug={githubAppSlug}
+        githubState={githubState}
+        bindingInstallationId={bindingInstallationId}
+        disabled={connecting}
+        hideIntro={stepper}
+        onUseInstallation={onUseInstallation}
+        onInstallOther={onInstallOther}
+      />
+    );
+    if (stepper) {
+      return (
+        <FirstRunGithubStepper
+          current="organization"
+          organizationStatus={
+            waitingForApproval ? <FirstRunPendingOrganizationRows githubOrganizations={githubOrganizations} /> : null
+          }
+        >
+          {picker}
+        </FirstRunGithubStepper>
+      );
+    }
     return (
       <>
         {waitingForApproval ? <FirstRunInstallRequested githubOrganizations={githubOrganizations} /> : null}
-        <FirstRunGitHubAccountPicker
-          installations={pendingInstallations}
-          githubAppSlug={githubAppSlug}
-          githubState={githubState}
-          bindingInstallationId={bindingInstallationId}
-          disabled={connecting}
-          onUseInstallation={onUseInstallation}
-          onInstallOther={onInstallOther}
-        />
+        {picker}
       </>
+    );
+  }
+
+  if (stepper) {
+    return (
+      <FirstRunGithubStepper
+        current="connect"
+        action={
+          <LoadingButton
+            type="button"
+            size="sm"
+            onClick={onConnectGitHub}
+            loading={connecting}
+            loadingText={copy.openingGitHub}
+            data-testid="first-run-connect-github"
+          >
+            {copy.connectAction}
+          </LoadingButton>
+        }
+        organizationStatus={
+          waitingForApproval ? <FirstRunPendingOrganizationRows githubOrganizations={githubOrganizations} /> : null
+        }
+      />
     );
   }
 

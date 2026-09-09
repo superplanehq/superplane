@@ -98,6 +98,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     initialOnboarding: false,
     provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
