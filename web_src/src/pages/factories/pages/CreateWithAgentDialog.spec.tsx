@@ -67,6 +67,16 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.queryByTestId("create-with-agent-chat")).not.toBeInTheDocument();
   });
 
+  it("matches the composer field height to the send button at a single line", () => {
+    renderDialog(waitingCreateWithAgentView());
+
+    const composer = screen.getByTestId("create-with-agent-composer");
+    const sendButton = screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.send });
+
+    expect(composer.className).toMatch(/(?:^|\s)min-h-11(?:\s|$)/);
+    expect(sendButton.className).toMatch(/(?:^|\s)h-11(?:\s|$)/);
+  });
+
   it("shows that the machine stopped and turns the composer off", () => {
     renderDialog(failedCreateWithAgentView({ composer: "hey" }));
 
