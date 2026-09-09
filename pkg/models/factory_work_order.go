@@ -28,6 +28,12 @@ const (
 var (
 	ErrFactoryWorkOrderNotFound     = errors.New("factory work order not found")
 	ErrFactoryWorkOrderInvalidState = errors.New("invalid work order state transition")
+
+	// errWorkOrderStateMismatch is an internal sentinel used to roll back
+	// an ExpectedState-guarded transition when the row is no longer in the
+	// expected state. UpdateStatus translates it into a silent no-op
+	// (changed=false, nil error), so it never surfaces to callers.
+	errWorkOrderStateMismatch = errors.New("work order state changed before guarded update")
 )
 
 var (
@@ -153,6 +159,14 @@ type FactoryWorkOrderStatusUpdate struct {
 	Run        *factory.RunRef
 	App        *factory.AppRef
 	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+	// ExpectedState, when non-empty, makes the write conditional on the
+	// row still being in that state. The transition is applied via a
+	// single `UPDATE ... WHERE state = ExpectedState`, so a concurrent
+	// transition that already moved the row away leaves it untouched and
+	// UpdateStatus reports changed=false with no error. This guards
+	// against read-then-write races where a caller observed the state in
+	// an earlier, separate step.
+	ExpectedState string
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -314,7 +328,21 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	if o.State == toState {
+	// The write below is scoped to rows still in ExpectedState (when set),
+	// so the transition that actually commits is `ExpectedState → toState`,
+	// not `o.State → toState`. o.State comes from a non-locking read and may
+	// be stale: a concurrent transition (e.g. `open → draft`) can move the
+	// row after the load. Validate against the state the write is guarded
+	// on, otherwise we could validate one transition (`open → closed` with
+	// `completed`) but persist a different, invalid one (`draft → closed`
+	// with `completed`) on the row that raced underneath us.
+	originalState := o.State
+	fromState := o.State
+	if update.ExpectedState != "" {
+		fromState = update.ExpectedState
+	}
+
+	if fromState == toState {
 		if update.SkipSame {
 			return false, nil
 		}
@@ -322,7 +350,6 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	fromState := o.State
 	if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
 		return false, fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
 	}
@@ -340,6 +367,8 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	}
 
 	fromResult := o.Result
+	fromUpdatedAt := o.UpdatedAt
+	fromStatusNote := o.StatusNote
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -358,17 +387,29 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// note must always describe the state the order is in now.
 		o.StatusNote = nil
 
-		err := tx.
-			Model(o).
-			Updates(map[string]any{
-				"state":       o.State,
-				"result":      o.Result,
-				"status_note": nil,
-				"updated_at":  o.UpdatedAt,
-			}).
-			Error
-		if err != nil {
-			return err
+		// When an ExpectedState guard is set, scope the write to rows
+		// still in that state. This makes the check-and-set atomic at the
+		// row level: a concurrent transition that already moved the order
+		// away matches zero rows, so we roll back and report a no-op
+		// rather than forcing a stale transition (e.g. rejecting a task
+		// that was dispatched out of the backlog after a filter node saw
+		// it as draft).
+		query := tx.Model(o)
+		if update.ExpectedState != "" {
+			query = query.Where("state = ?", update.ExpectedState)
+		}
+
+		result := query.Updates(map[string]any{
+			"state":       o.State,
+			"result":      o.Result,
+			"status_note": nil,
+			"updated_at":  o.UpdatedAt,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if update.ExpectedState != "" && result.RowsAffected == 0 {
+			return errWorkOrderStateMismatch
 		}
 
 		// A closing order abandons any traversal still waiting in a step's
@@ -414,6 +455,16 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		})
 	})
 	if err != nil {
+		// A guarded transition that lost the race is not a failure: the
+		// row was already moved away by a concurrent transition, so we
+		// report a no-op and let the caller leave it alone.
+		if errors.Is(err, errWorkOrderStateMismatch) {
+			o.State = originalState
+			o.Result = fromResult
+			o.UpdatedAt = fromUpdatedAt
+			o.StatusNote = fromStatusNote
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil

@@ -308,6 +308,119 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+// The intake close branch reads the task state in one node (a filter that
+// checks `draft`) and closes it in another. Without an atomic guard, a
+// dispatch (draft → open) between the two would let open → closed (rejected)
+// through and wrongly reject an actively processed task. ExpectedState makes
+// the close conditional on the row still being draft at write time.
+func TestFactoryWorkOrder_UpdateStatusExpectedStateGuard(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "expected-state-guard")
+
+	t.Run("no-ops when the row left the expected state before the write", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Raced draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, FactoryWorkOrderStateDraft, order.State)
+
+		// Simulate a concurrent dispatch: the DB row moves draft → open
+		// while our in-memory `order` still believes it is draft, exactly as
+		// it would after a non-locking read in a separate node.
+		require.NoError(t, database.Conn().
+			Model(&FactoryWorkOrder{}).
+			Where("id = ?", order.ID).
+			Update("state", FactoryWorkOrderStateOpen).
+			Error)
+
+		fromUpdatedAt := order.UpdatedAt
+		fromStatusNote := order.StatusNote
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState:       FactoryWorkOrderStateClosed,
+			Result:        FactoryWorkOrderResultRejected,
+			ExpectedState: FactoryWorkOrderStateDraft,
+			Actor:         &userID,
+			SkipSame:      true,
+		})
+		require.NoError(t, err, "a lost guard race is a no-op, not a failure")
+		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+		assert.Empty(t, order.Result)
+		assert.Equal(t, fromUpdatedAt, order.UpdatedAt)
+		assert.Equal(t, fromStatusNote, order.StatusNote)
+
+		// The dispatched task is left untouched, not rejected.
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateOpen, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+
+		// No spurious status.updated event was recorded for the no-op.
+		events, err := reloaded.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		statusEvents := filterEventsOfType(events, factory.EventTypeOrderStatusUpdated)
+		require.Len(t, statusEvents, 1, "only the create (\"\" → draft) transition should exist")
+	})
+
+	t.Run("applies when the row is still in the expected state", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Still draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState:       FactoryWorkOrderStateClosed,
+			Result:        FactoryWorkOrderResultRejected,
+			ExpectedState: FactoryWorkOrderStateDraft,
+			Actor:         &userID,
+			SkipSame:      true,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, order.Result)
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, reloaded.Result)
+	})
+
+	// The guard scopes the write to `ExpectedState`, so validation must also
+	// run against `ExpectedState` — not the (possibly stale, non-locking)
+	// in-memory `o.State`. Otherwise a close whose in-memory state raced ahead
+	// of the row could validate an open-task closure (e.g. `completed`) but
+	// apply it to the draft row, persisting an invalid `draft → closed
+	// (completed)` transition and dropping queued work.
+	t.Run("validates the transition against the expected state, not the stale in-memory state", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Raced back to draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, FactoryWorkOrderStateDraft, order.State)
+
+		// Mirror a non-locking read that observed the row as `open` just
+		// before a concurrent `open → draft` moved the row back to draft: the
+		// in-memory copy still believes it is `open` while the row is `draft`.
+		order.State = FactoryWorkOrderStateOpen
+
+		// `completed` is only a valid close result from `open`. Because the
+		// write is guarded on `draft`, the transition that would actually
+		// commit is `draft → closed`, which forbids `completed`.
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState:       FactoryWorkOrderStateClosed,
+			Result:        FactoryWorkOrderResultCompleted,
+			ExpectedState: FactoryWorkOrderStateDraft,
+			Actor:         &userID,
+		})
+		require.Error(t, err, "closing a draft with an open-only result must be rejected")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		assert.False(t, changed)
+
+		// The row is left untouched: no invalid draft → closed (completed).
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateDraft, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+	})
+}
+
 func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -1006,6 +1119,51 @@ func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 		_, _, otherFactory := setupFactoryWithUser(t, "find-by-key-other")
 
 		_, err := otherFactory.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+}
+
+func TestFactory_FindWorkOrderByOriginURL(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-origin")
+	order, err := factoryModel.CreateWorkOrderWithOrigin(
+		database.Conn(),
+		"Find target",
+		"",
+		&userID,
+		nil,
+		nil,
+		WorkOrderOrigin{URL: "https://github.com/example/repo/issues/7"},
+	)
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its origin url", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/7")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("trims the lookup url", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "  https://github.com/example/repo/issues/7  ")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown url", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/999")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank url", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(database.Conn(), "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a url belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-origin-other")
+
+		_, err := otherFactory.FindWorkOrderByOriginURL(database.Conn(), "https://github.com/example/repo/issues/7")
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
 	})
 }

@@ -58,11 +58,14 @@ type WorkOrderParams struct {
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects
 // the lookup strategy: "id" resolves OrderID directly, "artifactKey"
-// resolves the work order that owns the artifact tagged with ArtifactKey.
+// resolves the work order that owns the artifact tagged with ArtifactKey,
+// and "originUrl" resolves the work order created from the external ticket
+// at OriginURL (e.g. the GitHub issue that intake created it from).
 type FindWorkOrderParams struct {
 	By          string
 	OrderID     string
 	ArtifactKey string
+	OriginURL   string
 }
 
 type UpdateWorkOrderStatusParams struct {
@@ -73,6 +76,14 @@ type UpdateWorkOrderStatusParams struct {
 	OrderID string
 	State   string
 	Result  string
+	// ExpectedState optionally guards the transition: when set, the
+	// update only applies if the work order is still in ExpectedState at
+	// write time, evaluated atomically against the row. A mismatch is a
+	// silent no-op (changed=false, no error), not a failure. This closes
+	// the read-then-write race where a separate node observes a state
+	// (e.g. `draft`) that changes before this update runs. Empty means no
+	// guard.
+	ExpectedState string
 }
 
 type AddWorkOrderCommentParams struct {
