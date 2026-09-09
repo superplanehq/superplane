@@ -18,27 +18,25 @@ import (
 )
 
 const (
-	WaitForPullRequestChecksName        = "github.waitForPullRequestChecks"
-	waitChecksEvaluateHook              = "evaluate"
-	waitChecksRefKV                     = "waitChecksRef"
-	waitChecksPayloadType               = "github.pullRequestChecks"
-	waitChecksPassedChannel             = "passed"
-	waitChecksFailedChannel             = "failed"
-	waitChecksTimedOutChannel           = "timedOut"
-	waitChecksDefaultQuietPeriodSeconds = 60
-	waitChecksDefaultTimeoutSeconds     = 3600
-	waitChecksPollInterval              = 5 * time.Minute
-	waitChecksWebhookDelay              = time.Second
+	WaitForPullRequestChecksName      = "github.waitForPullRequestChecks"
+	waitChecksEvaluateHook            = "evaluate"
+	waitChecksRefKV                   = "waitChecksRef"
+	waitChecksPayloadType             = "github.pullRequestChecks"
+	waitChecksPassedChannel           = "passed"
+	waitChecksFailedChannel           = "failed"
+	waitChecksTimedOutChannel         = "timedOut"
+	waitChecksDefaultTimeoutSeconds   = 3600
+	waitChecksPollInterval            = 5 * time.Minute
+	waitChecksWebhookDelay            = time.Second
 )
 
 type WaitForPullRequestChecks struct{}
 
 type WaitForPullRequestChecksConfiguration struct {
-	Repository         string   `json:"repository" mapstructure:"repository"`
-	Ref                string   `json:"ref" mapstructure:"ref"`
-	CheckNames         []string `json:"checkNames" mapstructure:"checkNames"`
-	QuietPeriodSeconds *int     `json:"quietPeriodSeconds" mapstructure:"quietPeriodSeconds"`
-	TimeoutSeconds     *int     `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
+	Repository     string   `json:"repository" mapstructure:"repository"`
+	Ref            string   `json:"ref" mapstructure:"ref"`
+	CheckNames     []string `json:"checkNames" mapstructure:"checkNames"`
+	TimeoutSeconds *int     `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
 }
 
 type WaitForPullRequestChecksMetadata struct {
@@ -80,9 +78,7 @@ func (c *WaitForPullRequestChecks) Description() string {
 func (c *WaitForPullRequestChecks) Documentation() string {
 	return `The Wait For Pull Request Checks component watches GitHub Checks and Commit Statuses for one commit.
 
-It combines both GitHub status systems into one snapshot. It then waits until the selected checks become terminal.
-
-GitHub does not report the expected total number of checks. When you leave the check name list empty, the component waits for a quiet period after the last change. That quiet period is the completeness signal. When you specify check names, the component finishes as soon as every named check is terminal.
+It combines both GitHub status systems into one snapshot. It then waits until every named check becomes terminal.
 
 ## Use Cases
 
@@ -94,13 +90,12 @@ GitHub does not report the expected total number of checks. When you leave the c
 
 - **Repository**: Select the GitHub repository
 - **Ref**: Full commit SHA to watch
-- **Check Names** *(optional)*: Exact check or status names to require. An empty list waits for all observed checks.
-- **Quiet Period Seconds**: Seconds to wait after the last check change when the name list is empty. Default: 60. Named checks skip this wait.
+- **Check Names**: Exact check or status names to require
 - **Timeout Seconds**: Maximum wait time. Default: 3600.
 
 ## Output Channels
 
-- **Passed**: No selected check failed. For an empty name list, this is after the quiet period.
+- **Passed**: No selected check failed
 - **Failed**: A selected check has a failing conclusion
 - **Timed Out**: The timeout expired, or a selected check never appeared
 
@@ -155,8 +150,8 @@ func (c *WaitForPullRequestChecks) Configuration() []configuration.Field {
 			Name:        "checkNames",
 			Label:       "Check Names",
 			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Exact check or status names to require. Leave empty to wait for all checks. GitHub does not report the expected total number of checks.",
+			Required:    true,
+			Description: "Exact check or status names to require.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Check name",
@@ -165,14 +160,6 @@ func (c *WaitForPullRequestChecks) Configuration() []configuration.Field {
 					},
 				},
 			},
-		},
-		{
-			Name:        "quietPeriodSeconds",
-			Label:       "Quiet Period Seconds",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Default:     waitChecksDefaultQuietPeriodSeconds,
-			Description: "Seconds to wait after the last check change when no check names are selected. Named checks skip this wait.",
 		},
 		{
 			Name:        "timeoutSeconds",
@@ -373,21 +360,8 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 		return err
 	}
 
-	delay := nextEvaluateDelay(
-		now,
-		metadata.LastChangeAt,
-		metadata.TimeoutAt,
-		evaluation.AllTerminal,
-		ctx.Configuration.quietPeriod(),
-		waitChecksPollInterval,
-	)
+	delay := nextEvaluateDelay(now, metadata.TimeoutAt, waitChecksPollInterval)
 	if delay > 0 && evaluation.Outcome == waitChecksOutcomePending {
-		if err := ctx.Metadata.Set(metadata); err != nil {
-			return err
-		}
-		return ctx.Requests.ScheduleActionCall(waitChecksEvaluateHook, map[string]any{}, delay)
-	}
-	if delay > 0 && evaluation.AllTerminal && evaluation.Outcome != waitChecksOutcomeTimedOut {
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return err
 		}
@@ -502,17 +476,29 @@ func decodeWaitChecksConfig(raw any) (WaitForPullRequestChecksConfiguration, err
 	if config.Ref == "" {
 		return config, fmt.Errorf("ref is required")
 	}
+	config.CheckNames = normalizeWaitCheckNames(config.CheckNames)
+	if len(config.CheckNames) == 0 {
+		return config, fmt.Errorf("checkNames is required")
+	}
 	return config, nil
 }
 
-func (c WaitForPullRequestChecksConfiguration) quietPeriodSeconds() int {
-	if c.QuietPeriodSeconds == nil {
-		return waitChecksDefaultQuietPeriodSeconds
+func normalizeWaitCheckNames(names []string) []string {
+	normalized := make([]string, 0, len(names))
+	seen := map[string]bool{}
+	for _, name := range names {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		normalized = append(normalized, trimmed)
 	}
-	if *c.QuietPeriodSeconds < 0 {
-		return waitChecksDefaultQuietPeriodSeconds
-	}
-	return *c.QuietPeriodSeconds
+	return normalized
 }
 
 func (c WaitForPullRequestChecksConfiguration) timeoutSeconds() int {
@@ -523,22 +509,6 @@ func (c WaitForPullRequestChecksConfiguration) timeoutSeconds() int {
 		return waitChecksDefaultTimeoutSeconds
 	}
 	return *c.TimeoutSeconds
-}
-
-func (c WaitForPullRequestChecksConfiguration) hasSelectedCheckNames() bool {
-	for _, name := range c.CheckNames {
-		if strings.TrimSpace(name) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func (c WaitForPullRequestChecksConfiguration) quietPeriod() time.Duration {
-	if c.hasSelectedCheckNames() {
-		return 0
-	}
-	return time.Duration(c.quietPeriodSeconds()) * time.Second
 }
 
 func (c WaitForPullRequestChecksConfiguration) timeout() time.Duration {
