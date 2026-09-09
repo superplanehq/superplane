@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
-  GITHUB_INTAKE_RUNS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
-  intakePlacementActivity,
-  intakePlacementLabel,
-  intakeRelativeTime,
   intakeSettingsFromApi,
   intakeSettingsToApi,
   normalizeIntakeSourceSettings,
@@ -31,29 +27,14 @@ describe("intakeSourceSettingsModel", () => {
     expect(next.confidencePct).toBe(100);
   });
 
-  it("labels ticket placement for backlog, rejected, and in-progress work", () => {
-    const implement = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-1")!;
-    const backlog = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-3")!;
-    const rejected = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-4")!;
-    const held = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-6")!;
-
-    expect(intakePlacementLabel(implement)).toBe("Implement");
-    expect(intakePlacementActivity(implement)).toBe("Writing the retry handler.");
-    expect(intakePlacementLabel(backlog)).toBe("In Backlog");
-    expect(intakePlacementActivity(backlog)).toBe("Waiting for review.");
-    expect(intakePlacementLabel(rejected)).toBe("Rejected");
-    expect(intakePlacementLabel(held)).toBe("Not moved to Backlog");
-    expect(intakeRelativeTime(180)).toBe("3h ago");
-  });
-
   it("accepts the intake settings tabs", () => {
     expect(isIntakeSettingsTab("automation")).toBe(true);
-    expect(isIntakeSettingsTab("runs")).toBe(true);
+    expect(isIntakeSettingsTab("runs")).toBe(false);
     expect(isIntakeSettingsTab("agent")).toBe(true);
     expect(isIntakeSettingsTab("general")).toBe(true);
     expect(isIntakeSettingsTab("listen")).toBe(false);
-    expect(intakeSettingsTabs(false)).toEqual(["general", "runs", "automation"]);
-    expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "runs", "automation"]);
+    expect(intakeSettingsTabs(false)).toEqual(["general", "automation"]);
+    expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });
 
   it("defaults the authors filter to off", () => {
