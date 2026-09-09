@@ -92,7 +92,7 @@ export const FIRST_RUN_COPY = {
         ? `Imported the newest open ticket from ${source}`
         : `Imported the ${count} newest open tickets from ${source}`,
     stageScoringPending: "Scoring tickets",
-    stageScoring: "Started scoring. Open your board and run tickets as scores appear.",
+    stageScoring: "Agent review started. Open the board to review and start work.",
     emptyImport: (source = "your backlog") => `We did not find any issues to import from ${source}`,
     emptyNext: "You can create a new task on your board.",
     stageScored: (total: number) => `${ticketCount(total)} scored`,
