@@ -236,4 +236,24 @@ describe("useLiveLogStream", () => {
 
     await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2));
   });
+
+  it("clears a stale error when a retry opens a healthy stream", async () => {
+    pumpMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+    pumpMock.mockImplementationOnce((handlers: { onOpen?: () => void }) => {
+      handlers.onOpen?.();
+      return new Promise<void>(() => undefined);
+    });
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", true, null, null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.isLoading).toBe(false);
+  });
 });

@@ -37,7 +37,7 @@ const liveLogStateContent: Record<
   },
   empty: {
     title: "No logs available",
-    description: "This execution did not produce log output.",
+    description: "Run the task again to produce new log output.",
     Icon: Terminal,
   },
 };

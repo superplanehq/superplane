@@ -133,6 +133,25 @@ describe("RunInspector runner logs", () => {
     expect(screen.getByText("No logs available")).toBeInTheDocument();
     expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
   });
+
+  it("keeps existing logs visible when the stream fails", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [{ index: 0, text: "npm run build", lines: ["vite build"], events: [], status: "running" }],
+      orphanLines: [],
+      error: "Failed to fetch",
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load logs");
+    expect(screen.getByText(/vite build/)).toBeInTheDocument();
+  });
 });
 
 function renderRunnerInspector() {

@@ -60,6 +60,7 @@ describe("LiveLogStreamView", () => {
     render(<LiveLogStreamView execution={finishedExecution} />);
 
     expect(screen.getByText("No logs available")).toBeInTheDocument();
+    expect(screen.getByText("Run the task again to produce new log output.")).toBeInTheDocument();
     expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
   });
 
