@@ -6,6 +6,7 @@ import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 import { sectionTitle } from "./liveLogSections";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
+import { LiveLogStateNotice } from "./LiveLogStateNotice";
 
 export function LiveLogStreamView({
   execution,
@@ -15,7 +16,7 @@ export function LiveLogStreamView({
   session?: { organizationId?: string; canvasId?: string };
 }) {
   const executionInFlight = isExecutionInFlight(execution);
-  const { sections, orphanLines, error, isStreaming, toggleSection, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, retry, toggleSection, scrollRef } = useLiveLogStream(
     execution.id,
     executionInFlight,
     terminalCommandStatusForExecution(execution),
@@ -24,14 +25,20 @@ export function LiveLogStreamView({
   );
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
-  const waitingForLogs = !hasAnyLogs && !error && (executionInFlight || isStreaming);
-  const showError = Boolean(error) && !executionInFlight;
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50 dark:bg-gray-900">
-      {showError ? <ErrorMessage /> : null}
-      {waitingForLogs ? <WaitingForLogsMessage /> : null}
-      {!showError && !waitingForLogs && !hasAnyLogs ? <NoLogsMessage /> : null}
+      {error ? (
+        <LiveLogStateNotice
+          state="error"
+          error={error}
+          willRetry={executionInFlight}
+          onRetry={retry}
+          compact={hasAnyLogs}
+        />
+      ) : null}
+      {!error && !hasAnyLogs && executionInFlight ? <LiveLogStateNotice state="waiting" /> : null}
+      {!error && !hasAnyLogs && !executionInFlight ? <LiveLogStateNotice state="empty" /> : null}
 
       {sections.map((section, index) => (
         <CommandSectionView
@@ -41,22 +48,6 @@ export function LiveLogStreamView({
           isLast={index === lastSectionIndex}
         />
       ))}
-    </div>
-  );
-}
-
-function NoLogsMessage() {
-  return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
-}
-
-function WaitingForLogsMessage() {
-  return <div className="px-4 py-3 text-left text-muted-foreground">Waiting for logs…</div>;
-}
-
-function ErrorMessage() {
-  return (
-    <div className="px-4 py-3 text-left text-destructive">
-      Something went wrong while fetching logs. Please try again later.
     </div>
   );
 }

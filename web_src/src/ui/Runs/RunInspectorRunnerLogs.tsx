@@ -7,6 +7,7 @@ import {
   useLiveLogStream,
 } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
 import type { RunInspectorNodeSection } from "./types";
@@ -40,26 +41,24 @@ export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspec
 function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecution }) {
   const executionInfo = buildExecutionInfo(execution);
   const executionInFlight = isExecutionInFlight(executionInfo);
-  const { sections, orphanLines, error, isStreaming, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, retry, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
     terminalCommandStatusForExecution(executionInfo),
     terminalTimeMsForExecution(executionInfo),
   );
   const lines = runnerLogLines(orphanLines, sections);
-  const isWaiting = lines.length === 0 && !error && (executionInFlight || isStreaming);
-  const hasError = Boolean(error) && !executionInFlight;
 
-  if (hasError) {
-    return <EmptySectionText>Something went wrong while fetching logs. Please try again later.</EmptySectionText>;
+  if (error) {
+    return <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />;
   }
 
-  if (isWaiting) {
-    return <EmptySectionText>Waiting for logs...</EmptySectionText>;
+  if (lines.length === 0 && executionInFlight) {
+    return <LiveLogStateNotice state="waiting" compact />;
   }
 
   if (lines.length === 0) {
-    return <EmptySectionText>No log lines yet.</EmptySectionText>;
+    return <LiveLogStateNotice state="empty" compact />;
   }
 
   return (
