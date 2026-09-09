@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   CircleUser,
   Gauge,
@@ -133,5 +134,12 @@ export const ADMIN_LINKS: Array<{
     description: "Inspect runner task activity",
     href: "/admin/runner-tasks",
     icon: Terminal,
+  },
+  {
+    id: "price-book",
+    label: "Price book",
+    description: "Scan and update model and VM rates",
+    href: "/admin/price-book",
+    icon: BookOpen,
   },
 ];
