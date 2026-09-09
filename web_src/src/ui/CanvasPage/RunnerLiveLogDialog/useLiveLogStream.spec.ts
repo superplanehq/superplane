@@ -1,11 +1,46 @@
-import { describe, expect, it } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 import type { LogState } from "./types";
 import {
   finalizeRunningCommandSections,
   terminalCommandStatusForExecution,
   terminalTimeMsForExecution,
+  useLiveLogStream,
 } from "./useLiveLogStream";
+
+const { captureExceptionMock, pumpMock, stopMock } = vi.hoisted(() => ({
+  captureExceptionMock: vi.fn(),
+  pumpMock: vi.fn(),
+  stopMock: vi.fn(),
+}));
+
+vi.mock("@/sentry", () => ({
+  Sentry: { captureException: captureExceptionMock },
+}));
+
+vi.mock("./liveLogStream", () => {
+  class LiveLogStreamMock {
+    pump = pumpMock;
+    stop = stopMock;
+  }
+
+  return { LiveLogStream: LiveLogStreamMock };
+});
+
+vi.mock("@/hooks/useOrganizationId", () => ({
+  useOrganizationId: () => undefined,
+}));
+
+vi.mock("@/hooks/useCanvasId", () => ({
+  useCanvasId: () => undefined,
+}));
+
+beforeEach(() => {
+  captureExceptionMock.mockReset();
+  pumpMock.mockReset();
+  stopMock.mockReset();
+});
 
 function baseLogState(): LogState {
   return {
@@ -145,5 +180,35 @@ describe("runner live log state", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("useLiveLogStream", () => {
+  it("reports a request error and retries the terminal log session on demand", async () => {
+    pumpMock.mockRejectedValue(new Error("Failed to fetch"));
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "failed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Failed to fetch" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "request"],
+        extra: {
+          organizationId: "organization-1",
+          canvasId: "canvas-1",
+          executionId: "execution-1",
+        },
+      }),
+    );
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2));
   });
 });
