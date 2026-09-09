@@ -1,11 +1,11 @@
 export const GITHUB_INSTALL_REQUEST_TITLE = "Waiting for approval";
 
-export const GITHUB_INSTALL_REQUEST_NEXT = "After they approve, click Connect GitHub again.";
+export const GITHUB_INSTALL_REQUEST_NEXT = "SuperPlane checks for approval automatically.";
 
 export const GITHUB_INSTALL_APPROVED_TITLE = "Request approved";
 
 export const GITHUB_INSTALL_APPROVED_BODY =
-  "The SuperPlane GitHub App is approved. The person who asked can click Connect GitHub again.";
+  "The SuperPlane GitHub App is approved. The person who asked can continue in SuperPlane.";
 
 export const GITHUB_INSTALL_APPROVED_ACTION = "Open SuperPlane";
 

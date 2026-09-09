@@ -3,6 +3,7 @@ package e2e
 import (
 	"encoding/json"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,12 +30,12 @@ func TestGitHubInstallRequest(t *testing.T) {
 		steps.assertThePendingRequestIsExplained()
 	})
 
-	t.Run("connect screen explains a pending GitHub request from the return query", func(t *testing.T) {
+	t.Run("connect screen ignores a stale pending GitHub request from the return query", func(t *testing.T) {
 		steps := &githubInstallRequestSteps{t: t}
 		steps.start()
 		factory := steps.givenAnIncompleteWorkspaceExists()
 		steps.visitWorkspaceSetupWithInstallRequest(factory)
-		steps.assertTheConnectScreenExplainsThePendingRequest()
+		steps.assertTheConnectScreenIgnoresTheStalePendingRequest()
 	})
 
 	t.Run("owner approval without state opens the approved page", func(t *testing.T) {
@@ -146,11 +147,13 @@ func (s *githubInstallRequestSteps) visitWorkspaceSetupWithInstallRequest(factor
 	s.session.Visit("/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=vcs&githubSetup=request")
 }
 
-func (s *githubInstallRequestSteps) assertTheConnectScreenExplainsThePendingRequest() {
+func (s *githubInstallRequestSteps) assertTheConnectScreenIgnoresTheStalePendingRequest() {
 	s.session.AssertVisible(q.TestID("first-run-connect"))
-	s.session.AssertVisible(q.TestID("first-run-github-install-requested"))
 	s.session.AssertVisible(q.TestID("first-run-connect-github"))
-	s.assertPendingRequestCopy()
+	s.session.AssertHidden(q.TestID("first-run-github-install-requested"))
+	require.Eventually(s.t, func() bool {
+		return !strings.Contains(s.session.Page().URL(), "githubSetup=request")
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
@@ -174,5 +177,6 @@ func (s *githubInstallRequestSteps) assertTheOwnerApprovalIsExplained() {
 	require.NotContains(s.t, s.session.Page().URL(), "missing state")
 	s.session.AssertVisible(q.TestID("github-install-approved"))
 	s.session.AssertText("Request approved")
-	s.session.AssertText("The SuperPlane GitHub App is approved. The person who asked can click Connect GitHub again.")
+	s.session.AssertText("The SuperPlane GitHub App is approved.")
+	s.session.AssertVisible(q.TestID("github-install-approved-open"))
 }

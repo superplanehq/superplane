@@ -76,6 +76,16 @@ describe("pendingGitHubBrowserAction", () => {
       ]),
     ).toBeUndefined();
   });
+
+  it("does not guess between two legacy pending connections", () => {
+    const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
+    const legacy = (id: string) => ({
+      metadata: { id, integrationName: "github" },
+      status: { state: "pending", browserAction: action, metadata: {} },
+    });
+
+    expect(pendingGitHubBrowserAction([legacy("int-1"), legacy("int-2")], "user-1")).toBeUndefined();
+  });
 });
 
 describe("pendingGitHubInstallPicker", () => {

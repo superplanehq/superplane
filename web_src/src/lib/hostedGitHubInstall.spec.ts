@@ -9,6 +9,7 @@ import {
   hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
+  pendingGitHubInstallRequests,
   pendingGitHubInstallations,
 } from "./hostedGitHubInstall";
 
@@ -67,6 +68,25 @@ describe("pendingGitHubInstallations", () => {
   });
 });
 
+describe("pendingGitHubInstallRequests", () => {
+  it("reads every request and keeps legacy metadata compatible", () => {
+    expect(
+      pendingGitHubInstallRequests({
+        installRequests: [
+          { id: 1, accountLogin: "acme", requesterLogin: "member", createdAt: "2026-09-08T12:00:00Z" },
+          { id: "2", accountLogin: "octo", requesterLogin: "member" },
+        ],
+      }),
+    ).toEqual([
+      { id: "1", accountLogin: "acme", requesterLogin: "member", createdAt: "2026-09-08T12:00:00Z" },
+      { id: "2", accountLogin: "octo", requesterLogin: "member" },
+    ]);
+    expect(pendingGitHubInstallRequests({ installRequested: true, installRequestedAccount: "legacy" })).toEqual([
+      { accountLogin: "legacy" },
+    ]);
+  });
+});
+
 describe("hosted GitHub URLs", () => {
   it("builds the public bind path", () => {
     expect(hostedGitHubBindPath("csrf", "11")).toBe("/api/v1/github/app/bind?state=csrf&installation_id=11");
@@ -98,7 +118,7 @@ describe("hosted GitHub URLs", () => {
 
   it("reads the organization waiting for approval", () => {
     expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme" })).toBe("acme");
-    expect(hostedGitHubInstallRequestedAccount({ owner: "acme" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({ owner: "acme" })).toBe("");
     expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme", owner: "other" })).toBe("acme");
     expect(hostedGitHubInstallRequestedAccount({})).toBe("");
   });

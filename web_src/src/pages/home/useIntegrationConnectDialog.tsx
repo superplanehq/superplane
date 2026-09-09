@@ -155,12 +155,12 @@ export function useIntegrationConnectDialog({
     createIntegration: createIntegrationMutation.mutateAsync,
   });
 
-  const requestConnect = (integrationName: string) => {
+  const requestConnect = async (integrationName: string, preferredIntegrationId?: string): Promise<boolean> => {
     if (integrationName === "github" && githubConnect.hosted) {
-      void connectGitHubWithoutDialog();
-      return;
+      return connectGitHubWithoutDialog(false, preferredIntegrationId);
     }
     openConnectDialog(integrationName);
+    return false;
   };
 
   const requestPrivateGitHubConnect = useCallback(() => {
@@ -294,30 +294,31 @@ function useHostedGitHubConnect({
   }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
 }) {
   const navigate = useNavigate();
-  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean }>(false);
+  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean; preferredIntegrationId?: string }>(false);
 
   const connectGitHubWithoutDialog = useCallback(
-    async (forceNew = false) => {
+    async (forceNew = false, preferredIntegrationId?: string): Promise<boolean> => {
       const userGate = hostedGitHubConnectUserGate(currentUserId, currentUserResolved);
       if (userGate !== "run") {
         if (userGate === "queue") {
-          pendingGitHubConnectRef.current = { forceNew };
+          pendingGitHubConnectRef.current = { forceNew, preferredIntegrationId };
         } else {
           pendingGitHubConnectRef.current = false;
           showErrorToast("Failed to connect GitHub");
         }
-        return;
+        return false;
       }
 
       pendingGitHubConnectRef.current = false;
       try {
-        await startDirectGitHubConnect({
+        return await startDirectGitHubConnect({
           organizationId,
           returnTo,
           existingNames: existingIntegrationNames,
           connected,
           currentUserId,
           forceNew,
+          preferredIntegrationId,
           goTo: navigate,
           create: async (payload) => {
             const response = await createIntegration(payload);
@@ -327,6 +328,7 @@ function useHostedGitHubConnect({
         });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
+        return false;
       }
     },
     [
@@ -349,9 +351,9 @@ function useHostedGitHubConnect({
       return;
     }
 
-    const { forceNew } = pendingGitHubConnectRef.current;
+    const { forceNew, preferredIntegrationId } = pendingGitHubConnectRef.current;
     pendingGitHubConnectRef.current = false;
-    void connectGitHubWithoutDialog(forceNew);
+    void connectGitHubWithoutDialog(forceNew, preferredIntegrationId);
   }, [connectGitHubWithoutDialog, currentUserId, currentUserResolved]);
 
   return connectGitHubWithoutDialog;
