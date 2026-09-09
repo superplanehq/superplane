@@ -75,6 +75,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
+When this agent uses OpenRouter, SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation and any model switch.
+
 ## Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.
 
@@ -146,11 +148,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := injectSuperPlaneCredentials(resolved.Variables, runModel.Provider, access)
-	if err != nil {
-		return err
-	}
-
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
 		return fmt.Errorf("webhook setup: %w", err)
@@ -164,10 +161,24 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels)
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels, openrouter.FallbackRotateSeed(ctx))
 	if err != nil {
+		return err
+	}
+
+	if runModel.Provider == models.UsageProviderOpenRouter {
+		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)
+		if err != nil {
+			return err
+		}
+	}
+	environment, err = injectSuperPlaneCredentials(environment, runModel.Provider, access)
+	if err != nil {
+		if runModel.Provider == models.UsageProviderOpenRouter {
+			revokeMintedOpenRouterRunnerKey(ctx)
+		}
 		return err
 	}
 
@@ -182,6 +193,9 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		Labels:         runner.OriginLabelsForTask(ctx),
 	})
 	if err != nil {
+		if runModel.Provider == models.UsageProviderOpenRouter {
+			revokeMintedOpenRouterRunnerKey(ctx)
+		}
 		return fmt.Errorf("create task: %w", err)
 	}
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
@@ -268,6 +282,7 @@ func buildSuperPlaneBrokerTask(
 	setups []runner.IntegrationSetup,
 	environment []runner.BrokerEnvironmentVariable,
 	fallbackModels []string,
+	rotateSeed string,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
@@ -299,7 +314,7 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := openrouter.ApplyPlanningFollowUp(
-			openrouter.BuildBrokerTask(openRouterSpec, usage, setups, fallbackModels),
+			openrouter.BuildBrokerTask(openRouterSpec, usage, setups, fallbackModels, rotateSeed),
 			environment,
 			openRouterSpec,
 		)

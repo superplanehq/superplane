@@ -25,7 +25,10 @@ func TestClassifyOpenRouterErrorDetectsRateLimitsAndHardFailures(t *testing.T) {
 	assert.Equal(t, "hard", jsClassify(t, "Invalid API key"))
 	assert.Equal(t, "hard", jsClassify(t, "Insufficient credits"))
 	assert.Equal(t, "hard", jsClassify(t, "unknown model: nope"))
-	assert.Equal(t, "other", jsClassify(t, "provider exploded"))
+	assert.Equal(t, "retryable", jsClassify(t, "HTTP 503 Service Unavailable"))
+	assert.Equal(t, "retryable", jsClassify(t, "Provider returned error"))
+	assert.Equal(t, "retryable", jsClassify(t, "The model is currently overloaded"))
+	assert.Equal(t, "other", jsClassify(t, "opencode crashed"))
 }
 
 func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
@@ -88,6 +91,31 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "allow", permission["*"])
 	assert.Nil(t, permission["edit"])
 	assert.Nil(t, config["mcp"])
+}
+
+func TestBuildOpenCodeConfigSetsThroughputRoutingForModels(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{
+		"taskDir": "/task",
+		"env":     map[string]string{"OPENROUTER_API_KEY": "sk-or"},
+		"models":  []string{"x-ai/grok-4.6", "anthropic/claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(out, &config))
+	provider, _ := config["provider"].(map[string]any)
+	openrouter, _ := provider["openrouter"].(map[string]any)
+	models, _ := openrouter["models"].(map[string]any)
+	require.Contains(t, models, "x-ai/grok-4.6")
+	grok, _ := models["x-ai/grok-4.6"].(map[string]any)
+	options, _ := grok["options"].(map[string]any)
+	routing, _ := options["provider"].(map[string]any)
+	assert.Equal(t, true, routing["allow_fallbacks"])
+	assert.Equal(t, "throughput", routing["sort"])
 }
 
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
@@ -184,14 +212,94 @@ func TestRunPromptSwitchesModelAfterNewAccountRPM(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "-m")
 	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
 	assert.NotContains(t, result.spawns[0], "--session")
-	assert.Contains(t, result.spawns[1], "--session")
-	assert.Contains(t, result.spawns[1], "ses_1")
+	assert.NotContains(t, result.spawns[1], "--session")
 	assert.Contains(t, result.spawns[1], "openrouter/anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "OpenRouter model rotation: x-ai/grok-4.6 → anthropic/claude-sonnet-4-6")
 	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6 — switching to anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Switching to anthropic/claude-sonnet-4-6.")
+	assert.Contains(t, result.output, "Starting a new OpenCode session on anthropic/claude-sonnet-4-6.")
+	assert.Contains(t, result.output, "OpenCode finished on anthropic/claude-sonnet-4-6")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
+}
+
+func TestRunPromptKeepsFileOrderAndLogsStartModel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "x-ai/grok-4.6",
+		fallback: []string{"anthropic/claude-sonnet-4-6", "x-ai/grok-4.6"},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_rot","part":{"type":"text","text":"ok"}}`,
+				`{"type":"step_finish","sessionID":"ses_rot","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Contains(t, result.spawns[0], "openrouter/anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "OpenRouter model rotation: anthropic/claude-sonnet-4-6 → x-ai/grok-4.6")
+	assert.Contains(t, result.output, "This run starts on anthropic/claude-sonnet-4-6. Selected model x-ai/grok-4.6 is later in the rotation.")
+	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+}
+
+func TestRunPromptSwitchesModelAfterTemporaryProviderError(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		fallback: []string{
+			"x-ai/grok-4.6",
+			"anthropic/claude-sonnet-4-6",
+		},
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "HTTP 503 Service Unavailable",
+				Stdout: []string{
+					`{"type":"error","sessionID":"ses_1","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_2","part":{"type":"text","text":"recovered"}}`,
+					`{"type":"step_finish","sessionID":"ses_2","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.NotContains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "openrouter/anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Switching to anthropic/claude-sonnet-4-6.")
+	assert.Contains(t, result.output, "Starting a new OpenCode session on anthropic/claude-sonnet-4-6.")
+	assert.Contains(t, result.output, "OpenCode finished on anthropic/claude-sonnet-4-6")
+}
+
+func TestRunPromptSwitchesOnNestedRateLimitStatus(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "x-ai/grok-4.6",
+		fallback: []string{"x-ai/grok-4.6", "openai/gpt-4.1"},
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stdout: []string{
+					`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":429,"responseBody":"{\"error\":{\"code\":429,\"message\":\"Rate limit exceeded\"}}"}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"ok"}}`,
+					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Switching to openai/gpt-4.1.")
 }
 
 func TestRunPromptWaitsWhenOnlyOneModelIsRateLimited(t *testing.T) {
@@ -218,8 +326,10 @@ func TestRunPromptWaitsWhenOnlyOneModelIsRateLimited(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
 	assert.Equal(t, []float64{60000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit notice — waiting to continue…")
-	assert.NotContains(t, result.output, "switching to")
+	assert.Contains(t, result.output, "OpenRouter model: x-ai/grok-4.6. No other allowed models are available to rotate to.")
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 60 seconds, then retrying.")
+	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	assert.NotContains(t, result.output, "Switching to")
 }
 
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
@@ -380,8 +490,9 @@ func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.NotContains(t, result.output, "switching to")
+	assert.NotContains(t, result.output, "Switching to")
 	assert.Contains(t, result.output, "Invalid API key")
+	assert.Contains(t, result.output, "This error does not rotate to another model.")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
 
@@ -417,7 +528,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
 	assert.Contains(t, second.spawns[0], "ses_keep")
-	assert.Contains(t, second.output, "Continuing OpenCode session")
+	assert.Contains(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
 }
 
 func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
@@ -463,8 +574,9 @@ func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.NotContains(t, result.output, "switching to")
+	assert.NotContains(t, result.output, "Switching to")
 	assert.NotContains(t, result.output, "waiting to continue")
+	assert.NotContains(t, result.output, "Waiting 60 seconds")
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "recovered", payload["result"])
 }
