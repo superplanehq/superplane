@@ -237,8 +237,12 @@ describe("useLiveLogStream", () => {
     await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2));
   });
 
-  it("clears a stale error when a retry opens a healthy stream", async () => {
-    pumpMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+  it("preserves existing logs when a retry opens a healthy stream", async () => {
+    pumpMock.mockImplementationOnce(async (handlers: { onOpen?: () => void; onLogLine: (line: string) => void }) => {
+      handlers.onOpen?.();
+      handlers.onLogLine("existing output");
+      throw new Error("Failed to fetch");
+    });
     pumpMock.mockImplementationOnce((handlers: { onOpen?: () => void }) => {
       handlers.onOpen?.();
       return new Promise<void>(() => undefined);
@@ -251,9 +255,11 @@ describe("useLiveLogStream", () => {
     );
 
     await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    expect(result.current.orphanLines).toEqual(["existing output"]);
     act(() => result.current.retry());
 
     await waitFor(() => expect(result.current.error).toBeNull());
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.orphanLines).toEqual(["existing output"]);
   });
 });

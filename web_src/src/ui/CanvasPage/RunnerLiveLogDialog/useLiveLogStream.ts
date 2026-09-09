@@ -325,15 +325,19 @@ export function useLiveLogStream(
   }, []);
 
   useEffect(() => {
+    const canLoad = Boolean(organizationId && canvasId && executionId);
+    setState({ ...initialLogState, isLoading: canLoad, isStreaming: canLoad });
+    setUsage(emptyPromptUsageState());
+  }, [organizationId, canvasId, executionId]);
+
+  useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
-      setState((prev) => ({ ...prev, isLoading: false, isStreaming: false }));
       return;
     }
 
     const sessionAbort = new AbortController();
     let activeStream: LiveLogStream | null = null;
-    setState({ ...initialLogState, isLoading: true, isStreaming: true });
-    setUsage(emptyPromptUsageState());
+    setState((prev) => ({ ...prev, error: null, isLoading: true, isStreaming: true }));
 
     void runLiveLogSession({
       organizationId,
