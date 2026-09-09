@@ -110,7 +110,23 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset) error {
 	}
 
 	p.finalVersion = finalVersion
+	models.RewriteHostedProviderRunnerNodes(p.finalVersion.Nodes)
+	p.annotateSuperPlaneRunnerNodes()
 	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
+}
+
+func (p *CanvasPatcher) annotateSuperPlaneRunnerNodes() {
+	if p.finalVersion == nil {
+		return
+	}
+	var factoryID *uuid.UUID
+	if p.originalVersion.WorkflowID != uuid.Nil {
+		canvas, err := models.FindCanvasInTransaction(p.tx, p.orgID, p.originalVersion.WorkflowID)
+		if err == nil {
+			factoryID = canvas.FactoryID
+		}
+	}
+	_ = models.AnnotateSuperPlaneRunnerNodes(p.tx, p.orgID, factoryID, p.finalVersion.Nodes)
 }
 
 func (p *CanvasPatcher) handleChange(change *Change) error {

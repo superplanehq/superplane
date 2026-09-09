@@ -170,7 +170,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -745,7 +745,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
@@ -1030,6 +1030,22 @@ describe("line board work-order examples", () => {
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+  });
+
+  // A freshly created draft is known to be analyzing before its run appears in
+  // the polled list. The optimistic flag keeps the popup in step with the board.
+  it("shows the analyzing state from the pending flag before a run appears", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [],
+      isAnalyzing: true,
+    });
+
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).not.toContain("Reject");
   });
 
   // Scoring runs on the task before a line plans it. The log must read
@@ -1116,6 +1132,8 @@ describe("line board work-order examples", () => {
     expect(analysis[0].checks).toBeUndefined();
     expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
     expect(fixture.openPhaseId).toBeUndefined();
+    expect(fixture.footer.note?.headline).toBe("This task is ready to start");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("appends matching PR feedback runs after line steps, oldest first", () => {

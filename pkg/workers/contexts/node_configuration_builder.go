@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +15,13 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -1099,6 +1102,9 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, err
 	}
 	attachOrderOrigin(order, payload)
+	if err := attachOrderFiles(b.tx, order, payload); err != nil {
+		return nil, err
+	}
 
 	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
 	if err != nil {
@@ -1202,6 +1208,30 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	markdown, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return fmt.Errorf("order() could not mint a file URL: %w", err)
+	}
+
+	filePayloads := make([]any, 0, len(files))
+	for _, file := range files {
+		filePayloads = append(filePayloads, file.Map())
+	}
+	payload["description"] = markdown
+	payload["files"] = filePayloads
+	return nil
 }
 
 // resolveOrderRepository keeps orders created before repository snapshots
@@ -2206,10 +2236,6 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 }
 
 func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
-	if _, hasModel := resolved["model"]; !hasModel {
-		return resolved, nil
-	}
-
 	dispatch, err := b.lineDispatch()
 	if err != nil || dispatch == nil {
 		return resolved, err
@@ -2276,14 +2302,18 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
-	provider, ok := runnerProviderForComponent(node.ComponentName())
-	if !ok {
-		return false, nil
-	}
-
 	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return false, err
+	}
+
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
+	}
+
+	provider, ok := runnerProviderForComponent(node.ComponentName())
+	if !ok {
+		return false, nil
 	}
 
 	return models.ModelIsSelectable(
@@ -2293,6 +2323,40 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		provider,
 		runnerFundingSourceFromConfig(resolved),
 		model,
+	)
+}
+
+func superPlaneAcceptsDispatchModel(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	factoryID *uuid.UUID,
+	model string,
+) (bool, error) {
+	if parsed, err := models.ParseSelectableLLMModelKey(model); err == nil {
+		if parsed.Source.ID != models.UsageFundingSourceHosted {
+			return false, nil
+		}
+		return models.ModelIsSelectable(
+			tx,
+			orgID,
+			factoryID,
+			parsed.Provider.ID,
+			models.UsageFundingSourceHosted,
+			parsed.Model.ID,
+		)
+	}
+
+	hosted, err := models.ParseHostedLLMModelKey(model)
+	if err != nil || !hosted.IsSet() {
+		return false, nil
+	}
+	return models.ModelIsSelectable(
+		tx,
+		orgID,
+		factoryID,
+		hosted.Provider,
+		models.UsageFundingSourceHosted,
+		hosted.Model,
 	)
 }
 

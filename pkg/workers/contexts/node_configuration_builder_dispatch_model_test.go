@@ -196,6 +196,133 @@ func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
 	assert.Equal(t, "opus", resolved["model"])
 }
 
+func Test__Build__OverlaysLineDispatchModelOnSuperPlaneWithoutCanvasModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"x-ai/grok-4.6"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
+	})
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, order.ID, line.ID, line.Name, nil)
+	override := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
+	require.NoError(t, db.Model(dispatch).Update("model", override).Error)
+
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "agent",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{
+		"machineType": "e1-large-amd64",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, override, resolved["model"])
+}
+
+func Test__Build__SkipsSuperPlaneOverrideWhenModelIsNotAllowlisted(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"x-ai/grok-4.6"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
+	})
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, order.ID, line.ID, line.Name, nil)
+	require.NoError(t, db.Model(dispatch).Update("model", models.FormatSelectableLLMModelKey(
+		models.UsageFundingSourceHosted,
+		models.UsageProviderOpenRouter,
+		"openai/gpt-5",
+	)).Error)
+
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "agent",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{})
+	require.NoError(t, err)
+	assert.NotContains(t, resolved, "model")
+}
+
+func Test__Build__KeepsSuperPlaneModelUnsetWhenDispatchIsAuto(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{
+		"machineType": "e1-large-amd64",
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, resolved, "model")
+}
+
 func setupRunnerAppExecution(
 	t *testing.T,
 	r *support.ResourceRegistry,

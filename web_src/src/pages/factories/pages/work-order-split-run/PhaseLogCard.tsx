@@ -1,12 +1,18 @@
+import { emptyAgentRunTelemetry, type AgentPromptUsageSeries, type AgentRunTelemetry } from "@/lib/agentRunTelemetry";
+import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
+
+const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
+const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { formatClockDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, Pencil, RotateCw } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "@/components/Link/link";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -21,11 +27,20 @@ import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { groupPlanningSessionLog, mergePlanningSessionNotes } from "../planningSessionLog";
+import {
+  PhaseAgentUsageProvider,
+  usePhaseAgentUsageAgents,
+  useReportPhaseAgentUsageSeries,
+  type PhaseAgentUsageEntry,
+} from "./phaseAgentUsageContext";
+import { PhaseUsageSpendButton } from "./PhaseUsageChartButton";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
 const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
+const STREAM_NOTE_MARKDOWN =
+  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -379,23 +394,7 @@ function isNestedHeaderControl(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest("a, button, [role='button']"));
 }
 
-export function PhaseLogCard({
-  phase,
-  expanded,
-  stream,
-  selectedNodeId,
-  onToggle,
-  onSelectNode,
-  onStop,
-  onRerun,
-  runHref,
-  editHref,
-  actionBusy = false,
-  collapsible = true,
-  organizationId,
-  canvasId,
-  compactSessionLog = false,
-}: {
+type PhaseLogCardProps = {
   phase: SplitRunPhase;
   expanded: boolean;
   stream?: SplitRunStreamLine[];
@@ -414,12 +413,40 @@ export function PhaseLogCard({
   canvasId?: string;
   /** Collapse setup noise and bash in the Create with an Agent session log. */
   compactSessionLog?: boolean;
-}) {
+  /** Live canvas or run details are still loading for this phase. */
+  streamLoading?: boolean;
+  onUsageOpenChange?: (open: boolean) => void;
+};
+
+function phaseExpectsUsage(groups: StreamNodeGroup[]): boolean {
+  return groups.some((group) => isRunnerComponent(group.line.component) && Boolean(group.line.executionId));
+}
+
+export function PhaseLogCard({
+  phase,
+  expanded,
+  stream,
+  selectedNodeId,
+  onToggle,
+  onSelectNode,
+  onStop,
+  onRerun,
+  runHref,
+  editHref,
+  actionBusy = false,
+  collapsible = true,
+  organizationId,
+  canvasId,
+  compactSessionLog = false,
+  streamLoading = false,
+  onUsageOpenChange,
+}: PhaseLogCardProps) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
   const producedPullRequests = pullRequestsProducedBySteps(groups);
   const rootRef = useRef<HTMLDivElement>(null);
   useLastRunningLine(rootRef, phase.status === "running");
+  const expectUsage = phaseExpectsUsage(groups);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -440,59 +467,70 @@ export function PhaseLogCard({
       data-testid={`split-run-phase-${phase.id}`}
       aria-current={expanded ? "step" : undefined}
     >
-      <div
-        className={cn(
-          "rounded-md bg-muted",
-          !expanded && LOG_ROW_HOVER,
-          expanded ? "pb-2" : "py-2",
-          canToggleFromHeader && !expanded && "cursor-pointer",
-        )}
-        data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
-        onClick={
-          canToggleFromHeader
-            ? (event) => {
-                if (isNestedHeaderControl(event.target)) {
-                  return;
-                }
-                onToggle?.();
-              }
-            : undefined
-        }
-      >
-        <AutomationHeader
-          phase={phase}
+      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={expectUsage}>
+        <PhaseCollapsedUsageCollectors
+          groups={groups}
           expanded={expanded}
-          collapsible={collapsible}
-          producedArtifacts={producedArtifacts}
-          producedPullRequests={producedPullRequests}
-          onToggle={onToggle}
-          onStop={onStop}
-          onRerun={onRerun}
-          runHref={runHref}
-          editHref={editHref}
-          actionBusy={actionBusy}
+          organizationId={organizationId}
+          canvasId={canvasId ?? phase.appId}
         />
+        <div
+          className={cn(
+            "rounded-md bg-muted",
+            !expanded && LOG_ROW_HOVER,
+            expanded ? "pb-2" : "py-2",
+            canToggleFromHeader && !expanded && "cursor-pointer",
+          )}
+          data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
+          onClick={
+            canToggleFromHeader
+              ? (event) => {
+                  if (isNestedHeaderControl(event.target)) {
+                    return;
+                  }
+                  onToggle?.();
+                }
+              : undefined
+          }
+        >
+          {compactSessionLog ? null : (
+            <AutomationHeader
+              phase={phase}
+              expanded={expanded}
+              collapsible={collapsible}
+              producedArtifacts={producedArtifacts}
+              producedPullRequests={producedPullRequests}
+              onToggle={onToggle}
+              onStop={onStop}
+              onRerun={onRerun}
+              runHref={runHref}
+              editHref={editHref}
+              actionBusy={actionBusy}
+              onUsageOpenChange={onUsageOpenChange}
+            />
+          )}
 
-        {expanded ? (
-          <ol
-            className={cn("mt-1 min-w-0 list-none leading-tight", LOG_FACE)}
-            data-testid={`split-run-stream-${phase.id}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            {groups.map((group) => (
-              <StreamNode
-                key={group.line.id}
-                group={group}
-                highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
-                onSelect={onSelectNode}
-                organizationId={organizationId}
-                canvasId={canvasId ?? phase.appId}
-                compactSessionLog={compactSessionLog}
-              />
-            ))}
-          </ol>
-        ) : null}
-      </div>
+          {expanded ? (
+            <ol
+              className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
+              data-testid={`split-run-stream-${phase.id}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              {groups.map((group) => (
+                <StreamNode
+                  key={group.line.id}
+                  group={group}
+                  highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
+                  onSelect={onSelectNode}
+                  organizationId={organizationId}
+                  canvasId={canvasId ?? phase.appId}
+                  compactSessionLog={compactSessionLog}
+                />
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      </PhaseAgentUsageProvider>
     </div>
   );
 }
@@ -509,6 +547,7 @@ function AutomationHeader({
   runHref,
   editHref,
   actionBusy,
+  onUsageOpenChange,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -521,6 +560,7 @@ function AutomationHeader({
   runHref?: string;
   editHref?: string;
   actionBusy: boolean;
+  onUsageOpenChange?: (open: boolean) => void;
 }) {
   return (
     <div
@@ -570,7 +610,7 @@ function AutomationHeader({
             ))}
           </span>
         ) : null}
-        <PhaseMetrics phase={phase} />
+        <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
       </span>
     </div>
   );
@@ -752,37 +792,70 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
   return null;
 }
 
-function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
+function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
+  let tokens = 0;
+  let cents = 0;
+  for (const agent of agents) {
+    tokens += agentRunNewTokenCount(agent.telemetry);
+    const usd = agent.telemetry.usage.total_cost_usd;
+    if (usd != null && Number.isFinite(usd)) {
+      cents += Math.round(usd * 100);
+    }
+  }
+  return { tokens, cents };
+}
+
+function PhaseMetrics({
+  phase,
+  onUsageOpenChange,
+}: {
+  phase: SplitRunPhase;
+  onUsageOpenChange?: (open: boolean) => void;
+}) {
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? tickingRunningClock(phase.duration, sampledAt, now)
     : formatClockDurationLabel(phase.duration);
-  const tokens = parseWorkOrderMetric(phase.totalTokens);
-  const cents = parseWorkOrderMetric(phase.costCents);
+  const agents = usePhaseAgentUsageAgents();
+  const live = livePhaseSpend(agents);
+  const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
+  const cents = Math.max(parseWorkOrderMetric(phase.costCents), live.cents);
   const model = displayRunnerModel(phase.model ?? "");
-  const parts: string[] = [];
+  const spendParts: string[] = [];
   if (cents > 0) {
-    parts.push(formatUsdCents(cents));
+    spendParts.push(formatUsdCents(cents));
   }
   if (tokens > 0) {
-    parts.push(formatCompactTokenValue(tokens));
+    spendParts.push(formatCompactTokenValue(tokens));
   }
+  const restParts: string[] = [];
   if (model) {
-    parts.push(model);
+    restParts.push(model);
   }
   if (clock && clock !== "—") {
-    parts.push(clock);
+    restParts.push(clock);
   }
-  if (parts.length === 0) {
+  if (spendParts.length === 0 && restParts.length === 0) {
     return null;
   }
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className={cn(LOG_FACE, "tabular-nums text-muted-foreground")}
+      className={cn(LOG_FACE, "inline-flex items-center gap-1 tabular-nums text-muted-foreground")}
     >
-      {parts.join(" · ")}
+      {spendParts.length > 0 ? (
+        <PhaseUsageSpendButton
+          phaseId={phase.id}
+          phaseName={phase.name}
+          spendLabel={spendParts.join(" · ")}
+          live={running}
+          className={cn(LOG_FACE, "tabular-nums text-muted-foreground hover:text-foreground hover:underline")}
+          onOpenChange={onUsageOpenChange}
+        />
+      ) : null}
+      {spendParts.length > 0 && restParts.length > 0 ? <span aria-hidden> · </span> : null}
+      {restParts.length > 0 ? <span>{restParts.join(" · ")}</span> : null}
     </span>
   );
 }
@@ -819,7 +892,14 @@ function StreamNode({
   compactSessionLog: boolean;
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries({
+    nodeId: line.nodeId ?? line.id,
+    fallbackName: line.componentName,
+    series: usageSeries,
+    enabled: isRunnerComponent(line.component),
+    loading: usageLoading,
+  });
   const merged = compactSessionLog
     ? mergePlanningSessionNotes(liveNotes, notes)
     : mergeLiveStreamNotes(liveNotes, notes);
@@ -828,18 +908,25 @@ function StreamNode({
 
   return (
     <li className="min-w-0">
-      <StreamNodeHeader
-        line={line}
-        hasChildren={hasChildren}
-        highlighted={highlighted}
-        artifact={artifact}
-        pullRequest={pullRequest}
-        onSelect={onSelect}
-      />
+      {compactSessionLog ? null : (
+        <StreamNodeHeader
+          line={line}
+          hasChildren={hasChildren}
+          highlighted={highlighted}
+          artifact={artifact}
+          pullRequest={pullRequest}
+          onSelect={onSelect}
+        />
+      )}
       {hasChildren ? (
         <ol className="min-w-0">
           {steps.map((step) => (
-            <StreamStep key={step.line.id} step={step} highlightUserTalk={compactSessionLog} />
+            <StreamStep
+              key={step.line.id}
+              step={step}
+              highlightUserTalk={compactSessionLog}
+              stickyHeader={!compactSessionLog}
+            />
           ))}
         </ol>
       ) : null}
@@ -917,7 +1004,15 @@ function StreamNodeHeader({
   );
 }
 
-function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup; highlightUserTalk?: boolean }) {
+function StreamStep({
+  step,
+  highlightUserTalk = false,
+  stickyHeader = true,
+}: {
+  step: ClaudeStepGroup;
+  highlightUserTalk?: boolean;
+  stickyHeader?: boolean;
+}) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
   const showHeader = Boolean(step.line.componentName.trim() || step.line.componentType);
@@ -928,7 +1023,7 @@ function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup
         <div
           data-testid={`split-run-stream-line-${step.line.id}`}
           {...streamLineAttrs(step.line.status)}
-          className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
+          className={cn(STREAM_LINE_WRAP_ROW, hasBody && stickyHeader && STICKY_STEP)}
         >
           {step.line.componentType ? (
             <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>
@@ -968,14 +1063,14 @@ function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine;
     >
       <span className="inline-flex w-4 shrink-0" aria-hidden />
       {isUserTalk ? (
-        <div className="min-w-0 flex-1 rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
-          <span className="mb-0.5 block text-[11px] font-medium leading-none text-primary">{youLabel}</span>
-          <span className="whitespace-normal break-words leading-5 text-foreground">{line.componentName}</span>
+        <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
+          <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">{youLabel}</span>
+          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
         </div>
       ) : (
-        <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
-          {line.componentName}
-        </span>
+        <div className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
+          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
+        </div>
       )}
     </div>
   );
@@ -1141,28 +1236,125 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
   );
 }
 
+function PhaseCollapsedUsageCollectors({
+  groups,
+  expanded,
+  organizationId,
+  canvasId,
+}: {
+  groups: StreamNodeGroup[];
+  expanded: boolean;
+  organizationId?: string;
+  canvasId?: string;
+}) {
+  if (expanded) {
+    return null;
+  }
+  return (
+    <>
+      {groups.map((group) =>
+        isRunnerComponent(group.line.component) ? (
+          <PhaseAgentUsageCollector
+            key={`usage-${group.line.id}`}
+            line={group.line}
+            organizationId={organizationId}
+            canvasId={canvasId}
+          />
+        ) : null,
+      )}
+    </>
+  );
+}
+
+function PhaseAgentUsageCollector({
+  line,
+  organizationId,
+  canvasId,
+}: {
+  line: SplitRunStreamLine;
+  organizationId?: string;
+  canvasId?: string;
+}) {
+  const { usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries({
+    nodeId: line.nodeId ?? line.id,
+    fallbackName: line.componentName,
+    series: usageSeries,
+    enabled: true,
+    loading: usageLoading,
+  });
+  return null;
+}
+
+function liveLogFinishState(status: SplitRunPhaseStatus): "failed" | "passed" | null {
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "passed") {
+    return "passed";
+  }
+  return null;
+}
+
+function resolvedUsageSeries(
+  usageSeries: AgentPromptUsageSeries[] | undefined,
+  fallbackSeries: AgentPromptUsageSeries[],
+): AgentPromptUsageSeries[] {
+  if (usageSeries && usageSeries.length > 0) {
+    return usageSeries;
+  }
+  return fallbackSeries;
+}
+
+function isAgentUsageLoading(
+  canStream: boolean,
+  hasTurns: boolean,
+  isStreaming: boolean,
+  nodeRunning: boolean,
+): boolean {
+  return canStream && !hasTurns && (isStreaming || nodeRunning);
+}
+
 function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
-): SplitRunStreamLine[] | undefined {
+): {
+  notes: SplitRunStreamLine[] | undefined;
+  telemetry: AgentRunTelemetry;
+  usageSeries: AgentPromptUsageSeries[];
+  usageLoading: boolean;
+} {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming, telemetry, usageSeries } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
-    line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
+    liveLogFinishState(line.status),
     null,
     { organizationId, canvasId },
   );
+  const nextTelemetry = telemetry ?? EMPTY_AGENT_TELEMETRY;
+  const fallbackSeries = useMemo(
+    () => (nextTelemetry.turns.length > 0 ? [{ name: "", telemetry: nextTelemetry }] : EMPTY_USAGE_SERIES),
+    [nextTelemetry],
+  );
+  const nextSeries = resolvedUsageSeries(usageSeries, fallbackSeries);
+  const hasTurns = nextSeries.some((item) => item.telemetry.turns.length > 0);
+  const usageLoading = isAgentUsageLoading(canStream, hasTurns, isStreaming, line.status === "running");
   if (!canStream) {
-    return undefined;
+    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries, usageLoading: false };
   }
-  return notesForLiveStream({
-    nodeId: line.nodeId ?? line.id,
-    sections,
-    orphanLines,
-    error,
-    isStreaming,
-    nodeStatus: line.status,
-  });
+  return {
+    notes: notesForLiveStream({
+      nodeId: line.nodeId ?? line.id,
+      sections,
+      orphanLines,
+      error,
+      isStreaming,
+      nodeStatus: line.status,
+    }),
+    telemetry: nextTelemetry,
+    usageSeries: nextSeries,
+    usageLoading,
+  };
 }

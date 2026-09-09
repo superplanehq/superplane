@@ -1,15 +1,12 @@
 import type { CanvasesCanvas } from "@/api-client";
+import { AGENT_HARNESS_COMPONENTS, isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 import { materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 
 import type { PlanningReviewComponent, PlanningReviewDraft } from "../pages/planningReviewMockup";
 
-export const AGENT_HARNESS_COMPONENTS = new Set<string>(["runnerClaudeCode", "runnerCodex", "runnerOpenRouter"]);
+export { AGENT_HARNESS_COMPONENTS };
 
 export type CanvasSpecNode = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>[number];
-
-function isAgentHarnessComponent(component: string | undefined): boolean {
-  return Boolean(component && AGENT_HARNESS_COMPONENTS.has(component));
-}
 
 /** Agent harness nodes on a column automation canvas. */
 export function findAgentNodes(spec: CanvasesCanvas["spec"] | null | undefined): CanvasSpecNode[] {

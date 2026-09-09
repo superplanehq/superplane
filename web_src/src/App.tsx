@@ -1,10 +1,10 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useEffect } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
+import React from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
-import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
+import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -21,7 +21,8 @@ import { AccountProvider } from "./contexts/AccountProvider";
 import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
-import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
+import { RequirePermission } from "./components/PermissionGate";
+import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -37,15 +38,7 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
-  FactorySettingsAutomationsPage,
-  FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsAccountNotificationsPage,
-  FactorySettingsAccountProfilePage,
-  FactorySettingsAccountSecurityPage,
-  FactorySettingsRepositoryPage,
-  FactorySettingsModelsPage,
-  OrganizationSettingsOverviewPage,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
@@ -65,31 +58,15 @@ import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
 import {
-  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
-  LegacyFactorySettingsIndexRedirect,
-  LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
-  WorkspaceSpendingRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
+import { factorySettingsSectionRoutes } from "./pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import {
-  OrganizationIntegrationDetailsPage,
-  OrganizationIntegrationSetupPage,
-} from "./pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
-import { OrganizationSettingsIntegrationsPage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
-import { OrganizationSettingsWorkspaceUsagePage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
-import {
-  FactoryOrganizationApiKeyDetailPage,
-  FactoryOrganizationApiKeysPage,
-  FactoryOrganizationMembersPage,
-  FactoryOrganizationSecretDetailPage,
-  FactoryOrganizationSecretsPage,
-} from "./pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -143,7 +120,7 @@ function organizationScopedRouteTree() {
       <Route path="apps">
         <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "create")} />
         <Route path=":appId/settings" element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")} />
-        <Route path=":appId" element={withAuthAndPermission(AppDefaultTabGate, "canvases", "read")} />
+        <Route path=":appId" element={withAuthAndPermission(CanvasPageConfigureGate, "canvases", "read")} />
       </Route>
       <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
       <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
@@ -180,7 +157,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
               <Route path=":appId" element={<AutomationsPage />} />
             </Route>
-            <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+            <Route path="apps/:appId" element={<FactoryCanvasConfigureGate />} />
             <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
           </Route>
         </Route>
@@ -291,6 +268,7 @@ function PageObservabilityScope() {
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -315,14 +293,13 @@ export function OrganizationScope() {
           organizationSlug: resolvedSlug,
         })
       : null;
-  useEffect(() => {
-    if (!account?.id || !segment || isReserved || uidRedirectPath) {
-      return;
-    }
-    // Prefer the resolved slug so the last-visited value never carries a UID
-    // forward into a later root redirect.
-    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
-  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
+  usePersistOrganizationLastLocation({
+    accountId,
+    resolvedSlug,
+    isReserved,
+    uidRedirectPath,
+    path: `${location.pathname}${location.search}`,
+  });
 
   if (isReserved) {
     return <Navigate to="/" replace />;
@@ -355,144 +332,33 @@ function FactoryLineEditPageGate() {
   );
 }
 
-const factorySettingsSectionRoutes = [
-  <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route
-    key="factory-settings-account-general"
-    path="account/general"
-    element={<Navigate to="../profile" replace />}
-  />,
-  <Route
-    key="factory-settings-account-profile"
-    path="account/profile"
-    element={<FactorySettingsAccountProfilePage />}
-  />,
-  <Route
-    key="factory-settings-account-linked-accounts"
-    path="account/linked-accounts"
-    element={<AccountLinkedAccountsRedirect />}
-  />,
-  <Route
-    key="factory-settings-account-security"
-    path="account/security"
-    element={<FactorySettingsAccountSecurityPage />}
-  />,
-  <Route
-    key="factory-settings-account-notifications"
-    path="account/notifications"
-    element={<FactorySettingsAccountNotificationsPage />}
-  />,
-  <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
-  <Route
-    key="factory-settings-workspace-repository"
-    path="workspace/repository"
-    element={<FactorySettingsRepositoryPage />}
-  />,
-  <Route
-    key="factory-settings-workspace-automations"
-    path="workspace/automations"
-    element={<FactorySettingsAutomationsPage />}
-  />,
-  <Route
-    key="factory-settings-workspace-models"
-    path="workspace/models"
-    element={
-      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
-        <FactorySettingsModelsPage />
-      </RequireExperimentalFeature>
-    }
-  />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
-  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
-  <Route
-    key="factory-settings-organization-general"
-    path="organization/general"
-    element={<OrganizationSettingsOverviewPage />}
-  />,
-  <Route
-    key="factory-settings-organization-members"
-    path="organization/members"
-    element={
-      <RequirePermission resource="members" action="read">
-        <FactoryOrganizationMembersPage />
+function CanvasConfigureGate({ children }: { children: React.ReactNode }) {
+  const [searchParams] = useSearchParams();
+  if (isFactoryAppConfigureMode(searchParams)) {
+    return (
+      <RequirePermission resource="canvases" action="update">
+        {children}
       </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integrations"
-    path="organization/integrations"
-    element={
-      <RequirePermission resource="integrations" action="read">
-        <OrganizationSettingsIntegrationsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integration-setup"
-    path="organization/integrations/:integrationName/setup"
-    element={
-      <RequireAnyPermission
-        checks={[
-          { resource: "integrations", action: "create" },
-          { resource: "integrations", action: "update" },
-        ]}
-      >
-        <OrganizationIntegrationSetupPage />
-      </RequireAnyPermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integration-detail"
-    path="organization/integrations/:integrationId"
-    element={<OrganizationIntegrationDetailsPage />}
-  />,
-  <Route
-    key="factory-settings-organization-api-keys"
-    path="organization/api-keys"
-    element={
-      <RequirePermission resource="api_keys" action="read">
-        <FactoryOrganizationApiKeysPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-api-key-detail"
-    path="organization/api-keys/:id"
-    element={
-      <RequirePermission resource="api_keys" action="read">
-        <FactoryOrganizationApiKeyDetailPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-secrets"
-    path="organization/secrets"
-    element={
-      <RequirePermission resource="secrets" action="read">
-        <FactoryOrganizationSecretsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-secret-detail"
-    path="organization/secrets/:secretId"
-    element={
-      <RequirePermission resource="secrets" action="read">
-        <FactoryOrganizationSecretDetailPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-spending"
-    path="organization/spending"
-    element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsWorkspaceUsagePage />
-      </RequirePermission>
-    }
-  />,
-  <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
-];
+    );
+  }
+  return <>{children}</>;
+}
+
+function CanvasPageConfigureGate() {
+  return (
+    <CanvasConfigureGate>
+      <AppDefaultTabGate />
+    </CanvasConfigureGate>
+  );
+}
+
+function FactoryCanvasConfigureGate() {
+  return (
+    <CanvasConfigureGate>
+      <FactoryAppCanvasPage />
+    </CanvasConfigureGate>
+  );
+}
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();

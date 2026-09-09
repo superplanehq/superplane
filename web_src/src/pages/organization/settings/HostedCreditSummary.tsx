@@ -29,9 +29,9 @@ type HostedCreditSummaryProps = {
   hasBillingCustomer?: boolean;
   canManageBilling?: boolean;
   /**
-   * Sentence telling a non-owner who to contact to purchase hosted credit.
-   * Rendered in place of the checkout packs when `billingEnabled` is true
-   * and `canManageBilling` is false. Build it with
+   * Sentence telling a member without billing permission who to contact to
+   * purchase hosted credit. Rendered in place of the checkout packs when
+   * `billingEnabled` is true and `canManageBilling` is false. Build it with
    * `hostedCreditOwnerContactCopy` from `@/lib/hostedCreditOwnerContact`.
    */
   billingContactMessage?: string;

@@ -13,6 +13,8 @@ import {
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSettingsTab,
+  prFeedbackSettingsTabs,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
   oldestActivePRFeedbackRun,
@@ -43,6 +45,17 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
   };
 }
 
+describe("PR feedback settings tabs", () => {
+  it("accepts General, Agent, and Automation", () => {
+    expect(isPRFeedbackSettingsTab("general")).toBe(true);
+    expect(isPRFeedbackSettingsTab("agent")).toBe(true);
+    expect(isPRFeedbackSettingsTab("automation")).toBe(true);
+    expect(isPRFeedbackSettingsTab("runs")).toBe(false);
+    expect(prFeedbackSettingsTabs(false)).toEqual(["general", "automation"]);
+    expect(prFeedbackSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
+  });
+});
+
 describe("oldestActivePRFeedbackRun", () => {
   it("returns the oldest pending or started run", () => {
     const selected = oldestActivePRFeedbackRun([
@@ -71,6 +84,35 @@ describe("activePRFeedbackWorkOrderIds", () => {
         { runs: [{ run: { id: "r4", state: "STATE_PENDING" } }] },
       ]),
     ).toEqual(new Set(["wo-1", "wo-3"]));
+  });
+
+  it("does not treat a cancelling or cancelled check wait as waiting", () => {
+    expect(
+      waitingOnChecksWorkOrderIds([
+        {
+          workOrderId: "wo-cancelling",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelling", state: "STATE_CANCELLING" }),
+            },
+          ],
+        },
+        {
+          workOrderId: "wo-cancelled",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelled", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }),
+            },
+          ],
+        },
+      ]),
+    ).toEqual(new Set());
   });
 
   it("does not treat a concurrent check wait as addressing feedback", () => {

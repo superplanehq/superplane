@@ -150,6 +150,27 @@ describe("notesFromLiveLogSections", () => {
     ]);
     expect(notes.some((note) => note.componentType === "bash" && note.componentName === "echo a")).toBe(true);
   });
+
+  it("hides raw turn JSON notes", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [
+          { kind: "note", text: "I'll start by reading the task." },
+          {
+            kind: "note",
+            text: '{"type":"turn","turn":2,"usage":{"input_tokens":2000,"output_tokens":100,"cache_read_input_tokens":1200,"cache_creation_input_tokens":0,"reasoning_tokens":0}}',
+          },
+        ],
+      },
+    ]);
+
+    expect(notes.filter((note) => note.componentType === "note").map((note) => note.componentName)).toEqual([
+      "I'll start by reading the task.",
+    ]);
+    expect(notes.some((note) => note.componentName.includes('"type":"turn"'))).toBe(false);
+    expect(notes.some((note) => note.componentName.startsWith("Turn "))).toBe(false);
+  });
 });
 
 function talkLine(id: string, text: string, componentType: "prompt" | "note"): SplitRunStreamLine {
@@ -165,6 +186,19 @@ function talkLine(id: string, text: string, componentType: "prompt" | "note"): S
 }
 
 describe("notesForLiveStream", () => {
+  it("hides orphan turn JSON", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [],
+      orphanLines: ["Claude Code ready", '{"type":"turn","turn":1,"usage":{"input_tokens":900,"output_tokens":100}}'],
+      error: null,
+      isStreaming: true,
+      nodeStatus: "running",
+    });
+
+    expect(notes?.map((note) => note.componentName)).toEqual(["Claude Code ready"]);
+  });
+
   it("shows orphan live-log lines instead of Waiting for logs", () => {
     const notes = notesForLiveStream({
       nodeId: "agent",

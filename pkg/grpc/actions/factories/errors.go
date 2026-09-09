@@ -116,16 +116,28 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
 	case errors.Is(err, models.ErrFactoryPlanningSessionBusy):
 		return grpcerrors.FailedPrecondition(err, "Too many Create with an Agent sessions are running.")
+	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
+		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
+	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
+		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
 	case errors.Is(err, errPlanningClaudeRequired):
 		return grpcerrors.FailedPrecondition(err, "Connect Claude before you start Create with an Agent.")
 	case errors.Is(err, errPlanningGitHubRequired):
 		return grpcerrors.FailedPrecondition(err, "Connect GitHub before you start Create with an Agent.")
+	case errors.Is(err, errPlanningProviderRequired):
+		return grpcerrors.FailedPrecondition(err, "Connect this provider before you use the model.")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, models.ErrFileNotFound):
+		return grpcerrors.NotFound(err, "file not found")
+	case errors.Is(err, models.ErrFileNotReady), errors.Is(err, models.ErrFileForeignReference), errors.Is(err, models.ErrFileInvalid), errors.Is(err, models.ErrFileContentType):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFileQuotaExceeded):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

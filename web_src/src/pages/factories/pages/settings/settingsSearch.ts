@@ -115,10 +115,33 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   // Organization · Integrations (page-level; providers are added dynamically)
   entry("organization", "integrations", "Integrations", undefined, ["connect", "filter integrations", "integration"]),
 
-  // Organization · API keys / Secrets / Spending
+  // Organization · LLM Models
+  entry("organization", "models", "LLM Models", undefined, [
+    "llm",
+    "byok",
+    "openrouter",
+    "claude",
+    "openai",
+    "your keys",
+    "select models",
+  ]),
+
+  // Organization · API keys / Secrets / Billing / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
-  entry("organization", "spending", "Spending", undefined, ["billing", "usage", "credit", "hosted credit", "byok"]),
+  entry("organization", "billing", "Billing", undefined, [
+    "credit",
+    "hosted credit",
+    "invoices",
+    "remaining hosted credit",
+  ]),
+  entry("organization", "spending", "Spending", undefined, [
+    "usage",
+    "credit",
+    "hosted credit",
+    "your keys",
+    "superplane-hosted",
+  ]),
 ];
 
 function entry(

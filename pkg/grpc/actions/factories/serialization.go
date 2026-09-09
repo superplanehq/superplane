@@ -91,6 +91,8 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
 	case models.FactoryOnboardingAgentHarnessCodex:
 		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	case models.FactoryOnboardingAgentHarnessSuperPlane:
+		return pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE
 	default:
 		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
 	}
@@ -167,6 +169,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
+	case models.FactoryIntakeSourceProductiveTasks:
+		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -180,6 +184,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceSentryExceptions, nil
 	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
+	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
+		return models.FactoryIntakeSourceProductiveTasks, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

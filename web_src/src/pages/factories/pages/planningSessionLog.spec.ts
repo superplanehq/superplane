@@ -234,6 +234,23 @@ describe("groupPlanningSessionLog", () => {
     ).toHaveLength(2);
   });
 
+  it("hides the draft follow-up wait wrap from the transcript", () => {
+    const groups = groupPlanningSessionLog([
+      note({
+        id: "agent-step-10",
+        componentType: "prompt",
+        componentName:
+          "The user is talking about this draft. Do not ask which task they mean.\n\nTitle: Add a color field\n\nUser message:\nI actually want this to be about size and not color.",
+      }),
+    ]);
+
+    const notes = groups.flatMap((group) =>
+      group.events.filter((event) => event.kind === "note").map((event) => event.line.componentName),
+    );
+    expect(notes.join("\n")).not.toContain("The user is talking about this draft");
+    expect(notes.join("\n")).not.toContain("Do not ask which task they mean");
+  });
+
   it("hides setup and collapses truncated draft tool JSON", () => {
     const groups = groupPlanningSessionLog([
       note({
@@ -465,5 +482,43 @@ describe("mergePlanningSessionNotes", () => {
 
     expect(merged.map((line) => line.id)).toEqual(["agent-step-7", "look", "agent-step-8"]);
     expect(merged[2]?.userTalk).toBe("survey");
+  });
+
+  it("shows the raw follow-up when the live log has the draft wait wrap", () => {
+    const wrap =
+      "The user is talking about this draft. Do not ask which task they mean.\n\nTitle: Add a color field\n\nUser message:\nI actually want this to be about size and not color.";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "wait",
+        componentType: "prompt",
+        componentName: wrap,
+      }),
+      note({
+        id: "look",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Let me review the current draft and apply the requested change.",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-1",
+        componentType: "prompt",
+        componentName: "I actually want this to be about size and not color.",
+        userTalk: "message",
+      }),
+    ]);
+    const groups = groupPlanningSessionLog(merged);
+    const talk = groups.flatMap((group) =>
+      group.events.filter((event) => event.kind === "note").map((event) => event.line),
+    );
+
+    expect(talk.map((line) => line.componentName)).toEqual([
+      "Let me review the current draft and apply the requested change.",
+      "I actually want this to be about size and not color.",
+    ]);
+    expect(talk[1]?.userTalk).toBe("message");
+    expect(talk.map((line) => line.componentName).join("\n")).not.toContain("The user is talking about this draft");
   });
 });

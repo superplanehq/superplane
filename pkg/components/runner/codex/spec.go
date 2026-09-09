@@ -40,6 +40,9 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
 	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
@@ -50,9 +53,6 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 		return err
 	}
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenAIAPIKey); err != nil {
-		return err
-	}
-	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenAIBaseURL); err != nil {
 		return err
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
@@ -89,6 +89,14 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 		},
 	})
 	return CodexBrokerTask{Commands: commands, Files: files}
+}
+
+func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
+	return buildCodexBrokerTask(spec, usage, setups)
+}
+
+func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
+	return applyPlanningFollowUp(task, environment, spec)
 }
 
 // applyPlanningFollowUp keeps the machine on after canvas steps when this run

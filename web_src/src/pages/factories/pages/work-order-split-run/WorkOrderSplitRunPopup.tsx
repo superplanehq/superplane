@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useWorkOrder } from "@/hooks/useFactoryData";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
@@ -13,8 +14,7 @@ import { PhaseLogCard } from "./PhaseLogCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } from "./draftStartModel";
 import { SplitRunReview } from "./SplitRunReview";
-import { attachArtifactsToStream } from "./attachStreamArtifacts";
-import { emptySplitRunCanvas } from "./splitRunCanvases";
+import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import {
   autoExpandedPhaseId,
@@ -26,7 +26,6 @@ import {
 import {
   defaultSplitRunPopupTab,
   type SplitRunPopupTab,
-  splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
 } from "./splitRunPopupModel";
@@ -37,7 +36,8 @@ import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
-import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
+import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
+import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 /**
@@ -99,45 +99,26 @@ export function WorkOrderSplitRunBody({
   follow: SplitRunFollow;
   onStreamTick: (tick: string) => void;
 }) {
-  const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
+  const streamLengthsRef = useRef<Record<string, number>>({});
   const currentPhaseId = fixture.currentPhaseId;
   const expandedPhaseId = autoExpandedPhaseId(fixture);
   useEffect(() => {
-    setPhaseId(currentPhaseId);
     setOpenPhaseId(expandedPhaseId);
   }, [currentPhaseId, expandedPhaseId]);
-  const selectedPhase = fixture.phases.find((entry) => entry.id === phaseId) ?? fixture.phases[0];
-  const live = useSplitRunLiveCanvas(organizationId, selectedPhase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
   const demoArtifacts = !organizationId;
-  const visual = useMemo(
-    () =>
-      selectedPhase
-        ? resolveSplitRunVisual(selectedPhase, live, { demoArtifacts })
-        : { canvas: emptySplitRunCanvas(), stream: undefined },
-    [demoArtifacts, live, selectedPhase],
+  const onStreamLength = useCallback(
+    (phaseId: string, length: number) => {
+      if (streamLengthsRef.current[phaseId] === length) {
+        return;
+      }
+      streamLengthsRef.current = { ...streamLengthsRef.current, [phaseId]: length };
+      onStreamTick(fixture.phases.map((entry) => streamLengthsRef.current[entry.id] ?? 0).join(":"));
+    },
+    [fixture.phases, onStreamTick],
   );
-  const streams = useMemo(() => {
-    const yamlOnly = { enabled: false, stream: [] };
-    return new Map(
-      fixture.phases.map((entry) => [
-        entry.id,
-        attachArtifactsToStream(
-          entry.id === selectedPhase?.id
-            ? visual.stream
-            : resolveSplitRunVisual(entry, yamlOnly, { demoArtifacts }).stream,
-          artifactIndex,
-          entry.runId,
-        ),
-      ]),
-    );
-  }, [artifactIndex, demoArtifacts, fixture.phases, selectedPhase?.id, visual.stream]);
-  const streamTick = useMemo(() => [...streams.values()].map((stream) => stream?.length ?? 0).join(":"), [streams]);
-  useEffect(() => {
-    onStreamTick(streamTick);
-  }, [onStreamTick, streamTick]);
   const liveOrder = Boolean(organizationId && factoryId && orderId);
   const automationStop = (entry: SplitRunPhase) => {
     const appId = entry.appId;
@@ -169,21 +150,22 @@ export function WorkOrderSplitRunBody({
       >
         {fixture.phases.map((entry) => (
           <li key={entry.id} className="min-w-0 first:mt-3">
-            <PhaseLogCard
-              phase={phaseWithRunnerModel(entry, entry.id === selectedPhase?.id ? live.canvas?.nodes : undefined)}
+            <SplitRunPhaseLogItem
+              entry={entry}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
+              lineId={lineId}
               expanded={entry.id === openPhaseId}
-              stream={streams.get(entry.id) ?? entry.stream}
               selectedNodeId={nodeId}
               onSelectNode={setNodeId}
-              organizationId={organizationId}
-              canvasId={entry.appId}
+              demoArtifacts={demoArtifacts}
+              artifactIndex={artifactIndex}
               onStop={automationStop(entry)}
               onRerun={automationRerun(entry)}
-              runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
-              editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
               actionBusy={footerActions.busy}
+              onStreamLength={onStreamLength}
               onToggle={() => {
-                setPhaseId(entry.id);
                 setNodeId(null);
                 setOpenPhaseId((current) => (current === entry.id ? null : entry.id));
               }}
@@ -195,6 +177,71 @@ export function WorkOrderSplitRunBody({
         <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
       )}
     </div>
+  );
+}
+
+function SplitRunPhaseLogItem({
+  entry,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  lineId,
+  expanded,
+  selectedNodeId,
+  onSelectNode,
+  demoArtifacts,
+  artifactIndex,
+  onStop,
+  onRerun,
+  actionBusy,
+  onStreamLength,
+  onToggle,
+}: {
+  entry: SplitRunPhase;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  expanded: boolean;
+  selectedNodeId?: string | null;
+  onSelectNode: (nodeId: string) => void;
+  demoArtifacts: boolean;
+  artifactIndex: StreamArtifactIndex;
+  onStop?: () => void;
+  onRerun?: () => void;
+  actionBusy: boolean;
+  onStreamLength: (phaseId: string, length: number) => void;
+  onToggle: () => void;
+}) {
+  const [usageOpen, setUsageOpen] = useState(false);
+  const live = useSplitRunLiveCanvas(organizationId, expanded || usageOpen ? entry : undefined);
+  const visual = useMemo(() => resolveSplitRunVisual(entry, live, { demoArtifacts }), [demoArtifacts, entry, live]);
+  const stream = useMemo(
+    () => attachArtifactsToStream(visual.stream, artifactIndex, entry.runId),
+    [artifactIndex, entry.runId, visual.stream],
+  );
+  useEffect(() => {
+    onStreamLength(entry.id, stream?.length ?? 0);
+  }, [entry.id, onStreamLength, stream?.length]);
+
+  return (
+    <PhaseLogCard
+      phase={phaseWithRunnerModel(entry, live.canvas?.nodes)}
+      expanded={expanded}
+      stream={stream ?? entry.stream}
+      streamLoading={live.isLoading}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={onSelectNode}
+      organizationId={organizationId}
+      canvasId={entry.appId}
+      onStop={onStop}
+      onRerun={onRerun}
+      runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
+      editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
+      actionBusy={actionBusy}
+      onToggle={onToggle}
+      onUsageOpenChange={setUsageOpen}
+    />
   );
 }
 
@@ -216,6 +263,7 @@ export function WorkOrderSplitRunPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  onRefine,
 }: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
   fixed?: boolean;
@@ -223,6 +271,7 @@ export function WorkOrderSplitRunPopup({
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  onRefine?: () => void;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
@@ -294,6 +343,7 @@ export function WorkOrderSplitRunPopup({
         canAct={canUpdate}
         onStart={draftStart}
         onReject={mutations.onReject}
+        onRefine={onRefine}
         onBackToDraft={backToDraft}
         onStop={mutations.onStop}
         startBusy={isDispatching}
@@ -384,6 +434,7 @@ function SplitRunPopupTabs({
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
 }) {
+  const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const [streamTick, setStreamTick] = useState("");
   const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
     resumeOnBottom: true,
@@ -403,11 +454,10 @@ function SplitRunPopupTabs({
         <TabsList aria-label="Task views">
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="log">
-            <WorkOrderStatusDot
-              colorClassName={splitRunLogTabDotClass(fixture.lineStatus)}
-              pulsing={fixture.lineStatus === "running"}
+            <WorkOrderStatusIcon
+              status={displayStatusForLineStatus(fixture.lineStatus)}
               title={splitRunStatusLabel(fixture.lineStatus)}
-              className="size-1.5"
+              className="size-3"
               data-testid="split-run-log-tab-dot"
               aria-hidden
             />
@@ -425,8 +475,11 @@ function SplitRunPopupTabs({
           pullRequestsLoading={pullRequestsLoading}
           pullRequestsError={pullRequestsError}
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
+          orderId={orderId}
           orderNumber={orderNumber}
+          files={liveWorkOrder.data?.files}
           expandFirstCheck={fixture.footer.kind === "draft"}
           canEditDescription={edits.canEditDescription}
           descriptionBusy={edits.descriptionBusy}

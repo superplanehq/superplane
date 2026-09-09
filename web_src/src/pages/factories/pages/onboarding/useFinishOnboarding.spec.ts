@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { afterOnboardingPath, finishOnboardingError, provisionWorkspace } from "./useFinishOnboarding";
+import {
+  afterOnboardingPath,
+  afterWorkspaceProvisioned,
+  finishOnboardingError,
+  provisionWorkspace,
+} from "./useFinishOnboarding";
 
 const readyPlan = {
-  providerId: "openrouter",
-  component: "runnerOpenRouter",
+  component: "runnerSuperPlane",
   credentialsSource: "hosted",
-  integrationName: "openrouter",
-  harness: "AGENT_HARNESS_CLAUDE_CODE",
-  model: "openai/gpt-4.1",
-  planningModel: "openai/gpt-4.1",
+  harness: "AGENT_HARNESS_SUPERPLANE",
+  model: "",
+  planningModel: "",
 } as const;
 
 describe("finishOnboardingError", () => {
@@ -60,10 +63,9 @@ describe("provisionWorkspace", () => {
       github: { id: "github-1" },
       agentPlan: readyPlan,
       agentRewrite: {
-        component: "runnerOpenRouter",
-        model: readyPlan.model,
-        planningModel: readyPlan.planningModel,
-        credentials: { source: "hosted" as const },
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
       },
       ...overrides,
     };
@@ -90,6 +92,30 @@ describe("provisionWorkspace", () => {
     expect(result).toEqual({ lineId: "line-1" });
     const completeCall = updateOnboarding.mock.calls.find(([input]) => input.complete);
     expect(completeCall?.[0]).toMatchObject({ complete: true });
+  });
+});
+
+describe("afterWorkspaceProvisioned", () => {
+  it("renames the organization, refreshes the switcher, then opens the new slug", async () => {
+    const updateOrganization = vi.fn().mockResolvedValue("acme-org");
+    const invalidateAccountOrganizations = vi.fn();
+    const navigate = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization,
+      invalidateAccountOrganizations,
+      navigate,
+    });
+
+    expect(updateOrganization).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
+    expect(invalidateAccountOrganizations).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/SP/lines/line-1", { replace: true });
   });
 });
 

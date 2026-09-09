@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { rewriteWorkOrderFileRefs } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronDown } from "lucide-react";
@@ -19,15 +21,21 @@ import {
 interface WorkOrderDescriptionProps {
   description: string;
   className?: string;
+  /** When false, always show the full markdown. Default is true. */
+  collapsible?: boolean;
+  files?: FilesFile[];
 }
 
-export function WorkOrderDescription({ description, className }: WorkOrderDescriptionProps) {
+export function WorkOrderDescription({ description, className, collapsible = true, files }: WorkOrderDescriptionProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
   const [collapsedMaxHeight, setCollapsedMaxHeight] = useState(FALLBACK_COLLAPSED_MAX_HEIGHT_PX);
 
   useLayoutEffect(() => {
+    if (!collapsible) {
+      return;
+    }
     const content = contentRef.current;
     if (!content) {
       return;
@@ -52,22 +60,22 @@ export function WorkOrderDescription({ description, className }: WorkOrderDescri
       }
     }
     return () => observer.disconnect();
-  }, [description]);
+  }, [description, files, collapsible]);
 
-  if (!description.trim()) {
+  const rendered = rewriteWorkOrderFileRefs(description, files);
+
+  if (!rendered.trim()) {
     return null;
   }
 
-  const showFade = needsToggle && !isExpanded;
+  const showFade = collapsible && needsToggle && !isExpanded;
+  const clamp = collapsible && !isExpanded && needsToggle;
 
   return (
     <section className={className} data-testid="work-order-description">
       <div className="relative">
-        <div
-          ref={contentRef}
-          style={!isExpanded && needsToggle ? { maxHeight: `${collapsedMaxHeight}px`, overflow: "hidden" } : undefined}
-        >
-          <MarkdownContent content={description} variant="workspace" data-testid="work-order-description-markdown" />
+        <div ref={contentRef} style={clamp ? { maxHeight: `${collapsedMaxHeight}px`, overflow: "hidden" } : undefined}>
+          <MarkdownContent content={rendered} variant="workspace" data-testid="work-order-description-markdown" />
         </div>
         {showFade ? (
           <div
@@ -77,7 +85,7 @@ export function WorkOrderDescription({ description, className }: WorkOrderDescri
         ) : null}
       </div>
 
-      {needsToggle ? (
+      {collapsible && needsToggle ? (
         <Button
           type="button"
           variant="ghost"

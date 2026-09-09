@@ -9,28 +9,35 @@ const (
 
 	DomainTypeOrganization = "org"
 
-	DisplayNameOwner  = "Owner"
-	DisplayNameAdmin  = "Admin"
-	DisplayNameViewer = "Viewer"
+	DisplayNameOwner      = "Owner"
+	DisplayNameAdmin      = "Admin"
+	DisplayNameMaintainer = "Maintainer"
+	DisplayNameOperator   = "Operator"
 
-	RoleOrgOwner  = "org_owner"
-	RoleOrgAdmin  = "org_admin"
-	RoleOrgViewer = "org_viewer"
+	RoleOrgAdmin      = "org_admin"
+	RoleOrgMaintainer = "org_maintainer"
+	RoleOrgOperator   = "org_operator"
 
 	// Role descriptions
-	DescOrgOwner  = "Complete control over the organization including settings and deletion"
-	DescOrgAdmin  = "Full management access to organization resources including canvases and users"
-	DescOrgViewer = "Read-only access to organization resources"
+	DescOrgAdmin      = "Manage members, billing, and organization settings"
+	DescOrgMaintainer = "Create and edit automations, integrations, and models"
+	DescOrgOperator   = "Create tasks and interact with them"
 
 	// Metadata descriptions
-	MetaDescOrgOwner  = "Full control over organization settings, billing, and member management."
-	MetaDescOrgAdmin  = "Can manage canvases, users, groups, and roles within the organization."
-	MetaDescOrgViewer = "Read-only access to organization resources and information."
+	MetaDescOrgAdmin      = "Can manage members, billing, and organization settings."
+	MetaDescOrgMaintainer = "Can create and edit automations, set integrations, and change models."
+	MetaDescOrgOperator   = "Can create tasks and interact with them."
 
 	// User types
 	UserTypeHuman  = "human"
 	UserTypeAPIKey = "api_key"
 )
+
+var DefaultOrganizationRoles = []string{
+	RoleOrgAdmin,
+	RoleOrgMaintainer,
+	RoleOrgOperator,
+}
 
 var (
 	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
@@ -59,4 +66,13 @@ func PrefixGroup(groupName string) string {
 
 func PrefixRole(role string) string {
 	return fmt.Sprintf("/roles/%s", role)
+}
+
+func IsDefaultOrganizationRole(roleName string) bool {
+	for _, role := range DefaultOrganizationRoles {
+		if role == roleName {
+			return true
+		}
+	}
+	return false
 }

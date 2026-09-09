@@ -4,6 +4,7 @@ import {
   FACTORY_SETTINGS_NAV_GROUPS,
   factorySettingsRouteFromPathname,
   filterFactorySettingsNavGroups,
+  filterFactorySettingsNavGroupsByPermission,
 } from "./settingsNavItems";
 
 describe("factorySettingsRouteFromPathname", () => {
@@ -17,6 +18,9 @@ describe("factorySettingsRouteFromPathname", () => {
     );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
+    );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
+      "organization-models",
     );
   });
 
@@ -41,8 +45,10 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "General",
       "Members",
       "Integrations",
+      "LLM Models",
       "API keys",
       "Secrets",
+      "Billing",
       "Spending",
     ]);
   });
@@ -79,7 +85,7 @@ describe("filterFactorySettingsNavGroups", () => {
 
   it("matches keyword aliases such as billing", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "billing");
-    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-spending"]);
+    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-billing"]);
   });
 
   it("drops groups that have no matching items", () => {
@@ -101,5 +107,28 @@ describe("filterFactorySettingsNavGroups", () => {
   it("matches in-page phrases when query words appear in any order", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "key workspace");
     expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toContain("workspace-general");
+  });
+});
+
+describe("filterFactorySettingsNavGroupsByPermission", () => {
+  it("keeps every item while permissions are loading", () => {
+    const filtered = filterFactorySettingsNavGroupsByPermission(FACTORY_SETTINGS_NAV_GROUPS, () => false, true);
+    expect(filtered).toEqual(FACTORY_SETTINGS_NAV_GROUPS);
+  });
+
+  it("hides workspace settings without factories.update", () => {
+    const filtered = filterFactorySettingsNavGroupsByPermission(
+      FACTORY_SETTINGS_NAV_GROUPS,
+      (resource, action) => resource === "org" && action === "read",
+      false,
+    );
+    expect(filtered.map((group) => group.id)).toEqual(["account", "organization"]);
+    expect(filtered.find((group) => group.id === "workspace")).toBeUndefined();
+    expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
+      "organization-general",
+      "organization-models",
+      "organization-billing",
+      "organization-spending",
+    ]);
   });
 });

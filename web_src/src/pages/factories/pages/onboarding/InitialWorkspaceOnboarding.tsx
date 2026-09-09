@@ -1,13 +1,20 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router";
+
 import type { FactoriesFactory } from "@/api-client";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
+import { useRecordLastLocation } from "@/hooks/useRecordLastLocation";
+import { recordLastVisitedOrganization } from "@/lib/lastVisitedOrganization";
 
 import { resolveFactoryByKey } from "../../lib/factoryKeyResolution";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactoriesLayoutError, FactoriesLayoutLoading } from "../../layout/FactoriesLayout";
 import { FactoriesLayoutContext } from "../../layout/factoriesLayoutContext";
 import { OnboardingPage } from "./OnboardingPage";
+import { onboardingResumePath } from "./onboardingResumePath";
 
 const ignoreOpenCreateWorkOrder = () => undefined;
 
@@ -74,9 +81,34 @@ function ResolvedInitialWorkspaceOnboarding({
         openCreateWorkOrder: ignoreOpenCreateWorkOrder,
       }}
     >
+      <RecordOnboardingLastLocation organizationSlug={organizationId} factoryKey={factoryKey} />
       <main className="h-dvh overflow-y-auto bg-background">
         <OnboardingPage />
       </main>
     </FactoriesLayoutContext.Provider>
   );
+}
+
+function RecordOnboardingLastLocation({
+  organizationSlug,
+  factoryKey,
+}: {
+  organizationSlug: string;
+  factoryKey: string;
+}) {
+  const { account } = useAccount();
+  const { search } = useLocation();
+  const { canAct, isLoading } = usePermissions();
+  const resumePath = onboardingResumePath(organizationSlug, factoryKey, search);
+  const canRecord = !isLoading && (canAct("factories", "read") || canAct("canvases", "read"));
+
+  useEffect(() => {
+    if (!canRecord || !account?.id) {
+      return;
+    }
+    recordLastVisitedOrganization(account.id, organizationSlug);
+  }, [account?.id, canRecord, organizationSlug]);
+
+  useRecordLastLocation(canRecord ? organizationSlug : null, account?.id, resumePath);
+  return null;
 }

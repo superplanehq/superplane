@@ -40,6 +40,13 @@ type githubUserInstallation struct {
 	} `json:"account"`
 }
 
+// allowsRebind reports whether a bound hosted connection can move to another
+// installation: the CSRF state survived the first bind and the request
+// carries it.
+func allowsRebind(metadata common.Metadata, state string) bool {
+	return metadata.HostedApp && metadata.State != "" && state == metadata.State
+}
+
 func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	metadata, ok := decodeHostedMetadata(ctx)
 	if !ok {
@@ -47,12 +54,15 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+
+	// A bound connection refreshes its account picker through OAuth when the
+	// state is valid, so the member can install the App on another account.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
 	if state == "" || state != metadata.State {
 		http.Error(ctx.Response, "invalid state", http.StatusBadRequest)
 		return
@@ -114,14 +124,17 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	// Even a single installation goes through the account picker. A silent
 	// bind would lock the connection to that account (often the user's
 	// personal one) with no way to install the App on an organization.
-	metadata.PendingInstallations = installations
+	metadata.SetPendingInstallations(installations)
 
-	// The picker now offers the requested account, so the install request is
-	// approved and the waiting state must not show next to the picker.
-	if installationsIncludeAccount(installations, metadata.InstallRequestedAccount) {
-		metadata.InstallRequested = false
-		metadata.InstallRequestedAccount = ""
+	// Remove only the requests that the refreshed picker can now offer. Other
+	// organization requests can continue to wait on the same connection.
+	unresolved := []common.InstallRequest{}
+	for _, request := range metadata.CurrentInstallRequests() {
+		if !installationsIncludeAccount(installations, request.AccountLogin) {
+			unresolved = append(unresolved, request)
+		}
 	}
+	metadata.SetInstallRequests(unresolved)
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()
@@ -144,13 +157,17 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+
+	// A bound connection accepts a rebind with a valid state, so the
+	// onboarding account picker can move it to another account. A request
+	// without that state is a stale callback and goes back to settings.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
-	installationID := ctx.Request.URL.Query().Get("installation_id")
 	if state == "" || state != metadata.State || installationID == "" {
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return

@@ -176,7 +176,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
     expect(runningDot).toHaveAttribute("title", "Running");
-    expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
+    expect(runningDot.className).toContain("animate-spin");
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
@@ -700,7 +700,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     const pendingDot = screen.getByTestId("split-run-log-tab-dot");
     expect(pendingDot).toHaveAttribute("title", "Pending");
-    expect(pendingDot.querySelector(".animate-ping")).toBeNull();
+    expect(pendingDot.className).not.toContain("animate-spin");
     const source = screen.getByTestId("split-run-source");
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
@@ -708,6 +708,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
@@ -719,6 +720,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await openLogTab(user);
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
@@ -728,6 +730,42 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("shows a spark icon and tooltip on Refine", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const refine = within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" });
+    expect(refine.querySelector(".lucide-sparkles")).toBeInTheDocument();
+    await user.hover(refine);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
+  });
+
+  it("tells a draft is under analysis and hides Reject while it runs", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+        analysisRuns: [
+          {
+            canvasId: "canvas-backlog",
+            workOrderId: DRAFT_WORK_ORDER.id ?? "",
+            run: {
+              id: "run-analysis",
+              canvasId: "canvas-backlog",
+              state: "STATE_STARTED",
+              createdAt: "2026-08-28T12:00:00Z",
+              updatedAt: "2026-08-28T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("puts artifacts on the right and check analyses under the description", () => {

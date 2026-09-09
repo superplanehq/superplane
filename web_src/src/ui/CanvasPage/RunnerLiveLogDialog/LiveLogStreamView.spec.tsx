@@ -27,6 +27,8 @@ beforeEach(() => {
     orphanLines: [],
     error: null,
     isStreaming: false,
+    telemetry: { num_turns: 0, usage: {}, tool_counts: {}, turns: [] },
+    usageSeries: [],
     toggleSection: vi.fn(),
     scrollRef: { current: null },
   });

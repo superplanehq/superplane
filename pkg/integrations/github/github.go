@@ -8,9 +8,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
@@ -177,15 +179,15 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
+		return g.syncHostedApp(ctx, config)
+	}
+
 	//
 	// App is already installed - do not do anything.
 	//
 	if metadata.InstallationID != "" {
 		return nil
-	}
-
-	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
-		return g.syncHostedApp(ctx, config)
 	}
 
 	state, err := crypto.Base64String(32)
@@ -220,9 +222,9 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	var existing common.Metadata
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &existing)
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
-	if existing.HostedApp && existing.InstallationID == "" && existing.State != "" {
+	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
-		if existing.InstallRequested {
+		if existing.HasInstallRequests() {
 			// Adopt records the requested account it found on GitHub and
 			// moves an approved installation into the account picker;
 			// refreshHostedPendingAction below persists both.
@@ -260,6 +262,18 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
+	// The OAuth callback removes the browser action once installations load,
+	// so the connect screen keeps the authorize URL from metadata to ask
+	// again which GitHub account to use.
+	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
+	if oauthEnabled {
+		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	}
+	if metadata.InstallationID != "" {
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+
 	if len(metadata.PendingInstallations) >= 1 {
 		ctx.Integration.SetMetadata(metadata)
 		return
@@ -267,8 +281,8 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if app.UserOAuthEnabled() && ctx.BaseURL != "" && len(metadata.PendingInstallations) == 0 {
-		actionURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	if oauthEnabled {
+		actionURL = metadata.AuthorizeURL
 		description = hostedOAuthDescription
 	}
 
@@ -448,11 +462,27 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
 		metadata.State = state
+		metadata.PendingInstallations = slices.DeleteFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+			return installation.ID == installationID
+		})
+		metadata.AuthorizeURL = ""
+
+		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
+		actionDescription := appInstallationDescription
+		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
+				app.ClientID,
+				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+				state,
+			)
+			actionURL = metadata.AuthorizeURL
+			actionDescription = hostedOAuthDescription
+		}
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appInstallationDescription,
-			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+			Description: actionDescription,
+			URL:         actionURL,
 			Method:      "GET",
 		})
 
@@ -908,11 +938,17 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+	setupAction := ctx.Request.URL.Query().Get("setup_action")
+	state := ctx.Request.URL.Query().Get("state")
+
 	//
-	// App installation has already been set up.
-	// Just redirect to the SuperPlane app installation page.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
 		http.Redirect(
 			ctx.Response,
@@ -924,10 +960,6 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		)
 		return
 	}
-
-	installationID := ctx.Request.URL.Query().Get("installation_id")
-	setupAction := ctx.Request.URL.Query().Get("setup_action")
-	state := ctx.Request.URL.Query().Get("state")
 	if isInstallationRequestSetupAction(setupAction) {
 		if state != metadata.State {
 			ctx.Logger.Errorf("invalid installation ID or state")
@@ -1070,10 +1102,13 @@ func isInstallationRequestSetupAction(setupAction string) bool {
 func persistInstallRequested(ctx core.HTTPRequestContext) {
 	metadata := common.Metadata{}
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	metadata.InstallRequested = true
-	if account := requestedInstallAccount(ctx); account != "" {
-		metadata.InstallRequestedAccount = account
-	}
+	requests := metadata.CurrentInstallRequests()
+	requests = append(requests, common.InstallRequest{
+		AccountLogin:   requestedInstallAccount(ctx),
+		RequesterLogin: metadata.StartedByGitHubLogin,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	metadata.SetInstallRequests(requests)
 	ctx.Integration.SetMetadata(metadata)
 }
 
@@ -1082,11 +1117,10 @@ func clearInstallRequested(ctx core.HTTPRequestContext) {
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return
 	}
-	if !metadata.InstallRequested && metadata.InstallRequestedAccount == "" {
+	if !metadata.HasInstallRequests() && metadata.InstallRequestedAccount == "" {
 		return
 	}
-	metadata.InstallRequested = false
-	metadata.InstallRequestedAccount = ""
+	metadata.SetInstallRequests(nil)
 	ctx.Integration.SetMetadata(metadata)
 }
 
@@ -1102,10 +1136,6 @@ func requestedInstallAccount(ctx core.HTTPRequestContext) string {
 	if metadata.InstallRequestedAccount != "" {
 		return metadata.InstallRequestedAccount
 	}
-	if metadata.Owner != "" {
-		return metadata.Owner
-	}
-
 	return ""
 }
 
@@ -1114,7 +1144,7 @@ func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
 }
 
 func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
-	query := "githubSetup=request"
+	query := "githubSetup=request&githubIntegrationId=" + url.QueryEscape(ctx.Integration.ID().String())
 	metadata := common.Metadata{}
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if metadata.InstallRequestedAccount != "" {

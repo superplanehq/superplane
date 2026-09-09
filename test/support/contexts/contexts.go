@@ -256,6 +256,7 @@ func (s *SubscriptionContext) SendMessage(message any) error {
 
 type ExecutionStateContext struct {
 	Finished       bool
+	Cancelling     bool
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
@@ -267,6 +268,10 @@ type ExecutionStateContext struct {
 
 func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
+}
+
+func (c *ExecutionStateContext) IsCancelling() bool {
+	return c.Cancelling
 }
 
 func (c *ExecutionStateContext) Pass() error {
@@ -489,6 +494,8 @@ type HostedLLMContext struct {
 	CreditErr     error
 	ResolveErr    error
 	SelectableErr error
+	Default       core.DefaultHostedLLMModel
+	DefaultErr    error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -504,6 +511,13 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
 	return c.SelectableErr
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	if c.DefaultErr != nil {
+		return core.DefaultHostedLLMModel{}, c.DefaultErr
+	}
+	return c.Default, nil
 }
 
 type ExpressionContext struct {

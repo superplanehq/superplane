@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS } from "./factoryConfigureEnterSession";
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
 
 function baseOptions(overrides: Partial<Parameters<typeof useFactoryConfigureEnter>[0]> = {}) {
@@ -25,6 +26,9 @@ function baseOptions(overrides: Partial<Parameters<typeof useFactoryConfigureEnt
 }
 
 describe("useFactoryConfigureEnter", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it("does not re-enter Configure when activateCanvasVersionForEditing identity changes before edit is enabled", async () => {
     const activateCanvasVersionForEditing = vi.fn();
     const resyncStagedEditorState = vi.fn(() => new Promise<void>(() => {}));
@@ -195,5 +199,84 @@ describe("useFactoryConfigureEnter", () => {
     await waitFor(() => {
       expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("enables edit when staged resync does not finish in time", async () => {
+    vi.useFakeTimers();
+    const setEditSessionActive = vi.fn();
+    const resyncStagedEditorState = vi.fn(() => new Promise<void>(() => {}));
+
+    renderHook(() =>
+      useFactoryConfigureEnter(
+        baseOptions({
+          setEditSessionActive,
+          resyncStagedEditorState,
+        }),
+      ),
+    );
+
+    expect(setEditSessionActive).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS);
+    });
+
+    expect(setEditSessionActive).toHaveBeenCalledWith(true);
+  });
+
+  it("does not apply a late staged resync after the enter timeout", async () => {
+    vi.useFakeTimers();
+    const setEditSessionActive = vi.fn();
+    const setDraftCanvasSpec = vi.fn();
+    const lateSpec = { nodes: [{ id: "late" }], edges: [] };
+
+    const resyncStagedEditorState = vi.fn((_versionId: string, options?: { signal?: AbortSignal }) => {
+      return new Promise<void>((resolve) => {
+        const finish = () => {
+          if (!options?.signal?.aborted) {
+            setDraftCanvasSpec(lateSpec);
+          }
+          resolve();
+        };
+        const timeoutId = window.setTimeout(finish, 5000);
+        options?.signal?.addEventListener("abort", () => {
+          window.clearTimeout(timeoutId);
+          finish();
+        });
+      });
+    });
+
+    renderHook(() =>
+      useFactoryConfigureEnter(
+        baseOptions({
+          setEditSessionActive,
+          setDraftCanvasSpec,
+          resyncStagedEditorState,
+        }),
+      ),
+    );
+
+    expect(setDraftCanvasSpec).toHaveBeenCalled();
+    const seedCallCount = setDraftCanvasSpec.mock.calls.length;
+    expect(resyncStagedEditorState).toHaveBeenCalledWith(
+      "version-live",
+      expect.objectContaining({ bumpResetNonce: false, signal: expect.any(AbortSignal) }),
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS);
+    });
+
+    expect(setEditSessionActive).toHaveBeenCalledWith(true);
+    const lastCall = resyncStagedEditorState.mock.calls.at(-1);
+    const signal = lastCall?.[1]?.signal;
+    expect(signal?.aborted).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(setDraftCanvasSpec).toHaveBeenCalledTimes(seedCallCount);
+    expect(setDraftCanvasSpec.mock.calls.some((call) => call[0] === lateSpec)).toBe(false);
   });
 });

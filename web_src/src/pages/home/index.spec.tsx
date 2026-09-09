@@ -305,7 +305,8 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new"]);
 
-    expect(screen.getByRole("heading", { name: "404" })).toBeInTheDocument();
+    expect(screen.getByTestId("permission-denied-page")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
   });
 

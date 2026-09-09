@@ -48,6 +48,7 @@ import (
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -367,6 +368,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbFiles.RegisterFilesHandlerServer(ctx, grpcGatewayMux, services.Files)
+	if err != nil {
+		return err
+	}
+
 	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
@@ -409,6 +415,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
 		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
 	).Methods(http.MethodGet)
+
+	s.Router.Handle(
+		"/api/v1/files/{file_id}/content",
+		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
+	).Methods(http.MethodPut)
 
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
@@ -658,6 +669,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
@@ -1135,6 +1147,20 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
+	// App, so onboarding stops here on installations that do not hold the
+	// app credentials (for example, local development without a tunnel).
+	if !config.LoadGitHubHostedAppConfig().Enabled() {
+		http.Error(
+			w,
+			"This installation has no GitHub App configured, so workspace setup is not available. "+
+				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
+				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
+			http.StatusServiceUnavailable,
+		)
+		return
+	}
+
 	var req initialWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -1246,16 +1272,29 @@ func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.
 		return nil, nil, false, err
 	}
 
-	for _, organization := range organizations {
+	var pendingOrganization *models.Organization
+	var pendingWorkspace *models.Factory
+
+	for i := range organizations {
+		organization := &organizations[i]
 		factories, err := models.ListFactories(tx, organization.ID)
 		if err != nil {
 			return nil, nil, false, err
 		}
-		for _, factory := range factories {
+		for j := range factories {
+			factory := &factories[j]
 			if factory.HasInitialOnboardingAttempt(attemptID) {
-				return &organization, &factory, true, nil
+				return organization, factory, true, nil
+			}
+			if pendingWorkspace == nil && factory.IsPendingInitialOnboarding() {
+				pendingOrganization = organization
+				pendingWorkspace = factory
 			}
 		}
+	}
+
+	if pendingWorkspace != nil {
+		return pendingOrganization, pendingWorkspace, true, nil
 	}
 
 	return nil, nil, false, nil
@@ -1486,12 +1525,15 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	type Organization struct {
-		ID          string `json:"id"`
-		Slug        string `json:"slug"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CanvasCount int64  `json:"canvasCount"`
-		MemberCount int64  `json:"memberCount"`
+		ID                       string `json:"id"`
+		Slug                     string `json:"slug"`
+		Name                     string `json:"name"`
+		Description              string `json:"description"`
+		CanvasCount              int64  `json:"canvasCount"`
+		MemberCount              int64  `json:"memberCount"`
+		LastLocationPath         string `json:"lastLocationPath,omitempty"`
+		LastLocationUpdatedAt    string `json:"lastLocationUpdatedAt,omitempty"`
+		InitialOnboardingPending bool   `json:"initialOnboardingPending,omitempty"`
 	}
 
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
@@ -1517,17 +1559,45 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	lastLocations, err := models.ListUserLastLocationsForAccount(database.DB(r.Context()), account.ID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	lastLocationByOrg := make(map[string]models.UserLastLocation, len(lastLocations))
+	for _, location := range lastLocations {
+		lastLocationByOrg[location.OrganizationID.String()] = location
+	}
+
+	orgUUIDs := make([]uuid.UUID, 0, len(organizations))
+	for _, organization := range organizations {
+		orgUUIDs = append(orgUUIDs, organization.ID)
+	}
+	pendingInitialOnly, err := models.OrganizationIDsPendingInitialOnboardingOnly(database.DB(r.Context()), orgUUIDs)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	response := []Organization{}
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
-		response = append(response, Organization{
+		item := Organization{
 			ID:          organization.ID.String(),
 			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],
 			MemberCount: memberCounts[orgID],
-		})
+		}
+		if _, pending := pendingInitialOnly[organization.ID]; pending {
+			item.InitialOnboardingPending = true
+		}
+		if location, ok := lastLocationByOrg[orgID]; ok {
+			item.LastLocationPath = location.Path
+			item.LastLocationUpdatedAt = location.UpdatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		response = append(response, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

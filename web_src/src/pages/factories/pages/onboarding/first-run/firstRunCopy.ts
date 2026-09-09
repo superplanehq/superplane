@@ -7,9 +7,11 @@ import {
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
-    close: "Cancel setup",
+    switchOrganization: "Switch organization",
+    switchWorkspace: "Switch workspace",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
+    back: "Back",
   },
   welcome: {
     greeting: (firstName: string) => `Hi ${firstName}.`,
@@ -20,18 +22,21 @@ export const FIRST_RUN_COPY = {
   connect: {
     headline: "Connect GitHub",
     body: "SuperPlane reads your repositories. It does not start work yet.",
+    signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
     selectAccount: "Select a GitHub account",
     selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
     useAccount: (account: string) => `Use ${account}`,
-    installDifferentAccount: "Install on a different account",
-    connected: "Connected",
-    continue: "Choose a repository",
+    missingAccount: "Do not see your GitHub account or organization?",
+    installThere: "Install the GitHub App there.",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
     installRequestedBody: githubInstallRequestBody,
     installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
+    openingGitHub: "Opening GitHub…",
+    loadingAccounts: "Loading GitHub accounts…",
+    connectingAccount: (account: string) => `Connecting ${account}…`,
   },
   choose: {
     headline: "Choose a repository",
@@ -42,6 +47,9 @@ export const FIRST_RUN_COPY = {
     editConnection: "Edit the GitHub connection.",
     accessHint: "You need admin access to the GitHub App or organization to change the repositories.",
     continue: "Choose a repository to continue",
+    continueReady: "Continue",
+    saving: "Saving repository…",
+    loading: "Loading repositories…",
     moreLater: "You can add more repositories later.",
     missingTitle: "Why is my repository not shown?",
     missingReasons: [
@@ -63,15 +71,17 @@ export const FIRST_RUN_COPY = {
     linearHelper: "Find tickets in your Linear backlog.",
     analyze: "Analyze my tickets",
     continue: "Connect agent",
+    saving: "Saving ticket source…",
   },
   agent: {
     headline: "Connect agent",
+    loading: "Checking agent availability…",
   },
   // Shared by every screen that provisions the workspace. Hosted credentials
   // move that action from the agent screen to the ticket screen.
   finish: {
     action: "Finish setup",
-    saving: "Finishing setup...",
+    saving: "Finishing setup…",
   },
   analysis: {
     headline: "Analyzing your backlog",
@@ -84,6 +94,7 @@ export const FIRST_RUN_COPY = {
     overrun: "The analysis needs more time than usual. It is still running.",
     failure: "The analysis did not finish. Try again.",
     retry: "Run analysis again",
+    retrying: "Trying again…",
   },
   results: {
     headline: "Tickets SuperPlane can implement",

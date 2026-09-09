@@ -91,6 +91,9 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
 	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
@@ -101,9 +104,6 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 		return err
 	}
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envAnthropicAPIKey); err != nil {
-		return err
-	}
-	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envAnthropicBaseURL); err != nil {
 		return err
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
@@ -124,6 +124,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 
 	files := []runner.BrokerTaskFile{
 		runner.LLMUsageTaskFile(),
+		runner.TurnTelemetryTaskFile(),
 		{Path: "run.js", Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
@@ -144,10 +145,21 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 		Kind:    runner.LiveLogKindSetup,
 	}
 	commands := append([]runner.BrokerCommand{prepareCommand}, setupCommands...)
+	if fetch := runner.AttachmentFetchCommand(runner.CollectTaskAttachmentsFromSteps(spec.Steps)); fetch != nil {
+		commands = append(commands, *fetch)
+	}
 	return ClaudeCodeBrokerTask{
 		Commands: append(commands, stepCommands...),
 		Files:    files,
 	}
+}
+
+func BuildBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup) ClaudeCodeBrokerTask {
+	return buildClaudeCodeBrokerTask(spec, usage, setups)
+}
+
+func ApplyPlanningFollowUp(task ClaudeCodeBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
+	return applyPlanningFollowUp(task, environment, spec)
 }
 
 // applyPlanningFollowUp keeps the machine on after canvas steps when this run

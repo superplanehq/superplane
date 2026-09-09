@@ -4,7 +4,9 @@ import {
   getLogoutHref,
   getSignupRequiredAccountBody,
   getSignupRequiredCreateHref,
+  isEmailAuthProvider,
   isKnownAuthProvider,
+  isSignupRequiredErrorBody,
   shouldShowSignupRequiredPrompt,
 } from "./signupRequiredPrompt";
 
@@ -19,6 +21,10 @@ describe("getSignupRequiredAccountBody", () => {
 
   it("uses generic copy when the provider is missing", () => {
     expect(getSignupRequiredAccountBody(null)).toBe("This account does not have a SuperPlane account.");
+  });
+
+  it("names the email account", () => {
+    expect(getSignupRequiredAccountBody("email")).toBe("This email does not have a SuperPlane account.");
   });
 });
 
@@ -35,6 +41,35 @@ describe("getSignupRequiredCreateHref", () => {
 
   it("sends unknown providers to signup", () => {
     expect(getSignupRequiredCreateHref(null, "?redirect=%2Finvite%2Fabc")).toBe("/signup?redirect=%2Finvite%2Fabc");
+  });
+
+  it("does not send email create to signup or Google", () => {
+    expect(getSignupRequiredCreateHref("email", "?redirect=%2Finvite%2Fabc")).toBe("");
+    expect(getSignupRequiredCreateHref("email", "")).not.toContain("/signup");
+    expect(getSignupRequiredCreateHref("email", "")).not.toContain("/auth/google");
+  });
+});
+
+describe("isSignupRequiredErrorBody", () => {
+  it("accepts the JSON error used by magic-code request", () => {
+    expect(isSignupRequiredErrorBody(`{"error":"signup_required"}`)).toBe(true);
+  });
+
+  it("accepts the legacy plain-text error", () => {
+    expect(isSignupRequiredErrorBody("signup must be started from the signup page")).toBe(true);
+  });
+
+  it("rejects other errors", () => {
+    expect(isSignupRequiredErrorBody("signup is currently disabled")).toBe(false);
+    expect(isSignupRequiredErrorBody("")).toBe(false);
+  });
+});
+
+describe("isEmailAuthProvider", () => {
+  it("accepts email only", () => {
+    expect(isEmailAuthProvider("email")).toBe(true);
+    expect(isEmailAuthProvider("google")).toBe(false);
+    expect(isEmailAuthProvider(null)).toBe(false);
   });
 });
 

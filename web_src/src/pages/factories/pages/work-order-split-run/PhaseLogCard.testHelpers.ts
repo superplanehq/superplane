@@ -88,6 +88,19 @@ export function idleLiveLogStream(toggleSection: () => void) {
     orphanLines: [],
     error: null,
     isStreaming: false,
+    telemetry: {
+      num_turns: 0,
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0,
+      },
+      tool_counts: {},
+      turns: [],
+    },
+    usageSeries: [],
     toggleSection,
     scrollRef: { current: null },
   };

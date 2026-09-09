@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
 import {
@@ -85,7 +84,6 @@ export function useCanvasToolSidebarState({
   const agentEnabled = canUseAgents && featureEnabled;
 
   const [isToolSidebarOpen, setIsToolSidebarOpen] = useState(() => readInitialToolSidebarOpen(canvasId));
-  const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
 
   // Tracks the canvas whose managed-agent provider failed to provision a
   // session (e.g. the instance has no agent credentials configured). Keyed by
@@ -137,11 +135,6 @@ export function useCanvasToolSidebarState({
     persistOpen(next);
   }, [isToolSidebarOpen, onBeforeClose, persistOpen]);
 
-  const switchAgentMode = useCallback((mode: AgentMode) => {
-    setAgentMode(mode);
-    persistAgentMode(mode);
-  }, []);
-
   // Called by the agent panel when it cannot set up a chat because the agent
   // provider isn't configured on this instance. Hiding the toggle and closing
   // the panel avoids advertising a chat that can never work (issue #5803).
@@ -188,8 +181,6 @@ export function useCanvasToolSidebarState({
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,
-    agentMode,
-    switchAgentMode,
   };
 }
 

@@ -115,6 +115,33 @@ service Me {
       tags: "Me";
     };
   }
+
+  // Self-scoped "resume where you left off" location for the calling user.
+  // The UI saves the last meaningful screen it renders (e.g. a pending
+  // approval) so the user can return to it after closing the browser or
+  // opening a new session, even on a different device.
+  rpc DescribeLastLocation(DescribeLastLocationRequest) returns (DescribeLastLocationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/last-location"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe last location";
+      description: "Returns the last in-app screen the calling user visited, if any was saved";
+      tags: "Me";
+    };
+  }
+
+  rpc SaveLastLocation(SaveLastLocationRequest) returns (SaveLastLocationResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/last-location"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Save last location";
+      description: "Saves the last in-app screen the calling user visited";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -135,6 +162,7 @@ message User {
   repeated Authorization.Permission permissions = 7;
   repeated string roles = 8;
   repeated string groups = 9;
+  bool is_owner = 10;
 }
 
 message RegenerateTokenResponse {
@@ -219,4 +247,27 @@ message UpdateNotificationSettingsRequest {
 
 message UpdateNotificationSettingsResponse {
   NotificationSettings settings = 1;
+}
+
+// LastLocation is a saved in-app path (e.g. "/acme/apps/deploy?run=42") that
+// the UI can navigate back to. It is opaque to the backend beyond being a
+// safe, relative, same-origin path.
+message LastLocation {
+  string path = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message DescribeLastLocationRequest {}
+
+message DescribeLastLocationResponse {
+  // Unset when the calling user has no saved location yet.
+  LastLocation last_location = 1;
+}
+
+message SaveLastLocationRequest {
+  string path = 1;
+}
+
+message SaveLastLocationResponse {
+  LastLocation last_location = 1;
 }

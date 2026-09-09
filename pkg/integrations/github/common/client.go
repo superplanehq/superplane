@@ -559,6 +559,13 @@ func (r graphQLResponse) err() error {
 	return errors.New(strings.Join(messages, ": "))
 }
 
+func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
+	if c == nil || c.underlying == nil {
+		return nil, fmt.Errorf("github client is not configured")
+	}
+	return c.underlying.Client().Do(req)
+}
+
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {
 	if !ctx.LegacySetup() {
 		return newClientFromStorageContexts(httpCtx, ctx.Properties(), ctx.Secrets())

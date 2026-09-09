@@ -11,11 +11,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ResolveIntakeAgent(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+		})
+		require.NoError(t, err)
+	})
 
 	newFactoryIn := func(t *testing.T, organizationID uuid.UUID) *models.Factory {
 		t.Helper()
@@ -95,26 +104,37 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, integrationName(t, organization.ID, claudeID), integrationRefName(t, agent))
 	})
 
-	t.Run("an organization without an installation runs on hosted credentials", func(t *testing.T) {
+	t.Run("a SuperPlane harness ignores organization installations", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
-		clearHostedLLMProviders(t, db)
-		_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
-			Provider:      models.UsageProviderAnthropic,
-			Enabled:       true,
-			APIKey:        []byte("test-hosted-key"),
-			AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
-		})
-		require.NoError(t, err)
+		createReadyOnboardingIntegration(t, organization.ID, "claude")
+		enableHostedSuperPlaneAgent(t, db)
+
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
 
 		agent := resolveIntakeAgent(db, factory)
 		require.NotNil(t, agent)
-		assert.Equal(t, "runnerClaudeCode", agent.Component)
-		assert.Equal(t, map[string]any{"source": runner.CredentialsSourceHosted}, agent.Credentials)
-		assert.Equal(t, "claude-opus-4-6", agent.Model)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Empty(t, agent.Credentials)
+		assert.Empty(t, agent.Model)
 	})
 
-	t.Run("a hosted allowlist without Opus still serves the intake", func(t *testing.T) {
+	t.Run("an organization without an installation runs on the SuperPlane agent", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		enableHostedSuperPlaneAgent(t, db)
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Empty(t, agent.Credentials)
+		assert.Empty(t, agent.Model)
+	})
+
+	t.Run("hosted intake needs the instance SuperPlane agent model", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
 		clearHostedLLMProviders(t, db)
@@ -126,11 +146,15 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// The allowlist belongs to the installation admin, so a preference
-		// for Opus cannot become a requirement for it.
+		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+		})
+		require.NoError(t, err)
+
 		agent := resolveIntakeAgent(db, factory)
-		require.NotNil(t, agent)
-		assert.Equal(t, "claude-sonnet-4-6", agent.Model)
+		assert.Nil(t, agent)
 	})
 
 	t.Run("a workspace with no agent at all leaves the node incomplete", func(t *testing.T) {
@@ -184,24 +208,27 @@ func Test__IntakeAgentModel(t *testing.T) {
 	})
 }
 
-func Test__HostedIntakeModel(t *testing.T) {
-	t.Run("prefers the model the hint names", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"gpt-5-mini", "gpt-4.1"},
-		}
-		assert.Equal(t, "gpt-5-mini", hostedIntakeModel(provider, "gpt-5"))
-	})
+func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
+	t.Helper()
 
-	t.Run("takes the first model when the hint misses", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"  ", "z-model", "a-model"},
-		}
-		assert.Equal(t, "a-model", hostedIntakeModel(provider, "sonnet"))
+	clearHostedLLMProviders(t, db)
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
 	})
-
-	t.Run("reports no model for an empty allowlist", func(t *testing.T) {
-		assert.Empty(t, hostedIntakeModel(models.HostedLLMProvider{}, "sonnet"))
+	require.NoError(t, err)
+	provider := models.UsageProviderAnthropic
+	model := "claude-sonnet-4-6"
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: &provider,
+		DefaultHostedModel:    &model,
 	})
+	require.NoError(t, err)
 }
 
 func integrationName(t *testing.T, organizationID uuid.UUID, integrationID string) string {

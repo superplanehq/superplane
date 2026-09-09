@@ -8,8 +8,8 @@ import { RunOverlayBoardBackdrop } from "./work-order-popup-redesign/popupShared
 const AUTOMATION_HREF = "/organizations/demo-org/factories/refunds/apps/app-refund-planner?configure=1";
 
 /**
- * Simple editing mode for one phase agent. Column menu action Edit Agent
- * opens this popup.
+ * Simple editing mode for one phase agent. The automation icon action
+ * Edit Agent opens this popup.
  */
 const meta = {
   title: "Factories/Pages/Planning Review",

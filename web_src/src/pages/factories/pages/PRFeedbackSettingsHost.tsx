@@ -12,6 +12,7 @@ import { useState } from "react";
 import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
   apiPRFeedbackSource,
@@ -168,6 +169,7 @@ function PRFeedbackSettingsLoaded({
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
+  const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
   const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
   const editAutomationHref = canvasId
@@ -213,6 +215,16 @@ function PRFeedbackSettingsLoaded({
           : undefined
       }
       editAutomationHref={editAutomationHref}
+      agent={
+        agent.agentNode
+          ? {
+              draft: agent.draft ?? undefined,
+              isLoading: agent.isLoading || !agent.draft,
+              organizationId,
+              onSave: agent.save,
+            }
+          : undefined
+      }
       onClose={onClose}
       initialTab={initialTab}
     />

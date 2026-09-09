@@ -124,6 +124,25 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
+  it("refines a draft from the note", async () => {
+    const user = userEvent.setup();
+    const onRefine = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} onRefine={onRefine} />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
+    expect(onRefine).toHaveBeenCalledTimes(1);
+  });
+
   it("starts and rejects a draft from the note", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
     const user = userEvent.setup();

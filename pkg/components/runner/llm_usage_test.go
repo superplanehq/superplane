@@ -62,6 +62,36 @@ func TestMergeLLMUsageIntoPlanResult(t *testing.T) {
 	assert.InDelta(t, 0.004, merged["total_cost_usd"], 1e-9)
 }
 
+func TestMergeLLMUsageRestoresPromptTelemetry(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"branch":"feature/x","title":"feat"}`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "turn_telemetry_series.json"), []byte(`{"series":[`+
+		`{"name":"Implementation","telemetry":{"num_turns":2,"usage":{"input_tokens":10},"turns":[{"turn":1,"usage":{"input_tokens":6},"tools":[]},{"turn":2,"usage":{"input_tokens":4},"tools":[]}]}},`+
+		`{"name":"Generate PR title and description","telemetry":{"num_turns":1,"usage":{"input_tokens":2},"turns":[{"turn":1,"usage":{"input_tokens":2},"tools":[]}]}}`+
+		`]}`+"\n"), 0o644))
+	runAccumulate(t, taskDir, map[string]any{
+		"model":          "sonnet",
+		"usage":          map[string]any{"input_tokens": 12, "output_tokens": 3},
+		"total_cost_usd": 0.01,
+	})
+
+	runMerge(t, taskDir, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "feature/x", merged["branch"])
+	telemetry, ok := merged["telemetry"].(map[string]any)
+	require.True(t, ok)
+	prompts, ok := telemetry["prompts"].([]any)
+	require.True(t, ok)
+	require.Len(t, prompts, 2)
+	first := prompts[0].(map[string]any)
+	assert.Equal(t, "Implementation", first["name"])
+}
+
 func TestMergeLLMUsageLeavesFileUnchangedWithoutSidecar(t *testing.T) {
 	t.Parallel()
 

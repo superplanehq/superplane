@@ -6,8 +6,7 @@ import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 /**
- * Current Organization Spending UI when hosted credit is empty.
- * Hosted runs fail at execute. This page is the recovery screen.
+ * Empty hosted credit on Tasks. The banner action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Pages/Hosted Credit Empty",
