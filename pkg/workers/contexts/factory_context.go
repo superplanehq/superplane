@@ -387,6 +387,23 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	return statusNoteToCore(order, note), nil
 }
 
+func (c *FactoryContext) ClearWorkOrderStatusNote(params core.ClearWorkOrderStatusNoteParams) error {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return err
+	}
+
+	removed, err := order.ClearStatusNote(c.tx, params.NoteKey)
+	if err != nil {
+		return err
+	}
+
+	if removed {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusNoteUpdated)
+	}
+	return nil
+}
+
 // FindWorkOrder resolves a work order by id or by an artifact key,
 // independent of the current run's `factory_work_order_executions` row.
 // This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
@@ -777,6 +794,43 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 
 	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityAdded")
 	return c.activityResult(pullRequest, created.Activity, created.Revision, created.CurrentRevision, created.Outcome)
+}
+
+// ResolveWorkOrderAssigneeAccounts resolves the work order's assignees to
+// their linked identity for params.Provider (only "github" is currently
+// supported). Assignees with no linked identity are counted in Unlinked
+// instead of erroring — the caller decides how to surface that (e.g. a
+// status note prompting them to link their account).
+func (c *FactoryContext) ResolveWorkOrderAssigneeAccounts(params core.ResolveWorkOrderAssigneeAccountsParams) (*core.WorkOrderAssigneeAccounts, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	assigneeIDs := order.AssigneeIDs()
+	result := &core.WorkOrderAssigneeAccounts{}
+	if len(assigneeIDs) == 0 {
+		return result, nil
+	}
+
+	linked, err := models.FindLinkedAccountsForUsers(c.tx, assigneeIDs, params.Provider)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, userID := range assigneeIDs {
+		account, ok := linked[userID]
+		login := ""
+		if ok {
+			login = account.NormalizedUsername()
+		}
+		if login == "" {
+			result.Unlinked++
+			continue
+		}
+		result.Logins = append(result.Logins, login)
+	}
+	return result, nil
 }
 
 func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {

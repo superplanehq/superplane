@@ -2542,6 +2542,7 @@ The Create Pull Request component creates a new pull request in a specified GitH
 - **Title**: The pull request title (supports expressions)
 - **Body**: Optional pull request description (supports markdown and expressions)
 - **Draft**: Whether to create the pull request as a draft
+- **Task ID**: Optional. When set (e.g. to a factory task id), the created pull request is assigned to the task's assignees who have linked their GitHub account. Assignment is best-effort and never fails pull request creation; an assignee without a linked GitHub account surfaces a status note on the task instead.
 
 ### Output
 

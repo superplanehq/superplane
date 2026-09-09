@@ -52,6 +52,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
 	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
+	assert.Equal(t, "{{ task().id }}", createPR.Configuration["orderId"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
 
 	body, ok := createPR.Configuration["body"].(string)

@@ -68,6 +68,40 @@ func FindAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string)
 	return &linked, nil
 }
 
+// FindLinkedAccountsForUsers resolves each organization user's linked
+// identity for provider, keyed by the user's id. A user with no linked
+// identity for that provider — including a user with no global Account at
+// all, e.g. an API key user — is absent from the returned map.
+func FindLinkedAccountsForUsers(tx *gorm.DB, userIDs []uuid.UUID, provider string) (map[uuid.UUID]AccountLinkedAccount, error) {
+	result := make(map[uuid.UUID]AccountLinkedAccount, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	type linkedAccountRow struct {
+		UserID uuid.UUID
+		AccountLinkedAccount
+	}
+
+	var rows []linkedAccountRow
+	err := tx.
+		Table("users").
+		Select("users.id AS user_id, account_linked_accounts.*").
+		Joins("INNER JOIN account_linked_accounts ON account_linked_accounts.account_id = users.account_id").
+		Where("users.id IN ?", userIDs).
+		Where("account_linked_accounts.provider = ?", provider).
+		Find(&rows).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		result[row.UserID] = row.AccountLinkedAccount
+	}
+	return result, nil
+}
+
 // SaveAccountLinkedAccount links the identity to the account. It replaces the
 // identity the account previously linked for the same provider, so a member can
 // correct a wrong link without an extra step.

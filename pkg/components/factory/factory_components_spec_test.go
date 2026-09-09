@@ -39,6 +39,9 @@ type fakeFactoryContext struct {
 	setStatusNoteResult *core.WorkOrderStatusNote
 	setStatusNoteErr    error
 
+	clearStatusNoteCalls  int
+	clearStatusNoteParams core.ClearWorkOrderStatusNoteParams
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -46,6 +49,10 @@ type fakeFactoryContext struct {
 	lastUpdateParams core.UpdatePullRequestActivityParams
 	updateResult     *core.PullRequestActivityResult
 	updateErr        error
+
+	resolveAssigneeAccountsParams core.ResolveWorkOrderAssigneeAccountsParams
+	resolveAssigneeAccountsResult *core.WorkOrderAssigneeAccounts
+	resolveAssigneeAccountsErr    error
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -82,6 +89,12 @@ func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStat
 	f.setStatusNoteCalls++
 	f.setStatusNoteParams = params
 	return f.setStatusNoteResult, f.setStatusNoteErr
+}
+
+func (f *fakeFactoryContext) ClearWorkOrderStatusNote(params core.ClearWorkOrderStatusNoteParams) error {
+	f.clearStatusNoteCalls++
+	f.clearStatusNoteParams = params
+	return nil
 }
 
 func (f *fakeFactoryContext) AddPullRequest(_ core.AddPullRequestParams) (*core.PullRequest, error) {
@@ -130,6 +143,17 @@ func (f *fakeFactoryContext) UpdatePullRequestActivity(params core.UpdatePullReq
 		Activity:    &core.PullRequestActivity{Description: description, Access: params.Access, State: "active"},
 		Outcome:     core.PullRequestActivityOutcomeReady,
 	}, nil
+}
+
+func (f *fakeFactoryContext) ResolveWorkOrderAssigneeAccounts(params core.ResolveWorkOrderAssigneeAccountsParams) (*core.WorkOrderAssigneeAccounts, error) {
+	f.resolveAssigneeAccountsParams = params
+	if f.resolveAssigneeAccountsErr != nil {
+		return nil, f.resolveAssigneeAccountsErr
+	}
+	if f.resolveAssigneeAccountsResult != nil {
+		return f.resolveAssigneeAccountsResult, nil
+	}
+	return &core.WorkOrderAssigneeAccounts{}, nil
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
