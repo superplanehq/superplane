@@ -1,4 +1,5 @@
 import type { FactoriesFactory } from "@/api-client";
+import { useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -11,10 +12,15 @@ function isWorkspaceSetupRoute(pathname: string) {
 }
 
 /**
- * Where a finished workspace goes when it leaves setup: the line board, the
- * same place the Finish action opens. Finish and this redirect run in the same
- * tick, so a different target here would win whenever this redirect lands last.
+ * Where a finished workspace goes when it leaves setup: the line board.
+ * Finish now holds this route for analysis, then the board button navigates
+ * here. A later visit to setup still uses this path.
  */
+
+/** Keep setup mounted after this visit marks complete, so analysis can render. */
+export function holdSetupAfterThisVisitCompletes(startedIncomplete: boolean, isSetupRoute: boolean) {
+  return startedIncomplete && isSetupRoute;
+}
 function pathAfterSetup(organizationId: string, factoryKey: string, factory: FactoriesFactory | null) {
   const lineId = firstFactoryLineId(factory);
   if (!lineId) {
@@ -35,8 +41,16 @@ export function OnboardingGate() {
   const storybookPending = onboarding?.pending;
   const isSetupRoute = isWorkspaceSetupRoute(location.pathname);
   const isIncomplete = onboarding ? storybookPending?.workspaceId === factoryId : !isFactoryOnboardingComplete(factory);
+  // `complete: true` writes completedAt into the factory cache before
+  // FirstRunSetup stores the analysis destination. Hold this visit on setup
+  // so that write cannot unmount the analysis screen. A later open of setup
+  // still leaves for the board.
+  const startedIncomplete = useRef(isIncomplete);
 
   if (!isIncomplete) {
+    if (holdSetupAfterThisVisitCompletes(startedIncomplete.current, isSetupRoute)) {
+      return <Outlet />;
+    }
     if (isSetupRoute) {
       return <Navigate to={pathAfterSetup(organizationId, factoryKey, factory)} replace />;
     }

@@ -43,8 +43,6 @@ export function firstRunAnalysisProgress(
   const scored = runs.filter((run) => isScored(run, scoredOrderIds)).length;
   // Ready means scored and on the board, whichever path produced the score:
   // an intake confidence percentage or a finished Backlog analysis run.
-  const ready = runs.filter(
-    (run) => READY.includes(String(run.placement)) && isScored(run, scoredOrderIds),
-  ).length;
+  const ready = runs.filter((run) => READY.includes(String(run.placement)) && isScored(run, scoredOrderIds)).length;
   return { total: runs.length, scored, ready, stageIndex: scored === runs.length ? 2 : 1 };
 }

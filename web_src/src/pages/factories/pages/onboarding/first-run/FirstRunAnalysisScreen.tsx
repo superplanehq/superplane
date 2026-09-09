@@ -23,7 +23,10 @@ function StageIcon({ state }: { state: StageState }) {
   }
   return (
     <Loader2
-      className={cn("size-3.5 shrink-0", state === "current" ? "animate-spin text-foreground" : "text-muted-foreground")}
+      className={cn(
+        "size-3.5 shrink-0",
+        state === "current" ? "animate-spin text-foreground" : "text-muted-foreground",
+      )}
       aria-hidden
     />
   );
