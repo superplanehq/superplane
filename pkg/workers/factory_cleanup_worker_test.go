@@ -261,7 +261,7 @@ func Test__OrganizationCleanupWorker_WaitsForFactories(t *testing.T) {
 		Update("deleted_at", deletedAtOutsideGracePeriod).
 		Error)
 
-	deletedOrganizations, err := models.ListDeletedOrganizations()
+	deletedOrganizations, err := models.ListDeletedOrganizations(workerPollBatchSize)
 	require.NoError(t, err)
 	require.Len(t, deletedOrganizations, 1)
 

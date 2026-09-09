@@ -125,7 +125,7 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	executions, err := models.ListPendingNodeExecutions()
+	executions, err := models.ListPendingNodeExecutions(workerPollBatchSize)
 	require.NoError(t, err)
 	for _, pending := range executions {
 		assert.NotEqual(t, execution.ID, pending.ID)

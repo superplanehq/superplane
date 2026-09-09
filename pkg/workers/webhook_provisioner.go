@@ -60,7 +60,7 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			webhooks, err := models.ListPendingWebhooks()
+			webhooks, err := models.ListPendingWebhooks(workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}

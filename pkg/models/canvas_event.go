@@ -208,12 +208,18 @@ func CountCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string) (int64, e
 	return count, nil
 }
 
-func ListPendingCanvasEvents() ([]CanvasEvent, error) {
+func ListPendingCanvasEvents(limit int) ([]CanvasEvent, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var events []CanvasEvent
 	query := database.Conn().
 		Table("workflow_events").
 		Select("workflow_events.*").
-		Where("workflow_events.state = ?", CanvasEventStatePending)
+		Where("workflow_events.state = ?", CanvasEventStatePending).
+		Order("workflow_events.created_at ASC").
+		Limit(limit)
 
 	err := withActiveCanvas(query, "workflow_events.workflow_id").
 		Find(&events).

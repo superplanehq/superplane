@@ -65,7 +65,7 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		deletedAtWithinGracePeriod := time.Now().AddDate(0, 0, -29)
 		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("deleted_at", deletedAtWithinGracePeriod).Error)
 
-		deletedOrganizations, err := models.ListDeletedOrganizations()
+		deletedOrganizations, err := models.ListDeletedOrganizations(workerPollBatchSize)
 		require.NoError(t, err)
 		require.Len(t, deletedOrganizations, 1)
 
@@ -94,13 +94,13 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
 		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r2.Organization.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
 
-		deletedCanvases, err := models.ListDeletedCanvases(database.Conn())
+		deletedCanvases, err := models.ListDeletedCanvases(database.Conn(), workerPollBatchSize)
 		require.NoError(t, err)
 		require.Len(t, deletedCanvases, 1)
 		require.Equal(t, canvas.ID, deletedCanvases[0].ID)
 		require.NoError(t, canvasWorker.LockAndProcessCanvas(deletedCanvases[0]))
 
-		deletedOrganizations, err := models.ListDeletedOrganizations()
+		deletedOrganizations, err := models.ListDeletedOrganizations(workerPollBatchSize)
 		require.NoError(t, err)
 		require.Len(t, deletedOrganizations, 1)
 

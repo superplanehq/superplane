@@ -39,15 +39,20 @@ func CreateAppMessage(tx *gorm.DB, canvasID uuid.UUID, nodeID string, payload an
 	return tx.Create(message).Error
 }
 
-func ListAppMessages(tx *gorm.DB) ([]AppMessage, error) {
+func ListAppMessages(tx *gorm.DB, limit int) ([]AppMessage, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var messages []AppMessage
 
 	query := tx.
 		Table("app_messages").
-		Select("app_messages.*")
+		Select("app_messages.*").
+		Order("app_messages.created_at ASC").
+		Limit(limit)
 
 	err := withActiveCanvas(query, "app_messages.canvas_id").
-		Order("app_messages.created_at ASC").
 		Find(&messages).
 		Error
 	if err != nil {

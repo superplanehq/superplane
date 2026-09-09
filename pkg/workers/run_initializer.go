@@ -71,14 +71,10 @@ func (w *RunInitializer) Start(ctx context.Context) {
 }
 
 func (w *RunInitializer) sweepPendingRuns() {
-	runs, err := models.ListPendingRuns(database.Conn())
+	runs, err := models.ListPendingRuns(database.Conn(), pendingRunsSweepLimit)
 	if err != nil {
 		w.logger.Errorf("Error listing pending runs: %v", err)
 		return
-	}
-
-	if len(runs) > pendingRunsSweepLimit {
-		runs = runs[:pendingRunsSweepLimit]
 	}
 
 	for _, run := range runs {

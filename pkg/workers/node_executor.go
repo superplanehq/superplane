@@ -80,7 +80,7 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			executions, err := models.ListPendingNodeExecutions()
+			executions, err := models.ListPendingNodeExecutions(workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
