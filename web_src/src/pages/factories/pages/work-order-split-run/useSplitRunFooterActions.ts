@@ -1,10 +1,6 @@
 import { canvasesCancelRun } from "@/api-client";
-import {
-  factoryQueryKeys,
-  useCloseWorkOrder,
-  useDispatchWorkOrder,
-  useUpdateWorkOrderStatus,
-} from "@/hooks/useFactoryData";
+import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -72,12 +68,7 @@ function useSplitRunCancelRun(organizationId?: string, factoryId?: string, order
       if (!organizationId || !factoryId) {
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
-      if (orderId) {
-        await queryClient.invalidateQueries({
-          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
-        });
-      }
+      invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
     },
   });
 }

@@ -941,6 +941,7 @@ func TestSSHCommand_HandleHook_FileModeRetryReportsMissingFile(t *testing.T) {
 type fakeExecutionState struct{ finished bool }
 
 func (f *fakeExecutionState) IsFinished() bool                                       { return f.finished }
+func (f *fakeExecutionState) IsCancelling() bool                                     { return false }
 func (f *fakeExecutionState) SetKV(key, value string) error                          { return nil }
 func (f *fakeExecutionState) GetKV(key string) (string, error)                       { return "", nil }
 func (f *fakeExecutionState) Emit(channel, payloadType string, payloads []any) error { return nil }
