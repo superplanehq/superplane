@@ -1,13 +1,18 @@
 package factories
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
@@ -53,6 +58,30 @@ func (s stubIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, er
 		}
 	}
 	return nil, errIntakeItemNotFound
+}
+
+// stubRemoteFetcher stands in for a GitHub client's HTTPDo: it lets a test
+// intake source satisfy the optional `RemoteFetch` interface that
+// ImportFactoryIntakeItem uses to copy remote image bytes into workspace
+// storage.
+type stubRemoteFetcher struct {
+	body        []byte
+	contentType string
+	calls       int
+}
+
+func (f *stubRemoteFetcher) RemoteFetch(_ context.Context, _ *http.Request) (*http.Response, error) {
+	f.calls++
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(f.body)),
+		Header:     http.Header{"Content-Type": []string{f.contentType}},
+	}, nil
+}
+
+type stubIntakeItemSourceWithRemoteFetch struct {
+	stubIntakeItemSource
+	*stubRemoteFetcher
 }
 
 func Test__SearchFactoryIntakeItems(t *testing.T) {
@@ -247,5 +276,50 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEqual(t, first.GetOrder().GetId(), second.GetOrder().GetId())
 		assert.Equal(t, item.URL, second.GetOrder().GetOrigin().GetUrl())
+	})
+
+	t.Run("copies GitHub-hosted images into workspace storage", func(t *testing.T) {
+		t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+		t.Setenv("BASE_URL", "http://files.test")
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
+		t.Cleanup(func() { blob.SetCurrent(nil) })
+
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		imageURL := "https://user-images.githubusercontent.com/1/2.png"
+		itemWithImage := IntakeItem{
+			ID:    "42",
+			Key:   "#42",
+			Title: "Broken screenshot on a private repo",
+			Body:  "See ![screenshot](" + imageURL + ") for details.",
+			URL:   "https://github.com/acme/payments/issues/42",
+		}
+		fetcher := &stubRemoteFetcher{body: []byte("png-bytes"), contentType: "image/png"}
+		depsWithFetch := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSourceWithRemoteFetch{
+					stubIntakeItemSource: stubIntakeItemSource{items: []IntakeItem{itemWithImage}},
+					stubRemoteFetcher:    fetcher,
+				}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, depsWithFetch, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    itemWithImage.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder())
+		assert.Equal(t, 1, fetcher.calls)
+		assert.NotContains(t, response.GetOrder().GetDescription(), imageURL)
+
+		require.Len(t, response.GetOrder().GetFiles(), 1)
+		file := response.GetOrder().GetFiles()[0]
+		assert.Equal(t, "image/png", file.GetContentType())
+		assert.NotEmpty(t, file.GetDownloadUrl())
+		assert.Contains(t, response.GetOrder().GetDescription(), blob.FileRefScheme+"://"+file.GetId())
 	})
 }
