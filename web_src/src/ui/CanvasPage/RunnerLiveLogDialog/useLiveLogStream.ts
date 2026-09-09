@@ -15,6 +15,7 @@ import {
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { Sentry } from "@/sentry";
 import {
   applyPromptUsageRecord,
   emptyAgentRunTelemetry,
@@ -26,10 +27,19 @@ import {
 
 const RECONNECT_DELAY_MS = 2000;
 
+type LiveLogFailureSource = "broker" | "request";
+
+type LiveLogFailureContext = {
+  organizationId: string;
+  canvasId: string;
+  executionId: string;
+};
+
 const initialLogState: LogState = {
   sections: [],
   orphanLines: [],
   error: null,
+  isLoading: false,
   isStreaming: false,
 };
 
@@ -93,41 +103,35 @@ function commandSectionFinalDuration(section: CommandSection, endedAtMs: number 
   return Math.max(0, endedAtMs - section.started_at);
 }
 
-function applyStreamFailure(state: LogState, message: string, executionInFlight: boolean): LogState {
-  if (
-    hasRunningCommand(state) ||
-    (executionInFlight && state.sections.length === 0 && state.orphanLines.length === 0)
-  ) {
-    return {
-      ...state,
-      error: null,
-    };
-  }
+function applyStreamFailure(state: LogState, message: string): LogState {
+  return { ...state, error: message, isLoading: false, isStreaming: false };
+}
 
-  if (state.sections.length === 0 && state.orphanLines.length === 0) {
-    return { ...state, error: message };
-  }
-
-  return state;
+function withClearedError(state: LogState): LogState {
+  return { ...state, error: null };
 }
 
 type StreamHandlerContext = {
   reconnecting: boolean;
   replayLineSkip: Map<number, number>;
-  executionInFlight: boolean;
   setState: Dispatch<SetStateAction<LogState>>;
   setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>;
   commandCursor: { index?: number };
+  onFailure: (message: string) => void;
 };
 
 function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers {
-  const { reconnecting, replayLineSkip, executionInFlight, setState, setUsage, commandCursor } = ctx;
+  const { reconnecting, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
   return {
+    onOpen: () => setState((prev) => ({ ...prev, error: null, isLoading: false, isStreaming: true })),
     onLogLine: (text, commandIndex) => {
       const index = commandIndex ?? commandCursor.index;
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
     },
-    onStreamError: (message) => setState((prev) => applyStreamFailure(prev, message, executionInFlight)),
+    onStreamError: (message) => {
+      onFailure(message);
+      setState((prev) => applyStreamFailure(prev, message));
+    },
     onCmdStart: (index, text, startedAtMs, kind, preview) => {
       commandCursor.index = index;
       setState((prev) =>
@@ -138,7 +142,7 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       }
     },
     onCmdEnd: (index, status, durationMs) =>
-      setState((prev) => completeCommandSection(prev, index, status, durationMs)),
+      setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs))),
     onToolStart: (kind, text, id, turn) => {
       setState((prev) =>
         startReplayedTool(prev, { kind, text, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
@@ -152,6 +156,7 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
     },
     onTurn: (turn, usage, message) => {
+      setState((prev) => withClearedError(prev));
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "turn", turn, usage, message }));
     },
   };
@@ -167,7 +172,7 @@ function appendReplayedLogLine(
   if (shouldSkipUnindexedLiveLogReplay(reconnecting, commandIndex, hasFinishedCommandSection(state))) {
     return state;
   }
-  return appendLineToLatestSection(state, text, replayLineSkip, commandIndex);
+  return withClearedError(appendLineToLatestSection(state, text, replayLineSkip, commandIndex));
 }
 
 function rememberOrStartCommand(
@@ -178,12 +183,12 @@ function rememberOrStartCommand(
 ): LogState {
   const existing = state.sections.find((section) => section.index === start.index);
   if (!existing) {
-    return startCommandSection(state, start);
+    return withClearedError(startCommandSection(state, start));
   }
   if (reconnecting) {
     replayLineSkip.set(start.index, existing.lines.length);
   }
-  return state;
+  return withClearedError(state);
 }
 
 function startReplayedTool(
@@ -194,7 +199,7 @@ function startReplayedTool(
   if (shouldSkipUnindexedLiveLogReplay(reconnecting, tool.commandIndex, hasFinishedCommandSection(state))) {
     return state;
   }
-  return startToolOnLatestSection(state, tool.kind, tool.text, tool.sourceId, tool.commandIndex);
+  return withClearedError(startToolOnLatestSection(state, tool.kind, tool.text, tool.sourceId, tool.commandIndex));
 }
 
 function endReplayedTool(
@@ -205,7 +210,9 @@ function endReplayedTool(
   if (shouldSkipUnindexedLiveLogReplay(reconnecting, tool.commandIndex, hasFinishedCommandSection(state))) {
     return state;
   }
-  return endToolOnLatestSection(state, tool.status, tool.durationMs, tool.sourceId, tool.commandIndex);
+  return withClearedError(
+    endToolOnLatestSection(state, tool.status, tool.durationMs, tool.sourceId, tool.commandIndex),
+  );
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -242,17 +249,50 @@ type LiveLogSessionParams = {
   setActiveStream: (stream: LiveLogStream | null) => void;
 };
 
-async function pumpLiveLogConnection(params: LiveLogSessionParams, reconnecting: boolean): Promise<"aborted" | "open"> {
-  const {
-    organizationId,
-    canvasId,
-    executionId,
-    executionInFlight,
-    sessionAbort,
-    setState,
-    setUsage,
-    setActiveStream,
-  } = params;
+function createLiveLogFailureReporter(context: LiveLogFailureContext) {
+  const reportedFailures = new Set<LiveLogFailureSource>();
+
+  return (source: LiveLogFailureSource, error: Error): void => {
+    if (reportedFailures.has(source)) {
+      return;
+    }
+    reportedFailures.add(source);
+
+    Sentry.captureException(error, {
+      fingerprint: ["runner-live-logs", source],
+      tags: {
+        feature: "runner-live-logs",
+        source,
+      },
+      extra: context,
+    });
+  };
+}
+
+function errorFromUnknown(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function waitForLiveLogReconnect(
+  sessionAbort: AbortController,
+  setState: Dispatch<SetStateAction<LogState>>,
+): Promise<boolean> {
+  setState((prev) => ({ ...prev, isLoading: true, isStreaming: false }));
+  try {
+    await sleep(RECONNECT_DELAY_MS, sessionAbort.signal);
+  } catch {
+    return false;
+  }
+  setState((prev) => ({ ...prev, isStreaming: true }));
+  return true;
+}
+
+async function pumpLiveLogConnection(
+  params: LiveLogSessionParams,
+  reconnecting: boolean,
+  reportFailure: (source: LiveLogFailureSource, error: Error) => void,
+): Promise<"aborted" | "open"> {
+  const { organizationId, canvasId, executionId, sessionAbort, setState, setUsage, setActiveStream } = params;
   const stream = new LiveLogStream(organizationId, canvasId, executionId);
   setActiveStream(stream);
   try {
@@ -260,18 +300,20 @@ async function pumpLiveLogConnection(params: LiveLogSessionParams, reconnecting:
       createStreamHandlers({
         reconnecting,
         replayLineSkip: new Map<number, number>(),
-        executionInFlight,
         setState,
         setUsage,
         commandCursor: {},
+        onFailure: (message) => reportFailure("broker", new Error(message)),
       }),
     );
   } catch (error) {
-    if ((error as Error).name === "AbortError") {
+    const streamError = errorFromUnknown(error);
+    if (streamError.name === "AbortError") {
       return "aborted";
     }
     if (!sessionAbort.signal.aborted) {
-      setState((prev) => applyStreamFailure(prev, (error as Error).message, executionInFlight));
+      reportFailure("request", streamError);
+      setState((prev) => applyStreamFailure(prev, streamError.message));
     }
   } finally {
     stream.stop();
@@ -281,11 +323,21 @@ async function pumpLiveLogConnection(params: LiveLogSessionParams, reconnecting:
 }
 
 async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
-  const { executionInFlight, terminalCommandStatus, terminalAtMs, sessionAbort, setState } = params;
+  const {
+    organizationId,
+    canvasId,
+    executionId,
+    executionInFlight,
+    terminalCommandStatus,
+    terminalAtMs,
+    sessionAbort,
+    setState,
+  } = params;
   let reconnecting = false;
+  const reportFailure = createLiveLogFailureReporter({ organizationId, canvasId, executionId });
 
   while (!sessionAbort.signal.aborted) {
-    const result = await pumpLiveLogConnection(params, reconnecting);
+    const result = await pumpLiveLogConnection(params, reconnecting, reportFailure);
     if (result === "aborted") {
       return;
     }
@@ -297,13 +349,9 @@ async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
     }
 
     reconnecting = true;
-    setState((prev) => ({ ...prev, isStreaming: false }));
-    try {
-      await sleep(RECONNECT_DELAY_MS, sessionAbort.signal);
-    } catch {
+    if (!(await waitForLiveLogReconnect(sessionAbort, setState))) {
       return;
     }
-    setState((prev) => ({ ...prev, isStreaming: true }));
   }
 }
 
@@ -323,8 +371,9 @@ export function useLiveLogStream(
   const routeCanvasId = useCanvasId();
   const organizationId = session?.organizationId || routeOrganizationId;
   const canvasId = session?.canvasId || routeCanvasId;
-  const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isStreaming: true }));
+  const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isLoading: true, isStreaming: true }));
   const [usage, setUsage] = useState(emptyPromptUsageState);
+  const [sessionAttempt, setSessionAttempt] = useState(0);
 
   const scrollTrigger = useMemo(() => {
     const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
@@ -348,16 +397,24 @@ export function useLiveLogStream(
     }));
   }, []);
 
+  const retry = useCallback(() => {
+    setSessionAttempt((attempt) => attempt + 1);
+  }, []);
+
+  useEffect(() => {
+    const canLoad = Boolean(organizationId && canvasId && executionId);
+    setState({ ...initialLogState, isLoading: canLoad, isStreaming: canLoad });
+    setUsage(emptyPromptUsageState());
+  }, [organizationId, canvasId, executionId]);
+
   useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
-      setState((prev) => ({ ...prev, isStreaming: false }));
       return;
     }
 
     const sessionAbort = new AbortController();
     let activeStream: LiveLogStream | null = null;
-    setState({ ...initialLogState, isStreaming: true });
-    setUsage(emptyPromptUsageState());
+    setState((prev) => ({ ...prev, error: null, isLoading: true, isStreaming: true }));
 
     void runLiveLogSession({
       organizationId,
@@ -374,7 +431,7 @@ export function useLiveLogStream(
       },
     }).finally(() => {
       if (!sessionAbort.signal.aborted) {
-        setState((prev) => ({ ...prev, isStreaming: false }));
+        setState((prev) => ({ ...prev, isLoading: false, isStreaming: false }));
       }
     });
 
@@ -382,9 +439,9 @@ export function useLiveLogStream(
       sessionAbort.abort();
       activeStream?.stop();
     };
-  }, [organizationId, canvasId, executionId, executionInFlight, terminalCommandStatus, terminalAtMs]);
+  }, [organizationId, canvasId, executionId, executionInFlight, terminalCommandStatus, terminalAtMs, sessionAttempt]);
 
   const usageSeries = useMemo(() => promptUsageSeries(usage), [usage]);
   const telemetry = usageSeries.at(-1)?.telemetry ?? emptyAgentRunTelemetry();
-  return { ...state, telemetry, usageSeries, toggleSection, scrollRef };
+  return { ...state, telemetry, usageSeries, retry, toggleSection, scrollRef };
 }

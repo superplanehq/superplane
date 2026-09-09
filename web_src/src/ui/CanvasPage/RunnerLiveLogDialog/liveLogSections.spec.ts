@@ -12,7 +12,7 @@ import {
 import type { LogState } from "./types";
 
 function emptyState(): LogState {
-  return { sections: [], orphanLines: [], error: null, isStreaming: false };
+  return { sections: [], orphanLines: [], error: null, isLoading: false, isStreaming: false };
 }
 
 describe("liveLogSections", () => {

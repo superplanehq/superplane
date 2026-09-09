@@ -7,6 +7,7 @@ import {
   useLiveLogStream,
 } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
 import type { RunInspectorNodeSection } from "./types";
@@ -40,36 +41,43 @@ export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspec
 function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecution }) {
   const executionInfo = buildExecutionInfo(execution);
   const executionInFlight = isExecutionInFlight(executionInfo);
-  const { sections, orphanLines, error, isStreaming, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, retry, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
     terminalCommandStatusForExecution(executionInfo),
     terminalTimeMsForExecution(executionInfo),
   );
   const lines = runnerLogLines(orphanLines, sections);
-  const isWaiting = lines.length === 0 && !error && (executionInFlight || isStreaming);
-  const hasError = Boolean(error) && !executionInFlight;
 
-  if (hasError) {
-    return <EmptySectionText>Something went wrong while fetching logs. Please try again later.</EmptySectionText>;
+  if (error && lines.length === 0) {
+    return <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />;
   }
 
-  if (isWaiting) {
-    return <EmptySectionText>Waiting for logs...</EmptySectionText>;
+  if (lines.length === 0 && isLoading) {
+    return <LiveLogStateNotice state="loading" compact />;
+  }
+
+  if (lines.length === 0 && executionInFlight) {
+    return <LiveLogStateNotice state="waiting" compact />;
   }
 
   if (lines.length === 0) {
-    return <EmptySectionText>No log lines yet.</EmptySectionText>;
+    return <LiveLogStateNotice state="empty" compact />;
   }
 
   return (
-    <div
-      ref={scrollRef}
-      data-testid="run-inspector-runner-logs-terminal"
-      className="max-h-80 overflow-y-auto rounded-sm bg-slate-950 px-4 py-3 text-slate-100 shadow-inner ring-1 ring-slate-900/10 dark:bg-black dark:ring-gray-800"
-    >
-      <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">{lines.join("\n")}</pre>
-    </div>
+    <>
+      {error ? (
+        <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />
+      ) : null}
+      <div
+        ref={scrollRef}
+        data-testid="run-inspector-runner-logs-terminal"
+        className="max-h-80 overflow-y-auto rounded-sm bg-slate-950 px-4 py-3 text-slate-100 shadow-inner ring-1 ring-slate-900/10 dark:bg-black dark:ring-gray-800"
+      >
+        <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">{lines.join("\n")}</pre>
+      </div>
+    </>
   );
 }
 
