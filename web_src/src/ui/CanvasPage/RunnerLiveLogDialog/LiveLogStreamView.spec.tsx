@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionInfo } from "@/pages/app/mappers/types";
 import { LiveLogStreamView } from "./LiveLogStreamView";
@@ -26,43 +26,89 @@ beforeEach(() => {
     sections: [],
     orphanLines: [],
     error: null,
+    isLoading: false,
     isStreaming: false,
     telemetry: { num_turns: 0, usage: {}, tool_counts: {}, turns: [] },
     usageSeries: [],
     toggleSection: vi.fn(),
+    retry: vi.fn(),
     scrollRef: { current: null },
   });
 });
 
 describe("LiveLogStreamView", () => {
-  it("shows a loading message while the stream is connecting for a finished execution", () => {
+  it("shows loading while it fetches logs for a finished execution", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [],
       orphanLines: [],
       error: null,
+      isLoading: true,
       isStreaming: true,
       toggleSection: vi.fn(),
+      retry: vi.fn(),
       scrollRef: { current: null },
     });
 
     render(<LiveLogStreamView execution={finishedExecution} />);
 
-    expect(screen.getByText("Waiting for logs…")).toBeInTheDocument();
-    expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading logs")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
+    expect(screen.queryByText("No logs available")).not.toBeInTheDocument();
   });
 
-  it("shows the empty message only after the stream settles with no lines", () => {
+  it("shows the empty state when a finished execution has no logs", () => {
     render(<LiveLogStreamView execution={finishedExecution} />);
 
-    expect(screen.getByText("No log lines yet.")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
+    expect(screen.getByText("No logs available")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
   });
 
   it("keeps waiting while an in-flight execution has no lines yet", () => {
     render(<LiveLogStreamView execution={startedExecution} />);
 
-    expect(screen.getByText("Waiting for logs…")).toBeInTheDocument();
-    expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for logs")).toBeInTheDocument();
+    expect(screen.getByText("Logs will appear when the runner sends output.")).toBeInTheDocument();
+    expect(screen.queryByText("No logs available")).not.toBeInTheDocument();
+  });
+
+  it("shows the error and lets the user retry after an execution finishes", () => {
+    const retry = vi.fn();
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: "Failed to fetch",
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry,
+      scrollRef: { current: null },
+    });
+
+    render(<LiveLogStreamView execution={finishedExecution} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load logs");
+    expect(screen.getByText("Failed to fetch")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("shows a retrying error while the execution is in flight", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: "The log stream is not available yet",
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(<LiveLogStreamView execution={startedExecution} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Logs are temporarily unavailable");
+    expect(screen.getByText("SuperPlane will try again automatically.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
   });
 
   it("passes canvas session ids into the live log hook", () => {
@@ -110,8 +156,10 @@ describe("LiveLogStreamView", () => {
       ],
       orphanLines: [],
       error: null,
+      isLoading: false,
       isStreaming: false,
       toggleSection: vi.fn(),
+      retry: vi.fn(),
       scrollRef: { current: null },
     });
 
