@@ -716,7 +716,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
     expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
@@ -728,7 +728,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
     expect(within(backlog).queryByText(/Created manually/)).not.toBeInTheDocument();
@@ -749,7 +749,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
   });
 
-  it("tells a draft is under analysis and hides Reject while it runs", () => {
+  it("tells a draft is under analysis and hides Archive while it runs", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -772,7 +772,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("puts artifacts on the right and check analyses under the description", () => {
