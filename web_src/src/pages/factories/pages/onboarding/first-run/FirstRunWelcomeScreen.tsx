@@ -2,21 +2,24 @@ import { Button } from "@/components/ui/button";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 export function FirstRunWelcomeScreen({
   firstName,
   chrome,
+  sphere,
   onGetStarted,
 }: {
   firstName?: string;
   chrome?: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   onGetStarted: () => void;
 }) {
   const copy = FIRST_RUN_COPY.welcome;
 
   return (
-    <FirstRunShell testId="first-run-welcome" chrome={chrome}>
+    <FirstRunShell testId="first-run-welcome" chrome={chrome} sphere={sphere}>
       <FirstRunHeading
         greeting={firstName ? copy.greeting(firstName) : undefined}
         headline={copy.headline}
