@@ -25,9 +25,19 @@ export const BYOK_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
   costCents: "3",
   hostedCostCents: "0",
   byokCostCents: "3",
-  usedByok: true,
-  models: ["anthropic/claude-sonnet-4-6"],
+  models: [],
+  byokModels: ["anthropic/claude-sonnet-4-6"],
   machineTypes: ["e1-large-amd64"],
+};
+
+export const MIXED_FUNDING_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
+  ...BYOK_USAGE_HISTORY_ROW,
+  workOrderExecutionId: "exec-usage-mixed",
+  hostedCostCents: "120",
+  byokCostCents: "3",
+  costCents: "123",
+  models: ["anthropic/claude-haiku-4-5"],
+  byokModels: ["anthropic/claude-sonnet-4-6"],
 };
 
 export const HOSTED_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
@@ -45,14 +55,15 @@ export const HOSTED_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
   costCents: "150",
   hostedCostCents: "150",
   byokCostCents: "0",
-  usedByok: false,
   models: ["anthropic/claude-sonnet-4-6"],
+  byokModels: [],
   machineTypes: ["e1-standard-amd64"],
 };
 
 export const DEFAULT_USAGE_HISTORY_ROWS: FactoriesWorkOrderRunUsageRow[] = [
   BYOK_USAGE_HISTORY_ROW,
   HOSTED_USAGE_HISTORY_ROW,
+  MIXED_FUNDING_USAGE_HISTORY_ROW,
 ];
 
 export function usageHistoryRows(count: number, seed: FactoriesWorkOrderRunUsageRow = HOSTED_USAGE_HISTORY_ROW) {

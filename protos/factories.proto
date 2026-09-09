@@ -2055,8 +2055,8 @@ message WorkOrderRunUsageRow {
   int64 cost_cents = 12;
   int64 hosted_cost_cents = 13;
   int64 byok_cost_cents = 14;
-  bool used_byok = 15;
-  repeated string models = 16;
+  repeated string models = 15;
+  repeated string byok_models = 16;
   repeated string machine_types = 17;
 }
 

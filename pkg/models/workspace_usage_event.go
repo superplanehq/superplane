@@ -313,8 +313,8 @@ type WorkOrderRunUsage struct {
 	CostMicros           int64
 	HostedCostMicros     int64
 	BYOKCostMicros       int64
-	UsedBYOK             bool
 	Models               []string
+	BYOKModels           []string
 	MachineTypes         []string
 }
 
@@ -664,8 +664,8 @@ const workOrderRunUsageSelect = `
 	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
-	COALESCE(BOOL_OR(workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `'), false) AS used_byok,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS byok_models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
 
 type workOrderRunUsageScanRow struct {
@@ -682,8 +682,8 @@ type workOrderRunUsageScanRow struct {
 	CostMicros           int64
 	HostedCostMicros     int64
 	BYOKCostMicros       int64
-	UsedBYOK             bool
 	Models               string
+	BYOKModels           string
 	MachineTypes         string
 }
 
@@ -736,8 +736,8 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 			CostMicros:           row.CostMicros,
 			HostedCostMicros:     row.HostedCostMicros,
 			BYOKCostMicros:       row.BYOKCostMicros,
-			UsedBYOK:             row.UsedBYOK,
 			Models:               splitUsageAgg(row.Models),
+			BYOKModels:           splitUsageAgg(row.BYOKModels),
 			MachineTypes:         splitUsageAgg(row.MachineTypes),
 		})
 	}

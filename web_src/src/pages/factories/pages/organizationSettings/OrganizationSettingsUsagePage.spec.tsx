@@ -35,7 +35,7 @@ describe("OrganizationSettingsUsagePage", () => {
 
     const table = await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 });
     const rows = within(table).getAllByTestId("organization-usage-row");
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
 
     expect(rows[0]).toHaveTextContent("RF-101 · Reconcile duplicate refunds in ledger");
     expect(rows[0]).toHaveTextContent("22k tokens · 1 min 30 s");
@@ -52,6 +52,10 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[1]).toHaveTextContent("anthropic/claude-sonnet-4-6 · e1-standard-amd64");
     expect(rows[1]).not.toHaveTextContent("your keys");
     expect(rows[1]).toHaveTextContent("Arnold Schwarzenegger");
+
+    expect(rows[2]).toHaveTextContent(
+      "anthropic/claude-haiku-4-5 · anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64",
+    );
   }, 10000);
 
   it("shows an empty state when the period has no task spend", async () => {

@@ -78,21 +78,21 @@ export function SpendingPeriodControls({
             {SPENDING_PERIOD_PRESETS.map((option) => {
               const isActive = period === option.value;
               return (
-                <button
+                <Button
                   key={option.value}
+                  variant="ghost"
+                  size="sm"
                   type="button"
                   role="radio"
                   aria-checked={isActive}
                   className={cn(
-                    "rounded-md px-2.5 py-1.5 text-left text-[13px]",
-                    isActive
-                      ? "bg-accent font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    "h-auto justify-start rounded-md px-2.5 py-1.5 font-normal",
+                    isActive ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
                   )}
                   onClick={() => onPeriodChange(option.value)}
                 >
                   {option.label}
-                </button>
+                </Button>
               );
             })}
           </div>

@@ -111,8 +111,8 @@ func serializeWorkOrderRunUsageRow(factory *models.Factory, row models.WorkOrder
 		CostCents:            row.CostCents(),
 		HostedCostCents:      row.HostedCostCents(),
 		ByokCostCents:        row.BYOKCostCents(),
-		UsedByok:             row.UsedBYOK,
 		Models:               row.Models,
+		ByokModels:           row.BYOKModels,
 		MachineTypes:         row.MachineTypes,
 	}
 	if row.UserID != nil && *row.UserID != uuid.Nil {

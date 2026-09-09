@@ -84,22 +84,37 @@ describe("formatUsageTokensAndTime", () => {
 });
 
 describe("formatUsageRunResources", () => {
-  it("notes your keys on the model when BYOK paid the model", () => {
-    expect(formatUsageRunResources(["anthropic/claude-sonnet-4-6"], ["e1-large-amd64"], true)).toBe(
-      "anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64",
-    );
+  it("notes your keys on the model when your keys paid the model", () => {
+    expect(
+      formatUsageRunResources({
+        byokModels: ["anthropic/claude-sonnet-4-6"],
+        machineTypes: ["e1-large-amd64"],
+      }),
+    ).toBe("anthropic/claude-sonnet-4-6 (your keys) · e1-large-amd64");
   });
 
   it("keeps hosted models without the your-keys note", () => {
-    expect(formatUsageRunResources(["anthropic/claude-sonnet-4-6"], ["e1-large-amd64"], false)).toBe(
-      "anthropic/claude-sonnet-4-6 · e1-large-amd64",
-    );
+    expect(
+      formatUsageRunResources({
+        models: ["anthropic/claude-sonnet-4-6"],
+        machineTypes: ["e1-large-amd64"],
+      }),
+    ).toBe("anthropic/claude-sonnet-4-6 · e1-large-amd64");
+  });
+
+  it("notes your keys on only the your-keys models of a mixed run", () => {
+    expect(
+      formatUsageRunResources({
+        models: ["anthropic/claude-sonnet-4-6"],
+        byokModels: ["openai/gpt-5"],
+      }),
+    ).toBe("anthropic/claude-sonnet-4-6 · openai/gpt-5 (your keys)");
   });
 
   it("shows only the parts that exist", () => {
-    expect(formatUsageRunResources(["anthropic/claude-sonnet-4-6"], [], false)).toBe("anthropic/claude-sonnet-4-6");
-    expect(formatUsageRunResources([], ["e1-large-amd64"], false)).toBe("e1-large-amd64");
-    expect(formatUsageRunResources([], [], false)).toBe("—");
+    expect(formatUsageRunResources({ models: ["anthropic/claude-sonnet-4-6"] })).toBe("anthropic/claude-sonnet-4-6");
+    expect(formatUsageRunResources({ machineTypes: ["e1-large-amd64"] })).toBe("e1-large-amd64");
+    expect(formatUsageRunResources({})).toBe("—");
   });
 });
 

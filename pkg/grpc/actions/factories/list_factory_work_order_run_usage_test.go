@@ -81,8 +81,8 @@ func Test__ListFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Equal(t, r.UserModel.GetEmail(), row.UserEmail)
 	assert.Equal(t, int64(1_000_000), row.TotalTokens)
 	assert.Equal(t, int64(90), row.DurationSeconds)
-	assert.True(t, row.UsedByok)
-	assert.Contains(t, row.Models, "anthropic/claude-sonnet-4-6")
+	assert.Contains(t, row.ByokModels, "anthropic/claude-sonnet-4-6")
+	assert.Empty(t, row.Models)
 	assert.Contains(t, row.MachineTypes, "e1-large-amd64")
 	assert.Positive(t, row.CostCents)
 }

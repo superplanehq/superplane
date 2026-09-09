@@ -687,8 +687,8 @@ func Test__ListWorkOrderRunUsage__GroupsModelAndComputeForOneRun(t *testing.T) {
 	assert.Equal(t, r.UserModel.GetEmail(), rows[0].UserEmail)
 	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
 	assert.Equal(t, int64(90), rows[0].DurationSeconds)
-	assert.True(t, rows[0].UsedBYOK)
-	assert.Contains(t, rows[0].Models, "anthropic/claude-sonnet-4-6")
+	assert.Contains(t, rows[0].BYOKModels, "anthropic/claude-sonnet-4-6")
+	assert.Empty(t, rows[0].Models)
 	assert.Contains(t, rows[0].MachineTypes, "e1-large-amd64")
 	assert.Positive(t, rows[0].CostCents())
 	assert.Positive(t, rows[0].BYOKCostCents())
@@ -711,9 +711,36 @@ func Test__ListWorkOrderRunUsage__HostedModelDoesNotMarkYourKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, rows, 1)
-	assert.False(t, rows[0].UsedBYOK)
+	assert.Contains(t, rows[0].Models, "anthropic/claude-sonnet-4-6")
+	assert.Empty(t, rows[0].BYOKModels)
 	assert.Zero(t, rows[0].BYOKCostCents())
 	assert.Positive(t, rows[0].HostedCostCents())
+}
+
+func Test__ListWorkOrderRunUsage__SplitsMixedFundingModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	execution := dispatchNamedOrder(t, r, factory, line, "Mixed run")
+	runID := requireExecutionRunID(t, execution)
+
+	hosted := sonnetUsage(t, r, runID)
+	hosted.FundingSource = models.UsageFundingSourceHosted
+	require.NoError(t, models.RecordUsage(db, hosted))
+
+	byok := sonnetUsage(t, r, runID)
+	byok.Model = "claude-opus-4-1"
+	byok.FundingSource = models.UsageFundingSourceBYOK
+	require.NoError(t, models.RecordUsage(db, byok))
+
+	rows, _, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, rows[0].Models)
+	assert.Equal(t, []string{"anthropic/claude-opus-4-1"}, rows[0].BYOKModels)
 }
 
 func Test__ListWorkOrderRunUsage__OmitsOtherFactoriesAndRowsWithoutExecution(t *testing.T) {

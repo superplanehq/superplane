@@ -61,16 +61,31 @@ export function formatUsageTokensAndTime(tokens: number, durationSeconds: number
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
-export function formatUsageRunResources(
-  models: string[] | undefined,
-  machineTypes: string[] | undefined,
-  usedByok: boolean,
-): string {
-  const modelLabel = uniqueUsageLabels(models).join(" · ");
-  const machineLabel = uniqueUsageLabels(machineTypes).join(" · ");
-  const modelPart = modelLabel && usedByok ? `${modelLabel} (your keys)` : modelLabel;
-  const parts = [modelPart, machineLabel].filter(Boolean);
+export interface UsageRunResources {
+  /** Models the hosted credit paid for. */
+  models?: string[];
+  /** Models your own provider keys paid for. */
+  byokModels?: string[];
+  machineTypes?: string[];
+}
+
+export function formatUsageRunResources({ models, byokModels, machineTypes }: UsageRunResources): string {
+  const parts = [usageModelLabel(models, byokModels), uniqueUsageLabels(machineTypes).join(" · ")].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+/** Notes your keys only on the models your keys paid for, so a mixed run stays accurate. */
+function usageModelLabel(models: string[] | undefined, byokModels: string[] | undefined): string {
+  const hosted = uniqueUsageLabels(models);
+  const byok = uniqueUsageLabels(byokModels);
+  if (byok.length === 0) {
+    return hosted.join(" · ");
+  }
+  const byokLabel = `${byok.join(" · ")} (your keys)`;
+  if (hosted.length === 0) {
+    return byokLabel;
+  }
+  return `${hosted.join(" · ")} · ${byokLabel}`;
 }
 
 export function formatUsageOccurredAtUtc(value: string | undefined): string {

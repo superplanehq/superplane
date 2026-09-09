@@ -46,12 +46,12 @@ describe("matchFactoryPageFixture", () => {
 
     const history = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage-history`);
     await expect(history.json()).resolves.toMatchObject({
-      totalCount: 2,
+      totalCount: 3,
       rows: expect.arrayContaining([
         expect.objectContaining({
           workOrderKey: "RF-101",
-          usedByok: true,
-          models: ["anthropic/claude-sonnet-4-6"],
+          models: [],
+          byokModels: ["anthropic/claude-sonnet-4-6"],
         }),
       ]),
     });

@@ -33,7 +33,6 @@ export function OrganizationSettingsUsagePage() {
   const [period, setPeriod] = useState<SpendingPeriodPreset>("month");
   const [customRange, setCustomRange] = useState<SpendingDateRange | undefined>();
   const [customOpen, setCustomOpen] = useState(false);
-  const [offset, setOffset] = useState(0);
 
   const range = useMemo(() => {
     const now = quantizeSpendingNow(new Date());
@@ -42,6 +41,10 @@ export function OrganizationSettingsUsagePage() {
     }
     return rangeForPreset(period, now);
   }, [customRange, period]);
+
+  const [offset, setOffset] = useUsagePageOffset(
+    `${factoryId}|${range.start.toISOString()}|${range.end.toISOString()}`,
+  );
 
   const query = useFactoryWorkOrderRunUsage({
     organizationId,
@@ -75,14 +78,12 @@ export function OrganizationSettingsUsagePage() {
           onCustomRangeChange={(next) => {
             setCustomRange(next);
             setPeriod("custom");
-            setOffset(0);
           }}
           onPeriodChange={(next) => {
             setPeriod(next as SpendingPeriodPreset);
             if (next !== "custom") {
               setCustomOpen(false);
             }
-            setOffset(0);
           }}
         />
       }
@@ -104,6 +105,24 @@ export function OrganizationSettingsUsagePage() {
       </FactorySettingsCard>
     </FactorySettingsPageFrame>
   );
+}
+
+/**
+ * Owns the table's page offset.
+ *
+ * A workspace switch or a new period starts a new list, so the offset resets
+ * to the first page. This mirrors React's "adjust state during render" pattern
+ * rather than an effect, so the reset lands before the
+ * `useFactoryWorkOrderRunUsage` call that reads `offset` in the same render.
+ */
+function useUsagePageOffset(resetKey: string) {
+  const [offset, setOffset] = useState(0);
+  const [appliedResetKey, setAppliedResetKey] = useState(resetKey);
+  if (appliedResetKey !== resetKey) {
+    setAppliedResetKey(resetKey);
+    setOffset(0);
+  }
+  return [offset, setOffset] as const;
 }
 
 function UsageHistoryBody({
@@ -201,7 +220,11 @@ function UsageHistoryRow({
       </td>
       <td className="py-2 pr-3 whitespace-nowrap">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
       <td className="py-2 text-muted-foreground">
-        {formatUsageRunResources(row.models, row.machineTypes, Boolean(row.usedByok))}
+        {formatUsageRunResources({
+          models: row.models,
+          byokModels: row.byokModels,
+          machineTypes: row.machineTypes,
+        })}
       </td>
     </tr>
   );
