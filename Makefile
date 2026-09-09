@@ -231,6 +231,9 @@ check.format.js:
 check.tool.configs:
 	bash ./scripts/check_tool_config_guard.sh
 
+check.fast.security:
+	bash ./scripts/check_fast_security.sh
+
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 

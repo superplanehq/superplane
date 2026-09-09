@@ -1,6 +1,6 @@
-# Static scan of JS/TS tool configs. Do not add Node, npm, or ESLint here.
+# Fast static security. Do not add ESLint or npm install here.
 # Those tools load eslint.config.js and would run a dropper like PR 7318.
-name: Tool config guard
+name: Fast security
 
 on:
   pull_request:
@@ -11,12 +11,52 @@ permissions:
   contents: read
 
 jobs:
-  guard:
+  tool-configs:
     name: Scan tool configs without executing them
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Fail on PolinRider-style eslint/vite payloads
+      - name: Fail on PolinRider-style config payloads
         run: bash ./scripts/check_tool_config_guard.sh
+
+  ioc-and-hooks:
+    name: Scan IoC markers and install hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail on known dropper markers or new npm install hooks
+        run: |
+          bash ./scripts/check_ioc_markers.sh
+          bash ./scripts/check_install_hooks.sh
+
+  secrets:
+    name: Scan committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-audit-critical:
+    name: Fail on critical npm advisories
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web_src
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Audit the lockfile without installing packages
+        run: npm audit --omit=dev --audit-level=critical --package-lock-only
