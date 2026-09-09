@@ -27,6 +27,7 @@ function spendingReportQueryParams(query: OrganizationSpendingReportQuery) {
     model: filters.model || undefined,
     machineType: filters.machineType || undefined,
     taskOwnerId: filters.userId || undefined,
+    fundingSource: filters.fundingSource || undefined,
     groupBy,
     timeGrain: spendingTimeGrainForRange(range),
     usageKind,

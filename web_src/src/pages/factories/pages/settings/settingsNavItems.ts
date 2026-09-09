@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  CircleDollarSign,
   CircleUser,
   Cpu,
   Grid3x3,
@@ -11,7 +12,6 @@ import {
   Plug,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
@@ -22,9 +22,9 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "automations"
   | "models"
   | "spending"
+  | "billing"
   | "members"
   | "integrations"
   | "api-keys"
@@ -158,15 +158,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-automations",
-        label: "Automations",
-        Icon: Workflow,
-        scope: "workspace",
-        section: "automations",
-        permission: { resource: "factories", action: "update" },
-        keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
-      },
-      {
         id: "workspace-models",
         label: "Models",
         Icon: Cpu,
@@ -284,6 +275,24 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         keywords: ["create secret", "secret name", "key-value pairs", "credentials", "env"],
       },
       {
+        id: "organization-billing",
+        label: "Billing",
+        Icon: CircleDollarSign,
+        scope: "organization",
+        section: "billing",
+        permission: { resource: "org", action: "read" },
+        keywords: [
+          "billing",
+          "credit",
+          "hosted credit",
+          "invoices",
+          "remaining hosted credit",
+          "superplane grant",
+          "purchased hosted credit",
+          "buy more",
+        ],
+      },
+      {
         id: "organization-spending",
         label: "Spending",
         Icon: BarChart3,
@@ -291,16 +300,11 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "spending",
         permission: { resource: "org", action: "read" },
         keywords: [
-          "billing",
           "usage",
           "cost",
-          "credit",
           "tokens",
           "vm time",
           "estimated spend",
-          "remaining hosted credit",
-          "superplane grant",
-          "purchased hosted credit",
           "by model",
           "by machine type",
           "model usage",

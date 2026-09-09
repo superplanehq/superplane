@@ -7,7 +7,6 @@ import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
-  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsModelsPage,
   FactorySettingsRepositoryPage,
@@ -19,6 +18,7 @@ import {
 } from "@/pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
 import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
+import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsBillingPage";
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
@@ -31,6 +31,7 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
+  WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 
@@ -79,14 +80,11 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
+  // Automations moved to the factory nav Automations tab; this URL now forwards there.
   <Route
     key="factory-settings-workspace-automations"
     path="workspace/automations"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsAutomationsPage />
-      </RequirePermission>
-    }
+    element={<WorkspaceAutomationsSettingsRedirect />}
   />,
   <Route
     key="factory-settings-workspace-models"
@@ -193,6 +191,15 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="secrets" action="read">
         <FactoryOrganizationSecretDetailPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-billing"
+    path="organization/billing"
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsBillingPage />
       </RequirePermission>
     }
   />,

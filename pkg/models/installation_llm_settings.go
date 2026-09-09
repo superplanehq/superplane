@@ -12,6 +12,7 @@ const (
 	installationLLMSettingsID = 1
 
 	DefaultWelcomeGrantCents   int64 = 5000
+	DefaultWelcomeGrantTTL           = 14 * 24 * time.Hour
 	DefaultMarkupBPS                 = 2000
 	DefaultWarningThresholdBPS       = 2000
 	MarkupBaseBPS                    = 10000
@@ -147,4 +148,10 @@ func CentsToMicros(cents int64) int64 {
 		return 0
 	}
 	return cents * MicrosPerCent
+}
+
+// SignedMicrosToCents converts millionths of a dollar to whole cents and
+// keeps the sign. Refunds store negative amounts.
+func SignedMicrosToCents(micros int64) int64 {
+	return micros / MicrosPerCent
 }

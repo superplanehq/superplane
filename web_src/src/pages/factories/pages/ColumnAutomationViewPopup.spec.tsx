@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -12,11 +13,47 @@ import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
+const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
+  useInfiniteCanvasRuns: vi.fn(),
+}));
+
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),
 }));
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof CanvasDataModule>();
+  return {
+    ...actual,
+    useInfiniteCanvasRuns,
+  };
+});
+
+useInfiniteCanvasRuns.mockReturnValue({
+  data: {
+    pages: [
+      {
+        runs: [
+          {
+            id: "run-implement-1",
+            canvasId: "app-refund-implementer",
+            state: "STATE_STARTED",
+            createdAt: "2026-05-01T12:00:00Z",
+            rootEvent: { nodeId: "on-run", customName: "Add refund reconciliation test" },
+          },
+        ],
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  fetchNextPage: vi.fn(),
+  refetch: vi.fn(),
+});
 
 const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-implementer?configure=1&agent=1&from=lines&lineId=line-plan";
 
@@ -42,7 +79,12 @@ function implementGraph(): IntakeAutomationGraph {
     null,
     "live",
   );
-  return { nodes, edges, factoryId: "factory-1" };
+  return {
+    nodes,
+    edges,
+    factoryId: "factory-1",
+    specNodes: [{ id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "webhook" }],
+  };
 }
 
 function renderPopup(props: Partial<Parameters<typeof ColumnAutomationViewPopup>[0]> = {}) {
@@ -65,6 +107,10 @@ function renderPopup(props: Partial<Parameters<typeof ColumnAutomationViewPopup>
   );
 }
 
+afterEach(() => {
+  localStorage.clear();
+});
+
 describe("ColumnAutomationViewPopup", () => {
   it("shows the automation canvas in the board popup", () => {
     renderPopup();
@@ -75,8 +121,28 @@ describe("ColumnAutomationViewPopup", () => {
     expect(canvas).toHaveAccessibleName("Automation");
     expect(within(canvas).getAllByText("On run").length).toBeGreaterThan(0);
     expect(within(canvas).getAllByText("Implement From Task Description").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute("href", EDIT_HREF);
+    const edit = within(screen.getByTestId("settings-automation-header-row")).getByTestId(
+      "column-automation-view-edit",
+    );
+    expect(edit).toHaveAttribute("href", EDIT_HREF);
+    expect(edit.className).toContain("rounded-md");
+    expect(within(canvas).queryByTestId("column-automation-view-edit")).not.toBeInTheDocument();
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
+    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("lists canvas runs beside the automation when a canvas id is given", () => {
+    renderPopup({
+      canvasId: "app-refund-implementer",
+      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-refund-implementer?run=${runId}`,
+    });
+
+    const sidebar = within(screen.getByTestId("column-automation-view-canvas")).getByTestId("canvas-runs-sidebar");
+    expect(within(sidebar).getByText("Add refund reconciliation test")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "Add refund reconciliation test" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-refund-implementer?run=run-implement-1",
+    );
   });
 
   it("closes from the popup chrome", async () => {
@@ -110,12 +176,19 @@ describe("ColumnAutomationViewPopup", () => {
     expect(screen.getByTestId("column-automation-view-tab-agent")).toHaveAttribute("data-state", "active");
     expect(screen.getByTestId("column-automation-view-tab-automation")).toHaveTextContent("Automation");
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-settings")).toBeInTheDocument();
+    expect(screen.getByText("Concurrency")).toBeInTheDocument();
+    expect(screen.getByText("Model used")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-step-kind-0")).toHaveTextContent("Bash");
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     expect(screen.queryByTestId("planning-review-automation-note")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-edit")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("column-automation-view-tab-automation"));
     expect(screen.getByTestId("column-automation-view-canvas")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute("href", EDIT_HREF);
   });
 
   it("puts General first when a form and an agent exist", () => {

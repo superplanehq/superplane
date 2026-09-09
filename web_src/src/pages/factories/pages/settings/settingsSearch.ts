@@ -91,9 +91,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · Automations
-  entry("workspace", "automations", "Automations", undefined, ["new automation", "triggers", "lines", "canvas"]),
-
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
     "llm",
@@ -126,10 +123,22 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "select models",
   ]),
 
-  // Organization · API keys / Secrets / Spending
+  // Organization · API keys / Secrets / Billing / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
-  entry("organization", "spending", "Spending", undefined, ["billing", "usage", "credit", "hosted credit", "byok"]),
+  entry("organization", "billing", "Billing", undefined, [
+    "credit",
+    "hosted credit",
+    "invoices",
+    "remaining hosted credit",
+  ]),
+  entry("organization", "spending", "Spending", undefined, [
+    "usage",
+    "credit",
+    "hosted credit",
+    "your keys",
+    "superplane-hosted",
+  ]),
 ];
 
 function entry(

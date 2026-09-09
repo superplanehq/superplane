@@ -193,8 +193,10 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 }
 
 // RecordComputeUsage inserts one factory-linked runner-fleet row. Cost comes
-// from the compute price book (zero until rates are published). Hosted
-// markup and wallet debit do not apply. Org canvases are skipped.
+// from the compute price book (zero until rates are published) at the raw
+// provider rate; hosted markup does not apply. The stored cost_micros still
+// draws down org hosted credit and factory hosted budgets, same as model
+// usage. Org canvases are skipped.
 func RecordComputeUsage(tx *gorm.DB, in ComputeUsageEventInput) error {
 	machineType := strings.TrimSpace(in.MachineType)
 	if machineType == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
@@ -265,6 +267,15 @@ func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
 
+// ParseUsageFundingSource accepts hosted or byok. Empty input is an error.
+func ParseUsageFundingSource(source string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(source))
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+		return normalized, nil
+	}
+	return "", fmt.Errorf("unsupported usage funding source: %s", source)
+}
+
 func usageIdempotencyKey(key string) string {
 	if trimmed := strings.TrimSpace(key); trimmed != "" {
 		return trimmed
@@ -284,6 +295,7 @@ type UsageReportFilter struct {
 	Model          string
 	MachineType    string
 	TaskOwnerID    *uuid.UUID
+	FundingSource  string
 }
 
 // UsageTotals is a token, duration, and cost sum.
@@ -528,6 +540,13 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 	}
 	if filter.MachineType != "" {
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
+	}
+	if filter.FundingSource != "" {
+		if filter.FundingSource == UsageFundingSourceHosted {
+			query = query.Where("workspace_usage_events.funding_source = ?", UsageFundingSourceHosted)
+		} else {
+			query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ?", UsageFundingSourceHosted)
+		}
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)

@@ -1,6 +1,5 @@
-import { Link } from "@/components/Link/link";
+import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -10,10 +9,10 @@ import {
   columnAutomationViewTabs,
   type ColumnAutomationViewTab,
 } from "../lib/columnAutomations";
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
+import { SettingsAutomationHeaderRow, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { useIntakeAutomationCanvas, type IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
@@ -24,6 +23,8 @@ interface ColumnAutomationViewPopupProps {
   error?: boolean;
   onRetry?: () => void;
   editHref?: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
   onClose: () => void;
   general?: ReactNode;
   agent?: PlanningReviewAgentSlot;
@@ -38,6 +39,8 @@ export function ColumnAutomationViewPopup({
   error = false,
   onRetry,
   editHref,
+  canvasId,
+  runHrefFor,
   onClose,
   general,
   agent,
@@ -54,16 +57,21 @@ export function ColumnAutomationViewPopup({
   return (
     <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
       <PopupHeader title={title} onClose={onClose}>
-        <ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />
+        <SettingsAutomationHeaderRow
+          tabs={<ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />}
+          editHref={tab === "automation" ? editHref : undefined}
+          editLabel={COLUMN_AUTOMATIONS_COPY.editLabel}
+          editTestId="column-automation-view-edit"
+        />
       </PopupHeader>
       <ColumnAutomationViewBody
         tab={tab}
-        title={title}
         graph={graph}
         loading={loading}
         error={error}
         onRetry={onRetry}
-        editHref={editHref}
+        canvasId={canvasId}
+        runHrefFor={runHrefFor}
         general={general}
         agent={agent}
       />
@@ -84,7 +92,7 @@ function ColumnAutomationViewTabs({
     return null;
   }
   return (
-    <Tabs value={tab} onValueChange={(value) => onTabChange(value as ColumnAutomationViewTab)} className="mt-3">
+    <Tabs value={tab} onValueChange={(value) => onTabChange(value as ColumnAutomationViewTab)}>
       <TabsList aria-label={COLUMN_AUTOMATIONS_COPY.tabsLabel}>
         {tabs.includes("general") ? (
           <TabsTrigger value="general" data-testid="column-automation-view-tab-general">
@@ -109,22 +117,22 @@ function ColumnAutomationViewTabs({
 
 function ColumnAutomationViewBody({
   tab,
-  title,
   graph,
   loading,
   error,
   onRetry,
-  editHref,
+  canvasId,
+  runHrefFor,
   general,
   agent,
 }: {
   tab: ColumnAutomationViewTab;
-  title: string;
   graph?: IntakeAutomationGraph;
   loading: boolean;
   error: boolean;
   onRetry?: () => void;
-  editHref?: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
   general?: ReactNode;
   agent?: PlanningReviewAgentSlot;
 }) {
@@ -146,12 +154,12 @@ function ColumnAutomationViewBody({
   }
   return (
     <AutomationViewBody
-      title={title}
       graph={graph}
       loading={loading}
       error={error}
       onRetry={onRetry}
-      editHref={editHref}
+      canvasId={canvasId}
+      runHrefFor={runHrefFor}
     />
   );
 }
@@ -185,6 +193,8 @@ export function ColumnAutomationViewHost({
       error={automation.isError}
       onRetry={() => void automation.refetch()}
       editHref={factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })}
+      canvasId={canvasId}
+      runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
       general={general}
       agent={
@@ -203,19 +213,19 @@ export function ColumnAutomationViewHost({
 }
 
 function AutomationViewBody({
-  title,
   graph,
   loading,
   error,
   onRetry,
-  editHref,
+  canvasId,
+  runHrefFor,
 }: {
-  title: string;
   graph?: IntakeAutomationGraph;
   loading: boolean;
   error: boolean;
   onRetry?: () => void;
-  editHref?: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
 }) {
   if (!graph || graph.nodes.length === 0) {
     return (
@@ -230,33 +240,18 @@ function AutomationViewBody({
             {COLUMN_AUTOMATIONS_COPY.viewRetry}
           </Button>
         ) : null}
-        {editHref ? (
-          <Link href={editHref} className={buttonVariants({ size: "sm" })}>
-            {COLUMN_AUTOMATIONS_COPY.editLabel}
-          </Link>
-        ) : null}
       </section>
     );
   }
 
   return (
-    <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
-      aria-label="Automation"
-      data-testid="column-automation-view-canvas"
-    >
-      <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-3 pb-2">
-        <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">{title}</p>
-        {editHref ? (
-          <Link href={editHref} className={buttonVariants({ size: "sm" })} data-testid="column-automation-view-edit">
-            {COLUMN_AUTOMATIONS_COPY.editLabel}
-          </Link>
-        ) : null}
-      </div>
-      <div className="min-h-[18rem] flex-1">
-        <SettingsAutomationCanvas graph={graph} />
-      </div>
-    </section>
+    <SettingsAutomationWorkspace
+      graph={graph}
+      testId="column-automation-view-canvas"
+      canvasId={canvasId}
+      runHrefFor={runHrefFor}
+      workflowNodes={graph.specNodes}
+    />
   );
 }
 

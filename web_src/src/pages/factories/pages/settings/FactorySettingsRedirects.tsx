@@ -1,6 +1,7 @@
 import { useAccount } from "@/contexts/useAccount";
 import { useFactories } from "@/hooks/useFactoryData";
 import {
+  automationsPath,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
   type FactorySettingsScope,
@@ -18,7 +19,6 @@ const ORGANIZATION_GENERAL: FactorySettingsDestination = { scope: "organization"
 
 const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   general: { scope: "workspace", section: "general" },
-  automations: { scope: "workspace", section: "automations" },
   models: { scope: "workspace", section: "models" },
   usage: { scope: "organization", section: "spending" },
   spending: { scope: "organization", section: "spending" },
@@ -39,6 +39,7 @@ const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> =
   "api-keys": { scope: "organization", section: "api-keys" },
   integrations: { scope: "organization", section: "integrations" },
   spending: { scope: "organization", section: "spending" },
+  billing: { scope: "organization", section: "billing" },
   "llm-spend": { scope: "organization", section: "spending" },
   "workspace-usage": { scope: "organization", section: "spending" },
   secrets: { scope: "organization", section: "secrets" },
@@ -81,6 +82,14 @@ export function LegacyFactorySettingsRedirect() {
     return <Navigate to="/" replace />;
   }
 
+  // Automations moved out of settings entirely, so this legacy bookmark
+  // (`/settings/automations`) skips the settings destination map and opens
+  // the factory nav Automations tab instead.
+  const [section] = splitLegacyPath(rest);
+  if (section === "automations") {
+    return <Navigate to={`${automationsPath(organizationId, factoryKey)}${location.search}`} replace />;
+  }
+
   const destination = factorySettingsDestination(
     organizationId,
     factoryKey,
@@ -89,6 +98,18 @@ export function LegacyFactorySettingsRedirect() {
     WORKSPACE_GENERAL,
   );
   return <Navigate to={`${destination}${location.search}`} replace />;
+}
+
+/** Old `/settings/workspace/automations` URLs. Send the user to the factory nav Automations tab. */
+export function WorkspaceAutomationsSettingsRedirect() {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  const location = useLocation();
+
+  if (!organizationId || !factoryKey) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Navigate to={`${automationsPath(organizationId, factoryKey)}${location.search}`} replace />;
 }
 
 export function LegacyFactoryOrganizationSettingsRedirect() {

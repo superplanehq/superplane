@@ -13,9 +13,6 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/notifications")?.id).toBe(
       "account-notifications",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")?.id).toBe(
-      "workspace-automations",
-    );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
     );
@@ -30,6 +27,10 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/linked-accounts")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/security")).toBeUndefined();
   });
+
+  it("no longer resolves the removed workspace Automations settings page", () => {
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")).toBeUndefined();
+  });
 });
 
 describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
@@ -40,7 +41,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
-      "Automations",
       "Models",
       "General",
       "Members",
@@ -48,6 +48,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "LLM Models",
       "API keys",
       "Secrets",
+      "Billing",
       "Spending",
     ]);
   });
@@ -77,14 +78,13 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
-      "workspace-automations",
       "workspace-models",
     ]);
   });
 
   it("matches keyword aliases such as billing", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "billing");
-    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-spending"]);
+    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-billing"]);
   });
 
   it("drops groups that have no matching items", () => {
@@ -126,6 +126,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
       "organization-models",
+      "organization-billing",
       "organization-spending",
     ]);
   });

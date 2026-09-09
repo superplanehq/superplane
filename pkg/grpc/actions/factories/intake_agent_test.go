@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ResolveIntakeAgent(t *testing.T) {
@@ -103,27 +104,28 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, integrationName(t, organization.ID, claudeID), integrationRefName(t, agent))
 	})
 
+	t.Run("a SuperPlane harness ignores organization installations", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		createReadyOnboardingIntegration(t, organization.ID, "claude")
+		enableHostedSuperPlaneAgent(t, db)
+
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Empty(t, agent.Credentials)
+		assert.Empty(t, agent.Model)
+	})
+
 	t.Run("an organization without an installation runs on the SuperPlane agent", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
-		clearHostedLLMProviders(t, db)
-		_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
-			Provider:      models.UsageProviderAnthropic,
-			Enabled:       true,
-			APIKey:        []byte("test-hosted-key"),
-			AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
-		})
-		require.NoError(t, err)
-		provider := models.UsageProviderAnthropic
-		model := "claude-sonnet-4-6"
-		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-			MarkupBPS:             models.DefaultMarkupBPS,
-			WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
-			DefaultHostedProvider: &provider,
-			DefaultHostedModel:    &model,
-		})
-		require.NoError(t, err)
+		enableHostedSuperPlaneAgent(t, db)
 
 		agent := resolveIntakeAgent(db, factory)
 		require.NotNil(t, agent)
@@ -204,6 +206,29 @@ func Test__IntakeAgentModel(t *testing.T) {
 		agent := &intakeAgent{Component: "runnerBash"}
 		assert.Empty(t, agent.model())
 	})
+}
+
+func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	clearHostedLLMProviders(t, db)
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	provider := models.UsageProviderAnthropic
+	model := "claude-sonnet-4-6"
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: &provider,
+		DefaultHostedModel:    &model,
+	})
+	require.NoError(t, err)
 }
 
 func integrationName(t *testing.T, organizationID uuid.UUID, integrationID string) string {

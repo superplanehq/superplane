@@ -18,7 +18,6 @@ export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderD
 export { LegacyWorkOrderPermalinkRedirect, LegacyWorkOrdersRedirect } from "./LegacyWorkOrderRouteRedirects";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
-export { FactorySettingsAutomationsPage } from "./settings/FactorySettingsAutomationsPage";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";
 export { FactorySettingsAccountNotificationsPage } from "./settings/FactorySettingsAccountNotificationsPage";
 export { FactorySettingsAccountProfilePage } from "./settings/FactorySettingsAccountProfilePage";

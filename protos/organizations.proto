@@ -231,6 +231,17 @@ service Organizations {
     };
   }
 
+  rpc ListOrganizationCreditGrants(ListOrganizationCreditGrantsRequest) returns (ListOrganizationCreditGrantsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/credit-grants"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization credit grants";
+      description: "Returns hosted-credit grants for an organization, newest first";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -511,6 +522,7 @@ message DescribeOrganizationWorkspaceUsageResponse {
   repeated UsageByMachineType by_machine_type = 15;
   string default_hosted_provider = 16;
   string default_hosted_model = 17;
+  google.protobuf.Timestamp welcome_credit_expires_at = 18;
 }
 
 message DescribeOrganizationSpendingReportRequest {
@@ -524,6 +536,7 @@ message DescribeOrganizationSpendingReportRequest {
   string group_by = 8;
   string time_grain = 9;
   string usage_kind = 10;
+  string funding_source = 11;
 }
 
 message SpendingReportTotals {
@@ -576,6 +589,7 @@ message SpendingReportCreditSnapshot {
   bool remaining_credit_warning = 6;
   bool billing_enabled = 7;
   bool has_billing_customer = 8;
+  google.protobuf.Timestamp welcome_credit_expires_at = 9;
 }
 
 message DescribeOrganizationSpendingReportResponse {
@@ -689,6 +703,25 @@ message CreateBillingPortalSessionRequest {
 
 message CreateBillingPortalSessionResponse {
   string portal_url = 1;
+}
+
+message ListOrganizationCreditGrantsRequest {
+  string id = 1;
+}
+
+message OrganizationCreditGrant {
+  string id = 1;
+  string kind = 2;
+  int64 amount_cents = 3;
+  string note = 4;
+  string actor_name = 5;
+  string polar_order_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message ListOrganizationCreditGrantsResponse {
+  repeated OrganizationCreditGrant grants = 1;
 }
 
 message UsageByModel {

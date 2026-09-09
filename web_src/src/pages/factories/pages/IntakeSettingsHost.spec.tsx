@@ -15,20 +15,33 @@ import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
-const { useCanvas, useTriggers, useComponents, useAvailableIntegrations, useFactoryIntakeRuns, updateIntake } =
-  vi.hoisted(() => ({
-    useCanvas: vi.fn(),
-    useTriggers: vi.fn(),
-    useComponents: vi.fn(),
-    useAvailableIntegrations: vi.fn(),
-    useFactoryIntakeRuns: vi.fn(),
-    updateIntake: vi.fn(),
-  }));
+const {
+  useCanvas,
+  useTriggers,
+  useComponents,
+  useAvailableIntegrations,
+  updateIntake,
+  useInfiniteCanvasRuns,
+  useDescribeRun,
+  useEventExecutions,
+} = vi.hoisted(() => ({
+  useCanvas: vi.fn(),
+  useTriggers: vi.fn(),
+  useComponents: vi.fn(),
+  useAvailableIntegrations: vi.fn(),
+  updateIntake: vi.fn(),
+  useInfiniteCanvasRuns: vi.fn(),
+  useDescribeRun: vi.fn(),
+  useEventExecutions: vi.fn(),
+}));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
   ...(await importOriginal<typeof CanvasDataModule>()),
   useCanvas,
   useTriggers,
+  useInfiniteCanvasRuns,
+  useDescribeRun,
+  useEventExecutions,
 }));
 
 vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
@@ -43,7 +56,6 @@ vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
 
 vi.mock("@/hooks/useFactoryIntakeData", async (importOriginal) => ({
   ...(await importOriginal<typeof FactoryIntakeDataModule>()),
-  useFactoryIntakeRuns,
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
 }));
 
@@ -80,7 +92,6 @@ function renderHost(
   props: {
     intake?: ConfiguredLineIntakeSource;
     initialTab?: IntakeSettingsTab;
-    onOpenRun?: (run: { id: string }) => void;
     onClose?: () => void;
   } = {},
 ) {
@@ -96,7 +107,6 @@ function renderHost(
               lineId="line-plan"
               intake={props.intake ?? GITHUB_INTAKE}
               initialTab={props.initialTab}
-              onOpenRun={props.onOpenRun ?? vi.fn()}
               onClose={props.onClose ?? vi.fn()}
             />
           </TooltipProvider>
@@ -104,10 +114,6 @@ function renderHost(
       </MemoryRouter>
     </QueryClientProvider>,
   );
-}
-
-function intakeRuns(runs: unknown[]) {
-  useFactoryIntakeRuns.mockReturnValue({ data: runs, isLoading: false, isError: false, refetch: vi.fn() });
 }
 
 describe("IntakeSettingsHost", () => {
@@ -127,8 +133,46 @@ describe("IntakeSettingsHost", () => {
       isLoading: false,
     });
     useAvailableIntegrations.mockReturnValue({ data: [], isLoading: false });
-    intakeRuns([]);
+    useDescribeRun.mockReturnValue({ data: undefined, isLoading: false, isFetched: true });
+    useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
     updateIntake.mockResolvedValue({ id: "intake-github" });
+    localStorage.clear();
+    useInfiniteCanvasRuns.mockReturnValue({
+      data: {
+        pages: [
+          {
+            runs: [
+              {
+                id: "run-intake-1",
+                canvasId: "app-github-issues-intake",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                createdAt: "2026-05-01T12:00:00Z",
+                rootEvent: {
+                  id: "event-intake-1",
+                  nodeId: "github-issues-trigger",
+                  customName: "On mention on Issue",
+                },
+                executions: [
+                  {
+                    id: "exec-filter-1",
+                    nodeId: "github-issues-filter",
+                    state: "STATE_FINISHED",
+                    result: "RESULT_PASSED",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
   });
 
   it("opens the settings of the intake it is given", () => {
@@ -142,7 +186,8 @@ describe("IntakeSettingsHost", () => {
       within(dialog)
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["General", "Runs", "Automation"]);
+    ).toEqual(["General", "Automation"]);
+    expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -155,10 +200,37 @@ describe("IntakeSettingsHost", () => {
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
-    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+    const edit = within(screen.getByTestId("intake-source-settings")).getByRole("link", { name: "Edit automation" });
+    expect(edit).toHaveAttribute(
       "href",
       "/org-1/workspaces/rf/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
     );
+    expect(edit.className).toContain("rounded-md");
+    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-github-issues-intake", {}, true);
+    const sidebar = within(automation).getByTestId("canvas-runs-sidebar");
+    expect(within(sidebar).getByText("On mention on Issue")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "On mention on Issue" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-intake-1&from=lines&lineId=line-plan",
+    );
+  });
+
+  it("loads the selected run on the automation canvas", async () => {
+    const user = userEvent.setup();
+    renderHost({ initialTab: "automation" });
+
+    const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
+    expect(automation).not.toHaveAttribute("data-selected-run-id");
+    expect(automation.querySelector(".sp-canvas-live")).toBeNull();
+
+    await user.click(within(automation).getByRole("link", { name: "On mention on Issue" }));
+
+    expect(automation).toHaveAttribute("data-selected-run-id", "run-intake-1");
+    expect(automation.querySelector(".sp-canvas-live")).not.toBeNull();
+    expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
+    expect(within(automation).getByTestId("rf__node-github-issues-filter")).toBeInTheDocument();
+    expect(within(automation).getByTestId("rf__node-github-issues-create")).toBeInTheDocument();
   });
 
   it("reports an intake without an automation instead of drawing one", async () => {
@@ -171,37 +243,6 @@ describe("IntakeSettingsHost", () => {
     const automation = screen.getByTestId("intake-source-automation");
     expect(automation).toHaveTextContent("This intake has no automation yet.");
     expect(within(automation).queryByTestId("rf__node-github-issues-trigger")).not.toBeInTheDocument();
-  });
-
-  it("shows the placement and score the server reported for each run", async () => {
-    intakeRuns([
-      {
-        id: "run-1",
-        title: "Handle duplicate refunds on retry",
-        confidencePct: 94,
-        placement: "PLACEMENT_PROGRESSED",
-        stage: "implement",
-      },
-    ]);
-    const onOpenRun = vi.fn();
-    const user = userEvent.setup();
-    renderHost({ initialTab: "runs", onOpenRun });
-
-    const settings = screen.getByTestId("intake-source-settings");
-    const run = within(settings).getByTestId("intake-source-run-run-1");
-    expect(run).toHaveTextContent("94%");
-    expect(run).toHaveTextContent("Implement");
-
-    await user.click(screen.getByRole("button", { name: "View run for Handle duplicate refunds on retry" }));
-
-    expect(onOpenRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "run-1",
-        appId: "app-github-issues-intake",
-        runId: "run-1",
-        title: "Handle duplicate refunds on retry",
-      }),
-    );
   });
 
   it("saves the name and filters through the intake API", async () => {
