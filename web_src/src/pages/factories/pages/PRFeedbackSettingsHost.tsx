@@ -9,7 +9,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
@@ -215,6 +215,12 @@ function PRFeedbackSettingsLoaded({
           : undefined
       }
       editAutomationHref={editAutomationHref}
+      canvasId={canvasId}
+      runHrefFor={
+        canvasId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
+          : undefined
+      }
       agent={
         agent.agentNode
           ? {

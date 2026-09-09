@@ -93,7 +93,7 @@ function minutesBefore(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-/** Two tickets still in analysis, plus scored runs for the Runs tab. */
+/** Two tickets still in analysis, plus scored intake runs for API fixtures. */
 export const GITHUB_ISSUES_INTAKE_RUNS: FactoriesFactoryIntakeRun[] = [
   {
     id: "intake-run-analyzing-1",
