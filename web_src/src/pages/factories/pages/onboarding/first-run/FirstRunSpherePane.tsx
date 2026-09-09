@@ -21,8 +21,8 @@ export type FirstRunSphereProps = {
 };
 
 // The bright amber reads well on the dark pane but washes out on light
-// surfaces, so the light pane uses a copper accent instead.
-const AMBER_TEXT = "text-[#8f4c10] dark:text-[#f6a821]";
+// surfaces, so the light pane uses a violet accent instead.
+const ACCENT_TEXT = "text-[#4c2a94] dark:text-[#f6a821]";
 
 /** Concentric rings brighten the sphere as the level rises. */
 function dotAlpha(level: number, edge: number, random: number) {
@@ -57,10 +57,10 @@ function drawSphere(canvas: HTMLCanvasElement, level: number, tick: number) {
       const gapChance = 0.52 - 0.38 * level + edge * (0.5 - 0.22 * level) + (dy > 0 ? (dy / radius) * 0.25 : 0);
       if (random < gapChance) continue;
       const alpha = dotAlpha(level, edge, random);
-      // Copper dots with an alpha floor: low levels stay visible on paper.
+      // Violet dots with an alpha floor: low levels stay visible on paper.
       context.fillStyle = dark
         ? `rgba(246, 168, 33, ${alpha.toFixed(3)})`
-        : `rgba(146, 74, 17, ${Math.min(1, alpha * 1.2 + 0.1).toFixed(3)})`;
+        : `rgba(91, 51, 173, ${Math.min(1, alpha * 1.2 + 0.1).toFixed(3)})`;
       const dot = cell - 2.4;
       context.fillRect(x - dot / 2, y - dot / 2, dot, dot);
     }
@@ -75,12 +75,12 @@ function SphereChip({ chip, side }: { chip: FirstRunSphereChip; side: "left" | "
         side === "left" ? "left-4 top-[24%]" : "right-4 top-[60%]",
         chip.tone === "ghost" && "border-dashed opacity-40",
         chip.tone === "amber"
-          ? cn("border-[#8f4c10]/50 dark:border-[#f6a821]/70", AMBER_TEXT)
+          ? cn("border-[#5b33ad]/50 dark:border-[#f6a821]/70", ACCENT_TEXT)
           : "border-border text-muted-foreground",
       )}
     >
       {chip.label}
-      <span className={cn("mt-0.5 block text-[12px]", chip.tone === "amber" ? AMBER_TEXT : "text-foreground")}>
+      <span className={cn("mt-0.5 block text-[12px]", chip.tone === "amber" ? ACCENT_TEXT : "text-foreground")}>
         {chip.value}
       </span>
     </div>
@@ -121,7 +121,7 @@ export function FirstRunSpherePane({
     <div
       className={cn(
         "relative hidden overflow-hidden border-l border-border lg:flex lg:w-[44%]",
-        "bg-[radial-gradient(ellipse_at_50%_45%,#faf6ec_0%,#f2ede1_70%)]",
+        "bg-[radial-gradient(ellipse_at_50%_45%,#faf9fd_0%,#f1eff7_70%)]",
         "dark:bg-[radial-gradient(ellipse_at_50%_45%,#14100a_0%,#0d0c08_70%)]",
       )}
     >
@@ -129,7 +129,7 @@ export function FirstRunSpherePane({
         {[340, 440, 540].map((diameter) => (
           <span
             key={diameter}
-            className="absolute rounded-full border border-[#8f4c10]/20 dark:border-[#f6a821]/10"
+            className="absolute rounded-full border border-[#5b33ad]/15 dark:border-[#f6a821]/10"
             style={{ width: diameter, height: diameter, top: "47%", left: "50%", transform: "translate(-50%, -50%)" }}
           />
         ))}
@@ -143,15 +143,15 @@ export function FirstRunSpherePane({
             key={phase}
             className={cn(
               "flex flex-col items-center gap-1.5 whitespace-nowrap",
-              phasesLit ? AMBER_TEXT : "text-[#b3ab9c] dark:text-[#4d4a42]",
+              phasesLit ? ACCENT_TEXT : "text-[#a9a5b3] dark:text-[#4d4a42]",
             )}
           >
             <i
               className={cn(
                 "size-1.5 rounded-full",
                 phasesLit
-                  ? "bg-[#8f4c10] shadow-[0_0_8px_rgba(143,76,16,0.45)] dark:bg-[#f6a821] dark:shadow-[0_0_8px_rgba(246,168,33,0.7)]"
-                  : "bg-[#ddd6c6] dark:bg-[#3a382f]",
+                  ? "bg-[#5b33ad] shadow-[0_0_8px_rgba(91,51,173,0.45)] dark:bg-[#f6a821] dark:shadow-[0_0_8px_rgba(246,168,33,0.7)]"
+                  : "bg-[#dcd8e6] dark:bg-[#3a382f]",
               )}
             />
             {phase}
@@ -159,7 +159,7 @@ export function FirstRunSpherePane({
         ))}
       </div>
       <p className="absolute bottom-4 right-5 z-10 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-        {captionHighlight ? <span className={AMBER_TEXT}>{captionHighlight} </span> : null}
+        {captionHighlight ? <span className={ACCENT_TEXT}>{captionHighlight} </span> : null}
         {caption}
       </p>
     </div>
