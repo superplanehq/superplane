@@ -900,7 +900,11 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent"));
 
     expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-settings")).toBeInTheDocument();
+    expect(screen.getByText("Concurrency")).toBeInTheDocument();
+    expect(screen.getByText("Model used")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-step-kind-0")).toHaveTextContent("Bash");
     expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
     expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");
     await user.click(screen.getByTestId("planning-review-step-toggle-0"));
