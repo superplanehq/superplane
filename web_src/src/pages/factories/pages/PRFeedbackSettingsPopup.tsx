@@ -1,3 +1,4 @@
+import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import {
   PRFeedbackTextField,
 } from "./PRFeedbackSettingsFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { SettingsAutomationHeaderRow } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -34,6 +36,8 @@ interface PRFeedbackSettingsPopupProps {
   deletePending?: boolean;
   saveError?: string;
   editAutomationHref?: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
@@ -54,6 +58,8 @@ export function PRFeedbackSettingsPopup({
   deletePending = false,
   saveError,
   editAutomationHref,
+  canvasId,
+  runHrefFor,
   agent,
   onClose,
   fixed = true,
@@ -83,30 +89,36 @@ export function PRFeedbackSettingsPopup({
   return (
     <PopupShell testId="pr-feedback-settings" canvas fixed={fixed} onDismiss={onClose}>
       <PopupHeader title={settings.name} onClose={onClose}>
-        <Tabs value={tab} onValueChange={(value) => setTab(value as PRFeedbackSettingsTab)} className="mt-3">
-          <TabsList aria-label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}>
-            <TabsTrigger value="general" data-testid="pr-feedback-settings-tab-general">
-              <Settings />
-              {PR_FEEDBACK_SETTINGS_COPY.generalTab}
-            </TabsTrigger>
-            {tabs.includes("agent") ? (
-              <TabsTrigger value="agent" data-testid="pr-feedback-settings-tab-agent">
-                <Bot />
-                {PR_FEEDBACK_SETTINGS_COPY.agentTab}
-              </TabsTrigger>
-            ) : null}
-            <TabsTrigger value="automation" data-testid="pr-feedback-settings-tab-automation">
-              <Workflow />
-              {PR_FEEDBACK_SETTINGS_COPY.automationTab}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <SettingsAutomationHeaderRow
+          tabs={
+            <Tabs value={tab} onValueChange={(value) => setTab(value as PRFeedbackSettingsTab)}>
+              <TabsList aria-label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}>
+                <TabsTrigger value="general" data-testid="pr-feedback-settings-tab-general">
+                  <Settings />
+                  {PR_FEEDBACK_SETTINGS_COPY.generalTab}
+                </TabsTrigger>
+                {tabs.includes("agent") ? (
+                  <TabsTrigger value="agent" data-testid="pr-feedback-settings-tab-agent">
+                    <Bot />
+                    {PR_FEEDBACK_SETTINGS_COPY.agentTab}
+                  </TabsTrigger>
+                ) : null}
+                <TabsTrigger value="automation" data-testid="pr-feedback-settings-tab-automation">
+                  <Workflow />
+                  {PR_FEEDBACK_SETTINGS_COPY.automationTab}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          }
+          editHref={tab === "automation" ? editAutomationHref : undefined}
+          editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
+        />
       </PopupHeader>
       {tab === "automation" ? (
         <PRFeedbackAutomationTab
           graph={automationGraph}
-          title={settings.name}
-          editHref={editAutomationHref}
+          canvasId={canvasId}
+          runHrefFor={runHrefFor}
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}

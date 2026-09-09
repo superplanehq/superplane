@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -14,11 +15,48 @@ import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 
+const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
+  useInfiniteCanvasRuns: vi.fn(),
+}));
+
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),
 }));
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof CanvasDataModule>();
+  return {
+    ...actual,
+    useInfiniteCanvasRuns,
+  };
+});
+
+useInfiniteCanvasRuns.mockReturnValue({
+  data: {
+    pages: [
+      {
+        runs: [
+          {
+            id: "run-1",
+            canvasId: "app-github-issues-intake",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-05-01T12:00:00Z",
+            rootEvent: { nodeId: "trigger", customName: "feat: Add console empty-state" },
+          },
+        ],
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  fetchNextPage: vi.fn(),
+  refetch: vi.fn(),
+});
 
 const githubAutomationGraph = githubIntakeGraph();
 
@@ -59,7 +97,12 @@ function githubIntakeGraph(): IntakeAutomationGraph {
     "live",
   );
 
-  return { nodes, edges, factoryId: "factory-1" };
+  return {
+    nodes,
+    edges,
+    factoryId: "factory-1",
+    specNodes: [{ id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" }],
+  };
 }
 
 function renderPopup(
@@ -67,6 +110,8 @@ function renderPopup(
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
     editAutomationHref?: string;
+    canvasId?: string;
+    runHrefFor?: (runId: string) => string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
   } = {},
@@ -81,6 +126,8 @@ function renderPopup(
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
               editAutomationHref={props.editAutomationHref}
+              canvasId={props.canvasId}
+              runHrefFor={props.runHrefFor}
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
@@ -92,6 +139,10 @@ function renderPopup(
     </QueryClientProvider>,
   );
 }
+
+afterEach(() => {
+  localStorage.clear();
+});
 
 describe("IntakeSourceSettingsPopup", () => {
   it("shows the GitHub issues configuration fields", () => {
@@ -113,6 +164,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
   it("shows the intake automation on the Automation tab", async () => {
@@ -127,15 +179,38 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getAllByText("Create Task").length).toBeGreaterThan(0);
-    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1",
-    );
+    const headerRow = screen.getByTestId("settings-automation-header-row");
+    const edit = within(headerRow).getByRole("link", { name: "Edit automation" });
+    expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
+    expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1");
+    expect(edit.className).toContain("rounded-md");
+    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(edit.compareDocumentPosition(automation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("lists canvas runs beside the automation when a canvas id is given", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      canvasId: "app-github-issues-intake",
+      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-github-issues-intake?run=${runId}`,
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
+
+    const sidebar = within(screen.getByTestId("intake-source-automation")).getByTestId("canvas-runs-sidebar");
+    expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
+    expect(within(sidebar).getByText("feat: Add console empty-state")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "feat: Add console empty-state" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-1",
+    );
   });
 
   it("puts Agent after General when the intake canvas has an agent", async () => {

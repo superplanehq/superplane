@@ -2,7 +2,7 @@ import { useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useCallback } from "react";
 
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { intakeSettingsToApi, type IntakeSettingsTab, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
@@ -64,6 +64,12 @@ export function IntakeSettingsHost({
           : undefined
       }
       editAutomationHref={editAutomationHref}
+      canvasId={intake.appId}
+      runHrefFor={
+        intake.appId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, intake.appId, runId, { from: "lines", lineId })
+          : undefined
+      }
       agent={
         agent.agentNode
           ? {
