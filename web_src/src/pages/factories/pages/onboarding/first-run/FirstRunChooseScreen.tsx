@@ -6,6 +6,7 @@ import { useState } from "react";
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 export function FirstRunChooseScreen({
@@ -14,6 +15,7 @@ export function FirstRunChooseScreen({
   loading,
   saving = false,
   chrome,
+  sphere,
   onSelectRepository,
   onEditConnection,
   onContinue,
@@ -24,6 +26,7 @@ export function FirstRunChooseScreen({
   loading?: boolean;
   saving?: boolean;
   chrome?: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
   onContinue: () => void;
@@ -33,7 +36,7 @@ export function FirstRunChooseScreen({
   const busy = Boolean(loading || saving);
 
   return (
-    <FirstRunShell testId="first-run-choose" chrome={chrome} busy={busy}>
+    <FirstRunShell testId="first-run-choose" chrome={chrome} busy={busy} sphere={sphere}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
       </FirstRunHeading>

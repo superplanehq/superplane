@@ -39,7 +39,7 @@ import {
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
-import { useFinishOnboarding } from "./useFinishOnboarding";
+import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -403,6 +403,7 @@ export function useOnboardingPageModel(args: {
   });
 
   const [saving, setSaving] = useState(false);
+  const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const updateOrganization = useUpdateOrganization(args.organizationId);
@@ -468,6 +469,7 @@ export function useOnboardingPageModel(args: {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
     },
+    onProvisioned: setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
@@ -523,5 +525,8 @@ export function useOnboardingPageModel(args: {
     saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
     ...saves,
     finish: finishSetup,
+    // Fresh organization + first workspace: the redesigned split-pane look.
+    initialOnboarding: args.factory?.onboarding?.initial === true,
+    provisionedDestination,
   };
 }

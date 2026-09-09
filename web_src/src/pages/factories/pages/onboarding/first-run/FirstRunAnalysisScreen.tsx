@@ -1,76 +1,73 @@
-import { LoadingButton } from "@/components/ui/loading-button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 
-import { FIRST_RUN_COPY, FIRST_RUN_STAGES } from "./firstRunCopy";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
-import type { FirstRunAnalysisStatus, FirstRunChrome } from "./firstRunTypes";
+import { FIRST_RUN_COPY } from "./firstRunCopy";
+import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
+import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
+import type { FirstRunChrome } from "./firstRunTypes";
+
+function stageLabels(progress: FirstRunAnalysisProgress): [string, string, string] {
+  const copy = FIRST_RUN_COPY.analysis;
+  return [
+    progress.total > 0 ? copy.stageImported(progress.total) : copy.stageImporting,
+    copy.stageScoring(progress.scored, progress.total),
+    copy.stageBoard,
+  ];
+}
 
 export function FirstRunAnalysisScreen({
-  status,
-  currentStageIndex,
+  progress,
+  failed = false,
   chrome,
-  retrying = false,
-  onRetry,
+  sphere,
+  onGoToBoard,
 }: {
-  status: FirstRunAnalysisStatus;
-  /** 0–2 while running. Stages at or below this index are active or done. */
-  currentStageIndex: number;
+  progress: FirstRunAnalysisProgress;
+  failed?: boolean;
   chrome?: FirstRunChrome;
-  retrying?: boolean;
-  onRetry: () => void;
+  sphere?: FirstRunSphereProps;
+  onGoToBoard: () => void;
 }) {
   const copy = FIRST_RUN_COPY.analysis;
+  const stages = stageLabels(progress);
 
   return (
-    <FirstRunShell testId="first-run-analysis" chrome={chrome} busy={retrying || status !== "failed"}>
+    <FirstRunShell testId="first-run-analysis" chrome={chrome} sphere={sphere}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.body}</p>
-        <p className="text-[13px] text-muted-foreground">{copy.reassurance}</p>
       </FirstRunHeading>
 
-      {status === "failed" ? (
-        <div className="mt-8 space-y-4">
-          <p className="text-[13px] text-destructive">{copy.failure}</p>
-          <LoadingButton
-            type="button"
-            onClick={onRetry}
-            loading={retrying}
-            loadingText={copy.retrying}
-            data-testid="first-run-run-again"
-          >
-            {copy.retry}
-          </LoadingButton>
-        </div>
-      ) : (
-        <FirstRunPanel>
-          <ol className="space-y-3">
-            {FIRST_RUN_STAGES.map((stage, index) => {
-              const done = index < currentStageIndex;
-              const current = index === currentStageIndex;
-              return (
-                <li key={stage} className="flex items-center gap-3 text-[13px]">
-                  {done ? (
-                    <Check className="size-3.5 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
-                  ) : (
-                    <Loader2
-                      className={cn(
-                        "size-3.5 shrink-0",
-                        current ? "animate-spin text-foreground" : "text-muted-foreground",
-                      )}
-                      aria-hidden
-                    />
+      <ol className="mt-8 space-y-3">
+        {stages.map((stage, index) => {
+          const done = index < progress.stageIndex;
+          const current = index === progress.stageIndex;
+          return (
+            <li key={stage} className="flex items-center gap-3 text-[13px]">
+              {done ? (
+                <Check className="size-3.5 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+              ) : (
+                <Loader2
+                  className={cn(
+                    "size-3.5 shrink-0",
+                    current ? "animate-spin text-foreground" : "text-muted-foreground",
                   )}
-                  <span className={current || done ? "text-foreground" : "text-muted-foreground"}>{stage}</span>
-                </li>
-              );
-            })}
-          </ol>
-        </FirstRunPanel>
-      )}
+                  aria-hidden
+                />
+              )}
+              <span className={current || done ? "text-foreground" : "text-muted-foreground"}>{stage}</span>
+            </li>
+          );
+        })}
+      </ol>
 
-      {status === "overrun" ? <p className="mt-6 text-[13px] text-muted-foreground">{copy.overrun}</p> : null}
-      {status !== "failed" ? <p className="mt-6 text-[12px] text-muted-foreground">{copy.leaveHint}</p> : null}
+      {failed ? <p className="mt-4 text-[13px] text-muted-foreground">{copy.failure}</p> : null}
+
+      <Button type="button" className="mt-8 min-w-44" onClick={onGoToBoard} data-testid="first-run-go-to-board">
+        {copy.goToBoard}
+      </Button>
+      <p className="mt-3 text-[12px] text-muted-foreground">{copy.note}</p>
     </FirstRunShell>
   );
 }

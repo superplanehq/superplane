@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -95,6 +96,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    initialOnboarding: false,
+    provisionedDestination: null,
     ...overrides,
   };
 }
@@ -191,5 +194,25 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-organization-switch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-workspace-switch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
+  });
+
+  it("shows the factory sphere on welcome when this is the initial organization", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <FirstRunSetup model={pageModel({ initialOnboarding: true, openSection: "vcs" })} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+  });
+
+  it("keeps the centered welcome look when this is not the initial organization", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <FirstRunSetup model={pageModel({ initialOnboarding: false, openSection: "vcs" })} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText(FIRST_RUN_COPY.sphere.captionSetup)).not.toBeInTheDocument();
   });
 });

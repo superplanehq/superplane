@@ -72,6 +72,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    initialOnboarding: false,
+    provisionedDestination: null,
     ...overrides,
   };
 }

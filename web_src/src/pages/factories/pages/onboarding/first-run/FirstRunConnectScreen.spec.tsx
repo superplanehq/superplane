@@ -13,8 +13,8 @@ describe("FirstRunConnectScreen", () => {
     render(<FirstRunConnectScreen onConnectGitHub={onConnectGitHub} />);
 
     expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub);
-    expect(screen.getByText(FIRST_RUN_COPY.connect.trust)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.trust)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.headline })).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.body)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
 

@@ -1,16 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
-import type { FirstRunAnalysisStatus, FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
+import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
+import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 
 const STAGE_MS = 900;
-const COMPLETE_AFTER_MS = STAGE_MS * 3;
 
 /**
  * Clickable Storybook journey for the first-run PRD. Local state only.
@@ -20,23 +22,19 @@ export function FirstRunFlow({
   firstName,
   email = FIRST_RUN_STORY_EMAIL,
   initialScreen = "welcome",
-  analysisStatus = "running",
-  completeAfterMs = COMPLETE_AFTER_MS,
   board,
   onLogOut,
 }: {
   firstName?: string;
   email?: string;
   initialScreen?: FirstRunScreenId;
-  analysisStatus?: FirstRunAnalysisStatus;
-  completeAfterMs?: number;
   board?: ReactNode;
   onLogOut?: () => void;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
-  const [stageIndex, setStageIndex] = useState(0);
+  const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, stageIndex: 1 });
 
   const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
@@ -47,19 +45,29 @@ export function FirstRunFlow({
   });
 
   useEffect(() => {
-    if (screen !== "analysis" || analysisStatus === "failed") return;
-
+    if (screen !== "analysis") return;
     const stageTimer = window.setInterval(() => {
-      setStageIndex((current) => Math.min(current + 1, 2));
+      setProgress((current) => {
+        const scored = Math.min(current.scored + 1, current.total);
+        return { total: current.total, scored, stageIndex: scored === current.total ? 2 : 1 };
+      });
     }, STAGE_MS);
-    const doneTimer =
-      analysisStatus === "running" ? window.setTimeout(() => setScreen("board"), completeAfterMs) : undefined;
+    return () => window.clearInterval(stageTimer);
+  }, [screen]);
 
-    return () => {
-      window.clearInterval(stageTimer);
-      if (doneTimer) window.clearTimeout(doneTimer);
-    };
-  }, [analysisStatus, completeAfterMs, screen]);
+  const analysisSphere: FirstRunSphereProps = {
+    level: 1,
+    animate: true,
+    phasesLit: true,
+    caption: selectedRepository ?? "",
+    captionHighlight: "Scoring:",
+    leftChip: {
+      label: FIRST_RUN_COPY.sphere.discover,
+      value: FIRST_RUN_COPY.sphere.ticketsFound(progress.total),
+      tone: "amber",
+    },
+    rightChip: { label: FIRST_RUN_COPY.sphere.verify, value: FIRST_RUN_COPY.sphere.reviewReadyPr, tone: "amber" },
+  };
 
   if (screen === "welcome") {
     return (
@@ -94,7 +102,7 @@ export function FirstRunFlow({
         onSelectTicketSource={setTicketSource}
         onAnalyzeTickets={() => {
           if (!ticketSource) return;
-          setStageIndex(0);
+          setProgress({ total: 12, scored: 0, stageIndex: 1 });
           setScreen("analysis");
         }}
       />
@@ -104,13 +112,10 @@ export function FirstRunFlow({
   if (screen === "analysis") {
     return (
       <FirstRunAnalysisScreen
-        status={analysisStatus}
-        currentStageIndex={stageIndex}
+        progress={progress}
         chrome={chromeFor(4)}
-        onRetry={() => {
-          setStageIndex(0);
-          setScreen("analysis");
-        }}
+        sphere={analysisSphere}
+        onGoToBoard={() => setScreen("board")}
       />
     );
   }

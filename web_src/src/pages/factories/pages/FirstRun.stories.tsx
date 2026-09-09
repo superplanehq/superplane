@@ -73,26 +73,14 @@ export const Analysis: Story = {
   render: () => <FirstRunFlow firstName="Ada" initialScreen="analysis" />,
 };
 
-export const AnalysisOverrun: Story = {
-  name: "5b Analysis (overrun)",
-  render: () => (
-    <FirstRunAnalysisScreen
-      status="overrun"
-      currentStageIndex={2}
-      chrome={firstRunStoryChrome(4)}
-      onRetry={() => undefined}
-    />
-  ),
-};
-
 export const AnalysisFailed: Story = {
-  name: "5c Analysis (failed)",
+  name: "5b Analysis (failed)",
   render: () => (
     <FirstRunAnalysisScreen
-      status="failed"
-      currentStageIndex={0}
+      progress={{ total: 0, scored: 0, stageIndex: 0 }}
+      failed
       chrome={firstRunStoryChrome(4)}
-      onRetry={() => undefined}
+      onGoToBoard={() => undefined}
     />
   ),
 };
