@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -321,5 +322,18 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, "image/png", file.GetContentType())
 		assert.NotEmpty(t, file.GetDownloadUrl())
 		assert.Contains(t, response.GetOrder().GetDescription(), blob.FileRefScheme+"://"+file.GetId())
+
+		// Prove the image bytes were actually persisted to storage, not just
+		// that a download URL was minted from the file ID and signing key.
+		fileID, err := uuid.Parse(file.GetId())
+		require.NoError(t, err)
+		record, err := models.FindFile(database.DB(t.Context()), fileID)
+		require.NoError(t, err)
+		reader, err := store.Get(ctx, record.StorageKey)
+		require.NoError(t, err)
+		defer reader.Close()
+		stored, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, fetcher.body, stored)
 	})
 }
