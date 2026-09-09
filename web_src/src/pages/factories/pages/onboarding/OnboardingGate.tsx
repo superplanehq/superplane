@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryOverviewPath, factorySetupPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
+import { holdSetupAfterThisVisitCompletes } from "./onboardingGateState";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -17,10 +18,6 @@ function isWorkspaceSetupRoute(pathname: string) {
  * here. A later visit to setup still uses this path.
  */
 
-/** Keep setup mounted after this visit marks complete, so analysis can render. */
-export function holdSetupAfterThisVisitCompletes(startedIncomplete: boolean, isSetupRoute: boolean) {
-  return startedIncomplete && isSetupRoute;
-}
 function pathAfterSetup(organizationId: string, factoryKey: string, factory: FactoriesFactory | null) {
   const lineId = firstFactoryLineId(factory);
   if (!lineId) {

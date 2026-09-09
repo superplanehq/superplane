@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
-import { holdSetupAfterThisVisitCompletes, OnboardingGate } from "./OnboardingGate";
+import { OnboardingGate } from "./OnboardingGate";
+import { holdSetupAfterThisVisitCompletes } from "./onboardingGateState";
 
 let factory: FactoriesFactory;
 
