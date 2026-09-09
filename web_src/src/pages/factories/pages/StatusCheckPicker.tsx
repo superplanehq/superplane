@@ -22,6 +22,8 @@ export function StatusCheckPicker({
 }) {
   const selected = useMemo(() => new Set(names.map((name) => name.toLowerCase())), [names]);
   const rows = useMemo(() => statusCheckRows(catalog, names), [catalog, names]);
+  const showFullLoading = Boolean(loading) && rows.length === 0;
+  const showCatalogLoading = Boolean(loading) && catalog.length === 0 && rows.length > 0;
 
   return (
     <section>
@@ -39,7 +41,7 @@ export function StatusCheckPicker({
         aria-multiselectable="true"
         data-testid="pr-feedback-check-names-picker"
       >
-        {loading ? (
+        {showFullLoading ? (
           <div
             className="flex flex-col items-center gap-2 px-4 py-6 text-center"
             data-testid="pr-feedback-check-names-loading"
@@ -58,48 +60,83 @@ export function StatusCheckPicker({
             {PR_FEEDBACK_SETTINGS_COPY.checkNamesCatalogEmpty}
           </p>
         ) : (
-          <ul className="divide-y divide-border" data-testid="pr-feedback-check-names-list">
-            {rows.map((row) => {
-              const isSelected = selected.has(row.name.toLowerCase());
-              return (
-                <li key={row.name}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => onToggle(row.name)}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-                      isSelected ? "bg-accent/50" : "hover:bg-accent/30",
-                    )}
-                    data-testid={`pr-feedback-check-option-${row.name}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{row.name}</span>
-                    {row.required ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        {PR_FEEDBACK_SETTINGS_COPY.checkNamesRequired}
-                      </span>
-                    ) : null}
-                    {isSelected ? (
-                      <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul className="divide-y divide-border" data-testid="pr-feedback-check-names-list">
+              {rows.map((row) => {
+                const isSelected = selected.has(row.name.toLowerCase());
+                return (
+                  <li key={row.name}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => onToggle(row.name)}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                        isSelected ? "bg-accent/50" : "hover:bg-accent/30",
+                      )}
+                      data-testid={`pr-feedback-check-option-${row.name}`}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{row.name}</span>
+                      {row.required ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          {PR_FEEDBACK_SETTINGS_COPY.checkNamesRequired}
+                        </span>
+                      ) : null}
+                      {isSelected ? (
+                        <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {showCatalogLoading ? (
+              <div
+                className="flex items-center gap-2 border-t border-border px-3 py-2.5"
+                data-testid="pr-feedback-check-names-loading"
+              >
+                <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
+                <p className="workspace-body-text text-muted-foreground">
+                  {PR_FEEDBACK_SETTINGS_COPY.checkNamesLoadingMore}
+                </p>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </section>
   );
 }
 
-function statusCheckRows(
+export function statusCheckRows(
   catalog: FactoriesFactoryRepositoryStatusCheck[],
   names: string[],
 ): Array<{ name: string; required?: boolean }> {
   const rows: Array<{ name: string; required?: boolean }> = [];
   const seen = new Set<string>();
+  const catalogByName = new Map<string, FactoriesFactoryRepositoryStatusCheck>();
+  for (const check of catalog) {
+    const key = check.name?.trim().toLowerCase();
+    if (!key || catalogByName.has(key)) {
+      continue;
+    }
+    catalogByName.set(key, check);
+  }
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    const catalogCheck = catalogByName.get(key);
+    rows.push({ name: catalogCheck?.name?.trim() || trimmed, required: catalogCheck?.required });
+  }
 
   for (const check of catalog) {
     const name = check.name?.trim();
@@ -112,15 +149,6 @@ function statusCheckRows(
     }
     seen.add(key);
     rows.push({ name, required: check.required });
-  }
-
-  for (const name of names) {
-    const key = name.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    rows.push({ name });
   }
 
   return rows;

@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
+import { cn } from "@/lib/utils";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
@@ -233,9 +235,7 @@ function PRFeedbackIntegrationsField({
 
   return (
     <section>
-      <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
-        {PR_FEEDBACK_SETTINGS_COPY.integrationsLabel}
-      </h3>
+      <Label>{PR_FEEDBACK_SETTINGS_COPY.integrationsLabel}</Label>
       <p className="workspace-body-text mt-1 text-muted-foreground">
         {PR_FEEDBACK_SETTINGS_COPY.integrationsHelper} {PR_FEEDBACK_SETTINGS_COPY.integrationsMissingBefore}
         {organizationId ? (
@@ -253,43 +253,55 @@ function PRFeedbackIntegrationsField({
         )}
         {PR_FEEDBACK_SETTINGS_COPY.integrationsMissingAfter}
       </p>
-      {options.length === 0 ? (
-        <p className="workspace-body-text mt-2 text-muted-foreground" data-testid="pr-feedback-integrations-empty">
-          {PR_FEEDBACK_SETTINGS_COPY.integrationsEmpty}
-        </p>
-      ) : (
-        <ul className="mt-3 flex flex-col gap-2" data-testid="pr-feedback-integrations">
-          {options.map((integration) => {
-            const id = integration.metadata?.id ?? "";
-            const name = integration.metadata?.name || integration.metadata?.integrationName || id;
-            const checked = value.includes(id);
-            return (
-              <li key={id} className="flex items-center gap-2">
-                <Checkbox
-                  id={`pr-feedback-integration-${id}`}
-                  className="cursor-pointer"
-                  checked={checked}
-                  onChange={(event) => {
-                    if (event.currentTarget.checked) {
-                      onChange([...value, id]);
-                      return;
-                    }
-                    onChange(value.filter((item) => item !== id));
-                  }}
-                  data-testid={`pr-feedback-integration-${id}`}
-                />
-                <Label htmlFor={`pr-feedback-integration-${id}`} className="min-w-0 cursor-pointer gap-2">
-                  <IntegrationIcon
-                    integrationName={integration.metadata?.integrationName}
-                    className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
-                  />
-                  <span className="truncate">{name}</span>
-                </Label>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <div
+        className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border"
+        role="listbox"
+        aria-label={PR_FEEDBACK_SETTINGS_COPY.integrationsLabel}
+        aria-multiselectable="true"
+        data-testid="pr-feedback-integrations"
+      >
+        {options.length === 0 ? (
+          <p
+            className="px-3 py-6 text-center text-[13px] text-muted-foreground"
+            data-testid="pr-feedback-integrations-empty"
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.integrationsEmpty}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {options.map((integration) => {
+              const id = integration.metadata?.id ?? "";
+              const name = integration.metadata?.name || integration.metadata?.integrationName || id;
+              const selected = value.includes(id);
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => onChange(toggleUniqueString(value, id))}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                      selected ? "bg-accent/50" : "hover:bg-accent/30",
+                    )}
+                    data-testid={`pr-feedback-integration-${id}`}
+                  >
+                    <IntegrationIcon
+                      integrationName={integration.metadata?.integrationName}
+                      className="size-4 shrink-0"
+                      size={16}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
+                    {selected ? (
+                      <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

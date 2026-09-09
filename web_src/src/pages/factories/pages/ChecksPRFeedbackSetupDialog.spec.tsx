@@ -73,6 +73,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
   it("waits for the catalog before it offers continue", () => {
     mocks.fetching = true;
+    mocks.catalog.splice(0);
     render(
       <ChecksPRFeedbackSetupDialog
         open

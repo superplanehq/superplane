@@ -186,6 +186,29 @@ function renderAutomationPopup() {
 }
 
 describe("PRFeedbackSettingsPopup check names", () => {
+  it("does not offer name or repository fields because those come from setup", () => {
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "factory-1");
+
+    expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-check-names-picker")).toBeInTheDocument();
+  });
+
+  it("shows configured checks while other catalog checks are loading", () => {
+    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
+      data: [],
+      isLoading: true,
+      isPending: true,
+      isFetching: true,
+      isError: false,
+    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "e2e"] }), "org-1", "factory-1");
+
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-names-loading")).toHaveTextContent("Loading other status checks");
+  });
+
   it("selects a check from the repository catalog", async () => {
     vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
       data: [
@@ -268,10 +291,25 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
   it("shows the integration icon next to the integration name", () => {
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 
-    const row = screen.getByTestId("pr-feedback-integrations");
+    const row = screen.getByTestId("pr-feedback-integration-int-circleci");
+    expect(row).toHaveAttribute("role", "option");
+    expect(row).toHaveAttribute("aria-selected", "false");
     expect(within(row).getByTestId("integration-icon-circleci")).toBeInTheDocument();
     expect(row).toHaveTextContent("circleci-prod");
-    expect(within(row).getByRole("listitem").className).toContain("items-center");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("selects an integration with the same picker as status checks", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "factory-1");
+
+    const row = screen.getByTestId("pr-feedback-integration-int-circleci");
+    expect(row).toHaveAttribute("aria-selected", "false");
+    await user.click(row);
+    expect(row).toHaveAttribute("aria-selected", "true");
+
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ runnerIntegrationIds: ["int-circleci"] }));
   });
 
   it("groups integrations of the same type next to each other", () => {
