@@ -31,9 +31,13 @@ func (s *FactoryPlanningSession) ProposeDraft(tx *gorm.DB, draft PlanningSession
 		if title == "" {
 			return fmt.Errorf("%w: draft title is required", ErrFactoryPlanningSessionInvalid)
 		}
+		description := strings.TrimSpace(draft.Description)
+		if description == "" {
+			return fmt.Errorf("%w: draft description is required", ErrFactoryPlanningSessionInvalid)
+		}
 		s.setDraft(PlanningSessionDraft{
 			Title:       title,
-			Description: strings.TrimSpace(draft.Description),
+			Description: description,
 			WorkOrderID: s.Draft().WorkOrderID,
 		})
 		return s.saveDraft(inner)

@@ -27,6 +27,15 @@ describe("usePlanningSessionLiveRun", () => {
     expect(result.current.machineStatus).toBe("failed");
   });
 
+  it("marks the machine failed when the live run passed", () => {
+    useDescribeRun.mockReturnValue({ data: { run: { result: "RESULT_PASSED" } } });
+    const view = runningCreateWithAgentView();
+
+    const { result } = renderHook(() => usePlanningSessionLiveRun("org-1", view));
+
+    expect(result.current.machineStatus).toBe("failed");
+  });
+
   it("stays off until the session has a canvas run", () => {
     useDescribeRun.mockReturnValue({ data: undefined });
     const view = runningCreateWithAgentView({ canvasId: "", canvasRunId: "" });

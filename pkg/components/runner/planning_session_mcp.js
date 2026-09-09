@@ -46,9 +46,17 @@ async function requestJSON(method, path, body) {
 }
 
 async function proposeDraft(input) {
+  const title = String((input && input.title) || "").trim();
+  const description = String((input && input.description) || "").trim();
+  if (!title) {
+    throw new Error("title is required");
+  }
+  if (!description) {
+    throw new Error("description is required");
+  }
   return requestJSON("POST", "/api/v1/runner/planning-sessions/drafts", {
-    title: String((input && input.title) || "").trim(),
-    description: String((input && input.description) || "").trim(),
+    title,
+    description,
   });
 }
 
@@ -71,14 +79,14 @@ async function proposeSurvey(input) {
 const TOOLS = [
   {
     name: "propose_draft",
-    description: "Show a draft task on the right only when the user asked for a task in this turn. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
+    description: "Show a draft task on the right only when the user asked for a task in this turn. Title and description are required. Description must include the user's request and constraints. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string" },
         description: { type: "string" },
       },
-      required: ["title"],
+      required: ["title", "description"],
     },
   },
   {
