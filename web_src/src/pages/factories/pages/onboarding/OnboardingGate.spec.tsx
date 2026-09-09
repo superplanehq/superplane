@@ -10,11 +10,12 @@ import { OnboardingGate } from "./OnboardingGate";
 import { holdSetupAfterThisVisitCompletes } from "./onboardingGateState";
 
 let factory: FactoriesFactory;
+let factoryId: string;
 
 vi.mock("../../layout/factoriesLayoutContext", () => ({
   useFactoriesLayout: () => ({
     organizationId: "org-1",
-    factoryId: "factory-1",
+    factoryId,
     factoryKey: "PAY",
     factory,
   }),
@@ -38,7 +39,7 @@ function CompletionHarness() {
         type="button"
         onClick={() => {
           factory = {
-            id: "factory-1",
+            id: factoryId,
             lines: [{ id: "line-plan" }],
             onboarding: { completedAt: "2026-08-17T12:00:00Z" },
           };
@@ -46,6 +47,16 @@ function CompletionHarness() {
         }}
       >
         complete
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          factoryId = "factory-2";
+          factory = { id: factoryId, onboarding: {} };
+          setTick((n) => n + 1);
+        }}
+      >
+        switch workspace
       </button>
       <button type="button" onClick={() => navigate("/org-1/workspaces/PAY/lines/line-plan")}>
         open board
@@ -85,6 +96,7 @@ function renderRoute(path: string) {
 
 describe("OnboardingGate", () => {
   beforeEach(() => {
+    factoryId = "factory-1";
     factory = { id: "factory-1", onboarding: {} };
   });
 
@@ -150,6 +162,26 @@ describe("OnboardingGate", () => {
     await user.click(screen.getByRole("button", { name: "open setup" }));
 
     expect(await screen.findByText("/org-1/workspaces/pay/lines/line-plan")).toBeInTheDocument();
+  });
+
+  it("holds setup when a second workspace completes onboarding", async () => {
+    const user = userEvent.setup();
+    factory = {
+      id: factoryId,
+      lines: [{ id: "line-plan" }],
+      onboarding: { completedAt: "2026-08-17T12:00:00Z" },
+    };
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/lines/line-plan"]}>
+        <CompletionHarness />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "switch workspace" }));
+    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "complete" }));
+
+    expect(screen.getByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
   });
 
   it("opens the line board when a completed workspace leaves setup", async () => {

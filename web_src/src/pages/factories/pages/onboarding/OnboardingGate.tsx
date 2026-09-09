@@ -42,15 +42,19 @@ export function OnboardingGate() {
   // FirstRunSetup stores the analysis destination. Hold this visit on setup
   // so that write cannot unmount the analysis screen. A later open of setup
   // still leaves for the board.
-  const startedIncomplete = useRef(isIncomplete);
+  const startedIncompleteFactoryId = useRef(isIncomplete ? factoryId : null);
   useEffect(() => {
-    if (!isIncomplete && !isSetupRoute) {
-      startedIncomplete.current = false;
+    if (isIncomplete) {
+      startedIncompleteFactoryId.current = factoryId;
+      return;
     }
-  }, [isIncomplete, isSetupRoute]);
+    if (!isSetupRoute && startedIncompleteFactoryId.current === factoryId) {
+      startedIncompleteFactoryId.current = null;
+    }
+  }, [factoryId, isIncomplete, isSetupRoute]);
 
   if (!isIncomplete) {
-    if (holdSetupAfterThisVisitCompletes(startedIncomplete.current, isSetupRoute)) {
+    if (holdSetupAfterThisVisitCompletes(startedIncompleteFactoryId.current === factoryId, isSetupRoute)) {
       return <Outlet />;
     }
     if (isSetupRoute) {
