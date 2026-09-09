@@ -66,8 +66,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 3)
-		assert.Len(t, liveVersion.Edges, 2)
+		assert.Len(t, liveVersion.Nodes, 7)
+		assert.Len(t, liveVersion.Edges, 5)
 	})
 
 	t.Run("creating a Productive.io intake builds a healthy trigger to createWorkOrder canvas", func(t *testing.T) {
@@ -207,7 +207,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
 		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
-			if node.ID == intakeTriggerNodeID {
+			if node.ID == intakeTriggerNodeID || node.ID == intakeCloseTriggerNodeID {
 				continue
 			}
 			assert.Nilf(t, node.ErrorMessage, "node %s is incomplete: %s", node.ID, nodeErrorMessage(node))
@@ -224,7 +224,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		// scheduler reads the record.
 		canvasID := uuid.MustParse(intake.GetCanvasId())
 		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
-			if node.ID == intakeTriggerNodeID {
+			if node.ID == intakeTriggerNodeID || node.ID == intakeCloseTriggerNodeID {
 				continue
 			}
 

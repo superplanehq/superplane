@@ -226,12 +226,13 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 
 	fromState := order.State
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
-		ToState:    params.State,
-		Result:     params.Result,
-		Automation: c.automationRef(),
-		Run:        c.runRef(),
-		App:        c.appRef(),
-		SkipSame:   true,
+		ToState:       params.State,
+		Result:        params.Result,
+		ExpectedState: params.ExpectedState,
+		Automation:    c.automationRef(),
+		Run:           c.runRef(),
+		App:           c.appRef(),
+		SkipSame:      true,
 	})
 	if err != nil {
 		return nil, false, err
@@ -411,6 +412,8 @@ func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.W
 		order, err = f.FindWorkOrder(c.tx, orderID)
 	case "artifactKey":
 		order, err = f.FindWorkOrderByArtifactKey(c.tx, params.ArtifactKey)
+	case "originUrl":
+		order, err = f.FindWorkOrderByOriginURL(c.tx, params.OriginURL)
 	default:
 		return nil, fmt.Errorf("unknown findWorkOrder lookup %q", params.By)
 	}
