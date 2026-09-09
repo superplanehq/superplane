@@ -328,7 +328,21 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	if o.State == toState {
+	// The write below is scoped to rows still in ExpectedState (when set),
+	// so the transition that actually commits is `ExpectedState → toState`,
+	// not `o.State → toState`. o.State comes from a non-locking read and may
+	// be stale: a concurrent transition (e.g. `open → draft`) can move the
+	// row after the load. Validate against the state the write is guarded
+	// on, otherwise we could validate one transition (`open → closed` with
+	// `completed`) but persist a different, invalid one (`draft → closed`
+	// with `completed`) on the row that raced underneath us.
+	originalState := o.State
+	fromState := o.State
+	if update.ExpectedState != "" {
+		fromState = update.ExpectedState
+	}
+
+	if fromState == toState {
 		if update.SkipSame {
 			return false, nil
 		}
@@ -336,7 +350,6 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	fromState := o.State
 	if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
 		return false, fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
 	}
@@ -446,7 +459,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// row was already moved away by a concurrent transition, so we
 		// report a no-op and let the caller leave it alone.
 		if errors.Is(err, errWorkOrderStateMismatch) {
-			o.State = fromState
+			o.State = originalState
 			o.Result = fromResult
 			o.UpdatedAt = fromUpdatedAt
 			o.StatusNote = fromStatusNote

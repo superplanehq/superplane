@@ -383,6 +383,42 @@ func TestFactoryWorkOrder_UpdateStatusExpectedStateGuard(t *testing.T) {
 		assert.Equal(t, FactoryWorkOrderStateClosed, reloaded.State)
 		assert.Equal(t, FactoryWorkOrderResultRejected, reloaded.Result)
 	})
+
+	// The guard scopes the write to `ExpectedState`, so validation must also
+	// run against `ExpectedState` — not the (possibly stale, non-locking)
+	// in-memory `o.State`. Otherwise a close whose in-memory state raced ahead
+	// of the row could validate an open-task closure (e.g. `completed`) but
+	// apply it to the draft row, persisting an invalid `draft → closed
+	// (completed)` transition and dropping queued work.
+	t.Run("validates the transition against the expected state, not the stale in-memory state", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Raced back to draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, FactoryWorkOrderStateDraft, order.State)
+
+		// Mirror a non-locking read that observed the row as `open` just
+		// before a concurrent `open → draft` moved the row back to draft: the
+		// in-memory copy still believes it is `open` while the row is `draft`.
+		order.State = FactoryWorkOrderStateOpen
+
+		// `completed` is only a valid close result from `open`. Because the
+		// write is guarded on `draft`, the transition that would actually
+		// commit is `draft → closed`, which forbids `completed`.
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState:       FactoryWorkOrderStateClosed,
+			Result:        FactoryWorkOrderResultCompleted,
+			ExpectedState: FactoryWorkOrderStateDraft,
+			Actor:         &userID,
+		})
+		require.Error(t, err, "closing a draft with an open-only result must be rejected")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		assert.False(t, changed)
+
+		// The row is left untouched: no invalid draft → closed (completed).
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateDraft, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+	})
 }
 
 func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
