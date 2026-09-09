@@ -12,7 +12,8 @@ describe("FirstRunConnectScreen", () => {
 
     render(<FirstRunConnectScreen onConnectGitHub={onConnectGitHub} />);
 
-    expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub);
+    expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction);
+    expect(screen.getByText(FIRST_RUN_COPY.connect.connectGitHub)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.headline })).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.connect.body)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
@@ -37,14 +38,12 @@ describe("FirstRunConnectScreen", () => {
       FIRST_RUN_COPY.connect.installRequested,
     );
     expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody())).not.toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-github-install-org")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-github-install-help")).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedNext)).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedNext)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
     expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
 
-    await user.hover(screen.getByTestId("first-run-github-install-requested"));
+    await user.hover(screen.getByTestId("first-run-github-waiting-row"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody());
     expect(screen.getByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedNext);
 
@@ -69,7 +68,7 @@ describe("FirstRunConnectScreen", () => {
   it("names the GitHub organization that is waiting for approval", () => {
     render(<FirstRunConnectScreen installRequested githubOrganization="acme" onConnectGitHub={vi.fn()} />);
 
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("acme");
     expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
   });
 
@@ -78,7 +77,7 @@ describe("FirstRunConnectScreen", () => {
 
     render(<FirstRunConnectScreen installRequested githubOrganization="acme" onConnectGitHub={vi.fn()} />);
 
-    await user.hover(screen.getByTestId("first-run-github-install-requested"));
+    await user.hover(screen.getByTestId("first-run-github-waiting-row"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
@@ -124,9 +123,7 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.connect.missingAccount)).toBeInTheDocument();
@@ -150,9 +147,7 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-other")).toHaveAttribute(
       "href",
@@ -248,7 +243,7 @@ describe("FirstRunConnectScreen", () => {
     const user = userEvent.setup();
     const onConnectGitHub = vi.fn();
 
-    render(<FirstRunConnectScreen stepper onConnectGitHub={onConnectGitHub} />);
+    render(<FirstRunConnectScreen onConnectGitHub={onConnectGitHub} />);
 
     expect(screen.getByTestId("first-run-github-stepper")).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.connect.stepOrganization)).toBeInTheDocument();
@@ -262,7 +257,6 @@ describe("FirstRunConnectScreen", () => {
   it("lists a requested organization as a waiting row next to usable organizations", () => {
     render(
       <FirstRunConnectScreen
-        stepper
         installRequested
         githubOrganizations={["kittens-inc-1"]}
         pendingInstallations={[{ id: "11", accountLogin: "puppies-inc" }]}
@@ -284,12 +278,7 @@ describe("FirstRunConnectScreen", () => {
   // organization step even while the connect step is the active one.
   it("keeps the waiting row under the organization step on the connect page", () => {
     render(
-      <FirstRunConnectScreen
-        stepper
-        installRequested
-        githubOrganizations={["kittens-inc-1"]}
-        onConnectGitHub={vi.fn()}
-      />,
+      <FirstRunConnectScreen installRequested githubOrganizations={["kittens-inc-1"]} onConnectGitHub={vi.fn()} />,
     );
 
     const connectStep = within(screen.getByTestId("first-run-step-connect"));
@@ -305,7 +294,6 @@ describe("FirstRunConnectScreen", () => {
   it("drops the waiting row once the requested organization is usable", () => {
     render(
       <FirstRunConnectScreen
-        stepper
         installRequested
         githubOrganizations={["kittens-inc-1"]}
         pendingInstallations={[{ id: "11", accountLogin: "kittens-inc-1" }]}
@@ -323,7 +311,6 @@ describe("FirstRunConnectScreen", () => {
   it("marks connect done and asks the organization question on the stepper picker", () => {
     render(
       <FirstRunConnectScreen
-        stepper
         pendingInstallations={[{ id: "11", accountLogin: "puppies-inc" }]}
         githubState="csrf"
         githubAppSlug="superplane"

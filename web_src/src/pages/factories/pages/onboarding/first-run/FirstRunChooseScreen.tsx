@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
+import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
@@ -17,7 +17,7 @@ export function FirstRunChooseScreen({
   saving = false,
   chrome,
   sphere,
-  stepper,
+  organizationName,
   onSelectRepository,
   onEditConnection,
   onContinue,
@@ -29,27 +29,13 @@ export function FirstRunChooseScreen({
   saving?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** Renders the GitHub steps on one card (the initial-organization look). */
-  stepper?: { organizationName?: string };
+  /** Names the finished organization step, e.g. "Organization: puppies-inc". */
+  organizationName?: string;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
   onContinue: () => void;
 }) {
   const busy = Boolean(loading || saving);
-
-  const repositoryStep = (
-    <RepositoryStepBody
-      repositories={repositories}
-      selectedRepository={selectedRepository}
-      loading={loading}
-      busy={busy}
-      onSelectRepository={onSelectRepository}
-      onEditConnection={onEditConnection}
-    />
-  );
-  const continueBlock = (
-    <ChooseContinue selectedRepository={selectedRepository} saving={saving} busy={busy} onContinue={onContinue} />
-  );
 
   return (
     <FirstRunShell testId="first-run-choose" chrome={chrome} busy={busy} sphere={sphere}>
@@ -58,17 +44,17 @@ export function FirstRunChooseScreen({
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
-        {stepper ? (
-          <FirstRunGithubStepper current="repository" organizationName={stepper.organizationName}>
-            {repositoryStep}
-            {continueBlock}
-          </FirstRunGithubStepper>
-        ) : (
-          <>
-            <FirstRunPanel>{repositoryStep}</FirstRunPanel>
-            {continueBlock}
-          </>
-        )}
+        <FirstRunGithubStepper current="repository" organizationName={organizationName}>
+          <RepositoryStepBody
+            repositories={repositories}
+            selectedRepository={selectedRepository}
+            loading={loading}
+            busy={busy}
+            onSelectRepository={onSelectRepository}
+            onEditConnection={onEditConnection}
+          />
+          <ChooseContinue selectedRepository={selectedRepository} saving={saving} busy={busy} onContinue={onContinue} />
+        </FirstRunGithubStepper>
       </div>
     </FirstRunShell>
   );

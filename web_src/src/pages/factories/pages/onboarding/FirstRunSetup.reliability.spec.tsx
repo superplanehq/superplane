@@ -74,7 +74,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
-    initialOnboarding: false,
     provisionedDestination: null,
     githubOwner: undefined,
     ...overrides,
@@ -138,7 +137,7 @@ describe("FirstRunSetup reliability", () => {
     expect(requestConnect).toHaveBeenCalledTimes(1);
 
     navigation.resolve(true);
-    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub));
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
   });
 
   it("keeps repository and ticket screens locked until their saves finish", async () => {
@@ -234,8 +233,9 @@ describe("FirstRunSetup reliability", () => {
       pageModel({ openSection: "vcs", githubConnections: githubConnections([request]) }),
       "/org-1/workspaces/PAY/setup?step=vcs&githubOrg=wrong&githubIntegrationId=int-1",
     );
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("octo");
+    const waiting = screen.getByTestId("first-run-github-install-requested");
+    expect(waiting).toHaveTextContent("acme");
+    expect(waiting).toHaveTextContent("octo");
     expect(screen.queryByText("wrong")).not.toBeInTheDocument();
   });
 
