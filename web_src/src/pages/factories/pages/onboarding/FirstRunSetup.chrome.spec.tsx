@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -95,6 +96,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
@@ -191,5 +194,17 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-organization-switch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-workspace-switch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
+  });
+
+  // A new organization and a new workspace in an existing organization use
+  // the same redesigned screens, so the sphere pane shows on both.
+  it("shows the factory sphere on welcome", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <FirstRunSetup model={pageModel({ openSection: "vcs" })} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
   });
 });
