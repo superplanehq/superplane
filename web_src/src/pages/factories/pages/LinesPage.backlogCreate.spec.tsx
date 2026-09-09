@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -35,6 +36,15 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
 
 const REFUND_INTAKE_SEARCH = {
   data: [
@@ -129,6 +139,7 @@ describe("LinesPage backlog create", () => {
     useFactoryIntakes.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
   });
 
   afterEach(() => {
@@ -191,6 +202,7 @@ describe("LinesPage backlog create", () => {
   });
 
   it("opens the agent session from the backlog plus menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     Element.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal(
       "fetch",
@@ -216,7 +228,18 @@ describe("LinesPage backlog create", () => {
     });
   });
 
+  it("hides Create with an Agent when the feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+
+    expect(screen.queryByRole("button", { name: "Create with an Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create task manually" })).toBeInTheDocument();
+  });
+
   it("opens the agent session from Refine on a backlog draft", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     Element.prototype.scrollIntoView = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -267,7 +290,20 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByRole("heading", { name: "Refine this task" })).toBeInTheDocument();
   });
 
+  it("hides Refine when the feature is off", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("starts the session with the workspace repository, not the demo repo", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     Element.prototype.scrollIntoView = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

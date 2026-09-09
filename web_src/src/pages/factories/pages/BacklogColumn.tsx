@@ -32,7 +32,7 @@ export type BacklogColumnProps = {
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent: () => void;
+  onCreateWithAgent?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
@@ -240,7 +240,7 @@ function backlogCreatePopoverProps(args: {
   atCapacity: boolean;
   createMenu: ReturnType<typeof useBacklogCreateMenu>;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent: () => void;
+  onCreateWithAgent?: () => void;
 }) {
   return {
     canAdd: args.canAdd,

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryColumnAutomationViewPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -306,6 +307,7 @@ describe("LinesPage board", () => {
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const analyzingOrderId = REVIEW_CANDIDATE_WORK_ORDERS[0].id!;
     // The board optimistically knows this draft is analyzing before its Backlog
