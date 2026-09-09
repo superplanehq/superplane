@@ -324,10 +324,11 @@ func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlann
 	return &session, nil
 }
 
-func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, result string) error {
-	if result != CanvasRunResultFailed && result != CanvasRunResultCancelled {
-		return nil
-	}
+// EndPlanningSessionForFinishedRun closes the planning session when the canvas
+// run is finished. Follow-up keeps a healthy session's run in progress. A
+// finished run means the agent process is gone, including a passed greet that
+// never entered wait.
+func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, _ string) error {
 	session, err := FindPlanningSessionByRun(tx, canvasRunID)
 	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
 		return nil
