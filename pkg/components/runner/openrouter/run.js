@@ -414,6 +414,9 @@ function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
   if (!String(text || "").trim()) {
     return false;
   }
+  if (spawnResult && spawnResult.roundOpen) {
+    return false;
+  }
   return tokenTotal(spawnResult && spawnResult.usage) > 0;
 }
 
@@ -489,6 +492,7 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     usage: snapshot.usage,
     cost: snapshot.cost,
     lastEvent: snapshot.lastEvent,
+    roundOpen: Boolean(snapshot.roundOpen),
   };
 }
 
@@ -513,6 +517,23 @@ function tokenTotal(usage) {
     Number(usage.cache_creation_input_tokens || 0) +
     Number(usage.reasoning_tokens || 0)
   );
+}
+
+function mergeUsage(left, right) {
+  const merged = {
+    input_tokens: Number((left && left.input_tokens) || 0) + Number((right && right.input_tokens) || 0),
+    output_tokens: Number((left && left.output_tokens) || 0) + Number((right && right.output_tokens) || 0),
+    cache_read_input_tokens:
+      Number((left && left.cache_read_input_tokens) || 0) + Number((right && right.cache_read_input_tokens) || 0),
+    cache_creation_input_tokens:
+      Number((left && left.cache_creation_input_tokens) || 0) + Number((right && right.cache_creation_input_tokens) || 0),
+    reasoning_tokens: Number((left && left.reasoning_tokens) || 0) + Number((right && right.reasoning_tokens) || 0),
+  };
+  const cost = Number((left && left.total_cost_usd) || 0) + Number((right && right.total_cost_usd) || 0);
+  if (cost) {
+    merged.total_cost_usd = cost;
+  }
+  return merged;
 }
 
 function usageFromStepFinish(part) {
@@ -638,6 +659,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
       lastText = "";
       usage = emptyUsage();
       cost = 0;
+      roundOpen = false;
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -696,12 +718,13 @@ function createOpenCodeFormatter(telemetry, onSession) {
           formatToolUse(part, tools);
           break;
         case "step_finish": {
-          usage = usageFromStepFinish(part);
+          const stepUsage = usageFromStepFinish(part);
+          usage = mergeUsage(usage, stepUsage);
           if (part.cost != null && Number.isFinite(Number(part.cost))) {
-            cost = Number(part.cost);
+            cost = Number(cost || 0) + Number(part.cost);
           }
           if (!roundOpen) {
-            beginRound(usage, { message: lastText });
+            beginRound(stepUsage, { message: lastText });
           } else {
             tracker.updateCurrentUsage(usage);
           }
@@ -731,6 +754,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
         usage,
         cost,
         lastEvent,
+        roundOpen,
       };
     },
     lastText() {

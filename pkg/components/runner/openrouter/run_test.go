@@ -243,6 +243,34 @@ func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 	assert.Regexp(t, `✓ done`, result.output)
 }
 
+func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "google/gemma-4-31b-it",
+		fallback: []string{"google/gemma-4-31b-it"},
+		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"I opened the repository."}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":5,"output":3}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "I opened the repository.", payload["result"])
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(15), usage["input_tokens"])
+	assert.Equal(t, float64(11), usage["output_tokens"])
+	assert.Regexp(t, `✓ done`, result.output)
+}
+
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model:    "google/gemma-4-31b-it",
@@ -259,6 +287,32 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *tes
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "google/gemma-4-31b-it",
+		fallback: []string{"google/gemma-4-31b-it"},
+		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"I found a few files to inspect"}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+	payload := resultPayload(t, result.resultFile)
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(10), usage["input_tokens"])
+	assert.Equal(t, float64(8), usage["output_tokens"])
 }
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
