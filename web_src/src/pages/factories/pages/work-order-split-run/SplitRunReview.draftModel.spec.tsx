@@ -51,7 +51,7 @@ describe("SplitRunReview draft model select", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("keeps the model select off a waiting footer", () => {
