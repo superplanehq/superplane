@@ -18,9 +18,10 @@ func init() {
 type UpdateWorkOrderStatus struct{}
 
 type UpdateWorkOrderStatusConfiguration struct {
-	OrderID string `json:"orderId" mapstructure:"orderId"`
-	Status  string `json:"status" mapstructure:"status"`
-	Result  string `json:"result" mapstructure:"result"`
+	OrderID       string `json:"orderId" mapstructure:"orderId"`
+	Status        string `json:"status" mapstructure:"status"`
+	Result        string `json:"result" mapstructure:"result"`
+	ExpectedState string `json:"expectedState" mapstructure:"expectedState"`
 }
 
 func (c *UpdateWorkOrderStatus) Name() string {
@@ -38,7 +39,9 @@ func (c *UpdateWorkOrderStatus) Description() string {
 func (c *UpdateWorkOrderStatus) Documentation() string {
 	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened task never ran).
 
-` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.
+
+` + "`expectedState`" + ` is an optional guard: when set, the transition only applies if the task is still in that state at write time, checked atomically against the row. A mismatch is a silent no-op rather than a failure. Use it when an earlier, separate node observed the state (for example, a filter checking the task is still ` + "`draft`" + `) so a concurrent transition in between can't force a stale update.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
@@ -116,6 +119,22 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "expectedState",
+			Label:       "Expected State",
+			Description: "Optional guard: only apply the transition if the task is still in this state at write time, evaluated atomically. A mismatch is a silent no-op. Use it after a separate check node to avoid acting on a task that changed state in between (e.g. only close a task that is still draft).",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Draft", Value: "draft"},
+						{Label: "Open", Value: "open"},
+						{Label: "Closed", Value: "closed"},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -126,9 +145,10 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	workOrder, changed, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		OrderID: config.OrderID,
-		State:   config.Status,
-		Result:  config.Result,
+		OrderID:       config.OrderID,
+		State:         config.Status,
+		Result:        config.Result,
+		ExpectedState: config.ExpectedState,
 	})
 	if err != nil {
 		return err
