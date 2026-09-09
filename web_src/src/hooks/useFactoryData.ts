@@ -417,8 +417,10 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
 export function useReorderWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   const ordersKey = workOrdersKey(organizationId, factoryId);
+  const reorderMutationKey = ["reorderWorkOrder", organizationId, factoryId];
 
   return useMutation({
+    mutationKey: reorderMutationKey,
     mutationFn: async (move: WorkOrderReorderMove) => {
       const response = await factoriesReorderWorkOrder(
         withOrganizationHeader({
@@ -454,6 +456,16 @@ export function useReorderWorkOrder(organizationId: string, factoryId: string) {
       queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
         (current ?? []).map((existing) => (existing.id === order.id ? order : existing)),
       );
+    },
+    onSettled: () => {
+      // Overlapping drags snapshot the list independently, so a rollback from
+      // an earlier request that fails after a later request succeeds would
+      // restore a stale snapshot and erase the persisted reorder from the UI.
+      // Once the last in-flight reorder settles, refetch from the server (the
+      // source of truth for positions) so the cache reflects the saved order.
+      if (queryClient.isMutating({ mutationKey: reorderMutationKey }) === 1) {
+        void queryClient.invalidateQueries({ queryKey: ordersKey });
+      }
     },
   });
 }
