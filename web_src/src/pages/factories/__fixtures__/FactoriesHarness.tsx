@@ -56,7 +56,11 @@ function DefaultWikiWireframe() {
 const defaultFactoryAppFixture = refundLineCanvasFixture();
 
 /** Stories keep hidden-in-app surfaces visible for design review. */
-const PREVIEW_FLAGS: FactoryPreviewFlags = { addIntakeControl: true, columnAutomations: true };
+const PREVIEW_FLAGS: FactoryPreviewFlags = {
+  addIntakeControl: true,
+  columnAutomations: true,
+  columnAutomationRows: true,
+};
 
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
