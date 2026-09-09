@@ -4,7 +4,9 @@ import {
   hostedCreditBannerCopy,
   hostedCreditBannerKind,
   hostedCreditBannerTone,
+  hostedCreditBillingBalanceCopy,
   hostedCreditEmptyBannerCopy,
+  isHostedCreditTrialOrg,
   shouldShowHostedCreditEmptyBanner,
   welcomeCreditExpiryLabel,
   welcomeCreditExpirySentence,
@@ -13,6 +15,97 @@ import {
 const now = new Date("2026-09-08T12:00:00.000Z");
 const inFourteenDays = "2026-09-22T12:00:00.000Z";
 const yesterday = "2026-09-07T12:00:00.000Z";
+
+describe("isHostedCreditTrialOrg", () => {
+  it("is true when welcome credit has an expiry and the organization has not purchased credit", () => {
+    expect(
+      isHostedCreditTrialOrg({
+        purchasedCreditCents: "0",
+        welcomeCreditExpiresAt: inFourteenDays,
+      }),
+    ).toBe(true);
+  });
+
+  it("is false after the organization buys Polar credit", () => {
+    expect(
+      isHostedCreditTrialOrg({
+        purchasedCreditCents: "10000",
+        welcomeCreditExpiresAt: inFourteenDays,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when welcome credit was never granted", () => {
+    expect(isHostedCreditTrialOrg({ purchasedCreditCents: "0" })).toBe(false);
+  });
+});
+
+describe("hostedCreditBillingBalanceCopy", () => {
+  it("explains welcome trial credit when Polar has no customer and credit remains", () => {
+    expect(
+      hostedCreditBillingBalanceCopy({
+        remainingCents: 4124,
+        purchasedCents: 0,
+        hasBillingCustomer: false,
+        billingEnabled: true,
+        welcomeCreditExpiresAt: inFourteenDays,
+        now,
+      }),
+    ).toEqual({
+      badge: "Trial",
+      description:
+        `This remaining balance is welcome credit. Welcome credit is a free trial grant. ` +
+        `Unused credit expires on ${new Date(inFourteenDays).toLocaleDateString()}. ` +
+        `Purchase hosted credit to keep SuperPlane-hosted runs after the trial.`,
+    });
+  });
+
+  it("tells the owner to purchase when Polar has no customer and remaining credit is empty", () => {
+    expect(
+      hostedCreditBillingBalanceCopy({
+        remainingCents: 0,
+        purchasedCents: 0,
+        hasBillingCustomer: false,
+        billingEnabled: true,
+        welcomeCreditExpiresAt: inFourteenDays,
+        now,
+      }),
+    ).toEqual({
+      badge: "Trial",
+      description: "Hosted credit is empty. Click Add hosted credit to purchase more.",
+    });
+  });
+
+  it("tells the owner the trial ended when welcome credit expires", () => {
+    expect(
+      hostedCreditBillingBalanceCopy({
+        remainingCents: 0,
+        purchasedCents: 0,
+        hasBillingCustomer: false,
+        billingEnabled: true,
+        welcomeCreditExpiresAt: yesterday,
+        now,
+      }),
+    ).toEqual({
+      badge: "Trial",
+      description:
+        "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Add hosted credit to purchase more.",
+    });
+  });
+
+  it("hides trial copy when Polar already has a customer", () => {
+    expect(
+      hostedCreditBillingBalanceCopy({
+        remainingCents: 4124,
+        purchasedCents: 0,
+        hasBillingCustomer: true,
+        billingEnabled: true,
+        welcomeCreditExpiresAt: inFourteenDays,
+        now,
+      }),
+    ).toEqual({ badge: null, description: null });
+  });
+});
 
 describe("hostedCreditBannerKind", () => {
   it("shows the trial banner while welcome credit remains", () => {
