@@ -1,5 +1,5 @@
-import { ExternalLink } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import { useParams } from "react-router";
 
 import type {
   OrganizationsHostedCreditInvoice,
@@ -13,39 +13,33 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } from "../../lib/hostedCreditGrants";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
+const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
+const HOSTED_CREDIT_EXPLANATION = "Hosted credit pays SuperPlane-hosted models for this organization.";
+
 export function OrganizationSettingsBillingPage() {
-  const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
+  const { organizationId = "" } = useParams<{ organizationId: string }>();
   const model = useOrganizationBillingPageModel(organizationId);
-  const packs = sortHostedCreditPacks(model.billing.products);
-  const showStackedPacks = model.hasBillingCustomer && model.canManageBilling && packs.length > 0;
+  const packs = model.billing.products;
 
   usePageTitle(["Billing", model.organizationName]);
   useReportPageReady(!model.isLoading, { failed: Boolean(model.error) });
 
   return (
-    <FactorySettingsPageFrame
-      title="Billing"
-      subtitle="Hosted credit pays SuperPlane-hosted models for this organization."
-      actions={
-        showStackedPacks ? undefined : (
-          <AddHostedCreditAction
-            canManageBilling={model.canManageBilling}
-            checkoutPending={model.billing.checkoutPending}
-            products={packs}
-            onAddCredit={model.billing.startCheckout}
-          />
-        )
-      }
-    >
+    <FactorySettingsPageFrame title="Billing">
       <BillingPageBody
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
@@ -53,86 +47,19 @@ export function OrganizationSettingsBillingPage() {
         checkoutPending={model.billing.checkoutPending}
         creditRefreshStatus={model.creditRefreshStatus}
         error={model.error}
-        factoryKey={factoryKey}
         grants={model.grants}
         hasBillingCustomer={model.hasBillingCustomer}
         invoices={model.invoices}
         isLoading={model.isLoading}
-        organizationId={organizationId}
         packs={packs}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
-        showStackedPacks={showStackedPacks}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
-  );
-}
-
-function AddHostedCreditAction({
-  canManageBilling,
-  checkoutPending,
-  products,
-  onAddCredit,
-}: {
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  products: OrganizationsHostedCreditProduct[];
-  onAddCredit: (productId: string) => void | Promise<void>;
-}) {
-  if (!canManageBilling) {
-    return null;
-  }
-
-  const label = checkoutPending ? "Opening checkout..." : "Add hosted credit";
-
-  if (products.length === 0) {
-    return (
-      <Button type="button" disabled>
-        {label}
-      </Button>
-    );
-  }
-
-  if (products.length === 1) {
-    const productId = products[0].id ?? "";
-    return (
-      <Button
-        type="button"
-        disabled={!productId || checkoutPending}
-        onClick={() => productId && void onAddCredit(productId)}
-      >
-        {label}
-      </Button>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" disabled={checkoutPending}>
-          {label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {products.map((product) => {
-          const productId = product.id ?? "";
-          const amount = parseWorkOrderMetric(product.amountCents);
-          return (
-            <DropdownMenuItem
-              key={productId || amount}
-              disabled={!productId || checkoutPending}
-              onClick={() => productId && void onAddCredit(productId)}
-            >
-              {formatUsdCents(amount)}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -143,17 +70,14 @@ function BillingPageBody({
   checkoutPending,
   creditRefreshStatus,
   error,
-  factoryKey,
   grants,
   hasBillingCustomer,
   invoices,
   isLoading,
-  organizationId,
   packs,
   portalPending,
   purchased,
   remaining,
-  showStackedPacks,
   welcomeCreditExpiresAt,
   onAddCredit,
   onManageInvoices,
@@ -164,17 +88,14 @@ function BillingPageBody({
   checkoutPending: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
   error: unknown;
-  factoryKey: string;
   grants: OrganizationsOrganizationCreditGrant[];
   hasBillingCustomer: boolean;
   invoices: OrganizationsHostedCreditInvoice[];
   isLoading: boolean;
-  organizationId: string;
   packs: OrganizationsHostedCreditProduct[];
   portalPending: boolean;
   purchased: number;
   remaining: number;
-  showStackedPacks: boolean;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
@@ -195,7 +116,6 @@ function BillingPageBody({
     );
   }
 
-  const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending");
   const showInvoices = billingEnabled && canManageBilling && hasBillingCustomer;
 
   return (
@@ -210,8 +130,6 @@ function BillingPageBody({
         packs={packs}
         purchased={purchased}
         remaining={remaining}
-        showStackedPacks={showStackedPacks}
-        spendingHref={spendingHref}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
         onAddCredit={onAddCredit}
       />
@@ -233,8 +151,6 @@ function HostedCreditRemainingCard({
   packs,
   purchased,
   remaining,
-  showStackedPacks,
-  spendingHref,
   welcomeCreditExpiresAt,
   onAddCredit,
 }: {
@@ -247,8 +163,6 @@ function HostedCreditRemainingCard({
   packs: OrganizationsHostedCreditProduct[];
   purchased: number;
   remaining: number;
-  showStackedPacks: boolean;
-  spendingHref: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
 }) {
@@ -262,51 +176,50 @@ function HostedCreditRemainingCard({
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
 
   return (
-    <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="workspace-section-label">Remaining hosted credit</p>
-            {copy.badge ? (
-              <Badge variant="outline" className="text-muted-foreground">
-                {copy.badge}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="workspace-page-title mt-1" data-testid="billing-remaining-credit">
-            {formatUsdCents(remaining)}
-          </p>
-          {creditRefreshMessage ? (
-            <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
+    <FactorySettingsCard
+      title="Hosted credit"
+      data-testid="billing-credit-balance"
+      action={
+        canManageBilling ? (
+          <HostedCreditBuyMoreMenu checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+        ) : undefined
+      }
+    >
+      <p className="text-sm text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
+      <div className="mt-4 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="workspace-section-label">Remaining hosted credit</p>
+          {copy.badge ? (
+            <Badge variant="outline" className="text-muted-foreground">
+              {copy.badge}
+            </Badge>
           ) : null}
-          {copy.description ? (
-            <p
-              className={cn(
-                "mt-3 text-sm",
-                remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
-              )}
-            >
-              {copy.description}
-            </p>
-          ) : null}
-          {!canManageBilling && billingContactMessage ? (
-            <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
-          ) : null}
-          <p className="mt-3 text-sm text-muted-foreground">
-            <Link className="underline underline-offset-2" to={spendingHref}>
-              View spending
-            </Link>
-          </p>
         </div>
-        {showStackedPacks ? (
-          <HostedCreditPackButtons checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+        <p className="workspace-page-title mt-1" data-testid="billing-remaining-credit">
+          {formatUsdCents(remaining)}
+        </p>
+        {creditRefreshMessage ? (
+          <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
+        ) : null}
+        {copy.description ? (
+          <p
+            className={cn(
+              "mt-3 text-sm",
+              remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+            )}
+          >
+            {copy.description}
+          </p>
+        ) : null}
+        {!canManageBilling && billingContactMessage ? (
+          <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
         ) : null}
       </div>
     </FactorySettingsCard>
   );
 }
 
-function HostedCreditPackButtons({
+function HostedCreditBuyMoreMenu({
   checkoutPending,
   packs,
   onAddCredit,
@@ -315,24 +228,36 @@ function HostedCreditPackButtons({
   packs: OrganizationsHostedCreditProduct[];
   onAddCredit: (productId: string) => void | Promise<void>;
 }) {
+  const hasPurchasablePack = BUY_MORE_PACK_CENTS.some((cents) => findPackForCents(packs, cents));
+
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-44" data-testid="billing-credit-packs">
-      {packs.map((product) => {
-        const productId = product.id ?? "";
-        const amount = parseWorkOrderMetric(product.amountCents);
-        return (
-          <Button
-            key={productId || amount}
-            type="button"
-            variant="outline"
-            disabled={!productId || checkoutPending}
-            onClick={() => productId && void onAddCredit(productId)}
-          >
-            {checkoutPending ? "Opening checkout..." : `Add ${formatUsdCents(amount)}`}
-          </Button>
-        );
-      })}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" disabled={checkoutPending || !hasPurchasablePack} data-testid="billing-buy-more">
+          {checkoutPending ? "Opening checkout..." : "Buy more"}
+          <ChevronDown className="size-3.5" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {BUY_MORE_PACK_CENTS.map((cents) => {
+          const product = findPackForCents(packs, cents);
+          const productId = product?.id ?? "";
+          return (
+            <DropdownMenuItem
+              key={cents}
+              disabled={!productId || checkoutPending}
+              onClick={() => productId && void onAddCredit(productId)}
+            >
+              {formatUsdPackLabel(cents)}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled title="Custom amounts are not available yet.">
+          Custom
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -431,10 +356,16 @@ function InvoiceTable({ invoices }: { invoices: OrganizationsHostedCreditInvoice
   );
 }
 
-function sortHostedCreditPacks(products: OrganizationsHostedCreditProduct[]) {
-  return products
-    .slice()
-    .sort((left, right) => parseWorkOrderMetric(left.amountCents) - parseWorkOrderMetric(right.amountCents));
+function findPackForCents(packs: OrganizationsHostedCreditProduct[], cents: number) {
+  return packs.find((product) => Boolean(product.id) && parseWorkOrderMetric(product.amountCents) === cents);
+}
+
+function formatUsdPackLabel(cents: number): string {
+  const dollars = cents / 100;
+  if (Number.isInteger(dollars)) {
+    return `$${dollars}`;
+  }
+  return formatUsdCents(cents);
 }
 
 function creditRefreshClassName(status: HostedCreditRefreshStatus) {

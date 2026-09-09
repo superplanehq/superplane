@@ -264,14 +264,14 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
 
 function expiredWelcomeCreditDescription(billingEnabled: boolean): string {
   if (billingEnabled) {
-    return "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Add hosted credit to purchase more.";
+    return "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Buy more to purchase hosted credit.";
   }
   return "Welcome credit expired. SuperPlane-hosted runs cannot start.";
 }
 
 function emptyHostedCreditDescription(billingEnabled: boolean): string {
   if (billingEnabled) {
-    return "Hosted credit is empty. Click Add hosted credit to purchase more.";
+    return "Hosted credit is empty. Click Buy more to purchase hosted credit.";
   }
   return "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
 }

@@ -300,6 +300,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "remaining hosted credit",
           "superplane grant",
           "purchased hosted credit",
+          "buy more",
         ],
       },
       {

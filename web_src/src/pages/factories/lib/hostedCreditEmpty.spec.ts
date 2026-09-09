@@ -72,7 +72,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
       }),
     ).toEqual({
       badge: "Trial",
-      description: "Hosted credit is empty. Click Add hosted credit to purchase more.",
+      description: "Hosted credit is empty. Click Buy more to purchase hosted credit.",
     });
   });
 
@@ -89,7 +89,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
     ).toEqual({
       badge: "Trial",
       description:
-        "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Add hosted credit to purchase more.",
+        "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Buy more to purchase hosted credit.",
     });
   });
 

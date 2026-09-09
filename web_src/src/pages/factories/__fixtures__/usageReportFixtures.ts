@@ -110,7 +110,7 @@ export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
 
 /** Polar packs for empty-credit Storybook recovery screens. */
 export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
-  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
-  { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+  { id: "prod-50", name: "Hosted credit 50", amountCents: "5000" },
   { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
 ];
