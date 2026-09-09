@@ -101,6 +101,37 @@ describe("liveLogSections", () => {
     expect(tools.tools[1]).toMatchObject({ sourceId: "toolu_b", status: "failed", duration_ms: 10 });
   });
 
+  it("attaches replayed tools to the active command, not the latest section", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 2,
+      text: "Plan with the user",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "Greet the user",
+    });
+    state = startToolOnLatestSection(state, "bash", "ls", "call_1");
+    state = endToolOnLatestSection(state, "passed", 5, "call_1");
+    state = startCommandSection(state, {
+      index: 1000,
+      text: "Wait for the next message",
+      startedAtMs: 2,
+      kind: "prompt",
+      preview: "Wait for the next user message",
+    });
+
+    state = startToolOnLatestSection(state, "bash", "ls", "call_1", 2);
+    state = endToolOnLatestSection(state, "failed", 99, "call_1", 2);
+
+    const first = state.sections[0].events[0];
+    expect(first?.kind).toBe("tools");
+    if (first?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(first.tools).toHaveLength(1);
+    expect(first.tools[0]).toMatchObject({ status: "passed", duration_ms: 5 });
+    expect(state.sections[1].events).toEqual([]);
+  });
+
   it("ignores replayed tool records with the same source id", () => {
     let state = startCommandSection(emptyState(), {
       index: 5,
@@ -182,6 +213,106 @@ describe("liveLogSections", () => {
     state = appendLineToLatestSection(state, "Cloning...");
     expect(state.sections[0].events).toEqual([]);
     expect(state.sections[0].lines).toEqual(["Cloning..."]);
+  });
+
+  it("does not replay earlier command output onto the current prompt", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 0,
+      text: "Prepare OpenRouter agent",
+      startedAtMs: 1,
+      kind: "setup",
+      preview: "Prepare OpenRouter agent",
+    });
+    state = appendLineToLatestSection(state, "Agent ready");
+    state = appendLineToLatestSection(state, "opencode=1.18.3");
+    state = completeCommandSection(state, 0, "passed", 10);
+    state = startCommandSection(state, {
+      index: 1,
+      text: "Clone Repo",
+      startedAtMs: 2,
+      kind: "bash",
+      preview: "git clone",
+    });
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...");
+    state = completeCommandSection(state, 1, "passed", 20);
+    state = startCommandSection(state, {
+      index: 2,
+      text: "Plan with the user",
+      startedAtMs: 3,
+      kind: "prompt",
+      preview: "Greet the user",
+    });
+    state = appendLineToLatestSection(state, "Starting OpenCode");
+    state = appendLineToLatestSection(state, "Hello! How can I help you today?");
+
+    const skip = new Map<number, number>([
+      [0, state.sections[0].lines.length],
+      [1, state.sections[1].lines.length],
+      [2, state.sections[2].lines.length],
+    ]);
+    state = appendLineToLatestSection(state, "Agent ready", skip, 0);
+    state = appendLineToLatestSection(state, "opencode=1.18.3", skip, 0);
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...", skip, 1);
+    state = appendLineToLatestSection(state, "Starting OpenCode", skip, 2);
+    state = appendLineToLatestSection(state, "Hello! How can I help you today?", skip, 2);
+    state = appendLineToLatestSection(state, "What should we work on?", skip, 2);
+
+    const prompt = state.sections[2];
+    expect(prompt.lines).toEqual(["Starting OpenCode", "Hello! How can I help you today?", "What should we work on?"]);
+    expect(prompt.events.map((event) => (event.kind === "note" ? event.text : event.kind))).toEqual([
+      "Starting OpenCode",
+      "Hello! How can I help you today?",
+      "What should we work on?",
+    ]);
+  });
+
+  it("drops replayed clone and greet lines that already belong to earlier commands", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 0,
+      text: "Prepare OpenRouter agent",
+      startedAtMs: 1,
+      kind: "setup",
+      preview: "Prepare OpenRouter agent",
+    });
+    state = appendLineToLatestSection(state, "Agent ready");
+    state = completeCommandSection(state, 0, "passed", 10);
+    state = startCommandSection(state, {
+      index: 1,
+      text: "Clone Repo",
+      startedAtMs: 2,
+      kind: "bash",
+      preview: "git clone",
+    });
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...");
+    state = completeCommandSection(state, 1, "passed", 20);
+    state = startCommandSection(state, {
+      index: 2,
+      text: "Plan with the user",
+      startedAtMs: 3,
+      kind: "prompt",
+      preview: "Greet the user",
+    });
+    state = appendLineToLatestSection(state, "Hello! How can I help you today?");
+    state = completeCommandSection(state, 2, "passed", 30);
+    state = startCommandSection(state, {
+      index: 1000,
+      text: "Wait for the next message",
+      startedAtMs: 4,
+      kind: "prompt",
+      preview: "Wait for the next user message",
+    });
+    state = appendLineToLatestSection(state, "I've proposed a draft.");
+
+    state = appendLineToLatestSection(state, "Agent ready");
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...");
+    state = appendLineToLatestSection(state, "Hello! How can I help you today?");
+    state = appendLineToLatestSection(state, "Agent ready", undefined, 0);
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...", undefined, 1);
+    state = appendLineToLatestSection(state, "Hello! How can I help you today?", undefined, 2);
+
+    const prompt = state.sections[3];
+    expect(prompt.lines).toEqual(["I've proposed a draft."]);
+    expect(prompt.events).toEqual([{ kind: "note", text: "I've proposed a draft." }]);
   });
 
   it("drops raw turn JSON so it does not appear as a log line", () => {

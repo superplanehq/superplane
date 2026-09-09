@@ -14,6 +14,8 @@ const { spawn } = require("child_process");
 
 const PLANNING_SYSTEM_PROMPT =
   "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
+  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
+  "After you show a draft, tell the user it is on the right and ask them to review it. " +
   "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
   "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
   "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +

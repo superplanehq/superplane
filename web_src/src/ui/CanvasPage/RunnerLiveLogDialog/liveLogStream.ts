@@ -30,7 +30,7 @@ type LiveLogSessionResponse = {
 };
 
 export type LiveLogStreamHandlers = {
-  onLogLine: (text: string) => void;
+  onLogLine: (text: string, commandIndex?: number) => void;
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
@@ -111,7 +111,11 @@ function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
     handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
     return true;
   }
-  handlers.onLogLine(rec.text);
+  if (typeof rec.index === "number") {
+    handlers.onLogLine(rec.text, rec.index);
+  } else {
+    handlers.onLogLine(rec.text);
+  }
   return true;
 }
 

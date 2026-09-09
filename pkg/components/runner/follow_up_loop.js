@@ -81,13 +81,17 @@ async function requestJSON(method, urlPath) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
+        "ngrok-skip-browser-warning": "1",
       },
     }),
   );
 }
 
 function isTransientWaitFailure(status, parsed) {
-  if (status === 429 || status === 502 || status === 503 || status === 504) {
+  if (status === 401) {
+    return false;
+  }
+  if (status >= 400) {
     return true;
   }
   return Boolean(parsed && (parsed.retryable === true || parsed.cloudflare_error === true));

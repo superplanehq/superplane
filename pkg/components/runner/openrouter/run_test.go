@@ -41,6 +41,7 @@ func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
 		"--dir", "/tmp/repo",
 		"do the work",
 	}, args)
+	assert.NotContains(t, args, "--print-logs")
 	assert.NotContains(t, args, "--agent")
 }
 
@@ -87,6 +88,13 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "allow", permission["*"])
 	assert.Nil(t, permission["edit"])
 	assert.Nil(t, config["mcp"])
+}
+
+func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
+	output := runOpenCodeFormatter(t, []string{
+		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
+	})
+	assert.Contains(t, output, "OpenCode started")
 }
 
 func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
@@ -179,8 +187,8 @@ func TestRunPromptSwitchesModelAfterNewAccountRPM(t *testing.T) {
 	assert.Contains(t, result.spawns[1], "--session")
 	assert.Contains(t, result.spawns[1], "ses_1")
 	assert.Contains(t, result.spawns[1], "openrouter/anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
 	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6 — switching to anthropic/claude-sonnet-4-6")
-	assert.NotContains(t, result.output, "new accounts are limited to 20 requests")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
@@ -212,6 +220,40 @@ func TestRunPromptWaitsWhenOnlyOneModelIsRateLimited(t *testing.T) {
 	assert.Equal(t, []float64{60000}, result.sleeps)
 	assert.Contains(t, result.output, "Rate limit notice — waiting to continue…")
 	assert.NotContains(t, result.output, "switching to")
+}
+
+func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "google/gemma-4-31b-it",
+		fallback: []string{"google/gemma-4-31b-it"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "Hello! How can I help you today?", payload["result"])
+	assert.Regexp(t, `✓ done`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithoutReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "google/gemma-4-31b-it",
+		fallback: []string{"google/gemma-4-31b-it"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stderr:   "opencode crashed",
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
 }
 
 func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
@@ -292,6 +334,7 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "--auto")
 	assert.Equal(t, "--pure", result.spawns[0][0])
 	assert.Equal(t, "run", result.spawns[0][1])
+	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
 }
 
 func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
@@ -346,6 +389,9 @@ func TestOpenCodeProcessEnvSetsPureAndIsolatesHomes(t *testing.T) {
 	env := jsOpenCodeProcessEnv(t, "/task")
 	assert.Equal(t, "1", env["OPENCODE_PURE"])
 	assert.Equal(t, "1", env["OPENCODE_DISABLE_AUTOUPDATE"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_MODELS_FETCH"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_LSP_DOWNLOAD"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_CLAUDE_CODE"])
 	assert.Equal(t, "/task/opencode.json", env["OPENCODE_CONFIG"])
 	assert.Equal(t, "/task/xdg/data", env["XDG_DATA_HOME"])
 }

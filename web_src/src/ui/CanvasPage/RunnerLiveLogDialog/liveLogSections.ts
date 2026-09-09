@@ -66,19 +66,26 @@ export function appendLineToLatestSection(
   state: LogState,
   text: string,
   replayLineSkip?: Map<number, number>,
+  commandIndex?: number,
 ): LogState {
   if (isRawAgentTurnLiveLogText(text)) {
     return state;
   }
-  if (state.sections.length === 0) {
+  const sectionPos = commandSectionPosition(state, commandIndex);
+  if (sectionPos < 0) {
     return {
       ...state,
       orphanLines: [...state.orphanLines, text],
     };
   }
 
-  const lastSectionIndex = state.sections.length - 1;
-  const section = state.sections[lastSectionIndex];
+  const section = state.sections[sectionPos];
+  if (section.status !== "running") {
+    return state;
+  }
+  if (lineOwnedByOtherSection(state, text, section.index)) {
+    return state;
+  }
   const skipLeft = replayLineSkip?.get(section.index) ?? 0;
   if (skipLeft > 0) {
     replayLineSkip?.set(section.index, skipLeft - 1);
@@ -86,24 +93,33 @@ export function appendLineToLatestSection(
   }
 
   const nextSections = [...state.sections];
-  nextSections[lastSectionIndex] = appendLineToSection(section, text);
+  nextSections[sectionPos] = appendLineToSection(section, text);
   return {
     ...state,
     sections: nextSections,
   };
 }
 
-export function startToolOnLatestSection(state: LogState, kind: string, text: string, sourceId?: string): LogState {
-  if (state.sections.length === 0) {
+export function startToolOnLatestSection(
+  state: LogState,
+  kind: string,
+  text: string,
+  sourceId?: string,
+  commandIndex?: number,
+): LogState {
+  const sectionPos = commandSectionPosition(state, commandIndex);
+  if (sectionPos < 0) {
     return state;
   }
-  const lastSectionIndex = state.sections.length - 1;
-  const section = state.sections[lastSectionIndex];
+  const section = state.sections[sectionPos];
+  if (section.status !== "running") {
+    return state;
+  }
   if (sourceId && findToolInSection(section, sourceId)) {
     return state;
   }
   const nextSections = [...state.sections];
-  nextSections[lastSectionIndex] = startToolOnSection(section, kind, text, sourceId);
+  nextSections[sectionPos] = startToolOnSection(section, kind, text, sourceId);
   return { ...state, sections: nextSections };
 }
 
@@ -112,12 +128,13 @@ export function endToolOnLatestSection(
   status: "passed" | "failed",
   durationMs: number,
   sourceId?: string,
+  commandIndex?: number,
 ): LogState {
-  if (state.sections.length === 0) {
+  const sectionPos = commandSectionPosition(state, commandIndex);
+  if (sectionPos < 0) {
     return state;
   }
-  const lastSectionIndex = state.sections.length - 1;
-  const section = state.sections[lastSectionIndex];
+  const section = state.sections[sectionPos];
   if (sourceId) {
     const existing = findToolInSection(section, sourceId);
     if (existing && existing.status !== "running") {
@@ -125,8 +142,23 @@ export function endToolOnLatestSection(
     }
   }
   const nextSections = [...state.sections];
-  nextSections[lastSectionIndex] = endOpenTool(section, status, durationMs, sourceId);
+  nextSections[sectionPos] = endOpenTool(section, status, durationMs, sourceId);
   return { ...state, sections: nextSections };
+}
+
+function commandSectionPosition(state: LogState, commandIndex?: number): number {
+  if (commandIndex === undefined) {
+    return state.sections.length - 1;
+  }
+  return state.sections.findIndex((section) => section.index === commandIndex);
+}
+
+function lineOwnedByOtherSection(state: LogState, text: string, commandIndex: number): boolean {
+  const needle = text.trim();
+  if (!needle) {
+    return false;
+  }
+  return state.sections.some((section) => section.index !== commandIndex && section.lines.includes(text));
 }
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {

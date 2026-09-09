@@ -111,11 +111,16 @@ function createStreamHandlers(
   executionInFlight: boolean,
   setState: Dispatch<SetStateAction<LogState>>,
   setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>,
+  commandCursor: { index?: number },
 ): LiveLogStreamHandlers {
   return {
-    onLogLine: (text) => setState((prev) => appendLineToLatestSection(prev, text, replayLineSkip)),
+    onLogLine: (text, commandIndex) => {
+      const index = commandIndex ?? commandCursor.index;
+      setState((prev) => appendLineToLatestSection(prev, text, replayLineSkip, index));
+    },
     onStreamError: (message) => setState((prev) => applyStreamFailure(prev, message, executionInFlight)),
     onCmdStart: (index, text, startedAtMs, kind, preview) => {
+      commandCursor.index = index;
       setState((prev) => {
         const existing = prev.sections.find((section) => section.index === index);
         if (existing) {
@@ -133,11 +138,11 @@ function createStreamHandlers(
     onCmdEnd: (index, status, durationMs) =>
       setState((prev) => completeCommandSection(prev, index, status, durationMs)),
     onToolStart: (kind, text, id, turn) => {
-      setState((prev) => startToolOnLatestSection(prev, kind, text, id));
+      setState((prev) => startToolOnLatestSection(prev, kind, text, id, commandCursor.index));
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_start", kind, text, id, turn }));
     },
     onToolEnd: (status, durationMs, id, turn) => {
-      setState((prev) => endToolOnLatestSection(prev, status, durationMs, id));
+      setState((prev) => endToolOnLatestSection(prev, status, durationMs, id, commandCursor.index));
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
     },
     onTurn: (turn, usage, message) => {
@@ -193,6 +198,7 @@ async function runLiveLogSession({
   setActiveStream,
 }: LiveLogSessionParams): Promise<void> {
   let reconnecting = false;
+  const commandCursor: { index?: number } = {};
 
   while (!sessionAbort.signal.aborted) {
     const stream = new LiveLogStream(organizationId, canvasId, executionId);
@@ -200,7 +206,9 @@ async function runLiveLogSession({
     const replayLineSkip = new Map<number, number>();
 
     try {
-      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, executionInFlight, setState, setUsage));
+      await stream.pump(
+        createStreamHandlers(reconnecting, replayLineSkip, executionInFlight, setState, setUsage, commandCursor),
+      );
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
