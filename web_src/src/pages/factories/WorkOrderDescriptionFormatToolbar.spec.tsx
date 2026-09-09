@@ -27,6 +27,20 @@ describe("WorkOrderDescriptionFormatToolbar attach control", () => {
     editor.destroy();
   });
 
+  it("activates the hidden file input when the attach button is clicked", () => {
+    const editor = markdownEditor();
+
+    render(<WorkOrderDescriptionFormatToolbar editor={editor} disabled={false} onUploadFiles={vi.fn()} />);
+
+    const input = screen.getByTestId("work-order-description-file-input") as HTMLInputElement;
+    const clickInput = vi.spyOn(input, "click");
+
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+
+    expect(clickInput).toHaveBeenCalledTimes(1);
+    editor.destroy();
+  });
+
   it("uploads a selected image and inserts it as an sp-file ref", async () => {
     const editor = markdownEditor();
     const onUploadFiles = vi.fn().mockResolvedValue([
