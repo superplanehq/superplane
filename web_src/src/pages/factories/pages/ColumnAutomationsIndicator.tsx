@@ -1,8 +1,7 @@
-import { emptyColumnAutomationActivity } from "../lib/columnAutomationActivity";
 import type { ColumnAutomation } from "../lib/columnAutomations";
-import { ColumnAutomationsPopup, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
+import { ColumnAutomationIconButton, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 
-/** One header icon for each configured automation. */
+/** One header icon for each configured automation. Click opens settings. */
 export function ColumnAutomationsHeaderSlot({
   title,
   automations,
@@ -21,11 +20,7 @@ export function ColumnAutomationsHeaderSlot({
     <div className="flex shrink-0 items-center" role="list" aria-label={`${title} automations`} data-testid={testId}>
       {automations.map((automation) => (
         <div key={automation.id} role="listitem">
-          <ColumnAutomationsPopup
-            automation={automation}
-            activity={automation.activity ?? emptyColumnAutomationActivity(automation.runningCount)}
-            onAction={(action) => onRowAction(automation, action)}
-          />
+          <ColumnAutomationIconButton automation={automation} onClick={() => onRowAction(automation, "settings")} />
         </div>
       ))}
     </div>
