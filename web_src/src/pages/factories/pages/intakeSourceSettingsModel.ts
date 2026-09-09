@@ -20,10 +20,12 @@ export interface IntakeSourceSettings {
   /** Show and apply the label chip list. Off means every issue matches. */
   filterByLabel: boolean;
   assignment: IntakeAssignmentFilter;
-  /** Create a task when a GitHub issue is created or re-opened. */
+  /** Create a task when a GitHub issue is created. */
   newIssues: boolean;
-  /** Also create a task when an open issue is assigned to the agent. */
-  assignedToAgent: boolean;
+  /** Create a task when a closed GitHub issue is re-opened. */
+  reopenedIssues: boolean;
+  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
 }
 
@@ -35,7 +37,8 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   filterByLabel: false,
   assignment: "any",
   newIssues: true,
-  assignedToAgent: false,
+  reopenedIssues: true,
+  superplaneLabelAdded: false,
   authorsWithAccess: false,
 };
 
@@ -52,7 +55,8 @@ export const INTAKE_SETTINGS_COPY = {
   retryAutomation: "Try again",
   intakeSection: "Create tasks from",
   filtersLabel: "Filters",
-  newIssues: "New and re-opened issues",
+  newIssues: "New issues",
+  reopenedIssues: "Re-opened issues",
   filterByLabel: "Only issues with any of these labels",
   labelInput: "Issue label",
   labelPlaceholder: "Type a label name",
@@ -61,7 +65,7 @@ export const INTAKE_SETTINGS_COPY = {
   labelCancel: "Cancel",
   labelsLoading: "Loading labels from the repository",
   labelsEmpty: "No labels found in the repository. Add a label name.",
-  assignedToAgent: "Issues assigned to @superplaneagent",
+  superplaneLabelAdded: 'Issues you label "superplane"',
   authorsWithAccess: "Only issues from people with repository access",
   save: "Save",
   saving: "Saving",
@@ -87,6 +91,21 @@ export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): Inta
   return { ...draft, confidencePct };
 }
 
+type IntakeToggles = Pick<
+  IntakeSourceSettings,
+  "newIssues" | "reopenedIssues" | "superplaneLabelAdded" | "authorsWithAccess"
+>;
+
+/** A response that omits a toggle predates it, so fall back to the default. */
+function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefined): IntakeToggles {
+  return {
+    newIssues: settings?.newIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.newIssues,
+    reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
+    superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
+    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+  };
+}
+
 export function intakeSettingsFromApi(
   name: string,
   settings: FactoriesFactoryIntakeSettings | undefined,
@@ -99,9 +118,7 @@ export function intakeSettingsFromApi(
     labels,
     filterByLabel: labels.length > 0,
     assignment: assignmentFromApi(settings?.assignment),
-    newIssues: settings?.newIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.newIssues,
-    assignedToAgent: settings?.assignedToAgent ?? DEFAULT_GITHUB_INTAKE_SETTINGS.assignedToAgent,
-    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    ...intakeTogglesFromApi(settings),
   };
 }
 
@@ -119,7 +136,8 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
           : "ASSIGNMENT_ANY",
     authorsWithAccess: settings.authorsWithAccess,
     newIssues: settings.newIssues,
-    assignedToAgent: settings.assignedToAgent,
+    reopenedIssues: settings.reopenedIssues,
+    superplaneLabelAdded: settings.superplaneLabelAdded,
   };
 }
 

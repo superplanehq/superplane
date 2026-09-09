@@ -160,8 +160,9 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("radio", { name: /Run on a schedule/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Create tasks from" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "New and re-opened issues" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Issues assigned to @superplaneagent" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "New issues" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Re-opened issues" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: 'Issues you label "superplane"' })).not.toBeChecked();
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Only issues with any of these labels" })).not.toBeChecked();
     expect(screen.queryByTestId("intake-label-options")).not.toBeInTheDocument();
@@ -306,7 +307,8 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await user.click(screen.getByRole("checkbox", { name: "Only issues with any of these labels" }));
     await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
-    await user.click(screen.getByRole("checkbox", { name: "Issues assigned to @superplaneagent" }));
+    await user.click(screen.getByRole("checkbox", { name: "Re-opened issues" }));
+    await user.click(screen.getByRole("checkbox", { name: 'Issues you label "superplane"' }));
     await user.click(screen.getByRole("checkbox", { name: "Only issues from people with repository access" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
@@ -319,7 +321,8 @@ describe("IntakeSourceSettingsPopup", () => {
         filterByLabel: true,
         assignment: "any",
         newIssues: true,
-        assignedToAgent: true,
+        reopenedIssues: false,
+        superplaneLabelAdded: true,
         authorsWithAccess: true,
       }),
     );

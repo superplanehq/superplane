@@ -56,9 +56,14 @@ export function GitHubIntakeFilterFields({
             onChange={() => update("newIssues", !settings.newIssues)}
           />
           <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.assignedToAgent}
-            checked={settings.assignedToAgent}
-            onChange={() => update("assignedToAgent", !settings.assignedToAgent)}
+            title={INTAKE_SETTINGS_COPY.reopenedIssues}
+            checked={settings.reopenedIssues}
+            onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
+          />
+          <IntakeSettingsCheckbox
+            title={INTAKE_SETTINGS_COPY.superplaneLabelAdded}
+            checked={settings.superplaneLabelAdded}
+            onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
           />
         </div>
       </fieldset>

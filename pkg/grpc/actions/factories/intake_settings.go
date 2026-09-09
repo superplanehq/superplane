@@ -30,10 +30,14 @@ const (
 
 	intakeAuthorAccessCondition = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
 
+	// Label that a user adds to an issue to hand it to the factory.
+	intakeSuperplaneLabel = "superplane"
+
 	// Conditions are joined with `&&`, which binds tighter than `||`, so a
 	// compound condition has to carry its own parentheses. The `||` also has
-	// to short-circuit: only an `assigned` payload has an assignee to read.
-	intakeAssignedToAgentCondition = `(root().data.action != "assigned" || (root().data.issue.state == "open" && root().data.assignee.login == "superplaneagent"))`
+	// to short-circuit: only a `labeled` payload carries a label to read.
+	intakeSuperplaneLabelCondition = `(root().data.action != "labeled" || (root().data.issue.state == "open" && root().data.label.name == "` +
+		intakeSuperplaneLabel + `"))`
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -46,7 +50,9 @@ type intakeSettings struct {
 	Assignment        string
 	AuthorsWithAccess bool
 	NewIssues         bool
-	AssignedToAgent   bool
+	ReopenedIssues    bool
+	// Create a task when somebody adds the "superplane" label to an open issue.
+	SuperplaneLabelAdded bool
 }
 
 func defaultIntakeSettings() intakeSettings {
@@ -56,6 +62,7 @@ func defaultIntakeSettings() intakeSettings {
 		LabelFilterMode: intakeLabelFilterInclude,
 		Assignment:      intakeAssignmentAny,
 		NewIssues:       true,
+		ReopenedIssues:  true,
 		// AuthorsWithAccess is off by default: false.
 	}
 }
@@ -112,8 +119,8 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	if settings.AuthorsWithAccess {
 		conditions = append(conditions, intakeAuthorAccessCondition)
 	}
-	if settings.AssignedToAgent {
-		conditions = append(conditions, intakeAssignedToAgentCondition)
+	if settings.SuperplaneLabelAdded {
+		conditions = append(conditions, intakeSuperplaneLabelCondition)
 	}
 
 	if len(conditions) == 0 {
@@ -126,20 +133,25 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 func intakeTriggerActionsFor(settings intakeSettings) []any {
 	actions := []any{}
 	if settings.NewIssues {
-		actions = append(actions, "opened", "reopened")
+		actions = append(actions, "opened")
 	}
-	if settings.AssignedToAgent {
-		actions = append(actions, "assigned")
+	if settings.ReopenedIssues {
+		actions = append(actions, "reopened")
+	}
+	if settings.SuperplaneLabelAdded {
+		actions = append(actions, "labeled")
 	}
 	return actions
 }
 
 func intakeSettingsChangeTrigger(current, updated intakeSettings) bool {
-	return current.NewIssues != updated.NewIssues || current.AssignedToAgent != updated.AssignedToAgent
+	return current.NewIssues != updated.NewIssues ||
+		current.ReopenedIssues != updated.ReopenedIssues ||
+		current.SuperplaneLabelAdded != updated.SuperplaneLabelAdded
 }
 
 func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
-	if current.AssignedToAgent != updated.AssignedToAgent {
+	if current.SuperplaneLabelAdded != updated.SuperplaneLabelAdded {
 		return true
 	}
 	if current.LabelFilterMode != updated.LabelFilterMode {
@@ -179,8 +191,9 @@ func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) inta
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
 	if trigger != nil {
 		actions := configurationStrings(trigger.Configuration["actions"])
-		settings.NewIssues = slices.Contains(actions, "opened") || slices.Contains(actions, "reopened")
-		settings.AssignedToAgent = slices.Contains(actions, "assigned")
+		settings.NewIssues = slices.Contains(actions, "opened")
+		settings.ReopenedIssues = slices.Contains(actions, "reopened")
+		settings.SuperplaneLabelAdded = slices.Contains(actions, "labeled")
 	}
 
 	filter := findIntakeNode(spec.Nodes, graph.FilterNodeID)
@@ -219,13 +232,14 @@ func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) inta
 
 func serializeIntakeSettings(settings intakeSettings) *pb.FactoryIntake_Settings {
 	return &pb.FactoryIntake_Settings{
-		ConfidencePct:     int32(settings.ConfidencePct),
-		Labels:            settings.Labels,
-		LabelFilterMode:   serializeIntakeLabelFilterMode(settings.LabelFilterMode),
-		Assignment:        serializeIntakeAssignment(settings.Assignment),
-		AuthorsWithAccess: settings.AuthorsWithAccess,
-		NewIssues:         proto.Bool(settings.NewIssues),
-		AssignedToAgent:   proto.Bool(settings.AssignedToAgent),
+		ConfidencePct:        int32(settings.ConfidencePct),
+		Labels:               settings.Labels,
+		LabelFilterMode:      serializeIntakeLabelFilterMode(settings.LabelFilterMode),
+		Assignment:           serializeIntakeAssignment(settings.Assignment),
+		AuthorsWithAccess:    settings.AuthorsWithAccess,
+		NewIssues:            proto.Bool(settings.NewIssues),
+		ReopenedIssues:       proto.Bool(settings.ReopenedIssues),
+		SuperplaneLabelAdded: proto.Bool(settings.SuperplaneLabelAdded),
 	}
 }
 
@@ -250,8 +264,11 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if requested.NewIssues != nil {
 		updated.NewIssues = requested.GetNewIssues()
 	}
-	if requested.AssignedToAgent != nil {
-		updated.AssignedToAgent = requested.GetAssignedToAgent()
+	if requested.ReopenedIssues != nil {
+		updated.ReopenedIssues = requested.GetReopenedIssues()
+	}
+	if requested.SuperplaneLabelAdded != nil {
+		updated.SuperplaneLabelAdded = requested.GetSuperplaneLabelAdded()
 	}
 
 	return updated.normalized()

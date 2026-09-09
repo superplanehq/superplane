@@ -181,7 +181,8 @@ describe("IntakeSettingsHost", () => {
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("checkbox", { name: "New and re-opened issues" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "New issues" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Re-opened issues" })).toBeChecked();
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -260,7 +261,8 @@ describe("IntakeSettingsHost", () => {
         assignment: "ASSIGNMENT_ANY",
         authorsWithAccess: false,
         newIssues: true,
-        assignedToAgent: false,
+        reopenedIssues: true,
+        superplaneLabelAdded: false,
       },
     });
   });

@@ -60,14 +60,34 @@ describe("intakeSourceSettingsModel", () => {
   it("round-trips GitHub issue events through the API shape", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {
       newIssues: false,
-      assignedToAgent: true,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
     });
 
     expect(settings.newIssues).toBe(false);
-    expect(settings.assignedToAgent).toBe(true);
+    expect(settings.reopenedIssues).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(true);
     expect(intakeSettingsToApi(settings)).toMatchObject({
       newIssues: false,
-      assignedToAgent: true,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
     });
+  });
+
+  it("keeps the new and re-opened toggles apart", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: true,
+      reopenedIssues: false,
+    });
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(false);
+  });
+
+  it("defaults both issue event toggles on when the API omits them", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {});
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(true);
   });
 });

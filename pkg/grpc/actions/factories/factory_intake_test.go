@@ -387,21 +387,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 		newIssues := false
-		assignedToAgent := true
+		reopenedIssues := false
+		superplaneLabelAdded := true
 
 		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Settings: &pb.FactoryIntake_Settings{
-				NewIssues:       &newIssues,
-				AssignedToAgent: &assignedToAgent,
+				NewIssues:            &newIssues,
+				ReopenedIssues:       &reopenedIssues,
+				SuperplaneLabelAdded: &superplaneLabelAdded,
 			},
 		})
 		require.NoError(t, err)
 
 		settings := response.GetIntake().GetSettings()
 		assert.False(t, settings.GetNewIssues())
-		assert.True(t, settings.GetAssignedToAgent())
+		assert.False(t, settings.GetReopenedIssues())
+		assert.True(t, settings.GetSuperplaneLabelAdded())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		require.NoError(t, err)
@@ -411,9 +414,39 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		for _, node := range liveVersion.Nodes {
 			switch node.ID {
 			case intakeTriggerNodeID:
-				assert.Equal(t, []any{"assigned"}, node.Configuration["actions"])
+				assert.Equal(t, []any{"labeled"}, node.Configuration["actions"])
 			case intakeFilterNodeID:
-				assert.Contains(t, node.Configuration["expression"], intakeAssignedToAgentCondition)
+				assert.Contains(t, node.Configuration["expression"], intakeSuperplaneLabelCondition)
+			}
+		}
+	})
+
+	t.Run("the new and re-opened toggles reach the trigger on their own", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		reopenedIssues := false
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				ReopenedIssues: &reopenedIssues,
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.True(t, settings.GetNewIssues())
+		assert.False(t, settings.GetReopenedIssues())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeTriggerNodeID {
+				assert.Equal(t, []any{"opened"}, node.Configuration["actions"])
 			}
 		}
 	})
