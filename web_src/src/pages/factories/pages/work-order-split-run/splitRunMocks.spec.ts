@@ -81,7 +81,6 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toBe("implement");
     expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
       ["Backlog", "passed"],
-      ["Create plan", "passed"],
       ["Implement", "running"],
     ]);
   });
@@ -415,7 +414,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       { lineId: "line-1" },
     );
 
-    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
   });
 
   it("prefers an older active dispatch over a newer finished rerun", () => {
@@ -460,7 +459,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       { lineId: "line-1" },
     );
 
-    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
     expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
   });
 
@@ -1387,7 +1386,6 @@ describe("line board work-order examples", () => {
       fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
     ).toEqual([
       ["backlog", "Backlog", "Created manually", "passed", "2s"],
-      ["planning-0", "Plan", "Planning", "passed", "2m 59s"],
       ["implementation-1", "Implement", "Implementation", "passed", "23m 56s"],
       ["pr-creation-2", "PR Creation", "PR Creation", "passed", "1m 23s"],
       ["ci-loop-3", "Verify", "Risk Assessment", "passed", "10m 12s"],
@@ -1401,7 +1399,6 @@ describe("line board work-order examples", () => {
       ],
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "backlog"))).toEqual(["description.md"]);
-    expect(outputNames(fixture.phases.find((phase) => phase.id === "planning-0"))).toEqual(["PLAN.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implementation-1"))).toEqual([
       "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9",
     ]);

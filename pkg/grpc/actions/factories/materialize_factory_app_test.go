@@ -73,11 +73,11 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 
 	t.Run("a newly created app materializes its install template", func(t *testing.T) {
 		factoryModel := newFactory(t)
-		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Plan"))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))
 
 		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
 			FactoryId:  factoryModel.ID.String(),
-			TemplateId: "line-planning",
+			TemplateId: "line-implementation",
 			AppId:      canvas.ID.String(),
 			InstallParams: map[string]string{
 				"appRepository": "acme/app",
@@ -85,7 +85,7 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "line-planning", response.GetTemplateId())
+		assert.Equal(t, "line-implementation", response.GetTemplateId())
 		assert.NotEmpty(t, response.GetCanvasYaml())
 		assert.NotEmpty(t, response.GetConsoleYaml())
 	})
@@ -125,9 +125,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		assertNoRunnerNode(t, defaults)
 	})
 
-	t.Run("Plan with Claude BYOK resets to SuperPlane when the instance default is set", func(t *testing.T) {
+	t.Run("Implement with Claude BYOK resets to SuperPlane when the instance default is set", func(t *testing.T) {
 		factoryModel := newFactory(t)
-		canvas := createClaudePlanningCanvas(t, r, factoryModel.ID)
+		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 		enableInstanceSuperPlaneDefault(t)
 
 		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
@@ -135,16 +135,16 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 			AppId:     canvas.ID.String(),
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "line-planning", response.GetTemplateId())
+		assert.Equal(t, "line-implementation", response.GetTemplateId())
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, "planner-agent-no-issue"))
+		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, "implementation-agent-no-issue"))
 	})
 
-	t.Run("Plan keeps the Claude agent when the instance default is unset", func(t *testing.T) {
+	t.Run("Implement keeps the Claude agent when the instance default is unset", func(t *testing.T) {
 		factoryModel := newFactory(t)
-		canvas := createClaudePlanningCanvas(t, r, factoryModel.ID)
+		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 
 		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
@@ -154,7 +154,7 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		agent := findYAMLNode(t, defaults, "planner-agent-no-issue")
+		agent := findYAMLNode(t, defaults, "implementation-agent-no-issue")
 		assert.Equal(t, "runnerClaudeCode", agent.Component)
 		assert.Equal(t, "opus", agent.Configuration["model"])
 		assert.Equal(t, map[string]any{
@@ -269,21 +269,21 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 	})
 }
 
-func createClaudePlanningCanvas(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID) *models.Canvas {
+func createClaudeImplementationCanvas(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID) *models.Canvas {
 	t.Helper()
-	canvas := support.CreateFactoryCanvas(t, r, factoryID, "Plan")
+	canvas := support.CreateFactoryCanvas(t, r, factoryID, "Implement")
 	require.NoError(t, database.DB(t.Context()).Model(&models.CanvasVersion{}).
 		Where("id = ?", *canvas.LiveVersionID).
 		Update("nodes", datatypes.NewJSONSlice([]models.Node{
 			{
-				ID:   "onrun-create-plan",
+				ID:   "onrun-implement",
 				Name: "On Run",
 				Type: models.NodeTypeTrigger,
 				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}},
 			},
 			{
-				ID:   "planner-agent-no-issue",
-				Name: "Planner",
+				ID:   "implementation-agent-no-issue",
+				Name: "Implement",
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
 				Configuration: map[string]any{

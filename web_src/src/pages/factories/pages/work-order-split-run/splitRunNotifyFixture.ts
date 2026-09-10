@@ -1,6 +1,5 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { implementationPlanMarkdown } from "../onboarding/first-run/reviewCandidateModel";
 import { doneFooterForStatus } from "./splitRunFooter";
 import type { SplitRunCanvasKey } from "./splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
@@ -15,19 +14,6 @@ function markdownArtifact(id: string, name: string, body: string): FactoriesWork
     type: "TYPE_MARKDOWN",
     data: { name, title: name, body },
   };
-}
-
-function notifyPlanMarkdown(order: FactoriesWorkOrder): string {
-  return implementationPlanMarkdown({
-    goal: order.title ?? "Send a notification when a work-order status changes after a reopen.",
-    files: ["pkg/workers/work_order_status.go", "web_src/src/pages/factories/lib/workOrderStatusNote.ts"],
-    steps: [
-      "Find the reopen path that updates work-order status.",
-      "Send the same status-change notification that other status updates send.",
-      "Cover the reopen path with a regression test.",
-    ],
-    verify: ["A reopen sends one status-change notification.", "The existing notification suite passes."],
-  });
 }
 
 function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
@@ -313,7 +299,6 @@ function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStream
 export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPhase[] {
   const orderId = order.id ?? "notify";
   const description = markdownArtifact(`art-description-${orderId}`, "description.md", order.description ?? "");
-  const plan = markdownArtifact(`art-plan-${orderId}`, "PLAN.md", notifyPlanMarkdown(order));
   const branch = notifyBranchArtifact(orderId);
   const pullRequest = notifyPullRequest(orderId);
   const run = orderRun(order);
@@ -325,15 +310,6 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "Created manually",
       duration: "2s",
       artifacts: [description],
-    }),
-    passedPhase({
-      id: "planning-0",
-      name: "Plan",
-      componentName: "Planning",
-      duration: "2m 59s",
-      artifacts: [plan],
-      appId: "app-refund-planner",
-      canvasKey: "planning",
     }),
     passedPhase({
       id: "implementation-1",
