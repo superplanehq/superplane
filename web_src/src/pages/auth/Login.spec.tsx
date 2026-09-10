@@ -138,6 +138,36 @@ describe("Login automatic magic-code signup", () => {
     expect(localStorage.getItem("superplane:pending_signup_analytics_preference")).toBeNull();
   });
 
+  it("requests an email code when signup preference cleanup fails", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/auth/config") {
+        return mockAuthConfig();
+      }
+      if (url === "/auth/magic-code/request") {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ message: "sent" }),
+        } as Response;
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderLogin();
+
+    await screen.findByRole("button", { name: "Continue with email" });
+    await user.type(screen.getByPlaceholderText("you@example.com"), "new@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
+
+    expect(fetchMock).toHaveBeenCalledWith("/auth/magic-code/request", expect.objectContaining({ method: "POST" }));
+  });
+
   it("shows the closed notice when signup becomes disabled during verification", async () => {
     authConfig.signupsBlockedByEnvironment = true;
     const user = userEvent.setup();

@@ -129,7 +129,11 @@ const SignUpTermsDisclosure: React.FC = () => (
 
 const updateSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
   if (!enabled) {
-    clearPendingSignupAnalyticsPreference();
+    try {
+      clearPendingSignupAnalyticsPreference();
+    } catch {
+      // Analytics storage must not block authentication.
+    }
     return;
   }
 
