@@ -692,6 +692,21 @@ CREATE TABLE public.factory_work_order_comments (
 
 
 --
+-- Name: factory_work_order_dispatch_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_dispatch_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    idempotency_key character varying(255) NOT NULL,
+    request_fingerprint character varying(64) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1798,6 +1813,22 @@ ALTER TABLE ONLY public.factory_work_order_comments
 
 
 --
+-- Name: factory_work_order_dispatch_requests factory_work_order_dispatch_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_dispatch_requests
+    ADD CONSTRAINT factory_work_order_dispatch_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_work_order_dispatch_requests factory_work_order_dispatch_requests_work_order_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_dispatch_requests
+    ADD CONSTRAINT factory_work_order_dispatch_requests_work_order_key UNIQUE (work_order_id, idempotency_key);
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2719,6 +2750,20 @@ CREATE INDEX idx_factory_work_order_comment_mentions_user_id ON public.factory_w
 --
 
 CREATE INDEX idx_factory_work_order_comments_work_order_created ON public.factory_work_order_comments USING btree (work_order_id, created_at, id);
+
+
+--
+-- Name: idx_factory_work_order_dispatch_requests_factory; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_dispatch_requests_factory ON public.factory_work_order_dispatch_requests USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_work_order_dispatch_requests_organization; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_dispatch_requests_organization ON public.factory_work_order_dispatch_requests USING btree (organization_id);
 
 
 --
@@ -3714,6 +3759,22 @@ ALTER TABLE ONLY public.factory_work_order_comments
 
 
 --
+-- Name: factory_work_order_dispatch_requests factory_work_order_dispatch_requests_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_dispatch_requests
+    ADD CONSTRAINT factory_work_order_dispatch_requests_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_dispatch_requests factory_work_order_dispatch_requests_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_dispatch_requests
+    ADD CONSTRAINT factory_work_order_dispatch_requests_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4377,7 +4438,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260909151005	f
+20260910170606	f
 \.
 
 

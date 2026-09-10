@@ -442,7 +442,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Dispatch a work order";
-      description: "Dispatches a work order to a factory line";
+      description: "Dispatches a work order to a factory line. Supply an idempotency key to retry a request safely.";
       tags: "Factory";
     };
   }
@@ -1604,6 +1604,11 @@ message DispatchWorkOrderRequest {
   bool replace_active = 5;
   // Optional model override for this start. Empty means Auto.
   string model = 6;
+  // Optional key for safe retries. The key is scoped to this work order.
+  // A completed request returns the current work order and creates no new work.
+  // Reuse with different dispatch parameters returns ALREADY_EXISTS. Failed
+  // requests do not consume the key. The maximum length is 255 characters.
+  optional string idempotency_key = 7;
 }
 
 message DispatchWorkOrderResponse {

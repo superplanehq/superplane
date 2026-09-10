@@ -2,9 +2,14 @@ package factories
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,7 +21,17 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+const dispatchIdempotencyKeyMaxLength = 255
+
+type dispatchRequestParameters struct {
+	LineName       string `json:"lineName"`
+	StartStepIndex int32  `json:"startStepIndex"`
+	ReplaceActive  bool   `json:"replaceActive"`
+	Model          string `json:"model"`
+}
 
 func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.DispatchWorkOrderRequest) (*pb.DispatchWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
@@ -39,6 +54,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
+	idempotencyKey, err := dispatchIdempotencyKey(req)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+	requestFingerprint := dispatchRequestFingerprint(req, lineName)
+
 	var actor *uuid.UUID
 	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
 		parsed, err := uuid.Parse(userIDStr)
@@ -53,6 +74,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var startedSteps []*models.FactoryLineStepResult
 	var logger *log.Entry
 	var fromState string
+	var repeatedRequest bool
 
 	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -62,12 +84,31 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 		factory = f
 
-		order, err = factory.FindWorkOrder(tx, orderID)
+		order, err = factory.FindWorkOrder(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orderID)
 		if err != nil {
 			return err
 		}
 
 		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+		if idempotencyKey != "" {
+			reserved, err := models.ReserveFactoryWorkOrderDispatchRequest(tx, &models.FactoryWorkOrderDispatchRequest{
+				ID:                 uuid.New(),
+				OrganizationID:     orgID,
+				FactoryID:          factoryID,
+				WorkOrderID:        order.ID,
+				IdempotencyKey:     idempotencyKey,
+				RequestFingerprint: requestFingerprint,
+				CreatedAt:          time.Now(),
+			})
+			if err != nil {
+				return err
+			}
+			if !reserved {
+				repeatedRequest = true
+				return nil
+			}
+		}
+
 		if !order.IsDispatchable() {
 			return models.ErrFactoryWorkOrderNotDispatchable
 		}
@@ -135,6 +176,13 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	if repeatedRequest {
+		serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+		}
+		return &pb.DispatchWorkOrderResponse{Order: serialized}, nil
+	}
 
 	for _, pendingRun := range pendingRuns {
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
@@ -193,6 +241,32 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	return &pb.DispatchWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func dispatchIdempotencyKey(req *pb.DispatchWorkOrderRequest) (string, error) {
+	if req.IdempotencyKey == nil {
+		return "", nil
+	}
+
+	key := req.GetIdempotencyKey()
+	if strings.TrimSpace(key) == "" {
+		return "", invalidArgument("idempotency_key must not be empty")
+	}
+	if utf8.RuneCountInString(key) > dispatchIdempotencyKeyMaxLength {
+		return "", invalidArgument(fmt.Sprintf("idempotency_key must not exceed %d characters", dispatchIdempotencyKeyMaxLength))
+	}
+
+	return key, nil
+}
+
+func dispatchRequestFingerprint(req *pb.DispatchWorkOrderRequest, lineName string) string {
+	parameters, _ := json.Marshal(dispatchRequestParameters{
+		LineName:       lineName,
+		StartStepIndex: req.GetStartStepIndex(),
+		ReplaceActive:  req.GetReplaceActive(),
+		Model:          strings.TrimSpace(req.GetModel()),
+	})
+	return fmt.Sprintf("%x", sha256.Sum256(parameters))
 }
 
 func pendingRunsFromStepResults(results []*models.FactoryLineStepResult) []*models.CanvasRun {

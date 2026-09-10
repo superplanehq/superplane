@@ -10,9 +10,10 @@ import (
 )
 
 type orderDispatchCommand struct {
-	factory *string
-	orderID *string
-	line    *string
+	factory        *string
+	orderID        *string
+	line           *string
+	idempotencyKey *string
 }
 
 func (c *orderDispatchCommand) Execute(ctx core.CommandContext) error {
@@ -33,6 +34,9 @@ func (c *orderDispatchCommand) Execute(ctx core.CommandContext) error {
 
 	body := openapi_client.NewFactoriesDispatchWorkOrderBody()
 	body.SetLineName(lineName)
+	if idempotencyKey := strings.TrimSpace(stringValue(c.idempotencyKey)); idempotencyKey != "" {
+		body.SetIdempotencyKey(idempotencyKey)
+	}
 
 	response, _, err := ctx.API.FactoryAPI.
 		FactoriesDispatchWorkOrder(ctx.Context, factoryID, orderID).
