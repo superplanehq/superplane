@@ -180,6 +180,10 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.Equal(t, "repo", prompt["workingDirectory"])
 		assert.Contains(t, prompt["prompt"], "/tmp/intent.md")
 		assert.Contains(t, prompt["prompt"], "Do not write implementation details")
+		assert.Contains(t, prompt["prompt"], "How I understand this")
+		assert.Contains(t, prompt["prompt"], "How do you understand what needs to be done here?")
+		assert.Contains(t, prompt["prompt"], "Problem, Proposed outcome, Affected users and systems, Constraints.")
+		assert.Contains(t, prompt["prompt"], "Do not add an Open questions section.")
 	})
 }
 
