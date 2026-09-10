@@ -4,11 +4,13 @@ import { AutoCompleteInput } from "./AutoCompleteInput";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
 describe("calculateDropdownPosition", () => {
-  it("anchors the dropdown top to the cursor y coordinate", () => {
+  it("anchors the dropdown top below the cursor when there is room", () => {
     const position = calculateDropdownPosition({
       cursor: { x: 120, y: 240 },
       viewportWidth: 1000,
+      viewportHeight: 800,
       dropdownWidth: 350,
+      dropdownHeight: 244,
       valuePreviewWidth: 200,
       showValuePreview: false,
     });
@@ -20,12 +22,45 @@ describe("calculateDropdownPosition", () => {
     const position = calculateDropdownPosition({
       cursor: { x: 980, y: 80 },
       viewportWidth: 1000,
+      viewportHeight: 800,
       dropdownWidth: 350,
+      dropdownHeight: 244,
       valuePreviewWidth: 200,
       showValuePreview: false,
     });
 
     expect(position.left).toBe(630);
+  });
+
+  it("flips the dropdown above the caret when there is not enough room below", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 760 },
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      dropdownWidth: 350,
+      dropdownHeight: 244,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+      cursorHeight: 20,
+    });
+
+    // caret top (760 - 20) minus the gap (4) minus the dropdown height (244).
+    expect(position.top).toBe(492);
+  });
+
+  it("keeps the dropdown within the viewport vertically when neither side fits", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 190 },
+      viewportWidth: 1000,
+      viewportHeight: 200,
+      dropdownWidth: 350,
+      dropdownHeight: 244,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+    });
+
+    // Clamped to the top edge padding since the dropdown is taller than the viewport.
+    expect(position.top).toBe(16);
   });
 });
 
