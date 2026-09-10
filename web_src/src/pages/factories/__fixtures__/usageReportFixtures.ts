@@ -140,6 +140,7 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   remainingCreditCents: "14124",
   includedRemainingCents: "5000",
   purchasedRemainingCents: "9124",
+  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
   billingEnabled: true,
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: true,

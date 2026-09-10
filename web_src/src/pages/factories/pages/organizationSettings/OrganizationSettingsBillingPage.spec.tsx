@@ -36,10 +36,20 @@ describe("OrganizationSettingsBillingPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-page-header-subtitle")).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
+
+    const plans = await screen.findByTestId("billing-plans");
+    const usage = within(plans).getByTestId("billing-plan-usage");
+    expect(usage).toHaveTextContent("Your trial usage");
+    expect(usage).toHaveTextContent("$41.24 remaining");
+    expect(usage).toHaveTextContent(`Ends ${WELCOME_EXPIRY_LABEL}`);
+    expect(within(plans).getByTestId("billing-plan-usage-bar")).toHaveAttribute("aria-valuenow", "18");
+    expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
+    expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
 
     const balance = await screen.findByTestId("billing-credit-balance");
+    expect(within(balance).queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
     expect(balance).toHaveTextContent(
       "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.",
     );
@@ -102,7 +112,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).toHaveTextContent(
       "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.",
     );
-    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
   }, 10000);
 
@@ -133,7 +143,64 @@ describe("OrganizationSettingsBillingPage", () => {
       "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.",
     );
     expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$0.00");
-    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+  }, 10000);
+
+  it("updates the plan after Polar sync finds a Business subscription", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing?subscribed=1`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          billingAfterSync: BUSINESS_ORGANIZATION_BILLING,
+        }}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
+    expect(await screen.findByTestId("billing-current-plan", {}, { timeout: 5000 })).toHaveTextContent("Current plan");
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+  }, 10000);
+
+  it("opens Polar checkout from Business Subscribe", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const user = userEvent.setup();
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Upgrade to Business" }));
+    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_business");
+    vi.unstubAllGlobals();
+  }, 10000);
+
+  it("opens Polar checkout from Subscribe when the checkout flag is off", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const user = userEvent.setup();
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: {
+            ...defaultFactoriesFixture.organizationBilling,
+            subscriptionCheckoutEnabled: false,
+          },
+        }}
+      />,
+    );
+
+    const business = await screen.findByTestId("billing-plan-business");
+    await user.click(within(business).getByRole("button", { name: "Upgrade to Business" }));
+    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_business");
+    vi.unstubAllGlobals();
   }, 10000);
 
   it("opens Polar checkout for a single hosted credit pack", async () => {
@@ -200,6 +267,14 @@ describe("OrganizationSettingsBillingPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Buy more" })).toBeEnabled();
     });
+    expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
+    expect(screen.getByTestId("billing-plan-usage")).toHaveTextContent("Your included usage");
+    expect(screen.getByTestId("billing-plan-usage")).toHaveTextContent("$50.00 remaining");
+    expect(screen.getByTestId("billing-plan-usage")).toHaveTextContent(
+      `Resets ${new Date("2026-10-09T12:00:00.000Z").toLocaleDateString()}`,
+    );
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("billing-credit-balance")).getByTestId("billing-remaining-credit"),

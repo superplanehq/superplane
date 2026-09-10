@@ -118,7 +118,7 @@ export function HostedCreditHeaderKicker({
   return (
     <Link
       to={spendingHref}
-      aria-label="Add credits"
+      aria-label="Subscribe"
       data-testid="hosted-credit-header-kicker"
       className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-violet-100 py-1 pl-2.5 pr-1.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900"
     >
@@ -130,7 +130,7 @@ export function HostedCreditHeaderKicker({
         {remaining}
       </span>
       <span className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white">
-        Add credits
+        Subscribe
       </span>
     </Link>
   );

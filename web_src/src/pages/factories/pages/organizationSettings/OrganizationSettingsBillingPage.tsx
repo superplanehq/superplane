@@ -21,12 +21,11 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { SUPERPLANE_PRICING_URL } from "@/lib/pricing";
-
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } from "../../lib/hostedCreditGrants";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
+import { BillingPlansSection } from "./BillingPlansSection";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
 const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
@@ -61,7 +60,9 @@ export function OrganizationSettingsBillingPage() {
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
-        subscriptionCheckoutEnabled={model.subscriptionCheckoutEnabled}
+        grantTotal={model.grantTotal}
+        includedRemaining={model.includedRemaining}
+        currentPeriodEnd={model.currentPeriodEnd}
         trialEndsAt={model.trialEndsAt}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
@@ -90,7 +91,9 @@ function BillingPageBody({
   portalPending,
   purchased,
   remaining,
-  subscriptionCheckoutEnabled,
+  grantTotal,
+  includedRemaining,
+  currentPeriodEnd,
   trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
@@ -114,7 +117,9 @@ function BillingPageBody({
   portalPending: boolean;
   purchased: number;
   remaining: number;
-  subscriptionCheckoutEnabled: boolean;
+  grantTotal: number;
+  includedRemaining: number;
+  currentPeriodEnd?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
@@ -141,10 +146,25 @@ function BillingPageBody({
 
   return (
     <>
+      <BillingPlansSection
+        usage={{
+          plan,
+          remainingCents: remaining,
+          grantTotalCents: grantTotal,
+          includedRemainingCents: includedRemaining,
+          purchasedCents: purchased,
+          trialEndsAt,
+          welcomeCreditExpiresAt,
+          currentPeriodEnd,
+        }}
+        canManageBilling={canManageBilling}
+        creditPurchaseAllowed={creditPurchaseAllowed}
+        pending={businessCheckoutPending}
+        onSubscribe={onSubscribe}
+      />
       <HostedCreditRemainingCard
         billingContactMessage={billingContactMessage}
         billingEnabled={billingEnabled}
-        businessCheckoutPending={businessCheckoutPending}
         canManageBilling={canManageBilling}
         checkoutPending={checkoutPending}
         creditPurchaseAllowed={creditPurchaseAllowed}
@@ -154,11 +174,9 @@ function BillingPageBody({
         plan={plan}
         purchased={purchased}
         remaining={remaining}
-        subscriptionCheckoutEnabled={subscriptionCheckoutEnabled}
         trialEndsAt={trialEndsAt}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
         onAddCredit={onAddCredit}
-        onSubscribe={onSubscribe}
       />
       {showInvoices ? (
         <PolarInvoicesCard invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
@@ -171,7 +189,6 @@ function BillingPageBody({
 function HostedCreditRemainingCard({
   billingContactMessage,
   billingEnabled,
-  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
   creditPurchaseAllowed,
@@ -181,15 +198,12 @@ function HostedCreditRemainingCard({
   plan,
   purchased,
   remaining,
-  subscriptionCheckoutEnabled,
   trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
-  onSubscribe,
 }: {
   billingContactMessage?: string;
   billingEnabled: boolean;
-  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
@@ -199,11 +213,9 @@ function HostedCreditRemainingCard({
   plan?: string;
   purchased: number;
   remaining: number;
-  subscriptionCheckoutEnabled: boolean;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
-  onSubscribe: () => void | Promise<void>;
 }) {
   const copy = hostedCreditBillingBalanceCopy({
     remainingCents: remaining,
@@ -216,7 +228,6 @@ function HostedCreditRemainingCard({
     creditPurchaseAllowed,
   });
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
-  const showSubscribe = canManageBilling && subscriptionCheckoutEnabled && !creditPurchaseAllowed;
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
 
   return (
@@ -226,8 +237,6 @@ function HostedCreditRemainingCard({
       action={
         showBuyMore ? (
           <HostedCreditBuyMoreMenu checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
-        ) : showSubscribe ? (
-          <SubscribeActions pending={businessCheckoutPending} onSubscribe={onSubscribe} />
         ) : undefined
       }
     >
@@ -262,21 +271,6 @@ function HostedCreditRemainingCard({
         ) : null}
       </div>
     </FactorySettingsCard>
-  );
-}
-
-function SubscribeActions({ pending, onSubscribe }: { pending: boolean; onSubscribe: () => void | Promise<void> }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button asChild variant="ghost" size="sm">
-        <a href={SUPERPLANE_PRICING_URL} target="_blank" rel="noreferrer">
-          See pricing
-        </a>
-      </Button>
-      <Button type="button" disabled={pending} data-testid="billing-subscribe" onClick={() => void onSubscribe()}>
-        {pending ? "Opening checkout..." : "Subscribe"}
-      </Button>
-    </div>
   );
 }
 

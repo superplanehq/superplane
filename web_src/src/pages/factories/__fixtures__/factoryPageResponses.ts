@@ -328,6 +328,10 @@ export interface FactoriesFixture {
     creditPurchaseAllowed?: boolean;
     hasBillingCustomer?: boolean;
   };
+  /** Count of POST /billing/sync calls in this fixture session. */
+  billingSyncCalls?: number;
+  /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */
+  billingAfterSync?: FactoriesFixture["organizationBilling"];
   /**
    * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
    * Omit to treat every provider with a catalog as connected.

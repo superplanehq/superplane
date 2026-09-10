@@ -400,6 +400,15 @@ func TestCreateBusinessCheckoutUsesOrgUpdate(t *testing.T) {
 	assert.Equal(t, "update", rule.Action)
 }
 
+func TestSyncOrganizationBillingUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/billing/sync"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

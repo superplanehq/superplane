@@ -826,6 +826,29 @@ function hostedCreditProductsRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/sync"),
+    resolve: () => {
+      fixture.billingSyncCalls = (fixture.billingSyncCalls ?? 0) + 1;
+      if (fixture.billingAfterSync) {
+        fixture.organizationBilling = fixture.billingAfterSync;
+      }
+      return {
+        json: fixture.organizationBilling ?? {
+          plan: "trial",
+          planSource: "system",
+          trialEndsAt: "2026-09-22T12:00:00.000Z",
+          billingEnabled: true,
+          subscriptionCheckoutEnabled: true,
+          creditPurchaseAllowed: false,
+          hasBillingCustomer: false,
+        },
+      };
+    },
+  };
+}
+
 function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/billing"),
@@ -924,6 +947,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    organizationBillingSyncRoute(fixture),
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),

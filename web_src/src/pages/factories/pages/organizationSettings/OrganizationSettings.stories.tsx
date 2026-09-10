@@ -80,6 +80,7 @@ export const SpendingEmpty: Story = {
 };
 
 export const Billing: Story = {
+  name: "Billing (Business)",
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}

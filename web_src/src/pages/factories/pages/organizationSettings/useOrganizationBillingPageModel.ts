@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback } from "react";
 import { useSearchParams } from "react-router";
 
 import type {
@@ -11,7 +11,8 @@ import type {
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
-import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { syncOrganizationBilling, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { useOrganizationBillingSync } from "@/hooks/useOrganizationBillingSync";
 import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
@@ -46,6 +47,9 @@ export type OrganizationBillingPageModel = {
   purchased: number;
   remaining: number;
   remainingCreditWarning: boolean;
+  grantTotal: number;
+  includedRemaining: number;
+  currentPeriodEnd?: string;
   superplaneGrant: number;
   welcomeCreditExpiresAt?: string;
   hasBillingCustomer: boolean;
@@ -72,6 +76,8 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
   return {
     plan: billing?.plan,
     trialEndsAt: billing?.trialEndsAt,
+    currentPeriodEnd: billing?.currentPeriodEnd,
+    includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
     subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
     creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
     describeBillingEnabled: billing?.billingEnabled === true,
@@ -111,12 +117,21 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const refetchGrants = grantsQuery.refetch;
   const refetchBilling = orgBilling.refetch;
 
-  useEffect(() => {
-    if (!subscribed) {
-      return;
-    }
-    void Promise.all([refetchSpend(), refetchGrants(), refetchBilling()]);
-  }, [subscribed, refetchSpend, refetchGrants, refetchBilling]);
+  const refetchBillingState = useCallback(async () => {
+    await Promise.all([refetchSpend(), refetchGrants(), refetchBilling()]);
+  }, [refetchSpend, refetchGrants, refetchBilling]);
+
+  const syncFromPolar = useCallback(async () => {
+    await syncOrganizationBilling(organizationId);
+  }, [organizationId]);
+
+  useOrganizationBillingSync({
+    organizationId,
+    subscribed,
+    creditPurchaseAllowed: flags.creditPurchaseAllowed,
+    sync: syncFromPolar,
+    refetch: refetchBillingState,
+  });
 
   return {
     organizationName: organization?.metadata?.name || "Organization",
@@ -135,6 +150,9 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     purchased: metrics.purchased,
     remaining: metrics.remaining,
     remainingCreditWarning: metrics.remainingCreditWarning,
+    grantTotal: metrics.grantTotalCents,
+    includedRemaining: flags.includedRemaining,
+    currentPeriodEnd: flags.currentPeriodEnd,
     superplaneGrant: metrics.superplaneGrant,
     welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,
     hasBillingCustomer: metrics.hasBillingCustomer,

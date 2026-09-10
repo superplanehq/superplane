@@ -312,6 +312,11 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+# Local only. Puts every org on a 14-day trial and clears Polar ids in
+# superplane_dev. Cancel the Polar sandbox subscription separately.
+db.reset.billing.trial:
+	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+
 db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 

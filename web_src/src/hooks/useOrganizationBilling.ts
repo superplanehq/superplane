@@ -1,10 +1,24 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { organizationsCreateBusinessCheckout, organizationsDescribeOrganizationBilling } from "@/api-client";
+import {
+  organizationsCreateBusinessCheckout,
+  organizationsDescribeOrganizationBilling,
+  organizationsSyncOrganizationBilling,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export function organizationBillingQueryKey(organizationId: string) {
   return ["organizations", organizationId, "billing"] as const;
+}
+
+export async function syncOrganizationBilling(organizationId: string) {
+  await organizationsSyncOrganizationBilling(
+    withOrganizationHeader({
+      organizationId,
+      path: { id: organizationId },
+      body: {},
+    }),
+  );
 }
 
 export function useOrganizationBilling(organizationId: string | undefined) {

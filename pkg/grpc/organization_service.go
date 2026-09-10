@@ -188,6 +188,14 @@ func (s *OrganizationService) CreateBusinessCheckout(
 	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
+func (s *OrganizationService) SyncOrganizationBilling(
+	ctx context.Context,
+	req *pb.SyncOrganizationBillingRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.SyncOrganizationBilling(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {

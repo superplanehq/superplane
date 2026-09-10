@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -54,6 +55,23 @@ func DescribeOrganizationBilling(
 		resp.CreditPurchaseAllowed = plan.AllowsCreditPurchase()
 	}
 	return resp, nil
+}
+
+func SyncOrganizationBilling(
+	ctx context.Context,
+	orgID string,
+	req *pb.SyncOrganizationBillingRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := polar.SyncOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
+		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
+	}
+
+	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
 
 func CreateBusinessCheckout(

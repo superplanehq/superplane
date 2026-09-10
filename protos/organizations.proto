@@ -265,6 +265,18 @@ service Organizations {
     };
   }
 
+  rpc SyncOrganizationBilling(SyncOrganizationBillingRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync organization billing";
+      description: "Reads the Polar Business subscription for the organization and updates the local plan";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -773,6 +785,10 @@ message CreateBusinessCheckoutRequest {
 
 message CreateBusinessCheckoutResponse {
   string checkout_url = 1;
+}
+
+message SyncOrganizationBillingRequest {
+  string id = 1;
 }
 
 message UsageByModel {

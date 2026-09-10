@@ -147,7 +147,7 @@ describe("HostedCreditEmptyBanner", () => {
 });
 
 describe("HostedCreditHeaderKicker", () => {
-  it("shows remaining trial days and an Add credits action", () => {
+  it("shows remaining trial days and a Subscribe action", () => {
     const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
     render(
       <MemoryRouter>
@@ -163,8 +163,8 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker).toHaveTextContent("Trial");
     expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
     expect(kicker).toHaveTextContent("$41.24");
-    expect(kicker).toHaveTextContent("Add credits");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(kicker).toHaveTextContent("Subscribe");
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
   });
 
   it("falls back to a 14-day trial label when expiry is missing", () => {
