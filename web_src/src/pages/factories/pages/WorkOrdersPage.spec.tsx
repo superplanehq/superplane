@@ -10,10 +10,12 @@ import {
   PRIMARY_FACTORY_KEY,
 } from "../__fixtures__/factoryPageResponses";
 import {
+  EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
   LOW_TRIAL_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
+  BUSINESS_ORGANIZATION_BILLING,
 } from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
@@ -70,6 +72,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: PURCHASED_CREDIT_USAGE_REPORT,
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         }}
       />,
     );
@@ -91,9 +94,9 @@ describe("WorkOrdersPage hosted credit banner", () => {
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Trial credit is empty");
-    expect(banner).toHaveTextContent("SuperPlane-hosted runs cannot start.");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+    expect(banner).toHaveTextContent("Trial credit is used up");
+    expect(banner).toHaveTextContent("Hosted runs cannot start.");
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
@@ -121,13 +124,14 @@ describe("WorkOrdersPage hosted credit banner", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          organizationBilling: EXPIRED_TRIAL_ORGANIZATION_BILLING,
         }}
       />,
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Trial ended");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );

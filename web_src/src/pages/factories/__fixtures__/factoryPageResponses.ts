@@ -313,6 +313,21 @@ export interface FactoriesFixture {
     expiresAt?: string;
   }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
+  organizationBilling?: {
+    plan?: string;
+    planSource?: string;
+    polarSubscriptionStatus?: string;
+    trialEndsAt?: string;
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    remainingCreditCents?: string;
+    includedRemainingCents?: string;
+    purchasedRemainingCents?: string;
+    billingEnabled?: boolean;
+    subscriptionCheckoutEnabled?: boolean;
+    creditPurchaseAllowed?: boolean;
+    hasBillingCustomer?: boolean;
+  };
   /**
    * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
    * Omit to treat every provider with a catalog as connected.
@@ -376,4 +391,16 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
   organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
   organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
+  organizationBilling: {
+    plan: "trial",
+    planSource: "system",
+    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    remainingCreditCents: "4124",
+    includedRemainingCents: "0",
+    purchasedRemainingCents: "0",
+    billingEnabled: true,
+    subscriptionCheckoutEnabled: true,
+    creditPurchaseAllowed: false,
+    hasBillingCustomer: false,
+  },
 };

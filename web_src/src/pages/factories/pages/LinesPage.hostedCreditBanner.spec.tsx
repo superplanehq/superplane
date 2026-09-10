@@ -10,6 +10,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import {
+  BUSINESS_ORGANIZATION_BILLING,
   LOW_CREDIT_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
@@ -30,6 +31,7 @@ describe("LinesPage hosted credit banner", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: PURCHASED_CREDIT_USAGE_REPORT,
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         }}
       />,
     );
@@ -66,9 +68,9 @@ describe("LinesPage hosted credit banner", () => {
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Trial credit is empty");
+    expect(banner).toHaveTextContent("Trial credit is used up");
     expect(banner).toHaveAttribute("data-tone", "warning");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );
@@ -81,6 +83,7 @@ describe("LinesPage hosted credit banner", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT,
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         }}
       />,
     );

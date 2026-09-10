@@ -9,6 +9,7 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
 import {
+  BUSINESS_ORGANIZATION_BILLING,
   DEFAULT_FACTORY_USAGE,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
@@ -85,6 +86,7 @@ export const Billing: Story = {
       factoriesFixture={{
         ...defaultFactoriesFixture,
         hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         organizationCreditGrants: MIXED_CREDIT_GRANTS,
         organizationWorkspaceUsage: {
           ...PURCHASED_CREDIT_USAGE_REPORT,

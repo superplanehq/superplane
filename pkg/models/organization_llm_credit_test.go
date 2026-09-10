@@ -573,7 +573,7 @@ func Test__FactoryHostedBudgetHardStopWhenSpentOnCompute(t *testing.T) {
 		NodeID:          "runner",
 		MachineType:     "e1-large-amd64",
 		FleetID:         "e1-large-amd64",
-		DurationSeconds: 60,
+		DurationSeconds: 180,
 	}))
 
 	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
@@ -698,8 +698,8 @@ func Test__ListOrganizationLLMCreditGrants(t *testing.T) {
 	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(grants), 4)
-	assert.Equal(t, models.LLMCreditGrantKindPolarRefund, grants[0].Kind)
-	assert.Equal(t, models.LLMCreditGrantKindPolar, grants[1].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopupRefund, grants[0].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopup, grants[1].Kind)
 	assert.Equal(t, models.LLMCreditGrantKindAdmin, grants[2].Kind)
 	assert.Equal(t, models.LLMCreditGrantKindWelcome, grants[3].Kind)
 

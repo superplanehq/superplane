@@ -1,4 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { ReactNode } from "react";
@@ -13,15 +14,24 @@ export function useHostedCreditChrome(
 ): { headerKicker?: ReactNode; banner?: ReactNode } {
   const { canAct } = usePermissions();
   const spend = useOrganizationWorkspaceUsage(organizationId);
-  const kind = spend.data ? hostedCreditBannerKind(spend.data) : null;
+  const billing = useOrganizationBilling(organizationId);
+  const kind = spend.data
+    ? hostedCreditBannerKind({
+        ...spend.data,
+        plan: billing.data?.plan,
+        trialEndsAt: billing.data?.trialEndsAt,
+        subscriptionCheckoutEnabled: billing.data?.subscriptionCheckoutEnabled,
+        creditPurchaseAllowed: billing.data?.creditPurchaseAllowed,
+      })
+    : null;
   if (!kind) {
     return {};
   }
 
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  const welcomeCreditExpiresAt = spend.data?.welcomeCreditExpiresAt;
-  const billingEnabled = spend.data?.billingEnabled === true;
+  const welcomeCreditExpiresAt = billing.data?.trialEndsAt ?? spend.data?.welcomeCreditExpiresAt;
+  const billingEnabled = spend.data?.billingEnabled === true || billing.data?.billingEnabled === true;
   const canManageBilling = canAct("org", "update");
 
   if (kind === "trial") {
@@ -44,6 +54,7 @@ export function useHostedCreditChrome(
         canManageBilling={canManageBilling}
         remainingCreditCents={remainingCreditCents}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
+        subscriptionCheckoutEnabled={billing.data?.subscriptionCheckoutEnabled}
         spendingHref={spendingHref}
       />
     ),

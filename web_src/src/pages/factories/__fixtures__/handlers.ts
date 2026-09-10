@@ -741,6 +741,30 @@ function hostedCreditProductsRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing"),
+    resolve: () => ({
+      json: fixture.organizationBilling ?? {
+        plan: "trial",
+        planSource: "system",
+        trialEndsAt: "2026-09-22T12:00:00.000Z",
+        billingEnabled: true,
+        subscriptionCheckoutEnabled: true,
+        creditPurchaseAllowed: false,
+        hasBillingCustomer: false,
+      },
+    }),
+  };
+}
+
+function businessCheckoutRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/business-checkout"),
+    resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_business" } }),
+  };
+}
+
 function hostedCreditCheckoutRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout"),
@@ -815,6 +839,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    organizationBillingRoute(fixture),
+    businessCheckoutRoute(),
     billingPortalSessionRoute(),
   ];
 }

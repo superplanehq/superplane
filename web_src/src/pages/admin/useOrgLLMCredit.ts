@@ -13,6 +13,14 @@ export type OrganizationLLMCredit = {
   warning: boolean;
 };
 
+export type OrganizationBillingPlan = {
+  plan: string;
+  plan_source: string;
+  polar_subscription_status: string;
+  trial_ends_at: string | null;
+  current_period_end: string | null;
+};
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   const text = await response.text();
   if (text.trim() === "") {
@@ -23,12 +31,15 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
 
 export function useOrgLLMCredit(orgId: string) {
   const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
+  const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
+  const [planValue, setPlanValue] = useState("trial");
   const [loading, setLoading] = useState(true);
   const [grantDollars, setGrantDollars] = useState("");
   const [note, setNote] = useState("");
   const [markupPercent, setMarkupPercent] = useState("");
   const [savingGrant, setSavingGrant] = useState(false);
   const [savingMarkup, setSavingMarkup] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
 
   const applyCredit = useCallback((data: OrganizationLLMCredit) => {
     setCredit(data);
@@ -38,11 +49,19 @@ export function useOrgLLMCredit(orgId: string) {
   const loadCredit = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "Failed to load organization credit"));
+      const [creditResponse, planResponse] = await Promise.all([
+        fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" }),
+        fetch(`/admin/api/organizations/${orgId}/billing-plan`, { credentials: "include" }),
+      ]);
+      if (!creditResponse.ok) {
+        throw new Error(await readErrorMessage(creditResponse, "Failed to load organization credit"));
       }
-      applyCredit(await response.json());
+      applyCredit(await creditResponse.json());
+      if (planResponse.ok) {
+        const nextPlan = (await planResponse.json()) as OrganizationBillingPlan;
+        setPlan(nextPlan);
+        setPlanValue(nextPlan.plan || "none");
+      }
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
     } finally {
@@ -103,8 +122,34 @@ export function useOrgLLMCredit(orgId: string) {
     }
   };
 
+  const savePlan = async () => {
+    setSavingPlan(true);
+    try {
+      const response = await fetch(`/admin/api/organizations/${orgId}/billing-plan`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ plan: planValue }),
+      });
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Failed to set billing plan"));
+      }
+      const nextPlan = (await response.json()) as OrganizationBillingPlan;
+      setPlan(nextPlan);
+      setPlanValue(nextPlan.plan || "none");
+      showSuccessToast("Billing plan updated");
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   return {
     credit,
+    plan,
+    planValue,
+    setPlanValue,
     loading,
     grantDollars,
     setGrantDollars,
@@ -114,7 +159,9 @@ export function useOrgLLMCredit(orgId: string) {
     setMarkupPercent,
     savingGrant,
     savingMarkup,
+    savingPlan,
     addGrant,
     saveMarkup,
+    savePlan,
   };
 }

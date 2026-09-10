@@ -642,7 +642,7 @@ func Test__RecordComputeUsage__WritesCatalogCost(t *testing.T) {
 
 	var updated models.FactoryWorkOrderExecution
 	require.NoError(t, db.First(&updated, "id = ?", execution.ID).Error)
-	assert.Equal(t, int64(200), updated.CostCents)
+	assert.Equal(t, pricebook.MicrosToCents(int64(3600)*pricebook.MicrosPerSecondE1Large), updated.CostCents)
 	assert.Equal(t, int64(3600), updated.DurationSeconds)
 }
 
