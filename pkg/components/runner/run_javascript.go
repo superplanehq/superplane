@@ -368,7 +368,7 @@ func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhoo
 }
 
 func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunJSFinishedEventType)
 }
 
 func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }
