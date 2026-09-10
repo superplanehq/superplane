@@ -143,6 +143,24 @@ describe("ColumnAutomationsHeaderSlot", () => {
     expect(screen.getByTestId("lines-backlog-automations")).not.toHaveTextContent("2");
   });
 
+  it("opens settings from the icon without a dropdown", async () => {
+    const user = userEvent.setup();
+    const onRowAction = vi.fn();
+    render(
+      <ColumnAutomationsHeaderSlot
+        title="Backlog"
+        automations={[INTAKE]}
+        onRowAction={onRowAction}
+        testId="lines-backlog-automations"
+      />,
+    );
+
+    await user.click(screen.getByTestId("column-automation-icon-intake-github"));
+
+    expect(onRowAction).toHaveBeenCalledWith(INTAKE, "settings");
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
+  });
+
   it("hides the strip when the column has no automations", () => {
     const { container } = render(
       <ColumnAutomationsHeaderSlot

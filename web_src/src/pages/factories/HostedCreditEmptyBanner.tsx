@@ -5,9 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { formatUsdCents } from "./lib/workOrderUsage";
 import {
   hostedCreditBannerCopy,
   parseWelcomeCreditExpiresAt,
+  welcomeCreditHeaderLabel,
   type HostedCreditBannerKind,
 } from "./lib/hostedCreditEmpty";
 
@@ -21,6 +23,16 @@ interface HostedCreditEmptyBannerProps {
   remainingCreditCents?: number;
   welcomeCreditExpiresAt?: string;
 }
+
+const BANNER_TONE_CLASS = {
+  info: "border-border bg-muted/40 text-foreground",
+  warning: "border-border bg-muted/40 text-foreground shadow-[inset_3px_0_0_0_var(--status-waiting-dot)]",
+} as const;
+
+const BANNER_ICON_CLASS = {
+  info: "text-muted-foreground",
+  warning: "text-[color:var(--status-waiting-fg)]",
+} as const;
 
 export function HostedCreditEmptyBanner({
   billingEnabled,
@@ -38,6 +50,7 @@ export function HostedCreditEmptyBanner({
   });
   const isWarning = copy.tone === "warning";
   const Icon = isWarning ? TriangleAlert : Sparkles;
+  const hasHint = Boolean(copy.consequenceHint);
 
   return (
     <div
@@ -46,23 +59,18 @@ export function HostedCreditEmptyBanner({
       data-tone={copy.tone}
       className={cn(
         "flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border px-3.5 py-2 text-sm",
-        isWarning
-          ? "border-amber-200 bg-amber-50/90 text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
-          : "border-border bg-muted/40 text-foreground",
+        BANNER_TONE_CLASS[copy.tone],
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <Icon
-          className={cn("h-4 w-4 shrink-0", isWarning ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}
-          aria-hidden
-        />
+      <div className={cn("flex min-w-0 gap-2.5", hasHint ? "items-start" : "items-center")}>
+        <Icon className={cn("h-4 w-4 shrink-0", hasHint && "mt-0.5", BANNER_ICON_CLASS[copy.tone])} aria-hidden />
         {copy.remainingLabel ? (
           <TrialCreditSummary
             title={copy.title}
             remainingLabel={copy.remainingLabel}
             expiryLabel={copy.expiryLabel}
-            isWarning={isWarning}
+            consequenceHint={copy.consequenceHint}
           />
         ) : (
           <p>
@@ -71,19 +79,53 @@ export function HostedCreditEmptyBanner({
           </p>
         )}
       </div>
-      <Button
-        asChild
-        variant="outline"
-        size="sm"
-        className={
-          isWarning
-            ? "border-amber-300 bg-amber-100/70 text-amber-950 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-50 dark:hover:bg-amber-900/60"
-            : undefined
-        }
-      >
+      <Button asChild variant="outline" size="sm">
         <Link to={spendingHref}>{copy.actionLabel}</Link>
       </Button>
     </div>
+  );
+}
+
+/** Compact trial chip to the right of the workspace page title. */
+export function HostedCreditHeaderKicker({
+  spendingHref,
+  welcomeCreditExpiresAt,
+  remainingCreditCents = 0,
+}: {
+  spendingHref: string;
+  welcomeCreditExpiresAt?: string;
+  remainingCreditCents?: number;
+}) {
+  const expiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
+  const duration = expiresAt ? welcomeCreditHeaderLabel(expiresAt) : "14 days";
+  const remaining = formatUsdCents(remainingCreditCents);
+
+  return (
+    <Link
+      to={spendingHref}
+      aria-label="Add credits"
+      data-testid="hosted-credit-header-kicker"
+      className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-violet-100 py-1 pl-2.5 pr-1.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900"
+    >
+      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">Trial</span>
+      <ChipDot />
+      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">{duration}</span>
+      <ChipDot />
+      <span className="whitespace-nowrap font-semibold tabular-nums text-violet-950 dark:text-violet-50">
+        {remaining}
+      </span>
+      <span className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white">
+        Add credits
+      </span>
+    </Link>
+  );
+}
+
+function ChipDot() {
+  return (
+    <span className="select-none text-violet-400 dark:text-violet-600" aria-hidden>
+      ·
+    </span>
   );
 }
 
@@ -91,38 +133,32 @@ function TrialCreditSummary({
   title,
   remainingLabel,
   expiryLabel,
-  isWarning,
+  consequenceHint,
 }: {
   title: string;
   remainingLabel: string;
   expiryLabel?: string;
-  isWarning: boolean;
+  consequenceHint?: string;
 }) {
-  const mutedClass = isWarning ? "text-amber-900/80 dark:text-amber-100/80" : "text-muted-foreground";
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-      <Badge
-        variant="outline"
-        className={cn(
-          "font-medium",
-          isWarning
-            ? "border-amber-300/80 bg-amber-100/50 text-amber-950 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-50"
-            : "text-muted-foreground",
-        )}
-      >
-        {title}
-      </Badge>
-      <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
-        <span className="font-medium tabular-nums">{remainingLabel}</span>
-        {expiryLabel ? (
-          <>
-            <span className={cn("select-none", mutedClass)} aria-hidden>
-              ·
-            </span>
-            <span className={mutedClass}>{expiryLabel}</span>
-          </>
-        ) : null}
-      </p>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+        <Badge variant="outline" className="font-medium text-muted-foreground">
+          {title}
+        </Badge>
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
+          <span className="font-medium tabular-nums">{remainingLabel}</span>
+          {expiryLabel ? (
+            <>
+              <span className="select-none text-muted-foreground" aria-hidden>
+                ·
+              </span>
+              <span className="text-muted-foreground">{expiryLabel}</span>
+            </>
+          ) : null}
+        </p>
+      </div>
+      {consequenceHint ? <p className="text-xs text-muted-foreground">{consequenceHint}</p> : null}
     </div>
   );
 }

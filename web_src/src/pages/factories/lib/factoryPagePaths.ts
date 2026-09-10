@@ -9,8 +9,14 @@ export function newFactoryPath(organizationId: string) {
   return `${factoryListPath(organizationId)}/new`;
 }
 
+/**
+ * Every workspace-scoped path is built from this function, so lowercasing the
+ * key here makes lowercase the canonical URL form everywhere: the stored
+ * `factory.key` (and the settings page that displays it) stay uppercase —
+ * only the URL segment is lowercased.
+ */
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
-  return `${factoryListPath(organizationId)}/${factoryKey}`;
+  return `${factoryListPath(organizationId)}/${factoryKey.toLowerCase()}`;
 }
 
 export function factoryOverviewPath(organizationId: string, factoryKey: string) {
@@ -73,10 +79,14 @@ export function pathAfterWorkspaceSwitch({
     return pathname;
   }
 
-  const prefix = `/${organizationId}/workspaces/${currentFactoryKey}`;
+  // `currentFactoryKey` (from `factory.key`) is always uppercase, but the
+  // `pathname` segment is the canonical (lowercase) URL form — normalize
+  // before comparing so the prefix match doesn't fail on case alone.
+  const currentKeySegment = currentFactoryKey.toLowerCase();
+  const prefix = `/${organizationId}/workspaces/${currentKeySegment}`;
   const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
   if (workspacePageToKeep(rest)) {
-    return replaceFactoryKeySegment(pathname, organizationId, currentFactoryKey, nextKey);
+    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextKey);
   }
 
   return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
@@ -275,6 +285,22 @@ export function factoryLineDetailPath(organizationId: string, factoryKey: string
 
 export function editFactoryLinePath(organizationId: string, factoryKey: string, lineId: string) {
   return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
+}
+
+export type PRFeedbackSetupKind = "comments" | "checks";
+
+/** Dedicated setup page for the next-steps banner CTA (comments or checks wizard). */
+export function factoryPRFeedbackSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  kind: PRFeedbackSetupKind,
+) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/${kind}`;
+}
+
+export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
+  return sourceId === "checks" ? "checks" : "comments";
 }
 
 export function automationsPath(organizationId: string, factoryKey: string) {

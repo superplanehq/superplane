@@ -15,14 +15,14 @@ import {
 describe("readSplitRunQuery", () => {
   it("reads canvas, run, and order from the URL", () => {
     const query = readSplitRunQuery(
-      new URLSearchParams("from=lines&lineId=line-1&run=run-9&orderNumber=103&canvas=planning"),
+      new URLSearchParams("from=lines&lineId=line-1&run=run-9&orderNumber=103&canvas=implementation"),
     );
     expect(query).toEqual({
       from: "lines",
       lineId: "line-1",
       runId: "run-9",
       orderNumber: "103",
-      canvasKey: "planning",
+      canvasKey: "implementation",
     });
   });
 
@@ -120,11 +120,11 @@ describe("fixtureForSplitRunPage", () => {
 
 describe("phaseForSplitRunCanvas", () => {
   it("picks the phase that matches the canvas key", () => {
-    expect(phaseForSplitRunCanvas(SPLIT_RUN_RUNNING, "planning").id).toBe("plan");
+    expect(phaseForSplitRunCanvas(SPLIT_RUN_RUNNING, "implementation").id).toBe("implement");
   });
 
   it("uses the current phase when the canvas key is missing", () => {
-    expect(phaseForSplitRunCanvas({ ...SPLIT_RUN_RUNNING, currentPhaseId: "plan" }).id).toBe("plan");
+    expect(phaseForSplitRunCanvas({ ...SPLIT_RUN_RUNNING, currentPhaseId: "implement" }).id).toBe("implement");
   });
 
   it("picks the phase whose run id matches the URL", () => {

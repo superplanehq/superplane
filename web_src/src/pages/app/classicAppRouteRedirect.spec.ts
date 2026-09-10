@@ -68,7 +68,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1",
+      to: "/org-1/workspaces/rf/apps/canvas-1?configure=1&agent=1",
     });
   });
 
@@ -83,7 +83,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?run=run-9",
+      to: "/org-1/workspaces/rf/apps/canvas-1?run=run-9",
     });
   });
 
@@ -98,7 +98,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1",
+      to: "/org-1/workspaces/rf/apps/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1",
     });
   });
 
@@ -113,7 +113,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1",
+      to: "/org-1/workspaces/rf/apps/canvas-1?configure=1&agent=1",
     });
   });
 
@@ -129,7 +129,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?run=run-9&sidebar=1&node=create-pr",
+      to: "/org-1/workspaces/rf/apps/canvas-1?run=run-9&sidebar=1&node=create-pr",
     });
   });
 
@@ -156,7 +156,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?run=run-9&sidebar=1&node=create-pr",
+      to: "/org-1/workspaces/rf/apps/canvas-1?run=run-9&sidebar=1&node=create-pr",
     });
   });
 

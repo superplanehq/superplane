@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
+
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -72,6 +74,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
@@ -96,8 +100,12 @@ function githubConnections(instances: OrganizationsIntegration[]) {
   return { name: "github", readyInstances: [], allInstances: instances };
 }
 
-function githubConnection(id: string, metadata: Record<string, unknown>): OrganizationsIntegration {
-  return { metadata: { id, integrationName: "github" }, status: { state: "pending", metadata } };
+function githubConnection(
+  id: string,
+  metadata: Record<string, unknown>,
+  state: "pending" | "ready" = "pending",
+): OrganizationsIntegration {
+  return { metadata: { id, integrationName: "github" }, status: { state, metadata } };
 }
 
 describe("FirstRunSetup reliability", () => {
@@ -133,7 +141,7 @@ describe("FirstRunSetup reliability", () => {
     expect(requestConnect).toHaveBeenCalledTimes(1);
 
     navigation.resolve(true);
-    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub));
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
   });
 
   it("keeps repository and ticket screens locked until their saves finish", async () => {
@@ -186,6 +194,25 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
   });
 
+  // An install request made on GitHub without a callback only surfaces
+  // through the recheck sync, so the sync must also run while the picker
+  // is open without a known request.
+  it("rechecks GitHub for install requests while the account picker is open", () => {
+    const picker = githubConnection("int-1", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+    });
+    renderSetup(
+      pageModel({ openSection: "vcs", githubConnections: githubConnections([picker]) }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
+  });
+
   it("opens the waiting screen from a GitHub request return", () => {
     const request = githubConnection("int-1", { startedByUserID: "user-1", installRequested: true });
     renderSetup(
@@ -196,6 +223,49 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
     );
+  });
+
+  it("does not use another GitHub identity's installations for a pending request", () => {
+    const request = githubConnection("request-integration", {
+      startedByUserID: "user-1",
+      startedByGitHubLogin: "requester",
+      state: "request-csrf",
+      githubApp: { slug: "superplane" },
+      installRequests: [{ id: "1", accountLogin: "requested-org", requesterLogin: "requester" }],
+    });
+    const existing = githubConnection(
+      "github-1",
+      {
+        startedByUserID: "user-1",
+        startedByGitHubLogin: "connected-user",
+        state: "existing-csrf",
+        githubApp: { slug: "superplane" },
+        pendingInstallations: [
+          { id: "11", accountLogin: "connected-user" },
+          { id: "22", accountLogin: "requested-org" },
+        ],
+      },
+      "ready",
+    );
+
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          allInstances: [request, existing],
+          readyInstances: [existing],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=request-integration",
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("requested-org");
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("connected-user") }),
+    ).not.toBeInTheDocument();
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "request-integration", true);
   });
 
   it("uses server metadata for every requested organization", () => {
@@ -210,8 +280,9 @@ describe("FirstRunSetup reliability", () => {
       pageModel({ openSection: "vcs", githubConnections: githubConnections([request]) }),
       "/org-1/workspaces/PAY/setup?step=vcs&githubOrg=wrong&githubIntegrationId=int-1",
     );
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("octo");
+    const waiting = screen.getByTestId("first-run-github-install-requested");
+    expect(waiting).toHaveTextContent("acme");
+    expect(waiting).toHaveTextContent("octo");
     expect(screen.queryByText("wrong")).not.toBeInTheDocument();
   });
 

@@ -252,13 +252,12 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getAllByText("Create Task").length).toBeGreaterThan(0);
     const headerRow = screen.getByTestId("settings-automation-header-row");
-    const edit = within(headerRow).getByRole("link", { name: "Edit automation" });
     expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
     expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1");
-    expect(edit.className).toContain("rounded-md");
-    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(edit.compareDocumentPosition(automation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();

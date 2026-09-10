@@ -131,7 +131,7 @@ describe("SidebarUserMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "Billing" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent(
-      `/${FACTORIES_ORGANIZATION_ID}/workspaces/RFSDR/settings/organization/billing`,
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/organization/billing`,
     );
   });
 

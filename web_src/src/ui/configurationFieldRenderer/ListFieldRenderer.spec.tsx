@@ -133,4 +133,18 @@ describe("ListFieldRenderer", () => {
 
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
+
+  it("renders accordion item titles with a legible color in dark mode", () => {
+    render(
+      <ListFieldRenderer
+        field={parameterListField()}
+        value={[{ name: "Clone Repo", type: "bash" }]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByText("Clone Repo");
+    expect(title).toHaveClass("text-gray-800");
+    expect(title).toHaveClass("dark:text-gray-100");
+  });
 });

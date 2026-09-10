@@ -297,6 +297,23 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 
 func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
+	requiredFeatures := []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}
+	routes := []HTTPRoute{
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"},
+		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"},
+	}
+
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, requiredFeatures, rule.RequiredExperimentalFeatures)
+	}
 
 	start, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}]
 	require.True(t, ok)

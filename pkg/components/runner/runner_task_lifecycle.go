@@ -31,6 +31,7 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 
 func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
 	if ctx.ExecutionState.IsFinished() {
+		revokeOpenRouterChildKeyOrReschedule(ctx)
 		return nil
 	}
 
@@ -60,7 +61,9 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	}
 
 	if task.IsInTerminalState() {
-		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger, ctx.Usage, ctx.Configuration)
+		err := processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger, ctx.Usage, ctx.Configuration)
+		revokeOpenRouterChildKeyOrReschedule(ctx)
+		return err
 	}
 
 	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
@@ -106,8 +109,10 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 	}
 
 	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType, executionCtx.OrganizationID, ctx.Logger, executionCtx.Usage, executionCtx.Configuration); err != nil {
+		_ = revokeOpenRouterChildKey(executionCtx.HTTP, executionCtx.ExecutionState, executionCtx.HostedLLM, ctx.Logger)
 		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
 	}
+	_ = revokeOpenRouterChildKey(executionCtx.HTTP, executionCtx.ExecutionState, executionCtx.HostedLLM, ctx.Logger)
 
 	return http.StatusOK, nil, nil
 }
@@ -192,12 +197,14 @@ func billableSeconds(duration time.Duration) int64 {
 
 func cancelBrokerTask(ctx core.ExecutionContext) error {
 	if ctx.ExecutionState.IsFinished() {
+		_ = revokeOpenRouterChildKey(ctx.HTTP, ctx.ExecutionState, ctx.HostedLLM, ctx.Logger)
 		return nil
 	}
 
 	taskID, err := ctx.ExecutionState.GetKV("task_id")
 	if err != nil {
 		if errors.Is(err, core.ErrExecutionKVNotFound) {
+			_ = revokeOpenRouterChildKey(ctx.HTTP, ctx.ExecutionState, ctx.HostedLLM, ctx.Logger)
 			return nil
 		}
 		return fmt.Errorf("get task_id kv: %w", err)
@@ -211,5 +218,7 @@ func cancelBrokerTask(ctx core.ExecutionContext) error {
 	if err := broker.CancelTask(taskID); err != nil {
 		return fmt.Errorf("cancel task: %w", err)
 	}
+
+	_ = revokeOpenRouterChildKey(ctx.HTTP, ctx.ExecutionState, ctx.HostedLLM, ctx.Logger)
 	return nil
 }

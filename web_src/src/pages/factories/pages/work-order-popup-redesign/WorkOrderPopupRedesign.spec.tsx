@@ -272,12 +272,11 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
-    expect(within(waitingNote).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(waitingNote).getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(within(waitingNote).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();

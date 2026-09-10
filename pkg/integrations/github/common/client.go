@@ -36,15 +36,24 @@ type Client struct {
 }
 
 func IsNotFoundError(err error) bool {
+	return githubStatusCode(err) == http.StatusNotFound
+}
+
+func IsForbiddenError(err error) bool {
+	return githubStatusCode(err) == http.StatusForbidden
+}
+
+func githubStatusCode(err error) int {
 	var githubErr *github.ErrorResponse
-	if errors.As(err, &githubErr) && githubErr.Response != nil && githubErr.Response.StatusCode == http.StatusNotFound {
-		return true
+	if errors.As(err, &githubErr) && githubErr.Response != nil {
+		return githubErr.Response.StatusCode
 	}
 
 	var installationErr *ghinstallation.HTTPError
-	return errors.As(err, &installationErr) &&
-		installationErr.Response != nil &&
-		installationErr.Response.StatusCode == http.StatusNotFound
+	if errors.As(err, &installationErr) && installationErr.Response != nil {
+		return installationErr.Response.StatusCode
+	}
+	return 0
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
@@ -242,6 +251,48 @@ func (c *Client) ListCommits(
 	return c.underlying.Repositories.ListCommits(ctx, owner, name, opts)
 }
 
+func (c *Client) ListReviews(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestReview, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestReview
+	for {
+		reviews, resp, err := c.underlying.PullRequests.ListReviews(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list reviews: %w", err)
+		}
+
+		all = append(all, reviews...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+func (c *Client) ListPullRequestComments(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.PullRequestListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListComments(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pull request comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) ListPullRequestReviewComments(
 	ctx context.Context,
 	repository string,
@@ -339,6 +390,23 @@ func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref s
 func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
+}
+
+// GetBranchProtection returns required status checks for a branch. A missing
+// or unreadable rule is not an error: GitHub answers 404 when the branch is
+// open, and 403 when the installation cannot read Administration rules.
+func (c *Client) GetBranchProtection(ctx context.Context, repository, branch string) (*github.Protection, error) {
+	owner, name := c.ownerAndName(repository)
+	protection, _, err := c.underlying.Repositories.GetBranchProtection(ctx, owner, name, branch)
+	if err != nil {
+		// 404: the branch is open. 403: the installation cannot read
+		// Administration rules. Neither should hide observed PR checks.
+		if IsNotFoundError(err) || IsForbiddenError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return protection, nil
 }
 
 func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {

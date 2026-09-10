@@ -213,7 +213,7 @@ func reconcileFactoryRepository(
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
 			switch template.id {
-			case "line-planning", "line-implementation":
+			case "line-implementation":
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{
 					{from: previousAppRepository, to: orderRepositoryExpression},
 					{from: previousDefaultBranch, to: orderDefaultBranchExpression},

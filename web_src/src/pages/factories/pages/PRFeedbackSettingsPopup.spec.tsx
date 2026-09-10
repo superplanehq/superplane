@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -17,6 +17,8 @@ import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+
+Element.prototype.scrollIntoView ??= () => undefined;
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -41,6 +43,13 @@ vi.mock("@/hooks/useIntegrations", async (importOriginal) => {
   return {
     ...actual,
     useConnectedIntegrations: vi.fn(() => ({ data: [] })),
+    useIntegrationResources: vi.fn(() => ({
+      data: [],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    })),
   };
 });
 
@@ -56,6 +65,17 @@ function mockConnectedIntegrations(data: unknown[] = []) {
     isLoading: false,
     error: null,
   } as unknown as ReturnType<typeof useConnectedIntegrations>;
+}
+
+function mockIntegrationResources(data: unknown[] = [], overrides: Record<string, unknown> = {}) {
+  return {
+    data,
+    isLoading: false,
+    isPending: false,
+    isFetching: false,
+    isError: false,
+    ...overrides,
+  } as unknown as ReturnType<typeof useIntegrationResources>;
 }
 
 function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedbackDraftSettings {
@@ -115,6 +135,7 @@ useInfiniteCanvasRuns.mockReturnValue({
 
 beforeEach(() => {
   vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
+  vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources());
 });
 
 afterEach(() => {
@@ -125,12 +146,14 @@ function renderChecksPopup(
   onSave = vi.fn(),
   settings: PRFeedbackDraftSettings = checksDraft(),
   organizationId?: string,
+  githubIntegrationId?: string,
 ) {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <PRFeedbackSettingsPopup
           organizationId={organizationId}
+          githubIntegrationId={githubIntegrationId}
           settings={settings}
           healthy
           onSave={onSave}
@@ -222,60 +245,121 @@ function renderAutomationPopup(
   );
 }
 
-describe("PRFeedbackSettingsPopup check names", () => {
-  it("adds a check name that contains a comma as one value", async () => {
-    const user = userEvent.setup();
-    renderChecksPopup();
-
-    const input = screen.getByTestId("pr-feedback-check-names");
-    await user.type(input, "lint, typecheck");
-    await user.keyboard("{Enter}");
-
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(1);
-    expect(names).toHaveTextContent("lint, typecheck");
-    expect(input).toHaveValue("");
+describe("PRFeedbackSettingsPopup discussion", () => {
+  beforeEach(() => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([{ type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" }]),
+    );
   });
 
-  it("adds a second name with Add and keeps the first comma-containing name", async () => {
-    const user = userEvent.setup();
-    renderChecksPopup();
+  it("uses the same mention and bot choices as setup", () => {
+    renderChecksPopup(vi.fn(), discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }), "org-1", "gh-1");
 
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "lint, typecheck");
-    await user.keyboard("{Enter}");
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "unit");
-    await user.click(screen.getByTestId("pr-feedback-check-names-add"));
-
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(2);
-    expect(names).toHaveTextContent("lint, typecheck");
-    expect(names).toHaveTextContent("unit");
+    expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-mention")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Start from any human comment/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /Address bot comments/ })).toBeChecked();
+    expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
   });
 
-  it("includes a pending name that contains a comma when the user saves", async () => {
+  it("switches mention and bot modes without free-text fields", async () => {
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup();
+    const { onSave } = renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1");
 
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "lint, typecheck");
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+    expect(screen.queryByTestId("discussion-setup-bots-list")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /Start from any human comment/ }));
+    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "false");
+    await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        checkNames: ["lint, typecheck"],
+        mention: "",
+        ignoreBots: true,
+        allowedBots: ["coderabbitai"],
       }),
     );
   });
+});
 
-  it("removes a selected check name", async () => {
+describe("PRFeedbackSettingsPopup check names", () => {
+  it("does not offer name or repository fields because those come from setup", () => {
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "gh-1");
+
+    expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-check-names-picker")).toBeInTheDocument();
+  });
+
+  it("shows configured checks while other catalog checks are loading", () => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([], { isLoading: true, isPending: true, isFetching: true }),
+    );
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "e2e"] }), "org-1", "gh-1");
+
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-names-loading")).toHaveTextContent("Loading other status checks");
+  });
+
+  it("selects a check from the repository catalog", async () => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "e2e", name: "e2e" },
+      ]),
+    );
     const user = userEvent.setup();
-    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint, typecheck", "unit"] }));
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
 
-    await user.click(screen.getByRole("button", { name: "Remove check lint, typecheck" }));
+    const e2e = screen.getByTestId("pr-feedback-check-option-e2e");
+    expect(e2e).toHaveAttribute("aria-selected", "false");
+    await user.click(e2e);
 
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(1);
-    expect(names).toHaveTextContent("unit");
-    expect(names).not.toHaveTextContent("lint, typecheck");
+    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("deselects a selected check from the catalog list", async () => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "unit", name: "unit" },
+      ]),
+    );
+    const user = userEvent.setup();
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "unit"] }), "org-1", "gh-1");
+
+    await user.click(screen.getByTestId("pr-feedback-check-option-lint"));
+
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("pr-feedback-check-option-unit")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("saves only the selected catalog checks", async () => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
+        { type: "status_check", id: "lint", name: "lint" },
+        { type: "status_check", id: "e2e", name: "e2e" },
+      ]),
+    );
+    const user = userEvent.setup();
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
+
+    await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checkNames: ["e2e"],
+      }),
+    );
   });
 });
 
@@ -294,10 +378,25 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
   it("shows the integration icon next to the integration name", () => {
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 
-    const row = screen.getByTestId("pr-feedback-integrations");
+    const row = screen.getByTestId("pr-feedback-integration-int-circleci");
+    expect(row).toHaveAttribute("role", "option");
+    expect(row).toHaveAttribute("aria-selected", "false");
     expect(within(row).getByTestId("integration-icon-circleci")).toBeInTheDocument();
     expect(row).toHaveTextContent("circleci-prod");
-    expect(within(row).getByRole("listitem").className).toContain("items-center");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("selects an integration with the same picker as status checks", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "gh-1");
+
+    const row = screen.getByTestId("pr-feedback-integration-int-circleci");
+    expect(row).toHaveAttribute("aria-selected", "false");
+    await user.click(row);
+    expect(row).toHaveAttribute("aria-selected", "true");
+
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ runnerIntegrationIds: ["int-circleci"] }));
   });
 
   it("groups integrations of the same type next to each other", () => {
@@ -308,7 +407,10 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
           metadata: { id: "int-circleci-2", name: "circleci-staging", integrationName: "circleci" },
           status: { state: "ready" },
         },
-        { metadata: { id: "int-slack-1", name: "slack-alerts", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-semaphore-1", name: "semaphore-prod", integrationName: "semaphore" },
+          status: { state: "ready" },
+        },
         {
           metadata: { id: "int-circleci-1", name: "circleci-prod", integrationName: "circleci" },
           status: { state: "ready" },
@@ -320,21 +422,39 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
 
     const list = screen.getByTestId("pr-feedback-integrations");
     const rows = within(list).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual([
-      "circleci-prod",
-      "circleci-staging",
-      "slack-alerts",
-      "slack-eng",
-    ]);
+    expect(rows.map((row) => row.textContent)).toEqual(["circleci-prod", "circleci-staging", "semaphore-prod"]);
+  });
+
+  it("hides connected integrations that are not common status-check tools", () => {
+    vi.mocked(useConnectedIntegrations).mockReturnValue(
+      mockConnectedIntegrations([
+        { metadata: { id: "int-slack-1", name: "slack-alerts", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-cloudflare", name: "cloudflare-prod", integrationName: "cloudflare" },
+          status: { state: "ready" },
+        },
+      ]),
+    );
+
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1");
+
+    const list = screen.getByTestId("pr-feedback-integrations");
+    expect(list).toHaveTextContent("cloudflare-prod");
+    expect(list).not.toHaveTextContent("slack-alerts");
   });
 
   it("links to the organization Integrations page", () => {
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 
     expect(
-      screen.getByText(/Give the agent access to CI logs from other connected integrations/, { exact: false }),
+      screen.getByText(
+        /Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith/,
+        {
+          exact: false,
+        },
+      ),
     ).toHaveTextContent(
-      "Give the agent access to CI logs from other connected integrations. If this list does not include the integration you need, go to the Integrations page and connect it.",
+      "Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith. If this list does not include the integration you need, go to the Integrations page and connect it.",
     );
     const link = screen.getByRole("link", { name: "Integrations page" });
     expect(link).toHaveAttribute("href", organizationIntegrationsPath("org-1"));
@@ -412,12 +532,12 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(automation).toHaveAccessibleName("Automation");
     expect(within(automation).getAllByText("Find Pull Request").length).toBeGreaterThan(0);
     const headerRow = screen.getByTestId("settings-automation-header-row");
-    const edit = within(headerRow).getByRole("link", { name: "Edit automation" });
     expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
     expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1");
-    expect(edit.className).toContain("rounded-md");
-    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(within(automation).queryByText("passed")).not.toBeInTheDocument();

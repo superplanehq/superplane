@@ -66,6 +66,13 @@ describe("consumeLiveLogNdjsonLine", () => {
     expect(next.onTurn).not.toHaveBeenCalled();
   });
 
+  it("forwards a command index on a log line", () => {
+    const next = handlers();
+    consumeLiveLogNdjsonLine(JSON.stringify({ type: "line", index: 2, text: "Hello" }), next);
+
+    expect(next.onLogLine).toHaveBeenCalledWith("Hello", 2);
+  });
+
   it("splits each prompt command into its own usage series", () => {
     const series = reducePromptUsageFromLiveLogLines([
       JSON.stringify({ type: "cmd_start", index: 2, text: "Implementation", kind: "prompt" }),

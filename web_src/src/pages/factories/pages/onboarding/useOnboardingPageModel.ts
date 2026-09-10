@@ -2,7 +2,6 @@ import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
@@ -39,7 +38,7 @@ import {
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
-import { useFinishOnboarding } from "./useFinishOnboarding";
+import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -364,6 +363,18 @@ function useSelectOnboardingVcsConnection(args: {
   };
 }
 
+/** The mutation hooks the page model saves and provisions through. */
+function useOnboardingMutations(organizationId: string, factoryId: string) {
+  return {
+    updateFactory: useUpdateFactory(organizationId, factoryId),
+    updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
+    updateOrganization: useUpdateOrganization(organizationId),
+    createLine: useCreateFactoryLine(organizationId, factoryId),
+    createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    installer: useInstallFactory({ organizationId }),
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -403,13 +414,9 @@ export function useOnboardingPageModel(args: {
   });
 
   const [saving, setSaving] = useState(false);
-  const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
-  const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
-  const updateOrganization = useUpdateOrganization(args.organizationId);
-  const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
-  const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
-  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(args.organizationId, args.factoryId);
-  const installer = useInstallFactory({ organizationId: args.organizationId });
+  const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
+  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, installer } =
+    useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
@@ -440,6 +447,10 @@ export function useOnboardingPageModel(args: {
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
+  const githubOwner = githubOwnerFromConnections(
+    [...githubConnections.readyInstances, ...githubConnections.allInstances],
+    githubIntegrationId,
+  );
   const finish = useFinishOnboarding({
     ...args,
     setup,
@@ -452,22 +463,18 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
-    listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
-    createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
     listApps: () => fetchFactoryApps(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
-    githubOwner: githubOwnerFromConnections(
-      [...githubConnections.readyInstances, ...githubConnections.allInstances],
-      githubIntegrationId,
-    ),
+    githubOwner,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
     },
+    onProvisioned: setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
@@ -520,8 +527,11 @@ export function useOnboardingPageModel(args: {
     }),
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending,
     ...saves,
     finish: finishSetup,
+    provisionedDestination,
+    // Names the finished organization row on the GitHub stepper card.
+    githubOwner,
   };
 }

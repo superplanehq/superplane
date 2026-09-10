@@ -32,7 +32,7 @@ async function install(args: {
     pending: null,
     organizationId: ORGANIZATION_ID,
     queryClient: args.queryClient,
-    definition: getFactoryDefinition("line-planning"),
+    definition: getFactoryDefinition("line-implementation"),
     workspaceFactoryId: args.workspaceFactoryId,
     createCanvas: args.createCanvas,
     updateCanvasFolderMembership: vi.fn(),
@@ -44,35 +44,35 @@ describe("ensureFactoryCanvas", () => {
     const createCanvas = createCanvasSpy();
 
     const created = await install({
-      queryClient: seedQueryClient({ organizationApps: [{ name: "Plan" }] }),
+      queryClient: seedQueryClient({ organizationApps: [{ name: "Implement" }] }),
       workspaceFactoryId: WORKSPACE_ID,
       createCanvas,
     });
 
-    expect(created.canvasName).toBe("Plan");
-    expect(createCanvas).toHaveBeenCalledWith(expect.objectContaining({ name: "Plan" }));
+    expect(created.canvasName).toBe("Implement");
+    expect(createCanvas).toHaveBeenCalledWith(expect.objectContaining({ name: "Implement" }));
   });
 
   it("steps aside when the same workspace already holds the name", async () => {
     const createCanvas = createCanvasSpy();
 
     const created = await install({
-      queryClient: seedQueryClient({ workspaceApps: [{ name: "Plan" }] }),
+      queryClient: seedQueryClient({ workspaceApps: [{ name: "Implement" }] }),
       workspaceFactoryId: WORKSPACE_ID,
       createCanvas,
     });
 
-    expect(created.canvasName).toBe("Plan (2)");
+    expect(created.canvasName).toBe("Implement (2)");
   });
 
   it("steps aside for organization apps when no workspace owns the canvas", async () => {
     const createCanvas = createCanvasSpy();
 
     const created = await install({
-      queryClient: seedQueryClient({ organizationApps: [{ name: "Plan" }] }),
+      queryClient: seedQueryClient({ organizationApps: [{ name: "Implement" }] }),
       createCanvas,
     });
 
-    expect(created.canvasName).toBe("Plan (2)");
+    expect(created.canvasName).toBe("Implement (2)");
   });
 });

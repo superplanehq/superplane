@@ -8,6 +8,7 @@ import (
 // HostedLLMAccess is one SuperPlane-held provider key and allowlist.
 type HostedLLMAccess struct {
 	APIKey        string
+	ManagementKey string
 	BaseURL       string
 	AllowedModels []string
 }
