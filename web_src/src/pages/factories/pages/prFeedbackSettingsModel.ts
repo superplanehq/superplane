@@ -55,9 +55,6 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   },
 ];
 
-/** Hide the status-checks next step until that post-onboarding prompt is ready. */
-export const CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE = false;
-
 export function availablePRFeedbackSources(): PRFeedbackSource[] {
   return PR_FEEDBACK_SOURCES;
 }
@@ -212,13 +209,22 @@ function normalizeUniqueStrings(values: string[]): string[] {
   return normalized;
 }
 
+export const PR_FEEDBACK_MAXIMUM_ATTEMPTS_MIN = 1;
+export const PR_FEEDBACK_MAXIMUM_ATTEMPTS_MAX = 10;
+
+export function isPRFeedbackMaximumAttemptsValid(value: number): boolean {
+  return (
+    Number.isInteger(value) && value >= PR_FEEDBACK_MAXIMUM_ATTEMPTS_MIN && value <= PR_FEEDBACK_MAXIMUM_ATTEMPTS_MAX
+  );
+}
+
 export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean {
   const next = normalizePRFeedbackDraft(draft);
   if (next.name.length === 0 || next.repository.length === 0) {
     return false;
   }
   if (next.source === "checks") {
-    return next.checkNames.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
+    return next.checkNames.length > 0 && isPRFeedbackMaximumAttemptsValid(next.maximumAttempts);
   }
   return next.mention.length === 0 || next.mention.startsWith("@");
 }
