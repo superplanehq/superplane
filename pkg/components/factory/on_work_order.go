@@ -49,12 +49,15 @@ Each event has type ` + "`workOrder.created`" + `. The payload is:
     "description": "...",
     "number": 12,
     "state": "draft",
+    "repository": "acme/app",
+    "repository_url": "https://github.com/acme/app.git",
+    "default_branch": "main",
     "origin": { "url": "...", "label": "..." }
   }
 }
 ` + "```" + `
 
-` + "`origin`" + ` is present only when the task was created from an intake item.`
+` + "`origin`" + ` is present only when the task was created from an intake item. Repository fields are present when the workspace has an app repository.`
 }
 
 func (t *OnWorkOrder) Icon() string {
@@ -71,11 +74,14 @@ func (t *OnWorkOrder) ExampleData() map[string]any {
 		"timestamp": "2026-01-01T00:00:00Z",
 		"data": map[string]any{
 			"workOrder": map[string]any{
-				"id":          "123",
-				"title":       "Show a clearer empty state",
-				"description": "The billing page empty state does not name the next action.",
-				"number":      12,
-				"state":       "draft",
+				"id":             "123",
+				"title":          "Show a clearer empty state",
+				"description":    "The billing page empty state does not name the next action.",
+				"number":         12,
+				"state":          "draft",
+				"repository":     "acme/app",
+				"repository_url": "https://github.com/acme/app.git",
+				"default_branch": "main",
 				"origin": map[string]any{
 					"url":   "https://github.com/acme/app/issues/42",
 					"label": "acme/app#42",
