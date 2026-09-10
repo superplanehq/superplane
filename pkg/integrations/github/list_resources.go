@@ -30,6 +30,12 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "default_branch":
 		return g.listDefaultBranchResource(ctx)
 
+	case "status_check":
+		return g.listStatusCheckResources(ctx)
+
+	case "review_bot":
+		return g.listReviewBotResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

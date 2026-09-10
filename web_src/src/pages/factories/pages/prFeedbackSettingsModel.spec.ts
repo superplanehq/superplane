@@ -12,8 +12,11 @@ import {
   fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
+  toggleUniqueString,
+  availablePRFeedbackSources,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
+  prFeedbackHandlerForSource,
   prFeedbackSettingsTabs,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
@@ -313,8 +316,29 @@ describe("takenPRFeedbackSourceIds", () => {
         { source: "SOURCE_PULL_REQUEST_CHECKS" },
       ]),
     ).toEqual(["discussion", "checks"]);
-    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
+  });
+});
+
+describe("availablePRFeedbackSources", () => {
+  it("hides status-check setup until that wizard is ready", () => {
+    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion"]);
+    expect(hasAvailablePRFeedbackSource([])).toBe(true);
+    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(false);
     expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
+  });
+});
+
+describe("prFeedbackHandlerForSource", () => {
+  it("returns the handler for a source when it has an id", () => {
+    expect(
+      prFeedbackHandlerForSource(
+        [
+          { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" },
+          { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS" },
+        ],
+        "discussion",
+      ),
+    ).toEqual({ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" });
   });
 });
 
@@ -326,9 +350,11 @@ describe("prFeedbackListenTitle", () => {
 });
 
 describe("prFeedbackDraftIsValid", () => {
-  it("requires a name, repository, and mention", () => {
+  it("requires a name and repository", () => {
     expect(prFeedbackDraftIsValid(discussionDraft())).toBe(true);
     expect(prFeedbackDraftIsValid(discussionDraft({ name: "" }))).toBe(false);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "" }))).toBe(true);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "superplaneagent" }))).toBe(false);
   });
 
   it("does not require an allowed bots list", () => {
@@ -342,10 +368,22 @@ describe("prFeedbackDraftIsValid", () => {
           source: "checks",
           name: "Fix pull request checks",
           mention: "",
+          checkNames: ["lint"],
           maximumAttempts: 3,
         }),
       ),
     ).toBe(true);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
+          checkNames: [],
+          maximumAttempts: 3,
+        }),
+      ),
+    ).toBe(false);
     expect(
       prFeedbackDraftIsValid(
         discussionDraft({
@@ -371,6 +409,15 @@ describe("prFeedbackDraftFromHandler", () => {
 
     expect(prFeedbackDraftFromHandler(handler).allowedBots).toEqual(["coderabbitai", "bugbot"]);
     expect(prFeedbackDraftFromHandler(handler).source).toBe("discussion");
+  });
+
+  it("keeps an empty mention", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Address PR feedback",
+      settings: { subject: { repository: "acme/app" }, discussion: { mention: "" } },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).mention).toBe("");
   });
 
   it("defaults to an empty allowed bots list", () => {
@@ -406,6 +453,13 @@ describe("appendUniqueTrimmedString", () => {
     expect(appendUniqueTrimmedString(["lint"], " lint, typecheck ")).toEqual(["lint", "lint, typecheck"]);
     expect(appendUniqueTrimmedString(["lint"], "lint")).toEqual(["lint"]);
     expect(appendUniqueTrimmedString(["lint"], "   ")).toEqual(["lint"]);
+  });
+});
+
+describe("toggleUniqueString", () => {
+  it("adds a missing name and removes a matching name without case", () => {
+    expect(toggleUniqueString(["lint"], "e2e")).toEqual(["lint", "e2e"]);
+    expect(toggleUniqueString(["lint", "e2e"], "LINT")).toEqual(["e2e"]);
   });
 });
 

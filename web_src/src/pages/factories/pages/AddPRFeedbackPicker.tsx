@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  PR_FEEDBACK_SOURCES,
+  availablePRFeedbackSources,
   type PRFeedbackSource,
   type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
@@ -16,6 +16,8 @@ interface AddPRFeedbackPickerProps {
 }
 
 export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = [] }: AddPRFeedbackPickerProps) {
+  const sources = availablePRFeedbackSources();
+
   return (
     <Dialog
       open={open}
@@ -35,8 +37,14 @@ export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = 
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="grid grid-cols-2 gap-2 p-3" data-testid="add-pr-feedback-templates">
-          {PR_FEEDBACK_SOURCES.map((source) => {
+        <ul
+          className={cn(
+            "grid gap-2 p-3",
+            sources.length === 1 ? "grid-cols-1" : "grid-cols-2",
+          )}
+          data-testid="add-pr-feedback-templates"
+        >
+          {sources.map((source) => {
             const taken = takenSourceIds.includes(source.id);
             return (
               <li key={source.id}>

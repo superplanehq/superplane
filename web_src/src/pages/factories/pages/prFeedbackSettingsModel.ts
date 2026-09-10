@@ -35,7 +35,7 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   {
     id: "discussion",
     name: "Pull request discussion",
-    description: "Address comments and reviews after a mention.",
+    description: "Address comments and reviews on a pull request.",
     listenTitle: "Listening to pull request comments",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
@@ -51,6 +51,17 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
     defaultName: "Fix pull request checks",
   },
 ];
+
+/** Status-check setup is not ready. Hide the wizard and next-step until it is. */
+export const CHECKS_PR_FEEDBACK_SETUP_AVAILABLE = false;
+
+export function availablePRFeedbackSources(): PRFeedbackSource[] {
+  return PR_FEEDBACK_SOURCES.filter((source) => source.id !== "checks" || CHECKS_PR_FEEDBACK_SETUP_AVAILABLE);
+}
+
+export function isPRFeedbackSetupAvailable(sourceId: PRFeedbackSourceId): boolean {
+  return availablePRFeedbackSources().some((source) => source.id === sourceId);
+}
 
 export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource | undefined {
   return PR_FEEDBACK_SOURCES.find((source) => source.id === id);
@@ -71,7 +82,14 @@ export function takenPRFeedbackSourceIds(
 }
 
 export function hasAvailablePRFeedbackSource(taken: readonly PRFeedbackSourceId[]): boolean {
-  return PR_FEEDBACK_SOURCES.some((source) => !taken.includes(source.id));
+  return availablePRFeedbackSources().some((source) => !taken.includes(source.id));
+}
+
+export function prFeedbackHandlerForSource<T extends { id?: string; source?: FactoriesFactoryPrFeedbackHandlerSource }>(
+  handlers: readonly T[],
+  sourceId: PRFeedbackSourceId,
+): T | undefined {
+  return handlers.find((handler) => Boolean(handler.id) && prFeedbackSourceId(handler.source) === sourceId);
 }
 
 export interface PRFeedbackDraftSettings {
@@ -95,27 +113,72 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   nameHelper: "This name appears in the workspace app list.",
   repositoryLabel: "Repository",
   repositoryHelper: "Listen for mentions on pull requests in this repository.",
-  checksRepositoryHelper: "Wait for checks on pull requests in this repository.",
   mentionLabel: "Mention",
-  mentionHelper: "Use an exact GitHub mention, for example @superplaneagent.",
+  mentionHelper:
+    "Leave this field empty to start a run from any human comment or review. Use @superplaneagent to require a mention.",
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
   allowedBotsLabel: "Allowed bots",
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   checkNamesLabel: "Status checks",
-  checkNamesHelper:
-    "SuperPlane waits for each selected check and fixes selected failures. Leave empty to monitor all checks.",
-  checkNamesAdd: "Add",
-  checkNamesPlaceholder: "lint",
+  checkNamesHelper: "Select the status checks SuperPlane must wait for and automatically attempt to fix.",
+  checkNamesNone: "Select at least one status check.",
+  checkNamesCatalogEmpty: "No status checks found.",
+  checkNamesLoading: "Loading status checks",
+  checkNamesLoadingDetail: "Reading recent pull requests and the required status checks for this repository...",
+  checkNamesLoadingMore: "Loading other status checks...",
+  checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
+  wizardTitle: "Fix pull request checks",
+  wizardPageTitleComments: "How should pull request comments be handled?",
+  wizardPageTitleChecks: "How should failing status checks be handled?",
+  wizardBackToBoard: "Back to board",
+  wizardBack: "Back",
+  wizardStepHumanComments: "How to handle human comments?",
+  wizardStepAIComments: "How to handle AI comments?",
+  wizardStepWhichChecks: "Which status checks should be fixed?",
+  wizardStepWhichTools: "Which tools report these checks?",
+  wizardMentionRequireOption: "Require @superplaneagent",
+  wizardMentionRequireHelper: "Humans must mention @superplaneagent for pull request feedback.",
+  wizardMentionAnyOption: "Start from any human comment",
+  wizardMentionAnyHelper: "Handle any human comment or review on the pull request.",
+  wizardBotsIntro:
+    "AI review bots often leave comments on pull requests. Choose whether SuperPlane should handle that feedback.",
+  wizardBotIgnoreOption: "Ignore bot comments",
+  wizardBotIgnoreHelper: "Do not handle pull request feedback from bots.",
+  wizardBotAddressOption: "Address bot comments",
+  wizardBotAddressHelper: "Handle pull request feedback from the bots you select.",
+  wizardBotsLabel: "Review bots",
+  wizardBotsLoading: "Loading review bots",
+  wizardBotsEmpty: "No review bots found.",
+  wizardBotsLoadError: "SuperPlane could not load review bots from this repository.",
+  wizardBotsFound:
+    "SuperPlane scanned the most recent pull requests in the repository and found these bots. Select the bots that you want for pull request feedback.",
+  wizardBotsMissing: "The bot that you use is not here?",
+  wizardBotsAddManually: "Add a bot manually",
+  wizardBotsAddLabel: "Add bot login",
+  wizardBotsAddPlaceholder: "Add bot login, for example coderabbitai",
+  wizardBotsAdd: "Add",
+  wizardToolsDescription:
+    "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
+  wizardToolsUnknown:
+    "SuperPlane could not match these checks to a CI tool. The agent may not have enough context to fix them.",
+  wizardToolsUnselected: "Some of the checks you selected require additional access that you are not granting.",
+  wizardToolsUnselectedDetail: "That prevents the agent from having enough context to fix issues correctly.",
+  wizardContinue: "Continue",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
+  wizardConnect: "Connect",
+  wizardSuggested: "Suggested from the selected checks",
+  wizardOtherTools: "Other CI tools",
   maximumAttemptsLabel: "Maximum automatic fix attempts",
   maximumAttemptsHelper:
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
   integrationsLabel: "Additional integration access",
-  integrationsHelper: "Give the agent access to CI logs from other connected integrations.",
+  integrationsHelper: "Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith.",
   integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
   integrationsMissingLink: "Integrations page",
   integrationsMissingAfter: " and connect it.",
-  integrationsEmpty: "No other connected integrations are available.",
+  integrationsEmpty: "None of these CI tools are connected.",
   healthReady: "Ready",
   healthNeedsRepair: "Needs repair",
   healthReadyHelper: "This automation can receive a mention and address it.",
@@ -178,11 +241,7 @@ function handlerDraftRepository(handler: FactoriesFactoryPrFeedbackHandler): str
 }
 
 function handlerDraftMention(mention: string | undefined): string {
-  const trimmed = mention?.trim();
-  if (trimmed) {
-    return trimmed;
-  }
-  return "@superplaneagent";
+  return mention?.trim() ?? "";
 }
 
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {
@@ -209,6 +268,14 @@ export function appendUniqueTrimmedString(items: string[], raw: string): string[
   const name = raw.trim();
   if (name.length === 0 || items.includes(name)) {
     return items;
+  }
+  return [...items, name];
+}
+
+/** Select or deselect one name. Compare names without case. */
+export function toggleUniqueString(items: string[], name: string): string[] {
+  if (items.some((item) => item.toLowerCase() === name.toLowerCase())) {
+    return items.filter((item) => item.toLowerCase() !== name.toLowerCase());
   }
   return [...items, name];
 }
@@ -255,9 +322,9 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
     return false;
   }
   if (next.source === "checks") {
-    return next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
+    return next.checkNames.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
   }
-  return next.mention.startsWith("@");
+  return next.mention.length === 0 || next.mention.startsWith("@");
 }
 
 export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): FactoriesFactoryPrFeedbackHandlerSettings {

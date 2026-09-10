@@ -13,7 +13,8 @@ import {
   useFactoryWorkOrders,
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
-import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
@@ -43,6 +44,8 @@ import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { NextStepsPanel } from "./NextStepsPanel";
+import { runWorkspaceNextStepAction, workspaceNextSteps } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
@@ -110,6 +113,7 @@ import {
   factoryHomePath,
   factoryIntakePath,
   factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -120,6 +124,7 @@ import {
   isPRFeedbackSearchOpen,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
+  prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -158,13 +163,15 @@ import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
   PR_FEEDBACK_SOURCES,
-  apiPRFeedbackSource,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
+  prFeedbackSourceById,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
 } from "./prFeedbackSettingsModel";
+import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
@@ -225,7 +232,6 @@ export function LinesPage() {
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
@@ -247,6 +253,15 @@ export function LinesPage() {
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
+  const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
+  const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const catalogParameters = appRepository ? { repository: appRepository } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+  });
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+  });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const {
@@ -323,6 +338,11 @@ export function LinesPage() {
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const nextSteps = workspaceNextSteps({
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    takenPRFeedbackSources,
+  });
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
@@ -345,21 +365,18 @@ export function LinesPage() {
   });
 
   const createPRFeedbackFromSource = (source: PRFeedbackSource) => {
-    if (takenPRFeedbackSources.includes(source.id)) {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
       return;
     }
     setAddPRFeedbackOpen(false);
-    createPRFeedbackHandler
-      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
-      .then((handler) => {
-        if (!handler.id) {
-          return;
-        }
-        navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id));
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-      });
+    navigate(
+      factoryPRFeedbackSetupPath(
+        organizationId,
+        factoryKey,
+        selectedLine.id,
+        prFeedbackSetupKindFromSourceId(source.id),
+      ),
+    );
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
@@ -454,15 +471,12 @@ export function LinesPage() {
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          githubIntegrationId={githubIntegrationId}
+          repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onCreated={(handlerId) =>
-            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId), {
-              replace: true,
-            })
-          }
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
@@ -480,6 +494,23 @@ export function LinesPage() {
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
+          />
+          <NextStepsPanel
+            steps={nextSteps}
+            onContinue={(step) =>
+              runWorkspaceNextStepAction(step.action, {
+                openPRFeedbackSetup: (sourceId) => {
+                  navigate(
+                    factoryPRFeedbackSetupPath(
+                      organizationId,
+                      factoryKey,
+                      selectedLine.id,
+                      prFeedbackSetupKindFromSourceId(sourceId),
+                    ),
+                  );
+                },
+              })
+            }
           />
         </div>
         <div className={factoryWorkOrdersBodyClassName}>

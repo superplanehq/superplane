@@ -2,7 +2,6 @@ import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
@@ -372,7 +371,6 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
-    createPRFeedbackHandler: useCreateFactoryPRFeedbackHandler(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
   };
 }
@@ -417,15 +415,8 @@ export function useOnboardingPageModel(args: {
 
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
-  const {
-    updateFactory,
-    updateOnboarding,
-    updateOrganization,
-    createLine,
-    createIntake,
-    createPRFeedbackHandler,
-    installer,
-  } = useOnboardingMutations(args.organizationId, args.factoryId);
+  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, installer } =
+    useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
@@ -472,8 +463,6 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
-    listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
-    createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
     listApps: () => fetchFactoryApps(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
@@ -538,7 +527,7 @@ export function useOnboardingPageModel(args: {
     }),
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending,
     ...saves,
     finish: finishSetup,
     provisionedDestination,
