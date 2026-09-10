@@ -13,8 +13,10 @@ import {
   isChecksHandlerCIIntegration,
   type ChecksHandlerIntegrationRow,
 } from "./checksPRFeedbackSetup";
+import { ChecksPRFeedbackSetupPreview } from "./ChecksPRFeedbackSetupPreview";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
+import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import {
   integrationDefinitionLabel,
   useChecksPRFeedbackSetup,
@@ -44,7 +46,22 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
   return (
     <>
       {setup.connectName ? null : (
-        <div className="space-y-6" data-testid="checks-pr-feedback-setup">
+        <PRFeedbackSetupWizardShell
+          testId="checks-pr-feedback-setup"
+          preview={
+            <ChecksPRFeedbackSetupPreview
+              step={setup.step}
+              catalog={setup.catalog}
+              selectedNames={setup.checkNames}
+              catalogEmpty={setup.catalogEmpty}
+              maximumAttempts={setup.maximumAttempts}
+              toolsAccess={setup.toolsAccess}
+              suggestedNames={setup.suggestedNames}
+              runnerIntegrationIds={setup.runnerIntegrationIds}
+              connected={setup.connected}
+            />
+          }
+        >
           <SetupHeader
             step={setup.step}
             catalogEmpty={setup.catalogEmpty}
@@ -75,7 +92,7 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
               onCreated={props.onCreated}
             />
           </div>
-        </div>
+        </PRFeedbackSetupWizardShell>
       )}
       <IntegrationCreateDialog
         open={Boolean(setup.connectName)}

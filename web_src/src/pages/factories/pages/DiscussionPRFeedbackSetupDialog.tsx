@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
+import { DiscussionPRFeedbackSetupPreview } from "./DiscussionPRFeedbackSetupPreview";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
+import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import { ReviewBotPicker } from "./ReviewBotPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSource } from "./prFeedbackSettingsModel";
@@ -31,7 +33,18 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
   const canLeaveStep = setup.step === "bots";
 
   return (
-    <div className="space-y-6" data-testid="discussion-pr-feedback-setup">
+    <PRFeedbackSetupWizardShell
+      testId="discussion-pr-feedback-setup"
+      preview={
+        <DiscussionPRFeedbackSetupPreview
+          step={setup.step}
+          mentionRequired={setup.mentionRequired}
+          botMode={setup.botMode}
+          selectedBots={setup.allowedBots}
+          catalog={setup.catalog}
+        />
+      }
+    >
       <SetupHeader
         step={setup.step}
         onBack={() => {
@@ -51,7 +64,7 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
         ) : null}
       </div>
       <SetupFooter setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
-    </div>
+    </PRFeedbackSetupWizardShell>
   );
 }
 

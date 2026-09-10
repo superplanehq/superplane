@@ -190,18 +190,31 @@ export function checksHandlerIntegrationRows(
   return rows;
 }
 
+export function selectedSuggestedIntegrationNames(
+  suggestedNames: string[],
+  selectedIds: string[],
+  ready: Array<{ metadata?: { id?: string; integrationName?: string } }>,
+): string[] {
+  if (suggestedNames.length === 0) {
+    return [];
+  }
+  const selected = new Set(selectedIds);
+  const grantedTypes = new Set<string>();
+  for (const item of ready) {
+    const id = item.metadata?.id;
+    const type = item.metadata?.integrationName?.trim().toLowerCase();
+    if (!id || !type || !selected.has(id)) {
+      continue;
+    }
+    grantedTypes.add(type);
+  }
+  return suggestedNames.filter((name) => grantedTypes.has(name.trim().toLowerCase()));
+}
+
 export function hasSelectedSuggestedIntegration(
   suggestedNames: string[],
   selectedIds: string[],
   ready: Array<{ metadata?: { id?: string; integrationName?: string } }>,
 ): boolean {
-  if (suggestedNames.length === 0) {
-    return false;
-  }
-  const selected = new Set(selectedIds);
-  return ready.some((item) => {
-    const id = item.metadata?.id;
-    const type = item.metadata?.integrationName?.trim().toLowerCase();
-    return Boolean(id && type && selected.has(id) && suggestedNames.includes(type));
-  });
+  return selectedSuggestedIntegrationNames(suggestedNames, selectedIds, ready).length > 0;
 }
