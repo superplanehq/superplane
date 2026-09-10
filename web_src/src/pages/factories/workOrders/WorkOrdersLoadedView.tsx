@@ -122,6 +122,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}
           checksPassedOrderIds={checksPassedOrderIds}
           fixesPausedOrderIds={fixesPausedOrderIds}
+          pullRequests={pullRequests}
         />
       );
     }

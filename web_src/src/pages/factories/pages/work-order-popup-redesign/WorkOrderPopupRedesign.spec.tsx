@@ -168,7 +168,9 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Waiting for user review"),
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByRole("link", {
+        name: "Review pull request #6812.",
+      }),
     ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", { name: /^Open / }),
@@ -267,7 +269,9 @@ describe("Line board job popup", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     expect(
-      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Waiting for user review"),
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByRole("link", {
+        name: "Review pull request #6812.",
+      }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
@@ -315,14 +319,23 @@ describe("Line board job popup", () => {
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
+    expect(
+      within(screen.getByTestId("work-order-card-wo-pr-closure-receipts")).getByRole("link", {
+        name: "Merged pull request #510.",
+      }),
+    ).toHaveAttribute("href", "https://github.com/example/ledger/pull/510");
+
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
+    expect(await within(dialog).findByRole("link", { name: /#510/ })).toHaveAttribute(
+      "href",
+      "https://github.com/example/ledger/pull/510",
+    );
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
     expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   }, 20000);
 
   it("dispatches a draft task to the open line", async () => {
