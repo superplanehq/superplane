@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -32,7 +33,12 @@ func serializeFactoryPullRequests(
 		workOrderIDs = append(workOrderIDs, pullRequests[i].WorkOrderID)
 	}
 
-	numbers, err := workOrderNumbersByID(tx, workOrderIDs)
+	workOrders, err := loadWorkOrdersByID(tx, workOrderIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	creatorAutomations, err := models.ResolveFactoryWorkOrderCreatorAutomations(tx, workOrderList(workOrders))
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +73,11 @@ func serializeFactoryPullRequests(
 
 	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
 	for i := range pullRequests {
+		workOrder := workOrders[pullRequests[i].WorkOrderID]
 		serialized = append(serialized, serializeFactoryPullRequest(
 			&pullRequests[i],
-			numbers[pullRequests[i].WorkOrderID],
+			&workOrder,
+			creatorAutomations[workOrder.ID],
 			runsByPullRequest[pullRequests[i].ID],
 			revisions[pullRequests[i].ID],
 			usageByRun,
@@ -80,7 +88,8 @@ func serializeFactoryPullRequests(
 
 func serializeFactoryPullRequest(
 	pullRequest *models.FactoryPullRequest,
-	workOrderNumber int64,
+	workOrder *models.FactoryWorkOrder,
+	createdByAutomation *factory.AutomationRef,
 	runs []models.FactoryPullRequestLinkedRun,
 	currentRevision *models.FactoryPullRequestRevision,
 	usageByRun map[uuid.UUID]models.UsageTotals,
@@ -89,7 +98,7 @@ func serializeFactoryPullRequest(
 		Id:              pullRequest.ID.String(),
 		FactoryId:       pullRequest.FactoryID.String(),
 		WorkOrderId:     pullRequest.WorkOrderID.String(),
-		WorkOrderNumber: workOrderNumber,
+		WorkOrderNumber: workOrder.Number,
 		Provider:        pullRequestProviderToProto(pullRequest.Provider),
 		Repository:      pullRequest.Repository,
 		Number:          pullRequest.Number,
@@ -101,6 +110,7 @@ func serializeFactoryPullRequest(
 		Runs:            serializePullRequestRuns(runs, usageByRun),
 		Activities:      serializePullRequestActivities(runs, usageByRun),
 		CurrentRevision: serializePullRequestRevision(currentRevision),
+		CreatedBy:       serializeWorkOrderCreator(workOrder, createdByAutomation),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID
@@ -201,21 +211,34 @@ func listCurrentPullRequestRevisions(
 	return result, nil
 }
 
-func workOrderNumbersByID(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
-	result := map[uuid.UUID]int64{}
+// loadWorkOrdersByID loads the work orders a batch of pull requests belong
+// to, keyed by id, with the creator preloaded so serializeFactoryPullRequest
+// can report the task number and who created it.
+func loadWorkOrdersByID(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]models.FactoryWorkOrder, error) {
+	result := map[uuid.UUID]models.FactoryWorkOrder{}
 	if len(workOrderIDs) == 0 {
 		return result, nil
 	}
 
 	var orders []models.FactoryWorkOrder
-	err := tx.Select("id", "number").Where("id IN ?", workOrderIDs).Find(&orders).Error
+	err := tx.Preload("CreatedBy").Where("id IN ?", workOrderIDs).Find(&orders).Error
 	if err != nil {
 		return nil, err
 	}
 	for _, order := range orders {
-		result[order.ID] = order.Number
+		result[order.ID] = order
 	}
 	return result, nil
+}
+
+// workOrderList flattens a work-order-by-id map into a slice, the shape
+// models.ResolveFactoryWorkOrderCreatorAutomations expects.
+func workOrderList(workOrders map[uuid.UUID]models.FactoryWorkOrder) []models.FactoryWorkOrder {
+	result := make([]models.FactoryWorkOrder, 0, len(workOrders))
+	for _, order := range workOrders {
+		result = append(result, order)
+	}
+	return result
 }
 
 func pullRequestProviderToProto(provider string) pb.FactoryPullRequest_Provider {

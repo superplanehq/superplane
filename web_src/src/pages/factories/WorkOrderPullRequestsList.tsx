@@ -1,5 +1,6 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 
+import { pullRequestCreatorLabel } from "./lib/workOrderCreator";
 import { WorkOrderPullRequestInline } from "./WorkOrderPullRequestInline";
 
 interface WorkOrderPullRequestsListProps {
@@ -22,14 +23,29 @@ export function WorkOrderPullRequestsList({ pullRequests, isLoading, error }: Wo
           <p className="text-[13px] text-muted-foreground">No pull requests yet.</p>
         ) : (
           <ul>
-            {pullRequests.map((pullRequest) => (
-              <li
-                className="flex items-center py-1.5"
-                key={pullRequest.id ?? `${pullRequest.url}-${pullRequest.number}`}
-              >
-                <WorkOrderPullRequestInline className="w-full justify-start" pullRequest={pullRequest} showTitle />
-              </li>
-            ))}
+            {pullRequests.map((pullRequest) => {
+              const creator = pullRequestCreatorLabel(pullRequest.createdBy);
+              return (
+                <li
+                  className="flex items-center gap-2 py-1.5"
+                  key={pullRequest.id ?? `${pullRequest.url}-${pullRequest.number}`}
+                >
+                  <WorkOrderPullRequestInline
+                    className="min-w-0 flex-1 justify-start"
+                    pullRequest={pullRequest}
+                    showTitle
+                  />
+                  {creator ? (
+                    <span
+                      className="shrink-0 truncate text-[12px] text-muted-foreground"
+                      title={`Created by ${creator} on SuperPlane`}
+                    >
+                      by {creator}
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

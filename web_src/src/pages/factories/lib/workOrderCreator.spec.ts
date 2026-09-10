@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveWorkOrderCreatorDisplay, workOrderOwnerDisplay } from "./workOrderCreator";
+import { pullRequestCreatorLabel, resolveWorkOrderCreatorDisplay, workOrderOwnerDisplay } from "./workOrderCreator";
 
 const passthroughResolveUser = (userId: string | undefined, name?: string) =>
   userId ? { id: userId, name: name ?? "Member", initials: (name ?? "M").slice(0, 2).toUpperCase() } : null;
@@ -89,5 +89,28 @@ describe("workOrderOwnerDisplay", () => {
       name: "Ada",
       initials: "AD",
     });
+  });
+});
+
+describe("pullRequestCreatorLabel", () => {
+  it("returns the user's name when the task was created by a member", () => {
+    expect(pullRequestCreatorLabel({ user: { id: "user-1", name: "Ada Lovelace" } })).toBe("Ada Lovelace");
+  });
+
+  it("prefers the automation node name over the app name", () => {
+    expect(
+      pullRequestCreatorLabel({ automation: { nodeId: "node-1", nodeName: "Release Gate", appName: "Release" } }),
+    ).toBe("Release Gate");
+  });
+
+  it("falls back to the app name when the automation has no node name", () => {
+    expect(pullRequestCreatorLabel({ automation: { appId: "app-1", appName: "Release" } })).toBe("Release");
+  });
+
+  it("returns null when there is no usable identity", () => {
+    expect(pullRequestCreatorLabel(undefined)).toBeNull();
+    expect(pullRequestCreatorLabel({})).toBeNull();
+    expect(pullRequestCreatorLabel({ automation: {} })).toBeNull();
+    expect(pullRequestCreatorLabel({ user: { id: "user-1" } })).toBeNull();
   });
 });
