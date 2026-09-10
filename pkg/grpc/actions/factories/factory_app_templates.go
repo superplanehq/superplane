@@ -35,12 +35,6 @@ type factoryAppTemplate struct {
 }
 
 var factoryAppTemplates = map[string]factoryAppTemplate{
-	"line-planning": {
-		id:               "line-planning",
-		entrypointNodeID: "onrun-create-plan",
-		canvasFile:       "templates/line-planning.canvas.yaml",
-		consoleFile:      "templates/line-app.console.yaml",
-	},
 	"line-implementation": {
 		id:               "line-implementation",
 		entrypointNodeID: "onrun-implement",
@@ -245,7 +239,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		"integration": map[string]any{"name": agent.credentialIntegrationName},
 	}
 	model := agent.model
-	if (node.ID == "planner-agent-no-issue" || node.ID == "planning-agent") && agent.planningModel != "" {
+	if node.ID == "planning-agent" && agent.planningModel != "" {
 		model = agent.planningModel
 	}
 	node.Configuration["model"] = model

@@ -11,7 +11,7 @@ import {
 } from "./onboardingProvision";
 
 describe("provisionLine", () => {
-  it("reuses a line that already has the planning entrypoint", async () => {
+  it("reuses a line that already has the implementation entrypoint", async () => {
     const createLine = vi.fn();
     const updateOnboarding = vi.fn();
     const installFactory = vi.fn();
@@ -20,7 +20,7 @@ describe("provisionLine", () => {
       lines: [
         {
           id: "line-1",
-          steps: [{ app: { app: "app-1", entrypoint: "onrun-create-plan" } }],
+          steps: [{ app: { app: "app-1", entrypoint: "onrun-implement" } }],
         },
       ],
     } as FactoriesFactory;
@@ -41,7 +41,7 @@ describe("provisionLine", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("installs plan and implement, and creates a line that runs both", async () => {
+  it("installs implement and creates a line that runs it", async () => {
     const createLine = vi.fn().mockResolvedValue({ id: "line-new" });
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
@@ -60,21 +60,13 @@ describe("provisionLine", () => {
       updateOnboarding,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
-      "line-planning",
-      "line-implementation",
-    ]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["line-implementation"]);
     expect(installFactory.mock.calls.map(([input]) => input.installParams)).toEqual([
-      { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
       { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
     ]);
     expect(createLine).toHaveBeenCalledWith({
       name: DEFAULT_LINE_NAME,
       steps: [
-        {
-          type: "runApp",
-          app: { app: "canvas-line-planning", entrypoint: "onrun-create-plan" },
-        },
         {
           type: "runApp",
           app: { app: "canvas-line-implementation", entrypoint: "onrun-implement" },

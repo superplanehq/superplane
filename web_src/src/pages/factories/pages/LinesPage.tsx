@@ -1016,7 +1016,6 @@ function canvasAppIdsForLine(
     intake: backlog?.id,
     sentry: appIdNamed(apps, "Sentry"),
     slack: appIdNamed(apps, "Slack"),
-    planning: undefined,
     implementation: undefined,
     risk: undefined,
     closure: closure?.id,
@@ -1031,7 +1030,7 @@ function canvasAppIdsForLine(
       id: appId,
       name: app?.name,
     });
-    if (key === "planning" || key === "implementation" || key === "risk" || key === "closure") {
+    if (key === "implementation" || key === "risk" || key === "closure") {
       ids[key] = appId;
     }
   }
