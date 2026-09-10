@@ -2,7 +2,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { NavigateFunction } from "react-router";
 
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
-import { integrationKeys } from "@/hooks/useIntegrations";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
@@ -27,22 +26,6 @@ function seedFactoryQueriesForNewSlug(
   const detail = queryClient.getQueryData(factoryQueryKeys.detail(oldSlug, factoryId));
   if (detail !== undefined) {
     queryClient.setQueryData(factoryQueryKeys.detail(nextSlug, factoryId), detail);
-  }
-}
-
-/**
- * Copies GitHub connection and resource caches to the renamed organization.
- * Both slugs identify the same organization, so the repository step can keep
- * its loaded list while the route context changes.
- */
-function seedIntegrationQueriesForNewSlug(queryClient: QueryClient, oldSlug: string, nextSlug: string): void {
-  const oldPrefix = integrationKeys.connected(oldSlug);
-  const nextPrefix = integrationKeys.connected(nextSlug);
-  const queries = queryClient.getQueriesData({ queryKey: oldPrefix });
-
-  for (const [queryKey, value] of queries) {
-    if (value === undefined) continue;
-    queryClient.setQueryData([...nextPrefix, ...queryKey.slice(oldPrefix.length)], value);
   }
 }
 
@@ -78,7 +61,6 @@ export async function advanceAfterGithubConnect(args: {
 
   if (slugChanged) {
     seedFactoryQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug, args.factoryId);
-    seedIntegrationQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug);
   }
 
   args.navigate(nextPath, { replace: true });

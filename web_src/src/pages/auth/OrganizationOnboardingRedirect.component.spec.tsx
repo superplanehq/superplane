@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccountContextType } from "@/contexts/accountContextState";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import { integrationKeys } from "@/hooks/useIntegrations";
 import { meKeys } from "@/hooks/useMe";
 
 import { OrganizationOnboardingRedirect } from "./OrganizationOnboardingRedirect";
@@ -185,9 +186,14 @@ describe("OrganizationOnboardingRedirect", () => {
 
     const seededFactory = { id: "current-factory", key: "NEWWO" };
     const currentUser = { id: "account-1", permissions: [{ resource: "factories", action: "update" }] };
+    const integrationId = "github-1";
+    const connected = [{ metadata: { id: integrationId, integrationName: "github" } }];
+    const repositories = [{ id: "acme/api", name: "acme/api" }];
     queryClient.setQueryData(factoryQueryKeys.list("github-owner"), [seededFactory]);
     queryClient.setQueryData(factoryQueryKeys.detail("github-owner", seededFactory.id), seededFactory);
     queryClient.setQueryData(meKeys.me("dev-user"), currentUser);
+    queryClient.setQueryData(integrationKeys.connected("dev-user"), connected);
+    queryClient.setQueryData(integrationKeys.resources("dev-user", integrationId, "repository"), repositories);
     queryClient.setQueryData(meKeys.me("github-owner"), { id: "stale-user", permissions: [] });
     queryClient.setQueryData(["integrations", "connected", "github-owner"], [{ id: "stale-integration" }]);
     fetchMock.mockResolvedValueOnce({
@@ -201,7 +207,10 @@ describe("OrganizationOnboardingRedirect", () => {
     expect(queryClient.getQueryData(factoryQueryKeys.list("github-owner"))).toEqual([seededFactory]);
     expect(queryClient.getQueryData(factoryQueryKeys.detail("github-owner", seededFactory.id))).toEqual(seededFactory);
     expect(queryClient.getQueryData(meKeys.me("github-owner"))).toEqual(currentUser);
-    expect(queryClient.getQueryData(["integrations", "connected", "github-owner"])).toBeUndefined();
+    expect(queryClient.getQueryData(integrationKeys.connected("github-owner"))).toEqual(connected);
+    expect(queryClient.getQueryData(integrationKeys.resources("github-owner", integrationId, "repository"))).toEqual(
+      repositories,
+    );
   });
 
   it("starts workspace setup without GitHub authorization", async () => {
