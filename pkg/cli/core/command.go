@@ -33,6 +33,8 @@ type ConfigContext interface {
 	SetActiveApp(appID string) error
 	GetActiveFactory() string
 	SetActiveFactory(factoryID string) error
+	GetActiveWorkspace() string
+	SetActiveWorkspace(workspaceID string) error
 	GetURL() string
 }
 
