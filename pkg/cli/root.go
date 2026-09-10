@@ -11,14 +11,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
-	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
 	oidc "github.com/superplanehq/superplane/pkg/cli/commands/oidc"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
-	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
 	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
@@ -61,7 +59,6 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(apps.NewCommand(options))
-	RootCmd.AddCommand(executions.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
@@ -69,7 +66,6 @@ func init() {
 	RootCmd.AddCommand(members.NewCommand(options))
 	RootCmd.AddCommand(oidc.NewCommand(options))
 	RootCmd.AddCommand(organizations.NewCommand(options))
-	RootCmd.AddCommand(queue.NewCommand(options))
 	RootCmd.AddCommand(roles.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(tasks.NewCommand(options))
