@@ -28,6 +28,26 @@ interface WorkOrderDescriptionEditorProps {
   isUploading?: boolean;
 }
 
+function areUrlMapsEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
+  if (a === b) {
+    return true;
+  }
+  const keysA = Object.keys(a ?? {});
+  const keysB = Object.keys(b ?? {});
+  if (keysA.length === 0 && keysB.length === 0) {
+    return true;
+  }
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (const key of keysA) {
+    if ((a ?? {})[key] !== (b ?? {})[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function WorkOrderDescriptionEditor({
   value,
   maxLength,
@@ -138,6 +158,8 @@ export function WorkOrderDescriptionEditor({
   });
 
   editorRef.current = editor;
+  const lastFileUrlsRef = useRef<Record<string, string> | undefined>(undefined);
+  const lastEditorRef = useRef<Editor | null>(null);
 
   useEffect(() => {
     if (!editor) {
@@ -155,6 +177,17 @@ export function WorkOrderDescriptionEditor({
       ...(editor.storage.image ?? {}),
       downloadUrls: urls,
     };
+    const isNewEditor = editor !== lastEditorRef.current;
+    const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
+    if (!isNewEditor && !urlsChanged) {
+      return;
+    }
+    lastEditorRef.current = editor;
+    lastFileUrlsRef.current = fileUrls;
+    if (Object.keys(urls).length === 0 && !urlsChanged) {
+      return;
+    }
+
     const { state, view } = editor;
     const tr = state.tr;
     state.doc.descendants((node, pos) => {
