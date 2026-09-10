@@ -268,6 +268,11 @@ func (s *FactoryService) ListFactoryWorkOrderRunUsage(ctx context.Context, req *
 	return actions.ListFactoryWorkOrderRunUsage(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ExportFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ExportFactoryWorkOrderRunUsageRequest) (*pb.ExportFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ExportFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListFactoryLLMModelsRequest) (*pb.ListFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)
