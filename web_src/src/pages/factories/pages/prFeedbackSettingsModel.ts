@@ -55,9 +55,6 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   },
 ];
 
-/** Hide the status-checks next step until that post-onboarding prompt is ready. */
-export const CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE = false;
-
 export function availablePRFeedbackSources(): PRFeedbackSource[] {
   return PR_FEEDBACK_SOURCES;
 }

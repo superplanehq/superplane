@@ -637,16 +637,87 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should pull request comments be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/3");
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/4");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
     expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure");
+    expect(screen.queryByTestId("workspace-next-step-later")).not.toBeInTheDocument();
   });
 
-  it("hides next steps when the comments handler is configured", () => {
+  it("shows status checks after the comments handler is configured", () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "How should failing status checks be handled?",
+    );
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
+    expect(screen.getByTestId("workspace-next-step-later")).toHaveTextContent("Later");
+  });
+
+  it("moves the status-checks banner into a header badge when the user chooses Later", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-later"));
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+    const restore = screen.getByTestId("workspace-next-steps-restore");
+    expect(restore).toHaveTextContent("3/4");
+    expect(restore).toHaveTextContent("Configure status checks");
+    expect(screen.getByTestId("lines-detail-header")).toContainElement(restore);
+    const trial = screen.queryByTestId("hosted-credit-header-kicker");
+    if (trial) {
+      expect(trial.compareDocumentPosition(restore) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+
+    await user.click(restore);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "How should failing status checks be handled?",
+    );
+    expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
+  });
+
+  it("keeps the deferred status-checks badge after a reload", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    const { unmount } = renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+    await user.click(screen.getByTestId("workspace-next-step-later"));
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
+    unmount();
+
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
+  });
+
+  it("keeps next steps hidden while PR feedback handlers load", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: true });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
+  });
+
+  it("hides next steps when both handlers are configured", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
     });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -662,6 +733,22 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("opens the status-checks setup page from the next-step CTA", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-cta-pr-checks-handler"));
+
+    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
