@@ -46,7 +46,6 @@ export type BacklogColumnProps = {
   automations?: ColumnAutomation[];
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
   automationRowCount?: number;
-  onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 };
 
@@ -83,7 +82,6 @@ export function BacklogColumn({
   onAddIntake,
   automations,
   automationRowCount,
-  onAddAutomation,
   onAutomationRowAction,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
@@ -119,7 +117,6 @@ export function BacklogColumn({
             createPopover={createPopover}
             automations={automations}
             automationRowCount={automationRowCount}
-            onAddAutomation={onAddAutomation}
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
@@ -162,7 +159,6 @@ function BacklogColumnHeaderActions({
   createPopover,
   automations,
   automationRowCount,
-  onAddAutomation,
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
@@ -173,7 +169,6 @@ function BacklogColumnHeaderActions({
   | "title"
   | "automations"
   | "automationRowCount"
-  | "onAddAutomation"
   | "onAutomationRowAction"
   | "onOpenSettings"
   | "onAddIntake"
@@ -198,7 +193,6 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
-        onAddAutomation={onAddAutomation}
         colorId={colorId}
         onColorChange={onColorChange}
       />
