@@ -25,7 +25,7 @@ export interface WorkspaceNextStepContext {
   onboardingComplete: boolean;
   canConfigure: boolean;
   takenPRFeedbackSources: readonly PRFeedbackSourceId[];
-  /** Stay hidden until PR feedback handlers have loaded. */
+  /** Stay hidden until PR feedback handlers have loaded. Also hide when the query fails without cached data. */
   ready?: boolean;
 }
 
@@ -84,6 +84,17 @@ const WORKSPACE_NEXT_STEPS = [COMMENTS_NEXT_STEP, CHECKS_NEXT_STEP];
 
 export function workspaceNextStepsProgressCopy(done: number, total: number): string {
   return `${done}/${total}`;
+}
+
+export function isWorkspaceNextStepsQueryReady(query: {
+  isPending: boolean;
+  isError?: boolean;
+  data?: unknown;
+}): boolean {
+  if (query.isPending) {
+    return false;
+  }
+  return query.data !== undefined || query.isError !== true;
 }
 
 export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNextStep[] {

@@ -68,9 +68,17 @@ const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRe
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
-const useFactoryPRFeedbackHandlers = vi.fn(() => ({
-  data: [] as { id?: string; source?: string; healthy?: boolean }[],
-}));
+const useFactoryPRFeedbackHandlers = vi.fn(
+  (): {
+    data?: { id?: string; source?: string; healthy?: boolean }[];
+    isPending?: boolean;
+    isError?: boolean;
+  } => ({
+    data: [],
+    isPending: false,
+    isError: false,
+  }),
+);
 const createFactoryPRFeedbackHandler = vi.fn();
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
@@ -630,6 +638,12 @@ describe("LinesPage board", () => {
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
+});
+
+describe("LinesPage next steps", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
 
   it("shows comments as open after onboarding", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
@@ -712,6 +726,14 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
   });
 
+  it("keeps next steps hidden when PR feedback handlers fail to load", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({ isPending: false, isError: true });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
+  });
+
   it("hides next steps when both handlers are configured", () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
@@ -751,6 +773,12 @@ describe("LinesPage board", () => {
       factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+});
+
+describe("LinesPage board extras", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
   });
 
   it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {

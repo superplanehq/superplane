@@ -209,6 +209,27 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
   });
 
+  it("does not continue when the attempt limit is not a whole number", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChecksPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("checks-setup-maximum-attempts")).toHaveValue(3));
+    await user.clear(screen.getByTestId("checks-setup-maximum-attempts"));
+    await user.type(screen.getByTestId("checks-setup-maximum-attempts"), "5.5");
+
+    expect(screen.getByTestId("checks-setup-continue")).toBeDisabled();
+  });
+
   it("sends the maximum attempts from the first step", async () => {
     const user = userEvent.setup();
     render(

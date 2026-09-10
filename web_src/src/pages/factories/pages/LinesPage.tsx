@@ -49,6 +49,7 @@ import {
   isWorkspaceNextStepDeferred,
   runWorkspaceNextStepAction,
   shouldForgetDeferredWorkspaceNextStep,
+  isWorkspaceNextStepsQueryReady,
   workspaceNextStepBanner,
   workspaceNextSteps,
   workspaceNextStepsProgressCopy,
@@ -242,10 +243,8 @@ export function LinesPage() {
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
-  const { data: prFeedbackHandlers = [], isPending: prFeedbackHandlersPending } = useFactoryPRFeedbackHandlers(
-    organizationId,
-    factoryId,
-  );
+  const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
@@ -359,7 +358,7 @@ export function LinesPage() {
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
     takenPRFeedbackSources,
-    ready: !prFeedbackHandlersPending,
+    ready: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   isWorkspaceNextStepDeferred,
+  isWorkspaceNextStepsQueryReady,
   runWorkspaceNextStepAction,
   shouldForgetDeferredWorkspaceNextStep,
   workspaceNextStepBanner,
@@ -55,6 +56,23 @@ describe("workspaceNextSteps", () => {
       expect.objectContaining({ id: "pr-comments-handler", done: false }),
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);
+  });
+});
+
+describe("isWorkspaceNextStepsQueryReady", () => {
+  it("stays hidden while the query is pending or failed without data", () => {
+    expect(isWorkspaceNextStepsQueryReady({ isPending: true, isError: false })).toBe(false);
+    expect(isWorkspaceNextStepsQueryReady({ isPending: false, isError: true })).toBe(false);
+    expect(isWorkspaceNextStepsQueryReady({ isPending: false, isError: true, data: undefined })).toBe(false);
+  });
+
+  it("is ready after a successful load, including an empty list", () => {
+    expect(isWorkspaceNextStepsQueryReady({ isPending: false, isError: false, data: [] })).toBe(true);
+    expect(isWorkspaceNextStepsQueryReady({ isPending: false, data: [{ id: "handler-1" }] })).toBe(true);
+  });
+
+  it("uses cached handlers when a later fetch fails", () => {
+    expect(isWorkspaceNextStepsQueryReady({ isPending: false, isError: true, data: [{ id: "handler-1" }] })).toBe(true);
   });
 });
 

@@ -190,6 +190,7 @@ function MaximumAttemptsField({ value, onChange }: { value: number; onChange: (v
         type="number"
         min={1}
         max={10}
+        step={1}
         value={String(value)}
         onChange={(event) => onChange(Number(event.target.value))}
         data-testid="checks-setup-maximum-attempts"
