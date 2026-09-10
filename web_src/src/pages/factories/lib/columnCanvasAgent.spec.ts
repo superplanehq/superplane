@@ -96,6 +96,7 @@ describe("planningReviewDraftFromCanvas", () => {
 
     expect(draft?.title).toBe("Implement From Task Description");
     expect(draft?.components).toHaveLength(1);
+    expect(draft?.components[0].component).toBe("runnerClaudeCode");
     expect(draft?.components[0].configuration).toEqual(implementerConfiguration);
     expect(draft?.components[0].configuration.credentials).toEqual({
       source: "integration",
@@ -168,6 +169,17 @@ describe("canvasNodeToPlanningReviewComponent", () => {
       component: "runnerCodex",
     });
     expect(component.title).toBe("Agent");
+    expect(component.component).toBe("runnerCodex");
     expect(component.concurrency).toEqual({ max: "1", key: "" });
+  });
+
+  it("keeps the Run SuperPlane Agent runner id", () => {
+    const component = canvasNodeToPlanningReviewComponent(
+      agentNode({
+        id: "superplane-agent",
+        component: "runnerSuperPlane",
+      }),
+    );
+    expect(component.component).toBe("runnerSuperPlane");
   });
 });
