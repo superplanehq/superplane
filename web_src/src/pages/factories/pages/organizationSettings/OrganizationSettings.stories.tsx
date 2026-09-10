@@ -95,11 +95,25 @@ export const Billing: Story = {
           hasBillingCustomer: true,
           invoices: [
             {
+              id: "ord_storybook_business",
+              createdAt: "2026-09-10T12:00:00Z",
+              amountCents: "19900",
+              status: "paid",
+              productName: "Business",
+            },
+            {
               id: "ord_storybook_1",
               createdAt: "2026-09-01T12:00:00Z",
               amountCents: "2500",
               status: "paid",
               productName: "Hosted credit 25",
+            },
+            {
+              id: "ord_storybook_refund",
+              createdAt: "2026-08-15T12:00:00Z",
+              amountCents: "5000",
+              status: "refunded",
+              productName: "Hosted credit 50",
             },
           ],
         },
@@ -143,6 +157,11 @@ export const BillingEmptyNoCard: Story = {
           billingEnabled: true,
           hasBillingCustomer: false,
         },
+        organizationBilling: {
+          ...defaultFactoriesFixture.organizationBilling,
+          remainingCreditCents: "0",
+          welcomeRemainingCents: "0",
+        },
       }}
     />
   ),
@@ -157,6 +176,11 @@ export const BillingEmptyCredit: Story = {
         ...defaultFactoriesFixture,
         hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+        organizationBilling: {
+          ...defaultFactoriesFixture.organizationBilling,
+          remainingCreditCents: "0",
+          welcomeRemainingCents: "0",
+        },
       }}
     />
   ),

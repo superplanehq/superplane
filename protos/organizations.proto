@@ -777,6 +777,7 @@ message DescribeOrganizationBillingResponse {
   bool subscription_checkout_enabled = 11;
   bool credit_purchase_allowed = 12;
   bool has_billing_customer = 13;
+  int64 welcome_remaining_cents = 14;
 }
 
 message CreateBusinessCheckoutRequest {

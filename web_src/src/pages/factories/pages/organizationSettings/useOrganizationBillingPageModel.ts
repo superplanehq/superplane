@@ -49,6 +49,8 @@ export type OrganizationBillingPageModel = {
   remainingCreditWarning: boolean;
   grantTotal: number;
   includedRemaining: number;
+  purchasedRemaining: number;
+  welcomeRemaining: number;
   currentPeriodEnd?: string;
   superplaneGrant: number;
   welcomeCreditExpiresAt?: string;
@@ -78,6 +80,8 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     trialEndsAt: billing?.trialEndsAt,
     currentPeriodEnd: billing?.currentPeriodEnd,
     includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
+    purchasedRemaining: parseWorkOrderMetric(billing?.purchasedRemainingCents),
+    welcomeRemaining: parseWorkOrderMetric(billing?.welcomeRemainingCents),
     subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
     creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
     describeBillingEnabled: billing?.billingEnabled === true,
@@ -152,6 +156,8 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     remainingCreditWarning: metrics.remainingCreditWarning,
     grantTotal: metrics.grantTotalCents,
     includedRemaining: flags.includedRemaining,
+    purchasedRemaining: flags.purchasedRemaining,
+    welcomeRemaining: flags.welcomeRemaining,
     currentPeriodEnd: flags.currentPeriodEnd,
     superplaneGrant: metrics.superplaneGrant,
     welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,

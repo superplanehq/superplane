@@ -114,7 +114,6 @@ func allocateHostedCreditSpend(
 		switch {
 		case grant.Kind == LLMCreditGrantKindWelcome:
 			welcomeRemaining += left
-			includedRemaining += left
 		case grant.Kind == LLMCreditGrantKindIncluded:
 			includedRemaining += left
 		case isPurchasedGrantKind(grant.Kind):
@@ -137,7 +136,7 @@ func allocateHostedCreditSpend(
 	}
 
 	return hostedCreditSpend{
-		RemainingMicros:          includedRemaining + purchasedRemaining + adminRemaining,
+		RemainingMicros:          welcomeRemaining + includedRemaining + purchasedRemaining + adminRemaining,
 		IncludedRemainingMicros:  includedRemaining,
 		PurchasedRemainingMicros: purchasedRemaining,
 		WelcomeRemainingMicros:   welcomeRemaining,

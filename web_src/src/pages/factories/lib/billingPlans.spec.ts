@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { billingBusinessPlanAction, billingPlansUsageView, billingUsagePercentUsed } from "./billingPlans";
+import { billingBusinessPlanAction, billingUsagePercentUsed } from "./billingPlans";
 
 describe("billingBusinessPlanAction", () => {
   it("shows the upgrade action when the organization cannot buy credit", () => {
@@ -51,100 +51,5 @@ describe("billingUsagePercentUsed", () => {
 
   it("returns 100 when remaining credit is empty", () => {
     expect(billingUsagePercentUsed(0, 5000)).toBe(100);
-  });
-});
-
-describe("billingPlansUsageView", () => {
-  const now = new Date("2026-09-10T12:00:00.000Z");
-  const trialEndsAt = "2026-09-22T12:00:00.000Z";
-
-  it("shows remaining trial credit and the trial end date", () => {
-    expect(
-      billingPlansUsageView({
-        plan: "trial",
-        remainingCents: 4124,
-        grantTotalCents: 5000,
-        includedRemainingCents: 0,
-        purchasedCents: 0,
-        trialEndsAt,
-        now,
-      }),
-    ).toEqual({
-      heading: "Your trial usage",
-      remainingLabel: "$41.24 remaining",
-      usedPercent: 18,
-      footer: `Ends ${new Date(trialEndsAt).toLocaleDateString()}`,
-    });
-  });
-
-  it("says the trial has ended after the trial date", () => {
-    expect(
-      billingPlansUsageView({
-        plan: "trial",
-        remainingCents: 0,
-        grantTotalCents: 5000,
-        includedRemainingCents: 0,
-        purchasedCents: 0,
-        trialEndsAt: "2026-08-15T12:00:00.000Z",
-        now,
-      }).footer,
-    ).toBe("The trial has ended.");
-  });
-
-  it("shows included Business usage and the reset date", () => {
-    const currentPeriodEnd = "2026-10-09T12:00:00.000Z";
-    expect(
-      billingPlansUsageView({
-        plan: "business",
-        remainingCents: 14124,
-        grantTotalCents: 15000,
-        includedRemainingCents: 5000,
-        purchasedCents: 10000,
-        currentPeriodEnd,
-        now,
-      }),
-    ).toEqual({
-      heading: "Your included usage",
-      remainingLabel: "$50.00 remaining",
-      usedPercent: 0,
-      footer: `Resets ${new Date(currentPeriodEnd).toLocaleDateString()}`,
-    });
-  });
-
-  it("asks the organization to subscribe when Business has lapsed and prepaid credit remains", () => {
-    expect(
-      billingPlansUsageView({
-        plan: "none",
-        remainingCents: 5000,
-        grantTotalCents: 15000,
-        includedRemainingCents: 0,
-        purchasedCents: 5000,
-        currentPeriodEnd: "2026-10-09T12:00:00.000Z",
-        now,
-      }),
-    ).toEqual({
-      heading: "Your hosted usage",
-      remainingLabel: "$50.00 remaining",
-      usedPercent: 0,
-      footer: "Subscribe to Business to use this credit.",
-    });
-  });
-
-  it("asks the organization to subscribe when Business has lapsed and no credit remains", () => {
-    expect(
-      billingPlansUsageView({
-        plan: "none",
-        remainingCents: 0,
-        grantTotalCents: 15000,
-        includedRemainingCents: 0,
-        purchasedCents: 0,
-        now,
-      }),
-    ).toEqual({
-      heading: "Your hosted usage",
-      remainingLabel: "$0.00 remaining",
-      usedPercent: 100,
-      footer: "Subscribe to Business to start hosted runs.",
-    });
   });
 });

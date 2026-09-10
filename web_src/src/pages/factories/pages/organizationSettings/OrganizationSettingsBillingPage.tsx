@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, Receipt } from "lucide-react";
 import { useParams } from "react-router";
 
 import type {
@@ -21,6 +21,14 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import {
+  BILLING_SPEND_ORDER_COPY,
+  billingCreditBucketsView,
+  billingCreditRemainingShares,
+  type BillingCreditBarShare,
+  type BillingCreditBucketKey,
+  type BillingCreditBucketView,
+} from "../../lib/billingCreditBuckets";
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } from "../../lib/hostedCreditGrants";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
@@ -31,6 +39,10 @@ import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageMod
 const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
 const HOSTED_CREDIT_EXPLANATION =
   "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
+const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
+const INVOICES_DESCRIPTION = "Recent paid invoices for this organization.";
+const INVOICES_EMPTY_TITLE = "No invoices yet";
+const INVOICES_EMPTY_BODY = "Paid invoices appear here after checkout.";
 
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "" } = useParams<{ organizationId: string }>();
@@ -60,8 +72,9 @@ export function OrganizationSettingsBillingPage() {
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
-        grantTotal={model.grantTotal}
         includedRemaining={model.includedRemaining}
+        purchasedRemaining={model.purchasedRemaining}
+        welcomeRemaining={model.welcomeRemaining}
         currentPeriodEnd={model.currentPeriodEnd}
         trialEndsAt={model.trialEndsAt}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
@@ -91,8 +104,9 @@ function BillingPageBody({
   portalPending,
   purchased,
   remaining,
-  grantTotal,
   includedRemaining,
+  purchasedRemaining,
+  welcomeRemaining,
   currentPeriodEnd,
   trialEndsAt,
   welcomeCreditExpiresAt,
@@ -117,8 +131,9 @@ function BillingPageBody({
   portalPending: boolean;
   purchased: number;
   remaining: number;
-  grantTotal: number;
   includedRemaining: number;
+  purchasedRemaining: number;
+  welcomeRemaining: number;
   currentPeriodEnd?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
@@ -147,16 +162,6 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
-        usage={{
-          plan,
-          remainingCents: remaining,
-          grantTotalCents: grantTotal,
-          includedRemainingCents: includedRemaining,
-          purchasedCents: purchased,
-          trialEndsAt,
-          welcomeCreditExpiresAt,
-          currentPeriodEnd,
-        }}
         canManageBilling={canManageBilling}
         creditPurchaseAllowed={creditPurchaseAllowed}
         pending={businessCheckoutPending}
@@ -169,13 +174,17 @@ function BillingPageBody({
         checkoutPending={checkoutPending}
         creditPurchaseAllowed={creditPurchaseAllowed}
         creditRefreshStatus={creditRefreshStatus}
+        currentPeriodEnd={currentPeriodEnd}
         hasBillingCustomer={hasBillingCustomer}
+        includedRemaining={includedRemaining}
         packs={packs}
         plan={plan}
         purchased={purchased}
+        purchasedRemaining={purchasedRemaining}
         remaining={remaining}
         trialEndsAt={trialEndsAt}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
+        welcomeRemaining={welcomeRemaining}
         onAddCredit={onAddCredit}
       />
       {showInvoices ? (
@@ -193,13 +202,17 @@ function HostedCreditRemainingCard({
   checkoutPending,
   creditPurchaseAllowed,
   creditRefreshStatus,
+  currentPeriodEnd,
   hasBillingCustomer,
+  includedRemaining,
   packs,
   plan,
   purchased,
+  purchasedRemaining,
   remaining,
   trialEndsAt,
   welcomeCreditExpiresAt,
+  welcomeRemaining,
   onAddCredit,
 }: {
   billingContactMessage?: string;
@@ -208,13 +221,17 @@ function HostedCreditRemainingCard({
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
+  currentPeriodEnd?: string;
   hasBillingCustomer: boolean;
+  includedRemaining: number;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
   purchased: number;
+  purchasedRemaining: number;
   remaining: number;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
+  welcomeRemaining: number;
   onAddCredit: (productId: string) => void | Promise<void>;
 }) {
   const copy = hostedCreditBillingBalanceCopy({
@@ -227,8 +244,19 @@ function HostedCreditRemainingCard({
     trialEndsAt,
     creditPurchaseAllowed,
   });
+  const buckets = billingCreditBucketsView({
+    welcomeRemainingCents: welcomeRemaining,
+    includedRemainingCents: includedRemaining,
+    purchasedRemainingCents: purchasedRemaining,
+    purchasedCents: purchased,
+    plan,
+    trialEndsAt,
+    welcomeCreditExpiresAt,
+    currentPeriodEnd,
+  });
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
+  const remainingShares = billingCreditRemainingShares(buckets);
 
   return (
     <FactorySettingsCard
@@ -240,38 +268,125 @@ function HostedCreditRemainingCard({
         ) : undefined
       }
     >
-      <p className="text-sm text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
-      <div className="mt-4 min-w-0">
+      <p className="text-[12px] text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
+      <div className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="workspace-section-label">Remaining hosted credit</p>
-          {copy.badge ? (
+          <p
+            className="text-xl font-semibold tracking-[-0.02em] tabular-nums"
+            data-testid="billing-credit-remaining-total"
+          >
+            {formatUsdCents(remaining)}
+          </p>
+          {copy.badge === "Trial" ? (
             <Badge variant="outline" className="text-muted-foreground">
               {copy.badge}
             </Badge>
           ) : null}
         </div>
-        <p className="workspace-page-title mt-1" data-testid="billing-remaining-credit">
-          {formatUsdCents(remaining)}
+        <p className="mt-0.5 text-xs text-muted-foreground">{HOSTED_CREDIT_REMAINING_CAPTION}</p>
+        <RemainingSharesBar shares={remainingShares} />
+        <p className="mt-2 text-xs text-muted-foreground" data-testid="billing-credit-spend-order">
+          {BILLING_SPEND_ORDER_COPY}
         </p>
-        {creditRefreshMessage ? (
-          <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
-        ) : null}
-        {copy.description ? (
-          <p
-            className={cn(
-              "mt-3 text-sm",
-              remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
-            )}
-          >
-            {copy.description}
-          </p>
-        ) : null}
-        {!canManageBilling && billingContactMessage ? (
-          <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
-        ) : null}
       </div>
+      <ul className="mt-4 divide-y divide-border">
+        {buckets.map((bucket) => (
+          <CreditBucketRow key={bucket.key} bucket={bucket} />
+        ))}
+      </ul>
+      {creditRefreshMessage ? (
+        <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
+      ) : null}
+      {copy.description ? (
+        <p
+          className={cn(
+            "mt-3 text-sm",
+            remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+          )}
+        >
+          {copy.description}
+        </p>
+      ) : null}
+      {!canManageBilling && billingContactMessage ? (
+        <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
+      ) : null}
     </FactorySettingsCard>
   );
+}
+
+function RemainingSharesBar({ shares }: { shares: BillingCreditBarShare[] }) {
+  const hasRemaining = shares.some((share) => share.percent > 0);
+
+  return (
+    <div
+      className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted"
+      data-testid="billing-credit-remaining-shares"
+      role="img"
+      aria-label="Remaining credit by spend order"
+    >
+      {hasRemaining
+        ? shares
+            .filter((share) => share.percent > 0)
+            .map((share) => (
+              <div
+                key={share.key}
+                className={cn("h-full", bucketAccentClassName(share.key))}
+                style={{ width: `${share.percent}%` }}
+              />
+            ))
+        : null}
+    </div>
+  );
+}
+
+function CreditBucketRow({ bucket }: { bucket: BillingCreditBucketView }) {
+  const remainingPercent = Math.max(0, 100 - bucket.usedPercent);
+
+  return (
+    <li className="py-3 first:pt-1 last:pb-0" data-testid={`billing-credit-${bucket.key}`}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={cn("size-1.5 shrink-0 rounded-full", bucketAccentClassName(bucket.key))} aria-hidden />
+            <h3 className="text-[13px] font-medium tracking-[-0.01em]">{bucket.heading}</h3>
+          </div>
+          <p className="mt-0.5 pl-3.5 text-[11px] text-muted-foreground">{bucket.spendOrderLabel}</p>
+        </div>
+        <p
+          className="shrink-0 text-[13px] font-medium tracking-[-0.01em] tabular-nums"
+          data-testid={`billing-credit-${bucket.key}-remaining`}
+        >
+          {bucket.remainingLabel}
+        </p>
+      </div>
+      <div
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-label={`${bucket.heading} remaining`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={remainingPercent}
+        aria-valuetext={bucket.remainingLabel}
+      >
+        <div
+          className={cn("h-full rounded-full", bucketAccentClassName(bucket.key))}
+          style={{ width: `${remainingPercent}%` }}
+        />
+      </div>
+      {bucket.footer ? <p className="mt-1.5 text-xs text-muted-foreground">{bucket.footer}</p> : null}
+    </li>
+  );
+}
+
+function bucketAccentClassName(key: BillingCreditBucketKey) {
+  switch (key) {
+    case "trial":
+      return "bg-amber-500";
+    case "included":
+      return "bg-foreground";
+    case "topup":
+      return "bg-sky-500";
+  }
 }
 
 function HostedCreditBuyMoreMenu({
@@ -288,7 +403,12 @@ function HostedCreditBuyMoreMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" disabled={checkoutPending || !hasPurchasablePack} data-testid="billing-buy-more">
+        <Button
+          type="button"
+          size="sm"
+          disabled={checkoutPending || !hasPurchasablePack}
+          data-testid="billing-buy-more"
+        >
           {checkoutPending ? "Opening checkout..." : "Buy more"}
           <ChevronDown className="size-3.5" aria-hidden />
         </Button>
@@ -330,18 +450,88 @@ function PolarInvoicesCard({
       title="Invoices"
       data-testid="billing-polar-invoices"
       action={
-        <Button type="button" variant="ghost" disabled={portalPending} onClick={() => void onManageInvoices()}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={portalPending}
+          onClick={() => void onManageInvoices()}
+        >
           {portalPending ? "Opening invoices..." : "Manage invoices"}
           <ExternalLink className="size-3.5" aria-hidden />
         </Button>
       }
     >
-      {invoices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No invoices yet.</p>
-      ) : (
-        <InvoiceTable invoices={invoices} />
-      )}
+      <p className="text-[12px] text-muted-foreground">{INVOICES_DESCRIPTION}</p>
+      {invoices.length === 0 ? <InvoiceEmptyState /> : <InvoiceList invoices={invoices} />}
     </FactorySettingsCard>
+  );
+}
+
+function InvoiceEmptyState() {
+  return (
+    <div className="mt-4 flex flex-col items-center rounded-lg border border-dashed border-border px-6 py-8 text-center">
+      <Receipt className="size-5 text-muted-foreground" aria-hidden />
+      <p className="mt-2 text-sm font-medium text-foreground">{INVOICES_EMPTY_TITLE}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{INVOICES_EMPTY_BODY}</p>
+    </div>
+  );
+}
+
+function InvoiceList({ invoices }: { invoices: OrganizationsHostedCreditInvoice[] }) {
+  return (
+    <ul className="mt-3 divide-y divide-border">
+      {invoices.map((invoice) => (
+        <InvoiceRow key={invoice.id} invoice={invoice} />
+      ))}
+    </ul>
+  );
+}
+
+function InvoiceRow({ invoice }: { invoice: OrganizationsHostedCreditInvoice }) {
+  const productName = invoice.productName || "Hosted credit";
+  const amount = formatUsdCents(parseWorkOrderMetric(invoice.amountCents));
+  const dateLabel = formatInvoiceDate(invoice.createdAt);
+
+  return (
+    <li className="flex items-center gap-3 py-3 first:pt-1 last:pb-0">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+        <Receipt className="size-3.5 text-muted-foreground" aria-hidden />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium tracking-[-0.01em]">{productName}</p>
+        {invoice.createdAt ? (
+          <time className="mt-0.5 block text-xs text-muted-foreground" dateTime={invoice.createdAt}>
+            {dateLabel}
+          </time>
+        ) : (
+          <p className="mt-0.5 text-xs text-muted-foreground">{dateLabel}</p>
+        )}
+      </div>
+      <p className="shrink-0 text-[13px] font-medium tracking-[-0.01em] tabular-nums">{amount}</p>
+      <InvoiceStatusBadge status={invoice.status} />
+    </li>
+  );
+}
+
+function InvoiceStatusBadge({ status }: { status: string | undefined }) {
+  const label = invoiceStatusLabel(status);
+  if (status === "paid") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      >
+        <Check aria-hidden />
+        {label}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="text-muted-foreground">
+      {label}
+    </Badge>
   );
 }
 
@@ -386,29 +576,15 @@ function CreditGrantTable({ grants }: { grants: OrganizationsOrganizationCreditG
   );
 }
 
-function InvoiceTable({ invoices }: { invoices: OrganizationsHostedCreditInvoice[] }) {
-  return (
-    <table className="mt-1 w-full text-left text-[13px]">
-      <thead>
-        <tr className="border-b border-border text-muted-foreground">
-          <th className="py-2 font-medium">Date</th>
-          <th className="py-2 font-medium">Item</th>
-          <th className="py-2 font-medium">Amount</th>
-          <th className="py-2 font-medium">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {invoices.map((invoice) => (
-          <tr key={invoice.id} className="border-b border-border last:border-0">
-            <td className="py-2">{formatGrantDate(invoice.createdAt)}</td>
-            <td className="py-2">{invoice.productName || "Hosted credit"}</td>
-            <td className="py-2">{formatUsdCents(parseWorkOrderMetric(invoice.amountCents))}</td>
-            <td className="py-2">{invoiceStatusLabel(invoice.status)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+function formatInvoiceDate(value: string | undefined) {
+  if (!value) {
+    return "—";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function findPackForCents(packs: OrganizationsHostedCreditProduct[], cents: number) {

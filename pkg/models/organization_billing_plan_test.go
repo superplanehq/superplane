@@ -209,7 +209,8 @@ func Test__ConvertOpenTrialAllowanceToTopupIgnoresExpiredGrantSpend(t *testing.T
 	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.Positive(t, before.BilledMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), before.IncludedRemainingMicros)
 
 	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_expired"))
 

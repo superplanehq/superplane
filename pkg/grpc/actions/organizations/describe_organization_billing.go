@@ -44,6 +44,7 @@ func DescribeOrganizationBilling(
 		RemainingCreditCents:        pricebook.MicrosToCents(credit.RemainingMicros),
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),
 		PurchasedRemainingCents:     pricebook.MicrosToCents(credit.PurchasedRemainingMicros),
+		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
 	}
 	if plan != nil {
 		resp.Plan = plan.Plan

@@ -323,6 +323,7 @@ export interface FactoriesFixture {
     remainingCreditCents?: string;
     includedRemainingCents?: string;
     purchasedRemainingCents?: string;
+    welcomeRemainingCents?: string;
     billingEnabled?: boolean;
     subscriptionCheckoutEnabled?: boolean;
     creditPurchaseAllowed?: boolean;
@@ -402,6 +403,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",
+    welcomeRemainingCents: "4124",
     billingEnabled: true,
     subscriptionCheckoutEnabled: true,
     creditPurchaseAllowed: false,
