@@ -5,6 +5,29 @@ import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
 describe("useOnboardingSetupState", () => {
+  it("hydrates saved repository choices only when the state is created", () => {
+    const connected = new Set<IntegrationId>(["github"]);
+    const { result, rerender } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected,
+        simulateDiscovery: false,
+        initial: {
+          vcsHost: "github",
+          selectedRepo: "acme/old",
+          issuesRepo: "acme/old",
+          issuesChoice: "vcs",
+        },
+      }),
+    );
+
+    expect(result.current.selectedRepo).toBe("acme/old");
+    act(() => result.current.selectRepo("acme/new"));
+    rerender();
+
+    expect(result.current.selectedRepo).toBe("acme/new");
+    expect(result.current.issuesRepo).toBe("acme/new");
+  });
+
   it("uses real connected state and completes discovery without fixture counts", () => {
     const connected = new Set<IntegrationId>(["github", "claude"]);
     const { result } = renderHook(() =>
