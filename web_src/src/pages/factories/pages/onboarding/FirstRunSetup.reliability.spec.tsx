@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -126,7 +126,7 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
-  it("locks the connect screen while GitHub opens and ignores a second click", async () => {
+  it("keeps the connect screen locked after GitHub navigation starts", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
@@ -140,8 +140,32 @@ describe("FirstRunSetup reliability", () => {
     await user.click(connect);
     expect(requestConnect).toHaveBeenCalledTimes(1);
 
-    navigation.resolve(true);
+    await act(async () => {
+      navigation.resolve(true);
+      await navigation.promise;
+    });
+
+    expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
+    expect(connect).toBeDisabled();
+    expect(screen.getByTestId("first-run-back")).toBeDisabled();
+  });
+
+  it("unlocks the connect screen when GitHub navigation does not start", async () => {
+    const user = userEvent.setup();
+    const navigation = deferred<boolean>();
+    const requestConnect = vi.fn(() => navigation.promise);
+    renderSetup(pageModel({ openSection: "vcs", requestConnect }), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    const connect = screen.getByTestId("first-run-connect-github");
+    await user.click(connect);
+    await act(async () => {
+      navigation.resolve(false);
+      await navigation.promise;
+    });
+
     await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(connect).toBeEnabled();
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
   });
 
   it("keeps repository and ticket screens locked until their saves finish", async () => {

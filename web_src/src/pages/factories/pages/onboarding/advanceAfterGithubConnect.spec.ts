@@ -3,6 +3,7 @@ import type { NavigateFunction } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import { integrationKeys } from "@/hooks/useIntegrations";
 
 import { advanceAfterGithubConnect } from "./advanceAfterGithubConnect";
 
@@ -94,6 +95,42 @@ describe("advanceAfterGithubConnect", () => {
 
     expect(seededListWhenResolving).toEqual([{ id: factoryId }]);
     expect(seededDetailWhenResolving).toEqual({ id: factoryId, name: "Old" });
+  });
+
+  it("seeds GitHub and repository caches before re-resolving a new organization slug", async () => {
+    const integrationId = "github-1";
+    const connected = [{ metadata: { id: integrationId, integrationName: "github" } }];
+    const integration = connected[0];
+    const repositories = [{ id: "acme/api", name: "acme/api" }];
+    queryClient.setQueryData(integrationKeys.connected(oldSlug), connected);
+    queryClient.setQueryData(integrationKeys.integration(oldSlug, integrationId), integration);
+    queryClient.setQueryData(integrationKeys.resources(oldSlug, integrationId, "repository"), repositories);
+
+    let connectedWhenResolving: unknown;
+    let integrationWhenResolving: unknown;
+    let repositoriesWhenResolving: unknown;
+    const reresolveWorkspace = vi.fn().mockImplementation(async () => {
+      connectedWhenResolving = queryClient.getQueryData(integrationKeys.connected(nextSlug));
+      integrationWhenResolving = queryClient.getQueryData(integrationKeys.integration(nextSlug, integrationId));
+      repositoriesWhenResolving = queryClient.getQueryData(
+        integrationKeys.resources(nextSlug, integrationId, "repository"),
+      );
+    });
+
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
+      organizationId: oldSlug,
+      nextSlug,
+      factoryId,
+      factoryKey,
+      navigate,
+      reresolveWorkspace,
+      queryClient,
+    });
+
+    expect(connectedWhenResolving).toEqual(connected);
+    expect(integrationWhenResolving).toEqual(integration);
+    expect(repositoriesWhenResolving).toEqual(repositories);
   });
 
   it("navigates to the organization-scoped setup route outside initial onboarding", async () => {
