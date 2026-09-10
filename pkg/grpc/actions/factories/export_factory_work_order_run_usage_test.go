@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"encoding/csv"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -59,14 +59,29 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
 	}))
+	const (
+		computeMachineType = "e1-large-amd64"
+		// Catalog VM rates bill below one cent for short runs. One hour
+		// rounds to a whole-cent cost after MicrosToCents.
+		computeSeconds = int64(3600)
+	)
+	tokenCostCents := pricebook.MicrosToCents(
+		pricebook.EstimateMicros("anthropic", "claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0),
+	)
+	computeCostCents := pricebook.MicrosToCents(
+		pricebook.EstimateComputeMicros(computeMachineType, computeMachineType, computeSeconds),
+	)
+	require.Positive(t, tokenCostCents)
+	require.Positive(t, computeCostCents)
+
 	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
 		NodeID:          "runner",
-		MachineType:     "e1-large-amd64",
-		FleetID:         "e1-large-amd64",
-		DurationSeconds: 90,
+		MachineType:     computeMachineType,
+		FleetID:         computeMachineType,
+		DurationSeconds: computeSeconds,
 		IdempotencyKey:  "runner:compute:export-usage:" + uuid.New().String(),
 	}))
 
@@ -99,16 +114,10 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Equal(t, factory.WorkOrderKey(order.Number), row[2])
 	assert.Equal(t, "anthropic/claude-sonnet-4-6 (your keys)", row[3])
 	assert.Equal(t, "1000000", row[4])
-	assert.Equal(t, "e1-large-amd64", row[6])
-	assert.Equal(t, "90", row[7])
-
-	tokenPriceCents, err := strconv.ParseFloat(row[5], 64)
-	require.NoError(t, err)
-	assert.Greater(t, tokenPriceCents, 0.0)
-
-	vmPriceCents, err := strconv.ParseFloat(row[8], 64)
-	require.NoError(t, err)
-	assert.Greater(t, vmPriceCents, 0.0)
+	assert.Equal(t, formatUsageCSVCents(tokenCostCents), row[5])
+	assert.Equal(t, computeMachineType, row[6])
+	assert.Equal(t, formatUsageCSVInt(computeSeconds), row[7])
+	assert.Equal(t, formatUsageCSVCents(computeCostCents), row[8])
 }
 
 func Test__ExportFactoryWorkOrderRunUsage__NoRows(t *testing.T) {

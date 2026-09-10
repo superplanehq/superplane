@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -54,14 +55,25 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
 	}))
+	const (
+		computeMachineType = "e1-large-amd64"
+		// Catalog VM rates bill below one cent for short runs. One hour
+		// rounds to a whole-cent cost after MicrosToCents.
+		computeSeconds = int64(3600)
+	)
+	computeCostCents := pricebook.MicrosToCents(
+		pricebook.EstimateComputeMicros(computeMachineType, computeMachineType, computeSeconds),
+	)
+	require.Positive(t, computeCostCents)
+
 	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
 		NodeID:          "runner",
-		MachineType:     "e1-large-amd64",
-		FleetID:         "e1-large-amd64",
-		DurationSeconds: 90,
+		MachineType:     computeMachineType,
+		FleetID:         computeMachineType,
+		DurationSeconds: computeSeconds,
 		IdempotencyKey:  "runner:compute:factory-usage:" + uuid.New().String(),
 	}))
 
@@ -72,12 +84,12 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 	assert.Equal(t, int32(30), resp.PeriodDays)
 	assert.Equal(t, int64(1_000_000), resp.TotalTokens)
 	require.Len(t, resp.ByMachineType, 1)
-	assert.Equal(t, int64(300)+resp.ByMachineType[0].CostCents, resp.TotalCostCents)
+	assert.Equal(t, int64(300)+computeCostCents, resp.TotalCostCents)
 	require.Len(t, resp.ByModel, 1)
 	assert.Equal(t, "anthropic", resp.ByModel[0].Provider)
 	assert.Equal(t, "claude-sonnet-4-6", resp.ByModel[0].Model)
-	assert.Equal(t, int64(90), resp.TotalDurationSeconds)
-	assert.Equal(t, "e1-large-amd64", resp.ByMachineType[0].MachineType)
-	assert.Equal(t, int64(90), resp.ByMachineType[0].DurationSeconds)
-	assert.Positive(t, resp.ByMachineType[0].CostCents)
+	assert.Equal(t, computeSeconds, resp.TotalDurationSeconds)
+	assert.Equal(t, computeMachineType, resp.ByMachineType[0].MachineType)
+	assert.Equal(t, computeSeconds, resp.ByMachineType[0].DurationSeconds)
+	assert.Equal(t, computeCostCents, resp.ByMachineType[0].CostCents)
 }
