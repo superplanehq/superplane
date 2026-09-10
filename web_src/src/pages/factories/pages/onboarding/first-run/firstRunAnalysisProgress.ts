@@ -24,6 +24,14 @@ export function githubIssuesIntake(intakes: FactoriesFactoryIntake[] | undefined
   return intakes?.find((intake) => intake.source === "SOURCE_GITHUB_ISSUES");
 }
 
+export function initialImportFailed(
+  status: FactoryIntakeInitialImportStatus | undefined,
+  importSettled: boolean,
+): boolean {
+  if (status === "INITIAL_IMPORT_STATUS_FAILED" || status === "INITIAL_IMPORT_STATUS_SKIPPED") return true;
+  return status === "INITIAL_IMPORT_STATUS_PENDING" && importSettled;
+}
+
 function completedImportItemCount(initialImport: FirstRunInitialImport): number | undefined {
   if (initialImport.status !== "INITIAL_IMPORT_STATUS_COMPLETED") return undefined;
   return initialImport.itemCount;

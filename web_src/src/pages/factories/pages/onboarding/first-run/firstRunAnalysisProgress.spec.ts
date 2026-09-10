@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { FactoriesFactoryIntake } from "@/api-client";
 
-import { firstRunAnalysisProgress, githubIssuesIntake, type FirstRunInitialImport } from "./firstRunAnalysisProgress";
+import {
+  firstRunAnalysisProgress,
+  githubIssuesIntake,
+  initialImportFailed,
+  type FirstRunInitialImport,
+} from "./firstRunAnalysisProgress";
 
 function run(placement: string, extra: { confidencePct?: number; workOrderId?: string } = {}) {
   return { placement, ...extra } as never;
@@ -108,5 +113,18 @@ describe("githubIssuesIntake", () => {
     ];
 
     expect(githubIssuesIntake(intakes)?.id).toBe("github-1");
+  });
+});
+
+describe("initialImportFailed", () => {
+  it("fails a pending import only after its grace period", () => {
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_PENDING", false)).toBe(false);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_PENDING", true)).toBe(true);
+  });
+
+  it("fails terminal import errors without a grace period", () => {
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_FAILED", false)).toBe(true);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_SKIPPED", false)).toBe(true);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_COMPLETED", true)).toBe(false);
   });
 });

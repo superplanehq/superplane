@@ -5,6 +5,7 @@ import { lineIntakeSourceForApiSource } from "../../lineIntakeModel";
 import {
   firstRunAnalysisProgress,
   githubIssuesIntake,
+  initialImportFailed,
   type FirstRunAnalysisProgress,
 } from "./firstRunAnalysisProgress";
 
@@ -35,8 +36,9 @@ export function useFirstRunAnalysis(
   const scoredOrderIds = useBacklogAnalysisScoredOrderIds(organizationId, factoryId);
   const initialImportStatus = intake?.initialImportStatus;
   const githubIntakeMissing = intakes.isSuccess && !intake;
+  const importIsSettled = importSettled(intake?.createdAt);
   return {
-    progress: firstRunAnalysisProgress(runs.data, scoredOrderIds, importSettled(intake?.createdAt), {
+    progress: firstRunAnalysisProgress(runs.data, scoredOrderIds, importIsSettled, {
       status: initialImportStatus,
       itemCount: intake?.initialImportItemCount,
     }),
@@ -45,8 +47,7 @@ export function useFirstRunAnalysis(
       intakes.isError ||
         runs.isError ||
         githubIntakeMissing ||
-        initialImportStatus === "INITIAL_IMPORT_STATUS_FAILED" ||
-        initialImportStatus === "INITIAL_IMPORT_STATUS_SKIPPED",
+        initialImportFailed(initialImportStatus, importIsSettled),
     ),
   };
 }
