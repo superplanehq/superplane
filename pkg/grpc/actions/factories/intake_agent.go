@@ -166,6 +166,10 @@ func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string 
 		return intakeGitHubAppName
 	}
 
+	if name := githubInstallationNameFromVCS(tx, factory); name != "" {
+		return name
+	}
+
 	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
 	if err != nil {
 		log.Warnf("factory %s: backlog cannot read GitHub installations: %v", factory.ID, err)
@@ -185,6 +189,20 @@ func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string 
 	}
 
 	return intakeGitHubAppName
+}
+
+func githubInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) string {
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
+	if integrationID == "" {
+		return ""
+	}
+
+	integration := findIntakeGitHubIntegration(tx, factory, integrationID)
+	if integration == nil || integration.State != models.IntegrationStateReady {
+		return ""
+	}
+
+	return strings.TrimSpace(integration.InstallationName)
 }
 
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
