@@ -362,7 +362,7 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunnerFinishedEventType)
 }
 
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }
