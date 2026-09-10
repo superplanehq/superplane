@@ -987,3 +987,53 @@
     opacity: 0.25;
   }
 }
+
+/*
+ * Lines and Tasks board card motion. The root crossfade is disabled so
+ * only named cards move. New cards ease in; cards that leave fade out.
+ */
+@keyframes kanban-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kanban-card-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+html.kanban-board-motion::view-transition-old(root),
+html.kanban-board-motion::view-transition-new(root) {
+  animation: none;
+}
+
+html.kanban-board-motion::view-transition-group(*) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.kanban-board-motion::view-transition-new(.kanban-card):only-child {
+  animation: kanban-card-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html.kanban-board-motion::view-transition-old(.kanban-card):only-child {
+  animation: kanban-card-exit 200ms ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.kanban-board-motion::view-transition-group(*),
+  html.kanban-board-motion::view-transition-old(*),
+  html.kanban-board-motion::view-transition-new(*) {
+    animation: none !important;
+  }
+}

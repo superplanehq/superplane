@@ -94,6 +94,8 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
+import { KanbanCardMotionItem } from "../workOrders/KanbanCardMotionItem";
+import { lineBoardCardPlacements, useKanbanDisplayedBoard } from "../workOrders/kanbanCardMotion";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -704,13 +706,21 @@ function LineDetail({
   onClosePeek: () => void;
 }) {
   const steps = line.steps ?? [];
-  const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const incomingPlacements = useMemo(
+    () => lineBoardCardPlacements(line, workOrders ?? [], apps),
+    [apps, line, workOrders],
+  );
+  const displayedWorkOrders = useKanbanDisplayedBoard(workOrders ?? [], incomingPlacements);
+  const fullBoard = useMemo(
+    () => buildLinePhaseBoard(line, displayedWorkOrders, apps),
+    [apps, displayedWorkOrders, line],
+  );
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const backlogOrders = useMemo(() => collectLineBacklogOrders(displayedWorkOrders), [displayedWorkOrders]);
   const doneOrders = useMemo(
-    () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
-    [workOrders, line, fullBoard],
+    () => collectLineDoneOrders(displayedWorkOrders, line, fullBoard),
+    [displayedWorkOrders, fullBoard, line],
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
@@ -1383,13 +1393,13 @@ function VerifyColumn({
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-verify-column-scroll">
         {orders.map((order) => (
-          <li key={order.id}>
+          <KanbanCardMotionItem key={order.id} id={order.id}>
             <LineBoardOrderCard
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
             />
-          </li>
+          </KanbanCardMotionItem>
         ))}
       </ul>
     </WorkOrderBoardLane>
@@ -1459,13 +1469,13 @@ function DoneColumn({
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-done-column-scroll">
         {orders.map((order) => (
-          <li key={order.id}>
+          <KanbanCardMotionItem key={order.id} id={order.id}>
             <LineBoardOrderCard
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
             />
-          </li>
+          </KanbanCardMotionItem>
         ))}
       </ul>
     </WorkOrderBoardLane>
@@ -1595,9 +1605,9 @@ function PhaseColumn({
           data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
         >
           {visibleRuns.map((run) => (
-            <li key={run.executionId}>
+            <KanbanCardMotionItem key={run.workOrderId || run.executionId} id={run.workOrderId}>
               <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
-            </li>
+            </KanbanCardMotionItem>
           ))}
         </ul>
       </WorkOrderBoardLane>
