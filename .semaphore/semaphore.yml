@@ -62,6 +62,7 @@ blocks:
 
         - name: Checks
           commands:
+            - make count.repo.files
             - make check.db.structure
             - make check.db.migrations
             - make check.components.docs

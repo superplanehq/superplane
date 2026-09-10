@@ -251,6 +251,9 @@ check.lint.ui.baseline.update:
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
 
+count.repo.files:
+	bash ./scripts/count_repo_files.sh
+
 check.generated.artifacts:
 	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
 	if [ -n "$$tracked" ]; then \
