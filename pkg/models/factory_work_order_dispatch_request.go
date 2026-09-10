@@ -9,10 +9,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var ErrFactoryWorkOrderDispatchKeyConflict = errors.New(
-	"idempotency key was already used with different dispatch parameters",
-)
-
 // FactoryWorkOrderDispatchRequest records a committed dispatch request. The
 // row is created in the dispatch transaction, so failed attempts do not
 // consume their idempotency keys.
@@ -25,6 +21,10 @@ type FactoryWorkOrderDispatchRequest struct {
 	RequestFingerprint string
 	CreatedAt          time.Time
 }
+
+var ErrFactoryWorkOrderDispatchKeyConflict = errors.New(
+	"idempotency key was already used with different dispatch parameters",
+)
 
 func (FactoryWorkOrderDispatchRequest) TableName() string {
 	return "factory_work_order_dispatch_requests"
