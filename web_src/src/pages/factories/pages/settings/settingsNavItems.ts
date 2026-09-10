@@ -180,6 +180,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "save models",
         ],
       },
+      {
+        id: "workspace-usage",
+        label: "Usage",
+        Icon: Receipt,
+        scope: "workspace",
+        section: "usage",
+        permission: { resource: "org", action: "read" },
+        keywords: ["usage", "cost", "tokens", "vm time", "task spend", "your keys", "model", "machine"],
+      },
     ],
   },
   {
@@ -293,15 +302,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "purchased hosted credit",
           "buy more",
         ],
-      },
-      {
-        id: "organization-usage",
-        label: "Usage",
-        Icon: Receipt,
-        scope: "organization",
-        section: "usage",
-        permission: { resource: "org", action: "read" },
-        keywords: ["usage", "cost", "tokens", "vm time", "task spend", "your keys", "model", "machine"],
       },
       {
         id: "organization-spending",
