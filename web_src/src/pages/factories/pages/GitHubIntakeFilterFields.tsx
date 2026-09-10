@@ -96,17 +96,14 @@ export function GitHubIntakeFilterFields({
   );
 }
 
-function IntakeLabelField({
-  labels,
-  options,
-  loading,
-  onChange,
-}: {
+interface IntakeLabelFieldProps {
   labels: string[];
   options: string[];
   loading: boolean;
   onChange: (labels: string[]) => void;
-}) {
+}
+
+function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFieldProps) {
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

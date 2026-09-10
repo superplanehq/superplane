@@ -166,7 +166,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Issue has one of these labels" })).not.toBeChecked();
     expect(screen.queryByTestId("intake-label-options")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Author has repository access" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Author is a repository collaborator" })).not.toBeChecked();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
@@ -307,7 +307,7 @@ describe("IntakeSourceSettingsPopup", () => {
     await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
     await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
-    await user.click(screen.getByRole("checkbox", { name: "Author has repository access" }));
+    await user.click(screen.getByRole("checkbox", { name: "Author is a repository collaborator" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() =>
