@@ -27,6 +27,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderRunUsageRow,
 } from "@/api-client";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
@@ -169,6 +170,105 @@ function factoryWithLineMetrics(factory: FactoriesFactory): FactoriesFactory {
   };
 }
 
+const USAGE_HISTORY_CSV_HEADER = [
+  "Date",
+  "User",
+  "Task",
+  "Model",
+  "Tokens",
+  "Token price",
+  "VM type",
+  "Time",
+  "VM price",
+];
+
+/**
+ * Mirrors the real ExportFactoryWorkOrderRunUsage CSV shape closely enough
+ * for tests: UTF-8 BOM, same header and column order, and empty (not "0" or
+ * "—") cells for a band with nothing in it.
+ */
+function usageHistoryCsvBody(rows: FactoriesWorkOrderRunUsageRow[]): string {
+  const lines = [USAGE_HISTORY_CSV_HEADER, ...rows.map(usageHistoryCsvRow)];
+  return "﻿" + lines.map((line) => line.map(csvEscape).join(",")).join("\r\n") + "\r\n";
+}
+
+function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
+  const totalTokens = Number(row.totalTokens ?? 0);
+  const durationSeconds = Number(row.durationSeconds ?? 0);
+  const hostedCostCents = Number(row.hostedCostCents ?? 0);
+  const byokCostCents = Number(row.byokCostCents ?? 0);
+  const tokenPriceCents = hostedCostCents + byokCostCents;
+  const vmPriceCents = Math.max(0, Number(row.costCents ?? 0) - tokenPriceCents);
+
+  return [
+    row.lastOccurredAt ? new Date(row.lastOccurredAt).toISOString() : "",
+    row.userName || row.userEmail || "",
+    row.workOrderKey ?? "",
+    usageHistoryCsvModels(row.models, row.byokModels),
+    totalTokens > 0 ? String(totalTokens) : "",
+    tokenPriceCents > 0 ? (tokenPriceCents / 100).toFixed(2) : "",
+    (row.machineTypes ?? []).join(" · "),
+    durationSeconds > 0 ? String(durationSeconds) : "",
+    vmPriceCents > 0 ? (vmPriceCents / 100).toFixed(2) : "",
+  ];
+}
+
+function usageHistoryCsvModels(models: string[] = [], byokModels: string[] = []): string {
+  const hosted = models.join(" · ");
+  if (byokModels.length === 0) {
+    return hosted;
+  }
+  const byok = `${byokModels.join(" · ")} (your keys)`;
+  return hosted ? `${hosted} · ${byok}` : byok;
+}
+
+function csvEscape(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * The paginated table endpoint and its unbounded CSV export sibling, both
+ * reading `usageHistoryByFactoryId`. Neither route filters by date; the real
+ * export ignores its date window entirely, and the real table route's date
+ * window is not worth reproducing in a fixture.
+ */
+function usageHistoryRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      // Anchored before the plain "/usage-history" route below; only matters
+      // if both would match, and the trailing ".csv" makes them mutually
+      // exclusive.
+      pattern: re("/api/v1/factories/([^/]+)/usage-history\\.csv"),
+      resolve: (match) => {
+        const rows = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
+        const factory = fixture.factories.find((entry) => entry.id === match[1]);
+        return {
+          json: {
+            csv: usageHistoryCsvBody(rows),
+            filename: `${factory?.key ?? match[1]}-usage.csv`,
+          },
+        };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/usage-history"),
+      resolve: (match, _method, _body, url) => {
+        const all = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
+        const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, requestedLimit) : 50;
+        const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+        const offset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
+        return {
+          json: {
+            rows: all.slice(offset, offset + limit),
+            totalCount: all.length,
+          },
+        };
+      },
+    },
+  ];
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -214,22 +314,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     },
     ...factoryIntakeRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
-    {
-      pattern: re("/api/v1/factories/([^/]+)/usage-history"),
-      resolve: (match, _method, _body, url) => {
-        const all = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
-        const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
-        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, requestedLimit) : 50;
-        const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
-        const offset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
-        return {
-          json: {
-            rows: all.slice(offset, offset + limit),
-            totalCount: all.length,
-          },
-        };
-      },
-    },
+    ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),

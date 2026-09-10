@@ -808,6 +808,67 @@ func Test__ListWorkOrderRunUsage__PaginatesAndRespectsWindow(t *testing.T) {
 	assert.Equal(t, first.ID, rest[0].WorkOrderExecutionID)
 }
 
+func Test__ListAllWorkOrderRunUsage__IncludesRowsOutsideThirtyDayWindow(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+
+	recent := dispatchNamedOrder(t, r, factory, line, "Recent")
+	old := dispatchNamedOrder(t, r, factory, line, "Old")
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, recent))))
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, old))))
+
+	now := time.Now()
+	// A row from well outside any table window (default 30 days, max 366).
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Where("work_order_execution_id = ?", old.ID).
+		Update("occurred_at", now.AddDate(-1, 0, -1)).Error)
+
+	// The paginated, windowed list omits the old row.
+	windowed, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+		Since:          now.AddDate(0, 0, -30),
+		Until:          now.Add(time.Minute),
+	}, 50, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, windowed, 1)
+	assert.Equal(t, recent.ID, windowed[0].WorkOrderExecutionID)
+
+	// The unbounded export list returns both, ledger-order, with no limit.
+	all, err := models.ListAllWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+		Since:          now.AddDate(0, 0, -30),
+		Until:          now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	ids := []uuid.UUID{all[0].WorkOrderExecutionID, all[1].WorkOrderExecutionID}
+	assert.ElementsMatch(t, []uuid.UUID{recent.ID, old.ID}, ids)
+}
+
+func Test__ListAllWorkOrderRunUsage__OmitsOtherFactories(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	kept := dispatchNamedOrder(t, r, factory, line, "Kept")
+	other := dispatchWorkOrderExecution(t, r)
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, kept))))
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, other))))
+
+	rows, err := models.ListAllWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, kept.ID, rows[0].WorkOrderExecutionID)
+}
+
 func setupFactoryLine(t *testing.T, r *support.ResourceRegistry) (*models.Factory, *models.FactoryLine) {
 	t.Helper()
 	db := database.DB(t.Context())
