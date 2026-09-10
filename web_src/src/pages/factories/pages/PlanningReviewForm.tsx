@@ -1,19 +1,11 @@
-import type { ConfigurationField } from "@/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useComponent } from "@/hooks/useComponentData";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
-import { PLANNING_REVIEW_RUNNER_FIELDS } from "./planningReviewRunnerFields";
+import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
-
-const MODEL_FIELD: ConfigurationField | undefined = PLANNING_REVIEW_RUNNER_FIELDS.find(
-  (field) => field.name === "model",
-);
-
-const MODEL_USED_FIELD: ConfigurationField | undefined = MODEL_FIELD
-  ? { ...MODEL_FIELD, label: "Model used", description: "" }
-  : undefined;
 
 const EXPRESSION_CONTEXT = {
   data: { branch: "feature/planning-review" },
@@ -66,6 +58,8 @@ function AgentPanel({
       configuration: { ...component.configuration, [name]: value },
     });
   };
+  const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
+  const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
 
   return (
     <div className="flex flex-col gap-4" data-testid={`planning-review-component-${component.id}`}>
@@ -90,9 +84,9 @@ function AgentPanel({
             className="shadow-none"
           />
         </div>
-        {MODEL_USED_FIELD ? (
+        {modelUsedField ? (
           <ConfigurationFieldRenderer
-            field={MODEL_USED_FIELD}
+            field={modelUsedField}
             value={component.configuration.model}
             onChange={(value) => setConfigurationField("model", value)}
             allValues={component.configuration}

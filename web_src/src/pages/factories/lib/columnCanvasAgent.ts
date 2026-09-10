@@ -32,6 +32,7 @@ export function canvasNodeToPlanningReviewComponent(node: CanvasSpecNode): Plann
     title: node.name?.trim() || "Agent",
     description: "",
     expanded: true,
+    component: node.component,
     configuration: { ...(node.configuration ?? {}) },
     concurrency: {
       max: String(node.concurrency?.max ?? 1),
