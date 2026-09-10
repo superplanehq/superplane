@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -425,9 +426,16 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 type HTTPContext struct {
 	Requests  []*http.Request
 	Responses []*http.Response
+
+	// mu guards Requests and Responses so components that issue concurrent
+	// requests (e.g. metric fan-out) can safely share a single mock context.
+	mu sync.Mutex
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Requests = append(c.Requests, request)
 
 	if len(c.Responses) == 0 {
