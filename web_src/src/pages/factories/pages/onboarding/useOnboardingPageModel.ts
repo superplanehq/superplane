@@ -2,7 +2,7 @@ import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -42,6 +42,7 @@ import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
+import { useOnboardingGithubRepos } from "./useOnboardingGithubRepos";
 import {
   useOnboardingSetupState,
   type InitialOnboardingSetupState,
@@ -178,26 +179,6 @@ function useOnboardingAgentContext(organizationId: string, connected: Set<Integr
     provider: spend.data?.defaultHostedProvider,
     model: spend.data?.defaultHostedModel,
   });
-}
-
-function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: string) {
-  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
-  const resources = useIntegrationResources(organizationId, githubIntegrationId, "repository");
-  const repositories = useMemo(
-    () =>
-      (resources.data ?? [])
-        .map((resource) => resource.name ?? resource.id ?? "")
-        .filter((repository): repository is string => Boolean(repository)),
-    [resources.data],
-  );
-  return {
-    githubIntegration,
-    repositories,
-    // `isFetching` also covers refetches after an edit of the GitHub
-    // connection, so the screen shows a placeholder instead of a stale list.
-    repositoriesLoading: resources.isFetching,
-    repositoriesError: resources.error,
-  };
 }
 
 /**

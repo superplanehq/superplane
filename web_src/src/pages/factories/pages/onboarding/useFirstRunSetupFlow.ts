@@ -91,7 +91,20 @@ function useFirstRunBlockingAction() {
     },
     [begin, finish],
   );
-  return { action, busy: action !== null, begin, finish, setAction, run };
+  const runUntilNavigation = useCallback(
+    async (next: FirstRunBlockingAction, operation: () => Promise<boolean>) => {
+      if (!begin(next)) return;
+      try {
+        const navigationStarted = await operation();
+        if (!navigationStarted) finish();
+      } catch (error) {
+        finish();
+        throw error;
+      }
+    },
+    [begin, finish],
+  );
+  return { action, busy: action !== null, begin, finish, setAction, run, runUntilNavigation };
 }
 
 function useGitHubConnectionState(model: OnboardingPageModel, organizationId: string) {
@@ -217,9 +230,9 @@ function useFirstRunCommands(
       await model.finish(DEFAULT_ISSUES_CHOICE);
     });
   const connectGitHub = () =>
-    blocking.run("opening-github", async () => {
+    blocking.runUntilNavigation("opening-github", async () => {
       await waitForBrowserPaint();
-      await model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
+      return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
     });
   const finishSetup = () =>
     blocking.run("finishing-setup", async () => {
@@ -229,9 +242,10 @@ function useFirstRunCommands(
     const state = connection.accountPicker?.state;
     const slug = connection.accountPicker?.appSlug;
     if (!state || !slug) return Promise.resolve();
-    return blocking.run("opening-github", async () => {
+    return blocking.runUntilNavigation("opening-github", async () => {
       await waitForBrowserPaint();
       window.location.assign(hostedGitHubInstallURL(slug, state));
+      return true;
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
