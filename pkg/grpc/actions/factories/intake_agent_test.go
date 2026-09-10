@@ -217,6 +217,27 @@ func Test__ResolveGitHubInstallationName(t *testing.T) {
 
 		assert.Equal(t, integrationName(t, organization.ID, githubID), resolveGitHubInstallationName(db, factory))
 	})
+
+	t.Run("does not use another GitHub install when the workspace VCS is not ready", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		vcs, err := models.CreateIntegration(
+			uuid.New(),
+			organization.ID,
+			"github",
+			support.RandomName("github"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		otherID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		vcsID := vcs.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &vcsID,
+		}))
+
+		assert.Equal(t, intakeGitHubAppName, resolveGitHubInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, otherID), resolveGitHubInstallationName(db, factory))
+	})
 }
 
 func Test__IntakeAgentModel(t *testing.T) {

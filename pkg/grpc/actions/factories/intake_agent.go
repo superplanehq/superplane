@@ -166,8 +166,11 @@ func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string 
 		return intakeGitHubAppName
 	}
 
-	if name := githubInstallationNameFromVCS(tx, factory); name != "" {
-		return name
+	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) != "" {
+		if name := githubInstallationNameFromVCS(tx, factory); name != "" {
+			return name
+		}
+		return intakeGitHubAppName
 	}
 
 	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
