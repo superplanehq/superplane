@@ -681,6 +681,7 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"up-1","state":"already_terminal","status":"succeeded"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"broker-42","status":"canceled"}`))},
 		},
 	}
 
@@ -690,8 +691,9 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 		ExecutionState: state,
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "/v1/tasks/broker-42", httpContext.Requests[1].URL.Path)
 }
 
 func TestBrokerListActiveTasks(t *testing.T) {

@@ -32,8 +32,8 @@ func HandleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 	return handleBrokerWebhook(ctx, finishedEventType)
 }
 
-func CancelBrokerTask(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+func CancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error {
+	return cancelBrokerTask(ctx, finishedEventType)
 }
 
 func RevokeOpenRouterChildKey(httpCtx core.HTTPContext, state core.ExecutionStateContext, hosted core.HostedLLMContext, logger *logrus.Entry) {
