@@ -55,7 +55,7 @@ export const INTAKE_SETTINGS_COPY = {
   retryAutomation: "Try again",
   intakeSection: "Create task when:",
   filtersLabel: "Filters",
-  newIssues: "New issue is opened",
+  newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
   filterByLabel: "Issue has one of these labels",
   labelInput: "Issue label",

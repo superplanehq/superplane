@@ -160,7 +160,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("radio", { name: /Run on a schedule/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "New issue is opened" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: 'The "superplane" label is added to the issue' })).toBeChecked();
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
