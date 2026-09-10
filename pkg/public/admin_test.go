@@ -118,6 +118,29 @@ func TestAdminListOrganizations(t *testing.T) {
 		assert.Equal(t, 1, page.Limit)
 	})
 
+	t.Run("rejects invalid pagination params", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			path string
+		}{
+			{name: "invalid limit", path: "/admin/api/organizations?limit=abc"},
+			{name: "negative offset", path: "/admin/api/organizations?offset=-10"},
+			{name: "non-positive limit", path: "/admin/api/organizations?limit=0"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				response := execRequest(server, requestParams{
+					method:     "GET",
+					path:       tc.path,
+					authCookie: token,
+				})
+
+				assert.Equal(t, http.StatusBadRequest, response.Code)
+			})
+		}
+	})
+
 	t.Run("unauthenticated request is rejected", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
