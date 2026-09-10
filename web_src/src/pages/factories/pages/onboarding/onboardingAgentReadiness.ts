@@ -80,7 +80,6 @@ export function isAgentStepReady(connected: Set<IntegrationId>, remainingCreditC
 
 export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
-  remainingCreditCents: number;
   hostedModels: HostedModelsByProvider;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
@@ -97,12 +96,9 @@ export function resolveOnboardingAgent(args: {
 }
 
 function hostedSuperPlanePlan(args: {
-  remainingCreditCents: number;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
-  if (args.remainingCreditCents <= 0) return undefined;
-
   const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
   const defaultModel = args.defaultHostedModel?.trim() ?? "";
   if (!defaultProvider || !defaultModel) return undefined;
@@ -121,8 +117,9 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * Hosted credit answers the agent question for the organization, so setup has
- * nothing left to ask about the agent.
+ * A hosted default answers the agent question for the organization, so setup
+ * has nothing left to ask about the agent. Billing controls hosted runs after
+ * setup. Installations without a hosted default still use the connection step.
  */
 export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
   return plan?.component === "runnerSuperPlane";
