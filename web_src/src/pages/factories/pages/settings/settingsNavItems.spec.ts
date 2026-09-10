@@ -42,6 +42,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "General",
       "Repository",
       "Models",
+      "Usage",
       "General",
       "Members",
       "Integrations",
@@ -49,7 +50,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "API keys",
       "Secrets",
       "Billing",
-      "Usage",
       "Spending",
     ]);
   });
@@ -80,6 +80,7 @@ describe("filterFactorySettingsNavGroups", () => {
       "workspace-general",
       "workspace-repository",
       "workspace-models",
+      "workspace-usage",
     ]);
   });
 
@@ -116,19 +117,20 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     expect(filtered).toEqual(FACTORY_SETTINGS_NAV_GROUPS);
   });
 
-  it("hides workspace settings without factories.update", () => {
+  it("shows only Usage in the workspace group without factories.update", () => {
     const filtered = filterFactorySettingsNavGroupsByPermission(
       FACTORY_SETTINGS_NAV_GROUPS,
       (resource, action) => resource === "org" && action === "read",
       false,
     );
-    expect(filtered.map((group) => group.id)).toEqual(["account", "organization"]);
-    expect(filtered.find((group) => group.id === "workspace")).toBeUndefined();
+    expect(filtered.map((group) => group.id)).toEqual(["account", "workspace", "organization"]);
+    expect(filtered.find((group) => group.id === "workspace")?.items.map((item) => item.id)).toEqual([
+      "workspace-usage",
+    ]);
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
       "organization-models",
       "organization-billing",
-      "organization-usage",
       "organization-spending",
     ]);
   });
