@@ -48,7 +48,7 @@ describe("legacy factory organization settings routes", () => {
     ).toBeInTheDocument();
   }, 10000);
 
-  it("redirects workspace usage into Organization Usage", async () => {
+  it("opens Workspace Usage directly, no redirect", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
@@ -58,7 +58,25 @@ describe("legacy factory organization settings routes", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     await waitFor(() => {
-      expect(within(sidebar).getByTestId("factory-settings-nav-organization-usage")).toHaveAttribute(
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
+  }, 10000);
+
+  it("redirects the old Organization Usage URL into Workspace Usage", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
         "aria-current",
         "page",
       );

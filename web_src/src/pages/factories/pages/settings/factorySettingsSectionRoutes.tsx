@@ -32,9 +32,9 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
+  OrganizationUsageRedirect,
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
-  WorkspaceUsageRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 
 export const factorySettingsSectionRoutes = [
@@ -100,7 +100,15 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
-  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceUsageRedirect />} />,
+  <Route
+    key="factory-settings-workspace-usage"
+    path="workspace/usage"
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsUsagePage />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"
@@ -205,15 +213,7 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
-  <Route
-    key="factory-settings-organization-usage"
-    path="organization/usage"
-    element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsUsagePage />
-      </RequirePermission>
-    }
-  />,
+  <Route key="factory-settings-organization-usage" path="organization/usage" element={<OrganizationUsageRedirect />} />,
   <Route
     key="factory-settings-organization-spending"
     path="organization/spending"
