@@ -50,7 +50,7 @@ func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Pro
 		registry:                  registry,
 		gitProvider:               gitProvider,
 		rabbitMQURL:               rabbitMQURL,
-		semaphore:                 semaphore.NewWeighted(25),
+		semaphore:                 semaphore.NewWeighted(maxConcurrentTasks),
 		logger:                    logger,
 		queueItemConsumer:         queueItemConsumer,
 		executionFinishedConsumer: executionFinishedConsumer,
@@ -89,6 +89,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
@@ -101,6 +102,15 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 
 			for _, node := range nodes {
 				logger := logging.WithNode(w.logger, node)
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue

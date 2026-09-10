@@ -30,7 +30,7 @@ type AppMessageWorker struct {
 func NewAppMessageWorker(registry *registry.Registry) *AppMessageWorker {
 	return &AppMessageWorker{
 		registry:  registry,
-		semaphore: semaphore.NewWeighted(25),
+		semaphore: semaphore.NewWeighted(maxConcurrentTasks),
 		logger:    log.WithFields(log.Fields{"worker": "AppMessageWorker"}),
 	}
 }
@@ -42,6 +42,7 @@ func (w *AppMessageWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			appMessages, err := models.ListAppMessages(database.Conn())
@@ -51,6 +52,15 @@ func (w *AppMessageWorker) Start(ctx context.Context) {
 			}
 
 			for _, message := range appMessages {
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue

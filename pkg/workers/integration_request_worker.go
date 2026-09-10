@@ -36,7 +36,7 @@ func NewIntegrationRequestWorker(encryptor crypto.Encryptor, registry *registry.
 		oidcProvider:    oidcProvider,
 		baseURL:         baseURL,
 		webhooksBaseURL: webhooksBaseURL,
-		semaphore:       semaphore.NewWeighted(25),
+		semaphore:       semaphore.NewWeighted(maxConcurrentTasks),
 	}
 }
 
@@ -55,6 +55,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			requests, err := models.ListIntegrationRequests()
@@ -63,6 +64,15 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 			}
 
 			for _, request := range requests {
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)
 					continue
