@@ -208,6 +208,65 @@ func TestRunInstancesInputTagsRunnerArchitecture(t *testing.T) {
 	t.Fatal("missing runner architecture tag")
 }
 
+func TestRunInstancesInputRootVolumeOmitsGp3PerformanceWhenUnset(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:              "ami-1234567890abcdef0",
+		InstanceType:     "t3.micro",
+		SubnetIDs:        []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs: []string{"sg-1234567890abcdef0"},
+		VolumeSizeGB:     30,
+	}}
+
+	ebs := rootEBS(t, l.runInstancesInput(1, "ud", l.Config.SubnetIDs[0]))
+	if ebs.VolumeType != types.VolumeTypeGp3 {
+		t.Fatalf("VolumeType = %q, want gp3", ebs.VolumeType)
+	}
+	if aws.ToInt32(ebs.VolumeSize) != 30 {
+		t.Fatalf("VolumeSize = %d, want 30", aws.ToInt32(ebs.VolumeSize))
+	}
+	if ebs.Iops != nil {
+		t.Fatalf("Iops = %v, want omitted (AWS gp3 default 3000)", aws.ToInt32(ebs.Iops))
+	}
+	if ebs.Throughput != nil {
+		t.Fatalf("Throughput = %v, want omitted (AWS gp3 default 125)", aws.ToInt32(ebs.Throughput))
+	}
+}
+
+func TestRunInstancesInputRootVolumeSetsGp3IopsAndThroughput(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:                  "ami-1234567890abcdef0",
+		InstanceType:         "m8a.2xlarge",
+		SubnetIDs:            []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs:     []string{"sg-1234567890abcdef0"},
+		VolumeSizeGB:         30,
+		VolumeIOPS:           12000,
+		VolumeThroughputMBps: 500,
+	}}
+
+	ebs := rootEBS(t, l.runInstancesInput(1, "ud", l.Config.SubnetIDs[0]))
+	if ebs.VolumeType != types.VolumeTypeGp3 {
+		t.Fatalf("VolumeType = %q, want gp3", ebs.VolumeType)
+	}
+	if aws.ToInt32(ebs.Iops) != 12000 {
+		t.Fatalf("Iops = %d, want 12000", aws.ToInt32(ebs.Iops))
+	}
+	if aws.ToInt32(ebs.Throughput) != 500 {
+		t.Fatalf("Throughput = %d, want 500", aws.ToInt32(ebs.Throughput))
+	}
+}
+
+func rootEBS(t *testing.T, in *ec2.RunInstancesInput) *types.EbsBlockDevice {
+	t.Helper()
+	if len(in.BlockDeviceMappings) != 1 {
+		t.Fatalf("BlockDeviceMappings len = %d, want 1", len(in.BlockDeviceMappings))
+	}
+	ebs := in.BlockDeviceMappings[0].Ebs
+	if ebs == nil {
+		t.Fatal("Ebs mapping is nil")
+	}
+	return ebs
+}
+
 func TestRunInstancesInputShutdownBehavior(t *testing.T) {
 	cfg := Config{
 		AMI:              "ami-1234567890abcdef0",

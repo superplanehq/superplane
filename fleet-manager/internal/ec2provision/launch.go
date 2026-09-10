@@ -123,6 +123,12 @@ type Config struct {
 	RunnerProcessLogGroup string
 	// VolumeSizeGB is the root EBS volume size in GiB.
 	VolumeSizeGB int32
+	// VolumeIOPS is provisioned gp3 IOPS. Zero omits the field so AWS uses the
+	// gp3 default (3000).
+	VolumeIOPS int32
+	// VolumeThroughputMBps is provisioned gp3 throughput in MiB/s. Zero omits
+	// the field so AWS uses the gp3 default (125).
+	VolumeThroughputMBps int32
 	// RunnerProcessLogRegion is the AWS region for runner process logs (defaults to RunnerInstallAWSRegion).
 	RunnerProcessLogRegion string
 	// BootGraceSec skips health probes for newly launched instances during this grace window.
@@ -317,11 +323,7 @@ func (l *Launcher) runInstancesInput(count int32, encodedUserData, subnetID stri
 		BlockDeviceMappings: []types.BlockDeviceMapping{
 			{
 				DeviceName: aws.String("/dev/sda1"),
-				Ebs: &types.EbsBlockDevice{
-					VolumeSize:          aws.Int32(l.Config.VolumeSizeGB),
-					VolumeType:          types.VolumeTypeGp3,
-					DeleteOnTermination: aws.Bool(true),
-				},
+				Ebs:        l.rootEBS(),
 			},
 		},
 		TagSpecifications: []types.TagSpecification{
@@ -341,6 +343,21 @@ func (l *Launcher) runInstancesInput(count int32, encodedUserData, subnetID stri
 		in.InstanceInitiatedShutdownBehavior = types.ShutdownBehaviorTerminate
 	}
 	return in
+}
+
+func (l *Launcher) rootEBS() *types.EbsBlockDevice {
+	ebs := &types.EbsBlockDevice{
+		VolumeSize:          aws.Int32(l.Config.VolumeSizeGB),
+		VolumeType:          types.VolumeTypeGp3,
+		DeleteOnTermination: aws.Bool(true),
+	}
+	if l.Config.VolumeIOPS > 0 {
+		ebs.Iops = aws.Int32(l.Config.VolumeIOPS)
+	}
+	if l.Config.VolumeThroughputMBps > 0 {
+		ebs.Throughput = aws.Int32(l.Config.VolumeThroughputMBps)
+	}
+	return ebs
 }
 
 // managedInstanceFilters returns DescribeInstances filters scoped to this launcher's fleet and arch.
