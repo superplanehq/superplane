@@ -1,13 +1,11 @@
 import { Text } from "@/components/Text/text";
-import { Input, InputGroup } from "@/components/Input/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
   bpsToPercentInput,
   centsToDollarInput,
   dollarInputToCents,
   hostedProviderLabel,
+  parseDaysInput,
   percentInputToBps,
 } from "@/lib/hostedCredit";
 import { uniqueSortedModelIds } from "@/lib/hostedLLMModels";
@@ -22,6 +20,7 @@ import {
   type ProviderForm,
 } from "./hostedLLMSettingsApi";
 import { HostedLLMDefaultModelField } from "./HostedLLMDefaultModelField";
+import { HostedLLMPolicyFields } from "./HostedLLMPolicyFields";
 import { HostedLLMProviderCard } from "./HostedLLMProviderCard";
 import { defaultModelKeyFromSettings, hostedDefaultModelOptions, parseDefaultModelKey } from "./hostedLLMDefaultModel";
 
@@ -45,11 +44,14 @@ export function HostedLLMSettings() {
         <>
           <HostedLLMPolicyFields
             welcomeDollars={model.welcomeDollars}
+            welcomeTTLDays={model.welcomeTTLDays}
             markupPercent={model.markupPercent}
             warningPercent={model.warningPercent}
             savingPolicy={model.savingPolicy}
             policyChanged={model.policyChanged}
+            policyValid={model.policyValid}
             onWelcomeChange={model.setWelcomeDollars}
+            onWelcomeTTLChange={model.setWelcomeTTLDays}
             onMarkupChange={model.setMarkupPercent}
             onWarningChange={model.setWarningPercent}
             onSave={model.savePolicy}
@@ -87,6 +89,7 @@ function useHostedLLMSettings() {
   const [settings, setSettings] = useState<InstallationLLMSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [welcomeDollars, setWelcomeDollars] = useState("50.00");
+  const [welcomeTTLDays, setWelcomeTTLDays] = useState("14");
   const [markupPercent, setMarkupPercent] = useState("20");
   const [warningPercent, setWarningPercent] = useState("20");
   const [savingPolicy, setSavingPolicy] = useState(false);
@@ -97,6 +100,7 @@ function useHostedLLMSettings() {
   const applySettings = useCallback((data: InstallationLLMSettings) => {
     setSettings(data);
     setWelcomeDollars(centsToDollarInput(data.welcome_grant_cents));
+    setWelcomeTTLDays(String(data.welcome_grant_ttl_days ?? 14));
     setMarkupPercent(bpsToPercentInput(data.markup_bps));
     setWarningPercent(bpsToPercentInput(data.warning_threshold_bps));
     setProviders((current) => {
@@ -135,6 +139,7 @@ function useHostedLLMSettings() {
       applySettings(
         await patchInstallationLLMPolicy({
           welcome_grant_cents: dollarInputToCents(welcomeDollars),
+          welcome_grant_ttl_days: parseDaysInput(welcomeTTLDays) ?? 0,
           markup_bps: percentInputToBps(markupPercent),
           warning_threshold_bps: percentInputToBps(warningPercent),
         }),
@@ -166,11 +171,14 @@ function useHostedLLMSettings() {
   };
 
   const providerActions = useHostedLLMProviderActions(providers, setProviders, applySettings);
+  const parsedWelcomeTTLDays = parseDaysInput(welcomeTTLDays);
   const policyChanged =
     settings != null &&
     (dollarInputToCents(welcomeDollars) !== settings.welcome_grant_cents ||
+      (parsedWelcomeTTLDays ?? -1) !== settings.welcome_grant_ttl_days ||
       percentInputToBps(markupPercent) !== settings.markup_bps ||
       percentInputToBps(warningPercent) !== settings.warning_threshold_bps);
+  const policyValid = parsedWelcomeTTLDays != null;
   const savedDefaultModelKey = defaultModelKeyFromSettings(settings);
   const defaultModelOptions = hostedDefaultModelOptions(settings?.providers ?? [], providers);
   const defaultModelChanged = defaultModelKey !== savedDefaultModelKey;
@@ -180,6 +188,8 @@ function useHostedLLMSettings() {
     loading,
     welcomeDollars,
     setWelcomeDollars,
+    welcomeTTLDays,
+    setWelcomeTTLDays,
     markupPercent,
     setMarkupPercent,
     warningPercent,
@@ -187,6 +197,7 @@ function useHostedLLMSettings() {
     savingPolicy,
     providers,
     policyChanged,
+    policyValid,
     savePolicy,
     defaultModelKey,
     setDefaultModelKey,
@@ -272,86 +283,4 @@ function useHostedLLMProviderActions(
     toggleAllowedModel,
     saveProvider,
   };
-}
-
-function HostedLLMPolicyFields({
-  welcomeDollars,
-  markupPercent,
-  warningPercent,
-  savingPolicy,
-  policyChanged,
-  onWelcomeChange,
-  onMarkupChange,
-  onWarningChange,
-  onSave,
-}: {
-  welcomeDollars: string;
-  markupPercent: string;
-  warningPercent: string;
-  savingPolicy: boolean;
-  policyChanged: boolean;
-  onWelcomeChange: (value: string) => void;
-  onMarkupChange: (value: string) => void;
-  onWarningChange: (value: string) => void;
-  onSave: () => void;
-}) {
-  return (
-    <>
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div>
-          <Label className="mb-2 block text-left">Welcome grant (USD)</Label>
-          <InputGroup>
-            <Input
-              data-testid="installation-llm-welcome"
-              value={welcomeDollars}
-              onChange={(event) => onWelcomeChange(event.target.value)}
-              placeholder="50.00"
-            />
-          </InputGroup>
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Granted once when an organization is created. Set to 0 to disable grants.
-          </Text>
-        </div>
-        <div>
-          <Label className="mb-2 block text-left">Markup percent</Label>
-          <InputGroup>
-            <Input
-              data-testid="installation-llm-markup"
-              value={markupPercent}
-              onChange={(event) => onMarkupChange(event.target.value)}
-              placeholder="20"
-            />
-          </InputGroup>
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Applied to SuperPlane-hosted spend. Organization members cannot see this value.
-          </Text>
-        </div>
-        <div>
-          <Label className="mb-2 block text-left">Warning threshold percent</Label>
-          <InputGroup>
-            <Input
-              data-testid="installation-llm-warning"
-              value={warningPercent}
-              onChange={(event) => onWarningChange(event.target.value)}
-              placeholder="20"
-            />
-          </InputGroup>
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Show a warning when remaining credit is at or below this percent of the grant total.
-          </Text>
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <Button
-          type="button"
-          data-testid="installation-llm-policy-save"
-          onClick={onSave}
-          disabled={savingPolicy || !policyChanged}
-        >
-          {savingPolicy ? "Saving..." : "Save hosted LLM policy"}
-        </Button>
-      </div>
-    </>
-  );
 }

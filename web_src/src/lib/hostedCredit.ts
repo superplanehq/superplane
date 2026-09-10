@@ -24,6 +24,20 @@ export function bpsToPercentInput(bps: number): string {
   return String(bps / 100);
 }
 
+export function parseDaysInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "" || !/^\d+$/.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export function percentInputToBps(value: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {

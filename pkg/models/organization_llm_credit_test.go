@@ -59,6 +59,47 @@ func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
 	assert.WithinDuration(t, *grant.ExpiresAt, *summary.WelcomeCreditExpiresAt, time.Second)
 }
 
+func Test__WelcomeGrantUsesConfiguredTTLDays(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	_ = support.Setup(t)
+	db := database.Conn()
+
+	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		WelcomeGrantTTLDays: 7,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
+
+	account, err := models.CreateAccount("Custom TTL", "custom-ttl-welcome@example.com")
+	require.NoError(t, err)
+	org, err := models.CreateOrganization(support.RandomName("org"), "")
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, org.ID, account.ID))
+
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", org.ID, models.LLMCreditGrantKindWelcome).
+		First(&grant).Error)
+	require.NotNil(t, grant.ExpiresAt)
+	assert.WithinDuration(t, grant.CreatedAt.Add(7*24*time.Hour), *grant.ExpiresAt, time.Second)
+}
+
+func Test__UpdateInstallationLLMSettingsRejectsNegativeTTL(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	_ = support.Setup(t)
+	db := database.Conn()
+
+	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		WelcomeGrantTTLDays: -1,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "welcome grant duration")
+}
+
 func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
@@ -592,6 +633,7 @@ func resetInstallationLLMSettings(t *testing.T) {
 	t.Helper()
 	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		WelcomeGrantTTLDays: models.DefaultWelcomeGrantTTLDays,
 		MarkupBPS:           models.DefaultMarkupBPS,
 		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 	})

@@ -14,6 +14,7 @@ beforeAll(() => {
 
 const settingsWithOpenRouterModels: InstallationLLMSettings = {
   welcome_grant_cents: 5000,
+  welcome_grant_ttl_days: 14,
   markup_bps: 2000,
   warning_threshold_bps: 2000,
   providers: [
@@ -169,6 +170,58 @@ describe("HostedLLMSettings", () => {
         }),
       );
     });
+  });
+
+  it("saves welcome grant duration with the hosted LLM policy", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      const body =
+        method === "PATCH"
+          ? { ...settingsWithOpenRouterModels, welcome_grant_ttl_days: 30 }
+          : settingsWithOpenRouterModels;
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<HostedLLMSettings />);
+
+    const duration = await screen.findByTestId("installation-llm-welcome-ttl");
+    expect(duration).toHaveValue("14");
+    await user.clear(duration);
+    await user.type(duration, "30");
+    await user.click(screen.getByTestId("installation-llm-policy-save"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/admin/api/installation/llm-settings",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({
+            welcome_grant_cents: 5000,
+            welcome_grant_ttl_days: 30,
+            markup_bps: 2000,
+            warning_threshold_bps: 2000,
+          }),
+        }),
+      );
+    });
+  });
+
+  it("disables save when welcome duration is below 1 day", async () => {
+    mockSettingsFetch();
+    const user = userEvent.setup();
+
+    render(<HostedLLMSettings />);
+
+    const duration = await screen.findByTestId("installation-llm-welcome-ttl");
+    await user.clear(duration);
+    await user.type(duration, "0");
+
+    expect(screen.getByTestId("installation-llm-policy-save")).toBeDisabled();
   });
 
   it("shows the OpenRouter provisioning API key and hides it on other providers", async () => {
