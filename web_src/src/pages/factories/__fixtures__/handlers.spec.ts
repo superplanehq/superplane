@@ -206,4 +206,25 @@ describe("matchFactoryPageFixture", () => {
     expect(body.handlers).toHaveLength(1);
     expect(body.handlers[0]?.source).toBe("SOURCE_PULL_REQUEST_CHECKS");
   });
+
+  it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
+      undefined,
+      structuredClone(lineMetricsFactoriesFixture),
+    );
+    const body = (await response.json()) as {
+      pullRequests: Array<{ workOrderId?: string; number?: string; state?: string }>;
+    };
+    const byOrder = Object.fromEntries(body.pullRequests.map((pullRequest) => [pullRequest.workOrderId, pullRequest]));
+
+    expect(byOrder["wo-review-pay-842"]).toMatchObject({ number: "842", state: "STATE_DRAFT" });
+    expect(byOrder["wo-review-pay-844"]).toMatchObject({ number: "844", state: "STATE_DRAFT" });
+    expect(byOrder["wo-approval-refunds"]).toMatchObject({ number: "109", state: "STATE_OPEN" });
+    expect(byOrder["wo-board-implement-notify"]).toMatchObject({ number: "114", state: "STATE_DRAFT" });
+    expect(byOrder["wo-failed-refunds"]).toMatchObject({ number: "6812", state: "STATE_OPEN" });
+    expect(byOrder["wo-open-refunds-schema"]).toMatchObject({ number: "102", state: "STATE_DRAFT" });
+    expect(byOrder["wo-pr-closure-receipts"]).toMatchObject({ number: "510", state: "STATE_MERGED" });
+    expect(byOrder["wo-board-done-rejected"]).toMatchObject({ number: "112", state: "STATE_CLOSED" });
+  });
 });

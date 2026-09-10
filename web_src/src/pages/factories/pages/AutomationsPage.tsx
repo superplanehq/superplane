@@ -55,6 +55,7 @@ export function AutomationsPage() {
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
     fixesPausedOrderIds,
+    pullRequests,
     ...cardActions,
   };
 
