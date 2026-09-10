@@ -1,0 +1,132 @@
+package models_test
+
+import (
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+)
+
+func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
+}
+
+func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+	assert.True(t, plan.IsActiveBusiness())
+	assert.True(t, plan.AllowsCreditPurchase())
+
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_admin",
+		models.PolarSubscriptionStatusCanceled,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
+}
+
+func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{
+			"plan":          models.BillingPlanNone,
+			"plan_source":   models.BillingPlanSourcePolar,
+			"trial_ends_at": time.Now().Add(-time.Hour),
+		}).Error)
+
+	err := models.AssertHostedRunAllowed(db, r.Organization.ID, nil)
+	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+}
+
+func Test__ConvertOpenTrialAllowanceToTopup(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
+
+	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_1"))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+
+	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_1"))
+	again, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, summary.PurchasedRemainingMicros, again.PurchasedRemainingMicros)
+}
+
+func Test__ConvertOpenTrialAllowanceToTopupIgnoresExpiredGrantSpend(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
+
+	expiredAt := time.Now().Add(-time.Hour)
+	created := expiredAt.Add(-24 * time.Hour)
+	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		Kind:           models.LLMCreditGrantKindAdmin,
+		AmountMicros:   models.CentsToMicros(5000),
+		CreatedAt:      created,
+		ExpiresAt:      &expiredAt,
+	}).Error)
+
+	execution := dispatchWorkOrderExecution(t, r)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Update("occurred_at", expiredAt.Add(-time.Minute)).Error)
+
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Positive(t, before.BilledMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.IncludedRemainingMicros)
+
+	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_expired"))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+}

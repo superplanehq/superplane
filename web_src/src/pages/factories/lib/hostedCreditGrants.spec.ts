@@ -10,10 +10,11 @@ import {
 
 describe("creditGrantSourceLabel", () => {
   it("maps stored grant kinds to page labels", () => {
-    expect(creditGrantSourceLabel("welcome")).toBe("Welcome credit");
+    expect(creditGrantSourceLabel("welcome")).toBe("Trial");
     expect(creditGrantSourceLabel("admin")).toBe("SuperPlane grant");
-    expect(creditGrantSourceLabel("polar")).toBe("Purchased");
-    expect(creditGrantSourceLabel("polar_refund")).toBe("Refund");
+    expect(creditGrantSourceLabel("included")).toBe("Included");
+    expect(creditGrantSourceLabel("topup")).toBe("Top-up");
+    expect(creditGrantSourceLabel("topup_refund")).toBe("Refund");
   });
 });
 
@@ -29,7 +30,7 @@ describe("creditGrantDetails", () => {
   });
 
   it("shows a stored purchase order id", () => {
-    expect(creditGrantDetails({ kind: "polar", polarOrderId: "ord_123" })).toBe("Order ord_123");
+    expect(creditGrantDetails({ kind: "topup", polarOrderId: "ord_123" })).toBe("Order ord_123");
   });
 
   it("names the welcome credit expiry date", () => {

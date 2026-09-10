@@ -21,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import { SUPERPLANE_PRICING_URL } from "@/lib/pricing";
+
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } from "../../lib/hostedCreditGrants";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
@@ -28,7 +30,8 @@ import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/Facto
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
 const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
-const HOSTED_CREDIT_EXPLANATION = "Hosted credit pays SuperPlane-hosted models for this organization.";
+const HOSTED_CREDIT_EXPLANATION =
+  "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
 
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "" } = useParams<{ organizationId: string }>();
@@ -43,8 +46,10 @@ export function OrganizationSettingsBillingPage() {
       <BillingPageBody
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
+        businessCheckoutPending={model.billing.businessCheckoutPending}
         canManageBilling={model.canManageBilling}
         checkoutPending={model.billing.checkoutPending}
+        creditPurchaseAllowed={model.creditPurchaseAllowed}
         creditRefreshStatus={model.creditRefreshStatus}
         error={model.error}
         grants={model.grants}
@@ -52,11 +57,15 @@ export function OrganizationSettingsBillingPage() {
         invoices={model.invoices}
         isLoading={model.isLoading}
         packs={packs}
+        plan={model.plan}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
+        subscriptionCheckoutEnabled={model.subscriptionCheckoutEnabled}
+        trialEndsAt={model.trialEndsAt}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
+        onSubscribe={model.billing.startBusinessCheckout}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
@@ -66,8 +75,10 @@ export function OrganizationSettingsBillingPage() {
 function BillingPageBody({
   billingContactMessage,
   billingEnabled,
+  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
+  creditPurchaseAllowed,
   creditRefreshStatus,
   error,
   grants,
@@ -75,17 +86,23 @@ function BillingPageBody({
   invoices,
   isLoading,
   packs,
+  plan,
   portalPending,
   purchased,
   remaining,
+  subscriptionCheckoutEnabled,
+  trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
+  onSubscribe,
   onManageInvoices,
 }: {
   billingContactMessage?: string;
   billingEnabled: boolean;
+  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
+  creditPurchaseAllowed: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
   error: unknown;
   grants: OrganizationsOrganizationCreditGrant[];
@@ -93,11 +110,15 @@ function BillingPageBody({
   invoices: OrganizationsHostedCreditInvoice[];
   isLoading: boolean;
   packs: OrganizationsHostedCreditProduct[];
+  plan?: string;
   portalPending: boolean;
   purchased: number;
   remaining: number;
+  subscriptionCheckoutEnabled: boolean;
+  trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
+  onSubscribe: () => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
 }) {
   if (isLoading) {
@@ -123,15 +144,21 @@ function BillingPageBody({
       <HostedCreditRemainingCard
         billingContactMessage={billingContactMessage}
         billingEnabled={billingEnabled}
+        businessCheckoutPending={businessCheckoutPending}
         canManageBilling={canManageBilling}
         checkoutPending={checkoutPending}
+        creditPurchaseAllowed={creditPurchaseAllowed}
         creditRefreshStatus={creditRefreshStatus}
         hasBillingCustomer={hasBillingCustomer}
         packs={packs}
+        plan={plan}
         purchased={purchased}
         remaining={remaining}
+        subscriptionCheckoutEnabled={subscriptionCheckoutEnabled}
+        trialEndsAt={trialEndsAt}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
         onAddCredit={onAddCredit}
+        onSubscribe={onSubscribe}
       />
       {showInvoices ? (
         <PolarInvoicesCard invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
@@ -144,27 +171,39 @@ function BillingPageBody({
 function HostedCreditRemainingCard({
   billingContactMessage,
   billingEnabled,
+  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
+  creditPurchaseAllowed,
   creditRefreshStatus,
   hasBillingCustomer,
   packs,
+  plan,
   purchased,
   remaining,
+  subscriptionCheckoutEnabled,
+  trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
+  onSubscribe,
 }: {
   billingContactMessage?: string;
   billingEnabled: boolean;
+  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
+  creditPurchaseAllowed: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
   hasBillingCustomer: boolean;
   packs: OrganizationsHostedCreditProduct[];
+  plan?: string;
   purchased: number;
   remaining: number;
+  subscriptionCheckoutEnabled: boolean;
+  trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
+  onSubscribe: () => void | Promise<void>;
 }) {
   const copy = hostedCreditBillingBalanceCopy({
     remainingCents: remaining,
@@ -172,16 +211,23 @@ function HostedCreditRemainingCard({
     hasBillingCustomer,
     billingEnabled,
     welcomeCreditExpiresAt,
+    plan,
+    trialEndsAt,
+    creditPurchaseAllowed,
   });
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
+  const showSubscribe = canManageBilling && subscriptionCheckoutEnabled && !creditPurchaseAllowed;
+  const showBuyMore = canManageBilling && creditPurchaseAllowed;
 
   return (
     <FactorySettingsCard
       title="Hosted credit"
       data-testid="billing-credit-balance"
       action={
-        canManageBilling ? (
+        showBuyMore ? (
           <HostedCreditBuyMoreMenu checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+        ) : showSubscribe ? (
+          <SubscribeActions pending={businessCheckoutPending} onSubscribe={onSubscribe} />
         ) : undefined
       }
     >
@@ -216,6 +262,21 @@ function HostedCreditRemainingCard({
         ) : null}
       </div>
     </FactorySettingsCard>
+  );
+}
+
+function SubscribeActions({ pending, onSubscribe }: { pending: boolean; onSubscribe: () => void | Promise<void> }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button asChild variant="ghost" size="sm">
+        <a href={SUPERPLANE_PRICING_URL} target="_blank" rel="noreferrer">
+          See pricing
+        </a>
+      </Button>
+      <Button type="button" disabled={pending} data-testid="billing-subscribe" onClick={() => void onSubscribe()}>
+        {pending ? "Opening checkout..." : "Subscribe"}
+      </Button>
+    </div>
   );
 }
 
@@ -272,7 +333,7 @@ function PolarInvoicesCard({
 }) {
   return (
     <FactorySettingsCard
-      title="Polar invoices"
+      title="Invoices"
       data-testid="billing-polar-invoices"
       action={
         <Button type="button" variant="ghost" disabled={portalPending} onClick={() => void onManageInvoices()}>
@@ -282,7 +343,7 @@ function PolarInvoicesCard({
       }
     >
       {invoices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Polar invoices yet.</p>
+        <p className="text-sm text-muted-foreground">No invoices yet.</p>
       ) : (
         <InvoiceTable invoices={invoices} />
       )}

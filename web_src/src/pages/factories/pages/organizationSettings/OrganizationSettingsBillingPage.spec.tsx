@@ -8,7 +8,9 @@ import { DEFAULT_CREDIT_GRANTS, MIXED_CREDIT_GRANTS } from "../../__fixtures__/c
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
+  BUSINESS_ORGANIZATION_BILLING,
   DEFAULT_FACTORY_USAGE,
+  EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
@@ -34,16 +36,19 @@ describe("OrganizationSettingsBillingPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-page-header-subtitle")).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Buy more" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
 
     const balance = await screen.findByTestId("billing-credit-balance");
-    expect(balance).toHaveTextContent("Hosted credit pays SuperPlane-hosted models for this organization.");
+    expect(balance).toHaveTextContent(
+      "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.",
+    );
     expect(balance).toHaveTextContent("Remaining hosted credit");
     expect(balance).toHaveTextContent("Trial");
     expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$41.24");
-    expect(balance).toHaveTextContent("This remaining balance is welcome credit.");
-    expect(balance).toHaveTextContent(`Unused credit expires on ${WELCOME_EXPIRY_LABEL}.`);
-    expect(balance).toHaveTextContent("Purchase hosted credit to keep SuperPlane-hosted runs after the trial.");
+    expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
+    expect(balance).toHaveTextContent(`The trial ends on ${WELCOME_EXPIRY_LABEL}.`);
+    expect(balance).toHaveTextContent("Subscribe to Business to keep hosted runs.");
     expect(balance).not.toHaveTextContent("SuperPlane grant");
     expect(balance).not.toHaveTextContent("Purchased hosted credit");
     expect(balance).not.toHaveTextContent("Hosted billed spend");
@@ -51,9 +56,9 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByTestId("factories-sidebar-plan-label")).toHaveTextContent("Trial");
 
     const history = screen.getByTestId("billing-credit-history");
-    expect(within(history).getByText("Welcome credit")).toBeInTheDocument();
+    expect(within(history).getByText("Trial")).toBeInTheDocument();
     expect(within(history).getByText("SuperPlane grant")).toBeInTheDocument();
-    expect(within(history).getByText("Purchased")).toBeInTheDocument();
+    expect(within(history).getByText("Top-up")).toBeInTheDocument();
     expect(within(history).getByText("Refund")).toBeInTheDocument();
     expect(within(history).getByText("+$25.00")).toBeInTheDocument();
     expect(within(history).getByText("-$5.00")).toBeInTheDocument();
@@ -75,13 +80,12 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByTestId("billing-credit-history")).toHaveTextContent("No credit grants yet.");
   }, 10000);
 
-  it("shows $0 and a purchase prompt when Polar has no customer and credit is empty", async () => {
+  it("shows $0 and a subscribe prompt when trial usage is used up", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
           organizationWorkspaceUsage: {
             ...DEFAULT_FACTORY_USAGE,
             remainingCreditCents: "0",
@@ -96,8 +100,11 @@ describe("OrganizationSettingsBillingPage", () => {
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$0.00");
-    expect(balance).toHaveTextContent("Hosted credit is empty. Click Buy more to purchase hosted credit.");
-    expect(await screen.findByRole("button", { name: "Buy more" })).toBeEnabled();
+    expect(balance).toHaveTextContent(
+      "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.",
+    );
+    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
   }, 10000);
 
   it("explains unused welcome credit after it expires", async () => {
@@ -107,6 +114,7 @@ describe("OrganizationSettingsBillingPage", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
+          organizationBilling: EXPIRED_TRIAL_ORGANIZATION_BILLING,
           organizationWorkspaceUsage: {
             ...EXPIRED_WELCOME_USAGE_REPORT,
             hasBillingCustomer: false,
@@ -123,9 +131,10 @@ describe("OrganizationSettingsBillingPage", () => {
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent(
-      "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Buy more to purchase hosted credit.",
+      "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.",
     );
     expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$0.00");
+    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeEnabled();
   }, 10000);
 
   it("opens Polar checkout for a single hosted credit pack", async () => {
@@ -139,6 +148,7 @@ describe("OrganizationSettingsBillingPage", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
           organizationWorkspaceUsage: {
             ...DEFAULT_FACTORY_USAGE,
             billingEnabled: true,
@@ -169,6 +179,7 @@ describe("OrganizationSettingsBillingPage", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
           organizationWorkspaceUsage: {
             ...PURCHASED_CREDIT_USAGE_REPORT,
             billingEnabled: true,
@@ -187,7 +198,9 @@ describe("OrganizationSettingsBillingPage", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: "Buy more" })).toBeEnabled();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Buy more" })).toBeEnabled();
+    });
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("billing-credit-balance")).getByTestId("billing-remaining-credit"),
