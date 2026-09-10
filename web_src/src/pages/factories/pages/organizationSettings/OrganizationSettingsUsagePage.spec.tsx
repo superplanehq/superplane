@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
@@ -11,7 +11,7 @@ import {
   PRIMARY_FACTORY_KEY,
   defaultFactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
-import { usageHistoryRows } from "../../__fixtures__/usageHistoryFixtures";
+import { DEFAULT_USAGE_HISTORY_ROWS, usageHistoryRows } from "../../__fixtures__/usageHistoryFixtures";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 describe("OrganizationSettingsUsagePage", () => {
@@ -91,6 +91,48 @@ describe("OrganizationSettingsUsagePage", () => {
 
     expect(await screen.findByText("No task spend in this period.")).toBeInTheDocument();
     expect(screen.queryByTestId("organization-usage-row")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("puts Export CSV next to the period control and downloads all usage rows", async () => {
+    const user = userEvent.setup();
+    const capturedBlobs: Blob[] = [];
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      capturedBlobs.push(blob as Blob);
+      return "blob:mock-usage-csv";
+    });
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    try {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+      await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 });
+
+      const actions = screen.getByTestId("workspace-page-header-actions");
+      const buttons = within(actions).getAllByRole("button");
+      expect(buttons[0]).toHaveTextContent("Export CSV");
+      expect(buttons[0]).toHaveAccessibleName("Export all usage as CSV");
+      expect(buttons[1]).toHaveAttribute("data-testid", "usage-period");
+
+      await user.click(buttons[0]);
+
+      await waitFor(() => expect(capturedBlobs).toHaveLength(1));
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-usage-csv");
+
+      const csv = await capturedBlobs[0].text();
+      expect(csv).toContain("Date,User,Task,Model,Tokens,Token price,VM type,Time,VM price");
+      for (const row of DEFAULT_USAGE_HISTORY_ROWS) {
+        expect(csv).toContain(row.workOrderKey);
+      }
+
+      await screen.findByText("Export CSV");
+    } finally {
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+    }
   }, 10000);
 
   it("pages through more than 50 task runs", async () => {
