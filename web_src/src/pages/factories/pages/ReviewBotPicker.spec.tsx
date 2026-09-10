@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReviewBotPicker, normalizeReviewBotLogin, reviewBotRows } from "./ReviewBotPicker";
+import { ReviewBotPicker } from "./ReviewBotPicker";
+import { normalizeReviewBotLogin, reviewBotRows } from "./reviewBotPickerModel";
 
 describe("normalizeReviewBotLogin", () => {
   it("trims, strips @, and drops a trailing [bot]", () => {

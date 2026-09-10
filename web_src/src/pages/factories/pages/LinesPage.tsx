@@ -167,9 +167,9 @@ import {
   isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
-  prFeedbackSourceById,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
+  type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
 import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
@@ -205,6 +205,18 @@ function applyVisibleWorkOrders(
     }
     return visibleIds.has(id);
   });
+}
+
+function prFeedbackSetupHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  sourceId: PRFeedbackSourceId,
+): string | undefined {
+  if (!lineId) {
+    return undefined;
+  }
+  return factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(sourceId));
 }
 
 export function LinesPage() {
@@ -368,15 +380,12 @@ export function LinesPage() {
     if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
       return;
     }
+    const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, source.id);
+    if (!href) {
+      return;
+    }
     setAddPRFeedbackOpen(false);
-    navigate(
-      factoryPRFeedbackSetupPath(
-        organizationId,
-        factoryKey,
-        selectedLine.id,
-        prFeedbackSetupKindFromSourceId(source.id),
-      ),
-    );
+    navigate(href);
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
@@ -500,14 +509,10 @@ export function LinesPage() {
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
                 openPRFeedbackSetup: (sourceId) => {
-                  navigate(
-                    factoryPRFeedbackSetupPath(
-                      organizationId,
-                      factoryKey,
-                      selectedLine.id,
-                      prFeedbackSetupKindFromSourceId(sourceId),
-                    ),
-                  );
+                  const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
+                  if (href) {
+                    navigate(href);
+                  }
                 },
               })
             }

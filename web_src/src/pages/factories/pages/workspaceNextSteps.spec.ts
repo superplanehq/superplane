@@ -15,9 +15,7 @@ const ready = {
 
 describe("workspaceNextSteps", () => {
   it("lists the comments task as not done when no handler exists", () => {
-    expect(workspaceNextSteps(ready)).toEqual([
-      expect.objectContaining({ id: "pr-comments-handler", done: false }),
-    ]);
+    expect(workspaceNextSteps(ready)).toEqual([expect.objectContaining({ id: "pr-comments-handler", done: false })]);
   });
 
   it("hides the list when the comments handler is configured", () => {

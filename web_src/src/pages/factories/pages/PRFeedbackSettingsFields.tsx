@@ -13,13 +13,15 @@ import { useMemo, useState } from "react";
 import { isChecksHandlerCIIntegration } from "./checksPRFeedbackSetup";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import { normalizeReviewBotLogin } from "./reviewBotPickerModel";
+import { ReviewBotPicker } from "./ReviewBotPicker";
 import {
   catalogReviewBots,
   DISCUSSION_MENTION,
+  discussionBotModeFromDraft,
   discussionBotSettings,
   type DiscussionBotMode,
 } from "./useDiscussionPRFeedbackSetup";
-import { normalizeReviewBotLogin, ReviewBotPicker } from "./ReviewBotPicker";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 
 export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
@@ -240,15 +242,6 @@ export function PRFeedbackDiscussionFields({
       </section>
     </>
   );
-}
-
-export function discussionBotModeFromDraft(
-  draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">,
-): DiscussionBotMode {
-  if (!draft.ignoreBots || draft.allowedBots.length > 0) {
-    return "address";
-  }
-  return "ignore";
 }
 
 function PRFeedbackIntegrationsField({

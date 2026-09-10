@@ -17,7 +17,7 @@ export function suggestIntegrationFromCheckURL(rawURL: string | undefined): stri
   if (!value) {
     return "";
   }
-  let host = "";
+  let host: string;
   try {
     host = new URL(value).hostname.toLowerCase();
   } catch {
@@ -40,6 +40,42 @@ export function suggestIntegrationFromCheckURL(rawURL: string | undefined): stri
 
 function hostHasSuffix(host: string, suffix: string): boolean {
   return host === suffix || host.endsWith(`.${suffix}`);
+}
+
+export function statusCheckRows(
+  catalog: OrganizationsIntegrationResourceRef[],
+  names: string[],
+): Array<{ name: string }> {
+  const rows: Array<{ name: string }> = [];
+  const seen = new Set<string>();
+
+  for (const check of catalog) {
+    const name = check.name?.trim();
+    if (!name) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    rows.push({ name });
+  }
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    rows.push({ name: trimmed });
+  }
+
+  return rows;
 }
 
 export function suggestedIntegrationsForChecks(

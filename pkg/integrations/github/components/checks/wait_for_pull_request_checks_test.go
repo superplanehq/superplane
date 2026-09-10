@@ -282,7 +282,7 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 				"check_run": {"head_sha": %q, "name": "build"}
 			}`, sha)),
 			headers,
-			WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			config,
 			func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Requests:       requests,
@@ -349,7 +349,7 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 
 		err := component.HandleHook(core.ActionHookContext{
 			Name:           waitChecksEvaluateHook,
-			Configuration:  WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			Configuration:  config,
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: executionState,

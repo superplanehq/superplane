@@ -9,6 +9,9 @@ import type {
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
+import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
+
+export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
 export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
 export type PRFeedbackSourceId = "discussion" | "checks";
@@ -103,113 +106,6 @@ export interface PRFeedbackDraftSettings {
   maximumAttempts: number;
   runnerIntegrationIds: string[];
 }
-
-export const PR_FEEDBACK_SETTINGS_COPY = {
-  tabsLabel: "PR feedback settings",
-  generalTab: "General",
-  agentTab: "Agent",
-  automationTab: "Automation",
-  nameLabel: "Name",
-  nameHelper: "This name appears in the workspace app list.",
-  repositoryLabel: "Repository",
-  repositoryHelper: "Listen for mentions on pull requests in this repository.",
-  mentionLabel: "Mention",
-  mentionHelper:
-    "Leave this field empty to start a run from any human comment or review. Use @superplaneagent to require a mention.",
-  ignoreBotsLabel: "Ignore bot comments",
-  ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
-  allowedBotsLabel: "Allowed bots",
-  allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
-  checkNamesLabel: "Status checks",
-  checkNamesHelper: "Select the status checks SuperPlane must wait for and automatically attempt to fix.",
-  checkNamesNone: "Select at least one status check.",
-  checkNamesCatalogEmpty: "No status checks found.",
-  checkNamesLoading: "Loading status checks",
-  checkNamesLoadingDetail: "Reading recent pull requests and the required status checks for this repository...",
-  checkNamesLoadingMore: "Loading other status checks...",
-  checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
-  wizardTitle: "Fix pull request checks",
-  wizardPageTitleComments: "How should pull request comments be handled?",
-  wizardPageTitleChecks: "How should failing status checks be handled?",
-  wizardBackToBoard: "Back to board",
-  wizardBack: "Back",
-  wizardStepHumanComments: "How to handle human comments?",
-  wizardStepAIComments: "How to handle AI comments?",
-  wizardStepWhichChecks: "Which status checks should be fixed?",
-  wizardStepWhichTools: "Which tools report these checks?",
-  wizardMentionRequireOption: "Require @superplaneagent",
-  wizardMentionRequireHelper: "Humans must mention @superplaneagent for pull request feedback.",
-  wizardMentionAnyOption: "Start from any human comment",
-  wizardMentionAnyHelper: "Handle any human comment or review on the pull request.",
-  wizardBotsIntro:
-    "AI review bots often leave comments on pull requests. Choose whether SuperPlane should handle that feedback.",
-  wizardBotIgnoreOption: "Ignore bot comments",
-  wizardBotIgnoreHelper: "Do not handle pull request feedback from bots.",
-  wizardBotAddressOption: "Address bot comments",
-  wizardBotAddressHelper: "Handle pull request feedback from the bots you select.",
-  wizardBotsLabel: "Review bots",
-  wizardBotsLoading: "Loading review bots",
-  wizardBotsEmpty: "No review bots found.",
-  wizardBotsLoadError: "SuperPlane could not load review bots from this repository.",
-  wizardBotsFound:
-    "SuperPlane scanned the most recent pull requests in the repository and found these bots. Select the bots that you want for pull request feedback.",
-  wizardBotsMissing: "The bot that you use is not here?",
-  wizardBotsAddManually: "Add a bot manually",
-  wizardBotsAddLabel: "Add bot login",
-  wizardBotsAddPlaceholder: "Add bot login, for example coderabbitai",
-  wizardBotsAdd: "Add",
-  wizardToolsDescription:
-    "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
-  wizardToolsUnknown:
-    "SuperPlane could not match these checks to a CI tool. The agent may not have enough context to fix them.",
-  wizardToolsUnselected: "Some of the checks you selected require additional access that you are not granting.",
-  wizardToolsUnselectedDetail: "That prevents the agent from having enough context to fix issues correctly.",
-  wizardContinue: "Continue",
-  wizardFinish: "Finish",
-  wizardFinishing: "Finishing...",
-  wizardConnect: "Connect",
-  wizardSuggested: "Suggested from the selected checks",
-  wizardOtherTools: "Other CI tools",
-  maximumAttemptsLabel: "Maximum automatic fix attempts",
-  maximumAttemptsHelper:
-    "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
-  integrationsLabel: "Additional integration access",
-  integrationsHelper: "Give the agent access to CI logs from Semaphore, CircleCI, Harness, Cloudflare, or Cloudsmith.",
-  integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
-  integrationsMissingLink: "Integrations page",
-  integrationsMissingAfter: " and connect it.",
-  integrationsEmpty: "None of these CI tools are connected.",
-  healthReady: "Ready",
-  healthNeedsRepair: "Needs repair",
-  healthReadyHelper: "This automation can receive a mention and address it.",
-  healthChecksReadyHelper: "This automation can wait for checks and start a fix.",
-  healthNeedsRepairHelper: "Open the Automation tab and repair the canvas.",
-  save: "Save",
-  saving: "Saving",
-  delete: "Delete automation",
-  deleting: "Deleting",
-  keep: "Keep automation",
-  confirmDelete: "Delete this automation? This cannot be undone.",
-  saveError: "Could not save PR feedback settings.",
-  emptyTitle: "No PR feedback automation",
-  emptyBody: "Create an automation that addresses pull request feedback.",
-  create: "Add feedback handler",
-  creating: "Creating",
-  createError: "Could not create the PR feedback automation.",
-  addHandler: "Add feedback handler",
-  pickerTitle: "Add feedback handler",
-  pickerDescription: "Choose the signal that starts a pull request feedback run.",
-  sourceTaken: "A handler for this source already exists.",
-  loading: "Loading PR feedback.",
-  loadError: "Could not load PR feedback.",
-  retry: "Retry",
-  automationEmpty: "This automation has no canvas yet.",
-  automationLoading: "Loading the canvas.",
-  automationError: "Could not load the canvas.",
-  retryAutomation: "Retry",
-  editAutomation: "Edit automation",
-  waitingForAccess: "Waiting for another pull request activity",
-} as const;
 
 export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHandler): PRFeedbackDraftSettings {
   const source = prFeedbackSourceId(handler.source);

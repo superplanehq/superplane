@@ -67,10 +67,7 @@ const CHECKS_NEXT_STEP: WorkspaceNextStepDefinition = {
   isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
 };
 
-const WORKSPACE_NEXT_STEPS = [
-  COMMENTS_NEXT_STEP,
-  ...(CHECKS_PR_FEEDBACK_SETUP_AVAILABLE ? [CHECKS_NEXT_STEP] : []),
-];
+const WORKSPACE_NEXT_STEPS = [COMMENTS_NEXT_STEP, ...(CHECKS_PR_FEEDBACK_SETUP_AVAILABLE ? [CHECKS_NEXT_STEP] : [])];
 
 export function workspaceNextStepsProgressCopy(done: number, total: number): string {
   return `${done}/${total}`;

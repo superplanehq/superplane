@@ -3,8 +3,13 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useState } from "react";
 
-import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
-import { normalizeReviewBotLogin, type ReviewBotOption } from "./ReviewBotPicker";
+import {
+  PR_FEEDBACK_SETTINGS_COPY,
+  toggleUniqueString,
+  type PRFeedbackDraftSettings,
+  type PRFeedbackSource,
+} from "./prFeedbackSettingsModel";
+import { normalizeReviewBotLogin, type ReviewBotOption } from "./reviewBotPickerModel";
 
 export const DISCUSSION_MENTION = "@superplaneagent";
 
@@ -26,6 +31,15 @@ export function catalogReviewBots(catalog: Array<{ id?: string; name?: string }>
     bots.push({ login, displayName: bot.name?.trim() || login });
   }
   return bots;
+}
+
+export function discussionBotModeFromDraft(
+  draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">,
+): DiscussionBotMode {
+  if (!draft.ignoreBots || draft.allowedBots.length > 0) {
+    return "address";
+  }
+  return "ignore";
 }
 
 export function discussionBotSettings(

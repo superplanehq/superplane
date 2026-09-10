@@ -2,11 +2,7 @@ import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, Factori
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
-import {
-  PR_FEEDBACK_SOURCES,
-  availablePRFeedbackSources,
-  prFeedbackSourceId,
-} from "../pages/prFeedbackSettingsModel";
+import { PR_FEEDBACK_SOURCES, availablePRFeedbackSources, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
 import {
   buildColumnAutomationActivity,
   emptyColumnAutomationActivity,

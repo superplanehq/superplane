@@ -28,36 +28,36 @@ export function useChecksPRFeedbackSetup(
   const [runnerIntegrationIds, setRunnerIntegrationIds] = useState<string[]>([]);
   const [connectName, setConnectName] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [catalogApplied, setCatalogApplied] = useState(false);
-  const [connectedApplied, setConnectedApplied] = useState(false);
+  const [seeded, setSeeded] = useState({ catalog: false, connected: false });
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters);
-  const catalog = catalogQuery.data ?? [];
+  const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });
   const availableQuery = useAvailableIntegrations({ enabled: Boolean(organizationId), organizationId });
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
+  const connected = useMemo(() => connectedQuery.data ?? [], [connectedQuery.data]);
+  const connectedLoading = connectedQuery.isPending || connectedQuery.isFetching;
 
   useEffect(() => {
-    if (catalogApplied || catalogLoading) {
+    if (seeded.catalog || catalogLoading) {
       return;
     }
     setCheckNames(catalogStatusCheckNames(catalog));
-    setCatalogApplied(true);
-  }, [catalog, catalogApplied, catalogLoading]);
+    setSeeded((current) => ({ ...current, catalog: true }));
+  }, [catalog, catalogLoading, seeded.catalog]);
 
-  const connectedLoading = connectedQuery.isPending || connectedQuery.isFetching;
   useEffect(() => {
-    if (connectedApplied || connectedLoading) {
+    if (seeded.connected || connectedLoading) {
       return;
     }
-    setRunnerIntegrationIds(readyChecksHandlerIntegrationIds(connectedQuery.data ?? []));
-    setConnectedApplied(true);
-  }, [connectedApplied, connectedLoading, connectedQuery.data]);
+    setRunnerIntegrationIds(readyChecksHandlerIntegrationIds(connected));
+    setSeeded((current) => ({ ...current, connected: true }));
+  }, [connected, connectedLoading, seeded.connected]);
+
   const suggestedNames = useMemo(() => suggestedIntegrationsForChecks(catalog, checkNames), [catalog, checkNames]);
-  const connected = connectedQuery.data ?? [];
   const available = (availableQuery.data ?? []).filter((integration) => isChecksHandlerCIIntegration(integration.name));
   const existingNames = useMemo(
     () => new Set(connected.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name))),

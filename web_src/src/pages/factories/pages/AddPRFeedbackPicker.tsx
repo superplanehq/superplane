@@ -38,10 +38,7 @@ export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = 
         </DialogHeader>
 
         <ul
-          className={cn(
-            "grid gap-2 p-3",
-            sources.length === 1 ? "grid-cols-1" : "grid-cols-2",
-          )}
+          className={cn("grid gap-2 p-3", sources.length === 1 ? "grid-cols-1" : "grid-cols-2")}
           data-testid="add-pr-feedback-templates"
         >
           {sources.map((source) => {

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
+import { statusCheckRows } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsModel";
 
 export function StatusCheckPicker({
@@ -107,40 +108,4 @@ export function StatusCheckPicker({
       </div>
     </section>
   );
-}
-
-export function statusCheckRows(
-  catalog: OrganizationsIntegrationResourceRef[],
-  names: string[],
-): Array<{ name: string }> {
-  const rows: Array<{ name: string }> = [];
-  const seen = new Set<string>();
-
-  for (const check of catalog) {
-    const name = check.name?.trim();
-    if (!name) {
-      continue;
-    }
-    const key = name.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    rows.push({ name });
-  }
-
-  for (const name of names) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    rows.push({ name: trimmed });
-  }
-
-  return rows;
 }

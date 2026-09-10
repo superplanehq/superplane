@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { StatusCheckPicker, statusCheckRows } from "./StatusCheckPicker";
+import { statusCheckRows } from "./checksPRFeedbackSetup";
+import { StatusCheckPicker } from "./StatusCheckPicker";
 
 describe("statusCheckRows", () => {
   it("keeps catalog order and appends selected-only names", () => {
