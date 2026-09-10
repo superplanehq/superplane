@@ -711,11 +711,18 @@ func Test__ListOrganizationLLMCreditGrants(t *testing.T) {
 func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
-	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_expire"))
+	orderID := uuid.NewString()
+	_, err := models.AddTopupLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(2500),
+		orderID,
+	)
+	require.NoError(t, err)
 
 	periodEnd := time.Now().AddDate(0, 1, 0)
 	includedKey := models.IncludedGrantKey("sub_expire", periodEnd)
-	_, err := models.AddIncludedLLMCreditGrant(
+	_, err = models.AddIncludedLLMCreditGrant(
 		db,
 		r.Organization.ID,
 		models.CentsToMicros(models.DefaultIncludedGrantCents),
@@ -739,6 +746,7 @@ func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.RemainingMicros)
+	assert.Equal(t, models.CentsToMicros(2500), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.RemainingMicros)
 }

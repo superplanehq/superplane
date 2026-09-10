@@ -294,8 +294,8 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent(
       `Resets ${new Date("2026-10-09T12:00:00.000Z").toLocaleDateString()}`,
     );
-    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$91.24 remaining");
+    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$41.24 remaining");
+    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$141.24");
     expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
@@ -366,7 +366,7 @@ describe("OrganizationSettingsBillingPage", () => {
               id: "grant-topup",
               kind: "topup",
               amountCents: "5000",
-              polarOrderId: "trial-conversion:org:sub",
+              polarOrderId: "ord_topup_50",
               createdAt: "2026-09-10T12:00:00.000Z",
               expiresAt: "2027-09-10T12:00:00.000Z",
             },
@@ -395,15 +395,21 @@ describe("OrganizationSettingsBillingPage", () => {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationBilling: RESTORED_TRIAL_ORGANIZATION_BILLING,
-          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationWorkspaceUsage: {
+            ...DEFAULT_FACTORY_USAGE,
+            remainingCreditCents: "5000",
+            hostedBilledCents: "0",
+            billingEnabled: true,
+            hasBillingCustomer: true,
+          },
         }}
       />,
     );
 
     expect(await screen.findByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
-    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
+    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
-    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
+    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
 

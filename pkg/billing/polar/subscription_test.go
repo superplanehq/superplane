@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
@@ -35,7 +36,10 @@ func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
+	assertNoTrialConversionGrant(t, db, r.Organization.ID)
+	requireWelcomeGrantExpiresFourteenDaysAfterCreate(t, db, r.Organization.ID)
 }
 
 func Test__ApplySubscriptionCancelRestoresTrialAndExpiresIncluded(t *testing.T) {
@@ -56,8 +60,10 @@ func Test__ApplySubscriptionCancelRestoresTrialAndExpiresIncluded(t *testing.T) 
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.RemainingMicros)
+	assertNoTrialConversionGrant(t, db, r.Organization.ID)
 }
 
 func Test__ApplySubscriptionCancelEndsPlanAfterTrialAndExpiresIncluded(t *testing.T) {
@@ -69,6 +75,9 @@ func Test__ApplySubscriptionCancelEndsPlanAfterTrialAndExpiresIncluded(t *testin
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
 		Update("trial_ends_at", time.Now().Add(-time.Hour)).Error)
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Update("expires_at", time.Now().Add(-time.Hour)).Error)
 
 	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_lapsed", "canceled", periodStart, periodEnd)))
 
@@ -81,7 +90,9 @@ func Test__ApplySubscriptionCancelEndsPlanAfterTrialAndExpiresIncluded(t *testin
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, int64(0), summary.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
+	assertNoTrialConversionGrant(t, db, r.Organization.ID)
 }
 
 func Test__ApplySubscriptionResubscribeSamePeriodGrantsIncludedAgain(t *testing.T) {
@@ -102,7 +113,9 @@ func Test__ApplySubscriptionResubscribeSamePeriodGrantsIncludedAgain(t *testing.
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
+	assertNoTrialConversionGrant(t, db, r.Organization.ID)
 
 	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -308,6 +321,27 @@ func Test__SyncOrganizationSubscriptionNoopsWhenCheckoutDisabled(t *testing.T) {
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+}
+
+func assertNoTrialConversionGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+	t.Helper()
+	grants, err := models.ListOrganizationLLMCreditGrants(db, orgID)
+	require.NoError(t, err)
+	for _, grant := range grants {
+		if grant.PolarOrderID == nil {
+			continue
+		}
+		assert.False(t, strings.HasPrefix(*grant.PolarOrderID, "trial-conversion:"))
+	}
+}
+
+func requireWelcomeGrantExpiresFourteenDaysAfterCreate(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+	t.Helper()
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindWelcome).
+		First(&grant).Error)
+	require.NotNil(t, grant.ExpiresAt)
+	assert.WithinDuration(t, grant.CreatedAt.Add(models.DefaultWelcomeGrantTTL), *grant.ExpiresAt, time.Second)
 }
 
 func subscriptionEvent(orgID uuid.UUID, subscriptionID, status string, start, end time.Time) *SubscriptionWebhookEvent {

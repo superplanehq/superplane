@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -154,68 +153,4 @@ func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *test
 
 	err := models.AssertHostedRunAllowed(db, r.Organization.ID, nil)
 	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
-}
-
-func Test__ConvertOpenTrialAllowanceToTopup(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
-
-	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_1"))
-
-	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
-	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-
-	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_1"))
-	again, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, summary.PurchasedRemainingMicros, again.PurchasedRemainingMicros)
-}
-
-func Test__ConvertOpenTrialAllowanceToTopupIgnoresExpiredGrantSpend(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
-
-	expiredAt := time.Now().Add(-time.Hour)
-	created := expiredAt.Add(-24 * time.Hour)
-	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
-		ID:             uuid.New(),
-		OrganizationID: r.Organization.ID,
-		Kind:           models.LLMCreditGrantKindAdmin,
-		AmountMicros:   models.CentsToMicros(5000),
-		CreatedAt:      created,
-		ExpiresAt:      &expiredAt,
-	}).Error)
-
-	execution := dispatchWorkOrderExecution(t, r)
-	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
-		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     requireExecutionRunID(t, execution),
-		NodeExecutionID: uuid.New(),
-		NodeID:          "prompt",
-		Provider:        models.UsageProviderAnthropic,
-		Model:           "claude-sonnet-4-6",
-		InputTokens:     1_000_000,
-		TotalTokens:     1_000_000,
-		FundingSource:   models.UsageFundingSourceHosted,
-	}))
-	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
-		Where("organization_id = ?", r.Organization.ID).
-		Update("occurred_at", expiredAt.Add(-time.Minute)).Error)
-
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
-	require.NoError(t, err)
-	require.Positive(t, before.BilledMicros)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.WelcomeRemainingMicros)
-	assert.Equal(t, int64(0), before.IncludedRemainingMicros)
-
-	require.NoError(t, models.ConvertOpenTrialAllowanceToTopup(db, r.Organization.ID, "sub_expired"))
-
-	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
-	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
 }

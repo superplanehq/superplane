@@ -610,53 +610,8 @@ func AddIncludedLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64,
 	return &grant, nil
 }
 
-func ConvertOpenTrialAllowanceToTopup(tx *gorm.DB, orgID uuid.UUID, subscriptionID string) error {
-	now := time.Now()
-	grants, err := ListOrganizationLLMCreditGrants(tx, orgID)
-	if err != nil {
-		return err
-	}
-	var welcomeLive bool
-	for _, grant := range grants {
-		if grant.Kind == LLMCreditGrantKindWelcome && !grant.IsExpired(now) {
-			welcomeLive = true
-			break
-		}
-	}
-	if !welcomeLive {
-		return nil
-	}
-
-	billedMicros, err := sumHostedBilledMicros(tx, orgID, nil)
-	if err != nil {
-		return err
-	}
-	billedAtOrBefore, err := billedMicrosAtExpiredGrants(tx, orgID, grants, now)
-	if err != nil {
-		return err
-	}
-	spend := allocateHostedCreditSpend(grants, billedMicros, billedAtOrBefore, now)
-	key := trialConversionGrantKey(orgID, subscriptionID)
-	if spend.WelcomeRemainingMicros > 0 {
-		if _, err := AddTopupLLMCreditGrant(tx, orgID, spend.WelcomeRemainingMicros, key); err != nil {
-			return err
-		}
-	}
-	return expireWelcomeGrantNow(tx, orgID, now)
-}
-
-func trialConversionGrantKey(orgID uuid.UUID, subscriptionID string) string {
-	return "trial-conversion:" + orgID.String() + ":" + strings.TrimSpace(subscriptionID)
-}
-
 func IncludedGrantKey(subscriptionID string, periodEnd time.Time) string {
 	return "included:" + strings.TrimSpace(subscriptionID) + ":" + periodEnd.UTC().Format(time.RFC3339)
-}
-
-func expireWelcomeGrantNow(tx *gorm.DB, orgID uuid.UUID, now time.Time) error {
-	return tx.Model(&OrganizationLLMCreditGrant{}).
-		Where("organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)", orgID, LLMCreditGrantKindWelcome, now).
-		Update("expires_at", now).Error
 }
 
 // ExpireOpenIncludedGrants stops leftover Business included dollars from remaining

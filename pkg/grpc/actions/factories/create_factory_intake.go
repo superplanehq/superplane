@@ -128,7 +128,7 @@ func CreateFactoryIntake(
 
 	// An intake works without a first batch, so a source that cannot be read
 	// now costs the head start and nothing more.
-	if err := seedIntake(ctx, deps, db, canvasID, source, binding); err != nil {
+	if err := SeedIntake(ctx, deps, db, canvasID, source, binding); err != nil {
 		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, err)
 	}
 

@@ -67,9 +67,6 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			return nil
 		}
 		if grantIncluded {
-			if err := models.ConvertOpenTrialAllowanceToTopup(inner, orgID, data.ID); err != nil {
-				return err
-			}
 			if periodEnd == nil {
 				return nil
 			}

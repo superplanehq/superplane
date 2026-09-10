@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -317,6 +317,13 @@ db.migrate.all:
 # subscription separately.
 db.reset.billing.trial:
 	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+
+# Local only. Keeps org, workspace, GitHub, apps, lines, and intakes in
+# superplane_dev. Wipes tasks, runs, usage, subscription, and credits, then
+# reseeds intake from GitHub. Cancel the Polar sandbox subscription
+# separately. Run `make dev.server` so seeded intake events become tasks.
+db.reset.after.onboarding:
+	@$(COMPOSE) exec app ./scripts/db_reset_after_onboarding.sh superplane_dev
 
 # Local only. Inserts fake hosted model + runner VM usage into superplane_dev.
 # MONEY is the total dollar amount. It is spread across TASKS (default 20)
