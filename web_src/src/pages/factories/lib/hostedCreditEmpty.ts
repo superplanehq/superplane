@@ -404,7 +404,7 @@ function trialBillingDescription(remainingCents: number, expired: boolean, expir
 
 function emptyHostedCreditDescription(billingEnabled: boolean): string {
   if (billingEnabled) {
-    return "Hosted credit is empty. Click Buy more to purchase hosted credit.";
+    return "Hosted credit is empty. Click Top up to purchase hosted credit.";
   }
   return "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
 }

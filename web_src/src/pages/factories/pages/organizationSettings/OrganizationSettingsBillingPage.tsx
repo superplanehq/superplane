@@ -1,4 +1,5 @@
-import { Check, ChevronDown, ExternalLink, Receipt } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Receipt } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useParams } from "react-router";
 
 import type {
@@ -13,13 +14,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
 
 import {
   BILLING_SPEND_ORDER_COPY,
@@ -259,15 +253,7 @@ function HostedCreditRemainingCard({
   const remainingShares = billingCreditRemainingShares(buckets);
 
   return (
-    <FactorySettingsCard
-      title="Hosted credit"
-      data-testid="billing-credit-balance"
-      action={
-        showBuyMore ? (
-          <HostedCreditBuyMoreMenu checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
-        ) : undefined
-      }
-    >
+    <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
       <p className="text-[12px] text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
       <div className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -291,7 +277,15 @@ function HostedCreditRemainingCard({
       </div>
       <ul className="mt-4 divide-y divide-border">
         {buckets.map((bucket) => (
-          <CreditBucketRow key={bucket.key} bucket={bucket} />
+          <CreditBucketRow
+            key={bucket.key}
+            bucket={bucket}
+            action={
+              bucket.key === "topup" && showBuyMore ? (
+                <HostedCreditTopUpBanner checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+              ) : undefined
+            }
+          />
         ))}
       </ul>
       {creditRefreshMessage ? (
@@ -339,7 +333,7 @@ function RemainingSharesBar({ shares }: { shares: BillingCreditBarShare[] }) {
   );
 }
 
-function CreditBucketRow({ bucket }: { bucket: BillingCreditBucketView }) {
+function CreditBucketRow({ bucket, action }: { bucket: BillingCreditBucketView; action?: ReactNode }) {
   const remainingPercent = Math.max(0, 100 - bucket.usedPercent);
 
   return (
@@ -374,6 +368,7 @@ function CreditBucketRow({ bucket }: { bucket: BillingCreditBucketView }) {
         />
       </div>
       {bucket.footer ? <p className="mt-1.5 text-xs text-muted-foreground">{bucket.footer}</p> : null}
+      {action}
     </li>
   );
 }
@@ -389,7 +384,7 @@ function bucketAccentClassName(key: BillingCreditBucketKey) {
   }
 }
 
-function HostedCreditBuyMoreMenu({
+function HostedCreditTopUpBanner({
   checkoutPending,
   packs,
   onAddCredit,
@@ -398,41 +393,52 @@ function HostedCreditBuyMoreMenu({
   packs: OrganizationsHostedCreditProduct[];
   onAddCredit: (productId: string) => void | Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
   const hasPurchasablePack = BUY_MORE_PACK_CENTS.some((cents) => findPackForCents(packs, cents));
+  const disabled = checkoutPending || !hasPurchasablePack;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          disabled={checkoutPending || !hasPurchasablePack}
-          data-testid="billing-buy-more"
-        >
-          {checkoutPending ? "Opening checkout..." : "Buy more"}
-          <ChevronDown className="size-3.5" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {BUY_MORE_PACK_CENTS.map((cents) => {
-          const product = findPackForCents(packs, cents);
-          const productId = product?.id ?? "";
-          return (
-            <DropdownMenuItem
-              key={cents}
-              disabled={!productId || checkoutPending}
-              onClick={() => productId && void onAddCredit(productId)}
-            >
-              {formatUsdPackLabel(cents)}
-            </DropdownMenuItem>
-          );
-        })}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled title="Custom amounts are not available yet.">
-          Custom
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-violet-100 py-1 pr-1.5 pl-2.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-label="Top up"
+        data-testid="billing-top-up"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-violet-800 disabled:pointer-events-none disabled:opacity-50 dark:text-violet-200"
+      >
+        {checkoutPending ? "Opening checkout..." : "Top up"}
+        <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+      {open ? (
+        <div className="flex items-center gap-1" data-testid="billing-top-up-options">
+          {BUY_MORE_PACK_CENTS.map((cents) => {
+            const product = findPackForCents(packs, cents);
+            const productId = product?.id ?? "";
+            return (
+              <button
+                key={cents}
+                type="button"
+                disabled={!productId || checkoutPending}
+                onClick={() => productId && void onAddCredit(productId)}
+                className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white hover:bg-violet-700 disabled:pointer-events-none disabled:opacity-40"
+              >
+                {formatUsdPackLabel(cents)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            disabled
+            title="Custom amounts are not available yet."
+            className="inline-flex h-5 cursor-not-allowed items-center rounded-full bg-violet-600/40 px-2.5 text-[11px] leading-none font-medium text-white"
+          >
+            Custom
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

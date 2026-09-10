@@ -46,7 +46,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
     expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
-    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
@@ -132,7 +132,7 @@ describe("OrganizationSettingsBillingPage", () => {
       "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.",
     );
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
   }, 10000);
 
   it("explains unused welcome credit after it expires", async () => {
@@ -244,17 +244,20 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     const balance = await screen.findByTestId("billing-credit-balance");
+    const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
-      expect(within(balance).getByRole("button", { name: "Buy more" })).toBeEnabled();
+      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
-    await user.click(within(balance).getByRole("button", { name: "Buy more" }));
-    await user.click(await screen.findByRole("menuitem", { name: "$50" }));
+    expect(within(balance).queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
+    expect(within(topup).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
+    await user.click(within(topup).getByRole("button", { name: "Top up" }));
+    await user.click(await within(topup).findByRole("button", { name: "$50" }));
 
     expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
     vi.unstubAllGlobals();
   }, 10000);
 
-  it("opens Polar checkout from Buy more when billing already has a customer", async () => {
+  it("opens Polar checkout from Top up when billing already has a customer", async () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     const user = userEvent.setup();
@@ -285,8 +288,9 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     const balance = await screen.findByTestId("billing-credit-balance");
+    const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
-      expect(within(balance).getByRole("button", { name: "Buy more" })).toBeEnabled();
+      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
     expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included usage");
@@ -304,13 +308,13 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
     expect(balance).not.toHaveTextContent("welcome credit");
 
-    await user.click(within(balance).getByRole("button", { name: "Buy more" }));
-    expect(await screen.findByRole("menuitem", { name: "$50" })).toBeEnabled();
-    expect(screen.getByRole("menuitem", { name: "$100" })).toBeEnabled();
-    expect(screen.getByRole("menuitem", { name: "$500" })).toBeEnabled();
-    expect(screen.getByRole("menuitem", { name: "Custom" })).toHaveAttribute("aria-disabled", "true");
+    await user.click(within(topup).getByRole("button", { name: "Top up" }));
+    expect(await within(topup).findByRole("button", { name: "$50" })).toBeEnabled();
+    expect(within(topup).getByRole("button", { name: "$100" })).toBeEnabled();
+    expect(within(topup).getByRole("button", { name: "$500" })).toBeEnabled();
+    expect(within(topup).getByRole("button", { name: "Custom" })).toBeDisabled();
 
-    await user.click(screen.getByRole("menuitem", { name: "$50" }));
+    await user.click(within(topup).getByRole("button", { name: "$50" }));
     expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
     vi.unstubAllGlobals();
 
@@ -381,7 +385,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
     expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Hosted runs cannot start. Subscribe to Business to continue.");
