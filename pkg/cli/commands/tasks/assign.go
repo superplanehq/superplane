@@ -16,8 +16,8 @@ type taskAssignCommand struct {
 }
 
 func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
-	taskID := strings.TrimSpace(stringValue(c.taskID))
-	if taskID == "" {
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	if rawTaskID == "" {
 		return fmt.Errorf("--task is required")
 	}
 
@@ -37,6 +37,11 @@ func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
 	if err != nil {
 		return err
 	}

@@ -333,3 +333,46 @@ func TestEnvironmentContextRequiresURLAndToken(t *testing.T) {
 	require.Contains(t, err.Error(), EnvURL)
 	require.Contains(t, err.Error(), EnvToken)
 }
+
+func TestCurrentContext_GetActiveFactory_FallsBackToWorkspace(t *testing.T) {
+	setupViper(t)
+
+	workspaceID := "ws-1"
+	ctx := ConfigContext{URL: "https://app.superplane.com", Organization: "test-org", APIToken: "tok", Workspace: &workspaceID}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+	require.Equal(t, "ws-1", current.GetActiveFactory())
+}
+
+func TestCurrentContext_SetActiveWorkspace_SyncsFactory(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{URL: "https://app.superplane.com", Organization: "test-org", APIToken: "tok"}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+
+	err := current.SetActiveWorkspace("ws-1")
+	require.NoError(t, err)
+
+	saved, ok := GetCurrentContext()
+	require.True(t, ok)
+	require.NotNil(t, saved.Factory)
+	require.Equal(t, "ws-1", *saved.Factory)
+	require.NotNil(t, saved.Workspace)
+	require.Equal(t, "ws-1", *saved.Workspace)
+}
+
+func TestCurrentContext_SetActiveFactory_SyncsWorkspace(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{URL: "https://app.superplane.com", Organization: "test-org", APIToken: "tok"}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+
+	err := current.SetActiveFactory("factory-1")
+	require.NoError(t, err)
+
+	saved, ok := GetCurrentContext()
+	require.True(t, ok)
+	require.NotNil(t, saved.Factory)
+	require.Equal(t, "factory-1", *saved.Factory)
+	require.NotNil(t, saved.Workspace)
+	require.Equal(t, "factory-1", *saved.Workspace)
+}

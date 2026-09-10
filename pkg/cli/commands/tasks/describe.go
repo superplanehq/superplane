@@ -18,12 +18,17 @@ type taskDescribeCommand struct {
 }
 
 func (c *taskDescribeCommand) Execute(ctx core.CommandContext) error {
-	taskID := strings.TrimSpace(stringValue(c.taskID))
-	if taskID == "" {
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	if rawTaskID == "" {
 		return fmt.Errorf("--task is required")
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
 	if err != nil {
 		return err
 	}
