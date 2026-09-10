@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { init, identify, capture, reset, setOnce } = vi.hoisted(() => ({
@@ -203,6 +203,30 @@ describe("account identification", () => {
         },
       });
     });
+    expect(window.location.search).toBe("");
+  });
+
+  it("captures implicit signup without marketing properties", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=created&view=list");
+
+    render(
+      <StrictMode>
+        <AccountProvider>
+          <div />
+        </AccountProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(capture).toHaveBeenCalledWith("auth:signup");
+    });
+    expect(identify).toHaveBeenCalledWith("user-123", {
+      email: "john@example.com",
+      name: "John Doe",
+      installation_admin: false,
+    });
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe("?view=list");
   });
 
   it("clears unconfirmed signup preference when redirect marks account as existing", async () => {
@@ -226,6 +250,7 @@ describe("account identification", () => {
     });
 
     expect(capture).not.toHaveBeenCalledWith("auth:signup", expect.anything());
+    expect(window.location.search).toBe("");
   });
 });
 
