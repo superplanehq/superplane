@@ -234,7 +234,10 @@ export function LinesPage() {
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
-  const { data: prFeedbackHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const { data: prFeedbackHandlers = [], isPending: prFeedbackHandlersPending } = useFactoryPRFeedbackHandlers(
+    organizationId,
+    factoryId,
+  );
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
@@ -347,6 +350,7 @@ export function LinesPage() {
   const nextSteps = workspaceNextSteps({
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
+    prFeedbackHandlersReady: !prFeedbackHandlersPending,
     takenPRFeedbackSources,
   });
 
