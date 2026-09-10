@@ -149,3 +149,10 @@ after_pipeline:
       - name: Submit Reports
         commands:
           - test-results gen-pipeline-report
+
+promotions:
+  - name: Deploy to Production
+    pipeline_file: deploy-to-production.yml
+    deployment_target: production
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"
