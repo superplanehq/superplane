@@ -42,6 +42,15 @@ func (f *FakeConfig) SetActiveFactory(factoryID string) error {
 	return nil
 }
 
+func (f *FakeConfig) GetActiveWorkspace() string {
+	return f.ActiveFactory
+}
+
+func (f *FakeConfig) SetActiveWorkspace(workspaceID string) error {
+	f.ActiveFactory = workspaceID
+	return nil
+}
+
 func (f *FakeConfig) GetURL() string {
 	return f.URL
 }

@@ -1,4 +1,4 @@
-package factories
+package workspaces
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestActiveCommand_PrintActive(t *testing.T) {
-	factoryID := "11111111-1111-1111-1111-111111111111"
+	workspaceID := "11111111-1111-1111-1111-111111111111"
 
 	t.Run("text output", func(t *testing.T) {
 		stdout := bytes.NewBuffer(nil)
@@ -22,10 +22,10 @@ func TestActiveCommand_PrintActive(t *testing.T) {
 		ctx := core.CommandContext{
 			Cmd:      &cobra.Command{},
 			Renderer: renderer,
-			Config:   &cli.FakeConfig{ActiveFactory: factoryID},
+			Config:   &cli.FakeConfig{ActiveFactory: workspaceID},
 		}
 		require.NoError(t, (&activeCommand{}).printActive(ctx))
-		assert.Equal(t, factoryID+"\n", stdout.String())
+		assert.Equal(t, workspaceID+"\n", stdout.String())
 	})
 
 	t.Run("json output", func(t *testing.T) {
@@ -36,10 +36,25 @@ func TestActiveCommand_PrintActive(t *testing.T) {
 		ctx := core.CommandContext{
 			Cmd:      &cobra.Command{},
 			Renderer: renderer,
-			Config:   &cli.FakeConfig{ActiveFactory: factoryID},
+			Config:   &cli.FakeConfig{ActiveFactory: workspaceID},
 		}
 		require.NoError(t, (&activeCommand{}).printActive(ctx))
-		assert.Contains(t, stdout.String(), factoryID)
+		assert.Contains(t, stdout.String(), workspaceID)
 		assert.Contains(t, stdout.String(), `"id"`)
+	})
+
+	t.Run("errors when no active workspace", func(t *testing.T) {
+		stdout := bytes.NewBuffer(nil)
+		renderer, err := core.NewRenderer("text", stdout)
+		require.NoError(t, err)
+
+		ctx := core.CommandContext{
+			Cmd:      &cobra.Command{},
+			Renderer: renderer,
+			Config:   &cli.FakeConfig{},
+		}
+		err = (&activeCommand{}).printActive(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no active workspace")
 	})
 }

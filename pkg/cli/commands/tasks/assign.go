@@ -1,4 +1,4 @@
-package factories
+package tasks
 
 import (
 	"fmt"
@@ -9,16 +9,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type orderAssignCommand struct {
-	factory   *string
-	orderID   *string
+type taskAssignCommand struct {
+	workspace *string
+	taskID    *string
 	assignees *[]string
 }
 
-func (c *orderAssignCommand) Execute(ctx core.CommandContext) error {
-	orderID := strings.TrimSpace(stringValue(c.orderID))
-	if orderID == "" {
-		return fmt.Errorf("--order is required")
+func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	if rawTaskID == "" {
+		return fmt.Errorf("--task is required")
 	}
 
 	var raw []string
@@ -36,7 +36,12 @@ func (c *orderAssignCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("--assignee is required (at least one); assign replaces the full assignee list")
 	}
 
-	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
+	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
 	if err != nil {
 		return err
 	}
@@ -50,24 +55,24 @@ func (c *orderAssignCommand) Execute(ctx core.CommandContext) error {
 	body.SetAssigneeIds(assigneeIDs)
 
 	response, _, err := ctx.API.FactoryAPI.
-		FactoriesUpdateWorkOrderAssignees(ctx.Context, factoryID, orderID).
+		FactoriesUpdateWorkOrderAssignees(ctx.Context, workspaceID, taskID).
 		Body(*body).
 		Execute()
 	if err != nil {
 		return err
 	}
 
-	order := response.GetOrder()
+	task := response.GetOrder()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(order)
+		return ctx.Renderer.Render(task)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, err := fmt.Fprintf(
 			stdout,
-			"Work order assignees updated: %s\nAssignees: %s\n",
-			order.GetId(),
-			formatAssigneeList(order.GetAssignees()),
+			"Task assignees updated: %s\nAssignees: %s\n",
+			task.GetId(),
+			formatAssigneeList(task.GetAssignees()),
 		)
 		return err
 	})
