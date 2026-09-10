@@ -1,5 +1,5 @@
 import {
-  CHECKS_PR_FEEDBACK_SETUP_AVAILABLE,
+  CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE,
   PR_FEEDBACK_SETTINGS_COPY,
   type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
@@ -67,7 +67,10 @@ const CHECKS_NEXT_STEP: WorkspaceNextStepDefinition = {
   isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
 };
 
-const WORKSPACE_NEXT_STEPS = [COMMENTS_NEXT_STEP, ...(CHECKS_PR_FEEDBACK_SETUP_AVAILABLE ? [CHECKS_NEXT_STEP] : [])];
+const WORKSPACE_NEXT_STEPS = [
+  COMMENTS_NEXT_STEP,
+  ...(CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE ? [CHECKS_NEXT_STEP] : []),
+];
 
 export function workspaceNextStepsProgressCopy(done: number, total: number): string {
   return `${done}/${total}`;

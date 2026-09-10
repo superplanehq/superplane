@@ -138,12 +138,11 @@ func recentStatusCheckRefs(ctx context.Context, client githubStatusCheckAPI, rep
 		return nil
 	}
 
-	openErr := addPullSHAs("open")
+	if err := addPullSHAs("open"); err != nil {
+		return nil, err
+	}
 	closedErr := addPullSHAs("closed")
 	if len(refs) == 0 {
-		if openErr != nil {
-			return nil, openErr
-		}
 		if closedErr != nil {
 			return nil, closedErr
 		}

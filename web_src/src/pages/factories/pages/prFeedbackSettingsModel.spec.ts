@@ -320,10 +320,10 @@ describe("takenPRFeedbackSourceIds", () => {
 });
 
 describe("availablePRFeedbackSources", () => {
-  it("hides status-check setup until that wizard is ready", () => {
-    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion"]);
+  it("offers discussion and status-check setup", () => {
+    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion", "checks"]);
     expect(hasAvailablePRFeedbackSource([])).toBe(true);
-    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(false);
+    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
     expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
   });
 });

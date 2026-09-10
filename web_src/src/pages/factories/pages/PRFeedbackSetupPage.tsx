@@ -7,12 +7,7 @@ import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../l
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
-import {
-  CHECKS_PR_FEEDBACK_SETUP_AVAILABLE,
-  PR_FEEDBACK_SETTINGS_COPY,
-  prFeedbackSourceById,
-  type PRFeedbackSource,
-} from "./prFeedbackSettingsModel";
+import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
 export function DiscussionPRFeedbackSetupPage() {
   return <PRFeedbackSetupPage kind="comments" />;
@@ -125,9 +120,6 @@ function prFeedbackSetupRedirect(input: {
   boardHref: string;
   returnHref: string;
 }): string | undefined {
-  if (input.kind === "checks" && !CHECKS_PR_FEEDBACK_SETUP_AVAILABLE) {
-    return input.boardHref;
-  }
   if (!input.canUpdate || !input.lineId || (input.factoryPresent && !input.linePresent)) {
     return input.boardHref;
   }

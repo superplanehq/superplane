@@ -165,6 +165,8 @@ func Test__ListReviewBotResourcesFromClient(t *testing.T) {
 type fakeGitHubStatusCheckAPI struct {
 	openPulls   []*github.PullRequest
 	closedPulls []*github.PullRequest
+	openErr     error
+	closedErr   error
 	states      []string
 }
 
@@ -183,7 +185,13 @@ func (f *fakeGitHubStatusCheckAPI) ListPullRequests(_ context.Context, _ string,
 	}
 	f.states = append(f.states, state)
 	if state == "open" {
+		if f.openErr != nil {
+			return nil, &github.Response{}, f.openErr
+		}
 		return f.openPulls, &github.Response{}, nil
+	}
+	if f.closedErr != nil {
+		return nil, &github.Response{}, f.closedErr
 	}
 	return f.closedPulls, &github.Response{}, nil
 }
@@ -216,5 +224,20 @@ func Test__RecentStatusCheckRefs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"open", "closed"}, api.states)
 		assert.Equal(t, []string{"open-head", "closed-1", "closed-2"}, refs)
+	})
+
+	t.Run("returns the open listing error instead of closed-only SHAs", func(t *testing.T) {
+		t.Parallel()
+		api := &fakeGitHubStatusCheckAPI{
+			openErr: errors.New("open pulls unavailable"),
+			closedPulls: []*github.PullRequest{
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("closed-1")}},
+			},
+		}
+
+		refs, err := recentStatusCheckRefs(context.Background(), api, "acme/app", "main")
+		assert.EqualError(t, err, "open pulls unavailable")
+		assert.Empty(t, refs)
+		assert.Equal(t, []string{"open"}, api.states)
 	})
 }

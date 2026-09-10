@@ -55,11 +55,11 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   },
 ];
 
-/** Status-check setup is not ready. Hide the wizard and next-step until it is. */
-export const CHECKS_PR_FEEDBACK_SETUP_AVAILABLE = false;
+/** Hide the status-checks next step until that post-onboarding prompt is ready. */
+export const CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE = false;
 
 export function availablePRFeedbackSources(): PRFeedbackSource[] {
-  return PR_FEEDBACK_SOURCES.filter((source) => source.id !== "checks" || CHECKS_PR_FEEDBACK_SETUP_AVAILABLE);
+  return PR_FEEDBACK_SOURCES;
 }
 
 export function isPRFeedbackSetupAvailable(sourceId: PRFeedbackSourceId): boolean {

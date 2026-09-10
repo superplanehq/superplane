@@ -10,7 +10,7 @@ function renderPicker(onSelect = vi.fn(), onClose = vi.fn()) {
 }
 
 describe("AddPRFeedbackPicker", () => {
-  it("offers discussion and hides status-check setup", () => {
+  it("offers discussion and status-check setup", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-pr-feedback-picker");
@@ -18,7 +18,7 @@ describe("AddPRFeedbackPicker", () => {
     expect(within(picker).getByTestId("add-pr-feedback-template-discussion")).toHaveTextContent(
       "Pull request discussion",
     );
-    expect(within(picker).queryByTestId("add-pr-feedback-template-checks")).not.toBeInTheDocument();
+    expect(within(picker).getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
   });
 
   it("reports the chosen source to the caller", async () => {

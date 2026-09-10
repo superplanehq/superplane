@@ -235,8 +235,8 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("hides status-check setup from the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion"]);
+  it("offers discussion and status-check setup in the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {

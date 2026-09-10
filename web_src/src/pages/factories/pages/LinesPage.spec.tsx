@@ -592,7 +592,21 @@ describe("LinesPage board", () => {
     await user.click(add);
     expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-pr-feedback-template-discussion")).toHaveTextContent("Pull request discussion");
-    expect(screen.queryByTestId("add-pr-feedback-template-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+  });
+
+  it("opens the checks setup page from the Verify picker", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
+
+    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("opens the comments setup page instead of creating the handler immediately", async () => {
@@ -644,13 +658,19 @@ describe("LinesPage board", () => {
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
-  it("hides add when the comments handler already exists", () => {
+  it("keeps status-check setup in Add automation when the comments handler exists", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
+    const user = userEvent.setup();
     renderLinesBoard();
 
-    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeDisabled();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toBeEnabled();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
   });
 
   it("lists two intakes on the same source", () => {
