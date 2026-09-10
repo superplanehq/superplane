@@ -63,8 +63,22 @@ describe("discussionBotSettings", () => {
   });
 });
 
+function stubReducedMotion() {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query.includes("prefers-reduced-motion"),
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent: () => false,
+  }));
+}
+
 describe("DiscussionPRFeedbackSetupDialog", () => {
   beforeEach(() => {
+    stubReducedMotion();
     mocks.createHandler.mockReset();
     mocks.createHandler.mockResolvedValue({ id: "handler-1" });
     mocks.fetching = false;
@@ -88,12 +102,35 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
 
     expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute(
+      "data-comment",
+      "@superplaneagent fix this and make no mistakes",
+    );
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveTextContent("@superplaneagent");
+    expect(screen.getByTestId("discussion-setup-preview-caption")).toHaveTextContent(
+      "A mention starts pull request feedback.",
+    );
     await user.click(screen.getByRole("radio", { name: /Start from any human comment/ }));
     expect(screen.getByRole("radio", { name: /Start from any human comment/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).not.toBeChecked();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute(
+      "data-comment",
+      "fix this and make no mistakes",
+    );
+    expect(screen.getByTestId("discussion-setup-preview-comment")).not.toHaveTextContent("@superplaneagent");
+    expect(screen.getByTestId("discussion-setup-preview-caption")).toHaveTextContent(
+      "Any human comment starts pull request feedback.",
+    );
     await openBotsStep(user);
     expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
     expect(screen.queryByTestId("discussion-setup-bots-list")).not.toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveTextContent(
+      "This test does not cover the new error path.",
+    );
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Ignored");
+    expect(screen.getByTestId("discussion-setup-preview-caption")).toHaveTextContent(
+      "Bot comments do not start pull request feedback.",
+    );
     await user.click(screen.getByTestId("discussion-setup-finish"));
 
     expect(mocks.createHandler).toHaveBeenCalledWith({
@@ -127,11 +164,19 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
 
     await chooseAddressBots(user);
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "coderabbitai[bot]");
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Fixing...");
+    expect(screen.getByTestId("discussion-setup-preview-caption")).toHaveTextContent(
+      "Selected bots start pull request feedback.",
+    );
     expect(screen.getByTestId("discussion-setup-bots-found")).toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("discussion-setup-bot-bugbot")).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "bugbot[bot]");
     await user.click(screen.getByTestId("discussion-setup-bot-bugbot"));
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "coderabbitai[bot]");
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Ignored");
     await user.click(screen.getByTestId("discussion-setup-finish"));
 
     expect(mocks.createHandler).toHaveBeenCalledWith(
@@ -197,12 +242,16 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
 
     await chooseAddressBots(user);
     expect(screen.getByTestId("discussion-setup-bots-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "coderabbitai");
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Ignored");
     expect(screen.getByTestId("discussion-setup-finish")).toBeEnabled();
 
     await user.click(screen.getByTestId("discussion-setup-bot-add-manually"));
     await user.type(screen.getByTestId("discussion-setup-bot-manual"), "coderabbitai");
     await user.click(screen.getByTestId("discussion-setup-bot-add"));
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "coderabbitai");
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Fixing...");
     await user.click(screen.getByTestId("discussion-setup-finish"));
 
     expect(mocks.createHandler).toHaveBeenCalledWith(
