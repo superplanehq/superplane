@@ -1,0 +1,36 @@
+version: v1.0
+name: Deploy to Production
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+# Credentials come from the `production` deployment target:
+#   SEMAPHORE_API_TOKEN — service account token
+#   DEPLOY_TASK_ID      — Semaphore task that deploys the SuperPlane image
+blocks:
+  - name: Trigger production deploy
+    task:
+      jobs:
+        - name: Trigger Deploy SuperPlane image
+          commands:
+            - |
+              set -euo pipefail
+
+              if [ -z "${SEMAPHORE_API_TOKEN:-}" ]; then
+                echo "SEMAPHORE_API_TOKEN is required" >&2
+                exit 1
+              fi
+
+              if [ -z "${DEPLOY_TASK_ID:-}" ]; then
+                echo "DEPLOY_TASK_ID is required" >&2
+                exit 1
+              fi
+
+              curl -fsS -X POST \
+                --location "https://superplanehq.semaphoreci.com/api/v1alpha/tasks/${DEPLOY_TASK_ID}/run_now" \
+                -H "Authorization: Token ${SEMAPHORE_API_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: SemaphoreCI v2.0 Client" \
+                -d "{\"reference\":\"main\",\"parameters\":{\"ENVIRONMENT\":\"production\",\"BRANCH\":\"main\",\"COMMIT_SHA\":\"${SEMAPHORE_GIT_SHA}\"}}"
