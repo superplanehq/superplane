@@ -29,6 +29,21 @@ export function resolveWorkOrderCreatorDisplay(
   return null;
 }
 
+/**
+ * Plain-text creator label for a pull request: who created the task the
+ * pull request belongs to, as tracked in SuperPlane. Unlike
+ * `resolveWorkOrderCreatorDisplay`, this does not need the org member list
+ * (no avatar), so callers that only have the raw payload can still show a
+ * name.
+ */
+export function pullRequestCreatorLabel(createdBy: FactoriesWorkOrderCreator | undefined): string | null {
+  const automation = createdBy?.automation;
+  if (automation) {
+    return automation.nodeName?.trim() || automation.appName?.trim() || null;
+  }
+  return createdBy?.user?.name?.trim() || null;
+}
+
 function buildAutomationCreatorDisplay(automation: FactoriesAutomationRef): OrgUserDisplay | null {
   const name = automation.nodeName?.trim() || automation.appName?.trim();
   if (!name) {

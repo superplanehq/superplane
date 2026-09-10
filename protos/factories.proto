@@ -1236,6 +1236,9 @@ message FactoryPullRequest {
   repeated FactoryPullRequestRun runs = 16;
   optional FactoryPullRequestRevision current_revision = 17;
   repeated FactoryPullRequestActivity activities = 18;
+  // The SuperPlane user or automation that created the task this pull
+  // request belongs to. Unset when the task predates creator tracking.
+  WorkOrderCreator created_by = 19;
 }
 
 message ListFactoryPullRequestsRequest {

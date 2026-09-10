@@ -189,6 +189,35 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		assert.Equal(t, "Please add tests for the retry path.", linked.GetDescription())
 	})
 
+	t.Run("reports who created the task the pull request belongs to", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory, "Tracked")
+		created := createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
+			WorkOrderId: order.ID.String(),
+			Url:         "https://github.com/acme/app/pull/55",
+		})
+		require.NotNil(t, created.GetCreatedBy())
+		require.NotNil(t, created.GetCreatedBy().GetUser())
+		assert.Equal(t, r.User.String(), created.GetCreatedBy().GetUser().GetId())
+		assert.Equal(t, r.UserModel.Name, created.GetCreatedBy().GetUser().GetName())
+
+		listResp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.Len(t, listResp.GetPullRequests(), 1)
+		require.NotNil(t, listResp.GetPullRequests()[0].GetCreatedBy().GetUser())
+		assert.Equal(t, r.User.String(), listResp.GetPullRequests()[0].GetCreatedBy().GetUser().GetId())
+
+		describeResp, err := DescribeFactoryPullRequest(ctx, orgID, &pb.DescribeFactoryPullRequestRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      created.GetId(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, describeResp.GetPullRequest().GetCreatedBy().GetUser())
+		assert.Equal(t, r.User.String(), describeResp.GetPullRequest().GetCreatedBy().GetUser().GetId())
+	})
+
 	t.Run("includes usage on pull request activities", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory, "Tracked")
