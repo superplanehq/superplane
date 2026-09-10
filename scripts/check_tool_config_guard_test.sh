@@ -45,6 +45,12 @@ expect_fail "createRequire" "$guard" "$tmp"
 printf '%s\n' 'const x = eval("1")' >"$tmp/web_src/eslint.config.js"
 expect_fail "eval" "$guard" "$tmp"
 
+printf '%s\n' "globalThis['eval']('1')" >"$tmp/web_src/eslint.config.js"
+expect_fail "globalThis eval alias" "$guard" "$tmp"
+
+printf '%s\n' "require('child' + '_process')" >"$tmp/web_src/eslint.config.js"
+expect_fail "concat child_process" "$guard" "$tmp"
+
 python3 -c "print('export default [];' + (' ' * 250) + 'hidden')" >"$tmp/web_src/eslint.config.js"
 expect_fail "long whitespace run" "$guard" "$tmp"
 

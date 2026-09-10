@@ -80,6 +80,32 @@ blocks:
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - bash scripts/ci_cache_store_go.sh
 
+  - name: "Security"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      jobs:
+        - name: Tool configs
+          commands:
+            - make check.tool.configs
+
+        - name: IoC markers
+          commands:
+            - bash ./scripts/check_ioc_markers.sh
+
+        - name: Install hooks
+          commands:
+            - bash ./scripts/check_install_hooks.sh
+
+        - name: Secrets
+          commands:
+            - bash ./scripts/check_committed_secrets.sh
+
+        - name: npm audit
+          commands:
+            - make check.npm.audit.critical
+
   - name: "Frontend Tests"
     dependencies: []
     run:
@@ -88,28 +114,33 @@ blocks:
       jobs:
         - name: Check Build
           commands:
+            - make check.tool.configs
             - make check.build.ui
 
         - name: Storybook Build
           commands:
+            - make check.tool.configs
             - make check.build.storybook
 
         - name: Unit Tests
           parallelism: 4
           commands:
+            - make check.tool.configs
             - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:
+            - make check.tool.configs
             - make check.format.js
 
         - name: EsLint
           commands:
-            - make check.fast.security
+            - make check.tool.configs
             - make check.lint.ui
 
         - name: Knip (dead files check)
           commands:
+            - make check.tool.configs
             - make check.lint.ui.knip
 
 after_pipeline:

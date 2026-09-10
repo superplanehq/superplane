@@ -2,24 +2,18 @@
 #
 # Static guard for JS/TS tool configs that CI and editors execute.
 # Read file bytes only. Do not import, eval, or run ESLint/Node on the files.
-#
-# Catches the PR 7318 PolinRider pattern: createRequire / node:module in an
-# ESLint config, a packed payload after a long run of spaces, or a huge last line.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 root="${1:-.}"
 
-# 500 chars is far above any legitimate config line in this repo.
-# The PR 7318 dropper hid about 8000 characters on the last line.
 max_line_length=500
-# Diff viewers clip a line that starts with thousands of spaces.
 max_space_run=200
 
-# Patterns that a clean SuperPlane tool config does not need.
+# Literal dropper tokens plus the compact aliases Greptile flagged.
 # node:path and node:url stay allowed (Storybook uses them).
-forbidden_regex='createRequire|node:module|child_process|eval\(|new Function|Function\(|global\.o='
+forbidden_regex='createRequire|node:module|child_process|eval\(|new Function|Function\(|global\.o=|globalThis\[|require\(|Function\.constructor|['\''"]eval['\''"]|['\''"]Function['\''"]|['\''"]child['\''"][[:space:]]*\+'
 
 candidates=(
 	web_src/eslint.config.js
@@ -28,6 +22,7 @@ candidates=(
 	web_src/vite.config.ts
 	web_src/vite.config.js
 	web_src/vitest.config.ts
+	web_src/openapi-ts.config.ts
 	web_src/.storybook/main.ts
 	web_src/.storybook/manager.ts
 	web_src/.eslintrc.js
@@ -39,6 +34,9 @@ candidates=(
 	web_src/postcss.config.cjs
 )
 
+echo "==> Tool config guard"
+echo "    Static byte scan. Does not load ESLint or Node configs."
+
 files=()
 for rel in "${candidates[@]}"; do
 	if [ -f "$root/$rel" ]; then
@@ -47,37 +45,56 @@ for rel in "${candidates[@]}"; do
 done
 
 if [ "${#files[@]}" -eq 0 ]; then
-	echo "No tool config files found under $root" >&2
+	echo "FAIL  no tool config files under $root" >&2
 	exit 1
 fi
 
 failed=0
 
 for file in "${files[@]}"; do
+	rel="${file#"$root"/}"
+	file_fail=0
+	reasons=()
+
 	if grep -Eq "$forbidden_regex" "$file"; then
-		echo "FORBIDDEN token in $file (createRequire, node:module, child_process, eval, Function, or global.o)" >&2
-		failed=1
+		file_fail=1
+		reasons+=("forbidden token (createRequire, eval alias, require, or dropper marker)")
 	fi
 
 	if LC_ALL=C grep -Eq "[[:space:]]{$max_space_run,}" "$file"; then
-		echo "Long whitespace run (>= $max_space_run) in $file" >&2
-		failed=1
+		file_fail=1
+		reasons+=("whitespace run >= $max_space_run")
 	fi
 
 	line_no=0
+	longest=0
 	while IFS= read -r line || [ -n "$line" ]; do
 		line_no=$((line_no + 1))
 		len=${#line}
+		if [ "$len" -gt "$longest" ]; then
+			longest=$len
+		fi
 		if [ "$len" -gt "$max_line_length" ]; then
-			echo "Line $line_no in $file is $len chars (max $max_line_length)" >&2
-			failed=1
+			file_fail=1
+			reasons+=("line $line_no is $len chars (max $max_line_length)")
 		fi
 	done <"$file"
+
+	if [ "$file_fail" -ne 0 ]; then
+		failed=1
+		echo "FAIL  $rel"
+		for reason in "${reasons[@]}"; do
+			echo "      $reason"
+		done
+	else
+		echo "OK    $rel  lines=$line_no  longest=$longest"
+	fi
 done
 
 if [ "$failed" -ne 0 ]; then
-	echo "Tool config guard failed. Do not run ESLint or Node on these files." >&2
+	echo "==> Tool config guard: FAIL"
+	echo "    Do not run ESLint or Node on the failed files."
 	exit 1
 fi
 
-echo "Tool config guard passed (${#files[@]} files)."
+echo "==> Tool config guard: PASS (${#files[@]} files)"

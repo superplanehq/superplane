@@ -9,7 +9,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 root="${1:-.}"
 
-# Campaign tags from public PolinRider notes (split so a self-scan stays clean).
 markers=()
 markers+=("8-$(printf '%s' 15418)")
 markers+=("8-$(printf '%s' 10495)")
@@ -30,21 +29,31 @@ exclude_dirs=(
 	--exclude-dir=canvases
 )
 
+echo "==> IoC marker scan"
+echo "    Looks for known dropper campaign tags and C2 hostnames."
+
 failed=0
+checked=0
 for marker in "${markers[@]}"; do
+	checked=$((checked + 1))
+	hits=$(mktemp)
 	if grep -R -n -I "${exclude_dirs[@]}" -e "$marker" "$root" \
 		--exclude='check_ioc_markers.sh' \
 		--exclude='check_fast_security_test.sh' \
-		>/tmp/ioc-marker-hits.txt 2>/dev/null; then
-		echo "IoC marker found: $marker" >&2
-		cat /tmp/ioc-marker-hits.txt >&2
+		>"$hits" 2>/dev/null; then
+		echo "FAIL  marker $marker"
+		sed 's/^/      /' "$hits"
 		failed=1
+	else
+		echo "OK    no match for $marker"
 	fi
+	rm -f "$hits"
 done
 
 if [ "$failed" -ne 0 ]; then
-	echo "IoC marker scan failed. Do not run ESLint or Node on matched files." >&2
+	echo "==> IoC marker scan: FAIL"
+	echo "    Do not run ESLint or Node on matched files."
 	exit 1
 fi
 
-echo "IoC marker scan passed."
+echo "==> IoC marker scan: PASS ($checked markers)"
