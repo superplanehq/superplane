@@ -2,13 +2,15 @@ import { useBacklogAnalysisScoredOrderIds } from "@/hooks/useBacklogAnalysisRuns
 import { useFactoryIntakeRuns, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 
 import { lineIntakeSourceForApiSource } from "../../lineIntakeModel";
-import { firstRunAnalysisProgress, type FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
+import {
+  firstRunAnalysisProgress,
+  githubIssuesIntake,
+  type FirstRunAnalysisProgress,
+} from "./firstRunAnalysisProgress";
 
 /**
- * The API has no "import finished" flag. The seed import starts when
- * provisioning creates the intake, so an intake this old with zero runs
- * means the ticket source had no open tickets. The runs query polls every
- * ten seconds, so the check re-evaluates without its own timer.
+ * Intakes created before initial-import status existed need the old age
+ * fallback. New intakes report their exact import result through the API.
  */
 const IMPORT_GRACE_MS = 30_000;
 
@@ -28,12 +30,23 @@ export function useFirstRunAnalysis(
   factoryId: string,
 ): { progress: FirstRunAnalysisProgress; sourceName?: string; failed: boolean } {
   const intakes = useFactoryIntakes(organizationId, factoryId);
-  const intake = intakes.data?.[0];
+  const intake = githubIssuesIntake(intakes.data);
   const runs = useFactoryIntakeRuns(organizationId, factoryId, intake?.id);
   const scoredOrderIds = useBacklogAnalysisScoredOrderIds(organizationId, factoryId);
+  const initialImportStatus = intake?.initialImportStatus;
+  const githubIntakeMissing = intakes.isSuccess && !intake;
   return {
-    progress: firstRunAnalysisProgress(runs.data, scoredOrderIds, importSettled(intake?.createdAt)),
+    progress: firstRunAnalysisProgress(runs.data, scoredOrderIds, importSettled(intake?.createdAt), {
+      status: initialImportStatus,
+      itemCount: intake?.initialImportItemCount,
+    }),
     sourceName: lineIntakeSourceForApiSource(intake?.source)?.name,
-    failed: Boolean(intakes.isError || runs.isError),
+    failed: Boolean(
+      intakes.isError ||
+        runs.isError ||
+        githubIntakeMissing ||
+        initialImportStatus === "INITIAL_IMPORT_STATUS_FAILED" ||
+        initialImportStatus === "INITIAL_IMPORT_STATUS_SKIPPED",
+    ),
   };
 }

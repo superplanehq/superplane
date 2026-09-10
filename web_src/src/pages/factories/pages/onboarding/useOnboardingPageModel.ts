@@ -29,6 +29,7 @@ import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFi
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
+import { firstRunRepositoryPatch } from "./onboardingRepository";
 import {
   apiIssuesSource,
   initialOnboardingSelections,
@@ -41,7 +42,11 @@ import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import {
+  useOnboardingSetupState,
+  type InitialOnboardingSetupState,
+  type OnboardingSetupApi,
+} from "./useOnboardingSetupState";
 import { persistSelectedGithubConnection } from "./onboardingGithubCleanup";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
@@ -74,32 +79,25 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   return { selections, connected, setSelections };
 }
 
-function useRestoreSetup(
-  setup: OnboardingSetupApi,
-  onboarding: FactoriesFactory["onboarding"],
-  selections: IntegrationSelections,
-) {
+function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialOnboardingSetupState {
+  const appRepository = onboarding?.appRepository || null;
+  return {
+    vcsHost: onboarding?.vcsIntegrationId ? "github" : null,
+    selectedRepo: appRepository,
+    issuesRepo: onboarding?.backlogRepository || appRepository,
+    issuesChoice: localIssuesSource(onboarding?.issuesSource),
+  };
+}
+
+function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: IntegrationSelections) {
+  const { vcsHost, selectVcsHost, setAgent } = setup;
   useEffect(() => {
-    if (selections.github?.ready && setup.vcsHost !== "github") setup.selectVcsHost("github");
-  }, [selections.github?.ready, setup]);
-  useEffect(() => {
-    if (onboarding?.appRepository && setup.selectedRepo !== onboarding.appRepository) {
-      setup.selectRepo(onboarding.appRepository);
-    }
-  }, [onboarding?.appRepository, setup]);
-  useEffect(() => {
-    if (onboarding?.backlogRepository && setup.issuesRepo !== onboarding.backlogRepository) {
-      setup.selectIssuesRepo(onboarding.backlogRepository);
-    }
-  }, [onboarding?.backlogRepository, setup]);
-  useEffect(() => {
-    const source = localIssuesSource(onboarding?.issuesSource);
-    if (source && setup.issuesChoice !== source) setup.setIssuesChoice(source);
-  }, [onboarding?.issuesSource, setup]);
+    if (selections.github?.ready && vcsHost !== "github") selectVcsHost("github");
+  }, [selections.github?.ready, selectVcsHost, vcsHost]);
   useEffect(() => {
     if (!selections.claude?.ready) return;
-    setup.setAgent("claude-code");
-  }, [onboarding?.agentHarness, selections.claude?.ready, setup]);
+    setAgent("claude-code");
+  }, [selections.claude?.ready, setAgent]);
 }
 
 async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
@@ -139,12 +137,7 @@ function useSectionSaves(args: {
   const saveRepository = (repository: string) => {
     const integrationId = args.selections.github?.id;
     if (!repository || !integrationId) return Promise.resolve(false);
-    return runSave(args.setSaving, () =>
-      args.updateOnboarding({
-        vcsIntegrationId: integrationId,
-        appRepository: repository,
-      }),
-    );
+    return runSave(args.setSaving, () => args.updateOnboarding(firstRunRepositoryPatch(integrationId, repository)));
   };
   // The caller passes the source, because a selection made in the same render
   // is not readable from the setup state yet.
@@ -392,8 +385,9 @@ export function useOnboardingPageModel(args: {
     connected: integrations.connected,
     remainingCreditCents: agent.remainingCreditCents,
     simulateDiscovery: false,
+    initial: initialSetupState(onboarding),
   });
-  useRestoreSetup(setup, onboarding, integrations.selections);
+  useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {
     const requestedStep = searchParams.get("step");

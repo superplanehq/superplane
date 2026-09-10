@@ -395,7 +395,11 @@ CREATE TABLE public.factory_intakes (
     canvas_id uuid NOT NULL,
     source character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
+    initial_import_item_count integer,
+    CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
+    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
 
@@ -4377,7 +4381,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260909151005	f
+20260910153910	f
 \.
 
 

@@ -7,6 +7,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { QueryClient } from "@tanstack/react-query";
 
 import type { UpdateOnboarding } from "./onboardingProvision";
+import { githubConnectionPatch } from "./onboardingRepository";
 import { unusedOnboardingVcsIntegrationId } from "./unusedOnboardingIntegration";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
@@ -44,16 +45,13 @@ export async function saveSelectedGithubConnection(
   integrationId: string,
   previousId: string | undefined,
 ): Promise<boolean> {
-  const switchedConnection = Boolean(previousId && previousId !== integrationId);
+  const switchedConnection = previousId !== integrationId;
   if (switchedConnection) {
     args.setup.clearRepository();
   }
 
   try {
-    await args.updateOnboarding({
-      vcsIntegrationId: integrationId,
-      ...(switchedConnection ? { appRepository: "" } : {}),
-    });
+    await args.updateOnboarding(githubConnectionPatch(integrationId, previousId));
     return true;
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Could not save the GitHub connection"));
