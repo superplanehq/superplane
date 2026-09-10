@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+
 import { Login } from "./Login";
 import { getSignupUnavailableReason, isSignupDisabledErrorBody } from "./signupUnavailableReason";
 
@@ -68,9 +70,12 @@ describe("getSignupUnavailableReason", () => {
 
 describe("Login automatic magic-code signup", () => {
   beforeEach(() => {
+    authConfig.providers = [];
+    authConfig.passwordLoginEnabled = false;
     authConfig.magicCodeEnabled = true;
     authConfig.signupEnabled = true;
     authConfig.signupsBlockedByEnvironment = false;
+    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -106,6 +111,31 @@ describe("Login automatic magic-code signup", () => {
     expect(screen.queryByText("No account found")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create account" })).not.toBeInTheDocument();
     expect(screen.queryByText(/By creating an account, you agree to the/)).not.toBeInTheDocument();
+  });
+
+  it("clears an abandoned signup preference before provider login", async () => {
+    authConfig.providers = ["google"];
+    savePendingSignupAnalyticsPreference({ productUpdatesOptIn: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") {
+          return mockAuthConfig();
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+
+    renderLogin();
+
+    const providerLink = await screen.findByRole("link", { name: "Continue with Google" });
+    expect(localStorage).toHaveLength(1);
+    providerLink.addEventListener("click", (event) => event.preventDefault());
+
+    await userEvent.click(providerLink);
+
+    expect(localStorage.getItem("superplane:pending_signup_analytics_preference")).toBeNull();
   });
 
   it("shows the closed notice when signup becomes disabled during verification", async () => {

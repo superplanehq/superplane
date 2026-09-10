@@ -127,8 +127,9 @@ const SignUpTermsDisclosure: React.FC = () => (
   </p>
 );
 
-const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
+const updateSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
   if (!enabled) {
+    clearPendingSignupAnalyticsPreference();
     return;
   }
 
@@ -491,7 +492,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       return;
     }
 
-    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
+    updateSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
 
     setSubmitLoading(true);
 
@@ -676,7 +677,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const handleProviderClick = (provider: string) => {
-    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn);
+    updateSignupPreference(isSignupMode, signupProductUpdatesOptIn);
 
     recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
   };
