@@ -6,7 +6,6 @@ import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
 export function DiscussionPRFeedbackSetupPage() {
@@ -159,14 +158,12 @@ function PRFeedbackSetupDialogs({
   };
 
   return (
-    <div className={factoryContentBodyClassName} data-testid={`pr-feedback-setup-page-${kind}`}>
-      <div className="mx-auto w-full max-w-2xl">
-        {kind === "checks" ? (
-          <ChecksPRFeedbackSetupDialog {...shared} />
-        ) : (
-          <DiscussionPRFeedbackSetupDialog {...shared} />
-        )}
-      </div>
+    <div className="h-full min-h-0" data-testid={`pr-feedback-setup-page-${kind}`}>
+      {kind === "checks" ? (
+        <ChecksPRFeedbackSetupDialog {...shared} />
+      ) : (
+        <DiscussionPRFeedbackSetupDialog {...shared} />
+      )}
     </div>
   );
 }

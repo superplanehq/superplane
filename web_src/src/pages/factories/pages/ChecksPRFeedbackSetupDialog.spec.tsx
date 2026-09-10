@@ -127,8 +127,16 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint");
+      expect(screen.getByTestId("checks-setup-preview-check-lint")).toHaveAttribute("data-selected", "true");
     });
     expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("e2e");
+    expect(screen.getByTestId("checks-setup-preview-check-lint")).toHaveAttribute("data-outcome", "Fixing...");
+    expect(screen.getByTestId("checks-setup-preview-check-e2e")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("checks-setup-preview-check-e2e")).toHaveAttribute("data-outcome", "Fixing...");
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "Selected checks start an automatic fix.",
+    );
+    expect(screen.getByTestId("checks-setup-preview-attempts")).toHaveTextContent("Stops after 3 attempts.");
 
     expect(screen.getByTestId("checks-setup-back")).toHaveTextContent("Back to board");
     expect(screen.getByRole("heading", { name: "Which status checks should be fixed?" })).toBeInTheDocument();
@@ -207,6 +215,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
     expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("checks-setup-preview-check-lint")).toHaveAttribute("data-selected", "false");
+    expect(screen.getByTestId("checks-setup-preview-check-lint")).toHaveAttribute("data-outcome", "Ignored");
+    expect(screen.getByTestId("checks-setup-preview-check-e2e")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("checks-setup-preview-check-e2e")).toHaveAttribute("data-outcome", "Fixing...");
   });
 
   it("does not continue when the attempt limit is not a whole number", async () => {
@@ -245,8 +257,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("checks-setup-maximum-attempts")).toHaveValue(3));
+    expect(screen.getByTestId("checks-setup-preview-attempts")).toHaveTextContent("Stops after 3 attempts.");
     await user.clear(screen.getByTestId("checks-setup-maximum-attempts"));
     await user.type(screen.getByTestId("checks-setup-maximum-attempts"), "5");
+    expect(screen.getByTestId("checks-setup-preview-attempts")).toHaveTextContent("Stops after 5 attempts.");
     await user.click(screen.getByTestId("checks-setup-continue"));
     await user.click(screen.getByTestId("checks-setup-finish"));
 
@@ -291,6 +305,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
       "That prevents the agent from having enough context to fix issues correctly.",
     );
+    expect(screen.getByTestId("checks-setup-preview-tool-outcome")).toHaveTextContent("Not enough access");
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "SuperPlane does not have enough access to fix these checks.",
+    );
     await user.click(screen.getByTestId("checks-setup-finish"));
 
     await waitFor(() => {
@@ -327,6 +345,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     expect(screen.getByTestId("checks-setup-tools-no-access")).toHaveTextContent(
       "The selected status checks do not need additional access.",
+    );
+    expect(screen.queryByTestId("checks-setup-preview-tool-outcome")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "These checks do not need additional access.",
     );
     expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
     expect(screen.queryByText("CircleCI")).not.toBeInTheDocument();
@@ -375,6 +397,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent("GitHub Actions");
     expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent(
       "SuperPlane does not need additional access.",
+    );
+    expect(screen.queryByTestId("checks-setup-preview-tool-outcome")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "SuperPlane reads GitHub Actions logs.",
     );
     expect(screen.queryByText("CircleCI")).not.toBeInTheDocument();
     expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
@@ -444,6 +470,11 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
+    expect(screen.getByTestId("checks-setup-preview")).toHaveTextContent("No status checks yet.");
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "This repository has no status checks yet.",
+    );
+    expect(screen.queryByTestId("checks-setup-preview-attempts")).not.toBeInTheDocument();
     expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
       "This repository does not have status checks yet. That is OK.",
     );
@@ -491,6 +522,10 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checks-setup-tools-unselected")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-preview-tool-outcome")).toHaveTextContent("Reading CircleCI logs.");
+    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
+      "SuperPlane reads CI logs from the tools you grant.",
+    );
 
     await user.click(row);
     expect(row).toHaveAttribute("aria-selected", "false");
@@ -500,6 +535,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
       "That prevents the agent from having enough context to fix issues correctly.",
     );
+    expect(screen.getByTestId("checks-setup-preview-tool-outcome")).toHaveTextContent("Not enough access");
     expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
 
     await user.click(screen.getByTestId("checks-setup-finish"));
