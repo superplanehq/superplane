@@ -22,7 +22,7 @@ describe("OrganizationSettingsUsagePage", () => {
   it("shows one row per task run with tokens, VM time, cost, and model or machine", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
@@ -81,7 +81,7 @@ describe("OrganizationSettingsUsagePage", () => {
   it("shows an empty state when the period has no task spend", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           usageHistoryByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
@@ -105,7 +105,7 @@ describe("OrganizationSettingsUsagePage", () => {
     try {
       render(
         <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
           factoriesFixture={defaultFactoriesFixture}
         />,
       );
@@ -139,7 +139,7 @@ describe("OrganizationSettingsUsagePage", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           usageHistoryByFactoryId: { [PRIMARY_FACTORY_ID]: usageHistoryRows(51) },
