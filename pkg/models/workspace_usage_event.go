@@ -263,39 +263,6 @@ func persistUsageEvent(tx *gorm.DB, event WorkspaceUsageEvent, execution *Factor
 	return nil
 }
 
-func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRunID uuid.UUID) error {
-	runIDs, err := canvasRunIDsInTree(tx, sourceRunID)
-	if err != nil || len(runIDs) == 0 {
-		return err
-	}
-	return tx.Model(&WorkspaceUsageEvent{}).
-		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
-		Update("work_order_id", workOrderID).Error
-}
-
-func canvasRunIDsInTree(tx *gorm.DB, rootID uuid.UUID) ([]uuid.UUID, error) {
-	ids := []uuid.UUID{rootID}
-	seen := map[uuid.UUID]struct{}{rootID: {}}
-	frontier := []uuid.UUID{rootID}
-	for len(frontier) > 0 {
-		var children []CanvasRun
-		err := tx.Select("id").Where("parent_run_id IN ?", frontier).Find(&children).Error
-		if err != nil {
-			return nil, err
-		}
-		frontier = frontier[:0]
-		for _, child := range children {
-			if _, exists := seen[child.ID]; exists {
-				continue
-			}
-			seen[child.ID] = struct{}{}
-			ids = append(ids, child.ID)
-			frontier = append(frontier, child.ID)
-		}
-	}
-	return ids, nil
-}
-
 func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
@@ -854,4 +821,37 @@ func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
 			"updated_at":       now,
 		}).Error
 	})
+}
+
+func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRunID uuid.UUID) error {
+	runIDs, err := canvasRunIDsInTree(tx, sourceRunID)
+	if err != nil || len(runIDs) == 0 {
+		return err
+	}
+	return tx.Model(&WorkspaceUsageEvent{}).
+		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
+		Update("work_order_id", workOrderID).Error
+}
+
+func canvasRunIDsInTree(tx *gorm.DB, rootID uuid.UUID) ([]uuid.UUID, error) {
+	ids := []uuid.UUID{rootID}
+	seen := map[uuid.UUID]struct{}{rootID: {}}
+	frontier := []uuid.UUID{rootID}
+	for len(frontier) > 0 {
+		var children []CanvasRun
+		err := tx.Select("id").Where("parent_run_id IN ?", frontier).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+		frontier = frontier[:0]
+		for _, child := range children {
+			if _, exists := seen[child.ID]; exists {
+				continue
+			}
+			seen[child.ID] = struct{}{}
+			ids = append(ids, child.ID)
+			frontier = append(frontier, child.ID)
+		}
+	}
+	return ids, nil
 }
