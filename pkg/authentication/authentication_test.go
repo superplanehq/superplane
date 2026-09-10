@@ -269,7 +269,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		assert.Equal(t, gothUser.Email, accountFromDB.Email)
 	})
 
-	t.Run("should return error when signup intent is missing and account not found", func(t *testing.T) {
+	t.Run("should return signup disabled when account creation is unavailable", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)
 
 		gothUser := goth.User{
@@ -281,7 +281,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 
 		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
 		require.Error(t, err)
-		assert.Equal(t, errSignupRequired.Error(), err.Error())
+		assert.ErrorIs(t, err, errSignupDisabled)
 		assert.Nil(t, resultAccount)
 		assert.False(t, wasCreated)
 	})
@@ -337,31 +337,31 @@ func TestGetRedirectURL(t *testing.T) {
 	})
 }
 
-func TestGetSignupRequiredRedirectURL(t *testing.T) {
+func TestGetSignupDisabledRedirectURL(t *testing.T) {
 	t.Run("should redirect to login with an auth error and provider", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/google/callback", nil)
 		req = mux.SetURLVars(req, map[string]string{"provider": "google"})
 
-		redirectURL := getSignupRequiredRedirectURL(req)
+		redirectURL := getSignupDisabledRedirectURL(req)
 
-		assert.Equal(t, "/login?auth_error=signup_required&provider=google", redirectURL)
+		assert.Equal(t, "/login?auth_error=signup_disabled&provider=google", redirectURL)
 	})
 
 	t.Run("should preserve the original OAuth redirect", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/github/callback?state=%2Finvite%2Fabc", nil)
 		req = mux.SetURLVars(req, map[string]string{"provider": "github"})
 
-		redirectURL := getSignupRequiredRedirectURL(req)
+		redirectURL := getSignupDisabledRedirectURL(req)
 
-		assert.Equal(t, "/login?auth_error=signup_required&provider=github&redirect=%2Finvite%2Fabc", redirectURL)
+		assert.Equal(t, "/login?auth_error=signup_disabled&provider=github&redirect=%2Finvite%2Fabc", redirectURL)
 	})
 
 	t.Run("should omit provider when it is missing from the request", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/google/callback", nil)
 
-		redirectURL := getSignupRequiredRedirectURL(req)
+		redirectURL := getSignupDisabledRedirectURL(req)
 
-		assert.Equal(t, "/login?auth_error=signup_required", redirectURL)
+		assert.Equal(t, "/login?auth_error=signup_disabled", redirectURL)
 	})
 }
 
@@ -386,7 +386,7 @@ func TestGetPostLogoutRedirectURL(t *testing.T) {
 }
 
 func TestHandler_completeProviderAuth(t *testing.T) {
-	t.Run("should redirect to login when signup intent is missing", func(t *testing.T) {
+	t.Run("should create the account when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		googleUser := goth.User{
 			UserID:      "google-login-no-account",
@@ -404,11 +404,10 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 
 		handler.completeProviderAuth(recorder, req, googleUser)
 
-		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		assert.Equal(t, "/login?auth_error=signup_required&provider=google", recorder.Header().Get("Location"))
-
-		_, err := models.FindAccountByEmail(googleUser.Email)
-		assert.Error(t, err)
+		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+		account, err := models.FindAccountByEmail(googleUser.Email)
+		require.NoError(t, err)
+		assert.Equal(t, googleUser.Name, account.Name)
 	})
 
 	t.Run("should create the account when signup intent is present", func(t *testing.T) {
@@ -436,6 +435,30 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, googleUser.Name, account.Name)
 	})
 
+	t.Run("should redirect to login when signup is disabled", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, true)
+		googleUser := goth.User{
+			UserID:      "google-signup-disabled",
+			Email:       "google-signup-disabled@example.com",
+			Name:        "Google Signup Disabled",
+			NickName:    "googlesignupdisabled",
+			Provider:    "google",
+			AccessToken: "google-access-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
+			map[string]string{"provider": "google"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, googleUser)
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "/login?auth_error=signup_disabled&provider=google", recorder.Header().Get("Location"))
+		_, err := models.FindAccountByEmail(googleUser.Email)
+		assert.Error(t, err)
+	})
+
 	t.Run("should refuse an invalid link state instead of signing in", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)
 		googleUser := goth.User{
@@ -461,13 +484,22 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 }
 
 func TestHandler_checkSignupPolicy(t *testing.T) {
-	t.Run("should reject new magic-code account from login flow", func(t *testing.T) {
+	t.Run("should allow new magic-code account from login flow", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		req, _ := http.NewRequest("POST", "/auth/magic-code/verify", nil)
 
 		err := handler.checkSignupPolicy("new-magic-code-login@example.com", req)
 
-		assert.Equal(t, errSignupRequired, err)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should reject new magic-code account when signup is disabled", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, true)
+		req, _ := http.NewRequest("POST", "/auth/magic-code/verify", nil)
+
+		err := handler.checkSignupPolicy("disabled-magic-code-login@example.com", req)
+
+		assert.ErrorIs(t, err, errSignupDisabled)
 	})
 
 	t.Run("should allow new magic-code account from signup flow", func(t *testing.T) {
@@ -594,7 +626,7 @@ func TestHandler_getPostAuthRedirectURL(t *testing.T) {
 
 		redirectURL := handler.getPostAuthRedirectURL(req, true)
 
-		assert.Equal(t, "/welcome?redirect=%2Finvite%2Fabc", redirectURL)
+		assert.Equal(t, "/welcome?auth_signup_result=created&redirect=%2Finvite%2Fabc", redirectURL)
 	})
 
 	t.Run("should route new cloud users through welcome without empty redirect", func(t *testing.T) {
@@ -603,7 +635,7 @@ func TestHandler_getPostAuthRedirectURL(t *testing.T) {
 
 		redirectURL := handler.getPostAuthRedirectURL(req, true)
 
-		assert.Equal(t, "/welcome", redirectURL)
+		assert.Equal(t, "/welcome?auth_signup_result=created", redirectURL)
 	})
 }
 
@@ -631,8 +663,8 @@ func TestWritePostAuthRedirect(t *testing.T) {
 	})
 }
 
-func TestHandler_handleMagicCodeRequest_SignupRequired(t *testing.T) {
-	t.Run("rejects unknown email on login without sending a code", func(t *testing.T) {
+func TestHandler_handleMagicCodeRequest_AutomaticSignup(t *testing.T) {
+	t.Run("sends a code to an unknown email from login", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		handler.magicCodeEnabled = true
 		email := "new-login-code@example.com"
@@ -644,10 +676,28 @@ func TestHandler_handleMagicCodeRequest_SignupRequired(t *testing.T) {
 
 		handler.handleMagicCodeRequest(recorder, req)
 
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		count, err := models.CountRecentMagicCodes(email, time.Now().Add(-time.Hour))
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), count)
+	})
+
+	t.Run("rejects an unknown email when signup is disabled", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, true)
+		handler.magicCodeEnabled = true
+		email := "disabled-login-code@example.com"
+
+		form := url.Values{"email": {email}}
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/request", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		recorder := httptest.NewRecorder()
+
+		handler.handleMagicCodeRequest(recorder, req)
+
 		assert.Equal(t, http.StatusForbidden, recorder.Code)
 		var body map[string]string
 		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&body))
-		assert.Equal(t, authErrorSignupRequired, body["error"])
+		assert.Equal(t, authErrorSignupDisabled, body["error"])
 
 		count, err := models.CountRecentMagicCodes(email, time.Now().Add(-time.Hour))
 		require.NoError(t, err)
@@ -696,7 +746,7 @@ func TestHandler_handleMagicCodeRequest_SignupRequired(t *testing.T) {
 	})
 }
 
-func TestHandler_handleMagicCodeVerify_SignupRequiredJSON(t *testing.T) {
+func TestHandler_handleMagicCodeVerify_AutomaticSignup(t *testing.T) {
 	handler, _ := setupAuthHandler(t, false)
 	handler.magicCodeEnabled = true
 	email := "verify-signup-required@example.com"
@@ -711,165 +761,36 @@ func TestHandler_handleMagicCodeVerify_SignupRequiredJSON(t *testing.T) {
 
 	handler.handleMagicCodeVerify(recorder, req)
 
+	assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	assert.Equal(t, "/welcome?auth_signup_result=created", recorder.Header().Get("Location"))
+	account, err := models.FindAccountByEmail(email)
+	require.NoError(t, err)
+	assert.Equal(t, strings.Split(email, "@")[0], account.Name)
+}
+
+func TestHandler_handleMagicCodeVerify_SignupDisabled(t *testing.T) {
+	handler, _ := setupAuthHandler(t, true)
+	handler.magicCodeEnabled = true
+	email := "verify-signup-disabled@example.com"
+	code := "123456"
+	codeHash := crypto.HashToken(code)
+	_, err := models.CreateAccountMagicCode(email, codeHash, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+
+	form := url.Values{"email": {email}, "code": {code}}
+	req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", jsonContentType)
+	recorder := httptest.NewRecorder()
+
+	handler.handleMagicCodeVerify(recorder, req)
+
 	assert.Equal(t, http.StatusForbidden, recorder.Code)
-	var body map[string]string
-	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&body))
-	assert.Equal(t, authErrorSignupRequired, body["error"])
+	assert.JSONEq(t, `{"error":"signup_disabled"}`, recorder.Body.String())
 	_, err = models.FindAccountByEmail(email)
 	assert.Error(t, err)
-}
-
-func TestHandler_pendingOAuthSignup(t *testing.T) {
-	googleUser := goth.User{
-		UserID:      "pending-google-1",
-		Email:       "pending-google@example.com",
-		Name:        "Pending Google",
-		NickName:    "pendinggoogle",
-		Provider:    "google",
-		AccessToken: "google-access-token",
-	}
-
-	t.Run("stores a pending cookie when Google signup is required", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
-			map[string]string{"provider": "google"},
-		)
-		recorder := httptest.NewRecorder()
-
-		handler.completeProviderAuth(recorder, req, googleUser)
-
-		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		assert.Equal(t, "/login?auth_error=signup_required&provider=google", recorder.Header().Get("Location"))
-		cookie := pendingOAuthSignupCookieFromRecorder(t, recorder)
-		assert.NotEmpty(t, cookie.Value)
-		assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
-		assert.True(t, cookie.HttpOnly)
-		_, err := models.FindAccountByEmail(googleUser.Email)
-		assert.Error(t, err)
-	})
-
-	t.Run("creates the Google account from the pending cookie without a new OAuth start", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		seed := httptest.NewRecorder()
-		handler.setPendingOAuthSignupCookie(seed, httptest.NewRequest(http.MethodGet, "/", nil), googleUser)
-
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/google?signup=true", nil),
-			map[string]string{"provider": "google"},
-		)
-		req.AddCookie(pendingOAuthSignupCookieFromRecorder(t, seed))
-		recorder := httptest.NewRecorder()
-
-		handler.handleAuth(recorder, req)
-
-		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
-		account, err := models.FindAccountByEmail(googleUser.Email)
-		require.NoError(t, err)
-		assert.Equal(t, googleUser.Name, account.Name)
-		assert.True(t, pendingOAuthSignupCookieCleared(recorder))
-	})
-
-	t.Run("creates the GitHub account from the pending cookie", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		githubUser := goth.User{
-			UserID:      "pending-github-1",
-			Email:       "pending-github@example.com",
-			Name:        "Pending GitHub",
-			NickName:    "pendinggithub",
-			Provider:    "github",
-			AccessToken: "github-access-token",
-		}
-		seed := httptest.NewRecorder()
-		handler.setPendingOAuthSignupCookie(seed, httptest.NewRequest(http.MethodGet, "/", nil), githubUser)
-
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/github?signup=true", nil),
-			map[string]string{"provider": "github"},
-		)
-		req.AddCookie(pendingOAuthSignupCookieFromRecorder(t, seed))
-		recorder := httptest.NewRecorder()
-
-		handler.handleAuth(recorder, req)
-
-		account, err := models.FindAccountByEmail(githubUser.Email)
-		require.NoError(t, err)
-		assert.Equal(t, githubUser.Name, account.Name)
-	})
-
-	t.Run("does not create an account when the cookie provider does not match", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		seed := httptest.NewRecorder()
-		handler.setPendingOAuthSignupCookie(seed, httptest.NewRequest(http.MethodGet, "/", nil), googleUser)
-
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/github?signup=true", nil),
-			map[string]string{"provider": "github"},
-		)
-		req.AddCookie(pendingOAuthSignupCookieFromRecorder(t, seed))
-
-		_, ok := handler.gothUserFromPendingOAuthSignup(req, "github")
-		assert.False(t, ok)
-		_, err := models.FindAccountByEmail(googleUser.Email)
-		assert.Error(t, err)
-	})
-
-	t.Run("completes signup from the pending cookie in the development handler", func(t *testing.T) {
-		r := support.Setup(t)
-		t.Cleanup(func() { r.Close() })
-		handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
-
-		seed := httptest.NewRecorder()
-		handler.setPendingOAuthSignupCookie(seed, httptest.NewRequest(http.MethodGet, "/", nil), googleUser)
-
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/google?signup=true", nil),
-			map[string]string{"provider": "google"},
-		)
-		req.AddCookie(pendingOAuthSignupCookieFromRecorder(t, seed))
-		recorder := httptest.NewRecorder()
-
-		handler.handleDevAuth(recorder, req)
-
-		account, err := models.FindAccountByEmail(googleUser.Email)
-		require.NoError(t, err)
-		assert.Equal(t, googleUser.Name, account.Name)
-		_, err = models.FindAccountByEmail("dev@superplane.local")
-		assert.Error(t, err)
-	})
-
-	t.Run("clears the pending cookie on logout", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		req := httptest.NewRequest(http.MethodGet, "/logout", nil)
-		recorder := httptest.NewRecorder()
-
-		handler.handleLogout(recorder, req)
-
-		assert.True(t, pendingOAuthSignupCookieCleared(recorder))
-	})
-}
-
-func pendingOAuthSignupCookieFromRecorder(t *testing.T, recorder *httptest.ResponseRecorder) *http.Cookie {
-	t.Helper()
-
-	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == pendingOAuthSignupCookie {
-			return cookie
-		}
-	}
-
-	t.Fatal("pending OAuth signup cookie not set")
-	return nil
-}
-
-func pendingOAuthSignupCookieCleared(recorder *httptest.ResponseRecorder) bool {
-	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == pendingOAuthSignupCookie && cookie.MaxAge < 0 {
-			return true
-		}
-	}
-
-	return false
+	_, err = models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
+	assert.NoError(t, err)
 }
 
 func TestHandler_handlePasswordSignup(t *testing.T) {
@@ -892,6 +813,6 @@ func TestHandler_handlePasswordSignup(t *testing.T) {
 		handler.handlePasswordSignup(recorder, req)
 
 		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		assert.Equal(t, "/welcome?redirect=%2Fcanvases", recorder.Header().Get("Location"))
+		assert.Equal(t, "/welcome?auth_signup_result=created&redirect=%2Fcanvases", recorder.Header().Get("Location"))
 	})
 }
