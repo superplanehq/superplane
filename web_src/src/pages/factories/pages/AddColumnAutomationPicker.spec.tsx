@@ -15,7 +15,7 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-discussion")).toHaveTextContent(
       "Pull request discussion",
     );
-    expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
+    expect(screen.queryByTestId("add-column-automation-template-checks")).not.toBeInTheDocument();
   });
 
   it("reports the chosen entry and disables taken ones", async () => {
@@ -36,8 +36,6 @@ describe("AddColumnAutomationPicker", () => {
     expect(discussion).toHaveTextContent("This automation is already configured.");
     await user.click(discussion);
     expect(onSelect).not.toHaveBeenCalled();
-
-    await user.click(screen.getByTestId("add-column-automation-template-checks"));
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "checks" }));
+    expect(screen.queryByTestId("add-column-automation-template-checks")).not.toBeInTheDocument();
   });
 });

@@ -193,9 +193,7 @@ export function PRFeedbackDiscussionFields({
           <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
             {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
           </h3>
-          <p className="workspace-body-text mt-1 text-muted-foreground">
-            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro}
-          </p>
+          <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro}</p>
         </div>
         <div
           className="flex flex-col gap-2"
@@ -244,7 +242,9 @@ export function PRFeedbackDiscussionFields({
   );
 }
 
-export function discussionBotModeFromDraft(draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">): DiscussionBotMode {
+export function discussionBotModeFromDraft(
+  draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">,
+): DiscussionBotMode {
   if (!draft.ignoreBots || draft.allowedBots.length > 0) {
     return "address";
   }

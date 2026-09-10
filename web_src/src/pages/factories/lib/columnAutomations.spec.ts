@@ -245,6 +245,10 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
+  it("hides status-check setup from the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion"]);
+  });
+
   it("keeps phase catalog entries available after one agent exists", () => {
     const catalog = catalogForColumn("phase-0");
     const automations = buildColumnAutomations("phase-0", {

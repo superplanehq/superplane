@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
@@ -24,7 +25,9 @@ type githubReviewBotAPI interface {
 
 func (g *GitHub) listReviewBotResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	repository := strings.TrimSpace(ctx.Parameters["repository"])
+	logger := reviewBotLogger(ctx.Logger).WithField("repository", repository)
 	if repository == "" {
+		logger.Info("review bot catalog skipped: repository parameter is empty")
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -33,15 +36,17 @@ func (g *GitHub) listReviewBotResources(ctx core.ListResourcesContext) ([]core.I
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	return listReviewBotResourcesFromClient(context.Background(), client, repository)
+	return listReviewBotResourcesFromClient(context.Background(), client, repository, logger)
 }
 
-func listReviewBotResourcesFromClient(ctx context.Context, client githubReviewBotAPI, repository string) ([]core.IntegrationResource, error) {
+func listReviewBotResourcesFromClient(ctx context.Context, client githubReviewBotAPI, repository string, logger *log.Entry) ([]core.IntegrationResource, error) {
+	logger = reviewBotLogger(logger).WithField("repository", repository)
 	pulls, err := recentReviewBotPullRequests(ctx, client, repository)
 	if err != nil {
 		return nil, err
 	}
 
+	pullNumbers := make([]int, 0, len(pulls))
 	bots := map[string]core.IntegrationResource{}
 	for _, pull := range pulls {
 		if pull == nil {
@@ -51,59 +56,53 @@ func listReviewBotResourcesFromClient(ctx context.Context, client githubReviewBo
 		if number <= 0 {
 			continue
 		}
-		collectReviewBotResourcesFromPull(ctx, client, repository, number, bots)
+		pullNumbers = append(pullNumbers, number)
+		collectReviewBotResourcesFromPull(ctx, client, repository, number, bots, logger)
 	}
 
 	out := make([]core.IntegrationResource, 0, len(bots))
+	botIDs := make([]string, 0, len(bots))
 	for _, bot := range bots {
 		out = append(out, bot)
+		botIDs = append(botIDs, bot.ID)
 	}
+	logger.WithFields(log.Fields{
+		"pull_count":   len(pullNumbers),
+		"pull_numbers": pullNumbers,
+		"bot_count":    len(botIDs),
+		"bot_ids":      botIDs,
+	}).Info("listed review bot resources")
 	return out, nil
 }
 
 func recentReviewBotPullRequests(ctx context.Context, client githubReviewBotAPI, repository string) ([]*github.PullRequest, error) {
-	pulls := make([]*github.PullRequest, 0, reviewBotRecentPRLimit)
-	seen := map[int]struct{}{}
-	add := func(candidates []*github.PullRequest) {
-		for _, pull := range candidates {
-			if pull == nil || len(pulls) >= reviewBotRecentPRLimit {
-				return
-			}
-			number := pull.GetNumber()
-			if number <= 0 {
-				continue
-			}
-			if _, exists := seen[number]; exists {
-				continue
-			}
-			seen[number] = struct{}{}
-			pulls = append(pulls, pull)
-		}
+	page, _, err := client.ListPullRequests(ctx, repository, &github.PullRequestListOptions{
+		State:     "all",
+		Sort:      "updated",
+		Direction: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: reviewBotRecentPRLimit,
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	var firstErr error
-	for _, state := range []string{"closed", "open"} {
-		if len(pulls) >= reviewBotRecentPRLimit {
+	pulls := make([]*github.PullRequest, 0, reviewBotRecentPRLimit)
+	seen := map[int]struct{}{}
+	for _, pull := range page {
+		if pull == nil || len(pulls) >= reviewBotRecentPRLimit {
 			break
 		}
-		page, _, err := client.ListPullRequests(ctx, repository, &github.PullRequestListOptions{
-			State:     state,
-			Sort:      "updated",
-			Direction: "desc",
-			ListOptions: github.ListOptions{
-				PerPage: reviewBotRecentPRLimit,
-			},
-		})
-		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
+		number := pull.GetNumber()
+		if number <= 0 {
 			continue
 		}
-		add(page)
-	}
-	if len(pulls) == 0 {
-		return nil, firstErr
+		if _, exists := seen[number]; exists {
+			continue
+		}
+		seen[number] = struct{}{}
+		pulls = append(pulls, pull)
 	}
 	return pulls, nil
 }
@@ -114,8 +113,15 @@ func collectReviewBotResourcesFromPull(
 	repository string,
 	number int,
 	bots map[string]core.IntegrationResource,
+	logger *log.Entry,
 ) {
-	if reviews, err := client.ListReviews(ctx, repository, number); err == nil {
+	logger = reviewBotLogger(logger).WithFields(log.Fields{
+		"repository":  repository,
+		"pull_number": number,
+	})
+	if reviews, err := client.ListReviews(ctx, repository, number); err != nil {
+		logger.WithError(err).Warn("failed to list pull request reviews for review bot catalog")
+	} else {
 		for _, review := range reviews {
 			if review == nil {
 				continue
@@ -123,7 +129,9 @@ func collectReviewBotResourcesFromPull(
 			collectReviewBotResource(bots, review.GetUser())
 		}
 	}
-	if comments, err := client.ListIssueComments(ctx, repository, number); err == nil {
+	if comments, err := client.ListIssueComments(ctx, repository, number); err != nil {
+		logger.WithError(err).Warn("failed to list issue comments for review bot catalog")
+	} else {
 		for _, comment := range comments {
 			if comment == nil {
 				continue
@@ -131,7 +139,9 @@ func collectReviewBotResourcesFromPull(
 			collectReviewBotResource(bots, comment.GetUser())
 		}
 	}
-	if comments, err := client.ListPullRequestComments(ctx, repository, number); err == nil {
+	if comments, err := client.ListPullRequestComments(ctx, repository, number); err != nil {
+		logger.WithError(err).Warn("failed to list pull request comments for review bot catalog")
+	} else {
 		for _, comment := range comments {
 			if comment == nil {
 				continue
@@ -139,6 +149,13 @@ func collectReviewBotResourcesFromPull(
 			collectReviewBotResource(bots, comment.GetUser())
 		}
 	}
+}
+
+func reviewBotLogger(logger *log.Entry) *log.Entry {
+	if logger != nil {
+		return logger
+	}
+	return log.NewEntry(log.StandardLogger())
 }
 
 func collectReviewBotResource(bots map[string]core.IntegrationResource, user *github.User) {

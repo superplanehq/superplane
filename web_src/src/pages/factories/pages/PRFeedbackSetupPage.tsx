@@ -7,7 +7,11 @@ import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../l
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
-import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById } from "./prFeedbackSettingsModel";
+import {
+  CHECKS_PR_FEEDBACK_SETUP_AVAILABLE,
+  PR_FEEDBACK_SETTINGS_COPY,
+  prFeedbackSourceById,
+} from "./prFeedbackSettingsModel";
 
 export function DiscussionPRFeedbackSetupPage() {
   return <PRFeedbackSetupPage kind="comments" />;
@@ -35,6 +39,10 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
       : PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments;
 
   usePageTitle([pageTitle, factory?.name ?? "Workspace"]);
+
+  if (kind === "checks" && !CHECKS_PR_FEEDBACK_SETUP_AVAILABLE) {
+    return <Navigate to={boardHref} replace />;
+  }
 
   if (!canUpdate) {
     return <Navigate to={boardHref} replace />;

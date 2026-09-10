@@ -52,6 +52,17 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   },
 ];
 
+/** Status-check setup is not ready. Hide the wizard and next-step until it is. */
+export const CHECKS_PR_FEEDBACK_SETUP_AVAILABLE = false;
+
+export function availablePRFeedbackSources(): PRFeedbackSource[] {
+  return PR_FEEDBACK_SOURCES.filter((source) => source.id !== "checks" || CHECKS_PR_FEEDBACK_SETUP_AVAILABLE);
+}
+
+export function isPRFeedbackSetupAvailable(sourceId: PRFeedbackSourceId): boolean {
+  return availablePRFeedbackSources().some((source) => source.id === sourceId);
+}
+
 export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource | undefined {
   return PR_FEEDBACK_SOURCES.find((source) => source.id === id);
 }
@@ -71,7 +82,7 @@ export function takenPRFeedbackSourceIds(
 }
 
 export function hasAvailablePRFeedbackSource(taken: readonly PRFeedbackSourceId[]): boolean {
-  return PR_FEEDBACK_SOURCES.some((source) => !taken.includes(source.id));
+  return availablePRFeedbackSources().some((source) => !taken.includes(source.id));
 }
 
 export function prFeedbackHandlerForSource<T extends { id?: string; source?: FactoriesFactoryPrFeedbackHandlerSource }>(
@@ -140,11 +151,13 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardBotsLoading: "Loading review bots",
   wizardBotsEmpty: "No review bots found.",
   wizardBotsLoadError: "SuperPlane could not load review bots from this repository.",
+  wizardBotsFound:
+    "SuperPlane scanned the most recent pull requests in the repository and found these bots. Select the bots that you want for pull request feedback.",
+  wizardBotsMissing: "The bot that you use is not here?",
+  wizardBotsAddManually: "Add a bot manually",
   wizardBotsAddLabel: "Add bot login",
   wizardBotsAddPlaceholder: "Add bot login, for example coderabbitai",
   wizardBotsAdd: "Add",
-  wizardStepMention: "Step 1 of 2",
-  wizardStepBots: "Step 2 of 2",
   wizardToolsDescription:
     "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
   wizardToolsUnknown:
@@ -154,8 +167,6 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardContinue: "Continue",
   wizardFinish: "Finish",
   wizardFinishing: "Finishing...",
-  wizardStepChecks: "Step 1 of 2",
-  wizardStepTools: "Step 2 of 2",
   wizardConnect: "Connect",
   wizardSuggested: "Suggested from the selected checks",
   wizardOtherTools: "Other CI tools",

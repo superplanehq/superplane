@@ -13,9 +13,7 @@ import {
   useFactoryWorkOrders,
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
-import {
-  useFactoryPRFeedbackHandlers,
-} from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -161,6 +159,7 @@ import {
   PR_FEEDBACK_SETTINGS_COPY,
   PR_FEEDBACK_SOURCES,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
   prFeedbackSourceById,
@@ -353,7 +352,7 @@ export function LinesPage() {
   });
 
   const createPRFeedbackFromSource = (source: PRFeedbackSource) => {
-    if (takenPRFeedbackSources.includes(source.id)) {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
       return;
     }
     setAddPRFeedbackOpen(false);

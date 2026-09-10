@@ -6,16 +6,12 @@ import { StatusCheckPicker, statusCheckRows } from "./StatusCheckPicker";
 
 describe("statusCheckRows", () => {
   it("keeps catalog order and appends selected-only names", () => {
-    expect(
-      statusCheckRows(
-        [
-          { name: "lint" },
-          { name: "e2e" },
-          { name: "unit" },
-        ],
-        ["unit", "custom"],
-      ),
-    ).toEqual([{ name: "lint" }, { name: "e2e" }, { name: "unit" }, { name: "custom" }]);
+    expect(statusCheckRows([{ name: "lint" }, { name: "e2e" }, { name: "unit" }], ["unit", "custom"])).toEqual([
+      { name: "lint" },
+      { name: "e2e" },
+      { name: "unit" },
+      { name: "custom" },
+    ]);
   });
 });
 
@@ -38,16 +34,7 @@ describe("StatusCheckPicker", () => {
   it("toggles a catalog row", async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
-    render(
-      <StatusCheckPicker
-        names={["lint"]}
-        catalog={[
-          { name: "lint" },
-          { name: "e2e" },
-        ]}
-        onToggle={onToggle}
-      />,
-    );
+    render(<StatusCheckPicker names={["lint"]} catalog={[{ name: "lint" }, { name: "e2e" }]} onToggle={onToggle} />);
 
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     expect(onToggle).toHaveBeenCalledWith("e2e");

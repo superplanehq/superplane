@@ -6,14 +6,7 @@ import {
 
 describe("checksPRFeedbackSetup helpers", () => {
   it("collects catalog check names", () => {
-    expect(
-      catalogStatusCheckNames([
-        { name: "lint" },
-        { name: "unit" },
-        { name: "  " },
-        {},
-      ]),
-    ).toEqual(["lint", "unit"]);
+    expect(catalogStatusCheckNames([{ name: "lint" }, { name: "unit" }, { name: "  " }, {}])).toEqual(["lint", "unit"]);
   });
 
   it("suggests integrations from check urls", () => {

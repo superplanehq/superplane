@@ -71,6 +71,12 @@ func (f *fakeGitHubReviewBotAPI) ListPullRequests(_ context.Context, _ string, o
 	if opts != nil && opts.State == "open" {
 		return f.openPulls, &github.Response{}, nil
 	}
+	if opts != nil && opts.State == "all" {
+		all := make([]*github.PullRequest, 0, len(f.openPulls)+len(f.closedPulls))
+		all = append(all, f.openPulls...)
+		all = append(all, f.closedPulls...)
+		return all, &github.Response{}, nil
+	}
 	return f.closedPulls, &github.Response{}, nil
 }
 
@@ -117,7 +123,7 @@ func Test__ListReviewBotResourcesFromClient(t *testing.T) {
 			},
 		}
 
-		bots, err := listReviewBotResourcesFromClient(context.Background(), api, "acme/app")
+		bots, err := listReviewBotResourcesFromClient(context.Background(), api, "acme/app", nil)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, []core.IntegrationResource{
 			{Type: "review_bot", Name: "coderabbitai[bot]", ID: "coderabbitai"},
@@ -129,8 +135,29 @@ func Test__ListReviewBotResourcesFromClient(t *testing.T) {
 		t.Parallel()
 		api := &fakeGitHubReviewBotAPI{pullsErr: errors.New("github unavailable")}
 
-		bots, err := listReviewBotResourcesFromClient(context.Background(), api, "acme/app")
+		bots, err := listReviewBotResourcesFromClient(context.Background(), api, "acme/app", nil)
 		assert.Error(t, err)
 		assert.Empty(t, bots)
+	})
+
+	t.Run("includes bots from a recent open PR when older closed PRs have none", func(t *testing.T) {
+		t.Parallel()
+		closed := make([]*github.PullRequest, 0, reviewBotRecentPRLimit)
+		for number := 1; number <= reviewBotRecentPRLimit; number++ {
+			closed = append(closed, &github.PullRequest{Number: github.Ptr(number)})
+		}
+		api := &fakeGitHubReviewBotAPI{
+			closedPulls: closed,
+			openPulls:   []*github.PullRequest{{Number: github.Ptr(35)}},
+			issueComments: map[int][]*github.IssueComment{
+				35: {{User: &github.User{Login: github.Ptr("lucaspin-reviewer[bot]"), Type: github.Ptr("Bot")}}},
+			},
+		}
+
+		bots, err := listReviewBotResourcesFromClient(context.Background(), api, "lucaspin/decks-api", nil)
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: "review_bot", Name: "lucaspin-reviewer[bot]", ID: "lucaspin-reviewer"},
+		}, bots)
 	})
 }

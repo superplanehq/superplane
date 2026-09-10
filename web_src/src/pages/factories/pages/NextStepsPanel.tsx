@@ -24,7 +24,10 @@ export function NextStepsPanel({
 
   return (
     <section className="px-3 pb-3" data-testid="workspace-next-steps">
-      <div role="status" className="flex items-center gap-3 rounded-lg border border-border bg-background px-3.5 py-3 sm:gap-4">
+      <div
+        role="status"
+        className="flex items-center gap-3 rounded-lg border border-border bg-background px-3.5 py-3 sm:gap-4"
+      >
         <Badge
           variant="secondary"
           className="shrink-0 rounded-full px-3 py-1.5 text-[15px] font-semibold tabular-nums tracking-tight"
@@ -34,7 +37,11 @@ export function NextStepsPanel({
         </Badge>
         <div className="min-w-0">
           <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-foreground">{banner.title}</h2>
-          <p className="mt-1.5 text-[13px] text-muted-foreground">{banner.description}</p>
+          {banner.description.split("\n").map((line) => (
+            <p key={line} className="mt-1.5 text-[13px] text-muted-foreground">
+              {line}
+            </p>
+          ))}
           <Button
             type="button"
             size="sm"

@@ -112,9 +112,7 @@ function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () =>
       ? PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichChecks
       : PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichTools;
   const stepHelper =
-    step === "checks"
-      ? PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper
-      : PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription;
+    step === "checks" ? PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper : PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription;
 
   return (
     <header className="text-left">
@@ -323,42 +321,35 @@ function SetupFooter({
   onCreated: (handlerId: string) => void;
 }) {
   return (
-    <footer className="flex items-center justify-between gap-3 pt-2">
-      <span className="text-[12px] text-muted-foreground">
-        {setup.step === "checks"
-          ? PR_FEEDBACK_SETTINGS_COPY.wizardStepChecks
-          : PR_FEEDBACK_SETTINGS_COPY.wizardStepTools}
-      </span>
-      <div className="flex items-center gap-2">
-        {setup.step === "checks" ? (
-          <Button
-            type="button"
-            disabled={!setup.canContinue}
-            onClick={() => setup.setStep("tools")}
-            data-testid="checks-setup-continue"
-          >
-            {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            disabled={setup.createHandler.isPending}
-            onClick={() => {
-              void setup.finish(source).then((handler) => {
-                if (handler?.id) {
-                  onCreated(handler.id);
-                  onClose();
-                }
-              });
-            }}
-            data-testid="checks-setup-finish"
-          >
-            {setup.createHandler.isPending
-              ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
-              : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-          </Button>
-        )}
-      </div>
+    <footer className="flex items-center justify-end gap-3 pt-2">
+      {setup.step === "checks" ? (
+        <Button
+          type="button"
+          disabled={!setup.canContinue}
+          onClick={() => setup.setStep("tools")}
+          data-testid="checks-setup-continue"
+        >
+          {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          disabled={setup.createHandler.isPending}
+          onClick={() => {
+            void setup.finish(source).then((handler) => {
+              if (handler?.id) {
+                onCreated(handler.id);
+                onClose();
+              }
+            });
+          }}
+          data-testid="checks-setup-finish"
+        >
+          {setup.createHandler.isPending
+            ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
+            : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
+        </Button>
+      )}
     </footer>
   );
 }

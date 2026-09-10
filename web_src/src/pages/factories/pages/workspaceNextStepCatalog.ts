@@ -1,4 +1,8 @@
-import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSourceId } from "./prFeedbackSettingsModel";
+import {
+  CHECKS_PR_FEEDBACK_SETUP_AVAILABLE,
+  PR_FEEDBACK_SETTINGS_COPY,
+  type PRFeedbackSourceId,
+} from "./prFeedbackSettingsModel";
 
 export type WorkspaceNextStepId = "pr-comments-handler" | "pr-checks-handler";
 
@@ -33,29 +37,39 @@ export interface WorkspaceNextStepBanner {
   ctaLabel: string;
 }
 
-const WORKSPACE_NEXT_STEPS: Array<
-  Omit<WorkspaceNextStep, "done"> & { isDone: (ctx: WorkspaceNextStepContext) => boolean }
-> = [
-  {
-    id: "pr-comments-handler",
-    title: "Comments handler",
-    bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments,
-    description:
-      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
-    ctaLabel: "Configure",
-    action: { type: "open-pr-feedback-setup", sourceId: "discussion" },
-    isDone: (ctx) => ctx.takenPRFeedbackSources.includes("discussion"),
-  },
-  {
-    id: "pr-checks-handler",
-    title: "Status checks handler",
-    bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks,
-    description:
-      "SuperPlane can automatically fix failing status checks. Configure how to handle them next.",
-    ctaLabel: "Configure",
-    action: { type: "open-pr-feedback-setup", sourceId: "checks" },
-    isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
-  },
+/** GitHub and the repository are already set during onboarding. */
+const ONBOARDING_COMPLETED_STEP_COUNT = 2;
+
+type WorkspaceNextStepDefinition = Omit<WorkspaceNextStep, "done"> & {
+  isDone: (ctx: WorkspaceNextStepContext) => boolean;
+};
+
+const COMMENTS_NEXT_STEP: WorkspaceNextStepDefinition = {
+  id: "pr-comments-handler",
+  title: "Comments handler",
+  bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments,
+  description: "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
+  ctaLabel: "Configure",
+  action: { type: "open-pr-feedback-setup", sourceId: "discussion" },
+  isDone: (ctx) => ctx.takenPRFeedbackSources.includes("discussion"),
+};
+
+const CHECKS_NEXT_STEP: WorkspaceNextStepDefinition = {
+  id: "pr-checks-handler",
+  title: "Status checks handler",
+  bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks,
+  description: [
+    "SuperPlane can implement tasks, open pull requests, and address pull request reviews.",
+    "Do you also want SuperPlane to automatically fix failing pull request status checks?",
+  ].join("\n"),
+  ctaLabel: "Configure",
+  action: { type: "open-pr-feedback-setup", sourceId: "checks" },
+  isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
+};
+
+const WORKSPACE_NEXT_STEPS = [
+  COMMENTS_NEXT_STEP,
+  ...(CHECKS_PR_FEEDBACK_SETUP_AVAILABLE ? [CHECKS_NEXT_STEP] : []),
 ];
 
 export function workspaceNextStepsProgressCopy(done: number, total: number): string {
@@ -82,8 +96,8 @@ export function workspaceNextStepBanner(steps: WorkspaceNextStep[]): WorkspaceNe
     return null;
   }
   return {
-    doneCount: steps.filter((step) => step.done).length,
-    totalCount: steps.length,
+    doneCount: ONBOARDING_COMPLETED_STEP_COUNT + steps.filter((step) => step.done).length,
+    totalCount: ONBOARDING_COMPLETED_STEP_COUNT + steps.length,
     activeStep,
     title: activeStep.bannerTitle,
     description: activeStep.description,

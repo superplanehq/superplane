@@ -75,9 +75,11 @@ export function ReviewBotPicker({
   onAdd: (login: string) => boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [manualAddOpen, setManualAddOpen] = useState(false);
   const selectedKeys = useMemo(() => new Set(selected.map((login) => login.toLowerCase())), [selected]);
   const rows = useMemo(() => reviewBotRows(catalog, selected), [catalog, selected]);
   const showFullLoading = Boolean(loading) && rows.length === 0;
+  const showFoundMessage = !showFullLoading && !loadError && catalog.length > 0;
 
   const submitDraft = () => {
     if (!onAdd(draft)) {
@@ -90,6 +92,11 @@ export function ReviewBotPicker({
     <section className="space-y-3">
       {loadError ? (
         <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsLoadError}</p>
+      ) : null}
+      {showFoundMessage ? (
+        <p className="workspace-body-text text-muted-foreground" data-testid="discussion-setup-bots-found">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsFound}
+        </p>
       ) : null}
       <div
         className="max-h-56 overflow-y-auto rounded-lg border border-border"
@@ -132,9 +139,7 @@ export function ReviewBotPicker({
                   >
                     <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{bot.displayName}</span>
                     <span className="flex size-3.5 shrink-0 items-center justify-center">
-                      {isSelected ? (
-                        <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
-                      ) : null}
+                      {isSelected ? <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
                     </span>
                   </button>
                 </li>
@@ -143,31 +148,47 @@ export function ReviewBotPicker({
           </ul>
         )}
       </div>
-      <div className="flex gap-2">
-        <Input
-          id="discussion-setup-bot-manual"
-          value={draft}
-          placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
-          aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submitDraft();
-            }
-          }}
-          data-testid="discussion-setup-bot-manual"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={normalizeReviewBotLogin(draft).length === 0}
-          onClick={submitDraft}
-          data-testid="discussion-setup-bot-add"
-        >
-          {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAdd}
-        </Button>
-      </div>
+      {manualAddOpen ? (
+        <div className="flex gap-2">
+          <Input
+            id="discussion-setup-bot-manual"
+            value={draft}
+            placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
+            aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitDraft();
+              }
+            }}
+            data-testid="discussion-setup-bot-manual"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={normalizeReviewBotLogin(draft).length === 0}
+            onClick={submitDraft}
+            data-testid="discussion-setup-bot-add"
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAdd}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="workspace-body-text text-muted-foreground" data-testid="discussion-setup-bots-missing">
+            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsMissing}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setManualAddOpen(true)}
+            data-testid="discussion-setup-bot-add-manually"
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddManually}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

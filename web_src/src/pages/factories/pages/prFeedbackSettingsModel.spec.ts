@@ -13,6 +13,7 @@ import {
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
   toggleUniqueString,
+  availablePRFeedbackSources,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
   prFeedbackHandlerForSource,
@@ -286,7 +287,14 @@ describe("takenPRFeedbackSourceIds", () => {
         { source: "SOURCE_PULL_REQUEST_CHECKS" },
       ]),
     ).toEqual(["discussion", "checks"]);
-    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
+  });
+});
+
+describe("availablePRFeedbackSources", () => {
+  it("hides status-check setup until that wizard is ready", () => {
+    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion"]);
+    expect(hasAvailablePRFeedbackSource([])).toBe(true);
+    expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(false);
     expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
   });
 });

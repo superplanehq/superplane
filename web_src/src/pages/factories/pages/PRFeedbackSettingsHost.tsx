@@ -11,12 +11,17 @@ import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { factoryAppConfigurePath, factoryPRFeedbackSetupPath, prFeedbackSetupKindFromSourceId } from "../lib/factoryPagePaths";
+import {
+  factoryAppConfigurePath,
+  factoryPRFeedbackSetupPath,
+  prFeedbackSetupKindFromSourceId,
+} from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
+  isPRFeedbackSetupAvailable,
   takenPRFeedbackSourceIds,
   prFeedbackDraftFromHandler,
   prFeedbackSettingsToApi,
@@ -69,12 +74,14 @@ export function PRFeedbackSettingsHost({
   const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
 
   const createFromSource = (source: PRFeedbackSource) => {
-    if (takenSourceIds.includes(source.id) || !lineId) {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenSourceIds.includes(source.id) || !lineId) {
       return;
     }
     setPickerOpen(false);
     onClose();
-    navigate(factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)));
+    navigate(
+      factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)),
+    );
   };
 
   if (handlersQuery.isPending) {

@@ -52,12 +52,7 @@ export function useDiscussionPRFeedbackSetup(
   const [catalogApplied, setCatalogApplied] = useState(false);
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
-  const catalogQuery = useIntegrationResources(
-    organizationId,
-    githubIntegrationId,
-    "review_bot",
-    catalogParameters,
-  );
+  const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters);
   const catalog = catalogReviewBots(catalogQuery.data ?? []);
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);

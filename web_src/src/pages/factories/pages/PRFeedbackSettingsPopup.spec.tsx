@@ -189,19 +189,12 @@ function renderAutomationPopup() {
 describe("PRFeedbackSettingsPopup discussion", () => {
   beforeEach(() => {
     vi.mocked(useIntegrationResources).mockReturnValue(
-      mockIntegrationResources([
-        { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
-      ]),
+      mockIntegrationResources([{ type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" }]),
     );
   });
 
   it("uses the same mention and bot choices as setup", () => {
-    renderChecksPopup(
-      vi.fn(),
-      discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }),
-      "org-1",
-      "gh-1",
-    );
+    renderChecksPopup(vi.fn(), discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }), "org-1", "gh-1");
 
     expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
@@ -257,10 +250,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("selects a check from the repository catalog", async () => {
-    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
         { type: "status_check", id: "lint", name: "lint" },
         { type: "status_check", id: "e2e", name: "e2e" },
-      ]));
+      ]),
+    );
     const user = userEvent.setup();
     renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
 
@@ -273,10 +268,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("deselects a selected check from the catalog list", async () => {
-    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
         { type: "status_check", id: "lint", name: "lint" },
         { type: "status_check", id: "unit", name: "unit" },
-      ]));
+      ]),
+    );
     const user = userEvent.setup();
     renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "unit"] }), "org-1", "gh-1");
 
@@ -287,10 +284,12 @@ describe("PRFeedbackSettingsPopup check names", () => {
   });
 
   it("saves only the selected catalog checks", async () => {
-    vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources([
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([
         { type: "status_check", id: "lint", name: "lint" },
         { type: "status_check", id: "e2e", name: "e2e" },
-      ]));
+      ]),
+    );
     const user = userEvent.setup();
     const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
 

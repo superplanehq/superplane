@@ -127,6 +127,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
 
     await chooseAddressBots(user);
+    expect(screen.getByTestId("discussion-setup-bots-found")).toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("discussion-setup-bot-bugbot")).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
@@ -198,6 +199,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("discussion-setup-bots-empty")).toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-finish")).toBeEnabled();
 
+    await user.click(screen.getByTestId("discussion-setup-bot-add-manually"));
     await user.type(screen.getByTestId("discussion-setup-bot-manual"), "coderabbitai");
     await user.click(screen.getByTestId("discussion-setup-bot-add"));
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");

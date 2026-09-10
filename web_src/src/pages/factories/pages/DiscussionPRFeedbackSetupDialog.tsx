@@ -167,37 +167,30 @@ function SetupFooter({
   onCreated: (handlerId: string) => void;
 }) {
   return (
-    <footer className="flex items-center justify-between gap-3 pt-2">
-      <span className="text-[12px] text-muted-foreground">
-        {setup.step === "mention"
-          ? PR_FEEDBACK_SETTINGS_COPY.wizardStepMention
-          : PR_FEEDBACK_SETTINGS_COPY.wizardStepBots}
-      </span>
-      <div className="flex items-center gap-2">
-        {setup.step === "mention" ? (
-          <Button type="button" onClick={() => setup.setStep("bots")} data-testid="discussion-setup-continue">
-            {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            disabled={setup.createHandler.isPending}
-            onClick={() => {
-              void setup.finish(source).then((handler) => {
-                if (handler?.id) {
-                  onCreated(handler.id);
-                  onClose();
-                }
-              });
-            }}
-            data-testid="discussion-setup-finish"
-          >
-            {setup.createHandler.isPending
-              ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
-              : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-          </Button>
-        )}
-      </div>
+    <footer className="flex items-center justify-end gap-3 pt-2">
+      {setup.step === "mention" ? (
+        <Button type="button" onClick={() => setup.setStep("bots")} data-testid="discussion-setup-continue">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          disabled={setup.createHandler.isPending}
+          onClick={() => {
+            void setup.finish(source).then((handler) => {
+              if (handler?.id) {
+                onCreated(handler.id);
+                onClose();
+              }
+            });
+          }}
+          data-testid="discussion-setup-finish"
+        >
+          {setup.createHandler.isPending
+            ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
+            : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
+        </Button>
+      )}
     </footer>
   );
 }

@@ -32,12 +32,7 @@ export function useChecksPRFeedbackSetup(
   const [connectedApplied, setConnectedApplied] = useState(false);
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
-  const catalogQuery = useIntegrationResources(
-    organizationId,
-    githubIntegrationId,
-    "status_check",
-    catalogParameters,
-  );
+  const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters);
   const catalog = catalogQuery.data ?? [];
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });

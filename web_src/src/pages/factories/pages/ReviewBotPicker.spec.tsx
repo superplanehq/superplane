@@ -33,6 +33,27 @@ describe("reviewBotRows", () => {
 });
 
 describe("ReviewBotPicker", () => {
+  it("explains found bots and keeps the add field hidden until the user opens it", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewBotPicker
+        selected={["coderabbitai"]}
+        catalog={[{ login: "coderabbitai", displayName: "coderabbitai[bot]" }]}
+        onToggle={vi.fn()}
+        onAdd={vi.fn().mockReturnValue(true)}
+      />,
+    );
+
+    expect(screen.getByTestId("discussion-setup-bots-found")).toHaveTextContent(
+      "SuperPlane scanned the most recent pull requests in the repository and found these bots.",
+    );
+    expect(screen.getByTestId("discussion-setup-bots-missing")).toHaveTextContent("The bot that you use is not here?");
+    expect(screen.queryByTestId("discussion-setup-bot-manual")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("discussion-setup-bot-add-manually"));
+    expect(screen.getByTestId("discussion-setup-bot-manual")).toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bot-add-manually")).not.toBeInTheDocument();
+  });
+
   it("lets the user add a bot login when the catalog is empty", async () => {
     const user = userEvent.setup();
     const onAdd = vi.fn().mockReturnValue(true);
@@ -40,6 +61,8 @@ describe("ReviewBotPicker", () => {
     render(<ReviewBotPicker selected={[]} catalog={[]} onToggle={onToggle} onAdd={onAdd} />);
 
     expect(screen.getByTestId("discussion-setup-bots-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-found")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("discussion-setup-bot-add-manually"));
     await user.type(screen.getByTestId("discussion-setup-bot-manual"), "coderabbitai");
     await user.click(screen.getByTestId("discussion-setup-bot-add"));
     expect(onAdd).toHaveBeenCalledWith("coderabbitai");
