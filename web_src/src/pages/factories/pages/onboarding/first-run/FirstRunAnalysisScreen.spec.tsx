@@ -74,6 +74,20 @@ describe("FirstRunAnalysisScreen", () => {
     expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
+  it("shows an import failure without the empty result", () => {
+    render(
+      <FirstRunAnalysisScreen
+        progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0, empty: false }}
+        failed
+        onGoToBoard={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.failure)).toBeInTheDocument();
+    expect(screen.queryByText("🤔")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-analysis-empty")).not.toBeInTheDocument();
+  });
+
   it("omits the ready counter when no ticket scored above the threshold", () => {
     render(
       <FirstRunAnalysisScreen progress={{ total: 3, scored: 3, ready: 0, stageIndex: 2 }} onGoToBoard={vi.fn()} />,

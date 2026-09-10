@@ -27,6 +27,11 @@ const (
 	intakeGitHubIssuePayloadType = "github.issue"
 )
 
+type intakeSeedResult struct {
+	itemCount int
+	skipped   bool
+}
+
 // seedIntake gives a new intake work at once: the newest open items of the
 // source enter the graph as if they had just arrived. Without a seed the intake
 // stays empty until the source sends its next event, which can take days.
@@ -37,12 +42,12 @@ func seedIntake(
 	canvasID uuid.UUID,
 	source string,
 	binding *intakeBinding,
-) error {
+) (intakeSeedResult, error) {
 	// An unbound intake has nothing to read from. Its items arrive through the
 	// webhook alone.
 	installation := binding.installation()
 	if installation == nil {
-		return nil
+		return intakeSeedResult{skipped: true}, nil
 	}
 
 	switch source {
@@ -53,7 +58,7 @@ func seedIntake(
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
-	return nil
+	return intakeSeedResult{skipped: true}, nil
 }
 
 func seedGitHubIssues(
@@ -63,19 +68,22 @@ func seedGitHubIssues(
 	canvasID uuid.UUID,
 	binding *intakeBinding,
 	installation *models.Integration,
-) error {
+) (intakeSeedResult, error) {
 	client, err := newIntakeGitHubClient(deps, tx, installation)
 	if err != nil {
-		return err
+		return intakeSeedResult{}, err
 	}
 
 	repository, _ := binding.Configuration["repository"].(string)
 	payloads, err := newestGitHubIssueEvents(ctx, client, repository, intakeSeedSize)
 	if err != nil {
-		return err
+		return intakeSeedResult{}, err
 	}
 
-	return emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads)
+	if err := emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
 }
 
 func seedProductiveTasks(
@@ -84,19 +92,22 @@ func seedProductiveTasks(
 	canvasID uuid.UUID,
 	binding *intakeBinding,
 	installation *models.Integration,
-) error {
+) (intakeSeedResult, error) {
 	client, err := newIntakeProductiveClient(deps, tx, installation)
 	if err != nil {
-		return err
+		return intakeSeedResult{}, err
 	}
 
 	project, _ := binding.Configuration["project"].(string)
 	documents, err := client.ListNewestOpenTaskDocuments(project, intakeSeedSize)
 	if err != nil {
-		return fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
+		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
 
-	return emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents))
+	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents)); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(documents)}, nil
 }
 
 // productiveTaskEvents shapes each task of a newest-first page like the event
