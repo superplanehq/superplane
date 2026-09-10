@@ -105,7 +105,7 @@ describe("OrganizationSettingsUsagePage", () => {
     try {
       render(
         <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
           factoriesFixture={defaultFactoriesFixture}
         />,
       );
