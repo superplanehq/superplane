@@ -693,6 +693,8 @@ func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 		Where("workspace_usage_events.work_order_execution_id IS NOT NULL")
 }
 
+const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`
+
 // ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
 // It does not write usage or change remaining hosted credit.
 func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset int) ([]WorkOrderRunUsage, int64, error) {
@@ -710,7 +712,7 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 	var rows []workOrderRunUsageScanRow
 	err = workOrderRunUsageQuery(tx, filter).
 		Select(workOrderRunUsageSelect).
-		Group(`workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`).
+		Group(workOrderRunUsageGroupBy).
 		Order("MAX(workspace_usage_events.occurred_at) DESC").
 		Order("workspace_usage_events.work_order_execution_id DESC").
 		Limit(limit).
@@ -720,6 +722,32 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 		return nil, 0, err
 	}
 
+	return workOrderRunUsageRowsFromScan(rows), total, nil
+}
+
+// ListAllWorkOrderRunUsage returns every task-run spend row in the ledger for
+// the filter's scope, with no date window and no pagination. It backs the
+// full-history CSV export; the paginated ListWorkOrderRunUsage stays bound to
+// a reporting period and page size for the table.
+func ListAllWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter) ([]WorkOrderRunUsage, error) {
+	filter.Since = time.Time{}
+	filter.Until = time.Time{}
+
+	var rows []workOrderRunUsageScanRow
+	err := workOrderRunUsageQuery(tx, filter).
+		Select(workOrderRunUsageSelect).
+		Group(workOrderRunUsageGroupBy).
+		Order("MAX(workspace_usage_events.occurred_at) DESC").
+		Order("workspace_usage_events.work_order_execution_id DESC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return workOrderRunUsageRowsFromScan(rows), nil
+}
+
+func workOrderRunUsageRowsFromScan(rows []workOrderRunUsageScanRow) []WorkOrderRunUsage {
 	result := make([]WorkOrderRunUsage, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, WorkOrderRunUsage{
@@ -741,7 +769,7 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 			MachineTypes:         splitUsageAgg(row.MachineTypes),
 		})
 	}
-	return result, total, nil
+	return result
 }
 
 func splitUsageAgg(value string) []string {
