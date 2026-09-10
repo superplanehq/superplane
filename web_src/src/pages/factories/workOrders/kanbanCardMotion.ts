@@ -15,6 +15,40 @@ import { WORK_ORDER_BOARD_LANES } from "../lib/workOrderProgress";
 /** CSS class on `html` while a board view transition runs. */
 export const KANBAN_BOARD_MOTION_ROOT_CLASS = "kanban-board-motion";
 
+type KanbanMotionRoot = {
+  classList: {
+    add: (token: string) => void;
+    remove: (token: string) => void;
+  };
+};
+
+let kanbanMotionRootGeneration = 0;
+
+function defaultKanbanMotionRoot(): KanbanMotionRoot | undefined {
+  return typeof document === "undefined" ? undefined : document.documentElement;
+}
+
+/**
+ * Marks the document root for board motion CSS. Returns a generation so an
+ * older transition cannot remove the class while a newer one is still running.
+ */
+export function beginKanbanMotionRoot(root: KanbanMotionRoot | undefined = defaultKanbanMotionRoot()): number {
+  const generation = ++kanbanMotionRootGeneration;
+  root?.classList.add(KANBAN_BOARD_MOTION_ROOT_CLASS);
+  return generation;
+}
+
+/** Removes the motion class only when this generation is still the latest. */
+export function endKanbanMotionRoot(
+  generation: number,
+  root: KanbanMotionRoot | undefined = defaultKanbanMotionRoot(),
+): void {
+  if (generation !== kanbanMotionRootGeneration) {
+    return;
+  }
+  root?.classList.remove(KANBAN_BOARD_MOTION_ROOT_CLASS);
+}
+
 /** View-transition type, for browsers that support typed transitions. */
 export const KANBAN_BOARD_TRANSITION_TYPE = "kanban-board";
 
@@ -180,10 +214,9 @@ export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPl
       return;
     }
 
-    const root = document.documentElement;
-    root.classList.add(KANBAN_BOARD_MOTION_ROOT_CLASS);
+    const motionGeneration = beginKanbanMotionRoot();
     const clearRoot = () => {
-      root.classList.remove(KANBAN_BOARD_MOTION_ROOT_CLASS);
+      endKanbanMotionRoot(motionGeneration);
     };
 
     const update = () => {

@@ -3,8 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
 import {
+  beginKanbanMotionRoot,
   canStartKanbanViewTransition,
   countKanbanMembershipChanges,
+  endKanbanMotionRoot,
+  KANBAN_BOARD_MOTION_ROOT_CLASS,
   kanbanBoardSignature,
   kanbanViewTransitionName,
   lineBoardCardPlacements,
@@ -168,6 +171,43 @@ describe("canStartKanbanViewTransition", () => {
   });
 });
 
+describe("kanban motion root class", () => {
+  function createRoot() {
+    const tokens = new Set<string>();
+    return {
+      classList: {
+        add: (token: string) => {
+          tokens.add(token);
+        },
+        remove: (token: string) => {
+          tokens.delete(token);
+        },
+      },
+      has: (token: string) => tokens.has(token),
+    };
+  }
+
+  it("adds the motion class and removes it for a single transition", () => {
+    const root = createRoot();
+    const generation = beginKanbanMotionRoot(root);
+
+    expect(root.has(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(true);
+    endKanbanMotionRoot(generation, root);
+    expect(root.has(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(false);
+  });
+
+  it("keeps the class when an older transition ends during a newer one", () => {
+    const root = createRoot();
+    const first = beginKanbanMotionRoot(root);
+    const second = beginKanbanMotionRoot(root);
+
+    endKanbanMotionRoot(first, root);
+    expect(root.has(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(true);
+    endKanbanMotionRoot(second, root);
+    expect(root.has(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(false);
+  });
+});
+
 describe("lineBoardCardPlacements", () => {
   it("puts a draft in backlog and an open run on its current phase", () => {
     const workOrders: FactoriesWorkOrder[] = [
@@ -292,6 +332,85 @@ describe("useKanbanDisplayedBoard", () => {
       expect(startViewTransition).toHaveBeenCalledTimes(1);
       expect(startViewTransition.mock.calls[0]?.[0]).toMatchObject({ types: ["kanban-board"] });
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps motion styles when a newer transition replaces an older one", async () => {
+    let resolveFirst = () => {};
+    let resolveSecond = () => {};
+    const firstFinished = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondFinished = new Promise<void>((resolve) => {
+      resolveSecond = resolve;
+    });
+    let startCount = 0;
+    const startViewTransition = vi.fn((options: { types?: string[]; update?: () => void }) => {
+      startCount += 1;
+      queueMicrotask(() => {
+        options.update?.();
+      });
+      return {
+        skipTransition: vi.fn(),
+        finished: startCount === 1 ? firstFinished : secondFinished,
+      };
+    });
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: startViewTransition,
+    });
+    Object.defineProperty(document, "activeViewTransition", {
+      configurable: true,
+      value: null,
+      writable: true,
+    });
+
+    try {
+      const first: KanbanCardPlacement[] = [{ id: "a", column: "backlog" }];
+      const second: KanbanCardPlacement[] = [{ id: "a", column: "phase-0" }];
+      const third: KanbanCardPlacement[] = [{ id: "a", column: "verify" }];
+      const { rerender } = renderHook(
+        ({ value, placements }: { value: string; placements: KanbanCardPlacement[] }) =>
+          useKanbanDisplayedBoard(value, placements),
+        { initialProps: { value: "draft", placements: first } },
+      );
+
+      rerender({ value: "running", placements: second });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(document.documentElement.classList.contains(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(true);
+
+      rerender({ value: "verify", placements: third });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(document.documentElement.classList.contains(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(true);
+
+      await act(async () => {
+        resolveFirst();
+        await firstFinished;
+      });
+      expect(document.documentElement.classList.contains(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(true);
+
+      await act(async () => {
+        resolveSecond();
+        await secondFinished;
+      });
+      expect(document.documentElement.classList.contains(KANBAN_BOARD_MOTION_ROOT_CLASS)).toBe(false);
+    } finally {
+      document.documentElement.classList.remove(KANBAN_BOARD_MOTION_ROOT_CLASS);
       vi.unstubAllGlobals();
     }
   });
