@@ -824,7 +824,9 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
-    expect(within(screen.getByTestId("intake-source-settings")).getByLabelText("Name")).toHaveValue("Triage issues");
+    expect(
+      within(screen.getByTestId("intake-source-settings")).getByRole("heading", { name: "Intake Triage issues" }),
+    ).toBeInTheDocument();
   });
 
   it("does not list intake runs under the GitHub issues row", () => {
