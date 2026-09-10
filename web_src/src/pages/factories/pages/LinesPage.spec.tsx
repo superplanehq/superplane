@@ -70,6 +70,7 @@ const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] })
 const createFactoryIntakeMutateAsync = vi.fn();
 const useFactoryPRFeedbackHandlers = vi.fn(() => ({
   data: [] as { id?: string; source?: string; healthy?: boolean }[],
+  isPending: false,
 }));
 const createFactoryPRFeedbackHandler = vi.fn();
 const searchFactoryIntakeItems = vi.fn(() => ({
@@ -215,7 +216,7 @@ async function resetLinesBoardMocks() {
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
   createFactoryPRFeedbackHandler.mockReset();
-  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
+  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
   enabledExperimentalFeatures.clear();
@@ -425,6 +426,7 @@ describe("LinesPage board", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     renderLinesBoard();
 
@@ -542,6 +544,7 @@ describe("LinesPage board", () => {
   it("opens verify and done automations from the header icons", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     useFactoryApps.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
     const user = userEvent.setup();
@@ -568,6 +571,7 @@ describe("LinesPage board", () => {
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
+      isPending: false,
     });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
@@ -631,6 +635,13 @@ describe("LinesPage board", () => {
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
+  it("hides next steps while PR feedback handlers are pending", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({ isPending: true });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+  });
+
   it("shows comments as open after onboarding", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -647,6 +658,7 @@ describe("LinesPage board", () => {
   it("hides next steps when the comments handler is configured", () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -669,6 +681,7 @@ describe("LinesPage board", () => {
   it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     const user = userEvent.setup();
     renderLinesBoard();

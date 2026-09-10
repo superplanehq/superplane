@@ -10,6 +10,7 @@ import {
 const ready = {
   onboardingComplete: true,
   canConfigure: true,
+  prFeedbackHandlersReady: true,
   takenPRFeedbackSources: [] as const,
 };
 
@@ -30,6 +31,10 @@ describe("workspaceNextSteps", () => {
   it("hides the list before onboarding is complete or when the user cannot configure", () => {
     expect(workspaceNextSteps({ ...ready, onboardingComplete: false })).toEqual([]);
     expect(workspaceNextSteps({ ...ready, canConfigure: false })).toEqual([]);
+  });
+
+  it("hides the list while PR feedback handlers are still loading", () => {
+    expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: false })).toEqual([]);
   });
 });
 
