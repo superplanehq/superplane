@@ -261,28 +261,6 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
-  it("shows an attached pull request on the task card", () => {
-    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
-    useFactoryPullRequests.mockReturnValue({
-      data: [
-        {
-          id: "pr-106",
-          workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-          number: "106",
-          url: "https://github.com/acme/payments/pull/106",
-          title: "Fix refund dispatcher timeout loop",
-          state: "STATE_CLOSED",
-        },
-      ],
-    });
-    renderLinesBoard();
-
-    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
-    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
-    expect(pill).toHaveTextContent("Closed #106");
-    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
-  });
-
   it("loads checks only for draft cards that can show a score", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
@@ -861,6 +839,34 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
+  });
+});
+
+describe("LinesPage board pull request", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("shows an attached pull request on the task card", () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
+    useFactoryPullRequests.mockReturnValue({
+      data: [
+        {
+          id: "pr-106",
+          workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
+          number: "106",
+          url: "https://github.com/acme/payments/pull/106",
+          title: "Fix refund dispatcher timeout loop",
+          state: "STATE_CLOSED",
+        },
+      ],
+    });
+    renderLinesBoard();
+
+    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
+    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
+    expect(pill).toHaveTextContent("Closed #106");
+    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
   });
 });
 

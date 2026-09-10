@@ -162,8 +162,10 @@ function backlogReviewOrder(orderId: string): FactoriesWorkOrder {
   return order;
 }
 
-const BACKLOG_WEBHOOK_ORDER = backlogReviewOrder("wo-review-pay-842");
-const BACKLOG_FACTORY_500_ORDER = backlogReviewOrder("wo-review-pay-844");
+const BACKLOG_WEBHOOK_ORDER_ID = "wo-review-pay-842";
+const BACKLOG_FACTORY_500_ORDER_ID = "wo-review-pay-844";
+const BACKLOG_WEBHOOK_ORDER = backlogReviewOrder(BACKLOG_WEBHOOK_ORDER_ID);
+const BACKLOG_FACTORY_500_ORDER = backlogReviewOrder(BACKLOG_FACTORY_500_ORDER_ID);
 
 function lineBoardPullRequest(
   order: FactoriesWorkOrder,
@@ -218,8 +220,8 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
     ],
   },
   pullRequestsByOrderId: {
-    [BACKLOG_WEBHOOK_ORDER.id]: [lineBoardPullRequest(BACKLOG_WEBHOOK_ORDER, "842", "STATE_DRAFT")],
-    [BACKLOG_FACTORY_500_ORDER.id]: [lineBoardPullRequest(BACKLOG_FACTORY_500_ORDER, "844", "STATE_DRAFT")],
+    [BACKLOG_WEBHOOK_ORDER_ID]: [lineBoardPullRequest(BACKLOG_WEBHOOK_ORDER, "842", "STATE_DRAFT")],
+    [BACKLOG_FACTORY_500_ORDER_ID]: [lineBoardPullRequest(BACKLOG_FACTORY_500_ORDER, "844", "STATE_DRAFT")],
     [APPROVAL_WORK_ORDER.id!]: [lineBoardPullRequest(APPROVAL_WORK_ORDER, "109", "STATE_OPEN")],
     [BOARD_IMPLEMENT_NOTIFY_ORDER.id!]: [lineBoardPullRequest(BOARD_IMPLEMENT_NOTIFY_ORDER, "114", "STATE_DRAFT")],
     [LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id!]: [

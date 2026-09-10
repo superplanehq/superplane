@@ -2,7 +2,7 @@ import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-cl
 import { formatRelative } from "@/lib/datetime";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
-import { selectWorkOrderCardPullRequest } from "../lib/workOrderCardPullRequest";
+import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
@@ -18,7 +18,6 @@ const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [];
-const HIDDEN_ATTENTION_WHEN_PULL_REQUEST = new Set<WorkOrderAttentionReason>(["approval", "stalled"]);
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
@@ -100,14 +99,14 @@ export function WorkOrderCard({
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const showStart = entry.displayStatus === "draft";
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
-  const attentionReasons = visibleAttentionReasons(
+  const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
       addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
       waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
       checksPassed: checksPassedOrderIds.has(entry.id),
       fixesPaused: fixesPausedOrderIds.has(entry.id),
     }),
-    Boolean(cardPullRequest),
+    cardPullRequest,
   );
 
   return (
@@ -196,16 +195,6 @@ function WorkOrderCardStatusRow({
       )}
     </div>
   );
-}
-
-function visibleAttentionReasons(
-  reasons: WorkOrderAttentionReason[],
-  hasPullRequest: boolean,
-): WorkOrderAttentionReason[] {
-  if (!hasPullRequest) {
-    return reasons;
-  }
-  return reasons.filter((reason) => !HIDDEN_ATTENTION_WHEN_PULL_REQUEST.has(reason));
 }
 
 function WorkOrderCardMetaRow({

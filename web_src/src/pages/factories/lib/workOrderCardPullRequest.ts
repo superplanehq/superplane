@@ -1,5 +1,6 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 
+import type { WorkOrderAttentionReason } from "./workOrderAttention";
 import { pullRequestLabel, pullRequestState, type FactoryPullRequestState } from "./workOrderPullRequest";
 
 const STATE_RANK: Record<FactoryPullRequestState, number> = {
@@ -43,6 +44,21 @@ export function workOrderCardPullRequestVisibleLabel(pullRequest: FactoriesFacto
   const number = pullRequestLabel(pullRequest);
   const extra = extraCount > 0 ? ` +${extraCount}` : "";
   return `${verb} ${number}${extra}`;
+}
+
+/**
+ * An open Review pill already asks for review. Keep other attention,
+ * including Needs attention and notes next to a closed or merged
+ * request.
+ */
+export function visibleWorkOrderCardAttentionReasons(
+  reasons: WorkOrderAttentionReason[],
+  cardPullRequest: WorkOrderCardPullRequest | null,
+): WorkOrderAttentionReason[] {
+  if (!cardPullRequest || pullRequestState(cardPullRequest.pullRequest.state) !== "open") {
+    return reasons;
+  }
+  return reasons.filter((reason) => reason !== "approval");
 }
 
 export function workOrderCardPullRequestAriaLabel(pullRequest: FactoriesFactoryPullRequest, extraCount = 0): string {

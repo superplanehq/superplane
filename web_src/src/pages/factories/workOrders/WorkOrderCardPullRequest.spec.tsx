@@ -70,6 +70,26 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 
+  it("keeps Waiting for user review when the pull request is closed", () => {
+    renderCard({
+      pullRequests: [{ ...openPullRequest, id: "pr-closed", state: "STATE_CLOSED" }],
+    });
+
+    expect(screen.getByRole("link", { name: "Closed pull request #2323." })).toBeInTheDocument();
+    expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
+  });
+
+  it("keeps Needs attention when a pull request is attached", () => {
+    const stalledOrder = { ...waitingOrder, id: "wo-stalled", statusNotes: [] };
+    renderCard({
+      entry: buildWorkOrderListEntry(stalledOrder, factory),
+      pullRequests: [{ ...openPullRequest, workOrderId: "wo-stalled" }],
+    });
+
+    expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
+    expect(screen.getByText("Needs attention")).toBeInTheDocument();
+  });
+
   it("keeps the checks-passed mark next to the pull request pill", () => {
     renderCard({
       pullRequests: [openPullRequest],

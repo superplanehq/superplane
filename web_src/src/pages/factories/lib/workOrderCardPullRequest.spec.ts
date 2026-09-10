@@ -4,6 +4,7 @@ import type { FactoriesFactoryPullRequest } from "@/api-client";
 
 import {
   selectWorkOrderCardPullRequest,
+  visibleWorkOrderCardAttentionReasons,
   workOrderCardPullRequestAriaLabel,
   workOrderCardPullRequestVisibleLabel,
 } from "./workOrderCardPullRequest";
@@ -67,6 +68,29 @@ describe("workOrderCardPullRequestVisibleLabel", () => {
 
   it("appends a count when more pull requests are attached", () => {
     expect(workOrderCardPullRequestVisibleLabel(pr(), 1)).toBe("Review #2323 +1");
+  });
+});
+
+describe("visibleWorkOrderCardAttentionReasons", () => {
+  it("hides Waiting for user review when the shown pull request is open", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "checksPassed"], { pullRequest: pr(), extraCount: 0 }),
+    ).toEqual(["checksPassed"]);
+  });
+
+  it("keeps Needs attention and review when the pull request is not open", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "stalled"], {
+        pullRequest: pr({ state: "STATE_CLOSED" }),
+        extraCount: 0,
+      }),
+    ).toEqual(["approval", "stalled"]);
+  });
+
+  it("keeps Needs attention next to an open pull request", () => {
+    expect(visibleWorkOrderCardAttentionReasons(["stalled"], { pullRequest: pr(), extraCount: 0 })).toEqual([
+      "stalled",
+    ]);
   });
 });
 
