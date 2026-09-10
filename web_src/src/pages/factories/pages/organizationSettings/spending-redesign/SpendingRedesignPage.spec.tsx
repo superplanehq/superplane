@@ -55,6 +55,9 @@ describe("SpendingRedesignPage", () => {
     expect(
       screen.getByText("Review factory token usage, VM time, and estimated spend for this organization."),
     ).toBeInTheDocument();
+    // Spending is a settings sibling of Usage, so its column matches the
+    // wide settings max-width, not the Velocity report column.
+    expect(screen.getByTestId("workspace-page-header").className).toContain("max-w-6xl");
     expect(screen.getByRole("heading", { name: "Model usage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "VM usage" })).toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("SuperPlane-hosted spend");
