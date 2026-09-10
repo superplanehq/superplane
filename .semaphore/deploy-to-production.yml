@@ -6,15 +6,14 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2204
 
-# Secret `launchpad` must define SEMAPHORE_API_TOKEN (org API token).
+# Secret `launchpad` must define:
+#   SEMAPHORE_API_TOKEN — org API token
+#   LAUNCHPAD_TASK_ID   — launchpad task "Deploy SuperPlane image"
 blocks:
   - name: Trigger launchpad deploy
     task:
       secrets:
         - name: launchpad
-      env_vars:
-        - name: LAUNCHPAD_TASK_ID
-          value: 5e7e092b-c533-4dee-9802-a3c877647de4
       jobs:
         - name: Trigger Deploy SuperPlane image
           commands:
@@ -23,6 +22,11 @@ blocks:
 
               if [ -z "${SEMAPHORE_API_TOKEN:-}" ]; then
                 echo "SEMAPHORE_API_TOKEN is required" >&2
+                exit 1
+              fi
+
+              if [ -z "${LAUNCHPAD_TASK_ID:-}" ]; then
+                echo "LAUNCHPAD_TASK_ID is required" >&2
                 exit 1
               fi
 
