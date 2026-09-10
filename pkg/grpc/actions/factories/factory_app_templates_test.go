@@ -48,6 +48,9 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
+	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
+	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
+	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -96,27 +99,13 @@ func TestMaterializeFactoryTemplates(t *testing.T) {
 	}
 }
 
-func TestMaterializePlanningTemplateUsesPlanningModel(t *testing.T) {
-	result, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
+func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
+	_, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Plan",
-		installParams: map[string]string{
-			"appRepository": "acme/app",
-		},
-		agent: &factoryTemplateAgent{
-			component:        "runnerClaudeCode",
-			model:            "claude-sonnet-4-6",
-			planningModel:    "claude-opus-4-6",
-			credentialSource: "hosted",
-		},
 	})
-	require.NoError(t, err)
-	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-	require.NoError(t, err)
-	agent := findYAMLNode(t, canvas, "planner-agent-no-issue")
-	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
-	assert.Nil(t, agent.Configuration["model"])
-	assert.Nil(t, agent.Configuration["credentials"])
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown factory app template")
 }
 
 func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {

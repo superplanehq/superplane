@@ -53,7 +53,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner/split-run?from=lines&lineId=${line.id}&orderNumber=103&canvas=planning`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-implementer/split-run?from=lines&lineId=${line.id}&orderNumber=103&canvas=implementation`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );

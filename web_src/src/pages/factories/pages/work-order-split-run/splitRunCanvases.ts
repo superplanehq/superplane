@@ -14,7 +14,6 @@ import {
 } from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
 import issueIntakeYaml from "@factory-templates/issue-intake.canvas.yaml?raw";
-import planningYaml from "@factory-templates/line-planning.canvas.yaml?raw";
 import implementationYaml from "@factory-templates/line-implementation.canvas.yaml?raw";
 import prClosureYaml from "@factory-templates/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -26,18 +25,16 @@ import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
 import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
 import implementationClaudeLog from "./implementation-claude-log.txt?raw";
-import planningClaudeLog from "./planning-claude-log.txt?raw";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
-export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
+export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "implementation" | "risk" | "closure";
 
-const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "planning", "implementation", "risk", "closure"];
+const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
   { needles: ["sentry"], key: "sentry" },
   { needles: ["slack"], key: "slack" },
   { needles: ["ingest", "intake", "backlog"], key: "intake" },
-  { needles: ["plan"], key: "planning" },
   { needles: ["implement"], key: "implementation" },
   { needles: ["verify", "verifier", "risk", "ci"], key: "risk" },
   { needles: ["closure", "done"], key: "closure" },
@@ -66,7 +63,6 @@ const LINE_AUTOMATION_LABEL: Record<SplitRunCanvasKey, { name: string; component
   intake: { name: "Backlog", componentName: "Ingest" },
   sentry: { name: "Backlog", componentName: "Sentry" },
   slack: { name: "Backlog", componentName: "Slack" },
-  planning: { name: "Plan", componentName: "Planning" },
   implementation: { name: "Implement", componentName: "Implementation" },
   risk: { name: "Verify", componentName: "Risk Assessment" },
   closure: { name: "Done", componentName: "PR Closure" },
@@ -98,7 +94,6 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
   intake: issueIntakeYaml,
   sentry: sentryIntakeYaml,
   slack: slackIntakeYaml,
-  planning: planningYaml,
   implementation: implementationYaml,
   risk: riskAssessmentYaml,
   closure: prClosureYaml,
@@ -558,7 +553,6 @@ export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; typ
 }
 
 const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
-  planning: planningClaudeLog,
   implementation: implementationClaudeLog,
 };
 
@@ -576,9 +570,6 @@ function claudeCodeChildren(
 }
 
 function agentNotes(nodeId: string): string[] {
-  if (nodeId.startsWith("planner-agent")) {
-    return ["Clone Repo", "Write Implementation Plan", "Use plan as output"];
-  }
   if (nodeId.startsWith("implementation-agent")) {
     return ["Reading plan.md.", "Opening the refund reconciliation worker.", "Adding the timeout-then-retry test."];
   }
