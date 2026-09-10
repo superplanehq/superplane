@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -312,10 +312,25 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
-# Local only. Puts every org on a 14-day trial and clears Polar ids in
-# superplane_dev. Cancel the Polar sandbox subscription separately.
+# Local only. Puts every org on a 14-day trial, clears Polar ids, and
+# deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
+# subscription separately.
 db.reset.billing.trial:
 	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+
+# Local only. Inserts fake hosted model + runner VM usage into superplane_dev.
+# MONEY is the total dollar amount. It is spread across TASKS (default 20)
+# over DAYS (default 30). Requires an organization and a factory.
+# Example: make simulate.usage MONEY=20 TASKS=30 DAYS=30
+# Optional: ORGANIZATION_ID=<uuid> FACTORY_ID=<uuid>
+simulate.usage simulate-usage:
+	@$(COMPOSE) exec \
+		-e MONEY="$(MONEY)" \
+		-e TASKS="$(TASKS)" \
+		-e DAYS="$(DAYS)" \
+		-e ORGANIZATION_ID="$(ORGANIZATION_ID)" \
+		-e FACTORY_ID="$(FACTORY_ID)" \
+		app ./scripts/db_simulate_usage.sh superplane_dev
 
 db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)

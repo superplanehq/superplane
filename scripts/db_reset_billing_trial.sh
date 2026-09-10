@@ -4,6 +4,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Local-only. Resets SuperPlane billing rows so Subscribe can run again.
+# Also deletes local spend ledger rows and cached execution usage.
 # This does not change Polar sandbox customers or subscriptions.
 
 DB_NAME="${1:-superplane_dev}"
@@ -42,10 +43,37 @@ UPDATE organization_llm_credit_grants
 SET expires_at = NOW() + INTERVAL '14 days'
 WHERE kind = 'welcome';
 
+DELETE FROM workspace_usage_events;
+
+UPDATE factory_work_order_executions
+SET
+  total_tokens = 0,
+  cost_cents = 0,
+  duration_seconds = 0,
+  updated_at = NOW()
+WHERE total_tokens <> 0
+   OR cost_cents <> 0
+   OR duration_seconds <> 0;
+
+UPDATE agent_sessions
+SET
+  tracked_usage_input_tokens = 0,
+  tracked_usage_output_tokens = 0,
+  tracked_usage_cache_read_tokens = 0,
+  tracked_usage_cache_write_tokens = 0,
+  tracked_usage_total_tokens = 0,
+  tracked_usage_initialized = TRUE,
+  updated_at = NOW()
+WHERE tracked_usage_input_tokens <> 0
+   OR tracked_usage_output_tokens <> 0
+   OR tracked_usage_cache_read_tokens <> 0
+   OR tracked_usage_cache_write_tokens <> 0
+   OR tracked_usage_total_tokens <> 0
+   OR tracked_usage_initialized IS DISTINCT FROM TRUE;
+
 COMMIT;
 
 SELECT
-  COUNT(*) AS organizations_on_trial
-FROM organization_billing_plans
-WHERE plan = 'trial' AND plan_source = 'system';
+  (SELECT COUNT(*) FROM organization_billing_plans WHERE plan = 'trial' AND plan_source = 'system') AS organizations_on_trial,
+  (SELECT COUNT(*) FROM workspace_usage_events) AS usage_events;
 SQL
