@@ -60,11 +60,15 @@ func TestOrderDispatchCommand_Success(t *testing.T) {
 	factory := testOrderDispatchFactoryID
 	orderID := testOrderDispatchOrderID
 	line := "build"
-	err := (&orderDispatchCommand{factory: &factory, orderID: &orderID, line: &line}).Execute(ctx)
+	idempotencyKey := "dispatch-request-1"
+	err := (&orderDispatchCommand{
+		factory: &factory, orderID: &orderID, line: &line, idempotencyKey: &idempotencyKey,
+	}).Execute(ctx)
 	require.NoError(t, err)
 
 	require.NotNil(t, body)
 	assert.Equal(t, "build", body["lineName"])
+	assert.Equal(t, "dispatch-request-1", body["idempotencyKey"])
 
 	out := stdout.String()
 	assert.Contains(t, out, "Work order dispatched: order-1")

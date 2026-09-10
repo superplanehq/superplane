@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,9 +15,271 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func Test__DispatchWorkOrder__RetryReturnsExistingDispatch(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	key := "dispatch-retry"
+	request := &pb.DispatchWorkOrderRequest{
+		FactoryId:      factoryModel.ID.String(),
+		OrderId:        order.ID.String(),
+		LineName:       line.Name,
+		IdempotencyKey: &key,
+	}
+	first, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	second, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+
+	require.Len(t, first.Order.LineDispatches, 1)
+	require.Len(t, second.Order.LineDispatches, 1)
+	assert.Equal(t, first.Order.LineDispatches[0].Id, second.Order.LineDispatches[0].Id)
+
+	var dispatches, executions, events int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", order.ID).Count(&dispatches).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", order.ID).Count(&executions).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderEvent{}).
+		Where("work_order_id = ? AND type = ?", order.ID, factoryevents.EventTypeLineStepExecutionCreated).
+		Count(&events).Error)
+	assert.Equal(t, int64(1), dispatches)
+	assert.Equal(t, int64(1), executions)
+	assert.Equal(t, int64(1), events)
+}
+
+func Test__DispatchWorkOrder__ConcurrentRetriesCreateOneDispatch(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	key := "concurrent-dispatch"
+	request := &pb.DispatchWorkOrderRequest{
+		FactoryId:      factoryModel.ID.String(),
+		OrderId:        order.ID.String(),
+		LineName:       line.Name,
+		IdempotencyKey: &key,
+	}
+
+	type result struct {
+		response *pb.DispatchWorkOrderResponse
+		err      error
+	}
+	start := make(chan struct{})
+	results := make(chan result, 2)
+	var workers sync.WaitGroup
+	workers.Add(2)
+	for range 2 {
+		go func() {
+			defer workers.Done()
+			<-start
+			response, dispatchErr := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+			results <- result{response: response, err: dispatchErr}
+		}()
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+
+	var dispatchID string
+	for result := range results {
+		require.NoError(t, result.err)
+		require.Len(t, result.response.Order.LineDispatches, 1)
+		if dispatchID == "" {
+			dispatchID = result.response.Order.LineDispatches[0].Id
+		}
+		assert.Equal(t, dispatchID, result.response.Order.LineDispatches[0].Id)
+	}
+
+	var dispatches, executions int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", order.ID).Count(&dispatches).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", order.ID).Count(&executions).Error)
+	assert.Equal(t, int64(1), dispatches)
+	assert.Equal(t, int64(1), executions)
+}
+
+func Test__DispatchWorkOrder__ConcurrentDifferentKeysCreateOneDispatch(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	start := make(chan struct{})
+	errors := make(chan error, 2)
+	var workers sync.WaitGroup
+	workers.Add(2)
+	for _, key := range []string{"concurrent-dispatch-1", "concurrent-dispatch-2"} {
+		go func() {
+			defer workers.Done()
+			<-start
+			_, dispatchErr := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name, IdempotencyKey: &key,
+			})
+			errors <- dispatchErr
+		}()
+	}
+	close(start)
+	workers.Wait()
+	close(errors)
+
+	var successes, conflicts int
+	for dispatchErr := range errors {
+		if dispatchErr == nil {
+			successes++
+			continue
+		}
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(dispatchErr))
+		conflicts++
+	}
+	assert.Equal(t, 1, successes)
+	assert.Equal(t, 1, conflicts)
+
+	var requests, dispatches, executions int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderDispatchRequest{}).Where("work_order_id = ?", order.ID).Count(&requests).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", order.ID).Count(&dispatches).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", order.ID).Count(&executions).Error)
+	assert.Equal(t, int64(1), requests)
+	assert.Equal(t, int64(1), dispatches)
+	assert.Equal(t, int64(1), executions)
+}
+
+func Test__DispatchWorkOrder__RejectsKeyReuseWithDifferentParameters(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	key := "conflicting-dispatch"
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name, IdempotencyKey: &key,
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: "other-line", IdempotencyKey: &key,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
+
+func Test__DispatchWorkOrder__FailedAttemptDoesNotConsumeKey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	key := "recoverable-dispatch"
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: "ship", IdempotencyKey: &key,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+
+	var requests int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderDispatchRequest{}).Where("work_order_id = ?", order.ID).Count(&requests).Error)
+	assert.Zero(t, requests)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name, IdempotencyKey: &key,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func Test__DispatchWorkOrder__LateFailureDoesNotConsumeKey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	first, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, first.Order.LineDispatches, 1)
+
+	key := "retry-after-active-conflict"
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name, IdempotencyKey: &key,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	var requests int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderDispatchRequest{}).Where("work_order_id = ?", order.ID).Count(&requests).Error)
+	assert.Zero(t, requests)
+
+	active, err := models.FindWorkOrderLineDispatch(db, uuid.MustParse(first.Order.LineDispatches[0].Id))
+	require.NoError(t, err)
+	require.NoError(t, active.Finish(db, models.CanvasRunResultFailed))
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(), LineName: line.Name, IdempotencyKey: &key,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 2)
+}
 
 // Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot covers acceptance
 // criterion 1: dispatching a work order creates one line dispatch with the

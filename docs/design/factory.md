@@ -385,9 +385,19 @@ already has an active execution:
 - `--order` — work order UUID (`--order-id` is accepted as a deprecated
   alias).
 - `--line` — target factory line's name (required).
+- `--idempotency-key` — key for safe retries of one dispatch request.
+
+Idempotency keys are optional and are scoped to one work order. A retry with
+the same key and parameters returns the current work order. The retry does not
+create executions or timeline events. Reuse with different parameters returns
+a conflict. A failed request does not consume its key. The caller can retry
+after it fixes the failure.
 
 ```bash
-superplane factory orders dispatch --order "$OID" --line build
+superplane factory orders dispatch \
+  --order "$OID" \
+  --line build \
+  --idempotency-key "$REQUEST_ID"
 ```
 
 `orders assign` **sets** a work order's assignee list — it replaces the

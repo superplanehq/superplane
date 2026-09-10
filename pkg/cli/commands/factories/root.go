@@ -252,9 +252,10 @@ Examples:
 	}, options)
 
 	var (
-		orderDispatchFactory string
-		orderDispatchOrderID string
-		orderDispatchLine    string
+		orderDispatchFactory        string
+		orderDispatchOrderID        string
+		orderDispatchLine           string
+		orderDispatchIdempotencyKey string
 	)
 
 	orderDispatchCmd := &cobra.Command{
@@ -265,7 +266,7 @@ Examples:
 --factory is a factory name or UUID. When omitted, the active factory
 from "superplane factory active" is used. --order is the work order UUID
 (--order-id is accepted as an alias). --line is the target factory line's
-name.
+name. Use --idempotency-key to safely retry the same dispatch request.
 
 A draft work order moves to the open state on its first dispatch.
 
@@ -276,10 +277,12 @@ Example:
 	orderDispatchCmd.Flags().StringVar(&orderDispatchFactory, "factory", "", "factory name or UUID (default: active factory)")
 	bindOrderIDFlag(orderDispatchCmd, &orderDispatchOrderID)
 	orderDispatchCmd.Flags().StringVar(&orderDispatchLine, "line", "", "factory line name (required)")
+	orderDispatchCmd.Flags().StringVar(&orderDispatchIdempotencyKey, "idempotency-key", "", "key for safe request retries")
 	core.Bind(orderDispatchCmd, &orderDispatchCommand{
-		factory: &orderDispatchFactory,
-		orderID: &orderDispatchOrderID,
-		line:    &orderDispatchLine,
+		factory:        &orderDispatchFactory,
+		orderID:        &orderDispatchOrderID,
+		line:           &orderDispatchLine,
+		idempotencyKey: &orderDispatchIdempotencyKey,
 	}, options)
 
 	var (

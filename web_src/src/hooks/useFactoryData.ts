@@ -447,6 +447,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       startStepIndex?: number;
       replaceActive?: boolean;
       model?: string;
+      idempotencyKey?: string;
     }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
@@ -457,6 +458,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
             startStepIndex: input.startStepIndex,
             replaceActive: input.replaceActive,
             model: input.model,
+            idempotencyKey: input.idempotencyKey,
           },
         }),
       );
