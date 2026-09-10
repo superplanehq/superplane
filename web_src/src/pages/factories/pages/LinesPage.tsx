@@ -551,6 +551,7 @@ export function LinesPage() {
               waitingOnChecksOrderIds,
               checksPassedOrderIds,
               fixesPausedOrderIds,
+              pullRequests,
               ...cardActions,
             }}
             peekOrder={peekOrder ?? undefined}

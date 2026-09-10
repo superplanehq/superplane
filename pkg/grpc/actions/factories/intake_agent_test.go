@@ -186,6 +186,60 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	})
 }
 
+func Test__ResolveGitHubInstallationName(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	newFactoryIn := func(t *testing.T, organizationID uuid.UUID) *models.Factory {
+		t.Helper()
+		factory, err := models.CreateFactory(db, organizationID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		return factory
+	}
+
+	t.Run("uses the workspace VCS installation when several GitHub installs are ready", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		firstID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		chosenID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &chosenID,
+		}))
+
+		assert.Equal(t, integrationName(t, organization.ID, chosenID), resolveGitHubInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, firstID), resolveGitHubInstallationName(db, factory))
+	})
+
+	t.Run("falls back to a ready GitHub install when setup has no VCS", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		githubID := createReadyOnboardingIntegration(t, organization.ID, "github")
+
+		assert.Equal(t, integrationName(t, organization.ID, githubID), resolveGitHubInstallationName(db, factory))
+	})
+
+	t.Run("does not use another GitHub install when the workspace VCS is not ready", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		vcs, err := models.CreateIntegration(
+			uuid.New(),
+			organization.ID,
+			"github",
+			support.RandomName("github"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		otherID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		vcsID := vcs.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &vcsID,
+		}))
+
+		assert.Equal(t, intakeGitHubAppName, resolveGitHubInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, otherID), resolveGitHubInstallationName(db, factory))
+	})
+}
+
 func Test__IntakeAgentModel(t *testing.T) {
 	t.Run("keeps the model the agent carries", func(t *testing.T) {
 		agent := &intakeAgent{Component: "runnerCodex", Model: "gpt-5-mini"}

@@ -4,9 +4,11 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 
 import { WorkspacePageHeader } from "../../../layout/WorkspacePageHeader";
+// Spending is a settings sibling of Usage, so it uses the wide settings
+// column, not the Velocity report column.
 import {
-  factoryCenteredSectionBodyClassName,
-  factoryCenteredSectionHeaderClassName,
+  factorySettingsWideSectionBodyClassName,
+  factorySettingsWideSectionHeaderClassName,
 } from "../../factoryPageLayoutStyles";
 import type { SpendingCreditSnapshot } from "./spendingRedesignMocks";
 import {
@@ -83,7 +85,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
   return (
     <div className="min-h-full bg-sidebar dark:bg-background" data-testid="spending-redesign-page">
       <WorkspacePageHeader
-        className={factoryCenteredSectionHeaderClassName}
+        className={factorySettingsWideSectionHeaderClassName}
         title="Spending"
         subtitle="Review factory token usage, VM time, and estimated spend for this organization."
         actions={
@@ -100,7 +102,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
           </>
         }
       />
-      <div className={cn(factoryCenteredSectionBodyClassName, "flex flex-col gap-5 pb-10")}>
+      <div className={cn(factorySettingsWideSectionBodyClassName, "flex flex-col gap-5")}>
         <SpendingKpiRow credit={credit} metrics={metrics} rangeCaption={formatSpendingRangeCaption(view.range)} />
         <SpendingUsageSection
           breakdown={view.modelBreakdown}

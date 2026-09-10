@@ -2,7 +2,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoryApp,
+} from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
@@ -58,6 +64,7 @@ const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
@@ -106,7 +113,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => ({ data: [] }),
+  useFactoryPullRequests: () => useFactoryPullRequests(),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -203,6 +210,7 @@ async function resetLinesBoardMocks() {
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryApps.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
@@ -833,6 +841,34 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
+  });
+});
+
+describe("LinesPage board pull request", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("shows an attached pull request on the task card", () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
+    useFactoryPullRequests.mockReturnValue({
+      data: [
+        {
+          id: "pr-106",
+          workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
+          number: "106",
+          url: "https://github.com/acme/payments/pull/106",
+          title: "Fix refund dispatcher timeout loop",
+          state: "STATE_CLOSED",
+        },
+      ],
+    });
+    renderLinesBoard();
+
+    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
+    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
+    expect(pill).toHaveTextContent("Closed #106");
+    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
   });
 });
 

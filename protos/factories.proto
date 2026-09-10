@@ -562,6 +562,17 @@ service Factories {
     };
   }
 
+  rpc ExportFactoryWorkOrderRunUsage(ExportFactoryWorkOrderRunUsageRequest) returns (ExportFactoryWorkOrderRunUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage-history.csv"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Export factory work-order run usage";
+      description: "Returns the full task-run spend ledger for a workspace as CSV, with no date window";
+      tags: "Factory";
+    };
+  }
+
   rpc ListFactoryLLMModels(ListFactoryLLMModelsRequest) returns (ListFactoryLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/llm-models"
@@ -2070,6 +2081,15 @@ message WorkOrderRunUsageRow {
 message ListFactoryWorkOrderRunUsageResponse {
   repeated WorkOrderRunUsageRow rows = 1;
   uint32 total_count = 2;
+}
+
+message ExportFactoryWorkOrderRunUsageRequest {
+  string factory_id = 1;
+}
+
+message ExportFactoryWorkOrderRunUsageResponse {
+  string csv = 1;
+  string filename = 2;
 }
 
 message ListFactoryLineRunnerModelsRequest {

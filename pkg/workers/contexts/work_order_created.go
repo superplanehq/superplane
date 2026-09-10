@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -115,6 +116,11 @@ func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[st
 		"state":       order.State,
 		"files":       filePayloads,
 	}
+	if repository, repositoryURL, defaultBranch := workOrderCreatedRepository(tx, order); repository != "" {
+		workOrder["repository"] = repository
+		workOrder["repository_url"] = repositoryURL
+		workOrder["default_branch"] = defaultBranch
+	}
 	if order.OriginURL != nil && *order.OriginURL != "" {
 		origin := map[string]any{"url": *order.OriginURL}
 		if order.OriginLabel != nil && *order.OriginLabel != "" {
@@ -124,6 +130,30 @@ func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[st
 	}
 
 	return map[string]any{"workOrder": workOrder}
+}
+
+func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
+	repository := strings.TrimSpace(stringValue(order.Repository))
+	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
+	if repository == "" || defaultBranch == "" {
+		factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+		if err == nil {
+			config := factoryModel.OnboardingConfigValue()
+			if repository == "" {
+				repository = strings.TrimSpace(config.AppRepository)
+			}
+			if defaultBranch == "" {
+				defaultBranch = strings.TrimSpace(config.DefaultBranch)
+			}
+		}
+	}
+	if repository == "" {
+		return "", "", ""
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	return repository, githubRepositoryURL(repository), defaultBranch
 }
 
 func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {
