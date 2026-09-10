@@ -1,4 +1,4 @@
-import type { FactoriesFactoryIntakeRun } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryIntakeRun, FactoryIntakeInitialImportStatus } from "@/api-client";
 
 export type FirstRunAnalysisProgress = {
   total: number;
@@ -10,10 +10,44 @@ export type FirstRunAnalysisProgress = {
   empty?: boolean;
 };
 
+export type FirstRunInitialImport = {
+  status?: FactoryIntakeInitialImportStatus;
+  itemCount?: number;
+};
+
 // Intake decisions that only exist after a score: the item was gated out,
 // or its work order already started on a line.
 const TERMINAL = ["PLACEMENT_BELOW_THRESHOLD", "PLACEMENT_REJECTED", "PLACEMENT_PROGRESSED"];
 const READY = ["PLACEMENT_BACKLOG", "PLACEMENT_PROGRESSED"];
+
+export function githubIssuesIntake(intakes: FactoriesFactoryIntake[] | undefined): FactoriesFactoryIntake | undefined {
+  return intakes?.find((intake) => intake.source === "SOURCE_GITHUB_ISSUES");
+}
+
+function completedImportItemCount(initialImport: FirstRunInitialImport): number | undefined {
+  if (initialImport.status !== "INITIAL_IMPORT_STATUS_COMPLETED") return undefined;
+  return initialImport.itemCount;
+}
+
+function legacyImportIsEmpty(initialImport: FirstRunInitialImport, importSettled: boolean): boolean {
+  const legacyStatus = !initialImport.status || initialImport.status === "INITIAL_IMPORT_STATUS_UNSPECIFIED";
+  return legacyStatus && importSettled;
+}
+
+function initialProgress(
+  runsLoaded: boolean,
+  importedItemCount: number | undefined,
+  legacyEmpty: boolean,
+): FirstRunAnalysisProgress {
+  const empty = runsLoaded && (importedItemCount === 0 || (importedItemCount === undefined && legacyEmpty));
+  return {
+    total: importedItemCount ?? 0,
+    scored: 0,
+    ready: 0,
+    stageIndex: importedItemCount !== undefined && importedItemCount > 0 ? 1 : 0,
+    empty,
+  };
+}
 
 /**
  * An intake without an analysis node places items on the backlog the moment
@@ -34,15 +68,17 @@ export function firstRunAnalysisProgress(
   runs: FactoriesFactoryIntakeRun[] | undefined,
   scoredOrderIds: ReadonlySet<string> = new Set(),
   importSettled = false,
+  initialImport: FirstRunInitialImport = {},
 ): FirstRunAnalysisProgress {
-  // A loaded but empty run list only means "no tickets" once the import had
-  // time to seed (`importSettled`); before that it means "still importing".
+  const importedItemCount = completedImportItemCount(initialImport);
+
   if (!runs || runs.length === 0) {
-    return { total: 0, scored: 0, ready: 0, stageIndex: 0, empty: Boolean(runs) && importSettled };
+    return initialProgress(Boolean(runs), importedItemCount, legacyImportIsEmpty(initialImport, importSettled));
   }
   const scored = runs.filter((run) => isScored(run, scoredOrderIds)).length;
   // Ready means scored and on the board, whichever path produced the score:
   // an intake confidence percentage or a finished Backlog analysis run.
   const ready = runs.filter((run) => READY.includes(String(run.placement)) && isScored(run, scoredOrderIds)).length;
-  return { total: runs.length, scored, ready, stageIndex: scored === runs.length ? 2 : 1 };
+  const total = Math.max(runs.length, importedItemCount ?? 0);
+  return { total, scored, ready, stageIndex: scored === total ? 2 : 1 };
 }

@@ -60,6 +60,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.True(t, intake.GetSettings().GetReopenedIssues())
 		assert.True(t, intake.GetSettings().GetSuperplaneLabelAdded())
 		assert.False(t, intake.GetSettings().GetAuthorsWithAccess())
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
 
 		// The graph has to be live, not staged: a staged graph never receives
 		// events.
@@ -583,6 +585,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, response.GetRuns())
 	})
+}
+
+func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
+	itemCount := 0
+	intake := &models.FactoryIntake{
+		ID:                     uuid.New(),
+		FactoryID:              uuid.New(),
+		CanvasID:               uuid.New(),
+		Source:                 models.FactoryIntakeSourceGitHubIssues,
+		InitialImportStatus:    models.FactoryIntakeInitialImportStatusCompleted,
+		InitialImportItemCount: &itemCount,
+	}
+
+	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+
+	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
+	require.NotNil(t, serialized.InitialImportItemCount)
+	assert.Zero(t, serialized.GetInitialImportItemCount())
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {

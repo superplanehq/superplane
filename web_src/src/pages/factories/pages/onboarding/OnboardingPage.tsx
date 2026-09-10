@@ -1,7 +1,7 @@
 import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { Loader2 } from "lucide-react";
 
-import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { FirstRunShell } from "./first-run/FirstRunShell";
 import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
@@ -12,6 +12,10 @@ import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolu
 
 export function OnboardingPage() {
   const layout = useFactoriesLayout();
+  return <WorkspaceOnboardingPage key={layout.factoryId} layout={layout} />;
+}
+
+function WorkspaceOnboardingPage({ layout }: { layout: FactoriesLayoutContextValue }) {
   const onboardingEntryPath = useOnboardingEntryPath();
   const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
