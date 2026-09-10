@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
@@ -149,10 +150,27 @@ export function WorkOrderDescriptionEditor({
     if (!editor) {
       return;
     }
+    const urls = fileUrls ?? {};
     editor.storage.image = {
       ...(editor.storage.image ?? {}),
-      downloadUrls: fileUrls ?? {},
+      downloadUrls: urls,
     };
+    const { state, view } = editor;
+    const tr = state.tr;
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === "image") {
+        const resolved = resolveWorkOrderFileSrc(node.attrs.src as string | undefined, urls);
+        if (node.attrs.resolvedSrc !== resolved) {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            resolvedSrc: resolved,
+          });
+        }
+      }
+    });
+    if (tr.docChanged) {
+      view.dispatch(tr);
+    }
   }, [editor, fileUrls]);
 
   useEffect(() => {

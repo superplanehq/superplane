@@ -330,4 +330,51 @@ describe("WorkOrderDescriptionEditor", () => {
 
     expect(input.querySelector("strong")).toHaveTextContent("Hello world");
   });
+
+  it("resolves sp-file image refs to download URLs when fileUrls are provided", async () => {
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    const img = input.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
+
+  it("keeps sp-file refs in the markdown output when fileUrls are provided", async () => {
+    const user = userEvent.setup();
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard(" ");
+
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain(`sp-file://${fileId}`);
+    expect(onChange.mock.calls.at(-1)?.[0]).not.toContain(downloadUrl);
+  });
 });
