@@ -18,6 +18,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   checkNamesHelper: "Select the status checks SuperPlane must wait for and automatically attempt to fix.",
   checkNamesNone: "Select at least one status check.",
   checkNamesCatalogEmpty: "No status checks found.",
+  wizardChecksEmpty: "This repository does not have status checks yet. That is OK.",
+  wizardChecksEmptyDetail: "After you add them, you can configure SuperPlane to fix them automatically.",
   checkNamesLoading: "Loading status checks",
   checkNamesLoadingDetail: "Reading recent pull requests and the required status checks for this repository...",
   checkNamesLoadingMore: "Loading other status checks...",
@@ -54,6 +56,9 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardBotsAdd: "Add",
   wizardToolsDescription:
     "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
+  wizardToolsNoAccess: "The selected status checks do not need additional access.",
+  wizardToolsGitHubActions: "These checks use GitHub Actions. SuperPlane does not need additional access.",
+  wizardToolsGitHubActionsNote: "GitHub Actions does not need additional access.",
   wizardToolsUnknown:
     "SuperPlane could not match these checks to a CI tool. The agent may not have enough context to fix them.",
   wizardToolsUnselected: "Some of the checks you selected require additional access that you are not granting.",
@@ -62,7 +67,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardFinish: "Finish",
   wizardFinishing: "Finishing...",
   wizardConnect: "Connect",
-  wizardSuggested: "Suggested from the selected checks",
+  wizardSuggestedHelper: "Based on the status checks you selected, SuperPlane needs access to these tools.",
+  wizardSuggestedHelperDetail: "Grant that access so the agent can read CI logs and fix failing checks.",
   wizardOtherTools: "Other CI tools",
   maximumAttemptsLabel: "Maximum automatic fix attempts",
   maximumAttemptsHelper:

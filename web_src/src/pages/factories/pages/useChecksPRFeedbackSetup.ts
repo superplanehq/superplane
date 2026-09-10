@@ -11,8 +11,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   catalogStatusCheckNames,
+  checksToolsAccess,
   isChecksHandlerCIIntegration,
   readyChecksHandlerIntegrationIds,
+  selectedChecksUseGitHubActions,
   suggestedIntegrationsForChecks,
 } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
@@ -58,6 +60,9 @@ export function useChecksPRFeedbackSetup(
   }, [connected, connectedLoading, seeded.connected]);
 
   const suggestedNames = useMemo(() => suggestedIntegrationsForChecks(catalog, checkNames), [catalog, checkNames]);
+  const usesGitHubActions = useMemo(() => selectedChecksUseGitHubActions(catalog, checkNames), [catalog, checkNames]);
+  const toolsAccess = checksToolsAccess(suggestedNames, usesGitHubActions);
+  const catalogEmpty = !catalogLoading && !catalogQuery.isError && catalog.length === 0;
   const available = (availableQuery.data ?? []).filter((integration) => isChecksHandlerCIIntegration(integration.name));
   const existingNames = useMemo(
     () => new Set(connected.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name))),
@@ -103,7 +108,10 @@ export function useChecksPRFeedbackSetup(
     catalog,
     catalogQuery,
     catalogLoading,
+    catalogEmpty,
     canContinue: !catalogLoading && checkNames.length > 0,
+    usesGitHubActions,
+    toolsAccess,
     runnerIntegrationIds,
     setRunnerIntegrationIds,
     suggestedNames,

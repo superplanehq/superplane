@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { PR_FEEDBACK_SOURCES } from "./prFeedbackSettingsModel";
+import { readDeferredWorkspaceNextStep, WORKSPACE_NEXT_STEP_DEFERRAL_STORAGE_KEY } from "./workspaceNextStepDeferral";
 
 const mocks = vi.hoisted(() => ({
   createHandler: vi.fn(),
@@ -81,6 +82,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     mocks.fetching = false;
     mocks.catalog.splice(0, mocks.catalog.length, ...defaultCatalog);
     mocks.connected.splice(0);
+    window.localStorage.removeItem(WORKSPACE_NEXT_STEP_DEFERRAL_STORAGE_KEY);
   });
 
   it("waits for the catalog before it offers continue", () => {
@@ -133,10 +135,17 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     await user.click(screen.getByTestId("checks-setup-continue"));
 
     expect(screen.getByRole("heading", { name: "Which tools report these checks?" })).toBeInTheDocument();
-    expect(screen.getByText("Suggested from the selected checks")).toBeInTheDocument();
+    expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Based on the status checks you selected, SuperPlane needs access to these tools."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Grant that access so the agent can read CI logs and fix failing checks."),
+    ).toBeInTheDocument();
     expect(screen.getByText("CircleCI")).toBeInTheDocument();
-    expect(screen.getByText("Semaphore")).toBeInTheDocument();
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
     expect(screen.queryByText("Slack")).not.toBeInTheDocument();
+    expect(screen.queryByText("Other CI tools")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("checks-setup-connect-circleci"));
     expect(screen.getByTestId("integration-create-dialog")).toBeInTheDocument();
   });
@@ -208,7 +217,12 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
     await user.click(screen.getByTestId("checks-setup-continue"));
     expect(screen.getByTestId("checks-setup-finish")).toHaveTextContent("Finish");
-    expect(screen.getByText(/Connect the external tools reporting the status checks/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Based on the status checks you selected, SuperPlane needs access to these tools."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Grant that access so the agent can read CI logs and fix failing checks."),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
       "Some of the checks you selected require additional access that you are not granting.",
     );
@@ -230,9 +244,104 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(onCreated).toHaveBeenCalledWith("handler-1");
   });
 
-  it("warns when no CI tool is suggested and still lets the user finish", async () => {
+  it("says no additional access is required when no CI tool is suggested", async () => {
     const user = userEvent.setup();
+    const onCreated = vi.fn();
     mocks.catalog.splice(0, mocks.catalog.length, { type: "status_check", id: "lint", name: "lint" });
+    render(
+      <ChecksPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={onCreated}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
+    await user.click(screen.getByTestId("checks-setup-continue"));
+
+    expect(screen.getByTestId("checks-setup-tools-no-access")).toHaveTextContent(
+      "The selected status checks do not need additional access.",
+    );
+    expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
+    expect(screen.queryByText("CircleCI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checks-setup-tools-unknown")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
+
+    await user.click(screen.getByTestId("checks-setup-finish"));
+    await waitFor(() => {
+      expect(mocks.createHandler).toHaveBeenCalledWith({
+        source: "SOURCE_PULL_REQUEST_CHECKS",
+        name: "Fix pull request checks",
+        settings: {
+          subject: { repository: "acme/api" },
+          checks: { names: ["lint"], maximumAttempts: 3, runnerIntegrationIds: [] },
+        },
+      });
+    });
+    expect(onCreated).toHaveBeenCalledWith("handler-1");
+  });
+
+  it("says GitHub Actions does not need additional access", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    mocks.catalog.splice(0, mocks.catalog.length, {
+      type: "status_check",
+      id: "build",
+      name: "build",
+      url: "https://github.com/acme/api/actions/runs/99",
+    });
+    render(
+      <ChecksPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={onCreated}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("build"));
+    await user.click(screen.getByTestId("checks-setup-continue"));
+
+    expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent("GitHub Actions");
+    expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent(
+      "SuperPlane does not need additional access.",
+    );
+    expect(screen.queryByText("CircleCI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checks-setup-tools-no-access")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
+
+    await user.click(screen.getByTestId("checks-setup-finish"));
+    await waitFor(() => expect(mocks.createHandler).toHaveBeenCalled());
+    expect(onCreated).toHaveBeenCalledWith("handler-1");
+  });
+
+  it("keeps suggested tools when GitHub Actions is mixed with another CI tool", async () => {
+    const user = userEvent.setup();
+    mocks.catalog.splice(
+      0,
+      mocks.catalog.length,
+      {
+        type: "status_check",
+        id: "build",
+        name: "build",
+        url: "https://github.com/acme/api/actions/runs/99",
+      },
+      {
+        type: "status_check",
+        id: "e2e",
+        name: "e2e",
+        url: "https://app.circleci.com/pipelines/github/acme/api/1",
+      },
+    );
     render(
       <ChecksPRFeedbackSetupDialog
         organizationId="org-1"
@@ -245,14 +354,49 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
+    await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("e2e"));
     await user.click(screen.getByTestId("checks-setup-continue"));
 
-    expect(screen.getByTestId("checks-setup-tools-unknown")).toHaveTextContent(
-      "The agent may not have enough context to fix them",
+    expect(screen.getByText("CircleCI")).toBeInTheDocument();
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent(
+      "GitHub Actions does not need additional access.",
     );
-    expect(screen.getByTestId("checks-setup-finish")).toBeEnabled();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("finishes without a handler and minimizes next steps when no checks exist", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onCreated = vi.fn();
+    mocks.catalog.splice(0);
+    render(
+      <ChecksPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={onClose}
+        onCreated={onCreated}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
+    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
+      "This repository does not have status checks yet. That is OK.",
+    );
+    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
+      "After you add them, you can configure SuperPlane to fix them automatically.",
+    );
+    expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("checks-setup-finish"));
+
+    expect(mocks.createHandler).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
   });
 
   it("preselects a connected integration and hides Connect", async () => {
@@ -280,7 +424,8 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     await waitFor(() => expect(row).toHaveAttribute("aria-selected", "true"));
     expect(row).toHaveTextContent("circleci-prod");
     expect(screen.queryByTestId("checks-setup-connect-circleci")).not.toBeInTheDocument();
-    expect(screen.getByTestId("checks-setup-connect-semaphore")).toHaveTextContent("Connect");
+    expect(screen.queryByTestId("checks-setup-connect-semaphore")).not.toBeInTheDocument();
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checks-setup-tools-unselected")).not.toBeInTheDocument();
 
