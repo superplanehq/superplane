@@ -171,7 +171,7 @@ type fakeGitHubStatusCheckAPI struct {
 }
 
 func (f *fakeGitHubStatusCheckAPI) FindRepository(string) (*github.Repository, error) {
-	return nil, errors.New("unused")
+	return &github.Repository{DefaultBranch: github.Ptr("main")}, nil
 }
 
 func (f *fakeGitHubStatusCheckAPI) GetBranchProtection(context.Context, string, string) (*github.Protection, error) {
@@ -239,5 +239,18 @@ func Test__RecentStatusCheckRefs(t *testing.T) {
 		assert.EqualError(t, err, "open pulls unavailable")
 		assert.Empty(t, refs)
 		assert.Equal(t, []string{"open"}, api.states)
+	})
+}
+
+func Test__ListStatusCheckResourcesFromClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the open listing error instead of a default-branch catalog", func(t *testing.T) {
+		t.Parallel()
+		api := &fakeGitHubStatusCheckAPI{openErr: errors.New("open pulls unavailable")}
+
+		resources, err := listStatusCheckResourcesFromClient(context.Background(), api, "acme/app")
+		assert.EqualError(t, err, "open pulls unavailable")
+		assert.Empty(t, resources)
 	})
 }

@@ -57,7 +57,7 @@ func listStatusCheckResourcesFromClient(ctx context.Context, client githubStatus
 
 	refs, err := recentStatusCheckRefs(ctx, client, repository, branch)
 	if err != nil {
-		refs = []string{branch}
+		return nil, err
 	}
 
 	observed, err := observedStatusChecksForRefs(ctx, client, repository, refs)
