@@ -59,6 +59,63 @@ func TestRunnerPlanningSessionDraft(t *testing.T) {
 	assert.Equal(t, "Retry refunds", reloaded.Draft().Title)
 }
 
+func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
+	r := support.Setup(t)
+	server, signer := mustRunnerLiveLogServer(t, r)
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+
+	token, err := runneraction.MintPlanningSessionToken(signer, runneraction.PlanningSessionScope{
+		OrganizationID: session.OrganizationID,
+		FactoryID:      session.FactoryID,
+		SessionID:      session.ID,
+		CanvasRunID:    *session.CanvasRunID,
+	}, time.Hour)
+	require.NoError(t, err)
+
+	spec := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
+		`{"body":"# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"}`,
+	)))
+	spec.Header.Set("Authorization", "Bearer "+token)
+	specRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(specRec, spec)
+	require.Equal(t, http.StatusOK, specRec.Code, specRec.Body.String())
+
+	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
+	)))
+	confidence.Header.Set("Authorization", "Bearer "+token)
+	confidenceRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(confidenceRec, confidence)
+	require.Equal(t, http.StatusOK, confidenceRec.Code, confidenceRec.Body.String())
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, models.PlanningSpecArtifactKey+":"+order.ID.String(), *artifacts[0].Key)
+	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, 4.0, checks[0].Score)
+}
+
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	r := support.Setup(t)
 	server, signer := mustRunnerLiveLogServer(t, r)

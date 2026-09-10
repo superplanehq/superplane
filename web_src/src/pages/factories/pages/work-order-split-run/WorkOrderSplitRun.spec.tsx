@@ -691,7 +691,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
@@ -703,7 +703,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const logNote = screen.getByTestId("split-run-attention-note");
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(logNote).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(logNote).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(logNote).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(logNote).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
@@ -715,14 +715,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
-  it("shows a spark icon and tooltip on Refine", async () => {
-    const user = userEvent.setup();
+  it("hides Refine on a backlog draft", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
-    const refine = within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" });
-    expect(refine.querySelector(".lucide-sparkles")).toBeInTheDocument();
-    await user.hover(refine);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
+    expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
   it("tells a draft is under analysis and hides Archive while it runs", () => {
@@ -747,7 +743,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 

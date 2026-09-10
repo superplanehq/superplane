@@ -41,6 +41,8 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
+import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 
 /**
  * Absolute work-order permalink, so the popup copies the right link even
@@ -307,7 +309,24 @@ export function WorkOrderSplitRunPopup({
   const [tab, setTab] = useState(initialTab);
   const [fullPage, setFullPage] = useState(false);
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
+  const analysis = useAnalysisPlanningSession({
+    organizationId,
+    factoryId,
+    workOrderId: orderId,
+    enabled: fixture.footer.kind === "draft" && Boolean(organizationId && factoryId && orderId),
+    canUpdate,
+  });
+  const draftStart = draftStartAction(
+    fixture.footer.kind,
+    onDispatch
+      ? async (model) => {
+          await analysis.endSession();
+          await onDispatch(model);
+        }
+      : undefined,
+    () => setTab("log"),
+    draftModel,
+  );
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
   const review = (
     <SplitRunReview
@@ -383,6 +402,7 @@ export function WorkOrderSplitRunPopup({
         canUpdate={canUpdate}
         footerActions={footerActions}
         resultFooter={tab === "description" ? review : undefined}
+        analysis={fixture.footer.kind === "draft" ? analysis : undefined}
       />
       {tab !== "description" ? review : null}
     </PopupShell>
@@ -435,6 +455,7 @@ function SplitRunPopupTabs({
   canUpdate,
   footerActions,
   resultFooter,
+  analysis,
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
@@ -450,6 +471,7 @@ function SplitRunPopupTabs({
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
+  analysis?: IntentAnalysisChat;
 }) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const [streamTick, setStreamTick] = useState("");
@@ -495,6 +517,7 @@ function SplitRunPopupTabs({
           files={liveWorkOrder.data?.files}
           expandFirstCheck={fixture.footer.kind === "draft"}
           resultFooter={resultFooter}
+          analysis={analysis}
         />
       </TabsContent>
       <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

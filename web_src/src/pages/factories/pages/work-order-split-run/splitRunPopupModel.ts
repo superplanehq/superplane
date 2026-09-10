@@ -4,6 +4,7 @@ import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/facto
 import {
   composeIntentDocument,
   INTENT_ARTIFACT_NAME,
+  SPEC_ARTIFACT_NAME,
   type IntentDocument,
   parseIntentDocument,
 } from "../../lib/intentDocument";
@@ -166,7 +167,7 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
 }
 
 export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
-  return firstArtifactMarkdown(artifacts, [INTENT_ARTIFACT_NAME]);
+  return firstArtifactMarkdown(artifacts, [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME]);
 }
 
 export function splitRunIntentDocument(args: {
@@ -201,7 +202,11 @@ export function splitRunLinkedArtifacts(
 ): FactoriesWorkOrderArtifact[] {
   return artifacts
     .filter((artifact) => {
-      if (DESCRIPTION_NAMES.includes(artifactName(artifact)) || artifactName(artifact) === INTENT_ARTIFACT_NAME) {
+      if (
+        DESCRIPTION_NAMES.includes(artifactName(artifact)) ||
+        artifactName(artifact) === INTENT_ARTIFACT_NAME ||
+        artifactName(artifact) === SPEC_ARTIFACT_NAME
+      ) {
         return false;
       }
       return !isOriginTicketArtifact(artifact, source);

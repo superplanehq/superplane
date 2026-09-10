@@ -738,6 +738,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"}: {
+			Resource:                     "work_orders",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
+		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",

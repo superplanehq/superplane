@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
+import { Loader2 } from "lucide-react";
 
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -11,15 +14,34 @@ import { CONFIDENCE_CHECK_NAME, CONFIDENCE_SCORE_MAX } from "../../lib/confidenc
 import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import type { CreateWithAgentView } from "../createWithAgentTypes";
+import { planningSessionPhase } from "../planningSessionActivity";
+import { PlanningSessionSurveyForm } from "../PlanningSessionSurveyForm";
+import { JumpToLatestPill } from "./JumpToLatestPill";
+import { PhaseLogCard } from "./PhaseLogCard";
 import { splitRunIntentDocument } from "./splitRunPopupModel";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { DEFAULT_INTENT_LEFT_PERCENT, useSplitRunPanePercent } from "./useSplitRunPanePercent";
+import { useFollowLogScroll } from "./useFollowLogScroll";
 
 const SESSION_TITLE_FALLBACK = "Task";
 
 /**
- * Description-tab reading pane: original request as a chat, generated
- * summary or plan, and sticky confidence plus decision notes on the plan pane.
+ * Description-tab reading pane: original request plus live analysis chat
+ * on the left, generated summary or plan and sticky confidence on the right.
  */
+export type IntentAnalysisChat = {
+  organizationId: string;
+  view: CreateWithAgentView;
+  composer: string;
+  composerError?: string;
+  canSend: boolean;
+  onComposerChange: (value: string) => void;
+  onSend: () => void;
+  onSubmitSurvey: (text: string) => void;
+};
+
 export function WorkOrderIntentDocument({
   title,
   description,
@@ -29,6 +51,7 @@ export function WorkOrderIntentDocument({
   files,
   resultAfterBody,
   resultFooter,
+  analysis,
 }: {
   title: string;
   description: string;
@@ -38,6 +61,7 @@ export function WorkOrderIntentDocument({
   files?: FilesFile[];
   resultAfterBody?: ReactNode;
   resultFooter?: ReactNode;
+  analysis?: IntentAnalysisChat;
 }) {
   const [showPlan, setShowPlan] = useState(false);
   const split = useSplitRunPanePercent({ defaultPercent: DEFAULT_INTENT_LEFT_PERCENT, minPercent: 28, maxPercent: 68 });
@@ -53,29 +77,21 @@ export function WorkOrderIntentDocument({
           style={{ ["--intent-left" as string]: `${split.percent}%` }}
           data-testid="split-run-intent-request"
         >
-          <header className="sticky top-0 z-10 shrink-0 px-5 py-3" data-testid="split-run-intent-session">
-            <h2 className="truncate text-[13px] leading-5 font-medium text-foreground">{sessionTitle}</h2>
-          </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            <div className="max-w-[92%]">
-              <div
-                className="rounded-2xl bg-muted/70 px-3.5 py-3"
-                data-testid="split-run-description"
-                aria-label="Request"
-              >
-                {description.trim() ? (
-                  <WorkOrderDescription
-                    description={description}
-                    files={files}
-                    previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
-                    fadeClassName="from-muted via-muted/80"
-                  />
-                ) : (
-                  <p className="text-[13px] text-muted-foreground">No request yet.</p>
-                )}
-              </div>
-            </div>
-          </div>
+          {analysis ? (
+            <AnalysisRequestChat
+              title={sessionTitle}
+              description={description}
+              files={files}
+              analysis={analysis}
+            />
+          ) : (
+            <>
+              <header className="sticky top-0 z-10 shrink-0 px-5 py-3" data-testid="split-run-intent-session">
+                <h2 className="truncate text-[13px] leading-5 font-medium text-foreground">{sessionTitle}</h2>
+              </header>
+              <RequestMessage description={description} files={files} />
+            </>
+          )}
         </div>
 
         <div
@@ -119,6 +135,153 @@ export function WorkOrderIntentDocument({
         </div>
       </div>
     </article>
+  );
+}
+
+function AnalysisRequestChat({
+  title,
+  description,
+  files,
+  analysis,
+}: {
+  title: string;
+  description: string;
+  files?: FilesFile[];
+  analysis: IntentAnalysisChat;
+}) {
+  const follow = useFollowLogScroll<HTMLDivElement>(
+    analysis.view.executionId || analysis.view.canvasId || "analysis",
+    analysis.view.messages.length,
+    { resumeOnBottom: true },
+  );
+  const failed = analysis.view.machineStatus === "failed";
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!analysis.canSend) {
+      return;
+    }
+    analysis.onSend();
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
+      <header className="sticky top-0 z-10 shrink-0 px-5 py-3" data-testid="split-run-intent-session">
+        <h2 className="truncate text-[13px] leading-5 font-medium text-foreground">{title}</h2>
+      </header>
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={follow.scrollRef}
+          onScroll={follow.onScroll}
+          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          data-testid="split-run-intent-chat-log"
+        >
+          <RequestMessage description={description} files={files} asChat />
+          {analysis.view.canvasId && analysis.view.executionId ? (
+            <PhaseLogCard
+              phase={planningSessionPhase(analysis.view)}
+              expanded
+              collapsible={false}
+              organizationId={analysis.organizationId}
+              canvasId={analysis.view.canvasId}
+              compactSessionLog
+            />
+          ) : (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              <p>{ANALYSIS_PLANNING_COPY.writing}</p>
+            </div>
+          )}
+        </div>
+        {follow.following ? null : (
+          <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
+        )}
+      </div>
+      {analysis.view.survey && analysis.canSend ? (
+        <PlanningSessionSurveyForm
+          key={analysis.view.survey.id ?? analysis.view.survey.questions[0]?.prompt ?? "survey"}
+          survey={analysis.view.survey}
+          onSubmit={analysis.onSubmitSurvey}
+        />
+      ) : null}
+      <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
+        <label htmlFor="split-run-intent-composer" className="sr-only">
+          {ANALYSIS_PLANNING_COPY.composerPlaceholder}
+        </label>
+        <div className="flex items-end gap-2">
+          <Textarea
+            id="split-run-intent-composer"
+            data-testid="split-run-intent-composer"
+            value={analysis.composer}
+            placeholder={failed ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder}
+            disabled={!analysis.canSend}
+            onChange={(event) => analysis.onComposerChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (analysis.canSend) {
+                  analysis.onSend();
+                }
+              }
+            }}
+            className="min-h-[44px] resize-none text-[13px]"
+            rows={2}
+          />
+          <Button type="submit" size="sm" disabled={!analysis.canSend || !analysis.composer.trim()}>
+            {ANALYSIS_PLANNING_COPY.send}
+          </Button>
+        </div>
+        {analysis.composerError ? (
+          <p className="mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
+            {analysis.composerError}
+          </p>
+        ) : null}
+      </form>
+    </div>
+  );
+}
+
+function RequestMessage({
+  description,
+  files,
+  asChat = false,
+}: {
+  description: string;
+  files?: FilesFile[];
+  asChat?: boolean;
+}) {
+  const body = description.trim() ? (
+    <WorkOrderDescription
+      description={description}
+      files={files}
+      previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
+      fadeClassName={asChat ? "from-primary/10 via-primary/10" : "from-muted via-muted/80"}
+    />
+  ) : (
+    <p className="text-[13px] text-muted-foreground">No request yet.</p>
+  );
+
+  if (!asChat) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="max-w-[92%]">
+          <div className="rounded-2xl bg-muted/70 px-3.5 py-3" data-testid="split-run-description" aria-label="Request">
+            {body}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 flex w-full items-start" data-testid="split-run-description" aria-label="Request">
+      <span className="inline-flex w-4 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
+        <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">
+          {CREATE_WITH_AGENT_COPY.you}
+        </span>
+        {body}
+      </div>
+    </div>
   );
 }
 

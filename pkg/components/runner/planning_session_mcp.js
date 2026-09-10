@@ -76,7 +76,49 @@ async function proposeSurvey(input) {
   });
 }
 
+async function proposeSpec(input) {
+  const body = String((input && input.body) || "").trim();
+  if (!body) {
+    throw new Error("body is required");
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+}
+
+async function proposeConfidence(input) {
+  const score = Number(input && input.score);
+  if (!Number.isFinite(score)) {
+    throw new Error("score is required");
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
+    score,
+    summary: String((input && input.summary) || "").trim(),
+  });
+}
+
 const TOOLS = [
+  {
+    name: "propose_spec",
+    description: "Publish the full spec.md markdown for the open task. Include the title, Executive summary, and plan. Do not change the original request. Call this after you write the specification.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        body: { type: "string" },
+      },
+      required: ["body"],
+    },
+  },
+  {
+    name: "propose_confidence",
+    description: "Publish the 0 through 5 confidence score and one sentence of check copy for the open task.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        summary: { type: "string" },
+      },
+      required: ["score", "summary"],
+    },
+  },
   {
     name: "propose_draft",
     description: "Show a draft task on the right only when the user asked for a task in this turn. Title and description are required. Description must include the user's request and constraints. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
@@ -161,6 +203,10 @@ async function handleRequest(message) {
       let result;
       if (name === "propose_draft") {
         result = await proposeDraft(args);
+      } else if (name === "propose_spec") {
+        result = await proposeSpec(args);
+      } else if (name === "propose_confidence") {
+        result = await proposeConfidence(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
       } else {
@@ -288,4 +334,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { proposeDraft, proposeSurvey, surveyQuestions, TOOLS };
+module.exports = { proposeDraft, proposeSpec, proposeConfidence, proposeSurvey, surveyQuestions, TOOLS };

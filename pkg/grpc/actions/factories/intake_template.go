@@ -52,18 +52,18 @@ const (
 	intakeConfidenceCriticalAt = 2
 
 	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
-	intakeIntentOutputFile   = "/tmp/intent.md"
+	intakeIntentOutputFile   = "/tmp/spec.md"
 
 	intakeIntentArtifactNodeID   = "attach-intent"
-	intakeIntentArtifactNodeName = "Add intent"
-	intakeIntentArtifactTitle    = "intent.md"
+	intakeIntentArtifactNodeName = "Add spec"
+	intakeIntentArtifactTitle    = "spec.md"
 
 	intakeAddRunErrorNodeID    = "add-run-error"
 	intakeAddRunErrorNodeName  = "Record Analysis Failure"
 	intakeAddRunErrorComponent = "addRunError"
 	intakeAddRunErrorMessage   = "The analysis agent failed. Open the agent logs to find the cause."
 
-	intakeAnalysisTimeoutSeconds = 1800
+	intakeAnalysisTimeoutSeconds = 3600
 
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
@@ -466,6 +466,8 @@ func intakeAnalysisPrompt(subject string) string {
 		"Write three reasons: what the item names, what already exists in this repository, and whether an agent can do the work.",
 		"",
 		fmt.Sprintf("Also write %s. This file is the specification a person reads before they start.", intakeIntentOutputFile),
+		"After you write the files, call propose_spec with the full spec.md markdown. Call propose_confidence with the 0-5 score and the summary sentence.",
+		"Do not edit the original request. Later turns update only the spec and the confidence score.",
 		"The SuperPlane UI shows Executive summary as the short view. It shows the later headings as the Plan.",
 		"Write a specification, not a chat note. Use short sentences and plain words. Use American English. Do not use contractions.",
 		"Ground every claim in this repository. Name files, types, and functions that exist.",
@@ -539,7 +541,7 @@ func intakeAnalysisPrompt(subject string) string {
 // reasons. Only the score and intent body are required.
 func intakeAnalysisOutputCommand() string {
 	return fmt.Sprintf(`if [ ! -s %s ]; then
-  echo "The analysis wrote no intent.md" >&2
+  echo "The analysis wrote no spec.md" >&2
   exit 1
 fi
 if ! jq -ce --rawfile intent %s '{

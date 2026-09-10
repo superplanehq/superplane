@@ -166,6 +166,82 @@ describe("WorkOrderIntentDocument", () => {
     expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
   });
 
+  it("shows the request as the first chat message on the left", () => {
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        analysis={{
+          organizationId: "org-1",
+          view: {
+            repository: "acme/payments",
+            machineStatus: "waiting",
+            canvasId: "",
+            canvasRunId: "",
+            executionId: "",
+            messages: [],
+            composer: "",
+            created: [],
+            right: { kind: "empty" },
+            endConfirmOpen: false,
+            selectableModelKey: "",
+            refining: false,
+          },
+          composer: "Need the existing empty-state component.",
+          canSend: true,
+          onComposerChange: vi.fn(),
+          onSend: vi.fn(),
+          onSubmitSurvey: vi.fn(),
+        }}
+      />,
+    );
+
+    const chat = within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-intent-chat");
+    expect(chat).toBeInTheDocument();
+    expect(within(chat).getByText("You")).toBeInTheDocument();
+    expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
+      "Imported from GitHub: billing empty state is unclear.",
+    );
+    expect(within(chat).getByText("The agent is writing the plan.")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+  });
+
+  it("streams the analysis agent in the left chat", () => {
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        analysis={{
+          organizationId: "org-1",
+          view: {
+            repository: "acme/payments",
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [],
+            composer: "",
+            created: [],
+            right: { kind: "empty" },
+            endConfirmOpen: false,
+            selectableModelKey: "",
+            refining: false,
+          },
+          composer: "",
+          canSend: true,
+          onComposerChange: vi.fn(),
+          onSend: vi.fn(),
+          onSubmitSurvey: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-phase-planning")).toBeInTheDocument();
+  });
+
   it("collapses a long request and expands it on Show more", async () => {
     const user = userEvent.setup();
     renderDocument(

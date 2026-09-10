@@ -130,8 +130,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
-  it("refines a draft from the note", async () => {
-    const user = userEvent.setup();
+  it("does not refine a draft from the note", () => {
     const onRefine = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -145,8 +144,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
-    expect(onRefine).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
   it("starts and archives a draft from the note", async () => {

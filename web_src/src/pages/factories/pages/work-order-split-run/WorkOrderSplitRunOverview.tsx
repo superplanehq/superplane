@@ -6,7 +6,7 @@ import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
-import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
+import { WorkOrderIntentDocument, type IntentAnalysisChat } from "./WorkOrderIntentDocument";
 
 /**
  * Description tab: original request as a chat and the generated plan.
@@ -23,6 +23,7 @@ export function WorkOrderSplitRunOverview({
   expandFirstCheck = false,
   files,
   resultFooter,
+  analysis,
 }: {
   title: string;
   description: string;
@@ -35,6 +36,7 @@ export function WorkOrderSplitRunOverview({
   expandFirstCheck?: boolean;
   files?: FilesFile[];
   resultFooter?: ReactNode;
+  analysis?: IntentAnalysisChat;
 }) {
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
   const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
@@ -70,6 +72,9 @@ export function WorkOrderSplitRunOverview({
           ) : null
         }
         resultFooter={resultFooter}
+        analysis={
+          analysis && organizationId ? { ...analysis, organizationId } : analysis
+        }
       />
     </div>
   );

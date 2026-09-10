@@ -24,11 +24,48 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_draft")
 	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
 	assert.NotContains(t, tools, "mcp__superplane__say")
 	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, tools, "mcp__superplane__ask")
+}
+
+func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
+		"SUPERPLANE_RUN_TOKEN":           "token",
+		"SUPERPLANE_BASE_URL":            "http://localhost:8000",
+	})
+
+	assert.Contains(t, tools, "Read")
+	assert.Contains(t, tools, "Bash")
+	assert.Contains(t, tools, "mcp__superplane")
+	assert.Contains(t, tools, "mcp__superplane__propose_spec")
+	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
+	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
+	assert.NotContains(t, tools, "Edit")
+	assert.NotContains(t, tools, "Write")
+}
+
+func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
+	analysis := planningSystemPromptFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
+	})
+	assert.Contains(t, analysis, "propose_spec")
+	assert.Contains(t, analysis, "propose_confidence")
+	assert.Contains(t, analysis, "Do not call propose_draft")
+
+	planning := planningSystemPromptFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	})
+	assert.Contains(t, planning, "propose_draft")
+	assert.NotContains(t, planning, "propose_spec")
 }
 
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
@@ -244,6 +281,18 @@ func claudePermissionModeFromScript(t *testing.T, env map[string]string) string 
 	payload, err := json.Marshal(env)
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { claudePermissionMode } = require(process.argv[1]); process.stdout.write(claudePermissionMode(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func planningSystemPromptFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { planningSystemPrompt } = require(process.argv[1]); process.stdout.write(planningSystemPrompt(JSON.parse(process.argv[2])));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)

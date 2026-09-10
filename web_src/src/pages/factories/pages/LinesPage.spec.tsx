@@ -301,7 +301,9 @@ describe("LinesPage board", () => {
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-title")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
@@ -350,7 +352,7 @@ describe("LinesPage board", () => {
         within(dialog).getByRole("heading", { name: "SuperPlane is currently analyzing this task" }),
       ).toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-      expect(within(dialog).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
       expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);
@@ -362,7 +364,9 @@ describe("LinesPage board", () => {
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`);
 
     const popup = screen.getByTestId("work-order-split-run");
-    expect(within(popup).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(popup).getByTestId("popup-work-order-title")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`,
     );

@@ -108,10 +108,21 @@ func planningRefineKey(text string) string {
 }
 
 func planningWaitText(text string, refined bool, draft PlanningSessionDraft) string {
+	return planningWaitTextForKind(text, refined, draft, false)
+}
+
+func planningWaitTextForKind(text string, refined bool, draft PlanningSessionDraft, analysis bool) string {
 	if refined {
 		return planningRefinePrompt(text, draft)
 	}
+	if analysis {
+		return planningAnalysisFollowUpPrompt(text)
+	}
 	return planningDraftFollowUpPrompt(text, draft)
+}
+
+func planningAnalysisFollowUpPrompt(text string) string {
+	return "The user is adding context for the specification of the open task. Do not change the original request. Call propose_spec and/or propose_confidence when the new context changes the spec or the score.\n\nUser message:\n" + text
 }
 
 func planningDraftFollowUpPrompt(text string, draft PlanningSessionDraft) string {

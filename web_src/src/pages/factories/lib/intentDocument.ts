@@ -1,5 +1,7 @@
 export const INTENT_ARTIFACT_NAME = "intent.md";
 
+export const SPEC_ARTIFACT_NAME = "spec.md";
+
 export const INTENT_DOCUMENT_TITLE = "What this work will do";
 
 export const EXECUTIVE_SUMMARY_HEADING = "Executive summary";

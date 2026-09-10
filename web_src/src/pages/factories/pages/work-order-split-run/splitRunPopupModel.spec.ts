@@ -145,6 +145,25 @@ describe("splitRunPopupModel", () => {
     expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
   });
 
+  it("prefers spec.md over intent.md", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "# Old intent\n\n## Executive summary\n\nOld summary.\n" },
+      },
+      {
+        id: "art-spec",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "spec.md", body: "# New spec\n\n## Executive summary\n\nNew summary.\n" },
+      },
+    ];
+
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New spec");
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("New summary.");
+    expect(splitRunLinkedArtifacts(artifacts)).toEqual([]);
+  });
+
   it("keeps intent.md out of the Artifacts list", () => {
     const artifacts = [
       {
