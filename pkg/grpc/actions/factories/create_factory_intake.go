@@ -131,7 +131,10 @@ func CreateFactoryIntake(
 	// can distinguish an empty source from an import that did not run.
 	seedResult, seedErr := seedIntake(ctx, deps, db, canvasID, source, binding)
 	if err := recordInitialImport(db, intake, seedResult, seedErr); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to record factory intake import")
+		// The intake, canvas, and seed events already exist. Returning an error
+		// would invite a retry that creates a duplicate intake and emits the
+		// same events again.
+		log.Errorf("factory %s: intake %s initial import result was not recorded: %v", factory.ID, intake.ID, err)
 	}
 	if seedErr != nil {
 		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, seedErr)
