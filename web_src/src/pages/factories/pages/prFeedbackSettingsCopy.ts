@@ -71,6 +71,7 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardSuggestedHelperDetail: "Grant that access so the agent can read CI logs and fix failing checks.",
   wizardOtherTools: "Other CI tools",
   maximumAttemptsLabel: "Maximum automatic fix attempts",
+  wizardMaximumAttempts: "How many times should SuperPlane try before giving up?",
   maximumAttemptsHelper:
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
   integrationsLabel: "Additional integration access",

@@ -10,6 +10,8 @@ export interface WorkspaceNextStep {
   title: string;
   /** Banner header when this step is the next action. */
   bannerTitle: string;
+  /** Short call to action for the minimized header badge. */
+  badgeLabel: string;
   /** Banner body when this step is the next action. */
   description: string;
   ctaLabel: string;
@@ -33,6 +35,7 @@ export interface WorkspaceNextStepBanner {
   /** First incomplete step; drives the single CTA. */
   activeStep: WorkspaceNextStep;
   title: string;
+  badgeLabel: string;
   description: string;
   ctaLabel: string;
   canDefer: boolean;
@@ -49,6 +52,7 @@ const COMMENTS_NEXT_STEP: WorkspaceNextStepDefinition = {
   id: "pr-comments-handler",
   title: "Comments handler",
   bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments,
+  badgeLabel: "Configure pull request comments",
   description: "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
   ctaLabel: "Configure",
   canDefer: false,
@@ -60,6 +64,7 @@ const CHECKS_NEXT_STEP: WorkspaceNextStepDefinition = {
   id: "pr-checks-handler",
   title: "Status checks handler",
   bannerTitle: PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks,
+  badgeLabel: "Configure status checks",
   description: [
     "SuperPlane can implement tasks, open pull requests, and address pull request reviews.",
     "Do you also want SuperPlane to automatically fix failing pull request status checks?",
@@ -105,6 +110,7 @@ export function workspaceNextStepBanner(steps: WorkspaceNextStep[]): WorkspaceNe
     totalCount: ONBOARDING_COMPLETED_STEP_COUNT + steps.length,
     activeStep,
     title: activeStep.bannerTitle,
+    badgeLabel: activeStep.badgeLabel,
     description: activeStep.description,
     ctaLabel: activeStep.ctaLabel,
     canDefer: activeStep.canDefer,

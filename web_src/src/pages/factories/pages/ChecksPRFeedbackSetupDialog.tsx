@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { cn } from "@/lib/utils";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
@@ -173,6 +174,30 @@ function SetupHeaderHelper({
   return null;
 }
 
+function MaximumAttemptsField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <section className="space-y-6">
+      <div>
+        <h2 className={factoryPageTitleClassName}>
+          <label htmlFor="checks-setup-maximum-attempts">{PR_FEEDBACK_SETTINGS_COPY.wizardMaximumAttempts}</label>
+        </h2>
+        <p className="workspace-body-text mt-2 text-muted-foreground">
+          {PR_FEEDBACK_SETTINGS_COPY.maximumAttemptsHelper}
+        </p>
+      </div>
+      <Input
+        id="checks-setup-maximum-attempts"
+        type="number"
+        min={1}
+        max={10}
+        value={String(value)}
+        onChange={(event) => onChange(Number(event.target.value))}
+        data-testid="checks-setup-maximum-attempts"
+      />
+    </section>
+  );
+}
+
 function EmptyChecksMessage() {
   return (
     <div className="workspace-body-text space-y-2 text-muted-foreground" data-testid="checks-setup-empty">
@@ -188,14 +213,19 @@ function SetupStepBody({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
       return <EmptyChecksMessage />;
     }
     return (
-      <StatusCheckPicker
-        names={setup.checkNames}
-        catalog={setup.catalog}
-        loading={setup.catalogLoading}
-        loadError={setup.catalogQuery.isError}
-        onToggle={setup.toggleCheckName}
-        hideHeading
-      />
+      <div className="space-y-6">
+        <StatusCheckPicker
+          names={setup.checkNames}
+          catalog={setup.catalog}
+          loading={setup.catalogLoading}
+          loadError={setup.catalogQuery.isError}
+          onToggle={setup.toggleCheckName}
+          hideHeading
+        />
+        {setup.catalog.length > 0 ? (
+          <MaximumAttemptsField value={setup.maximumAttempts} onChange={setup.setMaximumAttempts} />
+        ) : null}
+      </div>
     );
   }
   if (setup.toolsAccess === "suggested") {

@@ -521,7 +521,7 @@ export function LinesPage() {
               nextStepsCollapsed && nextStepBanner ? (
                 <WorkspaceNextStepsHeaderBadge
                   progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
-                  title={nextStepBanner.title}
+                  title={nextStepBanner.badgeLabel}
                   onOpen={nextStepDeferral.restore}
                 />
               ) : undefined

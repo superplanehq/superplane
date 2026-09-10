@@ -27,6 +27,7 @@ export function useChecksPRFeedbackSetup(
 ) {
   const [step, setStep] = useState<"checks" | "tools">("checks");
   const [checkNames, setCheckNames] = useState<string[]>([]);
+  const [maximumAttempts, setMaximumAttempts] = useState(3);
   const [runnerIntegrationIds, setRunnerIntegrationIds] = useState<string[]>([]);
   const [connectName, setConnectName] = useState<string | null>(null);
   const [error, setError] = useState<string>();
@@ -88,7 +89,7 @@ export function useChecksPRFeedbackSetup(
           subject: repository ? { repository } : undefined,
           checks: {
             names: checkNames,
-            maximumAttempts: 3,
+            maximumAttempts,
             runnerIntegrationIds,
           },
         },
@@ -109,7 +110,9 @@ export function useChecksPRFeedbackSetup(
     catalogQuery,
     catalogLoading,
     catalogEmpty,
-    canContinue: !catalogLoading && checkNames.length > 0,
+    canContinue: !catalogLoading && checkNames.length > 0 && maximumAttempts >= 1 && maximumAttempts <= 10,
+    maximumAttempts,
+    setMaximumAttempts,
     usesGitHubActions,
     toolsAccess,
     runnerIntegrationIds,

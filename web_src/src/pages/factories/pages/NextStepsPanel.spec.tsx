@@ -47,21 +47,15 @@ describe("NextStepsPanel", () => {
 });
 
 describe("WorkspaceNextStepsHeaderBadge", () => {
-  it("keeps the banner question next to the progress count", async () => {
+  it("keeps the call to action next to the progress count", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
-    render(
-      <WorkspaceNextStepsHeaderBadge
-        progress="3/4"
-        title="How should failing status checks be handled?"
-        onOpen={onOpen}
-      />,
-    );
+    render(<WorkspaceNextStepsHeaderBadge progress="3/4" title="Configure status checks" onOpen={onOpen} />);
 
     const restore = screen.getByTestId("workspace-next-steps-restore");
     expect(restore).toHaveTextContent("3/4");
-    expect(restore).toHaveTextContent("How should failing status checks be handled?");
-    expect(restore).toHaveAccessibleName("Show next steps. How should failing status checks be handled?");
+    expect(restore).toHaveTextContent("Configure status checks");
+    expect(restore).toHaveAccessibleName("Show next steps. Configure status checks");
     await user.click(restore);
     expect(onOpen).toHaveBeenCalledOnce();
   });

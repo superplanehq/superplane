@@ -107,6 +107,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
     expect(loading.querySelector("svg.animate-spin")).not.toBeNull();
     expect(screen.getByTestId("checks-setup-continue")).toBeDisabled();
+    expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
   });
 
   it("preselects catalog checks and creates the handler after the tools step", async () => {
@@ -131,8 +132,17 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     expect(screen.getByTestId("checks-setup-back")).toHaveTextContent("Back to board");
     expect(screen.getByRole("heading", { name: "Which status checks should be fixed?" })).toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-maximum-attempts")).toHaveValue(3);
+    expect(screen.getByText("How many times should SuperPlane try before giving up?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
+      ),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByTestId("checks-setup-continue"));
+
+    expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "Which tools report these checks?" })).toBeInTheDocument();
     expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
@@ -197,6 +207,37 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
     expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("sends the maximum attempts from the first step", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChecksPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/api"
+        source={checksSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("checks-setup-maximum-attempts")).toHaveValue(3));
+    await user.clear(screen.getByTestId("checks-setup-maximum-attempts"));
+    await user.type(screen.getByTestId("checks-setup-maximum-attempts"), "5");
+    await user.click(screen.getByTestId("checks-setup-continue"));
+    await user.click(screen.getByTestId("checks-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            checks: expect.objectContaining({ maximumAttempts: 5 }),
+          }),
+        }),
+      );
+    });
   });
 
   it("creates the handler with selected check names", async () => {
@@ -389,6 +430,7 @@ describe("ChecksPRFeedbackSetupDialog", () => {
       "After you add them, you can configure SuperPlane to fix them automatically.",
     );
     expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("checks-setup-finish"));

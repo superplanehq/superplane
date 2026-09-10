@@ -671,7 +671,7 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     const restore = screen.getByTestId("workspace-next-steps-restore");
     expect(restore).toHaveTextContent("3/4");
-    expect(restore).toHaveTextContent("How should failing status checks be handled?");
+    expect(restore).toHaveTextContent("Configure status checks");
     expect(screen.getByTestId("lines-detail-header")).toContainElement(restore);
     const trial = screen.queryByTestId("hosted-credit-header-kicker");
     if (trial) {
@@ -694,18 +694,14 @@ describe("LinesPage board", () => {
     const { unmount } = renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
     await user.click(screen.getByTestId("workspace-next-step-later"));
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent(
-      "How should failing status checks be handled?",
-    );
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
     unmount();
 
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent(
-      "How should failing status checks be handled?",
-    );
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
   });
 
   it("keeps next steps hidden while PR feedback handlers load", () => {

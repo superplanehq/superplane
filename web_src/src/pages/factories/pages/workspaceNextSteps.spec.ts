@@ -83,6 +83,7 @@ describe("workspaceNextStepBanner", () => {
     expect(banner?.doneCount).toBe(3);
     expect(banner?.totalCount).toBe(4);
     expect(banner?.title).toBe("How should failing status checks be handled?");
+    expect(banner?.badgeLabel).toBe("Configure status checks");
     expect(banner?.description).toContain("automatically fix failing pull request status checks");
     expect(banner?.ctaLabel).toBe("Configure");
     expect(banner?.canDefer).toBe(true);
