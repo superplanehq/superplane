@@ -10,9 +10,9 @@ import {
   Key,
   KeyRound,
   Plug,
+  Receipt,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
@@ -23,9 +23,9 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "automations"
   | "models"
   | "spending"
+  | "usage"
   | "billing"
   | "members"
   | "integrations"
@@ -160,15 +160,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-automations",
-        label: "Automations",
-        Icon: Workflow,
-        scope: "workspace",
-        section: "automations",
-        permission: { resource: "factories", action: "update" },
-        keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
-      },
-      {
         id: "workspace-models",
         label: "Models",
         Icon: Cpu,
@@ -300,7 +291,17 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "remaining hosted credit",
           "superplane grant",
           "purchased hosted credit",
+          "buy more",
         ],
+      },
+      {
+        id: "organization-usage",
+        label: "Usage",
+        Icon: Receipt,
+        scope: "organization",
+        section: "usage",
+        permission: { resource: "org", action: "read" },
+        keywords: ["usage", "cost", "tokens", "vm time", "task spend", "your keys", "model", "machine"],
       },
       {
         id: "organization-spending",

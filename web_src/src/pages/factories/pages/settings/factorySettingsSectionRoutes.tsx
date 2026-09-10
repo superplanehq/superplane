@@ -7,7 +7,6 @@ import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
-  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsModelsPage,
   FactorySettingsRepositoryPage,
@@ -20,6 +19,7 @@ import {
 import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
 import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsBillingPage";
+import { OrganizationSettingsUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
@@ -32,7 +32,9 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
+  WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
+  WorkspaceUsageRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 
 export const factorySettingsSectionRoutes = [
@@ -80,14 +82,11 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
+  // Automations moved to the factory nav Automations tab; this URL now forwards there.
   <Route
     key="factory-settings-workspace-automations"
     path="workspace/automations"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsAutomationsPage />
-      </RequirePermission>
-    }
+    element={<WorkspaceAutomationsSettingsRedirect />}
   />,
   <Route
     key="factory-settings-workspace-models"
@@ -101,7 +100,7 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
-  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceUsageRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"
@@ -203,6 +202,15 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="org" action="read">
         <OrganizationSettingsBillingPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-usage"
+    path="organization/usage"
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsUsagePage />
       </RequirePermission>
     }
   />,

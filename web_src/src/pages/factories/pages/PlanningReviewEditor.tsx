@@ -4,14 +4,7 @@ import { Workflow } from "lucide-react";
 import { useState } from "react";
 
 import { PlanningReviewForm } from "./PlanningReviewForm";
-import { PlanningReviewNav } from "./PlanningReviewNav";
-import {
-  PLANNING_REVIEW_DRAFT,
-  singleAgentDraft,
-  type PlanningReviewDraft,
-  type PlanningReviewStep,
-} from "./planningReviewMockup";
-import { PLANNING_REVIEW_DEFAULT_SECTION, type PlanningReviewSectionId } from "./planningReviewSections";
+import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
 
 function AutomationNote({ href }: { href?: string }) {
@@ -66,9 +59,7 @@ export function PlanningReviewEditor({
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const [section, setSection] = useState<PlanningReviewSectionId>(PLANNING_REVIEW_DEFAULT_SECTION);
   const saveDisabled = isLoading || isSaving || draft.components.length === 0;
-  const stepCount = ((draft.components[0]?.configuration.steps as PlanningReviewStep[]) ?? []).length;
 
   const handleSave = async () => {
     if (!onSave) {
@@ -95,12 +86,9 @@ export function PlanningReviewEditor({
           </p>
         </PopupBody>
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <PlanningReviewNav active={section} onSelect={setSection} stepCount={stepCount} />
-          <PopupBody className="min-w-0 bg-muted px-6 py-5">
-            <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} section={section} />
-          </PopupBody>
-        </div>
+        <PopupBody className="min-h-0 min-w-0 flex-1 bg-muted px-6 py-5">
+          <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+        </PopupBody>
       )}
       <footer className="flex shrink-0 items-center gap-4 border-t border-border px-6 py-4">
         {showAutomationNote ? <AutomationNote href={automationHref} /> : <span className="min-w-0 flex-1" />}

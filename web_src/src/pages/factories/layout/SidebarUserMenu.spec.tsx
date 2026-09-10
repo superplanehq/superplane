@@ -32,7 +32,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderMenu() {
+function renderMenu(isTrial = false) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -47,6 +47,7 @@ function renderMenu() {
                   factoryKey="RFSDR"
                   userName="Ada Lovelace"
                   organizationName="SuperPlane"
+                  isTrial={isTrial}
                 />
               }
             />
@@ -102,9 +103,36 @@ describe("SidebarUserMenu", () => {
     expect(screen.queryByTestId("factories-sidebar-back-to-apps")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Back to Apps" })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Billing" })).toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Installation Admin" })).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-sidebar-appearance")).toHaveTextContent("Appearance");
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("shows Trial under the avatar and in the menu for a trial organization", async () => {
+    const user = userEvent.setup();
+    renderMenu(true);
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName(/Ada Lovelace.*SuperPlane.*Trial/s);
+    expect(screen.getByTestId("factories-sidebar-plan-label")).toHaveTextContent("Trial");
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Trial");
+  });
+
+  it("opens Billing from the user menu", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Billing" }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/organization/billing`,
+    );
   });
 
   it("opens Installation Admin for an installation admin", async () => {

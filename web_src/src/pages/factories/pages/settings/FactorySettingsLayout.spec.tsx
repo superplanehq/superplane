@@ -29,7 +29,7 @@ describe("FactorySettingsLayout sidebar", () => {
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(screen.getByTestId("factory-settings-main").className).toMatch(/overflow-y-auto/);
     expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
-    expect(screen.getByTestId("factories-workspace-settings-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("factories-workspace-settings-link")).not.toBeInTheDocument();
     expect(within(sidebar).queryByTestId("factory-settings-back")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-account-nav")).toHaveTextContent("Account");
     expect(within(sidebar).getByTestId("factory-settings-find")).toBeInTheDocument();
@@ -147,6 +147,30 @@ describe("FactorySettingsLayout sidebar", () => {
     expect(screen.getByText("Selected workspaces")).toBeInTheDocument();
   }, 10000);
 
+  it("redirects the removed workspace Automations settings URL to the factory Automations tab", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/automations`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("redirects the older /settings/automations bookmark to the factory Automations tab", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/automations`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+  }, 10000);
+
   it("redirects unknown legacy paths to Workspace General", async () => {
     render(
       <FactoriesHarness
@@ -169,6 +193,7 @@ describe("FactorySettingsLayout sidebar", () => {
     ["Secrets", "secrets", "factory-settings-secrets"],
     ["LLM Models", "models", "factory-settings-llm-models"],
     ["Billing", "billing", "billing-credit-balance"],
+    ["Usage", "usage", "organization-usage-history"],
   ])(
     "renders the Organization %s page in the factory settings shell",
     async (_title, path, pageTestId) => {
@@ -390,7 +415,9 @@ describe("FactorySettingsLayout sidebar", () => {
       );
       expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
         "href",
-        expect.stringContaining(`/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/settings/organization/general`),
+        expect.stringContaining(
+          `/workspaces/${ACME_ONBOARDING_FACTORY_KEY.toLowerCase()}/settings/organization/general`,
+        ),
       );
       expect(screen.queryByTestId("lines-detail-page")).not.toBeInTheDocument();
       expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();

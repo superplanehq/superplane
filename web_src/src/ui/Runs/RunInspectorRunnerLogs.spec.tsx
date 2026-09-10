@@ -51,8 +51,10 @@ beforeEach(() => {
     sections: [{ index: 0, text: "npm run build", lines: ["> build", "vite build"], events: [], status: "passed" }],
     orphanLines: [],
     error: null,
+    isLoading: false,
     isStreaming: false,
     toggleSection: vi.fn(),
+    retry: vi.fn(),
     scrollRef: { current: null },
   });
 });
@@ -93,38 +95,62 @@ describe("RunInspector runner logs", () => {
     expect(useLiveLogStreamMock).not.toHaveBeenCalled();
   });
 
-  it("shows a loading message while finished-execution logs are still streaming in", () => {
+  it("shows loading while it fetches logs for a finished execution", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [],
       orphanLines: [],
       error: null,
+      isLoading: true,
       isStreaming: true,
       toggleSection: vi.fn(),
+      retry: vi.fn(),
       scrollRef: { current: null },
     });
 
     renderRunnerInspector();
     fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
 
-    expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
-    expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading logs")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
+    expect(screen.queryByText("No logs available")).not.toBeInTheDocument();
   });
 
-  it("shows the empty message only after streaming settles with no lines", () => {
+  it("shows the empty state when a finished execution has no logs", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [],
       orphanLines: [],
       error: null,
+      isLoading: false,
       isStreaming: false,
       toggleSection: vi.fn(),
+      retry: vi.fn(),
       scrollRef: { current: null },
     });
 
     renderRunnerInspector();
     fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
 
-    expect(screen.getByText("No log lines yet.")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for logs...")).not.toBeInTheDocument();
+    expect(screen.getByText("No logs available")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
+  });
+
+  it("keeps existing logs visible when the stream fails", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [{ index: 0, text: "npm run build", lines: ["vite build"], events: [], status: "running" }],
+      orphanLines: [],
+      error: "Failed to fetch",
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load logs");
+    expect(screen.getByText(/vite build/)).toBeInTheDocument();
   });
 });
 

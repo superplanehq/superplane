@@ -2,9 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as CanvasDataModule from "@/hooks/useCanvasData";
+import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -18,22 +20,38 @@ import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 
 Element.prototype.scrollIntoView ??= () => undefined;
 
+const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
+  useInfiniteCanvasRuns: vi.fn(),
+}));
+
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),
 }));
 
-vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: vi.fn(() => ({ data: [] })),
-  useIntegrationResources: vi.fn(() => ({
-    data: [],
-    isLoading: false,
-    isPending: false,
-    isFetching: false,
-    isError: false,
-  })),
-}));
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof CanvasDataModule>();
+  return {
+    ...actual,
+    useInfiniteCanvasRuns,
+  };
+});
+
+vi.mock("@/hooks/useIntegrations", async (importOriginal) => {
+  const actual = await importOriginal<typeof IntegrationsModule>();
+  return {
+    ...actual,
+    useConnectedIntegrations: vi.fn(() => ({ data: [] })),
+    useIntegrationResources: vi.fn(() => ({
+      data: [],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    })),
+  };
+});
 
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
   IntegrationIcon: ({ integrationName }: { integrationName?: string }) => (
@@ -90,9 +108,38 @@ function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedba
   };
 }
 
+useInfiniteCanvasRuns.mockReturnValue({
+  data: {
+    pages: [
+      {
+        runs: [
+          {
+            id: "run-pr-1",
+            canvasId: "app-pr-feedback",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-05-01T12:00:00Z",
+            rootEvent: { nodeId: "comment", customName: "Please fix the lint error" },
+          },
+        ],
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  fetchNextPage: vi.fn(),
+  refetch: vi.fn(),
+});
+
 beforeEach(() => {
   vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
   vi.mocked(useIntegrationResources).mockReturnValue(mockIntegrationResources());
+});
+
+afterEach(() => {
+  localStorage.clear();
 });
 
 function renderChecksPopup(
@@ -160,10 +207,20 @@ function prFeedbackGraph(): IntakeAutomationGraph {
     "live",
   );
 
-  return { nodes, edges, factoryId: "factory-1" };
+  return {
+    nodes,
+    edges,
+    factoryId: "factory-1",
+    specNodes: [{ id: "comment", name: "On PR Comment", type: "TYPE_TRIGGER", component: "github.onPRComment" }],
+  };
 }
 
-function renderAutomationPopup() {
+function renderAutomationPopup(
+  props: {
+    canvasId?: string;
+    runHrefFor?: (runId: string) => string;
+  } = {},
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -176,6 +233,8 @@ function renderAutomationPopup() {
               onSave={vi.fn()}
               onClose={vi.fn()}
               editAutomationHref="/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1"
+              canvasId={props.canvasId}
+              runHrefFor={props.runHrefFor}
               initialTab="automation"
               fixed={false}
             />
@@ -472,14 +531,33 @@ describe("PRFeedbackSettingsPopup automation", () => {
     const automation = screen.getByTestId("pr-feedback-automation");
     expect(automation).toHaveAccessibleName("Automation");
     expect(within(automation).getAllByText("Find Pull Request").length).toBeGreaterThan(0);
-    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1",
-    );
+    const headerRow = screen.getByTestId("settings-automation-header-row");
+    expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
+    expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
+    expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1");
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(within(automation).queryByText("passed")).not.toBeInTheDocument();
     expect(within(automation).queryByText("failed")).not.toBeInTheDocument();
     expect(within(automation).queryByText("notFound")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("lists canvas runs beside the automation when a canvas id is given", () => {
+    renderAutomationPopup({
+      canvasId: "app-pr-feedback",
+      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-pr-feedback?run=${runId}`,
+    });
+
+    const sidebar = within(screen.getByTestId("pr-feedback-automation")).getByTestId("canvas-runs-sidebar");
+    expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
+    expect(within(sidebar).getByText("Please fix the lint error")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-pr-feedback?run=run-pr-1",
+    );
   });
 });

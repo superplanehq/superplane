@@ -111,7 +111,9 @@ describe("advanceAfterGithubConnect", () => {
     });
 
     expect(reresolveWorkspace).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith(`/${nextSlug}/workspaces/${factoryKey}/setup?step=repo`, { replace: true });
+    expect(navigate).toHaveBeenCalledWith(`/${nextSlug}/workspaces/${factoryKey.toLowerCase()}/setup?step=repo`, {
+      replace: true,
+    });
     expect(locationReplace).not.toHaveBeenCalled();
   });
 

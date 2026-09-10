@@ -455,10 +455,6 @@ export function applyColumnAutomationsOverlay(
     .map((automation) => (disabled.has(automation.id) ? { ...automation, health: "disabled" } : automation));
 }
 
-export function automationOffersAgentEdit(automation: Pick<ColumnAutomation, "kind">): boolean {
-  return automation.kind === "agent-step" || automation.kind === "analysis";
-}
-
 export function catalogEntryToAutomation(
   entry: ColumnAutomationCatalogEntry,
   columnTitle: string,
@@ -496,8 +492,6 @@ export const COLUMN_AUTOMATIONS_COPY = {
   needsRepairLabel: "Needs repair",
   disabledLabel: "Disabled",
   editLabel: "Edit automation",
-  editAgentLabel: "Edit Agent",
-  editAutomationMenuLabel: "Edit Automation",
   tabsLabel: "Automation sections",
   generalTab: "General",
   agentTab: "Agent",
@@ -506,6 +500,12 @@ export const COLUMN_AUTOMATIONS_COPY = {
   viewEmpty: "This automation has no canvas yet.",
   viewError: "SuperPlane could not load the automation.",
   viewRetry: "Try again",
+  rowsEmpty: "No automations",
+  rowMenu: "Open automation",
+  viewMenuLabel: "Board view",
+  viewOptions: "View options",
+  viewNames: "Automation names",
+  viewIcons: "Automation icons",
   lastRunPassed: "Passed",
   lastRunFailed: "Failed",
   activityRunning: "running",

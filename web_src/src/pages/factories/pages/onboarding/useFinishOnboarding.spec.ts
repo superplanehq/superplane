@@ -117,7 +117,34 @@ describe("afterWorkspaceProvisioned", () => {
 
     expect(updateOrganization).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
     expect(invalidateAccountOrganizations).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/SP/lines/line-1", { replace: true });
+    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/sp/lines/line-1", { replace: true });
+  });
+
+  it("hands the renamed organization to onProvisioned instead of navigating", async () => {
+    const updateOrganization = vi.fn().mockResolvedValue("acme-org");
+    const invalidateAccountOrganizations = vi.fn();
+    const navigate = vi.fn();
+    const onProvisioned = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization,
+      invalidateAccountOrganizations,
+      navigate,
+      onProvisioned,
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(onProvisioned).toHaveBeenCalledWith({
+      organizationId: "acme-org",
+      factoryKey: "SP",
+      lineId: "line-1",
+    });
   });
 });
 
@@ -129,6 +156,6 @@ describe("afterOnboardingPath", () => {
         factoryKey: "SP",
         lineId: "line-1",
       }),
-    ).toBe("/org-1/workspaces/SP/lines/line-1");
+    ).toBe("/org-1/workspaces/sp/lines/line-1");
   });
 });

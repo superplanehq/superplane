@@ -5,6 +5,8 @@ import {
   factoryCardClassName,
   factorySettingsSectionBodyClassName,
   factorySettingsSectionHeaderClassName,
+  factorySettingsWideSectionBodyClassName,
+  factorySettingsWideSectionHeaderClassName,
 } from "../factoryPageLayoutStyles";
 
 export function FactorySettingsPageFrame({
@@ -12,21 +14,21 @@ export function FactorySettingsPageFrame({
   subtitle,
   actions,
   children,
+  wide = false,
 }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
+  /** Use the wide column for tables that do not fit the form measure. */
+  wide?: boolean;
 }) {
+  const headerClassName = wide ? factorySettingsWideSectionHeaderClassName : factorySettingsSectionHeaderClassName;
+  const bodyClassName = wide ? factorySettingsWideSectionBodyClassName : factorySettingsSectionBodyClassName;
   return (
     <>
-      <WorkspacePageHeader
-        className={factorySettingsSectionHeaderClassName}
-        title={title}
-        subtitle={subtitle}
-        actions={actions}
-      />
-      <div className={cn(factorySettingsSectionBodyClassName, "flex flex-col gap-5")}>{children}</div>
+      <WorkspacePageHeader className={headerClassName} title={title} subtitle={subtitle} actions={actions} />
+      <div className={cn(bodyClassName, "flex flex-col gap-5")}>{children}</div>
     </>
   );
 }

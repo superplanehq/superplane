@@ -270,6 +270,33 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 		assert.Empty(t, httpCtx.Requests)
 	})
 
+	t.Run("does not schedule evaluate when the execution is cancelling", func(t *testing.T) {
+		requests := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{Cancelling: true}
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "check_run")
+
+		code, _, err := component.HandleWebhook(signedWaitChecksRequest(
+			[]byte(fmt.Sprintf(`{
+				"repository": {"name": "hello", "full_name": "testhq/hello"},
+				"check_run": {"head_sha": %q, "name": "build"}
+			}`, sha)),
+			headers,
+			WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Requests:       requests,
+					ExecutionState: executionState,
+				}, nil
+			},
+			httpCtx,
+		))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Empty(t, requests.Action)
+	})
+
 	t.Run("rejects an invalid signature", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", "status")
@@ -313,6 +340,27 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Empty(t, httpCtx.requests)
+	})
+
+	t.Run("skips work when the execution is cancelling", func(t *testing.T) {
+		httpCtx := newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha))
+		executionState := &contexts.ExecutionStateContext{Cancelling: true}
+		requests := &contexts.RequestContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           waitChecksEvaluateHook,
+			Configuration:  WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			HTTP:           httpCtx,
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			ExecutionState: executionState,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requests,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.requests)
+		assert.Empty(t, requests.Action)
+		assert.Empty(t, executionState.Channel)
 	})
 
 	t.Run("emits passed after a later evaluate", func(t *testing.T) {

@@ -110,10 +110,16 @@ export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
   run: { result?: string } | null | undefined,
 ): CreateWithAgentView {
-  if (view.machineStatus === "failed" || !isFailedPlanningCanvasRun(run)) {
+  if (view.machineStatus === "failed") {
     return view;
   }
-  return { ...view, machineStatus: "failed" };
+  if (isFailedPlanningCanvasRun(run)) {
+    return { ...view, machineStatus: "failed" };
+  }
+  if (run?.result === "RESULT_PASSED" && view.machineStatus !== "waiting") {
+    return { ...view, machineStatus: "failed" };
+  }
+  return view;
 }
 
 function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {

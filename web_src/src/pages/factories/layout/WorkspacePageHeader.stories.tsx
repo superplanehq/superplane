@@ -222,6 +222,7 @@ export const AlignedWithSidebar: Story = {
           factory={REFUND_FACTORY}
           factories={[REFUND_FACTORY, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY]}
           canCreateFactory
+          canOpenSettings
           permissionsLoading={false}
           onCreateFactory={() => console.log("create workspace")}
         />
@@ -229,8 +230,6 @@ export const AlignedWithSidebar: Story = {
           organizationId={FACTORIES_ORGANIZATION_ID}
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
-          canOpenSettings
-          permissionsLoading={false}
         />
       </aside>
       <div className="min-w-0 flex-1">

@@ -256,6 +256,7 @@ func (s *SubscriptionContext) SendMessage(message any) error {
 
 type ExecutionStateContext struct {
 	Finished       bool
+	Cancelling     bool
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
@@ -267,6 +268,10 @@ type ExecutionStateContext struct {
 
 func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
+}
+
+func (c *ExecutionStateContext) IsCancelling() bool {
+	return c.Cancelling
 }
 
 func (c *ExecutionStateContext) Pass() error {

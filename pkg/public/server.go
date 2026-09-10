@@ -1117,6 +1117,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1144,6 +1152,20 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
+	// App, so onboarding stops here on installations that do not hold the
+	// app credentials (for example, local development without a tunnel).
+	if !config.LoadGitHubHostedAppConfig().Enabled() {
+		http.Error(
+			w,
+			"This installation has no GitHub App configured, so workspace setup is not available. "+
+				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
+				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
+			http.StatusServiceUnavailable,
+		)
 		return
 	}
 
@@ -1401,6 +1423,9 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
+	}
+	if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+		return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
@@ -1790,9 +1815,11 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 
 			organizationID := ""
 			var organizationUUID uuid.UUID
+			var factoryID *uuid.UUID
 			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
 				organizationID = workflow.OrganizationID.String()
 				organizationUUID = workflow.OrganizationID
+				factoryID = workflow.FactoryID
 			}
 
 			return &core.ExecutionContext{
@@ -1812,6 +1839,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 				Usage:          contexts.NewUsageContext(organizationUUID, execution),
+				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
 			}, nil
 		},
 	})

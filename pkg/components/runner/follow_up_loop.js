@@ -81,20 +81,35 @@ async function requestJSON(method, urlPath) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
+        "ngrok-skip-browser-warning": "1",
       },
     }),
   );
 }
 
+function waitResponseMessage(parsed, text) {
+  return String((parsed && (parsed.message || parsed.error)) || text || "");
+}
+
+function isPlanningSessionGone(status, parsed, text) {
+  if (status !== 404) {
+    return false;
+  }
+  return /planning session not found/i.test(waitResponseMessage(parsed, text));
+}
+
 function isTransientWaitFailure(status, parsed) {
-  if (status === 429 || status === 502 || status === 503 || status === 504) {
+  if (status === 401 || status === 400) {
+    return false;
+  }
+  if (status >= 400) {
     return true;
   }
   return Boolean(parsed && (parsed.retryable === true || parsed.cloudflare_error === true));
 }
 
 function interpretWaitResponse(status, parsed, text) {
-  if (status === 409) {
+  if (status === 409 || isPlanningSessionGone(status, parsed, text)) {
     return { status: "ended" };
   }
   if (status >= 200 && status < 300) {
@@ -103,7 +118,7 @@ function interpretWaitResponse(status, parsed, text) {
   if (isTransientWaitFailure(status, parsed)) {
     return { status: "pending" };
   }
-  throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
+  throw new Error(waitResponseMessage(parsed, text) || `HTTP ${status}`);
 }
 
 async function waitOnce() {
@@ -197,9 +212,7 @@ async function runLoop(helpers) {
 async function main() {
   const taskDir = readEnv("SUPERPLANE_TASK_DIR");
   const model = String(process.argv[2] || "").trim();
-  // Forward any additional argv (for example OpenRouter's max-turns) straight
-  // through to run.js so every runner's follow-up prompt uses the same
-  // arguments as its original prompt step.
+  // Forward extra argv so follow-up prompts match the original prompt step.
   const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,

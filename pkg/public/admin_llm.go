@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -28,11 +30,12 @@ type installationLLMSettingsResponse struct {
 }
 
 type hostedLLMProviderResponse struct {
-	Provider         string   `json:"provider"`
-	Enabled          bool     `json:"enabled"`
-	APIKeyConfigured bool     `json:"api_key_configured"`
-	BaseURL          string   `json:"base_url"`
-	AllowedModels    []string `json:"allowed_models"`
+	Provider                string   `json:"provider"`
+	Enabled                 bool     `json:"enabled"`
+	APIKeyConfigured        bool     `json:"api_key_configured"`
+	ManagementKeyConfigured bool     `json:"management_key_configured"`
+	BaseURL                 string   `json:"base_url"`
+	AllowedModels           []string `json:"allowed_models"`
 }
 
 type installationLLMSettingsRequest struct {
@@ -46,6 +49,7 @@ type installationLLMSettingsRequest struct {
 type hostedLLMProviderRequest struct {
 	Enabled       *bool    `json:"enabled"`
 	APIKey        *string  `json:"api_key"`
+	ManagementKey *string  `json:"management_key"`
 	BaseURL       *string  `json:"base_url"`
 	AllowedModels []string `json:"allowed_models"`
 }
@@ -191,8 +195,29 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 				next.APIKey = encrypted
 			}
 		}
+		if req.ManagementKey != nil {
+			key := strings.TrimSpace(*req.ManagementKey)
+			if key == "" {
+				next.ManagementKey = nil
+			} else {
+				if provider == models.UsageProviderOpenRouter {
+					client := openrouter.NewManagementClient(s.registry.HTTPContext(), key)
+					if verifyErr := client.VerifyManagement(); verifyErr != nil {
+						return fmt.Errorf("provisioning API key is invalid: %w", verifyErr)
+					}
+				}
+				encrypted, encryptErr := llm.EncryptManagementKey(r.Context(), s.encryptor, provider, key)
+				if encryptErr != nil {
+					return encryptErr
+				}
+				next.ManagementKey = encrypted
+			}
+		}
 		if next.Enabled && !next.HasAPIKey() {
 			return errors.New("API key is required when the provider is enabled")
+		}
+		if next.Enabled && provider == models.UsageProviderOpenRouter && !next.HasManagementKey() {
+			return errors.New("provisioning API key is required when OpenRouter is enabled")
 		}
 		if next.Enabled && len(next.AllowedModels) == 0 {
 			return errors.New("select at least one model when the provider is enabled")
@@ -375,11 +400,12 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 	for _, name := range models.KnownHostedLLMProviders() {
 		row := byProvider[name]
 		providers = append(providers, hostedLLMProviderResponse{
-			Provider:         name,
-			Enabled:          row.Enabled,
-			APIKeyConfigured: row.HasAPIKey(),
-			BaseURL:          row.BaseURL,
-			AllowedModels:    append([]string{}, row.AllowedModels...),
+			Provider:                name,
+			Enabled:                 row.Enabled,
+			APIKeyConfigured:        row.HasAPIKey(),
+			ManagementKeyConfigured: row.HasManagementKey(),
+			BaseURL:                 row.BaseURL,
+			AllowedModels:           append([]string{}, row.AllowedModels...),
 		})
 	}
 
@@ -467,6 +493,7 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "provisioning api key") ||
 		strings.Contains(msg, "llm base url") ||
 		strings.Contains(msg, "superplane agent model")
 }

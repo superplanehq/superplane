@@ -6,6 +6,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
+  FactoriesWorkOrderRunUsageRow,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
@@ -20,6 +21,7 @@ import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -93,7 +95,7 @@ function minutesBefore(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-/** Two tickets still in analysis, plus scored runs for the Runs tab. */
+/** Two tickets still in analysis, plus scored intake runs for API fixtures. */
 export const GITHUB_ISSUES_INTAKE_RUNS: FactoriesFactoryIntakeRun[] = [
   {
     id: "intake-run-analyzing-1",
@@ -291,6 +293,8 @@ export interface FactoriesFixture {
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
+  /** Paginated task-run spend for Organization Usage. */
+  usageHistoryByFactoryId?: Record<string, FactoriesWorkOrderRunUsageRow[]>;
   /**
    * Velocity reports keyed by factory, then by requested period in days. A
    * period without an entry falls back to the empty report.
@@ -306,6 +310,7 @@ export interface FactoriesFixture {
     actorName?: string;
     polarOrderId?: string;
     createdAt?: string;
+    expiresAt?: string;
   }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /**
@@ -359,6 +364,11 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_USAGE,
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
     [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
+  },
+  usageHistoryByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_USAGE_HISTORY_ROWS,
+    [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: [],
   },
   velocityByFactoryId: {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,

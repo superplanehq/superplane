@@ -1,20 +1,15 @@
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
-import { Bot, LoaderCircle, Pencil, Sparkles, Workflow } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Bot, LoaderCircle, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { type ColumnAutomationActivity, type ColumnAutomationLastRunStatus } from "../lib/columnAutomationActivity";
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation, type ColumnAutomationKind } from "../lib/columnAutomations";
 
 export type { ColumnAutomationActivity, ColumnAutomationLastRunStatus };
 
-export type ColumnAutomationRowAction = "settings" | "edit" | "edit-agent" | "disable" | "enable" | "remove";
+export type ColumnAutomationRowAction = "settings" | "disable" | "enable" | "remove";
 
 const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
   analysis: Sparkles,
@@ -25,48 +20,25 @@ const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
 interface ColumnAutomationsPopupProps {
   automation: ColumnAutomation;
   onAction: (action: ColumnAutomationRowAction) => void;
-  showEditAgent?: boolean;
-  showEditAutomation?: boolean;
   activity?: ColumnAutomationActivity;
   /** Open the menu on first render. Used by stories. */
   defaultOpen?: boolean;
+  /** Replaces the default icon button. Used by the header rows. */
+  trigger?: ReactNode;
 }
 
-/** Header icon. Click opens a menu with the automation summary and edit actions. */
+/** Header icon. Click opens a menu with the automation summary. */
 export function ColumnAutomationsPopup({
   automation,
   onAction,
-  showEditAgent = false,
-  showEditAutomation = false,
   activity,
   defaultOpen = false,
+  trigger,
 }: ColumnAutomationsPopupProps) {
-  const needsRepair = automation.health === "needs-repair";
-  const disabled = automation.health === "disabled";
-  const hasEditActions = showEditAgent || showEditAutomation;
-
   return (
     <DropdownMenu defaultOpen={defaultOpen}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={automation.name}
-          title={automation.name}
-          data-testid={`column-automation-icon-${automation.id}`}
-          className={cn(
-            "relative flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            disabled && "opacity-70",
-          )}
-        >
-          <ColumnAutomationGlyph automation={automation} className="size-3.5" />
-          {needsRepair ? (
-            <span
-              className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-amber-500"
-              data-testid={`column-automation-icon-${automation.id}-needs-repair`}
-              aria-hidden
-            />
-          ) : null}
-        </button>
+        {trigger ?? <ColumnAutomationIconButton automation={automation} />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56 p-0" data-testid="column-automations-popup">
         <div className="p-1">
@@ -76,35 +48,44 @@ export function ColumnAutomationsPopup({
             onOpenSettings={() => onAction("settings")}
           />
         </div>
-        {hasEditActions ? (
-          <>
-            <DropdownMenuSeparator className="my-0" />
-            <div className="p-1">
-              {showEditAgent ? (
-                <DropdownMenuItem
-                  onSelect={() => onAction("edit-agent")}
-                  data-testid={`column-automation-${automation.id}-edit-agent`}
-                >
-                  <Bot className="h-3.5 w-3.5" aria-hidden />
-                  {COLUMN_AUTOMATIONS_COPY.editAgentLabel}
-                </DropdownMenuItem>
-              ) : null}
-              {showEditAutomation ? (
-                <DropdownMenuItem
-                  onSelect={() => onAction("edit")}
-                  data-testid={`column-automation-${automation.id}-edit`}
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                  {COLUMN_AUTOMATIONS_COPY.editAutomationMenuLabel}
-                </DropdownMenuItem>
-              ) : null}
-            </div>
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
+/** Header icon. Used as a direct settings button or as a menu trigger. */
+export const ColumnAutomationIconButton = forwardRef<
+  HTMLButtonElement,
+  { automation: ColumnAutomation } & ButtonHTMLAttributes<HTMLButtonElement>
+>(function ColumnAutomationIconButton({ automation, className, ...props }, ref) {
+  const needsRepair = automation.health === "needs-repair";
+  const disabled = automation.health === "disabled";
+
+  return (
+    <button
+      type="button"
+      aria-label={automation.name}
+      title={automation.name}
+      data-testid={`column-automation-icon-${automation.id}`}
+      className={cn(
+        "relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        disabled && "opacity-70",
+        className,
+      )}
+      {...props}
+      ref={ref}
+    >
+      <ColumnAutomationGlyph automation={automation} className="size-3.5" />
+      {needsRepair ? (
+        <span
+          className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-amber-500"
+          data-testid={`column-automation-icon-${automation.id}-needs-repair`}
+          aria-hidden
+        />
+      ) : null}
+    </button>
+  );
+});
 
 export function ColumnAutomationGlyph({
   automation,

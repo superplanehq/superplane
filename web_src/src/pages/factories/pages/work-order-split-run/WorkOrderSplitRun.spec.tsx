@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
+import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
@@ -176,7 +176,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
     expect(runningDot).toHaveAttribute("title", "Running");
-    expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
+    expect(runningDot.className).toContain("animate-spin");
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
@@ -454,14 +454,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
-  it("pins a review note and keeps Update manually off the note", () => {
+  it("pins a pull request review strip with one call to action and a More menu", async () => {
+    const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
-    expect(note).toHaveTextContent("The pull request is open and waiting for user review.");
-    expect(note).toHaveTextContent("Mention @superplaneagent in a pull request comment or review to request changes.");
-    expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(within(note).queryByText("Waiting for user review")).not.toBeInTheDocument();
+    expect(within(note).getAllByRole("listitem")).toHaveLength(3);
+    expect(note).toHaveTextContent("Mention @superplaneagent");
+    expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
     expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
       "href",
       "https://github.com/superplanehq/superplane/pull/6812",
@@ -469,9 +472,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+
+    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "To Backlog" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Reject" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
@@ -700,7 +707,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     const pendingDot = screen.getByTestId("split-run-log-tab-dot");
     expect(pendingDot).toHaveAttribute("title", "Pending");
-    expect(pendingDot.querySelector(".animate-ping")).toBeNull();
+    expect(pendingDot.className).not.toContain("animate-spin");
     const source = screen.getByTestId("split-run-source");
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
@@ -709,7 +716,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
     expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
@@ -721,7 +728,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
     expect(within(backlog).queryByText(/Created manually/)).not.toBeInTheDocument();
@@ -742,7 +749,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
   });
 
-  it("tells a draft is under analysis and hides Reject while it runs", () => {
+  it("tells a draft is under analysis and hides Archive while it runs", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -765,7 +772,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("puts artifacts on the right and check analyses under the description", () => {
@@ -1050,7 +1057,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
   });
 
-  it("puts View Automation Run and Edit Automation on an expanded log row", async () => {
+  it("puts View Automation Run on an expanded log row", async () => {
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -1061,7 +1068,6 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
     const view = within(prCreation).getByRole("link", { name: "View automation run" });
-    const edit = within(prCreation).getByRole("link", { name: "Edit automation" });
     expect(view).toHaveAttribute(
       "href",
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
@@ -1070,12 +1076,7 @@ describe("WorkOrderSplitRunPopup", () => {
         canvas: "closure",
       }),
     );
-    expect(edit).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
-      }),
-    );
+    expect(within(prCreation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();

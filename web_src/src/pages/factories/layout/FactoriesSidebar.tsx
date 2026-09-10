@@ -2,8 +2,10 @@ import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
+import { isHostedCreditTrialOrg } from "../lib/hostedCreditEmpty";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -16,8 +18,8 @@ interface FactoriesSidebarProps {
 }
 
 /**
- * Icon rail shared by the workspace shell and workspace settings, so the
- * board, Velocity, and settings stay one click away on both screens.
+ * Icon rail shared by the workspace shell and workspace settings.
+ * Board and Velocity stay on the rail. Workspace settings open from the switcher.
  */
 export function FactoriesSidebar({ organizationId, factoryKey, factory, factories }: FactoriesSidebarProps) {
   const navigate = useNavigate();
@@ -25,6 +27,8 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: organization } = useOrganization(organizationId);
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
+  const spend = useOrganizationWorkspaceUsage(organizationId);
+  const isTrial = spend.data ? isHostedCreditTrialOrg(spend.data) : false;
 
   return (
     <aside
@@ -36,6 +40,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         factory={factory}
         factories={factories}
         canCreateFactory={canAct("factories", "create")}
+        canOpenSettings={canAct("factories", "update")}
         permissionsLoading={permissionsLoading}
         onCreateFactory={() => navigate(newFactoryPath(organizationId))}
       />
@@ -43,8 +48,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         organizationId={organizationId}
         factoryKey={factoryKey}
         lineId={routeLineId ?? firstFactoryLineId(factory)}
-        canOpenSettings={canAct("factories", "update")}
-        permissionsLoading={permissionsLoading}
       />
       <div className="flex-1" />
       <SidebarUserMenu
@@ -53,6 +56,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         userName={account?.name ?? "You"}
         userAvatarUrl={account?.avatar_url}
         organizationName={organization?.metadata?.name || "Organization"}
+        isTrial={isTrial}
       />
     </aside>
   );

@@ -14,6 +14,7 @@ export interface StorybookUsageReport {
   remainingCreditWarning?: boolean;
   billingEnabled?: boolean;
   hasBillingCustomer?: boolean;
+  welcomeCreditExpiresAt?: string;
   invoices?: Array<{
     id?: string;
     createdAt?: string;
@@ -40,6 +41,7 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
 export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
@@ -77,6 +79,7 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "876",
   remainingCreditWarning: false,
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
@@ -92,9 +95,40 @@ export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   hasBillingCustomer: true,
 };
 
+/** Welcome credit remains, but the balance is at or below $20. */
+export const LOW_TRIAL_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "432",
+  hostedBilledCents: "4568",
+  remainingCreditWarning: true,
+};
+
+export const EXPIRED_WELCOME_USAGE_REPORT: StorybookUsageReport = {
+  ...SPENT_CREDIT_USAGE_REPORT,
+  welcomeCreditExpiresAt: "2026-08-15T12:00:00.000Z",
+};
+
+export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "14124",
+  grantTotalCents: "15000",
+  purchasedCreditCents: "10000",
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+};
+
+/** Purchased hosted credit remains, but the balance is at or below $20. */
+export const LOW_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...PURCHASED_CREDIT_USAGE_REPORT,
+  remainingCreditCents: "1500",
+  hostedBilledCents: "13500",
+  remainingCreditWarning: true,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};
+
 /** Polar packs for empty-credit Storybook recovery screens. */
 export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
-  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
-  { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+  { id: "prod-50", name: "Hosted credit 50", amountCents: "5000" },
   { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
 ];

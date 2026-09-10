@@ -38,7 +38,7 @@ import {
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
-import { useFinishOnboarding } from "./useFinishOnboarding";
+import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -47,9 +47,11 @@ import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
 
-// Onboarding never adopts an existing organization GitHub connection on its
-// own. The repository list must come from the account the user picked.
-const ONBOARDING_MANUAL_SELECTIONS = ["github"] as const;
+// Onboarding never adopts an existing organization GitHub or agent
+// connection on its own. GitHub repositories must come from the account the
+// user picked. Agent keys stay unselected so a new workspace can use the
+// canonical SuperPlane template when hosted credit is available.
+const ONBOARDING_MANUAL_SELECTIONS = ["github", ...AGENT_PROVIDER_IDS] as const;
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key
@@ -205,6 +207,21 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   };
 }
 
+/**
+ * After an organization rename, the connection list reloads under the new
+ * slug before the repository request can start. Keep one loader visible
+ * through both requests.
+ */
+function isRepositoryListLoading(args: {
+  savedIntegrationId?: string;
+  selectedIntegrationId: string;
+  connectionsLoading: boolean;
+  repositoriesLoading: boolean;
+}): boolean {
+  if (!args.savedIntegrationId && !args.selectedIntegrationId) return false;
+  return args.connectionsLoading || args.repositoriesLoading;
+}
+
 function useOnboardingGithubConnectionSelected(args: {
   organizationId: string;
   factoryId: string;
@@ -346,6 +363,18 @@ function useSelectOnboardingVcsConnection(args: {
   };
 }
 
+/** The mutation hooks the page model saves and provisions through. */
+function useOnboardingMutations(organizationId: string, factoryId: string) {
+  return {
+    updateFactory: useUpdateFactory(organizationId, factoryId),
+    updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
+    updateOrganization: useUpdateOrganization(organizationId),
+    createLine: useCreateFactoryLine(organizationId, factoryId),
+    createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    installer: useInstallFactory({ organizationId }),
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -385,12 +414,9 @@ export function useOnboardingPageModel(args: {
   });
 
   const [saving, setSaving] = useState(false);
-  const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
-  const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
-  const updateOrganization = useUpdateOrganization(args.organizationId);
-  const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
-  const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
-  const installer = useInstallFactory({ organizationId: args.organizationId });
+  const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
+  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, installer } =
+    useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
@@ -421,6 +447,10 @@ export function useOnboardingPageModel(args: {
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
+  const githubOwner = githubOwnerFromConnections(
+    [...githubConnections.readyInstances, ...githubConnections.allInstances],
+    githubIntegrationId,
+  );
   const finish = useFinishOnboarding({
     ...args,
     setup,
@@ -439,14 +469,12 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
-    githubOwner: githubOwnerFromConnections(
-      [...githubConnections.readyInstances, ...githubConnections.allInstances],
-      githubIntegrationId,
-    ),
+    githubOwner,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
     },
+    onProvisioned: setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
@@ -462,6 +490,7 @@ export function useOnboardingPageModel(args: {
     // True when hosted credentials cover the agent, so setup can skip the
     // agent screen and provision from the ticket screen.
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
@@ -490,11 +519,19 @@ export function useOnboardingPageModel(args: {
     },
     integrationDialogs: connect.dialogs,
     repositories: github.repositories,
-    repositoriesLoading: github.repositoriesLoading,
+    repositoriesLoading: isRepositoryListLoading({
+      savedIntegrationId: onboarding?.vcsIntegrationId,
+      selectedIntegrationId: githubIntegrationId,
+      connectionsLoading: connect.connectionsLoading,
+      repositoriesLoading: github.repositoriesLoading,
+    }),
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || installer.isInstalling || createIntake.isPending,
     ...saves,
     finish: finishSetup,
+    provisionedDestination,
+    // Names the finished organization row on the GitHub stepper card.
+    githubOwner,
   };
 }

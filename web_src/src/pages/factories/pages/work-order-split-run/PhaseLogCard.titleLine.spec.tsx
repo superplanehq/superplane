@@ -340,14 +340,13 @@ describe("PhaseLogCard title line", () => {
 
 describe("PhaseLogCard phase actions", () => {
   const RUN_HREF = "/org-1/workspaces/RF/apps/app-refund-planner/split-run?run=run-1";
-  const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-planner?configure=1";
 
   function renderCard(ui: ReactElement) {
     return render(<MemoryRouter>{ui}</MemoryRouter>);
   }
 
   it("stays off collapsed phases", () => {
-    renderCard(<PhaseLogCard phase={PHASE} expanded={false} runHref={RUN_HREF} editHref={EDIT_HREF} />);
+    renderCard(<PhaseLogCard phase={PHASE} expanded={false} runHref={RUN_HREF} />);
 
     expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
@@ -356,32 +355,22 @@ describe("PhaseLogCard phase actions", () => {
 
   it("puts icon actions next to the expanded name without pill chrome", async () => {
     const user = userEvent.setup();
-    renderCard(
-      <PhaseLogCard
-        phase={{ ...PHASE, artifacts: [PLAN_MD_ARTIFACT] }}
-        expanded
-        runHref={RUN_HREF}
-        editHref={EDIT_HREF}
-      />,
-    );
+    renderCard(<PhaseLogCard phase={{ ...PHASE, artifacts: [PLAN_MD_ARTIFACT] }} expanded runHref={RUN_HREF} />);
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     const name = within(header).getByRole("button", { name: "Plan" });
     const view = screen.getByRole("link", { name: "View automation run" });
-    const edit = screen.getByRole("link", { name: "Edit automation" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
     const duration = within(header).getByTestId("split-run-phase-duration-plan");
     expect(view).toHaveAttribute("href", RUN_HREF);
-    expect(edit).toHaveAttribute("href", EDIT_HREF);
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByText("View automation run")).not.toBeInTheDocument();
-    expect(screen.queryByText("Edit automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
     expect(view.className).toMatch(/font-mono/);
     expect(view.className).not.toMatch(/rounded-full/);
     expect(view.className).not.toMatch(/border-border/);
     expect(name.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(view.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(edit.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).toBe(
       duration.parentElement,
@@ -393,12 +382,9 @@ describe("PhaseLogCard phase actions", () => {
 
     await user.hover(view);
     expect(await screen.findByRole("tooltip", { name: "View automation run" })).toBeInTheDocument();
-    await user.unhover(view);
-    await user.hover(edit);
-    expect(await screen.findByRole("tooltip", { name: "Edit automation" })).toBeInTheDocument();
   });
 
-  it("puts Stop after Edit on the left of a running automation", async () => {
+  it("puts Stop after View on the left of a running automation", async () => {
     const user = userEvent.setup();
     const onStop = vi.fn();
     renderCard(
@@ -406,21 +392,21 @@ describe("PhaseLogCard phase actions", () => {
         phase={{ ...PHASE, status: "running", artifacts: [PLAN_MD_ARTIFACT] }}
         expanded
         runHref={RUN_HREF}
-        editHref={EDIT_HREF}
         onStop={onStop}
       />,
     );
 
     const header = screen.getByTestId("split-run-automation-header-plan");
-    const edit = screen.getByRole("link", { name: "Edit automation" });
+    const view = screen.getByRole("link", { name: "View automation run" });
     const stop = screen.getByRole("button", { name: "Stop" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(edit.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(stop.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
       stop.parentElement,
     );
     expect(stop.querySelector(".lucide-circle-x")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     await user.hover(stop);
     expect(await screen.findByRole("tooltip", { name: "Stop" })).toBeInTheDocument();
@@ -428,7 +414,7 @@ describe("PhaseLogCard phase actions", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("puts Rerun after Edit on the left of a failed automation", async () => {
+  it("puts Rerun after View on the left of a failed automation", async () => {
     const user = userEvent.setup();
     const onRerun = vi.fn();
     renderCard(
@@ -436,23 +422,23 @@ describe("PhaseLogCard phase actions", () => {
         phase={{ ...PHASE, status: "failed", artifacts: [PLAN_MD_ARTIFACT] }}
         expanded
         runHref={RUN_HREF}
-        editHref={EDIT_HREF}
         onRerun={onRerun}
       />,
     );
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     const name = within(header).getByRole("button", { name: "Plan" });
-    const edit = screen.getByRole("link", { name: "Edit automation" });
+    const view = screen.getByRole("link", { name: "View automation run" });
     const rerun = screen.getByRole("button", { name: "Rerun" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(name.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(edit.compareDocumentPosition(rerun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.compareDocumentPosition(rerun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rerun.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
       rerun.parentElement,
     );
     expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     await user.hover(rerun);
     expect(await screen.findByRole("tooltip", { name: "Rerun" })).toBeInTheDocument();
@@ -460,18 +446,17 @@ describe("PhaseLogCard phase actions", () => {
     expect(onRerun).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the run or canvas without collapsing the phase", async () => {
+  it("opens the run without collapsing the phase", async () => {
     const onToggle = vi.fn();
     const user = userEvent.setup();
-    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} editHref={EDIT_HREF} onToggle={onToggle} />);
+    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} onToggle={onToggle} />);
 
     await user.click(screen.getByRole("link", { name: "View automation run" }));
-    await user.click(screen.getByRole("link", { name: "Edit automation" }));
 
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it("is absent when the log has no run or canvas path", () => {
+  it("is absent when the log has no run path", () => {
     renderCard(<PhaseLogCard phase={PHASE} expanded />);
 
     expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();

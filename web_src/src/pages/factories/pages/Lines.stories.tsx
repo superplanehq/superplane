@@ -17,6 +17,7 @@ import {
   noIntakeFactoriesFixture,
   severalIntakeFactoriesFixture,
 } from "../__fixtures__/backlogIntakeItemFixtures";
+import { LOW_CREDIT_USAGE_REPORT, SPENT_CREDIT_USAGE_REPORT } from "../__fixtures__/usageReportFixtures";
 import {
   columnAutomationsEmptyPhaseFixture,
   columnAutomationsFixture,
@@ -94,20 +95,6 @@ export const LineBoardIntakeAutomation: Story = {
     return (
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=automation`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
-      />
-    );
-  },
-};
-
-export const LineBoardIntakeRuns: Story = {
-  name: "Line board — intake runs",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=runs`}
         factoriesFixture={lineMetricsFactoriesFixture}
         appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
       />
@@ -301,6 +288,34 @@ export const LineDetailFivePhases: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={fiveStepLineFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Welcome credit is empty. The board shows the trial-empty banner in the header. */
+export const LineBoardHostedCreditEmpty: Story = {
+  name: "Line board — hosted credit empty",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT }}
+      />
+    );
+  },
+};
+
+/** Purchased hosted credit remains at or below $20. The board shows a low-credit warning. */
+export const LineBoardHostedCreditLow: Story = {
+  name: "Line board — hosted credit low",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT }}
       />
     );
   },

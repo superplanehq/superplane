@@ -8,7 +8,7 @@ import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
-import { useHostedCreditEmptyBanner } from "../../lib/useHostedCreditEmptyBanner";
+import { useHostedCreditChrome } from "../../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
@@ -32,7 +32,10 @@ export function MissionsWorkOrdersPage() {
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
-  const hostedCreditEmptyBanner = useHostedCreditEmptyBanner(organizationId, factoryKey);
+  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
+    organizationId,
+    factoryKey,
+  );
   const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
@@ -72,6 +75,7 @@ export function MissionsWorkOrdersPage() {
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
+      hostedCreditHeaderKicker={hostedCreditHeaderKicker}
       hostedCreditEmptyBanner={hostedCreditEmptyBanner}
       brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}

@@ -5,8 +5,11 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
- * Compact amber banner for empty hosted credit. Tasks shows this above the
- * board. The action opens Organization Billing.
+ * Status banner for hosted credit. A healthy trial uses quiet chrome.
+ * Low remaining credit keeps the same surface and adds a short stop hint.
+ * Empty or expired credit uses a waiting accent, not a full amber wash.
+ * Tasks and the workspace board show this in the page header. The action
+ * opens Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -39,4 +42,65 @@ export const BillingOn: Story = {
 export const BillingOff: Story = {
   name: "Billing off",
   args: { billingEnabled: false },
+};
+
+/** Welcome credit remains. The action opens Billing. */
+export const Trial: Story = {
+  name: "Trial",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit expires today. The banner uses a waiting accent. */
+export const TrialEndsToday: Story = {
+  name: "Trial ends today",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is low. The banner names that tasks stop when credit runs out. */
+export const TrialLowCredit: Story = {
+  name: "Trial low credit",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 432,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is spent. The action opens Billing. */
+export const TrialEmpty: Story = {
+  name: "Trial empty",
+  args: {
+    billingEnabled: true,
+    kind: "trial-empty",
+  },
+};
+
+/** Welcome credit expired. The action opens Billing. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  args: {
+    billingEnabled: true,
+    kind: "trial-expired",
+  },
+};
+
+/** Purchased hosted credit remains at or below $20. The action opens Billing. */
+export const LowCredit: Story = {
+  name: "Low credit",
+  args: {
+    billingEnabled: true,
+    kind: "low",
+    remainingCreditCents: 1500,
+  },
 };

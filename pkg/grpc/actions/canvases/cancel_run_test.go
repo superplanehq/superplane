@@ -99,6 +99,53 @@ func Test__CancelRun__RequestsCancellationAndDrainsWork(t *testing.T) {
 	assert.Zero(t, queueItemCount)
 }
 
+func Test__CancelRun__DrainsWaitForPullRequestChecks(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "wait-pr-checks",
+				Name:   "Wait For Pull Request Checks",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "github.waitForPullRequestChecks"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "wait-pr-checks", "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+	require.NoError(t, rootEvent.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "wait-pr-checks", rootEvent.ID, rootEvent.ID)
+	execution.RunID = run.ID
+	execution.State = models.CanvasNodeExecutionStateStarted
+	require.NoError(t, database.Conn().Save(execution).Error)
+
+	runAt := time.Now().Add(time.Minute)
+	require.NoError(t, execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{ActionName: "evaluate", Parameters: map[string]any{}},
+	}, &runAt))
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	response, err := CancelRun(ctx, database.DB(t.Context()), canvas, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, response.Run)
+	assert.Equal(t, pb.CanvasRun_STATE_CANCELLING, response.Run.State)
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}
+
 func Test__CancelRun__IsIdempotentForCancellingRun(t *testing.T) {
 	r := support.Setup(t)
 

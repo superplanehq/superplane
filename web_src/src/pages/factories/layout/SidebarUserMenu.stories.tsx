@@ -57,3 +57,19 @@ export const Open: Story = {
     defaultOpen: true,
   },
 };
+
+export const Trial: Story = {
+  args: {
+    ...defaultArgs,
+    isTrial: true,
+  },
+};
+
+export const TrialOpen: Story = {
+  name: "Trial (open)",
+  args: {
+    ...defaultArgs,
+    isTrial: true,
+    defaultOpen: true,
+  },
+};

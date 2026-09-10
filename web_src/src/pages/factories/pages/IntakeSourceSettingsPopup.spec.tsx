@@ -2,28 +2,61 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  GITHUB_INTAKE_RUNS,
-  type IntakeAutomationRun,
-  type IntakeSettingsTab,
-} from "./intakeSourceSettingsModel";
+import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+
+const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
+  useInfiniteCanvasRuns: vi.fn(),
+}));
 
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),
 }));
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof CanvasDataModule>();
+  return {
+    ...actual,
+    useInfiniteCanvasRuns,
+  };
+});
+
+useInfiniteCanvasRuns.mockReturnValue({
+  data: {
+    pages: [
+      {
+        runs: [
+          {
+            id: "run-1",
+            canvasId: "app-github-issues-intake",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-05-01T12:00:00Z",
+            rootEvent: { nodeId: "trigger", customName: "feat: Add console empty-state" },
+          },
+        ],
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  fetchNextPage: vi.fn(),
+  refetch: vi.fn(),
+});
 
 const githubAutomationGraph = githubIntakeGraph();
 
@@ -64,16 +97,21 @@ function githubIntakeGraph(): IntakeAutomationGraph {
     "live",
   );
 
-  return { nodes, edges, factoryId: "factory-1" };
+  return {
+    nodes,
+    edges,
+    factoryId: "factory-1",
+    specNodes: [{ id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" }],
+  };
 }
 
 function renderPopup(
   props: {
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
-    onOpenRun?: (run: IntakeAutomationRun) => void;
-    runs?: IntakeAutomationRun[];
     editAutomationHref?: string;
+    canvasId?: string;
+    runHrefFor?: (runId: string) => string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
   } = {},
@@ -87,9 +125,9 @@ function renderPopup(
               settings={DEFAULT_GITHUB_INTAKE_SETTINGS}
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
-              onOpenRun={props.onOpenRun}
-              runs={props.runs}
               editAutomationHref={props.editAutomationHref}
+              canvasId={props.canvasId}
+              runHrefFor={props.runHrefFor}
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
@@ -101,6 +139,10 @@ function renderPopup(
     </QueryClientProvider>,
   );
 }
+
+afterEach(() => {
+  localStorage.clear();
+});
 
 describe("IntakeSourceSettingsPopup", () => {
   it("shows the GitHub issues configuration fields", () => {
@@ -118,10 +160,11 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByRole("checkbox", { name: "bug" })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "Any assignment" })).toBeChecked();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-runs")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
   it("shows the intake automation on the Automation tab", async () => {
@@ -136,54 +179,37 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getAllByText("Create Task").length).toBeGreaterThan(0);
-    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1",
-    );
+    const headerRow = screen.getByTestId("settings-automation-header-row");
+    expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
+    expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
+    expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1");
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
   });
 
-  it("lists scored intake runs on the Runs tab", async () => {
-    const onOpenRun = vi.fn();
+  it("lists canvas runs beside the automation when a canvas id is given", async () => {
     const user = userEvent.setup();
-    renderPopup({ onOpenRun, runs: GITHUB_INTAKE_RUNS });
+    renderPopup({
+      canvasId: "app-github-issues-intake",
+      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-github-issues-intake?run=${runId}`,
+    });
 
-    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
 
-    const runs = screen.getByTestId("intake-source-runs");
-    expect(runs).toHaveAccessibleName("Runs");
-    expect(within(runs).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(runs).queryByText("acme/payments-service")).not.toBeInTheDocument();
-    expect(within(runs).queryByText("acme/docs")).not.toBeInTheDocument();
-
-    const implement = within(runs).getByTestId("intake-source-run-gh-issue-1");
-    expect(implement).toHaveTextContent("94%");
-    expect(implement).toHaveTextContent("3h ago");
-    expect(implement).toHaveTextContent("2h ago");
-    expect(implement).toHaveTextContent("Implement");
-    expect(implement).toHaveTextContent("Writing the retry handler.");
-    expect(implement).not.toHaveTextContent("Moved to Backlog");
-
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Verify");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-3")).toHaveTextContent("In Backlog");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-4")).toHaveTextContent("Rejected");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-5")).toHaveTextContent("Waiting for review.");
-
-    const held = within(runs).getByTestId("intake-source-run-gh-issue-6");
-    expect(held).toHaveTextContent("52%");
-    expect(held).toHaveTextContent("Not moved to Backlog");
-    expect(held).not.toHaveTextContent("Below the confidence score");
-
-    expect(within(runs).getAllByTestId(/^intake-source-run-/)).toHaveLength(6);
-    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "View run for Handle duplicate refunds on retry" }));
-    expect(onOpenRun).toHaveBeenCalledWith(expect.objectContaining({ id: "gh-issue-1", placement: "progressed" }));
+    const sidebar = within(screen.getByTestId("intake-source-automation")).getByTestId("canvas-runs-sidebar");
+    expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
+    expect(within(sidebar).getByText("feat: Add console empty-state")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "feat: Add console empty-state" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-1",
+    );
   });
 
   it("puts Agent after General when the intake canvas has an agent", async () => {
@@ -192,12 +218,7 @@ describe("IntakeSourceSettingsPopup", () => {
       agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
     });
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "General",
-      "Agent",
-      "Runs",
-      "Automation",
-    ]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
 
     await user.click(screen.getByTestId("intake-settings-tab-agent"));
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();

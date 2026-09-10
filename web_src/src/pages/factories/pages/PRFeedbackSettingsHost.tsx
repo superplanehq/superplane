@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 
 import {
   factoryAppConfigurePath,
+  factoryAppRunPath,
   factoryPRFeedbackSetupPath,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
@@ -230,6 +231,12 @@ function PRFeedbackSettingsLoaded({
           : undefined
       }
       editAutomationHref={editAutomationHref}
+      canvasId={canvasId}
+      runHrefFor={
+        canvasId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
+          : undefined
+      }
       agent={
         agent.agentNode
           ? {

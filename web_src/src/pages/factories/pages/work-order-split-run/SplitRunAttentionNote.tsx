@@ -20,6 +20,8 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
+import { SplitRunPullRequestReviewNote } from "./SplitRunPullRequestReviewNote";
+import { pullRequestReviewNote } from "./splitRunPullRequestReview";
 
 const TONE = {
   draft: {
@@ -56,7 +58,8 @@ const TONE = {
 
 /**
  * Sticky decision note. Actions sit beside the copy. No Update manually,
- * no source time.
+ * no source time. A waiting note that links to a pull request renders as
+ * the pull-request review strip instead.
  */
 function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
   if (!note.actor) {
@@ -91,6 +94,19 @@ export function SplitRunAttentionNote({
   modelSelect?: ReactNode;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
+  const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
+  if (pullRequest && note.cta) {
+    return (
+      <SplitRunPullRequestReviewNote
+        ctaLabel={note.cta.label}
+        pullRequest={pullRequest}
+        actions={actions}
+        actionBusy={actionBusy}
+        onAction={onAction}
+      />
+    );
+  }
+
   const visual = TONE[tone];
   const Icon = actions.some((action) => action.kind === "reopen") ? RotateCcw : visual.Icon;
 

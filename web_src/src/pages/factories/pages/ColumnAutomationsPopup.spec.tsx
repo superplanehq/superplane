@@ -116,28 +116,13 @@ describe("ColumnAutomationsPopup", () => {
     expect(onAction).toHaveBeenCalledWith("settings");
   });
 
-  it("offers Edit Agent ahead of Edit Automation when both are present", async () => {
-    const user = userEvent.setup();
-    const onAction = vi.fn();
-    render(
-      <ColumnAutomationsPopup automation={AGENT} onAction={onAction} showEditAgent showEditAutomation defaultOpen />,
-    );
+  it("does not offer Edit Agent or Edit Automation", () => {
+    renderPopup({ automation: AGENT });
 
-    const editAgent = screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent");
-    const editAutomation = screen.getByTestId("column-automation-step-0-app-refund-implementer-edit");
-    expect(editAgent).toHaveTextContent("Edit Agent");
-    expect(editAutomation).toHaveTextContent("Edit Automation");
-    expect(editAgent.compareDocumentPosition(editAutomation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(editAgent);
-    expect(onAction).toHaveBeenCalledWith("edit-agent");
-  });
-
-  it("hides edit actions when they are not offered", () => {
-    renderPopup();
-
-    expect(screen.queryByTestId("column-automation-intake-github-edit-agent")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("column-automation-intake-github-edit")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit")).not.toBeInTheDocument();
   });
 });
 
@@ -156,6 +141,24 @@ describe("ColumnAutomationsHeaderSlot", () => {
     expect(screen.getByTestId("column-automation-icon-intake-github")).toHaveAttribute("aria-label", "GitHub issues");
     expect(screen.getByTestId("column-automation-icon-analysis-1")).toHaveAttribute("aria-label", "Task analysis");
     expect(screen.getByTestId("lines-backlog-automations")).not.toHaveTextContent("2");
+  });
+
+  it("opens settings from the icon without a dropdown", async () => {
+    const user = userEvent.setup();
+    const onRowAction = vi.fn();
+    render(
+      <ColumnAutomationsHeaderSlot
+        title="Backlog"
+        automations={[INTAKE]}
+        onRowAction={onRowAction}
+        testId="lines-backlog-automations"
+      />,
+    );
+
+    await user.click(screen.getByTestId("column-automation-icon-intake-github"));
+
+    expect(onRowAction).toHaveBeenCalledWith(INTAKE, "settings");
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
   });
 
   it("hides the strip when the column has no automations", () => {

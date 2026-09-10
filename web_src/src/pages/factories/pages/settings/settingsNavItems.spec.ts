@@ -13,9 +13,6 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/notifications")?.id).toBe(
       "account-notifications",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")?.id).toBe(
-      "workspace-automations",
-    );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
     );
@@ -30,6 +27,10 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/linked-accounts")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/security")).toBeUndefined();
   });
+
+  it("no longer resolves the removed workspace Automations settings page", () => {
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")).toBeUndefined();
+  });
 });
 
 describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
@@ -40,7 +41,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
-      "Automations",
       "Models",
       "General",
       "Members",
@@ -49,6 +49,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "API keys",
       "Secrets",
       "Billing",
+      "Usage",
       "Spending",
     ]);
   });
@@ -78,7 +79,6 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
-      "workspace-automations",
       "workspace-models",
     ]);
   });
@@ -128,6 +128,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
       "organization-general",
       "organization-models",
       "organization-billing",
+      "organization-usage",
       "organization-spending",
     ]);
   });

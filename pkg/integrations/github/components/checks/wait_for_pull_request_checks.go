@@ -225,11 +225,15 @@ func (c *WaitForPullRequestChecks) Hooks() []core.Hook {
 	}
 }
 
+func waitChecksStopped(state core.ExecutionStateContext) bool {
+	return state.IsFinished() || state.IsCancelling()
+}
+
 func (c *WaitForPullRequestChecks) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != waitChecksEvaluateHook {
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
-	if ctx.ExecutionState.IsFinished() {
+	if waitChecksStopped(ctx.ExecutionState) {
 		return nil
 	}
 
@@ -288,7 +292,7 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 	if err != nil {
 		return http.StatusOK, nil, nil
 	}
-	if executionCtx.ExecutionState.IsFinished() {
+	if waitChecksStopped(executionCtx.ExecutionState) {
 		return http.StatusOK, nil, nil
 	}
 
@@ -317,7 +321,7 @@ type waitChecksRuntime struct {
 }
 
 func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) error {
-	if ctx.ExecutionState.IsFinished() {
+	if waitChecksStopped(ctx.ExecutionState) {
 		return nil
 	}
 

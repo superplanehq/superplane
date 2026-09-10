@@ -279,6 +279,14 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		newNode.StateReason = nil
 	}
 
+	deletedNode, err := models.FindUnscopedCanvasNode(p.tx, p.live.WorkflowID, nodeID)
+	if err == nil && deletedNode.DeletedAt.Valid {
+		return p.restoreDeletedNode(node, *deletedNode, appInstallationID, newNode)
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
 	//
 	// Insert first so Setup() (and sibling lookups during a later Setup) can
 	// find the workflow_node row. Setup itself is deferred until every AddNode
@@ -289,19 +297,52 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		return err
 	}
 
-	p.allNodes[newNode.NodeID] = newNode
+	return p.rememberAddedNode(node, newNode)
+}
 
-	//
-	// If node is already in error state, no need to run Setup() for it.
-	//
-	if newNode.State == models.CanvasNodeStateError {
-		node.Metadata = newNode.Metadata.Data()
+func (p *CanvasPublisher) restoreDeletedNode(
+	node models.Node,
+	existing models.CanvasNode,
+	appInstallationID *uuid.UUID,
+	replacement models.CanvasNode,
+) error {
+	now := time.Now()
+	existing.Name = replacement.Name
+	existing.Type = replacement.Type
+	existing.Ref = replacement.Ref
+	existing.Configuration = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Configuration.Data()))
+	existing.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Metadata.Data()))
+	existing.Position = replacement.Position
+	existing.IsCollapsed = replacement.IsCollapsed
+	existing.AppInstallationID = appInstallationID
+	existing.WebhookID = nil
+	existing.State = replacement.State
+	existing.StateReason = replacement.StateReason
+	existing.ConcurrencyKey = replacement.ConcurrencyKey
+	existing.ConcurrencyMax = replacement.ConcurrencyMax
+	existing.DeletedAt = gorm.DeletedAt{}
+	existing.UpdatedAt = &now
+	node.Configuration = withoutAppSubscriptionID(node.Configuration)
+	node.Metadata = withoutAppSubscriptionID(node.Metadata)
+
+	if err := p.tx.Unscoped().Save(&existing).Error; err != nil {
+		return err
+	}
+
+	return p.rememberAddedNode(node, existing)
+}
+
+func (p *CanvasPublisher) rememberAddedNode(node models.Node, canvasNode models.CanvasNode) error {
+	p.allNodes[canvasNode.NodeID] = canvasNode
+
+	if canvasNode.State == models.CanvasNodeStateError {
+		node.Metadata = canvasNode.Metadata.Data()
 		p.finalNodes[node.ID] = node
 		return nil
 	}
 
 	p.pendingSetups = append(p.pendingSetups, pendingNodeSetup{
-		canvasNode: newNode,
+		canvasNode: canvasNode,
 		draftID:    node.ID,
 	})
 	p.finalNodes[node.ID] = node
@@ -624,4 +665,21 @@ func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 	node.ID = newNodeID
 	p.finalNodes[newNodeID] = node
 	return newNodeID
+}
+
+const appSubscriptionIDKey = "appSubscriptionID"
+
+func withoutAppSubscriptionID(values map[string]any) map[string]any {
+	if values == nil {
+		return nil
+	}
+
+	cleaned := make(map[string]any, len(values))
+	for key, value := range values {
+		if key == appSubscriptionIDKey {
+			continue
+		}
+		cleaned[key] = value
+	}
+	return cleaned
 }

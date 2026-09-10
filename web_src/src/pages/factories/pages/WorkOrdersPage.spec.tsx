@@ -9,16 +9,24 @@ import {
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_KEY,
 } from "../__fixtures__/factoryPageResponses";
-import { SPENT_CREDIT_USAGE_REPORT } from "../__fixtures__/usageReportFixtures";
+import {
+  EXPIRED_WELCOME_USAGE_REPORT,
+  LOW_TRIAL_USAGE_REPORT,
+  PURCHASED_CREDIT_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+} from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
+
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
 
 describe("WorkOrdersPage hosted credit banner", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("hides the banner when remaining hosted credit is greater than zero", async () => {
+  it("shows the trial chip next to the title when welcome credit remains", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
@@ -26,8 +34,49 @@ describe("WorkOrdersPage hosted credit banner", () => {
       />,
     );
 
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveTextContent(defaultTrialLabel);
+    expect(kicker).toHaveTextContent("$41.24");
+    expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
+    expect(screen.queryByTestId("workspace-page-header-above-title")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+  }, 10000);
+
+  it("keeps the trial kicker when remaining trial credit is low", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LOW_TRIAL_USAGE_REPORT,
+        }}
+      />,
+    );
+
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveTextContent(defaultTrialLabel);
+    expect(kicker).toHaveTextContent("$4.32");
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("hides the trial kicker after the organization buys credit", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: PURCHASED_CREDIT_USAGE_REPORT,
+        }}
+      />,
+    );
+
     expect(await screen.findByTestId("work-orders-header", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("hosted-credit-header-kicker")).not.toBeInTheDocument();
   }, 10000);
 
   it("shows the banner on Tasks when remaining hosted credit is empty", async () => {
@@ -42,9 +91,9 @@ describe("WorkOrdersPage hosted credit banner", () => {
     );
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Hosted credit is empty");
-    expect(banner).toHaveTextContent("SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.");
-    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
+    expect(banner).toHaveTextContent("Trial credit is empty");
+    expect(banner).toHaveTextContent("SuperPlane-hosted runs cannot start.");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
@@ -63,6 +112,25 @@ describe("WorkOrdersPage hosted credit banner", () => {
     );
 
     expect(await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
+  it("shows the trial-ended banner when welcome credit expires", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+        }}
+      />,
+    );
+
+    const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
+    expect(banner).toHaveTextContent("Trial ended");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
   }, 10000);
 });
 
