@@ -16,6 +16,7 @@ const hostedLLMModelKeySeparator = "::"
 
 const (
 	SuperPlaneRunnerNoCreditMessage        = "This organization has no hosted credit."
+	SuperPlaneRunnerSubscribeMessage       = "Subscribe to Business to keep SuperPlane-hosted runs."
 	SuperPlaneRunnerNoFactoryBudgetMessage = "This workspace has no remaining hosted credit."
 	SuperPlaneRunnerNoModelMessage         = "The instance has no SuperPlane agent model."
 	SuperPlaneRunnerModelNotAllowedMessage = "This workspace does not allow the SuperPlane agent model."
@@ -171,6 +172,9 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 	}
 
 	if err := AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
+		if errors.Is(err, ErrHostedSubscriptionRequired) {
+			return ErrHostedSubscriptionRequired
+		}
 		if errors.Is(err, ErrHostedCreditEmpty) {
 			return ErrSuperPlaneRunnerNoCredit
 		}
@@ -233,6 +237,8 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 
 func SuperPlaneRunnerReadinessMessage(err error) string {
 	switch {
+	case errors.Is(err, ErrHostedSubscriptionRequired):
+		return SuperPlaneRunnerSubscribeMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoCredit):
 		return SuperPlaneRunnerNoCreditMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, ErrFactoryHostedBudgetEmpty):
@@ -247,7 +253,8 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 }
 
 func isSuperPlaneReadinessError(err error) bool {
-	return errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
+	return errors.Is(err, ErrHostedSubscriptionRequired) ||
+		errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget) ||
 		errors.Is(err, ErrFactoryHostedBudgetEmpty) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoModel) ||
@@ -256,7 +263,8 @@ func isSuperPlaneReadinessError(err error) bool {
 
 func isSuperPlaneReadinessMessage(message string) bool {
 	switch strings.TrimSpace(message) {
-	case SuperPlaneRunnerNoCreditMessage,
+	case SuperPlaneRunnerSubscribeMessage,
+		SuperPlaneRunnerNoCreditMessage,
 		SuperPlaneRunnerNoFactoryBudgetMessage,
 		SuperPlaneRunnerNoModelMessage,
 		SuperPlaneRunnerModelNotAllowedMessage:

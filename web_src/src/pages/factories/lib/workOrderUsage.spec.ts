@@ -123,8 +123,8 @@ describe("formatUsageModels", () => {
 
 describe("formatUsageMachineTypes", () => {
   it("joins unique machine types", () => {
-    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-large-amd64"])).toBe("e1-large-amd64");
-    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-standard-amd64"])).toBe("e1-large-amd64 · e1-standard-amd64");
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-large-amd64"])).toBe("Large x64");
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-standard-amd64"])).toBe("Large x64 · e1-standard-amd64");
   });
 
   it("returns an em dash when no machine types exist", () => {

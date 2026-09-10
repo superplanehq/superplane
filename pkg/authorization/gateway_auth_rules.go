@@ -448,6 +448,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/billing"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/roles"}: {
 			Resource:   "roles",
 			Action:     "read",
@@ -851,6 +856,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing-portal-session"}: {
+			Resource:   "org",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/business-checkout"}: {
 			Resource:   "org",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,

@@ -132,3 +132,29 @@ export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
   { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
   { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
 ];
+
+export const BUSINESS_ORGANIZATION_BILLING = {
+  plan: "business",
+  planSource: "polar",
+  polarSubscriptionStatus: "active",
+  remainingCreditCents: "14124",
+  includedRemainingCents: "5000",
+  purchasedRemainingCents: "9124",
+  billingEnabled: true,
+  subscriptionCheckoutEnabled: true,
+  creditPurchaseAllowed: true,
+  hasBillingCustomer: true,
+};
+
+export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
+  plan: "trial",
+  planSource: "system",
+  trialEndsAt: "2026-08-15T12:00:00.000Z",
+  remainingCreditCents: "0",
+  includedRemainingCents: "0",
+  purchasedRemainingCents: "0",
+  billingEnabled: true,
+  subscriptionCheckoutEnabled: true,
+  creditPurchaseAllowed: false,
+  hasBillingCustomer: false,
+};

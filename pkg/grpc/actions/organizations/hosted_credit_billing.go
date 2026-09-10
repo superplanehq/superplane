@@ -20,11 +20,20 @@ func ListHostedCreditProducts(
 	orgID string,
 	_ *pb.ListHostedCreditProductsRequest,
 ) (*pb.ListHostedCreditProductsResponse, error) {
-	if _, err := resolveOrganizationID(ctx, orgID); err != nil {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
 		return nil, err
 	}
 	if !polar.Configured() {
 		return &pb.ListHostedCreditProductsResponse{}, nil
+	}
+
+	plan, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list hosted credit products")
+	}
+	if !plan.AllowsCreditPurchase() {
+		return &pb.ListHostedCreditProductsResponse{BillingEnabled: true}, nil
 	}
 
 	packs, err := polar.NewClientFromEnv().ListCreditPacks(ctx)
@@ -59,6 +68,13 @@ func CreateHostedCreditCheckout(
 	}
 	if !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
+	}
+	plan, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+	}
+	if !plan.AllowsCreditPurchase() {
+		return nil, grpcerrors.FailedPrecondition(nil, "Subscribe to Business to purchase hosted credit.")
 	}
 	productID := strings.TrimSpace(req.GetProductId())
 	if productID == "" {

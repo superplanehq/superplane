@@ -171,6 +171,23 @@ func (s *OrganizationService) ListOrganizationCreditGrants(
 	return organizations.ListOrganizationCreditGrants(ctx, orgID, req)
 }
 
+func (s *OrganizationService) DescribeOrganizationBilling(
+	ctx context.Context,
+	req *pb.DescribeOrganizationBillingRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationBilling(ctx, orgID, req)
+}
+
+func (s *OrganizationService) CreateBusinessCheckout(
+	ctx context.Context,
+	req *pb.CreateBusinessCheckoutRequest,
+) (*pb.CreateBusinessCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {

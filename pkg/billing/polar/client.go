@@ -87,6 +87,14 @@ func Configured() bool {
 	return strings.TrimSpace(os.Getenv("POLAR_ACCESS_TOKEN")) != ""
 }
 
+func BusinessProductID() string {
+	return strings.TrimSpace(os.Getenv("POLAR_BUSINESS_PRODUCT_ID"))
+}
+
+func SubscriptionCheckoutEnabled() bool {
+	return Configured() && BusinessProductID() != ""
+}
+
 func NewClientFromEnv() *Client {
 	return NewClient(APIBaseURL(), os.Getenv("POLAR_ACCESS_TOKEN"), nil)
 }

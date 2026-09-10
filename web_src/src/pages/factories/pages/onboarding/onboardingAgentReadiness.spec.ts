@@ -254,6 +254,8 @@ describe("hosted credit grant copy", () => {
   });
 
   it("asks the user to connect a provider when remaining credit is empty", () => {
-    expect(hostedCreditGrantCopy(0)).toBe("Hosted credit is empty. Connect a provider to continue.");
+    expect(hostedCreditGrantCopy(0)).toBe(
+      "Trial credit is used up. Subscribe to Business or connect a provider to continue.",
+    );
   });
 });
