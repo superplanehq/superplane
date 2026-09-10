@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { FactoriesFactoryIntake } from "@/api-client";
 
-import { firstRunAnalysisProgress } from "./firstRunAnalysisProgress";
+import {
+  firstRunAnalysisProgress,
+  githubIssuesIntake,
+  initialImportFailed,
+  type FirstRunInitialImport,
+} from "./firstRunAnalysisProgress";
 
 function run(placement: string, extra: { confidencePct?: number; workOrderId?: string } = {}) {
   return { placement, ...extra } as never;
@@ -29,6 +35,42 @@ describe("firstRunAnalysisProgress", () => {
       stageIndex: 0,
       empty: false,
     });
+  });
+
+  it("reports an empty source immediately after a completed zero-item import", () => {
+    const initialImport: FirstRunInitialImport = { status: "INITIAL_IMPORT_STATUS_COMPLETED", itemCount: 0 };
+
+    expect(firstRunAnalysisProgress([], new Set(), false, initialImport)).toEqual({
+      total: 0,
+      scored: 0,
+      ready: 0,
+      stageIndex: 0,
+      empty: true,
+    });
+  });
+
+  it("uses the completed import count while queued runs become visible", () => {
+    const initialImport: FirstRunInitialImport = { status: "INITIAL_IMPORT_STATUS_COMPLETED", itemCount: 2 };
+
+    expect(firstRunAnalysisProgress([], new Set(), false, initialImport)).toEqual({
+      total: 2,
+      scored: 0,
+      ready: 0,
+      stageIndex: 1,
+      empty: false,
+    });
+  });
+
+  it("does not report failed or skipped imports as empty", () => {
+    for (const status of ["INITIAL_IMPORT_STATUS_FAILED", "INITIAL_IMPORT_STATUS_SKIPPED"] as const) {
+      expect(firstRunAnalysisProgress([], new Set(), true, { status })).toEqual({
+        total: 0,
+        scored: 0,
+        ready: 0,
+        stageIndex: 0,
+        empty: false,
+      });
+    }
   });
 
   // An intake without an analysis node places items on the backlog the
@@ -60,5 +102,29 @@ describe("firstRunAnalysisProgress", () => {
     // Progressed work already moved to a line, so it also counts as ready.
     const runs = [run("PLACEMENT_BELOW_THRESHOLD"), run("PLACEMENT_REJECTED"), run("PLACEMENT_PROGRESSED")];
     expect(firstRunAnalysisProgress(runs)).toEqual({ total: 3, scored: 3, ready: 1, stageIndex: 2 });
+  });
+});
+
+describe("githubIssuesIntake", () => {
+  it("selects the GitHub intake when another source appears first", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" },
+      { id: "github-1", source: "SOURCE_GITHUB_ISSUES" },
+    ];
+
+    expect(githubIssuesIntake(intakes)?.id).toBe("github-1");
+  });
+});
+
+describe("initialImportFailed", () => {
+  it("fails a pending import only after its grace period", () => {
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_PENDING", false)).toBe(false);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_PENDING", true)).toBe(true);
+  });
+
+  it("fails terminal import errors without a grace period", () => {
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_FAILED", false)).toBe(true);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_SKIPPED", false)).toBe(true);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_COMPLETED", true)).toBe(false);
   });
 });
