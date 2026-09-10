@@ -658,19 +658,18 @@ describe("LinesPage board", () => {
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
-  it("keeps status-check setup in Add automation when the comments handler exists", async () => {
+  it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-verify-menu"));
-    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
-
-    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeDisabled();
-    expect(screen.getByTestId("add-column-automation-template-checks")).toBeEnabled();
-    expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
+    for (const menuTestId of ["lines-backlog-menu", "lines-verify-menu", "lines-done-menu"]) {
+      await user.click(screen.getByTestId(menuTestId));
+      expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+    }
   });
 
   it("lists two intakes on the same source", () => {

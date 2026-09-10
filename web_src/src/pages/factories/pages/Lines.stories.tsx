@@ -221,26 +221,6 @@ export const LineBoardAutomationView: Story = {
   },
 };
 
-export const LineBoardAddAutomationPicker: Story = {
-  name: "Line board — add automation picker",
-  parameters: {
-    docs: {
-      description: {
-        story: "Open the column menu and press Add automation. Taken catalog entries stay disabled.",
-      },
-    },
-  },
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
-        factoriesFixture={columnAutomationsFixture}
-      />
-    );
-  },
-};
-
 export const LineBoardSeveralBacklogAutomations: Story = {
   name: "Line board — several backlog automations",
   render: () => {
