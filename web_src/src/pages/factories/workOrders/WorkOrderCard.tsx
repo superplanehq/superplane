@@ -1,12 +1,14 @@
-import type { FactoriesFactoryLine } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
+import { selectWorkOrderCardPullRequest } from "../lib/workOrderCardPullRequest";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
 import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
+import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 
@@ -15,6 +17,8 @@ const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [];
+const HIDDEN_ATTENTION_WHEN_PULL_REQUEST = new Set<WorkOrderAttentionReason>(["approval", "stalled"]);
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
@@ -38,6 +42,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   checksPassedOrderIds?: ReadonlySet<string>;
   /** Tasks whose check handler stopped at the attempt limit. */
   fixesPausedOrderIds?: ReadonlySet<string>;
+  /** Pull requests attached to tasks on this board. */
+  pullRequests?: FactoriesFactoryPullRequest[];
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
@@ -62,12 +68,12 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional attention pills such as Waiting for user
- * review sit on a middle row. The footer shows when the task was
- * created on the left, and the owner given name plus avatar on the
- * right (except on drafts). Drafts show a Start button. Reviewed
- * drafts also show a score to the left of Start. The owner is
- * display-only on the card.
+ * to the title. Optional pills sit on a middle row: an attached pull
+ * request, then attention such as Waiting on status checks. The
+ * footer shows when the task was created on the left, and the owner
+ * given name plus avatar on the right (except on drafts). Drafts show
+ * a Start button. Reviewed drafts also show a score to the left of
+ * Start. The owner is display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -82,6 +88,7 @@ export function WorkOrderCard({
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
   checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
+  pullRequests = EMPTY_PULL_REQUESTS,
   onDispatch,
   href,
   onOpen,
@@ -92,12 +99,16 @@ export function WorkOrderCard({
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const showStart = entry.displayStatus === "draft";
-  const attentionReasons = getWorkOrderAttentionReasons(entry.order, {
-    addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
-    waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
-    checksPassed: checksPassedOrderIds.has(entry.id),
-    fixesPaused: fixesPausedOrderIds.has(entry.id),
-  });
+  const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
+  const attentionReasons = visibleAttentionReasons(
+    getWorkOrderAttentionReasons(entry.order, {
+      addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
+      waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
+      checksPassed: checksPassedOrderIds.has(entry.id),
+      fixesPaused: fixesPausedOrderIds.has(entry.id),
+    }),
+    Boolean(cardPullRequest),
+  );
 
   return (
     <article
@@ -114,7 +125,11 @@ export function WorkOrderCard({
           </h3>
         </div>
 
-        <WorkOrderCardStatusRow reasons={attentionReasons} feedbackLabel={addressingFeedbackLabels.get(entry.id)} />
+        <WorkOrderCardStatusRow
+          reasons={attentionReasons}
+          feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+          cardPullRequest={cardPullRequest}
+        />
         <WorkOrderCardMetaRow
           entry={entry}
           organizationId={organizationId}
@@ -153,16 +168,21 @@ function WorkOrderCardOpenControl({
 function WorkOrderCardStatusRow({
   reasons,
   feedbackLabel,
+  cardPullRequest,
 }: {
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
+  cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
 }) {
-  if (reasons.length === 0) {
+  if (reasons.length === 0 && !cardPullRequest) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+      {cardPullRequest ? (
+        <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+      ) : null}
       {reasons.map((reason) =>
         reason === "checksPassed" ? (
           <WorkOrderChecksPassedMark key={reason} />
@@ -176,6 +196,16 @@ function WorkOrderCardStatusRow({
       )}
     </div>
   );
+}
+
+function visibleAttentionReasons(
+  reasons: WorkOrderAttentionReason[],
+  hasPullRequest: boolean,
+): WorkOrderAttentionReason[] {
+  if (!hasPullRequest) {
+    return reasons;
+  }
+  return reasons.filter((reason) => !HIDDEN_ATTENTION_WHEN_PULL_REQUEST.has(reason));
 }
 
 function WorkOrderCardMetaRow({

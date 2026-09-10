@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -193,5 +193,28 @@ describe("WorkOrdersPage broken integrations banner", () => {
     );
 
     expect(await screen.findByTestId("broken-integrations-banner", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+});
+
+describe("WorkOrdersPage attached pull request", () => {
+  beforeAll(() => {
+    client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  it("shows Review plus the number on the production Tasks board", async () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+        pageOverrides={{ workOrders: WorkOrdersPage }}
+      />,
+    );
+
+    const card = await screen.findByTestId("work-order-card-wo-open-refunds", {}, { timeout: 8000 });
+    const pill = within(card).getByRole("link", { name: "Review pull request #482." });
+    expect(pill).toHaveTextContent("Review #482");
+    expect(pill).toHaveAttribute("href", "https://github.com/example/ledger/pull/482");
+    expect(within(card).queryByText("Waiting for user review")).not.toBeInTheDocument();
   }, 10000);
 });
