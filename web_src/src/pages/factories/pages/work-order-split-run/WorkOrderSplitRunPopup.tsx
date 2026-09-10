@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -309,6 +309,37 @@ export function WorkOrderSplitRunPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
+  const review = (
+    <SplitRunReview
+      footer={fixture.footer}
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+      orderNumber={orderNumber}
+      canAct={canUpdate}
+      canRefine={canRefine}
+      onStart={draftStart}
+      onArchive={mutations.onArchive}
+      onReject={mutations.onReject}
+      onRefine={onRefine}
+      onBackToDraft={backToDraft}
+      onStop={mutations.onStop}
+      startBusy={isDispatching}
+      actionBusy={footerActions.busy}
+      startDisabled={!canDispatch}
+      modelSelect={
+        fixture.footer.kind === "draft" && canPickDraftStartModel ? (
+          <DraftStartModelSelect
+            organizationId={organizationId}
+            factoryId={factoryId}
+            lineName={fixture.lineName}
+            value={draftModel}
+            onChange={setDraftModel}
+            disabled={isDispatching}
+          />
+        ) : undefined
+      }
+    />
+  );
 
   return (
     <PopupShell
@@ -351,36 +382,9 @@ export function WorkOrderSplitRunPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
+        resultFooter={tab === "description" ? review : undefined}
       />
-      <SplitRunReview
-        footer={fixture.footer}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        canAct={canUpdate}
-        canRefine={canRefine}
-        onStart={draftStart}
-        onArchive={mutations.onArchive}
-        onReject={mutations.onReject}
-        onRefine={onRefine}
-        onBackToDraft={backToDraft}
-        onStop={mutations.onStop}
-        startBusy={isDispatching}
-        actionBusy={footerActions.busy}
-        startDisabled={!canDispatch}
-        modelSelect={
-          fixture.footer.kind === "draft" && canPickDraftStartModel ? (
-            <DraftStartModelSelect
-              organizationId={organizationId}
-              factoryId={factoryId}
-              lineName={fixture.lineName}
-              value={draftModel}
-              onChange={setDraftModel}
-              disabled={isDispatching}
-            />
-          ) : undefined
-        }
-      />
+      {tab !== "description" ? review : null}
     </PopupShell>
   );
 }
@@ -430,6 +434,7 @@ function SplitRunPopupTabs({
   onTabChange,
   canUpdate,
   footerActions,
+  resultFooter,
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
@@ -444,6 +449,7 @@ function SplitRunPopupTabs({
   onTabChange: (tab: SplitRunPopupTab) => void;
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
+  resultFooter?: ReactNode;
 }) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const [streamTick, setStreamTick] = useState("");
@@ -488,6 +494,7 @@ function SplitRunPopupTabs({
           orderNumber={orderNumber}
           files={liveWorkOrder.data?.files}
           expandFirstCheck={fixture.footer.kind === "draft"}
+          resultFooter={resultFooter}
         />
       </TabsContent>
       <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

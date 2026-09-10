@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
@@ -20,6 +22,7 @@ export function WorkOrderSplitRunOverview({
   orderNumber,
   expandFirstCheck = false,
   files,
+  resultFooter,
 }: {
   title: string;
   description: string;
@@ -31,6 +34,7 @@ export function WorkOrderSplitRunOverview({
   orderNumber?: string;
   expandFirstCheck?: boolean;
   files?: FilesFile[];
+  resultFooter?: ReactNode;
 }) {
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
   const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
@@ -44,27 +48,29 @@ export function WorkOrderSplitRunOverview({
         confidence={confidence}
         isAnalyzing={isAnalyzing}
         files={files}
+        resultAfterBody={
+          otherChecks.length > 0 ? (
+            <section className="mt-6" data-testid="split-run-overview-other-checks" aria-label="Checks">
+              <h3 className="workspace-section-label">Checks</h3>
+              <div className="mt-1">
+                {otherChecks.map((check, index) => (
+                  <WorkOrderCheckComment
+                    key={check.id}
+                    check={check}
+                    defaultOpen={expandFirstCheck && !confidence && index === 0}
+                    runHref={
+                      organizationId && factoryKey
+                        ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
+                        : null
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null
+        }
+        resultFooter={resultFooter}
       />
-
-      {otherChecks.length > 0 ? (
-        <section className="shrink-0 px-5 pb-5" data-testid="split-run-overview-other-checks" aria-label="Checks">
-          <h3 className="workspace-section-label">Checks</h3>
-          <div className="mt-1">
-            {otherChecks.map((check, index) => (
-              <WorkOrderCheckComment
-                key={check.id}
-                check={check}
-                defaultOpen={expandFirstCheck && !confidence && index === 0}
-                runHref={
-                  organizationId && factoryKey
-                    ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
-                    : null
-                }
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

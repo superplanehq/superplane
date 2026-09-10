@@ -697,11 +697,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(start.parentElement).not.toHaveClass("mt-3");
     expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-result")).getByTestId("split-run-attention-note")).toBe(note);
+    expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-attention-note")).toBeNull();
     await openLogTab(user);
+    const logNote = screen.getByTestId("split-run-attention-note");
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
-    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(logNote).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(logNote).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(logNote).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
     expect(within(backlog).queryByText(/Created manually/)).not.toBeInTheDocument();

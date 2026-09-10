@@ -47,7 +47,7 @@ function reviewRunHref(
 }
 
 /**
- * Decision note under Description and Automations. Header stays Close only.
+ * Decision note under the plan on Description, and under Automations.
  */
 export function SplitRunReview({
   footer,

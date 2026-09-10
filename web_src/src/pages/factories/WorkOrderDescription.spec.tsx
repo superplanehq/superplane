@@ -95,6 +95,34 @@ describe("WorkOrderDescription", () => {
     expect(content).toHaveStyle({ maxHeight: "440px" });
   });
 
+  it("clamps to a preview height when one is set", () => {
+    render(
+      <div data-testid="description-pane" style={{ overflowY: "auto", padding: "24px 0" }}>
+        <WorkOrderDescription description="# Test description" previewHeight={220} />
+      </div>,
+    );
+
+    const pane = screen.getByTestId("description-pane");
+    Object.defineProperty(pane, "clientHeight", { configurable: true, get: () => 520 });
+    const content = screen.getByTestId("work-order-description-markdown").parentElement;
+    Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 640 });
+
+    act(() => notifyResize());
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+    expect(content).toHaveStyle({ maxHeight: "220px" });
+  });
+
+  it("does not collapse a preview when the body fits", () => {
+    render(<WorkOrderDescription description="# Test description" previewHeight={220} />);
+
+    const content = screen.getByTestId("work-order-description-markdown").parentElement;
+    Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 180 });
+
+    act(() => notifyResize());
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(content).not.toHaveStyle({ maxHeight: "220px" });
+  });
+
   it("leaves room for checks in the leftover pane", () => {
     render(
       <div data-testid="description-pane" style={{ overflowY: "auto", padding: "24px 0" }}>
