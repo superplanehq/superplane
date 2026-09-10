@@ -70,7 +70,7 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 	if p.PlanSource == BillingPlanSourceAdmin {
 		return true
 	}
-	return polarSubscriptionIsPaid(p.PolarSubscriptionStatus)
+	return PolarSubscriptionIsPaid(p.PolarSubscriptionStatus)
 }
 
 func (p *OrganizationBillingPlan) IsOpenTrial(now time.Time) bool {
@@ -91,7 +91,7 @@ func (p *OrganizationBillingPlan) AllowsCreditPurchase() bool {
 	return p.IsActiveBusiness()
 }
 
-func polarSubscriptionIsPaid(status string) bool {
+func PolarSubscriptionIsPaid(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing:
 		return true
@@ -103,8 +103,7 @@ func polarSubscriptionIsPaid(status string) bool {
 func polarSubscriptionIsCanceled(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusCanceled, PolarSubscriptionStatusUnpaid,
-		PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue,
-		PolarSubscriptionStatusIncomplete:
+		PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue:
 		return true
 	default:
 		return false
@@ -238,9 +237,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status
 	}
 
 	periodChanged := periodStartChanged(existing.CurrentPeriodStart, next.CurrentPeriodStart)
-	becamePaid := !existing.IsActiveBusiness() && polarSubscriptionIsPaid(next.PolarSubscriptionStatus)
+	becamePaid := !existing.IsActiveBusiness() && PolarSubscriptionIsPaid(next.PolarSubscriptionStatus)
 
-	if polarSubscriptionIsPaid(next.PolarSubscriptionStatus) {
+	if PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) {
 		next.Plan = BillingPlanBusiness
 	} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) {
 		next.Plan = BillingPlanNone
@@ -264,7 +263,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status
 		return nil, false, err
 	}
 
-	shouldGrantIncluded := polarSubscriptionIsPaid(next.PolarSubscriptionStatus) && (becamePaid || periodChanged)
+	shouldGrantIncluded := PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) && (becamePaid || periodChanged)
 	saved, err := loadedOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return nil, false, err

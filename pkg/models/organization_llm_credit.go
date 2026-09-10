@@ -645,8 +645,8 @@ func trialConversionGrantKey(orgID uuid.UUID, subscriptionID string) string {
 	return "trial-conversion:" + orgID.String() + ":" + strings.TrimSpace(subscriptionID)
 }
 
-func IncludedGrantKey(subscriptionID string, periodStart time.Time) string {
-	return "included:" + strings.TrimSpace(subscriptionID) + ":" + periodStart.UTC().Format(time.RFC3339)
+func IncludedGrantKey(subscriptionID string, periodEnd time.Time) string {
+	return "included:" + strings.TrimSpace(subscriptionID) + ":" + periodEnd.UTC().Format(time.RFC3339)
 }
 
 func expireWelcomeGrantNow(tx *gorm.DB, orgID uuid.UUID, now time.Time) error {

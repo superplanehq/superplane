@@ -75,15 +75,11 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		if periodEnd == nil {
 			return nil
 		}
-		start := time.Now()
-		if periodStart != nil {
-			start = *periodStart
-		}
 		_, err = models.AddIncludedLLMCreditGrant(
 			inner,
 			orgID,
 			models.CentsToMicros(models.DefaultIncludedGrantCents),
-			models.IncludedGrantKey(data.ID, start),
+			models.IncludedGrantKey(data.ID, *periodEnd),
 			*periodEnd,
 		)
 		return err
@@ -124,20 +120,11 @@ func selectBusinessSubscription(items []SubscriptionData) *SubscriptionData {
 		return nil
 	}
 	for i := range items {
-		if polarSubscriptionIsPaid(items[i].Status) {
+		if models.PolarSubscriptionIsPaid(items[i].Status) {
 			return &items[i]
 		}
 	}
 	return &items[0]
-}
-
-func polarSubscriptionIsPaid(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case models.PolarSubscriptionStatusActive, models.PolarSubscriptionStatusTrialing:
-		return true
-	default:
-		return false
-	}
 }
 
 func parseSubscriptionOrganizationID(data SubscriptionData) (uuid.UUID, error) {

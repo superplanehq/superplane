@@ -52,6 +52,59 @@ func Test__ApplySubscriptionCancelStopsBusiness(t *testing.T) {
 	assert.False(t, plan.IsActiveBusiness())
 }
 
+func Test__ApplySubscriptionIncompleteKeepsTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+
+	require.NoError(t, ApplySubscriptionEvent(
+		context.Background(),
+		db,
+		subscriptionEvent(r.Organization.ID, "sub_incomplete", "incomplete", periodStart, periodEnd),
+	))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
+	assert.False(t, plan.IsActiveBusiness())
+}
+
+func Test__ApplySubscriptionIncludedGrantIsIdempotentWithoutPeriodStart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodEnd := time.Now().UTC().Truncate(time.Second).AddDate(0, 1, 0)
+	event := &SubscriptionWebhookEvent{
+		Type: subscriptionUpdatedType,
+		Data: SubscriptionData{
+			ID:               "sub_no_start",
+			Status:           "active",
+			CurrentPeriodEnd: polarTime{Time: periodEnd},
+			Customer: OrderCustomer{
+				ID:         "cust_polar_1",
+				ExternalID: r.Organization.ID.String(),
+			},
+		},
+	}
+
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+
+	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
+	require.NoError(t, err)
+	included := 0
+	for _, grant := range grants {
+		if grant.Kind != models.LLMCreditGrantKindIncluded {
+			continue
+		}
+		included++
+		require.NotNil(t, grant.PolarOrderID)
+		assert.Equal(t, models.IncludedGrantKey("sub_no_start", periodEnd), *grant.PolarOrderID)
+	}
+	assert.Equal(t, 1, included)
+}
+
 func Test__SyncOrganizationSubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
@@ -107,6 +160,23 @@ func Test__SyncOrganizationSubscriptionLeavesTrialWhenPolarHasNone(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
 	assert.Equal(t, models.BillingPlanSourceSystem, plan.PlanSource)
+}
+
+func Test__SyncOrganizationSubscriptionLeavesTrialWhenPolarIsIncomplete(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	usePolarSubscriptionServer(t, r.Organization.ID.String(), []map[string]any{
+		polarSubscriptionJSON("sub_sync_incomplete", "incomplete", r.Organization.ID.String(), periodStart, periodEnd),
+	})
+
+	require.NoError(t, SyncOrganizationSubscription(context.Background(), db, r.Organization.ID))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
 }
 
 func Test__SyncOrganizationSubscriptionSkipsAdminPlan(t *testing.T) {

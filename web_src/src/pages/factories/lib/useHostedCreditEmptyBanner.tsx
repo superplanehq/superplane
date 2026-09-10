@@ -1,3 +1,7 @@
+import type {
+  OrganizationsDescribeOrganizationBillingResponse,
+  OrganizationsDescribeOrganizationWorkspaceUsageResponse,
+} from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
@@ -8,6 +12,27 @@ import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "../HostedCred
 import { factorySettingsSectionPath } from "./factoryPagePaths";
 import { hostedCreditBannerKind } from "./hostedCreditEmpty";
 
+function hostedCreditChromeState(
+  spendData: OrganizationsDescribeOrganizationWorkspaceUsageResponse | undefined,
+  billingData: OrganizationsDescribeOrganizationBillingResponse | undefined,
+) {
+  return {
+    kind: spendData
+      ? hostedCreditBannerKind({
+          ...spendData,
+          plan: billingData?.plan,
+          trialEndsAt: billingData?.trialEndsAt,
+          subscriptionCheckoutEnabled: billingData?.subscriptionCheckoutEnabled,
+          creditPurchaseAllowed: billingData?.creditPurchaseAllowed,
+        })
+      : null,
+    remainingCreditCents: parseWorkOrderMetric(spendData?.remainingCreditCents),
+    welcomeCreditExpiresAt: billingData?.trialEndsAt ?? spendData?.welcomeCreditExpiresAt,
+    billingEnabled: spendData?.billingEnabled === true || billingData?.billingEnabled === true,
+    subscriptionCheckoutEnabled: billingData?.subscriptionCheckoutEnabled,
+  };
+}
+
 export function useHostedCreditChrome(
   organizationId: string,
   factoryKey: string,
@@ -15,23 +40,13 @@ export function useHostedCreditChrome(
   const { canAct } = usePermissions();
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
-  const kind = spend.data
-    ? hostedCreditBannerKind({
-        ...spend.data,
-        plan: billing.data?.plan,
-        trialEndsAt: billing.data?.trialEndsAt,
-        subscriptionCheckoutEnabled: billing.data?.subscriptionCheckoutEnabled,
-        creditPurchaseAllowed: billing.data?.creditPurchaseAllowed,
-      })
-    : null;
+  const { kind, remainingCreditCents, welcomeCreditExpiresAt, billingEnabled, subscriptionCheckoutEnabled } =
+    hostedCreditChromeState(spend.data, billing.data);
   if (!kind) {
     return {};
   }
 
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
-  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  const welcomeCreditExpiresAt = billing.data?.trialEndsAt ?? spend.data?.welcomeCreditExpiresAt;
-  const billingEnabled = spend.data?.billingEnabled === true || billing.data?.billingEnabled === true;
   const canManageBilling = canAct("org", "update");
 
   if (kind === "trial") {
@@ -54,7 +69,7 @@ export function useHostedCreditChrome(
         canManageBilling={canManageBilling}
         remainingCreditCents={remainingCreditCents}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
-        subscriptionCheckoutEnabled={billing.data?.subscriptionCheckoutEnabled}
+        subscriptionCheckoutEnabled={subscriptionCheckoutEnabled}
         spendingHref={spendingHref}
       />
     ),

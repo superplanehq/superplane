@@ -51,6 +51,27 @@ func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
 	assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
 }
 
+func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_incomplete",
+		models.PolarSubscriptionStatusIncomplete,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanTrial, after.Plan)
+	assert.True(t, after.IsOpenTrial(time.Now()))
+	assert.Equal(t, models.PolarSubscriptionStatusIncomplete, after.PolarSubscriptionStatus)
+}
+
 func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
