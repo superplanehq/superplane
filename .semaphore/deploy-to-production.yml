@@ -28,9 +28,29 @@ blocks:
                 exit 1
               fi
 
-              curl -fsS -X POST \
-                --location "https://superplanehq.semaphoreci.com/api/v1alpha/tasks/${DEPLOY_TASK_ID}/run_now" \
+              payload="$(cat <<EOF
+              {
+                "parameters": {
+                  "ENVIRONMENT": "production",
+                  "BRANCH": "main",
+                  "COMMIT_SHA": "${SEMAPHORE_GIT_SHA}"
+                }
+              }
+              EOF
+              )"
+
+              http_code="$(curl -sS -o /tmp/run_now.json -w "%{http_code}" -X POST \
+                "https://superplanehq.semaphoreci.com/api/v1alpha/tasks/${DEPLOY_TASK_ID}/run_now" \
                 -H "Authorization: Token ${SEMAPHORE_API_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -H "User-Agent: SemaphoreCI v2.0 Client" \
-                -d "{\"reference\":\"main\",\"parameters\":{\"ENVIRONMENT\":\"production\",\"BRANCH\":\"main\",\"COMMIT_SHA\":\"${SEMAPHORE_GIT_SHA}\"}}"
+                -d "${payload}")"
+
+              echo "HTTP ${http_code}"
+              cat /tmp/run_now.json
+              echo
+
+              if [ "${http_code}" != "200" ]; then
+                echo "Deploy task trigger failed" >&2
+                exit 1
+              fi
