@@ -576,7 +576,7 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
-	return &core.WorkOrder{
+	wo := &core.WorkOrder{
 		ID:          order.ID.String(),
 		Title:       order.Title,
 		Description: order.Description,
@@ -584,6 +584,15 @@ func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
 		Result:      order.Result,
 		Number:      order.Number,
 	}
+	if origin := order.Origin(); origin != nil {
+		wo.OriginURL = origin.URL
+		wo.OriginLabel = origin.Label
+		if owner, repo, kind, number, ok := models.ParseGitHubOrigin(origin.URL); ok && kind == "issues" {
+			wo.OriginRepository = owner + "/" + repo
+			wo.OriginNumber = number
+		}
+	}
+	return wo
 }
 
 func pullRequestToCore(pullRequest *models.FactoryPullRequest) *core.PullRequest {

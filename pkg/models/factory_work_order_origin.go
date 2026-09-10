@@ -143,6 +143,30 @@ func githubOriginLabel(parsed *url.URL) string {
 	return owner + "/" + repo + "#" + number
 }
 
+// ParseGitHubOrigin parses a GitHub issue or pull request URL.
+// It returns the owner, repository, kind ("issues" or "pull"), number, and true when the URL matches.
+func ParseGitHubOrigin(rawURL string) (owner, repo, kind, number string, ok bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Hostname() != "github.com" {
+		return "", "", "", "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 {
+		return "", "", "", "", false
+	}
+
+	owner, repo, kind, number = parts[0], parts[1], parts[2], parts[3]
+	if owner == "" || repo == "" || number == "" {
+		return "", "", "", "", false
+	}
+	if kind != "issues" && kind != "pull" {
+		return "", "", "", "", false
+	}
+
+	return owner, repo, kind, number, true
+}
+
 func lastPathSegment(parsed *url.URL) string {
 	parts := strings.FieldsFunc(parsed.Path, func(r rune) bool { return r == '/' })
 	if len(parts) == 0 {

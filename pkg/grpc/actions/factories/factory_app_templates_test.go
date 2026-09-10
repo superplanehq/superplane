@@ -99,6 +99,58 @@ func TestMaterializeFactoryTemplates(t *testing.T) {
 	}
 }
 
+func TestMaterializePRCIosureTemplate_HasOriginClosingNodes(t *testing.T) {
+	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "PR Closure",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+			"defaultBranch": "main",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	hasOrigin := findYAMLNode(t, canvas, "has-github-origin")
+	assert.Equal(t, "if", hasOrigin.Component)
+	assert.Contains(t, hasOrigin.Configuration["expression"], "originRepository")
+
+	comment := findYAMLNode(t, canvas, "comment-on-origin")
+	assert.Equal(t, "github.createIssueComment", comment.Component)
+	assert.Equal(t, "{{ $[\"Find Pull Request\"].data.workOrder.originRepository }}", comment.Configuration["repository"])
+	assert.Equal(t, "{{ $[\"Find Pull Request\"].data.workOrder.originNumber }}", comment.Configuration["issueNumber"])
+	assert.Equal(t, "{{ $[\"complete-work-order\"] != nil ? \"SuperPlane completed this task.\" : \"SuperPlane closed this task.\" }}", comment.Configuration["body"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
+
+	closeOrigin := findYAMLNode(t, canvas, "close-origin")
+	assert.Equal(t, "github.updateIssue", closeOrigin.Component)
+	assert.Equal(t, "{{ $[\"Find Pull Request\"].data.workOrder.originRepository }}", closeOrigin.Configuration["repository"])
+	assert.Equal(t, "{{ $[\"Find Pull Request\"].data.workOrder.originNumber }}", closeOrigin.Configuration["issueNumber"])
+	assert.Equal(t, "closed", closeOrigin.Configuration["state"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, closeOrigin.Integration)
+
+	// Edges from both status nodes to has-github-origin
+	assertEdge(t, canvas, "complete-work-order", "has-github-origin", "default")
+	assertEdge(t, canvas, "reject-work-order", "has-github-origin", "default")
+	assertEdge(t, canvas, "has-github-origin", "comment-on-origin", "true")
+	assertEdge(t, canvas, "comment-on-origin", "close-origin", "default")
+}
+
+func assertEdge(t *testing.T, canvas *yaml.Canvas, sourceID, targetID, channel string) {
+	t.Helper()
+	for _, edge := range canvas.Spec.Edges {
+		if edge.SourceID == sourceID && edge.TargetID == targetID && edge.Channel == channel {
+			return
+		}
+	}
+	t.Fatalf("edge not found: %s -> %s (channel: %s)", sourceID, targetID, channel)
+}
+
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
 	_, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
 		appID:   "app-1",

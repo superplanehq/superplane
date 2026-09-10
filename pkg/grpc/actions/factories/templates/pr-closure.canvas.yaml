@@ -26,6 +26,18 @@ spec:
     - channel: default
       sourceId: stamp-pr-closed
       targetId: reject-work-order
+    - channel: default
+      sourceId: complete-work-order
+      targetId: has-github-origin
+    - channel: default
+      sourceId: reject-work-order
+      targetId: has-github-origin
+    - channel: "true"
+      sourceId: has-github-origin
+      targetId: comment-on-origin
+    - channel: default
+      sourceId: comment-on-origin
+      targetId: close-origin
   nodes:
     - id: on-pr-closed
       name: On Pull Request Closed
@@ -122,4 +134,38 @@ spec:
       position:
         x: 1600
         'y': 1332
+      isCollapsed: true
+    - id: has-github-origin
+      name: Has GitHub Origin?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: $["Find Pull Request"].data.workOrder.originRepository != ""
+      position:
+        x: 1366
+        'y': 1512
+      isCollapsed: true
+    - id: comment-on-origin
+      name: Comment on Origin Issue
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      configuration:
+        repository: '{{ $["Find Pull Request"].data.workOrder.originRepository }}'
+        issueNumber: '{{ $["Find Pull Request"].data.workOrder.originNumber }}'
+        body: '{{ $["complete-work-order"] != nil ? "SuperPlane completed this task." : "SuperPlane closed this task." }}'
+      position:
+        x: 1366
+        'y': 1692
+      isCollapsed: true
+    - id: close-origin
+      name: Close Origin Issue
+      type: TYPE_ACTION
+      component: github.updateIssue
+      configuration:
+        repository: '{{ $["Find Pull Request"].data.workOrder.originRepository }}'
+        issueNumber: '{{ $["Find Pull Request"].data.workOrder.originNumber }}'
+        state: closed
+      position:
+        x: 1366
+        'y': 1872
       isCollapsed: true

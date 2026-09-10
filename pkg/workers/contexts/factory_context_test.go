@@ -269,6 +269,64 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_ReturnsOriginForGitHubIssue(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	origin := models.WorkOrderOrigin{
+		URL:   "https://github.com/acme/payments/issues/42",
+		Label: "acme/payments#42",
+	}
+	order, err := factory.CreateWorkOrderWithOrigin(database.Conn(), "Origin target", "", &r.User, nil, nil, origin)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	updated, _, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultCompleted,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/acme/payments/issues/42", updated.OriginURL)
+	assert.Equal(t, "acme/payments#42", updated.OriginLabel)
+	assert.Equal(t, "acme/payments", updated.OriginRepository)
+	assert.Equal(t, "42", updated.OriginNumber)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_ReturnsEmptyOriginForNonGitHubURL(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	origin := models.WorkOrderOrigin{
+		URL:   "https://example.com/tickets/42",
+		Label: "42",
+	}
+	order, err := factory.CreateWorkOrderWithOrigin(database.Conn(), "Origin target", "", &r.User, nil, nil, origin)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	updated, _, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultCompleted,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/tickets/42", updated.OriginURL)
+	assert.Equal(t, "42", updated.OriginLabel)
+	assert.Empty(t, updated.OriginRepository)
+	assert.Empty(t, updated.OriginNumber)
+}
+
 // orderId is required and explicit at the FactoryContext level too — there
 // is no implicit fallback to "the work order driving the current run".
 // That behavior now lives entirely in the `{{ order().id }}` default on the

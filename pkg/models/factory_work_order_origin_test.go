@@ -56,6 +56,46 @@ func TestOriginFromIntakePayload_MissingURLReturnsNil(t *testing.T) {
 	}))
 }
 
+func TestParseGitHubOrigin(t *testing.T) {
+	t.Run("parses issue URL", func(t *testing.T) {
+		owner, repo, kind, number, ok := ParseGitHubOrigin("https://github.com/acme/payments/issues/12")
+		assert.True(t, ok)
+		assert.Equal(t, "acme", owner)
+		assert.Equal(t, "payments", repo)
+		assert.Equal(t, "issues", kind)
+		assert.Equal(t, "12", number)
+	})
+
+	t.Run("parses pull request URL", func(t *testing.T) {
+		owner, repo, kind, number, ok := ParseGitHubOrigin("https://github.com/acme/payments/pull/8")
+		assert.True(t, ok)
+		assert.Equal(t, "acme", owner)
+		assert.Equal(t, "payments", repo)
+		assert.Equal(t, "pull", kind)
+		assert.Equal(t, "8", number)
+	})
+
+	t.Run("rejects non-GitHub URL", func(t *testing.T) {
+		_, _, _, _, ok := ParseGitHubOrigin("https://example.com/issues/12")
+		assert.False(t, ok)
+	})
+
+	t.Run("rejects missing path segments", func(t *testing.T) {
+		_, _, _, _, ok := ParseGitHubOrigin("https://github.com/acme/payments")
+		assert.False(t, ok)
+	})
+
+	t.Run("rejects unsupported kind", func(t *testing.T) {
+		_, _, _, _, ok := ParseGitHubOrigin("https://github.com/acme/payments/discussions/12")
+		assert.False(t, ok)
+	})
+
+	t.Run("rejects empty number", func(t *testing.T) {
+		_, _, _, _, ok := ParseGitHubOrigin("https://github.com/acme/payments/issues/")
+		assert.False(t, ok)
+	})
+}
+
 func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "acme/payments#12", OriginLabelFromURL("https://github.com/acme/payments/issues/12"))
 	assert.Equal(t, "acme/payments#8", OriginLabelFromURL("https://github.com/acme/payments/pull/8"))
