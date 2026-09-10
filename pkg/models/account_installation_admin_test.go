@@ -21,6 +21,16 @@ func TestInstallationAdmin(t *testing.T) {
 		assert.False(t, account.IsInstallationAdmin())
 	})
 
+	t.Run("installation admin accounts are persisted as admins on creation", func(t *testing.T) {
+		account, err := CreateInstallationAdminAccount(database.Conn(), "Instance Owner", "owner@example.com")
+		require.NoError(t, err)
+		assert.True(t, account.IsInstallationAdmin())
+
+		refreshed, err := FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.True(t, refreshed.IsInstallationAdmin())
+	})
+
 	t.Run("PromoteToInstallationAdmin sets the flag", func(t *testing.T) {
 		account, err := CreateAccount("Admin Candidate", "candidate@example.com")
 		require.NoError(t, err)
