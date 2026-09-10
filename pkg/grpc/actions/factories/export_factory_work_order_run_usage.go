@@ -110,15 +110,32 @@ func workOrderRunUsageCSVRecord(item *pb.WorkOrderRunUsageRow) []string {
 
 	return []string{
 		formatUsageCSVDate(item.GetLastOccurredAt().AsTime()),
-		user,
-		item.GetWorkOrderKey(),
-		formatUsageCSVModels(item.GetModels(), item.GetByokModels()),
+		sanitizeUsageCSVCell(user),
+		sanitizeUsageCSVCell(item.GetWorkOrderKey()),
+		sanitizeUsageCSVCell(formatUsageCSVModels(item.GetModels(), item.GetByokModels())),
 		formatUsageCSVInt(item.GetTotalTokens()),
 		formatUsageCSVCents(tokenPriceCents),
-		formatUsageCSVMachineTypes(item.GetMachineTypes()),
+		sanitizeUsageCSVCell(formatUsageCSVMachineTypes(item.GetMachineTypes())),
 		formatUsageCSVInt(item.GetDurationSeconds()),
 		formatUsageCSVCents(vmPriceCents),
 	}
+}
+
+// sanitizeUsageCSVCell neutralizes spreadsheet formula injection. User-supplied
+// text (names, models, machine types, task keys) can start with a formula
+// trigger, which Excel and other spreadsheets would otherwise execute on open,
+// potentially issuing external requests or rendering deceptive links. Prefixing
+// such a value with a single quote forces the cell to be treated as literal
+// text. Numeric and date cells are produced by this package and never need it.
+func sanitizeUsageCSVCell(value string) string {
+	if value == "" {
+		return value
+	}
+	switch value[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + value
+	}
+	return value
 }
 
 func formatUsageCSVDate(value time.Time) string {

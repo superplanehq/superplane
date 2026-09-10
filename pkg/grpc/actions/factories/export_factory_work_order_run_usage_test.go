@@ -134,6 +134,32 @@ func Test__WorkOrderRunUsageCSVRecord__UserFallsBackToEmail(t *testing.T) {
 	assert.Equal(t, "person@example.com", record[1])
 }
 
+func Test__SanitizeUsageCSVCell(t *testing.T) {
+	assert.Equal(t, "", sanitizeUsageCSVCell(""))
+	assert.Equal(t, "Ada Lovelace", sanitizeUsageCSVCell("Ada Lovelace"))
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", sanitizeUsageCSVCell("anthropic/claude-sonnet-4-6"))
+
+	// Formula triggers must be neutralized so spreadsheets treat them as text.
+	for _, prefix := range []string{"=", "+", "-", "@", "\t", "\r"} {
+		value := prefix + "cmd|'/C calc'!A1"
+		assert.Equal(t, "'"+value, sanitizeUsageCSVCell(value), "prefix %q must be escaped", prefix)
+	}
+}
+
+func Test__WorkOrderRunUsageCSVRecord__NeutralizesFormulaInjection(t *testing.T) {
+	item := &pb.WorkOrderRunUsageRow{
+		UserName:     "=HYPERLINK(\"http://evil\",\"click\")",
+		WorkOrderKey: "@SUM(A1:A9)",
+		Models:       []string{"-2+3"},
+		MachineTypes: []string{"+bad"},
+	}
+	record := workOrderRunUsageCSVRecord(item)
+	assert.Equal(t, "'=HYPERLINK(\"http://evil\",\"click\")", record[1])
+	assert.Equal(t, "'@SUM(A1:A9)", record[2])
+	assert.Equal(t, "'-2+3", record[3])
+	assert.Equal(t, "'+bad", record[6])
+}
+
 func Test__FormatUsageCSVModels(t *testing.T) {
 	assert.Equal(t, "", formatUsageCSVModels(nil, nil))
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", formatUsageCSVModels([]string{"anthropic/claude-sonnet-4-6"}, nil))
