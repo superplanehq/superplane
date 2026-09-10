@@ -18,7 +18,9 @@ import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   AutomationsPage,
+  ChecksPRFeedbackSetupPage,
   CreateWorkOrderComposeRedirect,
+  DiscussionPRFeedbackSetupPage,
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
@@ -291,6 +293,8 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path="new" element={<FactoryLineEditPage />} />
                 <Route path=":lineId" element={<LinesPage />} />
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
+                <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
+                <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
                 <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>

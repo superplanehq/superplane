@@ -9,6 +9,9 @@ import type {
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
+import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
+
+export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
 export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
 export type PRFeedbackSourceId = "discussion" | "checks";
@@ -35,7 +38,7 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   {
     id: "discussion",
     name: "Pull request discussion",
-    description: "Address comments and reviews after a mention.",
+    description: "Address comments and reviews on a pull request.",
     listenTitle: "Listening to pull request comments",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
@@ -51,6 +54,17 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
     defaultName: "Fix pull request checks",
   },
 ];
+
+/** Hide the status-checks next step until that post-onboarding prompt is ready. */
+export const CHECKS_PR_FEEDBACK_NEXT_STEP_AVAILABLE = false;
+
+export function availablePRFeedbackSources(): PRFeedbackSource[] {
+  return PR_FEEDBACK_SOURCES;
+}
+
+export function isPRFeedbackSetupAvailable(sourceId: PRFeedbackSourceId): boolean {
+  return availablePRFeedbackSources().some((source) => source.id === sourceId);
+}
 
 export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource | undefined {
   return PR_FEEDBACK_SOURCES.find((source) => source.id === id);
@@ -71,7 +85,14 @@ export function takenPRFeedbackSourceIds(
 }
 
 export function hasAvailablePRFeedbackSource(taken: readonly PRFeedbackSourceId[]): boolean {
-  return PR_FEEDBACK_SOURCES.some((source) => !taken.includes(source.id));
+  return availablePRFeedbackSources().some((source) => !taken.includes(source.id));
+}
+
+export function prFeedbackHandlerForSource<T extends { id?: string; source?: FactoriesFactoryPrFeedbackHandlerSource }>(
+  handlers: readonly T[],
+  sourceId: PRFeedbackSourceId,
+): T | undefined {
+  return handlers.find((handler) => Boolean(handler.id) && prFeedbackSourceId(handler.source) === sourceId);
 }
 
 export interface PRFeedbackDraftSettings {
@@ -85,68 +106,6 @@ export interface PRFeedbackDraftSettings {
   maximumAttempts: number;
   runnerIntegrationIds: string[];
 }
-
-export const PR_FEEDBACK_SETTINGS_COPY = {
-  tabsLabel: "PR feedback settings",
-  generalTab: "General",
-  agentTab: "Agent",
-  automationTab: "Automation",
-  nameLabel: "Name",
-  nameHelper: "This name appears in the workspace app list.",
-  repositoryLabel: "Repository",
-  repositoryHelper: "Listen for mentions on pull requests in this repository.",
-  checksRepositoryHelper: "Wait for checks on pull requests in this repository.",
-  mentionLabel: "Mention",
-  mentionHelper: "Use an exact GitHub mention, for example @superplaneagent.",
-  ignoreBotsLabel: "Ignore bot comments",
-  ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
-  allowedBotsLabel: "Allowed bots",
-  allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
-  checkNamesLabel: "Status checks",
-  checkNamesHelper:
-    "SuperPlane waits for each selected check and fixes selected failures. Leave empty to monitor all checks.",
-  checkNamesAdd: "Add",
-  checkNamesPlaceholder: "lint",
-  maximumAttemptsLabel: "Maximum automatic fix attempts",
-  maximumAttemptsHelper:
-    "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
-  integrationsLabel: "Additional integration access",
-  integrationsHelper: "Give the agent access to CI logs from other connected integrations.",
-  integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
-  integrationsMissingLink: "Integrations page",
-  integrationsMissingAfter: " and connect it.",
-  integrationsEmpty: "No other connected integrations are available.",
-  healthReady: "Ready",
-  healthNeedsRepair: "Needs repair",
-  healthReadyHelper: "This automation can receive a mention and address it.",
-  healthChecksReadyHelper: "This automation can wait for checks and start a fix.",
-  healthNeedsRepairHelper: "Open the Automation tab and repair the canvas.",
-  save: "Save",
-  saving: "Saving",
-  delete: "Delete automation",
-  deleting: "Deleting",
-  keep: "Keep automation",
-  confirmDelete: "Delete this automation? This cannot be undone.",
-  saveError: "Could not save PR feedback settings.",
-  emptyTitle: "No PR feedback automation",
-  emptyBody: "Create an automation that addresses pull request feedback.",
-  create: "Add feedback handler",
-  creating: "Creating",
-  createError: "Could not create the PR feedback automation.",
-  addHandler: "Add feedback handler",
-  pickerTitle: "Add feedback handler",
-  pickerDescription: "Choose the signal that starts a pull request feedback run.",
-  sourceTaken: "A handler for this source already exists.",
-  loading: "Loading PR feedback.",
-  loadError: "Could not load PR feedback.",
-  retry: "Retry",
-  automationEmpty: "This automation has no canvas yet.",
-  automationLoading: "Loading the canvas.",
-  automationError: "Could not load the canvas.",
-  retryAutomation: "Retry",
-  editAutomation: "Edit automation",
-  waitingForAccess: "Waiting for another pull request activity",
-} as const;
 
 export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHandler): PRFeedbackDraftSettings {
   const source = prFeedbackSourceId(handler.source);
@@ -178,11 +137,7 @@ function handlerDraftRepository(handler: FactoriesFactoryPrFeedbackHandler): str
 }
 
 function handlerDraftMention(mention: string | undefined): string {
-  const trimmed = mention?.trim();
-  if (trimmed) {
-    return trimmed;
-  }
-  return "@superplaneagent";
+  return mention?.trim() ?? "";
 }
 
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {
@@ -209,6 +164,14 @@ export function appendUniqueTrimmedString(items: string[], raw: string): string[
   const name = raw.trim();
   if (name.length === 0 || items.includes(name)) {
     return items;
+  }
+  return [...items, name];
+}
+
+/** Select or deselect one name. Compare names without case. */
+export function toggleUniqueString(items: string[], name: string): string[] {
+  if (items.some((item) => item.toLowerCase() === name.toLowerCase())) {
+    return items.filter((item) => item.toLowerCase() !== name.toLowerCase());
   }
   return [...items, name];
 }
@@ -255,9 +218,9 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
     return false;
   }
   if (next.source === "checks") {
-    return next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
+    return next.checkNames.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
   }
-  return next.mention.startsWith("@");
+  return next.mention.length === 0 || next.mention.startsWith("@");
 }
 
 export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): FactoriesFactoryPrFeedbackHandlerSettings {

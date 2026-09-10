@@ -244,6 +244,11 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		handler, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
 			FactoryId: factoryModel.ID.String(),
 			Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					Names: []string{"lint"},
+				},
+			},
 		})
 		require.NoError(t, err)
 		enableInstanceSuperPlaneDefault(t)

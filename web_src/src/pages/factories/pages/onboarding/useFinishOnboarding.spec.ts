@@ -51,8 +51,6 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-      listPRFeedbackHandlers: vi.fn().mockResolvedValue([]),
-      createPRFeedbackHandler: vi.fn().mockResolvedValue({ id: "handler-1" }),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
@@ -92,6 +90,10 @@ describe("provisionWorkspace", () => {
     expect(result).toEqual({ lineId: "line-1" });
     const completeCall = updateOnboarding.mock.calls.find(([input]) => input.complete);
     expect(completeCall?.[0]).toMatchObject({ complete: true });
+  });
+
+  it("does not create a comments handler during workspace setup", async () => {
+    await provisionWorkspace(provisionArgs());
   });
 });
 
