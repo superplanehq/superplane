@@ -33,6 +33,7 @@ import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCand
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
@@ -146,7 +147,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(close).toHaveClass("h-6", "w-6", "rounded-full");
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).toContain("w-[min(70rem,calc(100vw-5rem))]");
+    expect(dialog.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
+    );
     expect(dialog.parentElement).toHaveClass("fixed");
     expect(dialog.parentElement?.className).not.toContain("left-[var(--workspace-navigation-width)]");
 
@@ -155,7 +158,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
     expect(fullPage.className).toContain("w-full");
-    expect(fullPage.className).not.toContain("w-[min(70rem,calc(100vw-5rem))]");
+    expect(fullPage.className).not.toContain("w-[min(90rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
     expect(fullPage.parentElement?.className).toContain("left-[var(--workspace-navigation-width)]");
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
@@ -163,7 +166,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
 
-    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem,calc(100vw-5rem))]");
+    expect(screen.getByTestId("work-order-split-run").className.split(/\s+/)).toEqual(
+      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
+    );
     expect(screen.getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
   });
 
@@ -171,7 +176,9 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).toContain("w-[min(70rem,calc(100vw-5rem))]");
+    expect(dialog.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
+    );
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");

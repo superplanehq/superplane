@@ -24,7 +24,12 @@ import {
   type SplitRunPhase,
   type SplitRunPhaseId,
 } from "./splitRunMocks";
-import { defaultSplitRunPopupTab, type SplitRunPopupTab, splitRunPhaseRunHref } from "./splitRunPopupModel";
+import {
+  defaultSplitRunPopupTab,
+  SPLIT_RUN_POPUP_DIALOG_CLASSNAME,
+  type SplitRunPopupTab,
+  splitRunPhaseRunHref,
+} from "./splitRunPopupModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -306,7 +311,13 @@ export function WorkOrderSplitRunPopup({
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
 
   return (
-    <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
+    <PopupShell
+      testId="work-order-split-run"
+      fixed={fixed}
+      fullPage={fullPage}
+      className={fullPage ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
+      onDismiss={onClose}
+    >
       <PopupHeader
         title={edits.title}
         onClose={onClose}

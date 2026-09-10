@@ -38,19 +38,13 @@ export function WorkOrderIntentDocument({
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
 
   return (
-    <article
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card"
-      data-testid="split-run-intent-document"
-    >
+    <article className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="split-run-intent-document">
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(13rem,0.42fr)_minmax(0,1fr)]">
         <div className="flex min-h-0 flex-col border-b border-border lg:border-r lg:border-b-0">
-          <header
-            className="sticky top-0 z-10 shrink-0 border-b border-border bg-card px-4 py-3"
-            data-testid="split-run-intent-session"
-          >
+          <header className="sticky top-0 z-10 shrink-0 px-5 py-3" data-testid="split-run-intent-session">
             <h2 className="truncate text-[13px] leading-5 font-medium text-foreground">{sessionTitle}</h2>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <div className="max-w-[92%]">
               <div
                 className="rounded-2xl bg-muted/70 px-3.5 py-3"
@@ -112,7 +106,7 @@ function IntentConfidenceFooter({
   if (isAnalyzing && !confidence) {
     return (
       <footer
-        className="shrink-0 border-t border-border px-4 py-3"
+        className="shrink-0 border-t border-border px-5 py-3"
         data-testid="split-run-overview-checks"
         aria-label={CONFIDENCE_CHECK_NAME}
       >
@@ -127,7 +121,7 @@ function IntentConfidenceFooter({
   if (!confidence) {
     return (
       <footer
-        className="shrink-0 border-t border-border px-4 py-3"
+        className="shrink-0 border-t border-border px-5 py-3"
         data-testid="split-run-overview-checks"
         aria-label={CONFIDENCE_CHECK_NAME}
       >
@@ -138,7 +132,7 @@ function IntentConfidenceFooter({
 
   return (
     <footer
-      className="shrink-0 border-t border-border px-4 py-3"
+      className="shrink-0 border-t border-border px-5 py-3"
       data-testid="split-run-overview-checks"
       aria-label={CONFIDENCE_CHECK_NAME}
     >

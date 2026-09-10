@@ -19,6 +19,10 @@ import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
+/** Task popup size. Wider than the default overlay so Summary and Plan have room. */
+export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
+  "max-h-[min(62rem,calc(100vh-3rem))] h-[min(56rem,calc(100vh-3rem))] w-[min(90rem,calc(100vw-3rem))]";
+
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
 const PLAN_NAMES = ["plan.md"];
 

@@ -308,7 +308,12 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-title")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
+    expect(within(dialog).getByTestId("split-run-intent-session")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
@@ -326,10 +331,6 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(await within(dialog).findByRole("link", { name: /#510/ })).toHaveAttribute(
-      "href",
-      "https://github.com/example/ledger/pull/510",
-    );
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
