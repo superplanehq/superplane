@@ -425,8 +425,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
-  it("pins a pull request review strip with one call to action and a More menu", async () => {
-    const user = userEvent.setup();
+  it("pins a pull request review strip with a single call to action and no More menu", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
     const note = screen.getByTestId("split-run-attention-note");
@@ -444,12 +443,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
-
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Reject" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(within(note).getAllByRole("link")).toHaveLength(1);
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });

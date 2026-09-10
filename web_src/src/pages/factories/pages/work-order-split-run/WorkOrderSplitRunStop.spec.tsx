@@ -88,21 +88,17 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
-  it("rejects and approves a waiting pull request task from the More menu", async () => {
-    const user = userEvent.setup();
+  it("leaves a waiting pull request task with only the review CTA, no More menu", () => {
     renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Reject" }));
-    expect(handleRejectMock).toHaveBeenCalledTimes(1);
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Approve" }));
-    expect(handleStopMock).toHaveBeenCalledWith(
-      "completed",
-      expect.objectContaining({ kind: "waiting", status: "waiting" }),
-    );
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(handleRejectMock).not.toHaveBeenCalled();
+    expect(handleStopMock).not.toHaveBeenCalled();
   });
 
   it("hides the draft model select when the feature is off", async () => {
