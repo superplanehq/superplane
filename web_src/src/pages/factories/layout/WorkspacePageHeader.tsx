@@ -96,7 +96,9 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
               <h1 className="workspace-page-title min-w-0 overflow-visible" data-testid="workspace-page-header-title">
                 {props.title}
               </h1>
-              {!isEntity && props.leading ? <div className="flex items-center gap-2">{props.leading}</div> : null}
+              {!isEntity && props.leading ? (
+                <div className="flex min-w-0 items-center gap-2">{props.leading}</div>
+              ) : null}
             </div>
           </div>
           {hasSubtitle ? (

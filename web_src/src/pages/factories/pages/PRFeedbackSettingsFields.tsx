@@ -53,6 +53,7 @@ export function PRFeedbackTextField({
   type = "text",
   min,
   max,
+  step,
 }: {
   id: string;
   label: string;
@@ -62,6 +63,7 @@ export function PRFeedbackTextField({
   type?: "text" | "number";
   min?: number;
   max?: number;
+  step?: number;
 }) {
   return (
     <section>
@@ -73,6 +75,7 @@ export function PRFeedbackTextField({
         type={type}
         min={min}
         max={max}
+        step={step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         data-testid={id}
@@ -118,6 +121,7 @@ export function PRFeedbackChecksFields({
         type="number"
         min={1}
         max={10}
+        step={1}
         onChange={(value) => onUpdate("maximumAttempts", Number(value))}
       />
       <PRFeedbackIntegrationsField

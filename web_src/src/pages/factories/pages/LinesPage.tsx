@@ -43,8 +43,17 @@ import { useColumnAutomationViewPreference, type ColumnAutomationView } from "..
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
-import { NextStepsPanel } from "./NextStepsPanel";
-import { runWorkspaceNextStepAction, workspaceNextSteps } from "./workspaceNextStepCatalog";
+import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
+import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
+import {
+  isWorkspaceNextStepDeferred,
+  runWorkspaceNextStepAction,
+  shouldForgetDeferredWorkspaceNextStep,
+  isWorkspaceNextStepsQueryReady,
+  workspaceNextStepBanner,
+  workspaceNextSteps,
+  workspaceNextStepsProgressCopy,
+} from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
@@ -234,10 +243,8 @@ export function LinesPage() {
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
-  const { data: prFeedbackHandlers = [], isPending: prFeedbackHandlersPending } = useFactoryPRFeedbackHandlers(
-    organizationId,
-    factoryId,
-  );
+  const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
@@ -350,9 +357,18 @@ export function LinesPage() {
   const nextSteps = workspaceNextSteps({
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
-    prFeedbackHandlersReady: !prFeedbackHandlersPending,
     takenPRFeedbackSources,
+    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
   });
+  const nextStepBanner = workspaceNextStepBanner(nextSteps);
+  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
+  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
+
+  useEffect(() => {
+    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
+      nextStepDeferral.forget();
+    }
+  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
@@ -500,12 +516,22 @@ export function LinesPage() {
             state={listState}
             canUpdate={canUpdate}
             hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+            nextStepsRestore={
+              nextStepsCollapsed && nextStepBanner ? (
+                <WorkspaceNextStepsHeaderBadge
+                  progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
+                  title={nextStepBanner.badgeLabel}
+                  onOpen={nextStepDeferral.restore}
+                />
+              ) : undefined
+            }
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
           />
           <NextStepsPanel
             steps={nextSteps}
+            collapsed={nextStepsCollapsed}
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
                 openPRFeedbackSetup: (sourceId) => {
@@ -516,6 +542,11 @@ export function LinesPage() {
                 },
               })
             }
+            onDefer={() => {
+              if (nextStepBanner) {
+                nextStepDeferral.defer(nextStepBanner.activeStep.id);
+              }
+            }}
           />
         </div>
         <div className={factoryWorkOrdersBodyClassName}>
@@ -577,6 +608,7 @@ function LineDetailHeader({
   state,
   canUpdate,
   hostedCreditHeaderKicker,
+  nextStepsRestore,
   hostedCreditEmptyBanner,
   automationView,
   onAutomationViewChange,
@@ -589,6 +621,7 @@ function LineDetailHeader({
   state: WorkOrderListState;
   canUpdate: boolean;
   hostedCreditHeaderKicker?: ReactNode;
+  nextStepsRestore?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
@@ -625,7 +658,14 @@ function LineDetailHeader({
           inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
         />
       }
-      leading={hostedCreditHeaderKicker}
+      leading={
+        nextStepsRestore || hostedCreditHeaderKicker ? (
+          <>
+            {hostedCreditHeaderKicker}
+            {nextStepsRestore}
+          </>
+        ) : undefined
+      }
       actions={
         <>
           <ScopePills
