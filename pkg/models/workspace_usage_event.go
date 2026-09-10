@@ -263,6 +263,39 @@ func persistUsageEvent(tx *gorm.DB, event WorkspaceUsageEvent, execution *Factor
 	return nil
 }
 
+func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRunID uuid.UUID) error {
+	runIDs, err := canvasRunIDsInTree(tx, sourceRunID)
+	if err != nil || len(runIDs) == 0 {
+		return err
+	}
+	return tx.Model(&WorkspaceUsageEvent{}).
+		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
+		Update("work_order_id", workOrderID).Error
+}
+
+func canvasRunIDsInTree(tx *gorm.DB, rootID uuid.UUID) ([]uuid.UUID, error) {
+	ids := []uuid.UUID{rootID}
+	seen := map[uuid.UUID]struct{}{rootID: {}}
+	frontier := []uuid.UUID{rootID}
+	for len(frontier) > 0 {
+		var children []CanvasRun
+		err := tx.Select("id").Where("parent_run_id IN ?", frontier).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+		frontier = frontier[:0]
+		for _, child := range children {
+			if _, exists := seen[child.ID]; exists {
+				continue
+			}
+			seen[child.ID] = struct{}{}
+			ids = append(ids, child.ID)
+			frontier = append(frontier, child.ID)
+		}
+	}
+	return ids, nil
+}
+
 func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
@@ -690,7 +723,7 @@ type workOrderRunUsageScanRow struct {
 func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 	return spendingScopedQuery(tx, filter, true).
 		Joins("LEFT JOIN users ON users.id = factory_work_orders.created_by_id").
-		Where("workspace_usage_events.work_order_execution_id IS NOT NULL")
+		Where("workspace_usage_events.work_order_id IS NOT NULL")
 }
 
 const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`
@@ -702,7 +735,7 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 		Count int64
 	}
 	err := workOrderRunUsageQuery(tx, filter).
-		Select("COUNT(DISTINCT workspace_usage_events.work_order_execution_id) AS count").
+		Select("COUNT(DISTINCT COALESCE(workspace_usage_events.work_order_execution_id, workspace_usage_events.work_order_id)) AS count").
 		Scan(&totalRow).Error
 	if err != nil {
 		return nil, 0, err
