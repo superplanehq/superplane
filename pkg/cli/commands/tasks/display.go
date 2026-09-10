@@ -191,7 +191,7 @@ type eventRunRef struct {
 type eventArtifactRef struct {
 	ID   string                 `json:"id"`
 	Type string                 `json:"type"`
-	Data map[string]interface{} `json:"data,omitempty"`
+	Data map[string]any `json:"data,omitempty"`
 }
 
 type taskStatusUpdatedEvent struct {
@@ -234,7 +234,7 @@ type stepExecutionEvent struct {
 	} `json:"line,omitempty"`
 }
 
-func decodeEventPayload[T any](payload map[string]interface{}) (*T, error) {
+func decodeEventPayload[T any](payload map[string]any) (*T, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
