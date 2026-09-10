@@ -161,3 +161,60 @@ func Test__ListReviewBotResourcesFromClient(t *testing.T) {
 		}, bots)
 	})
 }
+
+type fakeGitHubStatusCheckAPI struct {
+	openPulls   []*github.PullRequest
+	closedPulls []*github.PullRequest
+	states      []string
+}
+
+func (f *fakeGitHubStatusCheckAPI) FindRepository(string) (*github.Repository, error) {
+	return nil, errors.New("unused")
+}
+
+func (f *fakeGitHubStatusCheckAPI) GetBranchProtection(context.Context, string, string) (*github.Protection, error) {
+	return nil, errors.New("unused")
+}
+
+func (f *fakeGitHubStatusCheckAPI) ListPullRequests(_ context.Context, _ string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
+	state := ""
+	if opts != nil {
+		state = opts.State
+	}
+	f.states = append(f.states, state)
+	if state == "open" {
+		return f.openPulls, &github.Response{}, nil
+	}
+	return f.closedPulls, &github.Response{}, nil
+}
+
+func (f *fakeGitHubStatusCheckAPI) ListCheckRunsForRef(context.Context, string, string, *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
+	return nil, &github.Response{}, errors.New("unused")
+}
+
+func (f *fakeGitHubStatusCheckAPI) GetCombinedStatus(context.Context, string, string, *github.ListOptions) (*github.CombinedStatus, *github.Response, error) {
+	return nil, &github.Response{}, errors.New("unused")
+}
+
+func Test__RecentStatusCheckRefs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("keeps open pull request SHAs when closed PRs would fill the limit", func(t *testing.T) {
+		t.Parallel()
+		api := &fakeGitHubStatusCheckAPI{
+			closedPulls: []*github.PullRequest{
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("closed-1")}},
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("closed-2")}},
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("closed-3")}},
+			},
+			openPulls: []*github.PullRequest{
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("open-head")}},
+			},
+		}
+
+		refs, err := recentStatusCheckRefs(context.Background(), api, "acme/app", "main")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"open", "closed"}, api.states)
+		assert.Equal(t, []string{"open-head", "closed-1", "closed-2"}, refs)
+	})
+}

@@ -134,7 +134,7 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 func Test__NextEvaluateDelay(t *testing.T) {
 	t.Parallel()
 
-	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	now := time.Now()
 	timeoutAt := now.Add(time.Hour)
 	pollInterval := 5 * time.Minute
 
