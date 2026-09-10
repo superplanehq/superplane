@@ -235,6 +235,10 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
+  it("offers discussion and status-check setup in the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
+  });
+
   it("keeps phase catalog entries available after one agent exists", () => {
     const catalog = catalogForColumn("phase-0");
     const automations = buildColumnAutomations("phase-0", {

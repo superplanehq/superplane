@@ -287,6 +287,22 @@ export function editFactoryLinePath(organizationId: string, factoryKey: string, 
   return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
 }
 
+export type PRFeedbackSetupKind = "comments" | "checks";
+
+/** Dedicated setup page for the next-steps banner CTA (comments or checks wizard). */
+export function factoryPRFeedbackSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  kind: PRFeedbackSetupKind,
+) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/${kind}`;
+}
+
+export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
+  return sourceId === "checks" ? "checks" : "comments";
+}
+
 export function automationsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }
