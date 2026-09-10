@@ -174,7 +174,8 @@ export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPl
       setTick((tick) => tick + 1);
     };
 
-    if (!shouldAnimateKanbanBoard(previousPlacements, placements)) {
+    const animate = shouldAnimateKanbanBoard(previousPlacements, placements);
+    if (!animate) {
       commit();
       return;
     }
@@ -185,33 +186,30 @@ export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPl
       root.classList.remove(KANBAN_BOARD_MOTION_ROOT_CLASS);
     };
 
-    let transition: ViewTransition | undefined;
-    const startTransition = () => {
-      if (cancelled) {
-        clearRoot();
-        return;
-      }
+    const update = () => {
+      flushSync(commit);
+    };
+
+    try {
+      document.activeViewTransition?.skipTransition();
+      let transition: ViewTransition;
       try {
-        document.activeViewTransition?.skipTransition();
         transition = document.startViewTransition({
           types: [KANBAN_BOARD_TRANSITION_TYPE],
-          update() {
-            flushSync(commit);
-          },
+          update,
         });
-        void transition.finished.finally(clearRoot);
       } catch {
-        clearRoot();
-        commit();
+        transition = document.startViewTransition(update);
       }
-    };
-    queueMicrotask(startTransition);
-
-    return () => {
-      cancelled = true;
-      transition?.skipTransition();
+      void transition.finished.finally(clearRoot);
+      return () => {
+        cancelled = true;
+        clearRoot();
+      };
+    } catch {
       clearRoot();
-    };
+      commit();
+    }
   }, [incoming, placements, signature]);
 
   return displayedRef.current.value;

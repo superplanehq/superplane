@@ -247,7 +247,9 @@ describe("useKanbanDisplayedBoard", () => {
 
   it("starts a typed view transition when a card changes column", async () => {
     const startViewTransition = vi.fn((options: { types?: string[]; update?: () => void }) => {
-      options.update?.();
+      queueMicrotask(() => {
+        options.update?.();
+      });
       return {
         skipTransition: vi.fn(),
         finished: Promise.resolve(),
