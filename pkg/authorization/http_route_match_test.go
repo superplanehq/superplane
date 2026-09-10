@@ -48,7 +48,7 @@ func TestMatchHTTPRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodPost,
-			path:   "/api/v1/factories/factory-123/app-templates/line-planning:materialize",
+			path:   "/api/v1/factories/factory-123/app-templates/line-implementation:materialize",
 			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"},
 			wantOK: true,
 		},

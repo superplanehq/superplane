@@ -191,12 +191,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
-    const plan = screen.getByTestId("split-run-phase-plan");
-    expect(within(plan).getAllByText(/Create plan/).length).toBeGreaterThan(0);
-    expect(within(plan).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:12");
-    expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
-
     const implement = screen.getByTestId("split-run-phase-implement");
     expect(within(implement).getAllByText(/Implementation/).length).toBeGreaterThan(0);
     expect(within(implement).getByTestId("split-run-phase-duration-implement")).toHaveTextContent("04:00");
@@ -244,52 +238,29 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    const plan = screen.getByTestId("split-run-phase-plan");
-    const planToggle = within(plan).getByRole("button", { name: /^Create plan/ });
-    const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
-    expect(planToggle.parentElement).toBe(planArtifacts.parentElement?.parentElement);
-    expect(planArtifacts.parentElement?.className).toMatch(/ml-auto/);
-    expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
-
-    await user.click(planToggle);
-
-    expect(within(plan).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-automation-header-plan")).getByRole("button", { name: "plan.md" }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-stream-plan")).getByRole("button", { name: "plan.md" }),
-    ).toBeInTheDocument();
-
     const implement = screen.getByTestId("split-run-phase-implement");
-    const implementToggle = within(implement).getByRole("button", { name: /^Implement/ });
     const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
-    expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement?.parentElement);
     expect(implementArtifacts.parentElement?.className).toMatch(/ml-auto/);
     expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
-
-    await user.click(implementToggle);
-
-    expect(within(implement).getByTestId("split-run-phase-artifacts-implement")).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-automation-header-implement")).getByRole("link", {
-        name: /feature\/refund-retry/,
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
     ).toBeInTheDocument();
+
+    await user.click(within(implement).getByTestId("split-run-automation-header-implement"));
+
+    expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
+    expect(within(implement).getByTestId("split-run-phase-artifacts-implement")).toBeInTheDocument();
+    expect(within(implement).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
   });
 
   it("shows canvas artifacts on a collapsed automation before it is opened", () => {
     renderSplitRun();
 
-    const plan = screen.getByTestId("split-run-phase-plan");
-    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
-    expect(within(plan).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
-    expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
+    const backlog = screen.getByTestId("split-run-phase-backlog");
+    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
+    expect(within(backlog).getByTestId("split-run-phase-artifacts-backlog")).toBeInTheDocument();
+    expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
   });
 
   it("highlights a log line when it is clicked", async () => {
@@ -1034,26 +1005,11 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /^Create plan/ }));
+    await user.click(within(screen.getByTestId("split-run-phase-backlog")).getByRole("button", { name: /^Backlog/ }));
 
-    expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("Create Implementation Plan").length).toBe(
-      1,
-    );
-    const planStream = screen.getByTestId("split-run-stream-plan");
-    expect(within(planStream).getByText("Clone Repo")).toBeInTheDocument();
-    expect(within(planStream).getAllByText("✓").length).toBeGreaterThan(0);
-    expect(within(planStream).getByText(/Cloning into/)).toBeInTheDocument();
-    expect(within(planStream).getByText("Provide description")).toBeInTheDocument();
-    expect(within(planStream).getByText("Write Implementation Plan")).toBeInTheDocument();
-    expect(within(planStream).getByText("Use plan as output")).toBeInTheDocument();
-    expect(within(planStream).getAllByText("bash").length).toBeGreaterThan(0);
-    expect(within(planStream).getByText("prompt")).toBeInTheDocument();
-    expect(within(planStream).getByText("Let me examine the key reference files in detail.")).toBeInTheDocument();
-    expect(within(planStream).getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
-    expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
-    expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-backlog")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-backlog")).queryByText("Started")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-backlog")).getByText("On Issue Label")).toBeInTheDocument();
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
   });
 
