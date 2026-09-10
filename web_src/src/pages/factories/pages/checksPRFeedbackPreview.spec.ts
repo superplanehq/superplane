@@ -82,6 +82,20 @@ describe("checksPreviewToolOutcome", () => {
     ).toEqual({ kind: "no-access", labels: ["CircleCI"] });
   });
 
+  it("names only the suggested tools the user granted", () => {
+    expect(
+      checksPreviewToolOutcome({
+        toolsAccess: "suggested",
+        suggestedNames: ["circleci", "semaphore"],
+        selectedIds: ["int-cci"],
+        connected: [
+          { metadata: { id: "int-cci", integrationName: "circleci" } },
+          { metadata: { id: "int-sem", integrationName: "semaphore" } },
+        ],
+      }),
+    ).toEqual({ kind: "granted", labels: ["CircleCI"] });
+  });
+
   it("describes GitHub Actions without extra tools", () => {
     expect(
       checksPreviewToolOutcome({

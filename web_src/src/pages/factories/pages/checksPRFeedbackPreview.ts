@@ -1,6 +1,6 @@
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 
-import { hasSelectedSuggestedIntegration, type ChecksToolsAccess } from "./checksPRFeedbackSetup";
+import { selectedSuggestedIntegrationNames, type ChecksToolsAccess } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
 export type ChecksPreviewRow = {
@@ -75,11 +75,16 @@ export function checksPreviewToolOutcome(input: {
   connected: Array<{ metadata?: { id?: string; integrationName?: string } }>;
 }): ChecksPreviewToolOutcome {
   if (input.toolsAccess === "suggested") {
-    const labels = input.suggestedNames.map(checksPreviewToolLabel);
-    const granted = hasSelectedSuggestedIntegration(input.suggestedNames, input.selectedIds, input.connected);
+    const grantedNames = selectedSuggestedIntegrationNames(input.suggestedNames, input.selectedIds, input.connected);
+    if (grantedNames.length > 0) {
+      return {
+        kind: "granted",
+        labels: grantedNames.map(checksPreviewToolLabel),
+      };
+    }
     return {
-      kind: granted ? "granted" : "no-access",
-      labels,
+      kind: "no-access",
+      labels: input.suggestedNames.map(checksPreviewToolLabel),
     };
   }
   if (input.toolsAccess === "github-actions") {
