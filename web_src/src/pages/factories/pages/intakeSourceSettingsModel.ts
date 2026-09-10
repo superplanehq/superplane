@@ -1,6 +1,5 @@
 import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
-export type IntakeListenMode = "listen" | "schedule";
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
 export type IntakeSettingsTab = "general" | "agent" | "automation";
@@ -15,23 +14,31 @@ export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
 
 export interface IntakeSourceSettings {
   name: string;
-  listenMode: IntakeListenMode;
   confidencePct: number;
   labelFilterMode: IntakeLabelFilterMode;
   labels: string[];
+  /** Show and apply the label chip list. Off means every issue matches. */
+  filterByLabel: boolean;
   assignment: IntakeAssignmentFilter;
+  /** Create a task when a GitHub issue is created. */
+  newIssues: boolean;
+  /** Create a task when a closed GitHub issue is re-opened. */
+  reopenedIssues: boolean;
+  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
 }
 
-export const GITHUB_INTAKE_LABEL_OPTIONS = ["bug", "enhancement", "documentation", "good first issue"] as const;
-
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   name: "GitHub issues",
-  listenMode: "listen",
   confidencePct: 65,
   labelFilterMode: "include",
   labels: [],
+  filterByLabel: false,
   assignment: "any",
+  newIssues: true,
+  reopenedIssues: true,
+  superplaneLabelAdded: true,
   authorsWithAccess: false,
 };
 
@@ -46,25 +53,20 @@ export const INTAKE_SETTINGS_COPY = {
   automationEmpty: "This intake has no automation yet.",
   automationError: "SuperPlane could not load the automation.",
   retryAutomation: "Try again",
-  nameLabel: "Name",
-  nameHelper: "Shown in the Intake list.",
-  listenLabel: "When to create",
-  listenOption: "Listen for new issues",
-  listenHelper: "Create a task when a GitHub issue is opened.",
-  scheduleOption: "Run on a schedule",
-  scheduleHelper: "Scheduled intake is not available.",
+  intakeSection: "Create task when:",
   filtersLabel: "Filters",
-  labelsLabel: "Labels",
-  includeLabels: "Include these labels",
-  excludeLabels: "Exclude these labels",
-  labelsHelper: "Leave all labels off to match every issue.",
-  assignmentLabel: "Assignment",
-  assignmentAny: "Any assignment",
-  assignmentAssigned: "Assigned",
-  assignmentUnassigned: "Unassigned",
-  authorsLabel: "Authors",
-  authorsWithAccess: "Only issues from people with repository access",
-  authorsHelper: "Skip issues opened by outside contributors.",
+  newIssues: "New issue is opened",
+  reopenedIssues: "A closed issue is re-opened",
+  filterByLabel: "Issue has one of these labels",
+  labelInput: "Issue label",
+  labelPlaceholder: "Type a label name",
+  labelNew: "Add label",
+  labelAdd: "Add",
+  labelCancel: "Cancel",
+  labelsLoading: "Loading labels from the repository",
+  labelsEmpty: "No labels found in the repository. Add a label name.",
+  superplaneLabelAdded: 'The "superplane" label is added to the issue',
+  authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
@@ -74,31 +76,57 @@ export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
 }
 
+export function addIntakeLabel(labels: string[], label: string): string[] {
+  const next = label.trim();
+  if (next.length === 0 || labels.includes(next)) {
+    return labels;
+  }
+  return [...labels, next];
+}
 export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
-  const name = draft.name.trim() || DEFAULT_GITHUB_INTAKE_SETTINGS.name;
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
-  return { ...draft, name, confidencePct };
+  if (!draft.filterByLabel) {
+    return { ...draft, confidencePct, labels: [], labelFilterMode: "include" };
+  }
+  return { ...draft, confidencePct };
+}
+
+type IntakeToggles = Pick<
+  IntakeSourceSettings,
+  "newIssues" | "reopenedIssues" | "superplaneLabelAdded" | "authorsWithAccess"
+>;
+
+/** A response that omits a toggle predates it, so fall back to the default. */
+function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefined): IntakeToggles {
+  return {
+    newIssues: settings?.newIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.newIssues,
+    reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
+    superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
+    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+  };
 }
 
 export function intakeSettingsFromApi(
   name: string,
   settings: FactoriesFactoryIntakeSettings | undefined,
 ): IntakeSourceSettings {
+  const labels = settings?.labels ?? [];
   return {
     name,
-    listenMode: "listen",
     confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
     labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
-    labels: settings?.labels ?? [],
+    labels,
+    filterByLabel: labels.length > 0,
     assignment: assignmentFromApi(settings?.assignment),
-    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    ...intakeTogglesFromApi(settings),
   };
 }
 
 export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
+  const labels = settings.filterByLabel ? settings.labels : [];
   return {
     confidencePct: settings.confidencePct,
-    labels: settings.labels,
+    labels,
     labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",
     assignment:
       settings.assignment === "assigned"
@@ -107,6 +135,9 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
           ? "ASSIGNMENT_UNASSIGNED"
           : "ASSIGNMENT_ANY",
     authorsWithAccess: settings.authorsWithAccess,
+    newIssues: settings.newIssues,
+    reopenedIssues: settings.reopenedIssues,
+    superplaneLabelAdded: settings.superplaneLabelAdded,
   };
 }
 

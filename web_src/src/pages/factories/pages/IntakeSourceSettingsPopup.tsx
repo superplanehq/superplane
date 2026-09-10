@@ -1,7 +1,5 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -10,12 +8,10 @@ import {
   INTAKE_SETTINGS_COPY,
   intakeSettingsTabs,
   normalizeIntakeSourceSettings,
-  type IntakeListenMode,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
-import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import {
   SettingsAutomationCanvasEdit,
@@ -29,6 +25,8 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
   sourceId?: LineIntakeSourceId;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
   automationGraph?: IntakeAutomationGraph;
   automationLoading?: boolean;
   automationError?: boolean;
@@ -48,6 +46,8 @@ interface IntakeSourceSettingsPopupProps {
 export function IntakeSourceSettingsPopup({
   settings,
   sourceId = "github-issues",
+  labelOptions,
+  labelOptionsLoading,
   automationGraph,
   automationLoading = false,
   automationError = false,
@@ -79,10 +79,6 @@ export function IntakeSourceSettingsPopup({
     }
   }, [tab, hasAgent]);
 
-  const update = <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => {
-    setDraft((current) => ({ ...current, [key]: value }));
-  };
-
   return (
     <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
       <PopupHeader title={`Intake ${settings.name}`} onClose={onClose}>
@@ -112,6 +108,8 @@ export function IntakeSourceSettingsPopup({
       <IntakeSettingsTabPanel
         tab={tab}
         sourceId={sourceId}
+        labelOptions={labelOptions}
+        labelOptionsLoading={labelOptionsLoading}
         draft={draft}
         agent={agent}
         automationGraph={automationGraph}
@@ -123,7 +121,6 @@ export function IntakeSourceSettingsPopup({
         editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
-        onUpdate={update}
         onDraftChange={setDraft}
         onSave={onSave}
         onClose={onClose}
@@ -135,6 +132,8 @@ export function IntakeSourceSettingsPopup({
 function IntakeSettingsTabPanel({
   tab,
   sourceId,
+  labelOptions,
+  labelOptionsLoading,
   draft,
   agent,
   automationGraph,
@@ -146,13 +145,14 @@ function IntakeSettingsTabPanel({
   editAutomationHref,
   savePending,
   saveError,
-  onUpdate,
   onDraftChange,
   onSave,
   onClose,
 }: {
   tab: IntakeSettingsTab;
   sourceId: LineIntakeSourceId;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
   agent?: PlanningReviewAgentSlot;
   automationGraph?: IntakeAutomationGraph;
@@ -164,7 +164,6 @@ function IntakeSettingsTabPanel({
   editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
-  onUpdate: <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -198,10 +197,11 @@ function IntakeSettingsTabPanel({
   return (
     <IntakeGeneralTab
       sourceId={sourceId}
+      labelOptions={labelOptions}
+      labelOptionsLoading={labelOptionsLoading}
       draft={draft}
       savePending={savePending}
       saveError={saveError}
-      onUpdate={onUpdate}
       onDraftChange={onDraftChange}
       onSave={onSave}
       onClose={onClose}
@@ -211,19 +211,21 @@ function IntakeSettingsTabPanel({
 
 function IntakeGeneralTab({
   sourceId,
+  labelOptions,
+  labelOptionsLoading,
   draft,
   savePending,
   saveError,
-  onUpdate,
   onDraftChange,
   onSave,
   onClose,
 }: {
   sourceId: LineIntakeSourceId;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
-  onUpdate: <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -232,44 +234,13 @@ function IntakeGeneralTab({
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          <section>
-            <Label htmlFor="intake-source-name">{INTAKE_SETTINGS_COPY.nameLabel}</Label>
-            <p className="workspace-body-text mt-1 text-muted-foreground">{INTAKE_SETTINGS_COPY.nameHelper}</p>
-            <Input
-              id="intake-source-name"
-              className="mt-2"
-              value={draft.name}
-              onChange={(event) => onUpdate("name", event.target.value)}
-              data-testid="intake-source-name"
-            />
-          </section>
-
-          <fieldset className="min-w-0">
-            <legend className="text-sm font-medium text-gray-800 dark:text-gray-100">
-              {INTAKE_SETTINGS_COPY.listenLabel}
-            </legend>
-            <div className="mt-2 flex flex-col gap-2">
-              <IntakeSettingsRadioOption
-                name="intake-listen-mode"
-                value="listen"
-                checked={draft.listenMode === "listen"}
-                title={INTAKE_SETTINGS_COPY.listenOption}
-                helper={INTAKE_SETTINGS_COPY.listenHelper}
-                onChange={() => onUpdate("listenMode", "listen" satisfies IntakeListenMode)}
-              />
-              <IntakeSettingsRadioOption
-                name="intake-listen-mode"
-                value="schedule"
-                checked={draft.listenMode === "schedule"}
-                title={INTAKE_SETTINGS_COPY.scheduleOption}
-                helper={INTAKE_SETTINGS_COPY.scheduleHelper}
-                disabled
-                onChange={() => onUpdate("listenMode", "schedule" satisfies IntakeListenMode)}
-              />
-            </div>
-          </fieldset>
-
-          <GitHubIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <GitHubIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            labelOptions={labelOptions}
+            labelOptionsLoading={labelOptionsLoading}
+          />
         </div>
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
