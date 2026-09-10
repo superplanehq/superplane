@@ -17,6 +17,8 @@ const (
 	LLMCreditGrantKindIncluded    = "included"
 	LLMCreditGrantKindTopup       = "topup"
 	LLMCreditGrantKindTopupRefund = "topup_refund"
+
+	canceledIncludedGrantPrefix = "canceled:"
 )
 
 var (
@@ -653,4 +655,44 @@ func expireWelcomeGrantNow(tx *gorm.DB, orgID uuid.UUID, now time.Time) error {
 	return tx.Model(&OrganizationLLMCreditGrant{}).
 		Where("organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)", orgID, LLMCreditGrantKindWelcome, now).
 		Update("expires_at", now).Error
+}
+
+// ExpireOpenIncludedGrants stops leftover Business included dollars from remaining
+// spendable after Polar cancels or refunds the subscription. It rewrites the Polar
+// order key so a later subscribe can grant a new included allowance.
+func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
+	now := time.Now()
+	var grants []OrganizationLLMCreditGrant
+	err := tx.Where(
+		"organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)",
+		orgID,
+		LLMCreditGrantKindIncluded,
+		now,
+	).Find(&grants).Error
+	if err != nil {
+		return err
+	}
+	for _, grant := range grants {
+		updates := map[string]any{"expires_at": now}
+		if grant.PolarOrderID != nil {
+			if canceled := canceledIncludedOrderID(*grant.PolarOrderID); canceled != "" {
+				updates["polar_order_id"] = canceled
+			}
+		}
+		if err := tx.Model(&OrganizationLLMCreditGrant{}).Where("id = ?", grant.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func canceledIncludedOrderID(polarOrderID string) string {
+	trimmed := strings.TrimSpace(polarOrderID)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, canceledIncludedGrantPrefix) {
+		return trimmed
+	}
+	return canceledIncludedGrantPrefix + trimmed
 }

@@ -71,12 +71,24 @@ export function billingPlansUsageView(args: BillingPlansUsageInput): BillingPlan
     };
   }
 
-  const periodEnd = parseWelcomeCreditExpiresAt(args.currentPeriodEnd);
+  if (args.plan === "business") {
+    const periodEnd = parseWelcomeCreditExpiresAt(args.currentPeriodEnd);
+    return {
+      heading: "Your included usage",
+      remainingLabel: `${formatUsdCents(args.includedRemainingCents)} remaining`,
+      usedPercent: billingUsagePercentUsed(args.includedRemainingCents, BILLING_INCLUDED_USAGE_CENTS),
+      footer: periodEnd ? `Resets ${periodEnd.toLocaleDateString()}` : null,
+    };
+  }
+
   return {
-    heading: "Your included usage",
-    remainingLabel: `${formatUsdCents(args.includedRemainingCents)} remaining`,
-    usedPercent: billingUsagePercentUsed(args.includedRemainingCents, BILLING_INCLUDED_USAGE_CENTS),
-    footer: periodEnd ? `Resets ${periodEnd.toLocaleDateString()}` : null,
+    heading: "Your hosted usage",
+    remainingLabel: `${formatUsdCents(args.remainingCents)} remaining`,
+    usedPercent: billingUsagePercentUsed(args.remainingCents, args.remainingCents),
+    footer:
+      args.remainingCents > 0
+        ? "Subscribe to Business to use this credit."
+        : "Subscribe to Business to start hosted runs.",
   };
 }
 

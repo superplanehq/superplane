@@ -110,4 +110,41 @@ describe("billingPlansUsageView", () => {
       footer: `Resets ${new Date(currentPeriodEnd).toLocaleDateString()}`,
     });
   });
+
+  it("asks the organization to subscribe when Business has lapsed and prepaid credit remains", () => {
+    expect(
+      billingPlansUsageView({
+        plan: "none",
+        remainingCents: 5000,
+        grantTotalCents: 15000,
+        includedRemainingCents: 0,
+        purchasedCents: 5000,
+        currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+        now,
+      }),
+    ).toEqual({
+      heading: "Your hosted usage",
+      remainingLabel: "$50.00 remaining",
+      usedPercent: 0,
+      footer: "Subscribe to Business to use this credit.",
+    });
+  });
+
+  it("asks the organization to subscribe when Business has lapsed and no credit remains", () => {
+    expect(
+      billingPlansUsageView({
+        plan: "none",
+        remainingCents: 0,
+        grantTotalCents: 15000,
+        includedRemainingCents: 0,
+        purchasedCents: 0,
+        now,
+      }),
+    ).toEqual({
+      heading: "Your hosted usage",
+      remainingLabel: "$0.00 remaining",
+      usedPercent: 100,
+      footer: "Subscribe to Business to start hosted runs.",
+    });
+  });
 });

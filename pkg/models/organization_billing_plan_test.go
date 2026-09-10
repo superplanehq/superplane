@@ -51,6 +51,73 @@ func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
 	assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
 }
 
+func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_restore",
+		models.PolarSubscriptionStatusActive,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_restore",
+		models.PolarSubscriptionStatusCanceled,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanTrial, after.Plan)
+	assert.True(t, after.IsOpenTrial(time.Now()))
+	assert.False(t, after.IsActiveBusiness())
+}
+
+func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_lapsed",
+		models.PolarSubscriptionStatusActive,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+
+	ended := now.Add(-time.Hour)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Update("trial_ends_at", ended).Error)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		"sub_lapsed",
+		models.PolarSubscriptionStatusCanceled,
+		&now,
+		&end,
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanNone, after.Plan)
+	assert.False(t, after.IsOpenTrial(time.Now()))
+	assert.False(t, after.IsActiveBusiness())
+}
+
 func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

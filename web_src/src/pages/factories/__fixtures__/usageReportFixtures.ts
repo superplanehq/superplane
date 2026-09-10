@@ -159,3 +159,43 @@ export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   creditPurchaseAllowed: false,
   hasBillingCustomer: false,
 };
+
+export const LAPSED_ORGANIZATION_BILLING = {
+  plan: "none",
+  planSource: "polar",
+  polarSubscriptionStatus: "canceled",
+  remainingCreditCents: "5000",
+  includedRemainingCents: "0",
+  purchasedRemainingCents: "5000",
+  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+  billingEnabled: true,
+  subscriptionCheckoutEnabled: true,
+  creditPurchaseAllowed: false,
+  hasBillingCustomer: true,
+};
+
+export const RESTORED_TRIAL_ORGANIZATION_BILLING = {
+  plan: "trial",
+  planSource: "polar",
+  polarSubscriptionStatus: "canceled",
+  trialEndsAt: "2026-09-22T12:00:00.000Z",
+  remainingCreditCents: "5000",
+  includedRemainingCents: "0",
+  purchasedRemainingCents: "5000",
+  billingEnabled: true,
+  subscriptionCheckoutEnabled: true,
+  creditPurchaseAllowed: false,
+  hasBillingCustomer: true,
+};
+
+export const LAPSED_TOPUP_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "5000",
+  grantTotalCents: "10000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "5000",
+  hostedBilledCents: "0",
+  remainingCreditWarning: false,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};

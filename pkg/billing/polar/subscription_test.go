@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
 }
 
-func Test__ApplySubscriptionCancelStopsBusiness(t *testing.T) {
+func Test__ApplySubscriptionCancelRestoresTrialAndExpiresIncluded(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
@@ -48,8 +49,81 @@ func Test__ApplySubscriptionCancelStopsBusiness(t *testing.T) {
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
+	assert.False(t, plan.IsActiveBusiness())
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.RemainingMicros)
+}
+
+func Test__ApplySubscriptionCancelEndsPlanAfterTrialAndExpiresIncluded(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_lapsed", "active", periodStart, periodEnd)))
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Update("trial_ends_at", time.Now().Add(-time.Hour)).Error)
+
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_lapsed", "canceled", periodStart, periodEnd)))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanNone, plan.Plan)
 	assert.False(t, plan.IsActiveBusiness())
+	assert.False(t, plan.IsOpenTrial(time.Now()))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+}
+
+func Test__ApplySubscriptionResubscribeSamePeriodGrantsIncludedAgain(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	event := subscriptionEvent(r.Organization.ID, "sub_renew", "active", periodStart, periodEnd)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_renew", "canceled", periodStart, periodEnd)))
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.True(t, plan.IsActiveBusiness())
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.PurchasedRemainingMicros)
+
+	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
+	require.NoError(t, err)
+	liveIncluded := 0
+	canceledIncluded := 0
+	for _, grant := range grants {
+		if grant.Kind != models.LLMCreditGrantKindIncluded {
+			continue
+		}
+		if grant.IsExpired(time.Now()) {
+			canceledIncluded++
+			require.NotNil(t, grant.PolarOrderID)
+			assert.True(t, strings.HasPrefix(*grant.PolarOrderID, "canceled:"))
+			continue
+		}
+		liveIncluded++
+		require.NotNil(t, grant.PolarOrderID)
+		assert.Equal(t, models.IncludedGrantKey("sub_renew", periodEnd), *grant.PolarOrderID)
+	}
+	assert.Equal(t, 1, liveIncluded)
+	assert.Equal(t, 1, canceledIncluded)
 }
 
 func Test__ApplySubscriptionIncompleteKeepsTrial(t *testing.T) {
@@ -145,7 +219,8 @@ func Test__SyncOrganizationSubscriptionAppliesCanceledWhenNoPaidExists(t *testin
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.BillingPlanNone, plan.Plan)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
 	assert.False(t, plan.IsActiveBusiness())
 }
 

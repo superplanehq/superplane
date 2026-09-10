@@ -12,7 +12,10 @@ import {
   DEFAULT_FACTORY_USAGE,
   EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
+  RESTORED_TRIAL_ORGANIZATION_BILLING,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
 
@@ -297,5 +300,77 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(invoices).getByText("$25.00")).toBeInTheDocument();
     expect(within(invoices).getByText("Paid")).toBeInTheDocument();
     expect(within(invoices).getByText("Manage invoices")).toBeInTheDocument();
+  }, 10000);
+
+  it("asks the organization to subscribe after Business lapses and does not show included usage", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationCreditGrants: [
+            {
+              id: "grant-included",
+              kind: "included",
+              amountCents: "5000",
+              createdAt: "2026-09-10T12:00:00.000Z",
+              expiresAt: "2026-08-15T12:00:00.000Z",
+            },
+            {
+              id: "grant-topup",
+              kind: "topup",
+              amountCents: "5000",
+              polarOrderId: "trial-conversion:org:sub",
+              createdAt: "2026-09-10T12:00:00.000Z",
+              expiresAt: "2027-09-10T12:00:00.000Z",
+            },
+          ],
+        }}
+      />,
+    );
+
+    const usage = await screen.findByTestId("billing-plan-usage");
+    expect(usage).toHaveTextContent("Your hosted usage");
+    expect(usage).toHaveTextContent("$50.00 remaining");
+    expect(usage).toHaveTextContent("Subscribe to Business to use this credit.");
+    expect(usage).not.toHaveTextContent("Your included usage");
+    expect(usage).not.toHaveTextContent("Resets");
+    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
+
+    const balance = screen.getByTestId("billing-credit-balance");
+    expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$50.00");
+    expect(balance).toHaveTextContent("Hosted runs cannot start. Subscribe to Business to continue.");
+    expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Expired on");
+  }, 10000);
+
+  it("shows trial usage after a refund while the trial window is still open", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: RESTORED_TRIAL_ORGANIZATION_BILLING,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+        }}
+      />,
+    );
+
+    const usage = await screen.findByTestId("billing-plan-usage");
+    expect(usage).toHaveTextContent("Your trial usage");
+    expect(usage).toHaveTextContent("$50.00 remaining");
+    expect(usage).toHaveTextContent(`Ends ${WELCOME_EXPIRY_LABEL}`);
+    expect(usage).not.toHaveTextContent("Your included usage");
+    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+
+    const balance = screen.getByTestId("billing-credit-balance");
+    expect(balance).toHaveTextContent("Trial");
+    expect(within(balance).getByTestId("billing-remaining-credit")).toHaveTextContent("$50.00");
+    expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
+    expect(balance).not.toHaveTextContent("Hosted runs cannot start.");
+    expect(await screen.findByTestId("factories-sidebar-plan-label")).toHaveTextContent("Trial");
   }, 10000);
 });

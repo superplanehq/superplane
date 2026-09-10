@@ -242,7 +242,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status
 	if PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) {
 		next.Plan = BillingPlanBusiness
 	} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) {
-		next.Plan = BillingPlanNone
+		next.Plan = planAfterPaidSubscriptionEnds(&next, now)
 	}
 
 	err = tx.Clauses(clause.OnConflict{
@@ -290,4 +290,11 @@ func periodStartChanged(previous, next *time.Time) bool {
 		return true
 	}
 	return !previous.Equal(*next)
+}
+
+func planAfterPaidSubscriptionEnds(plan *OrganizationBillingPlan, now time.Time) string {
+	if plan != nil && plan.TrialEndsAt != nil && plan.TrialEndsAt.After(now) {
+		return BillingPlanTrial
+	}
+	return BillingPlanNone
 }
