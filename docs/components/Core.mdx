@@ -229,12 +229,15 @@ Each event has type `workOrder.created`. The payload is:
     "description": "...",
     "number": 12,
     "state": "draft",
+    "repository": "acme/app",
+    "repository_url": "https://github.com/acme/app.git",
+    "default_branch": "main",
     "origin": { "url": "...", "label": "..." }
   }
 }
 ```
 
-`origin` is present only when the task was created from an intake item.
+`origin` is present only when the task was created from an intake item. Repository fields are present when the workspace has an app repository.
 
 ### Example Data
 
@@ -242,6 +245,7 @@ Each event has type `workOrder.created`. The payload is:
 {
   "data": {
     "workOrder": {
+      "default_branch": "main",
       "description": "The billing page empty state does not name the next action.",
       "id": "123",
       "number": 12,
@@ -249,6 +253,8 @@ Each event has type `workOrder.created`. The payload is:
         "label": "acme/app#42",
         "url": "https://github.com/acme/app/issues/42"
       },
+      "repository": "acme/app",
+      "repository_url": "https://github.com/acme/app.git",
       "state": "draft",
       "title": "Show a clearer empty state"
     }
