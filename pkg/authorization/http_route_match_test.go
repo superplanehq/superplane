@@ -81,6 +81,12 @@ func TestMatchHTTPRoute(t *testing.T) {
 			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/files"},
 			wantOK: true,
 		},
+		{
+			method: http.MethodPost,
+			path:   "/api/v1/organizations/org-123/billing/sync",
+			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/billing/sync"},
+			wantOK: true,
+		},
 	}
 
 	for _, tt := range tests {

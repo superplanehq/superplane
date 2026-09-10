@@ -14,14 +14,14 @@ export const DEFAULT_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
 export const MIXED_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
   {
     id: "grant-refund",
-    kind: "polar_refund",
+    kind: "topup_refund",
     amountCents: "-500",
     polarOrderId: "ord_100",
     createdAt: "2026-08-20T15:00:00.000Z",
   },
   {
-    id: "grant-polar",
-    kind: "polar",
+    id: "grant-topup",
+    kind: "topup",
     amountCents: "2500",
     polarOrderId: "ord_100",
     createdAt: "2026-08-18T10:00:00.000Z",
