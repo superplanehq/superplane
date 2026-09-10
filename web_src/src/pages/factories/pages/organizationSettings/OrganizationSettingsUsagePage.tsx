@@ -1,11 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useFactoryWorkOrderRunUsage, WORK_ORDER_RUN_USAGE_PAGE_SIZE } from "@/hooks/useFactoryWorkOrderRunUsage";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { factoriesExportFactoryWorkOrderRunUsage } from "@/api-client";
 import type { FactoriesWorkOrderRunUsageRow } from "@/api-client";
 
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
@@ -72,25 +76,28 @@ export function OrganizationSettingsUsagePage() {
       subtitle="Review task spend for this workspace."
       wide
       actions={
-        <SpendingPeriodControls
-          customOpen={customOpen}
-          customRange={range}
-          label="Usage period"
-          period={period}
-          pickerTestId="usage-period-picker"
-          testId="usage-period"
-          onCustomOpenChange={setCustomOpen}
-          onCustomRangeChange={(next) => {
-            setCustomRange(next);
-            setPeriod("custom");
-          }}
-          onPeriodChange={(next) => {
-            setPeriod(next as SpendingPeriodPreset);
-            if (next !== "custom") {
-              setCustomOpen(false);
-            }
-          }}
-        />
+        <>
+          <ExportUsageCsvButton factoryId={factoryId} organizationId={organizationId} />
+          <SpendingPeriodControls
+            customOpen={customOpen}
+            customRange={range}
+            label="Usage period"
+            period={period}
+            pickerTestId="usage-period-picker"
+            testId="usage-period"
+            onCustomOpenChange={setCustomOpen}
+            onCustomRangeChange={(next) => {
+              setCustomRange(next);
+              setPeriod("custom");
+            }}
+            onPeriodChange={(next) => {
+              setPeriod(next as SpendingPeriodPreset);
+              if (next !== "custom") {
+                setCustomOpen(false);
+              }
+            }}
+          />
+        </>
       }
     >
       <p className="text-[13px] text-muted-foreground">
@@ -110,6 +117,64 @@ export function OrganizationSettingsUsagePage() {
       </FactorySettingsCard>
     </FactorySettingsPageFrame>
   );
+}
+
+/**
+ * Downloads the full, unwindowed usage ledger as CSV.
+ *
+ * The table only shows the selected period, at most 100 rows a page, so this
+ * calls a dedicated export RPC instead of paging through the table's query.
+ * Stays enabled even when the current period is empty: all-time usage can
+ * still exist.
+ */
+function ExportUsageCsvButton({ factoryId, organizationId }: { factoryId: string; organizationId: string }) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleClick = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const response = await factoriesExportFactoryWorkOrderRunUsage(
+        withOrganizationHeader({ organizationId, path: { factoryId } }),
+      );
+      const csv = response.data?.csv;
+      const filename = response.data?.filename;
+      if (!csv || !filename) {
+        throw new Error("Usage export response is missing CSV data");
+      }
+      downloadUsageCsv(csv, filename);
+    } catch {
+      showErrorToast("Unable to export usage.");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [factoryId, organizationId]);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={isExporting}
+      aria-label="Export all usage as CSV"
+      data-testid="organization-usage-export"
+      onClick={handleClick}
+    >
+      <Download className="mr-1 h-3.5 w-3.5" />
+      {isExporting ? "Exporting..." : "Export CSV"}
+    </Button>
+  );
+}
+
+function downloadUsageCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /**
