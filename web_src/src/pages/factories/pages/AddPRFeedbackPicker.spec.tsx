@@ -10,7 +10,7 @@ function renderPicker(onSelect = vi.fn(), onClose = vi.fn()) {
 }
 
 describe("AddPRFeedbackPicker", () => {
-  it("offers discussion and check cards", () => {
+  it("offers discussion and hides status-check setup", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-pr-feedback-picker");
@@ -18,16 +18,16 @@ describe("AddPRFeedbackPicker", () => {
     expect(within(picker).getByTestId("add-pr-feedback-template-discussion")).toHaveTextContent(
       "Pull request discussion",
     );
-    expect(within(picker).getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+    expect(within(picker).queryByTestId("add-pr-feedback-template-checks")).not.toBeInTheDocument();
   });
 
   it("reports the chosen source to the caller", async () => {
     const user = userEvent.setup();
     const { onSelect } = renderPicker();
 
-    await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
+    await user.click(screen.getByTestId("add-pr-feedback-template-discussion"));
 
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "checks" }));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "discussion" }));
   });
 
   it("does not offer a source that already has a handler", async () => {
@@ -40,8 +40,5 @@ describe("AddPRFeedbackPicker", () => {
     expect(discussion).toHaveTextContent("A handler for this source already exists.");
     await user.click(discussion);
     expect(onSelect).not.toHaveBeenCalled();
-
-    await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "checks" }));
   });
 });

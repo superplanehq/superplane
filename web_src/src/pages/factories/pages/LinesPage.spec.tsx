@@ -9,6 +9,7 @@ import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -590,31 +591,66 @@ describe("LinesPage board", () => {
     expect(add.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(add);
     expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
-    expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+    expect(screen.getByTestId("add-pr-feedback-template-discussion")).toHaveTextContent("Pull request discussion");
+    expect(screen.queryByTestId("add-pr-feedback-template-checks")).not.toBeInTheDocument();
   });
 
-  it("hides add when every feedback source already has a handler", () => {
-    useFactoryPRFeedbackHandlers.mockReturnValue({
-      data: [
-        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
-        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
-      ],
-    });
-    renderLinesBoard();
-
-    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
-  });
-
-  it("does not offer a source that already has a handler", async () => {
-    useFactoryPRFeedbackHandlers.mockReturnValue({
-      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
-    });
+  it("opens the comments setup page instead of creating the handler immediately", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-template-discussion")).toBeDisabled();
-    expect(screen.getByTestId("add-pr-feedback-template-checks")).toBeEnabled();
+    await user.click(screen.getByTestId("add-pr-feedback-template-discussion"));
+
+    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("shows comments as open after onboarding", () => {
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "How should pull request comments be handled?",
+    );
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/3");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
+    );
+    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure");
+  });
+
+  it("hides next steps when the comments handler is configured", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+  });
+
+  it("opens the comments setup page from the next-step CTA", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-cta-pr-comments-handler"));
+
+    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("hides add when the comments handler already exists", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
   });
 
   it("lists two intakes on the same source", () => {
