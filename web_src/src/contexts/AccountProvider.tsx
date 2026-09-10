@@ -40,10 +40,11 @@ export function AccountProvider({ children }: AccountProviderProps) {
       return;
     }
 
+    const signupResult = getSignupAnalyticsResult(window.location.search);
     const signupPreference = consumePendingSignupAnalyticsPreference({
       accountEmail: accountData.email,
       currentPath: window.location.pathname,
-      signupResult: getSignupAnalyticsResult(window.location.search),
+      signupResult,
     });
 
     const accountProperties = {
@@ -66,6 +67,12 @@ export function AccountProvider({ children }: AccountProviderProps) {
           product_updates_opt_in: signupPreference.productUpdatesOptIn,
         },
       });
+    } else if (signupResult === "created") {
+      posthog.capture("auth:signup");
+    }
+
+    if (signupResult) {
+      removeSignupAnalyticsResult();
     }
   }, []);
 
@@ -93,4 +100,13 @@ function getSignupAnalyticsResult(search: string) {
   }
 
   return null;
+}
+
+function removeSignupAnalyticsResult() {
+  const params = new URLSearchParams(window.location.search);
+  params.delete("auth_signup_result");
+
+  const search = params.toString();
+  const nextURL = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  window.history.replaceState(window.history.state, "", nextURL);
 }
