@@ -155,11 +155,7 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				if len(updated.CheckNames) > 0 {
-					configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
-				} else {
-					delete(configuration, "checkNames")
-				}
+				configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
 				nodes[i].Configuration = configuration
 				continue
 			}

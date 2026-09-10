@@ -69,9 +69,6 @@ func prFeedbackCanvasName(request prFeedbackBuildRequest, fallback string) strin
 func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 	name := prFeedbackCanvasName(request, prFeedbackDefaultName)
 	mention := strings.TrimSpace(request.Mention)
-	if mention == "" {
-		mention = prFeedbackDefaultMention
-	}
 
 	includeReviewSubmissions := false
 	return &yaml.Canvas{
