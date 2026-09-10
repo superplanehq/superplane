@@ -129,18 +129,43 @@ describe("FirstRunSetup", () => {
     bindMutate.mockReset();
   });
 
-  it("finishes setup from the ticket screen when hosted credentials cover the agent", async () => {
-    const user = userEvent.setup();
-    const model = pageModel({ hostedAgentReady: true });
+  it.each([
+    {
+      scenario: "a new user, organization, and workspace",
+      currentFactory: { onboarding: { initial: true, vcsIntegrationId: "github-1" } },
+      otherFactories: [],
+      otherOrganizations: [],
+    },
+    {
+      scenario: "an existing user and organization with a new workspace",
+      currentFactory: { onboarding: { vcsIntegrationId: "github-1" } },
+      otherFactories: [{ id: "factory-2", key: "CORE", name: "Core" }],
+      otherOrganizations: [],
+    },
+    {
+      scenario: "an existing user with a new organization and workspace",
+      currentFactory: { onboarding: { vcsIntegrationId: "github-1" } },
+      otherFactories: [],
+      otherOrganizations: [{ id: "org-2", name: "Existing organization" }],
+    },
+  ])(
+    "finishes setup without the agent screen for $scenario",
+    async ({ currentFactory, otherFactories, otherOrganizations }) => {
+      factory = { id: "factory-1", key: "PAY", name: "New workspace", ...currentFactory };
+      factories = [factory, ...otherFactories];
+      accountOrganizations = [{ id: "org-1", name: "Acme" }, ...otherOrganizations];
+      const user = userEvent.setup();
+      const model = pageModel({ hostedAgentReady: true });
 
-    renderSetup(model);
+      renderSetup(model);
 
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+      await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
-  });
+      expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+    },
+  );
 
   // Regression: the click that sets the issues choice and the call that
   // provisions the workspace happen in the same handler. `finish` used to
@@ -432,7 +457,7 @@ describe("FirstRunSetup", () => {
     expect(finish).toBeDisabled();
   });
 
-  it("opens the agent screen when the agent needs a connected provider", async () => {
+  it("opens the agent screen when local setup has no hosted agent", async () => {
     const user = userEvent.setup();
     const model = pageModel({ hostedAgentReady: false });
 

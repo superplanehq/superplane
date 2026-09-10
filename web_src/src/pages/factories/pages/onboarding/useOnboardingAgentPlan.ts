@@ -26,7 +26,6 @@ export function useOnboardingAgentPlan(
     hostedModelsLoading: hostedModelsQueriesLoading(needHostedModels, [anthropic, openai, openrouter]),
     plan: resolveOnboardingAgent({
       connected,
-      remainingCreditCents,
       hostedModels: {
         anthropic: hostedModelIds(anthropic.data?.models),
         openai: hostedModelIds(openai.data?.models),
