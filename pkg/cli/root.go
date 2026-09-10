@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
-	factories "github.com/superplanehq/superplane/pkg/cli/commands/factories"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
@@ -63,7 +62,6 @@ func init() {
 	options := defaultBindOptions()
 	RootCmd.AddCommand(apps.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
-	RootCmd.AddCommand(factories.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
