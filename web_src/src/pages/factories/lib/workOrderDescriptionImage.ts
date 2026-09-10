@@ -17,14 +17,23 @@ export const WorkOrderImage = Image.extend({
       downloadUrls: {} as Record<string, string>,
     };
   },
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      resolvedSrc: {
+        default: null,
+        rendered: false,
+      },
+    };
+  },
   renderHTML({ HTMLAttributes }) {
-    const src = resolveWorkOrderFileSrc(
-      HTMLAttributes.src as string | undefined,
-      this.editor?.storage.image?.downloadUrls,
-    );
+    const { resolvedSrc, ...rest } = HTMLAttributes;
+    const src =
+      (resolvedSrc as string | undefined | null) ??
+      resolveWorkOrderFileSrc(rest.src as string | undefined, this.editor?.storage.image?.downloadUrls);
     return [
       "img",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+      mergeAttributes(this.options.HTMLAttributes, rest, {
         src,
         class: "work-order-file-image",
       }),

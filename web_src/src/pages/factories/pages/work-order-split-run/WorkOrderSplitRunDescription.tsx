@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export function WorkOrderSplitRunDescription({
   const [saved, setSaved] = useState(description);
   const [draft, setDraft] = useState(description);
   const canUpload = Boolean(organizationId && factoryId);
+  const fileUrls = useMemo(() => workOrderFileDownloadMap(files), [files]);
   const fileUpload = useWorkOrderFileUpload({
     organizationId: organizationId ?? "",
     factoryId: factoryId ?? "",
@@ -118,7 +119,7 @@ export function WorkOrderSplitRunDescription({
             disabled={busy || fileUpload.isUploading}
             className="min-h-32 pr-28 text-[13px] leading-[1.625] [&>p:first-child]:mt-0"
             onChange={setDraft}
-            fileUrls={workOrderFileDownloadMap(files)}
+            fileUrls={fileUrls}
             onUploadFiles={canUpload ? fileUpload.uploadFiles : undefined}
             isUploading={fileUpload.isUploading}
           />
