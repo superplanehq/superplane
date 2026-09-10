@@ -23,7 +23,7 @@ func Test__ListDeletedFactories(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, factory.SoftDelete(database.DB(t.Context())))
 
-	deleted, err := models.ListDeletedFactories(database.DB(t.Context()))
+	deleted, err := models.ListDeletedFactories(database.DB(t.Context()), 100)
 	require.NoError(t, err)
 
 	var found bool
@@ -50,7 +50,7 @@ func Test__ListDeletedFactories__IncludesFactoriesInDeletedOrg(t *testing.T) {
 		Update("deleted_at", deletedAt).
 		Error)
 
-	deleted, err := models.ListDeletedFactories(database.DB(t.Context()))
+	deleted, err := models.ListDeletedFactories(database.DB(t.Context()), 100)
 	require.NoError(t, err)
 
 	var found *models.Factory
@@ -86,7 +86,7 @@ func Test__ListDeletedFactories__UsesEarliestDeletedAt(t *testing.T) {
 		Update("deleted_at", orgDeletedAt).
 		Error)
 
-	deleted, err := models.ListDeletedFactories(db)
+	deleted, err := models.ListDeletedFactories(db, 100)
 	require.NoError(t, err)
 
 	var found *models.Factory

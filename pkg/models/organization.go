@@ -262,16 +262,22 @@ func HardDeleteOrganization(id string) error {
 		Error
 }
 
-func ListDeletedOrganizations() ([]Organization, error) {
-	return ListDeletedOrganizationsInTransaction(database.Conn())
+func ListDeletedOrganizations(limit int) ([]Organization, error) {
+	return ListDeletedOrganizationsInTransaction(database.Conn(), limit)
 }
 
-func ListDeletedOrganizationsInTransaction(tx *gorm.DB) ([]Organization, error) {
+func ListDeletedOrganizationsInTransaction(tx *gorm.DB, limit int) ([]Organization, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var organizations []Organization
 
 	err := tx.
 		Unscoped().
 		Where("deleted_at IS NOT NULL").
+		Order("deleted_at ASC").
+		Limit(limit).
 		Find(&organizations).
 		Error
 	if err != nil {

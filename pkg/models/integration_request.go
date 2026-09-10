@@ -78,7 +78,11 @@ func LeaseIntegrationRequest(tx *gorm.DB, id uuid.UUID, lease time.Duration) (*I
 	return &request, nil
 }
 
-func ListIntegrationRequests() ([]IntegrationRequest, error) {
+func ListIntegrationRequests(limit int) ([]IntegrationRequest, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var requests []IntegrationRequest
 
 	now := time.Now()
@@ -87,6 +91,8 @@ func ListIntegrationRequests() ([]IntegrationRequest, error) {
 		Where("app_installation_requests.state = ?", IntegrationRequestStatePending).
 		Where("app_installation_requests.run_at <= ?", now).
 		Where("app_installations.deleted_at IS NULL").
+		Order("app_installation_requests.run_at ASC").
+		Limit(limit).
 		Find(&requests).
 		Error
 	if err != nil {

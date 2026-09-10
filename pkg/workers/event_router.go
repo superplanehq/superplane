@@ -51,7 +51,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			events, err := models.ListPendingCanvasEvents()
+			events, err := models.ListPendingCanvasEvents(workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}

@@ -573,7 +573,7 @@ func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 
 	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
-	requests, err := models.ListNodeRequests()
+	requests, err := models.ListNodeRequests(workerPollBatchSize)
 	require.NoError(t, err)
 
 	found := false
@@ -1026,7 +1026,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	//
 	// Verify that ListNodeRequests does not return the request for the deleted workflow.
 	//
-	requests, err := models.ListNodeRequests()
+	requests, err := models.ListNodeRequests(workerPollBatchSize)
 	require.NoError(t, err)
 
 	// Check that our request is not in the list
@@ -1090,7 +1090,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	requests, err := models.ListNodeRequests()
+	requests, err := models.ListNodeRequests(workerPollBatchSize)
 	require.NoError(t, err)
 	for _, pending := range requests {
 		assert.NotEqual(t, request.ID, pending.ID)

@@ -362,7 +362,11 @@ func ListOrganizationCanvases(tx *gorm.DB, organizationID uuid.UUID) ([]Canvas, 
 	return canvases, nil
 }
 
-func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
+func ListDeletedCanvases(db *gorm.DB, limit int) ([]Canvas, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var canvases []Canvas
 	err := db.
 		Model(&Canvas{}).
@@ -381,6 +385,8 @@ func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
 		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		Order("COALESCE(workflows.deleted_at, organizations.deleted_at) ASC").
+		Limit(limit).
 		Find(&canvases).
 		Error
 

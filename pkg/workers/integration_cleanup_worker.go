@@ -42,7 +42,7 @@ func (w *IntegrationCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			integrations, err := models.ListDeletedIntegrations()
+			integrations, err := models.ListDeletedIntegrations(workerPollBatchSize)
 			if err != nil {
 				w.log("Error finding deleted integrations: %v", err)
 			}

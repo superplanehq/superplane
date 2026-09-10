@@ -43,7 +43,7 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 		assert.True(t, leased.RunAt.After(before.Add(lease-time.Minute)),
 			"expected run_at to be pushed ~lease into the future")
 
-		listed, err := ListIntegrationRequests()
+		listed, err := ListIntegrationRequests(100)
 		require.NoError(t, err)
 		assert.Empty(t, listed, "a leased request must not be listed as due")
 	})
@@ -84,7 +84,7 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 		}
 		require.NoError(t, database.Conn().Create(expired).Error)
 
-		listed, err := ListIntegrationRequests()
+		listed, err := ListIntegrationRequests(100)
 		require.NoError(t, err)
 		require.Len(t, listed, 1, "an expired lease must be listed as due again")
 		assert.Equal(t, expired.ID, listed[0].ID)
