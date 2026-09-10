@@ -213,25 +213,18 @@ describe("FactorySettingsLayout sidebar", () => {
     10000,
   );
 
-  it(
-    "renders the Workspace Usage page in the factory settings shell",
-    async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
-          factoriesFixture={defaultFactoriesFixture}
-        />,
-      );
+  it("renders the Workspace Usage page in the factory settings shell", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
 
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
-      expect(await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 })).toBeInTheDocument();
-    },
-    10000,
-  );
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 
   describe("Find settings", () => {
     it("shows section results for Security and hides the grouped nav", async () => {
