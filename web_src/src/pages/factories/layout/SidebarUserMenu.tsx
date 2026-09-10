@@ -19,7 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, CircleDollarSign, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
+import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -63,10 +63,7 @@ export function SidebarUserMenu({
   const organizationHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
-  const billingHref = factoryKey
-    ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing")
-    : `/${organizationId}/settings/billing`;
-  const triggerLabel = isTrial ? `${userName}, ${organizationName}, Trial` : `${userName}, ${organizationName}`;
+  const triggerLabel = `${userName}, ${organizationName}`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -100,14 +97,6 @@ export function SidebarUserMenu({
                 className="size-7 text-[10px]"
               />
             </span>
-            {isTrial ? (
-              <span
-                data-testid="factories-sidebar-plan-label"
-                className="max-w-full px-0.5 text-[9px] leading-none font-medium tracking-wide text-muted-foreground"
-              >
-                Trial
-              </span>
-            ) : null}
             <span className="sr-only">{triggerLabel}</span>
           </button>
         </DropdownMenuTrigger>
@@ -126,14 +115,6 @@ export function SidebarUserMenu({
           >
             <UserIcon aria-hidden />
             Profile
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className={MENU_ITEM_CLASS}
-            onClick={() => navigate(billingHref)}
-            data-testid="factories-sidebar-billing"
-          >
-            <CircleDollarSign aria-hidden />
-            Billing
           </DropdownMenuItem>
           {account?.installation_admin ? (
             <DropdownMenuItem

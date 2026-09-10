@@ -26,7 +26,7 @@ export interface WorkspaceNextStepContext {
   canConfigure: boolean;
   takenPRFeedbackSources: readonly PRFeedbackSourceId[];
   /** Stay hidden until PR feedback handlers have loaded. Also hide when the query fails without cached data. */
-  ready?: boolean;
+  prFeedbackHandlersReady: boolean;
 }
 
 export interface WorkspaceNextStepBanner {
@@ -98,7 +98,7 @@ export function isWorkspaceNextStepsQueryReady(query: {
 }
 
 export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNextStep[] {
-  if (ctx.ready === false || !ctx.onboardingComplete || !ctx.canConfigure) {
+  if (!ctx.onboardingComplete || !ctx.canConfigure || !ctx.prFeedbackHandlersReady) {
     return [];
   }
   const steps = WORKSPACE_NEXT_STEPS.map(({ isDone, ...step }) => ({

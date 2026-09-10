@@ -358,7 +358,7 @@ export function LinesPage() {
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
     takenPRFeedbackSources,
-    ready: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);

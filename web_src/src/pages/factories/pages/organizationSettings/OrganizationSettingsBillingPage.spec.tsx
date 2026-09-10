@@ -48,7 +48,6 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).not.toHaveTextContent("Purchased hosted credit");
     expect(balance).not.toHaveTextContent("Hosted billed spend");
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
-    expect(await screen.findByTestId("factories-sidebar-plan-label")).toHaveTextContent("Trial");
 
     const history = screen.getByTestId("billing-credit-history");
     expect(within(history).getByText("Welcome credit")).toBeInTheDocument();

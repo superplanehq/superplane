@@ -9,12 +9,14 @@ const commentsSteps = workspaceNextSteps({
   onboardingComplete: true,
   canConfigure: true,
   takenPRFeedbackSources: [],
+  prFeedbackHandlersReady: true,
 });
 
 const checksSteps = workspaceNextSteps({
   onboardingComplete: true,
   canConfigure: true,
   takenPRFeedbackSources: ["discussion"],
+  prFeedbackHandlersReady: true,
 });
 
 describe("NextStepsPanel", () => {

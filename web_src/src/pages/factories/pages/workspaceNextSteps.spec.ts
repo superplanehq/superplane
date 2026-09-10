@@ -13,6 +13,7 @@ import {
 const ready = {
   onboardingComplete: true,
   canConfigure: true,
+  prFeedbackHandlersReady: true,
   takenPRFeedbackSources: [] as const,
 };
 
@@ -51,8 +52,8 @@ describe("workspaceNextSteps", () => {
   });
 
   it("hides the list until handler status is ready", () => {
-    expect(workspaceNextSteps({ ...ready, ready: false })).toEqual([]);
-    expect(workspaceNextSteps({ ...ready, ready: true })).toEqual([
+    expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: false })).toEqual([]);
+    expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: true })).toEqual([
       expect.objectContaining({ id: "pr-comments-handler", done: false }),
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);

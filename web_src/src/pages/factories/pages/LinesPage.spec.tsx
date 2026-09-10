@@ -223,7 +223,7 @@ async function resetLinesBoardMocks() {
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
   createFactoryPRFeedbackHandler.mockReset();
-  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
+  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
   enabledExperimentalFeatures.clear();
@@ -433,6 +433,7 @@ describe("LinesPage board", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     renderLinesBoard();
 
@@ -550,6 +551,7 @@ describe("LinesPage board", () => {
   it("opens verify and done automations from the header icons", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     useFactoryApps.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
     const user = userEvent.setup();
@@ -576,6 +578,7 @@ describe("LinesPage board", () => {
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
+      isPending: false,
     });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
@@ -662,6 +665,7 @@ describe("LinesPage next steps", () => {
   it("shows status checks after the comments handler is configured", () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -784,6 +788,7 @@ describe("LinesPage board extras", () => {
   it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+      isPending: false,
     });
     const user = userEvent.setup();
     renderLinesBoard();
