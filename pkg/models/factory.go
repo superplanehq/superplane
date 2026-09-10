@@ -580,6 +580,12 @@ func (f *Factory) createWorkOrder(
 		return nil, err
 	}
 
+	if sourceRunID != nil {
+		if err := attachUsageEventsToWorkOrder(tx, f.ID, order.ID, *sourceRunID); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(assignees) > 0 {
 		if err := order.ReplaceAssignees(tx, assignees); err != nil {
 			return nil, err
