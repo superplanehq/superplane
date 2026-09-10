@@ -180,8 +180,12 @@ describe("IntakeSettingsHost", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Name")).toHaveValue("GitHub issues");
-    expect(within(dialog).getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
+    expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "New issue is opened" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(
+      within(dialog).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).toBeChecked();
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -244,23 +248,23 @@ describe("IntakeSettingsHost", () => {
     expect(within(automation).queryByTestId("rf__node-github-issues-trigger")).not.toBeInTheDocument();
   });
 
-  it("saves the name and filters through the intake API", async () => {
+  it("saves the settings without renaming the intake", async () => {
     const user = userEvent.setup();
     renderHost();
 
-    await user.clear(screen.getByLabelText("Name"));
-    await user.type(screen.getByLabelText("Name"), "Acme issues");
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-github",
-      name: "Acme issues",
       settings: {
         confidencePct: 65,
         labels: [],
         labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
         assignment: "ASSIGNMENT_ANY",
         authorsWithAccess: false,
+        newIssues: true,
+        reopenedIssues: true,
+        superplaneLabelAdded: true,
       },
     });
   });

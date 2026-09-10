@@ -489,6 +489,14 @@ func (c *Client) ListLabelsForIssue(ctx context.Context, repository string, issu
 	return c.underlying.Issues.ListLabelsByIssue(ctx, owner, name, issueNumber, nil)
 }
 
+// ListLabelsForRepository lists the labels defined in a repository, not the
+// labels of a single issue. Settings screens use it to offer the labels that
+// exist instead of a hardcoded list.
+func (c *Client) ListLabelsForRepository(ctx context.Context, repository string, opts *github.ListOptions) ([]*github.Label, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.ListLabels(ctx, owner, name, opts)
+}
+
 func (c *Client) GetRef(repository string, ref string) (*github.Reference, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Git.GetRef(context.Background(), owner, name, ref)

@@ -437,6 +437,8 @@ export function LinesPage() {
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           intake={settingsIntake}
+          repository={factory?.onboarding?.backlogRepository}
+          vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
