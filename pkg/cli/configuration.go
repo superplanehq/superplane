@@ -369,10 +369,15 @@ func (c *CurrentContext) SetActiveApp(appID string) error {
 }
 
 func (c *CurrentContext) GetActiveFactory() string {
-	if c.context.Factory == nil {
-		return ""
+	if c.context.Factory != nil {
+		if v := strings.TrimSpace(*c.context.Factory); v != "" {
+			return v
+		}
 	}
-	return strings.TrimSpace(*c.context.Factory)
+	if c.context.Workspace != nil {
+		return strings.TrimSpace(*c.context.Workspace)
+	}
+	return ""
 }
 
 func (c *CurrentContext) SetActiveFactory(factoryID string) error {
@@ -382,6 +387,7 @@ func (c *CurrentContext) SetActiveFactory(factoryID string) error {
 
 	factoryID = strings.TrimSpace(factoryID)
 	c.context.Factory = &factoryID
+	c.context.Workspace = &factoryID
 	_, err := UpsertContext(c.context)
 	return err
 }
@@ -403,6 +409,7 @@ func (c *CurrentContext) SetActiveWorkspace(workspaceID string) error {
 
 	workspaceID = strings.TrimSpace(workspaceID)
 	c.context.Workspace = &workspaceID
+	c.context.Factory = &workspaceID
 	_, err := UpsertContext(c.context)
 	return err
 }

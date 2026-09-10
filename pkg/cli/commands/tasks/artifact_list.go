@@ -14,13 +14,18 @@ type artifactListCommand struct {
 }
 
 func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
-	taskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
 
-	if taskID == "" {
+	if rawTaskID == "" {
 		return fmt.Errorf("--task must be a UUID or slug")
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
 	if err != nil {
 		return err
 	}

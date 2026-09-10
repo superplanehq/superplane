@@ -39,7 +39,7 @@ func TestFormatTaskResult(t *testing.T) {
 }
 
 func TestFormatRelativeTimeAt(t *testing.T) {
-	now := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Truncate(time.Second)
 
 	cases := []struct {
 		name  string
