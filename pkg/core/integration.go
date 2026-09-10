@@ -148,6 +148,7 @@ type IntegrationResource struct {
 	Type string
 	Name string
 	ID   string
+	URL  string
 }
 
 type ListResourcesContext struct {

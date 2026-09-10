@@ -168,13 +168,16 @@ func evaluatePullRequestChecks(checks []PullRequestCheck, selectedNames []string
 }
 
 func selectedChecks(checks []PullRequestCheck, selectedNames []string) []PullRequestCheck {
-	if len(selectedNames) == 0 {
-		return checks
-	}
-
 	wanted := map[string]bool{}
 	for _, name := range selectedNames {
-		wanted[strings.ToLower(strings.TrimSpace(name))] = true
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		wanted[strings.ToLower(trimmed)] = true
+	}
+	if len(wanted) == 0 {
+		return nil
 	}
 
 	selected := make([]PullRequestCheck, 0, len(checks))
@@ -252,22 +255,11 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func nextEvaluateDelay(now, lastChange, timeoutAt time.Time, allTerminal bool, quietPeriod, pollInterval time.Duration) time.Duration {
+func nextEvaluateDelay(now, timeoutAt time.Time, pollInterval time.Duration) time.Duration {
 	if !now.Before(timeoutAt) {
 		return 0
 	}
 	timeoutRemain := timeoutAt.Sub(now)
-	if allTerminal {
-		quietUntil := lastChange.Add(quietPeriod)
-		if !now.Before(quietUntil) {
-			return 0
-		}
-		quietRemain := quietUntil.Sub(now)
-		if quietRemain < timeoutRemain {
-			return quietRemain
-		}
-		return timeoutRemain
-	}
 	if pollInterval < timeoutRemain {
 		return pollInterval
 	}

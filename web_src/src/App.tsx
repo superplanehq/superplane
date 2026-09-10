@@ -52,6 +52,8 @@ import {
   WorkOrderDetailPage,
   WorkOrdersPage,
   WorkspaceOverviewPage,
+  ChecksPRFeedbackSetupPage,
+  DiscussionPRFeedbackSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
@@ -150,6 +152,8 @@ function organizationScopedRouteTree() {
               <Route path="new" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId" element={<LinesPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
+              <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
+              <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />
