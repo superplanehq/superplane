@@ -104,6 +104,8 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
 			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: "attach-intent"},
+			{Channel: "failed", SourceID: intakeAnalysisNodeID, TargetID: intakeAddRunErrorNodeID},
 		}, canvas.Spec.Edges)
 
 		trigger := findSpecNode(t, canvas, backlogTriggerNodeID)
@@ -114,6 +116,17 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.Equal(t, "{{ root().data.workOrder.id }}", report.Configuration["orderId"])
 		assert.Equal(t, "confidence", report.Configuration["checkKey"])
 		assert.Equal(t, "Confidence score", report.Configuration["name"])
+
+		intent := findSpecNode(t, canvas, "attach-intent")
+		assert.Equal(t, factory.AddWorkOrderArtifactComponentName, intent.Component)
+		assert.Equal(t, "{{ root().data.workOrder.id }}", intent.Configuration["orderId"])
+		assert.Equal(t, "markdown", intent.Configuration["artifactType"])
+		assert.Equal(t, "intent.md", intent.Configuration["title"])
+		assert.Equal(t, `{{ $["Analyze intake"].data.result.intent }}`, intent.Configuration["body"])
+
+		runError := findSpecNode(t, canvas, intakeAddRunErrorNodeID)
+		assert.Equal(t, intakeAddRunErrorComponent, runError.Component)
+		assert.Equal(t, intakeAddRunErrorMessage, runError.Configuration["message"])
 	})
 
 	t.Run("the analysis runner authenticates with the workspace agent", func(t *testing.T) {
@@ -135,6 +148,42 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		}, analysis.Configuration["credentials"])
 		assert.Equal(t, "gpt-5", analysis.Configuration["model"])
 		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
+		assert.Equal(t, []any{
+			map[string]any{
+				"source":      "integration",
+				"integration": map[string]any{"name": "github"},
+			},
+		}, analysis.Configuration["environmentFrom"])
+		assert.Equal(t, []any{
+			map[string]any{
+				"name":        "REPO_URL",
+				"value":       "{{ root().data.workOrder.repository_url }}",
+				"valueSource": "literal",
+			},
+			map[string]any{
+				"name":        "BASE",
+				"value":       "{{ root().data.workOrder.default_branch }}",
+				"valueSource": "literal",
+			},
+		}, analysis.Configuration["environment"])
+
+		steps, ok := analysis.Configuration["steps"].([]any)
+		require.True(t, ok)
+		require.Len(t, steps, 3)
+		clone, ok := steps[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Clone repository", clone["name"])
+		assert.Contains(t, clone["command"], "rm -rf repo")
+		assert.Contains(t, clone["command"], `git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`)
+		prompt, ok := steps[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "repo", prompt["workingDirectory"])
+		assert.Contains(t, prompt["prompt"], "/tmp/intent.md")
+		assert.Contains(t, prompt["prompt"], "Do not write implementation details")
+		assert.Contains(t, prompt["prompt"], "How I understand this")
+		assert.Contains(t, prompt["prompt"], "How do you understand what needs to be done here?")
+		assert.Contains(t, prompt["prompt"], "Problem, Proposed outcome, Affected users and systems, Constraints.")
+		assert.Contains(t, prompt["prompt"], "Do not add an Open questions section.")
 	})
 }
 

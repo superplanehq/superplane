@@ -161,6 +161,32 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 	}
 }
 
+func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string {
+	if tx == nil || factory == nil {
+		return intakeGitHubAppName
+	}
+
+	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
+	if err != nil {
+		log.Warnf("factory %s: backlog cannot read GitHub installations: %v", factory.ID, err)
+		return intakeGitHubAppName
+	}
+
+	for i := range integrations {
+		if integrations[i].AppName != intakeGitHubAppName {
+			continue
+		}
+		if integrations[i].State != models.IntegrationStateReady {
+			continue
+		}
+		if name := strings.TrimSpace(integrations[i].InstallationName); name != "" {
+			return name
+		}
+	}
+
+	return intakeGitHubAppName
+}
+
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
 	if integration.State != models.IntegrationStateReady {
 		return nil

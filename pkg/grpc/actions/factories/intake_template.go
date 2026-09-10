@@ -47,6 +47,18 @@ const (
 	intakeConfidenceCriticalAt = 2
 
 	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
+	intakeIntentOutputFile   = "/tmp/intent.md"
+
+	intakeIntentArtifactNodeID   = "attach-intent"
+	intakeIntentArtifactNodeName = "Add intent"
+	intakeIntentArtifactTitle    = "intent.md"
+
+	intakeAddRunErrorNodeID    = "add-run-error"
+	intakeAddRunErrorNodeName  = "Record Analysis Failure"
+	intakeAddRunErrorComponent = "addRunError"
+	intakeAddRunErrorMessage   = "The analysis agent failed. Open the agent logs to find the cause."
+
+	intakeAnalysisTimeoutSeconds = 1800
 
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
@@ -251,16 +263,47 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration sets the machine and steps. BYOK agents also
-// receive credentials and a model.
-func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
+// intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK
+// agents also receive credentials and a model.
+func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName string) map[string]any {
+	if strings.TrimSpace(githubName) == "" {
+		githubName = intakeGitHubAppName
+	}
+
 	configuration := map[string]any{
-		"machineType": intakeAnalysisMachineType,
+		"machineType":             intakeAnalysisMachineType,
+		"executionTimeoutSeconds": intakeAnalysisTimeoutSeconds,
+		"environmentFrom": []any{
+			map[string]any{
+				"source": "integration",
+				"integration": map[string]any{
+					"name": githubName,
+				},
+			},
+		},
+		"environment": []any{
+			map[string]any{
+				"name":        "REPO_URL",
+				"value":       "{{ root().data.workOrder.repository_url }}",
+				"valueSource": "literal",
+			},
+			map[string]any{
+				"name":        "BASE",
+				"value":       "{{ root().data.workOrder.default_branch }}",
+				"valueSource": "literal",
+			},
+		},
 		"steps": []any{
 			map[string]any{
-				"name":   "Analyze and score",
-				"type":   "prompt",
-				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
+				"name":    "Clone repository",
+				"type":    runner.AgentStepBash,
+				"command": intakeAnalysisCloneCommand(),
+			},
+			map[string]any{
+				"name":             "Analyze and score",
+				"type":             "prompt",
+				"workingDirectory": "repo",
+				"prompt":           intakeAnalysisPrompt(spec.analysisSubject),
 			},
 			map[string]any{
 				"name":    "Use analysis as output",
@@ -280,38 +323,79 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string
 	return configuration
 }
 
+func intakeAnalysisCloneCommand() string {
+	return strings.Join([]string{
+		"set -euo pipefail",
+		`if [ -z "${REPO_URL:-}" ]; then`,
+		`  echo "This workspace has no repository to analyze." >&2`,
+		"  exit 1",
+		"fi",
+		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
+		"rm -rf repo",
+		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+	}, "\n")
+}
+
 func intakeAnalysisPrompt(subject string) string {
 	return strings.Join([]string{
-		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
-		"Consider impact, clarity, feasibility, and whether an agent on this factory line can take a concrete action.",
-		fmt.Sprintf("Write one JSON object to %s. Do not write the result to another file.", intakeAnalysisOutputFile),
+		fmt.Sprintf("Analyze this %s against the repository checked out in the working directory.", subject),
+		"Read the ticket and the code. Score how well an agent on this factory line can complete the work.",
+		"Do not score from the title and description alone.",
+		"",
+		fmt.Sprintf("Write one JSON object to %s.", intakeAnalysisOutputFile),
 		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
 		"Keys:",
 		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
 		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
 		`- "reasons": exactly three short sentences that explain the score.`,
-		"Write three reasons: what the item names, what already exists, and whether an agent can do the work.",
+		"Write three reasons: what the item names, what already exists in this repository, and whether an agent can do the work.",
 		"",
-		"Event:",
-		"{{ root().data }}",
+		fmt.Sprintf("Also write %s. This is a short proto-spec of the idea, not a plan.", intakeIntentOutputFile),
+		"Keep it human readable and under 40 lines.",
+		"Do not write implementation details, file lists, APIs, or a detailed spec.",
+		"Use a mermaid fence only when a simple diagram clarifies the idea.",
+		"Start with \"How I understand this\". Write that section in first person as the agent that read the ticket and the code.",
+		"Answer this question: How do you understand what needs to be done here?",
+		"Then use these sections: Problem, Proposed outcome, Affected users and systems, Constraints.",
+		"Do not add an Open questions section.",
+		"",
+		"Task:",
+		"{{ root().data.workOrder }}",
 	}, "\n")
 }
 
-// intakeAnalysisOutputCommand promotes the file the agent wrote to the node's
+// intakeAnalysisOutputCommand promotes the files the agent wrote to the node's
 // result, so the rest of the graph reads fields instead of parsing text. The
 // prompt asks for an exact shape, but this step accepts what an agent really
 // produces: a quoted number, a missing summary, or a different number of
-// reasons. Only the score is required, because the report check cannot run
-// without it.
+// reasons. Only the score and intent body are required.
 func intakeAnalysisOutputCommand() string {
-	return fmt.Sprintf(`if ! jq -ce '{
+	return fmt.Sprintf(`if [ ! -s %s ]; then
+  echo "The analysis wrote no intent.md" >&2
+  exit 1
+fi
+if ! jq -ce --rawfile intent %s '{
   score: (.score | tonumber | floor),
   summary: ((.summary // "") | tostring),
-  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring]
+  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring],
+  intent: ($intent | tostring)
 }' %s > "$SUPERPLANE_RESULT_FILE"; then
   echo "The analysis at %s has no readable score" >&2
   exit 1
-fi`, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
+fi`, intakeIntentOutputFile, intakeIntentOutputFile, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
+}
+
+func intakeIntentBodyExpression() string {
+	return fmt.Sprintf(`{{ $[%q].data.result.intent }}`, intakeAnalysisNodeName)
+}
+
+func intakeIntentArtifactConfiguration() map[string]any {
+	return map[string]any{
+		"orderId":      intakeWorkOrderIDFromRootExpression(),
+		"artifactType": "markdown",
+		"title":        intakeIntentArtifactTitle,
+		"body":         intakeIntentBodyExpression(),
+	}
 }
 
 func intakeAnalysisScorePath() string {

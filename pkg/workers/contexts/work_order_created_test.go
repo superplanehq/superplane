@@ -64,6 +64,31 @@ func TestWorkOrderCreatedPayloadRewritesFileRefs(t *testing.T) {
 	assert.Equal(t, description, order.Description)
 }
 
+func TestWorkOrderCreatedPayloadIncludesRepository(t *testing.T) {
+	r := support.Setup(t)
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	appRepo := "acme/widgets"
+	defaultBranch := "develop"
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &appRepo,
+		DefaultBranch: &defaultBranch,
+	}))
+
+	order, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	payload := workOrderCreatedPayload(db, order)
+	workOrder, ok := payload["workOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "acme/widgets", workOrder["repository"])
+	assert.Equal(t, "https://github.com/acme/widgets.git", workOrder["repository_url"])
+	assert.Equal(t, "develop", workOrder["default_branch"])
+}
+
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {
 	r := support.Setup(t)
 	blob.SetCurrent(nil)
