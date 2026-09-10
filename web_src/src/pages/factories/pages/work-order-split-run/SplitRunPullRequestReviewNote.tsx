@@ -1,9 +1,7 @@
-import { ChevronDown, ExternalLink, GitPullRequest } from "lucide-react";
+import { ExternalLink, GitPullRequest } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
-import type { SplitRunFooterAction } from "./splitRunFooter";
 import { PULL_REQUEST_REVIEW_COPY, type PullRequestReviewTarget } from "./splitRunPullRequestReview";
 
 const MARK_CLASSNAME = "flex shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white";
@@ -12,21 +10,16 @@ const MARK_CLASSNAME = "flex shrink-0 items-center justify-center rounded-full b
  * Decision strip for a task whose pull request is open. One message (the
  * pull request is ready), one large call to action (review it), and a
  * three-step guide. The automation-authored headline and body are not
- * shown here; the steps say the same thing in a scannable form. Close
- * actions stay available behind More so they do not compete with review.
+ * shown here; the steps say the same thing in a scannable form. The task
+ * closes on its own when the pull request is merged or closed, so no
+ * other actions compete with the review CTA.
  */
 export function SplitRunPullRequestReviewNote({
   ctaLabel,
   pullRequest,
-  actions = [],
-  actionBusy = false,
-  onAction,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
-  actions?: SplitRunFooterAction[];
-  actionBusy?: boolean;
-  onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
     <div
@@ -59,8 +52,6 @@ export function SplitRunPullRequestReviewNote({
             <p className="text-[13px] leading-5 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
           </div>
         </div>
-
-        <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />
       </div>
     </div>
   );
@@ -81,48 +72,5 @@ function ReviewSteps() {
         </li>
       ))}
     </ol>
-  );
-}
-
-function MoreActionsMenu({
-  actions,
-  disabled,
-  onAction,
-}: {
-  actions: SplitRunFooterAction[];
-  disabled: boolean;
-  onAction?: (action: SplitRunFooterAction) => void;
-}) {
-  if (actions.length === 0) {
-    return null;
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="shrink-0 text-foreground/70"
-          aria-label={PULL_REQUEST_REVIEW_COPY.moreActions}
-          disabled={disabled}
-          data-testid="split-run-more-actions"
-        >
-          {PULL_REQUEST_REVIEW_COPY.more}
-          <ChevronDown className="size-3.5" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-40">
-        {actions.map((action) => (
-          <DropdownMenuItem
-            key={action.id}
-            onSelect={() => onAction?.(action)}
-            data-testid={`split-run-footer-${action.id}`}
-          >
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

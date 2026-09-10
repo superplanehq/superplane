@@ -96,15 +96,7 @@ export function SplitRunAttentionNote({
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
   if (pullRequest && note.cta) {
-    return (
-      <SplitRunPullRequestReviewNote
-        ctaLabel={note.cta.label}
-        pullRequest={pullRequest}
-        actions={actions}
-        actionBusy={actionBusy}
-        onAction={onAction}
-      />
-    );
+    return <SplitRunPullRequestReviewNote ctaLabel={note.cta.label} pullRequest={pullRequest} />;
   }
 
   const visual = TONE[tone];

@@ -45,19 +45,6 @@ const footer = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER).footer;
 export const Default: Story = {
   name: "Pull request is ready",
   render: () => (
-    <PopupShell>
-      {footer.note ? (
-        <SplitRunAttentionNote note={footer.note} tone="waiting" actions={footer.actions} onAction={() => {}} />
-      ) : null}
-    </PopupShell>
-  ),
-};
-
-export const ReadOnly: Story = {
-  name: "Pull request is ready — no close actions",
-  render: () => (
-    <PopupShell>
-      {footer.note ? <SplitRunAttentionNote note={footer.note} tone="waiting" actions={[]} /> : null}
-    </PopupShell>
+    <PopupShell>{footer.note ? <SplitRunAttentionNote note={footer.note} tone="waiting" /> : null}</PopupShell>
   ),
 };

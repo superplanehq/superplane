@@ -39,6 +39,4 @@ export const PULL_REQUEST_REVIEW_COPY = {
   ] satisfies PullRequestReviewStep[],
   stepsLabel: "Next steps",
   closing: "This task closes when the pull request is merged or closed.",
-  moreActions: "More actions",
-  more: "More",
 } as const;
