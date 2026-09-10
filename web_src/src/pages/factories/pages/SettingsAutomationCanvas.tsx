@@ -16,7 +16,7 @@ interface SettingsAutomationCanvasProps {
 /**
  * Read-only factory automation preview. Uses the same leaf-right layout as
  * factory run inspection and fits every node into the popup. Edit lives
- * behind the Edit automation link.
+ * as a pencil on the canvas.
  */
 export function SettingsAutomationCanvas({
   graph,

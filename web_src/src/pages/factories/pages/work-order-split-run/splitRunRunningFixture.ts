@@ -1,12 +1,9 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import { LINE_RUN_IMPLEMENT_ID } from "../../__fixtures__/factoryPageIds";
 import {
-  HOUR_AGO,
   OPEN_WORK_ORDER,
-  REVIEWER_USER,
   RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -16,18 +13,6 @@ import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopu
 import { buildSplitRunFooter } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
 import { splitRunSourceForOrder } from "./splitRunSource";
-
-const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
-  id: "art-plan-md",
-  type: "TYPE_MARKDOWN",
-  data: {
-    name: "plan.md",
-    title: "plan.md",
-    body: "Add a focused test for the refund reconciliation worker.\nCover the timeout-then-retry path.",
-  },
-  createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  createdAt: HOUR_AGO,
-};
 
 const OWNER: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
@@ -92,54 +77,6 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           status: "passed",
           detail: "description.md",
           duration: "2s",
-        },
-      ],
-    },
-    {
-      id: "plan",
-      name: "Create plan",
-      status: "passed",
-      duration: "1m 12s",
-      componentName: "Create plan",
-      artifacts: [PLAN_ARTIFACT],
-      canvasKey: "planning",
-      appId: "app-refund-planner",
-      stream: [
-        {
-          id: "plan-read",
-          at: "12:24:05",
-          componentName: "Read Task",
-          status: "passed",
-          duration: "4s",
-          detail: "description.md",
-        },
-        {
-          id: "plan-write",
-          at: "12:24:09",
-          componentName: "Planning",
-          status: "passed",
-          duration: "1m 8s",
-          detail: "plan.md",
-        },
-      ],
-      canvasSteps: [
-        {
-          id: "read-order",
-          title: "Read task",
-          componentName: "Read Task",
-          provider: "superplane",
-          status: "passed",
-          detail: "description.md",
-          duration: "4s",
-        },
-        {
-          id: "refund-planner",
-          title: "Write plan",
-          componentName: "Planning",
-          provider: "superplane",
-          status: "passed",
-          detail: "plan.md",
-          duration: "1m 8s",
         },
       ],
     },

@@ -2,9 +2,9 @@ package runner
 
 import _ "embed"
 
-// Planning sessions run every code runner (Claude, Codex, OpenRouter) in a
-// read-only "explore, then propose a draft" mode. These assets are shared by
-// every runner so the wait loop and the MCP tool contract behave identically
+// Planning sessions run every code runner (Claude, Codex, OpenCode/OpenRouter)
+// in a read-only "explore, then propose a draft" mode. These assets are shared
+// by every runner so the wait loop and the MCP tool contract behave identically
 // regardless of which agent CLI is executing the turn.
 
 //go:embed planning_session_mcp.js
@@ -17,7 +17,7 @@ var planningSessionMCPConfig string
 var followUpLoopScript string
 
 // PlanningSessionMCPScript is the stdio MCP server exposing propose_draft and
-// survey. Runners that speak MCP (Claude, Codex) ship it under
+// survey. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
 // SUPERPLANE_TASK_DIR as planning_session_mcp.js.
 func PlanningSessionMCPScript() string { return planningSessionMCPScript }
 
@@ -28,10 +28,8 @@ func PlanningSessionMCPConfigJSON() string { return planningSessionMCPConfig }
 // run.js --continue (or the runner's equivalent) for each one.
 func FollowUpLoopScript() string { return followUpLoopScript }
 
-// PlanningSessionMCPScriptFile is just the MCP server task file. Runners that
-// do not speak MCP (OpenRouter) still ship this file so their tool loop can
-// require() its exported proposeDraft/proposeSurvey helpers instead of
-// duplicating the SuperPlane planning-endpoint request contract.
+// PlanningSessionMCPScriptFile is just the MCP server task file. Attach it
+// together with PlanningSessionMCPConfigFile for runners that speak MCP.
 func PlanningSessionMCPScriptFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"}
 }

@@ -228,6 +228,17 @@ check.test.ui.shard:
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
 
+check.tool.configs:
+	bash ./scripts/check_tool_config_guard.sh
+
+check.fast.security:
+	bash ./scripts/check_fast_security.sh
+
+check.npm.audit.critical:
+	@echo "==> npm audit (critical, production, lockfile only)"
+	$(COMPOSE) exec app bash -c "cd web_src && npm audit --omit=dev --audit-level=critical --package-lock-only"
+	@echo "==> npm audit: PASS"
+
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 

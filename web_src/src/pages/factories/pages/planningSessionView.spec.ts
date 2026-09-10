@@ -88,6 +88,23 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.machineStatus).toBe("failed");
   });
 
+  it("marks the machine failed when the live run passed and SuperPlane is not waiting", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+  });
+
   it("keeps waiting when the live run is still open", () => {
     const view = applyPlanningSessionLiveRun(
       createWithAgentViewFromSession(

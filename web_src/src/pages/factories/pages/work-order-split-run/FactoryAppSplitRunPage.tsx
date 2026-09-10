@@ -111,7 +111,6 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   onSelectNode={model.setNodeId}
                   organizationId={model.organizationId}
                   canvasId={model.phase.appId}
-                  editHref={model.editHref}
                 />
               </li>
             </ol>

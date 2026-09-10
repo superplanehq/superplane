@@ -4,7 +4,6 @@ import { groupSplitRunStream } from "./PhaseLogCard";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
-  claudeCodeSteps,
   lineAutomationPresentation,
   parseSplitRunCanvasKey,
   richStreamForCanvas,
@@ -30,10 +29,6 @@ describe("canvasKeyForAutomation", () => {
       name: "Implement",
       componentName: "Implementation",
     });
-    expect(lineAutomationPresentation({ id: "app-refund-planner", name: "Refund Planner" }, "Plan")).toEqual({
-      name: "Plan",
-      componentName: "Planning",
-    });
     expect(lineAutomationPresentation({ id: "app-refund-verifier", name: "Refund Verifier" }, "Verify")).toEqual({
       name: "Verify",
       componentName: "Risk Assessment",
@@ -41,7 +36,6 @@ describe("canvasKeyForAutomation", () => {
   });
 
   it("maps planner, implementer, verifier, and closure apps", () => {
-    expect(canvasKeyForAutomation({ id: "app-refund-planner" })).toBe("planning");
     expect(canvasKeyForAutomation({ id: "app-refund-implementer" })).toBe("implementation");
     expect(canvasKeyForAutomation({ id: "app-refund-verifier", name: "Refund Verifier" })).toBe("risk");
     expect(canvasKeyForAutomation({ name: "Verify" })).toBe("risk");
@@ -116,17 +110,6 @@ describe("splitRunCanvasForPhase", () => {
       action: "passed",
     });
     expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
-  });
-
-  it("opens the planning canvas for a completed plan step", () => {
-    const plan = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "plan");
-    expect(canvasKeyForPhase(plan!)).toBe("planning");
-
-    const canvas = splitRunCanvasForPhase(plan!);
-    expect(canvas.title).toBe("Plan");
-    expect(canvas.statuses["onrun-create-plan"]).toBe("triggered");
-    expect(canvas.statuses["planner-agent-no-issue"]).toBe("passed");
-    expect(canvas.statuses["add-plan-artifact"]).toBe("passed");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
@@ -248,64 +231,6 @@ describe("splitRunCanvasForPhase", () => {
       componentName: "On Issue Assignment",
       action: "did not run",
     });
-  });
-
-  it("uses catalog labels and namespaced ids for planning components", () => {
-    const canvas = splitRunCanvasForPhase({
-      id: "plan",
-      name: "Plan",
-      status: "passed",
-      duration: "1m",
-      componentName: "Planning",
-      artifacts: [],
-      stream: [],
-      canvasSteps: [],
-    });
-    const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "add-plan-artifact")).toMatchObject({
-      componentType: "Add Task Artifact",
-      componentName: "Add Task Artifact",
-    });
-    expect(stream.find((line) => line.id === "planner-agent-no-issue")).toMatchObject({
-      componentType: "Run Claude Code",
-      componentName: "Draft Implementation Plan",
-    });
-    const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent-no-issue" && line.note);
-    expect(
-      plannerNotes
-        .filter((line) => !line.noteParentId)
-        .map((line) => ({
-          name: line.componentName,
-          type: line.componentType,
-        })),
-    ).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Provide description", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
-    ]);
-    expect(
-      plannerNotes.some(
-        (line) =>
-          line.componentName === "Clone Repo" && line.status === "passed" && line.detail?.includes("Cloning into"),
-      ),
-    ).toBe(true);
-    expect(plannerNotes.some((line) => line.componentName === "cat /tmp/ORDER.md" && line.noteParentId)).toBe(true);
-    expect(
-      plannerNotes.some(
-        (line) =>
-          line.componentType === "note" && line.componentName === "Let me examine the key reference files in detail.",
-      ),
-    ).toBe(true);
-    expect(
-      plannerNotes.some((line) => line.componentName.includes("LineListCard.tsx") && line.componentType === "read"),
-    ).toBe(true);
-    expect(plannerNotes.some((line) => line.componentName.includes("import type"))).toBe(false);
-    expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent-no-issue") ?? {})).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
-    ]);
   });
 
   it("uses the implementation runner log under Claude Code", () => {

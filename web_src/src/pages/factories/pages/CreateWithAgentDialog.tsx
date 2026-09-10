@@ -393,7 +393,7 @@ function DraftWorkPane({
         <Button
           type="button"
           data-testid="create-with-agent-create"
-          disabled={failed || !title.trim()}
+          disabled={failed || !title.trim() || !description.trim()}
           onClick={onCreate}
         >
           {refining ? CREATE_WITH_AGENT_COPY.update : CREATE_WITH_AGENT_COPY.create}

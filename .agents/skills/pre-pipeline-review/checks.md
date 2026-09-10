@@ -12,7 +12,7 @@ targets across rows. Skip a row when nothing in that column changed.
 | Touched paths | Targets (in order) |
 | --- | --- |
 | `*.go` under `cmd/`, `pkg/`, `test/` (non-generated) | `make format.go` → `make lint` → `make check.build.app` → `make check.format.go` |
-| `web_src/**` (TS/JS/CSS, not `web_src/src/api-client/`) | `make format.js` → `make check.format.js` → `make check.lint.ui` → `make check.build.ui` |
+| `web_src/**` (TS/JS/CSS, not `web_src/src/api-client/`) | `make format.js` → `make check.format.js` → `make check.fast.security` → `make check.lint.ui` → `make check.build.ui` |
 | `protos/**` | `make pb.gen` → `make check.proto.field.numbers` (never hand-edit generated output) |
 | `pkg/models/**` | Also: `make check.models.tx.debt` |
 | `pkg/grpc/actions/**` | Also: `make check.grpc.actions.status` |
@@ -29,6 +29,10 @@ targets across rows. Skip a row when nothing in that column changed.
   (`scripts/` has multiple `main` packages).
 - **Protos**: after `pb.gen`, generated trees stay gitignored; a clean
   `git status` for those paths is expected. Do not commit them.
+- **Fast security**: `make check.fast.security` is a static scan of tool
+  configs, known dropper markers, and npm install hooks. Run it before
+  jobs that load Vite, Vitest, Storybook, or ESLint. It does not load
+  `eslint.config.js`. Semaphore runs the same scans in the Security block.
 - **ESLint**: `make check.lint.ui` fails when the budget grows. Fix violations;
   do not update the baseline unless the user explicitly requests it.
 - **DB structure**: `make check.db.structure` is CI-only for this skill unless
@@ -64,6 +68,7 @@ make check.generated.artifacts
 ```bash
 make format.js
 make check.format.js
+make check.fast.security
 make check.lint.ui
 make check.build.ui
 make check.generated.artifacts

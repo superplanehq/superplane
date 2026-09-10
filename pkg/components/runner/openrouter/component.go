@@ -10,10 +10,9 @@ import (
 )
 
 const (
-	ComponentName        = "runnerOpenRouter"
-	FinishedEventType    = "runnerOpenRouter.finished"
-	envOpenRouterAPIKey  = "OPENROUTER_API_KEY"
-	envOpenRouterBaseURL = "OPENROUTER_BASE_URL"
+	ComponentName       = "runnerOpenRouter"
+	FinishedEventType   = "runnerOpenRouter.finished"
+	envOpenRouterAPIKey = "OPENROUTER_API_KEY"
 )
 
 func init() {
@@ -52,9 +51,10 @@ func (c *RunOpenRouter) Description() string {
 }
 
 func (c *RunOpenRouter) Documentation() string {
-	return `Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can use bash, read, edit, and write tools.
+	return `Runs a SuperPlane OpenRouter agent on a fleet runner. The runner starts OpenCode with the selected OpenRouter model.
 
 ## Prerequisites
+- The ` + "`opencode`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + `.
 - Node.js on the runner ` + "`PATH`" + `.
 - An OpenRouter API key stored as a SuperPlane secret or an OpenRouter integration.
 
@@ -62,7 +62,7 @@ func (c *RunOpenRouter) Documentation() string {
 Configure an ordered list of **bash** and **prompt** steps:
 
 - **bash** — shell commands (clone a repo, install deps, run tests, push).
-- **prompt** — one OpenRouter agent loop in the same working directory (up to max turns).
+- **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
@@ -71,7 +71,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Model**: Required. Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
-- **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
+
+SuperPlane rotates across allowed OpenRouter models. The live log shows the rotation, the start model, and each switch. A rate limit or a temporary provider error starts a new OpenCode session on the next model.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -101,24 +102,6 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenRouterAPIKey),
 		runner.AgentTimeoutField(),
-		maxTurnsField(),
-	}
-}
-
-func maxTurnsField() configuration.Field {
-	return configuration.Field{
-		Name:        "maxTurns",
-		Label:       "Max turns per prompt",
-		Type:        configuration.FieldTypeNumber,
-		Required:    false,
-		Default:     DefaultMaxTurns,
-		Description: "Maximum model turns for each prompt step. Defaults to 128. After this limit, SuperPlane asks for a final reply without tools.",
-		TypeOptions: &configuration.TypeOptions{
-			Number: &configuration.NumberTypeOptions{
-				Min: runner.IntPtr(0),
-				Max: runner.IntPtr(MaxTurnsLimit),
-			},
-		},
 	}
 }
 
@@ -166,12 +149,11 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups)
+	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, byokOpenRouterAllowedModels(ctx), FallbackRotateSeed(ctx))
 	task = applyPlanningFollowUp(task, environment, spec)
-	if runner.HasPlanningSessionToken(environment) {
-		task.Files = append(task.Files, runner.PlanningSessionMCPScriptFile())
-	}
+	task = attachPlanningSessionFiles(task, environment)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

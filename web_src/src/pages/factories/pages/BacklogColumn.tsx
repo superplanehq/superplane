@@ -5,6 +5,7 @@ import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
+import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
@@ -32,7 +33,7 @@ export type BacklogColumnProps = {
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent: () => void;
+  onCreateWithAgent?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
@@ -43,7 +44,8 @@ export type BacklogColumnProps = {
   onAddIntake?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
-  onAddAutomation?: () => void;
+  /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
+  automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 };
 
@@ -79,7 +81,7 @@ export function BacklogColumn({
   intakePanel,
   onAddIntake,
   automations,
-  onAddAutomation,
+  automationRowCount,
   onAutomationRowAction,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
@@ -114,7 +116,7 @@ export function BacklogColumn({
             title={title}
             createPopover={createPopover}
             automations={automations}
-            onAddAutomation={onAddAutomation}
+            automationRowCount={automationRowCount}
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
@@ -122,6 +124,13 @@ export function BacklogColumn({
             onColorChange={onColorChange}
           />
         }
+        subheader={columnAutomationRowsSubheader({
+          title,
+          automations,
+          rowCount: automationRowCount,
+          onRowAction: onAutomationRowAction,
+          testId: "lines-backlog-automation-rows",
+        })}
         banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
         testId="lines-backlog-column"
       >
@@ -149,7 +158,7 @@ function BacklogColumnHeaderActions({
   title,
   createPopover,
   automations,
-  onAddAutomation,
+  automationRowCount,
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
@@ -159,7 +168,7 @@ function BacklogColumnHeaderActions({
   BacklogColumnProps,
   | "title"
   | "automations"
-  | "onAddAutomation"
+  | "automationRowCount"
   | "onAutomationRowAction"
   | "onOpenSettings"
   | "onAddIntake"
@@ -170,19 +179,20 @@ function BacklogColumnHeaderActions({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      <ColumnAutomationsHeaderSlot
-        title={title}
-        automations={automations}
-        onRowAction={onAutomationRowAction}
-        testId="lines-backlog-automations"
-      />
+      {automationRowCount ? null : (
+        <ColumnAutomationsHeaderSlot
+          title={title}
+          automations={automations}
+          onRowAction={onAutomationRowAction}
+          testId="lines-backlog-automations"
+        />
+      )}
       <BacklogCreatePopover {...createPopover} />
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
-        onAddAutomation={onAddAutomation}
         colorId={colorId}
         onColorChange={onColorChange}
       />
@@ -240,7 +250,7 @@ function backlogCreatePopoverProps(args: {
   atCapacity: boolean;
   createMenu: ReturnType<typeof useBacklogCreateMenu>;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent: () => void;
+  onCreateWithAgent?: () => void;
 }) {
   return {
     canAdd: args.canAdd,

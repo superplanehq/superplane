@@ -8,14 +8,12 @@ import {
   PRFeedbackChecksFields,
   PRFeedbackDiscussionFields,
   PRFeedbackHealthSection,
-  PRFeedbackTextField,
 } from "./PRFeedbackSettingsFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { SettingsAutomationHeaderRow } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  appendUniqueTrimmedString,
   prFeedbackSettingsTabs,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
@@ -24,6 +22,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface PRFeedbackSettingsPopupProps {
   organizationId?: string;
+  githubIntegrationId?: string;
   settings: PRFeedbackDraftSettings;
   healthy: boolean;
   automationGraph?: IntakeAutomationGraph;
@@ -46,6 +45,7 @@ interface PRFeedbackSettingsPopupProps {
 
 export function PRFeedbackSettingsPopup({
   organizationId,
+  githubIntegrationId,
   settings,
   healthy,
   automationGraph,
@@ -110,8 +110,6 @@ export function PRFeedbackSettingsPopup({
               </TabsList>
             </Tabs>
           }
-          editHref={tab === "automation" ? editAutomationHref : undefined}
-          editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
         />
       </PopupHeader>
       {tab === "automation" ? (
@@ -119,6 +117,7 @@ export function PRFeedbackSettingsPopup({
           graph={automationGraph}
           canvasId={canvasId}
           runHrefFor={runHrefFor}
+          editHref={editAutomationHref}
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}
@@ -136,6 +135,7 @@ export function PRFeedbackSettingsPopup({
       ) : (
         <PRFeedbackGeneralTab
           organizationId={organizationId}
+          githubIntegrationId={githubIntegrationId}
           draft={draft}
           healthy={healthy}
           confirmDelete={confirmDelete}
@@ -155,6 +155,7 @@ export function PRFeedbackSettingsPopup({
 
 function PRFeedbackGeneralTab({
   organizationId,
+  githubIntegrationId,
   draft,
   healthy,
   confirmDelete,
@@ -168,6 +169,7 @@ function PRFeedbackGeneralTab({
   onClose,
 }: {
   organizationId?: string;
+  githubIntegrationId?: string;
   draft: PRFeedbackDraftSettings;
   healthy: boolean;
   confirmDelete: boolean;
@@ -181,50 +183,31 @@ function PRFeedbackGeneralTab({
   onClose: () => void;
 }) {
   const checks = draft.source === "checks";
-  const [checkNameInput, setCheckNameInput] = useState("");
-  const addCheckName = () => {
-    onUpdate("checkNames", appendUniqueTrimmedString(draft.checkNames, checkNameInput));
-    setCheckNameInput("");
-  };
 
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           <PRFeedbackHealthSection healthy={healthy} checks={checks} />
-          <PRFeedbackTextField
-            id="pr-feedback-name"
-            label={PR_FEEDBACK_SETTINGS_COPY.nameLabel}
-            helper={PR_FEEDBACK_SETTINGS_COPY.nameHelper}
-            value={draft.name}
-            onChange={(value) => onUpdate("name", value)}
-          />
-          <PRFeedbackTextField
-            id="pr-feedback-repository"
-            label={PR_FEEDBACK_SETTINGS_COPY.repositoryLabel}
-            helper={
-              checks ? PR_FEEDBACK_SETTINGS_COPY.checksRepositoryHelper : PR_FEEDBACK_SETTINGS_COPY.repositoryHelper
-            }
-            value={draft.repository}
-            onChange={(value) => onUpdate("repository", value)}
-          />
           {checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}
+              githubIntegrationId={githubIntegrationId}
               draft={draft}
-              checkNameInput={checkNameInput}
               onUpdate={onUpdate}
-              onInputChange={setCheckNameInput}
-              onAdd={addCheckName}
             />
           ) : (
-            <PRFeedbackDiscussionFields draft={draft} onUpdate={onUpdate} />
+            <PRFeedbackDiscussionFields
+              organizationId={organizationId}
+              githubIntegrationId={githubIntegrationId}
+              draft={draft}
+              onUpdate={onUpdate}
+            />
           )}
         </div>
       </div>
       <PRFeedbackSettingsFooter
         draft={draft}
-        pendingCheckName={checkNameInput}
         confirmDelete={confirmDelete}
         savePending={savePending}
         deletePending={deletePending}

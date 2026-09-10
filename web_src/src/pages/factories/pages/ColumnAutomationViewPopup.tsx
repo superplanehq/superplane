@@ -12,7 +12,11 @@ import {
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { SettingsAutomationHeaderRow, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import {
+  SettingsAutomationCanvasEdit,
+  SettingsAutomationHeaderRow,
+  SettingsAutomationWorkspace,
+} from "./SettingsAutomationWorkspace";
 import { useIntakeAutomationCanvas, type IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
@@ -59,9 +63,6 @@ export function ColumnAutomationViewPopup({
       <PopupHeader title={title} onClose={onClose}>
         <SettingsAutomationHeaderRow
           tabs={<ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />}
-          editHref={tab === "automation" ? editHref : undefined}
-          editLabel={COLUMN_AUTOMATIONS_COPY.editLabel}
-          editTestId="column-automation-view-edit"
         />
       </PopupHeader>
       <ColumnAutomationViewBody
@@ -72,6 +73,7 @@ export function ColumnAutomationViewPopup({
         onRetry={onRetry}
         canvasId={canvasId}
         runHrefFor={runHrefFor}
+        editHref={editHref}
         general={general}
         agent={agent}
       />
@@ -123,6 +125,7 @@ function ColumnAutomationViewBody({
   onRetry,
   canvasId,
   runHrefFor,
+  editHref,
   general,
   agent,
 }: {
@@ -133,6 +136,7 @@ function ColumnAutomationViewBody({
   onRetry?: () => void;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
   general?: ReactNode;
   agent?: PlanningReviewAgentSlot;
 }) {
@@ -160,6 +164,7 @@ function ColumnAutomationViewBody({
       onRetry={onRetry}
       canvasId={canvasId}
       runHrefFor={runHrefFor}
+      editHref={editHref}
     />
   );
 }
@@ -219,6 +224,7 @@ function AutomationViewBody({
   onRetry,
   canvasId,
   runHrefFor,
+  editHref,
 }: {
   graph?: IntakeAutomationGraph;
   loading: boolean;
@@ -226,11 +232,12 @@ function AutomationViewBody({
   onRetry?: () => void;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
 }) {
   if (!graph || graph.nodes.length === 0) {
     return (
       <section
-        className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+        className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
         aria-label="Automation"
         data-testid="column-automation-view-canvas"
       >
@@ -239,6 +246,13 @@ function AutomationViewBody({
           <Button type="button" variant="outline" size="sm" onClick={onRetry}>
             {COLUMN_AUTOMATIONS_COPY.viewRetry}
           </Button>
+        ) : null}
+        {editHref ? (
+          <SettingsAutomationCanvasEdit
+            href={editHref}
+            label={COLUMN_AUTOMATIONS_COPY.editLabel}
+            testId="column-automation-view-edit"
+          />
         ) : null}
       </section>
     );
@@ -251,6 +265,9 @@ function AutomationViewBody({
       canvasId={canvasId}
       runHrefFor={runHrefFor}
       workflowNodes={graph.specNodes}
+      editHref={editHref}
+      editLabel={COLUMN_AUTOMATIONS_COPY.editLabel}
+      editTestId="column-automation-view-edit"
     />
   );
 }

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Implement
-  description: Create a branch, implement the plan, and open a pull request.
+  description: Create a branch, implement the task, and open a pull request.
 spec:
   edges:
     - channel: default
@@ -115,11 +115,8 @@ spec:
               Task description:
               {{ task().description }}
 
-              Implementation plan:
-              {{ find(task().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body }}
-
               1/ Create a new branch. Do not commit on {{ task().default_branch }}.
-              2/ Implement the task and the plan. Keep the change focused.
+              2/ Implement the task. Keep the change focused.
               3/ Commit on the working branch with clear messages.
               4/ Do not create or open the pull request. Only commit and push to the working branch. The automation opens or updates the pull request after you finish.
 

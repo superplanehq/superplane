@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { editFactoryLinePath, factoryAppConfigurePath, factoryColumnAutomationViewPath } from "../lib/factoryPagePaths";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import {
+  factoryAppConfigurePath,
+  factoryColumnAutomationViewPath,
+  factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
+} from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -26,6 +32,11 @@ import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageC
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
 const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
+const ICON_VIEW: FactoryPreviewFlags = {
+  addIntakeControl: false,
+  columnAutomations: true,
+  columnAutomationRows: false,
+};
 
 function renderLinesBoard(
   path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
@@ -306,6 +317,7 @@ describe("LinesPage board", () => {
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const analyzingOrderId = REVIEW_CANDIDATE_WORK_ORDERS[0].id!;
     // The board optimistically knows this draft is analyzing before its Backlog
@@ -412,17 +424,18 @@ describe("LinesPage board", () => {
     expect(within(backlog).queryByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-listener-handler-discussion")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-icon-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer")).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-icon-handler-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`lines-backlog-automation-rows-row-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
   });
 
   it("puts backlog automations before the create plus and column menu", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
 
     const backlog = screen.getByTestId("lines-backlog-column");
     const automations = within(backlog).getByTestId("lines-backlog-automations");
@@ -433,36 +446,14 @@ describe("LinesPage board", () => {
     expect(create.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("opens the backlog automations menu from the indicator", async () => {
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`));
-
-    expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
-    expect(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
-      "On GitHub issue → Create a task in Backlog",
-    );
-    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
-
-    await user.keyboard("{Escape}");
-    await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
-    expect(screen.getByTestId("column-automation-row-analysis-app-refund-backlog")).toHaveTextContent(
-      "On task in Backlog → Score the task",
-    );
-  });
-
-  it("opens intake settings on the first tab when an automation row is clicked", async () => {
+  it("opens intake settings on the first tab when an automation icon is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`));
-    await user.click(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`));
+    await user.click(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("settings=automation");
     expect(screen.getByTestId("intake-source-settings")).toBeInTheDocument();
@@ -474,9 +465,9 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("column-automation-row-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     const location = screen.getByTestId("lines-test-location");
     expect(location).toHaveTextContent(
       factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-implementer"),
@@ -505,8 +496,9 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
-    await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
-    await user.click(screen.getByTestId("column-automation-row-analysis-app-refund-backlog"));
+    await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
+
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-backlog"),
@@ -515,65 +507,51 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
-  it("shows last-run activity on a phase automation from work-order executions", async () => {
-    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
+  it("opens the phase automation view from the header icon", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
-    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("Failed");
-    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
   });
 
-  it("opens the phase automation summary from the header icon", async () => {
+  it("hides Add automation on step column menus", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-
-    expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-row-step-0-app-refund-implementer")).toHaveTextContent(
-      "On task in Phase 1 → Run the Phase 1 agent",
-    );
-    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
-    expect(screen.queryByTestId("column-automations-add")).not.toBeInTheDocument();
+    const phaseMenus = screen.getAllByTestId(/lines-phase-menu-\d+$/);
+    expect(phaseMenus.length).toBeGreaterThan(0);
+    for (const menu of phaseMenus) {
+      await user.click(menu);
+      expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+    }
   });
 
-  it("opens Add automation from the column menu", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    await user.click(screen.getByTestId("lines-phase-menu-0-add-automation"));
-
-    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();
-  });
-
-  it("opens the verify and done automation summaries from the header icons", async () => {
+  it("opens verify and done automations from the header icons", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
     useFactoryApps.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
     const user = userEvent.setup();
+    const { unmount } = renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion"));
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, undefined, "handler-discussion"),
+    );
+
+    unmount();
     renderLinesBoard();
-
-    await user.click(screen.getByTestId("column-automation-icon-handler-discussion"));
-    expect(screen.getByTestId("column-automation-row-handler-discussion")).toHaveTextContent(
-      "On pull request comment → Address the feedback",
+    await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-pr-closure"),
     );
-    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
-    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
-
-    await user.keyboard("{Escape}");
-    await user.click(screen.getByTestId("column-automation-icon-closure-app-pr-closure"));
-    expect(screen.getByTestId("column-automation-row-closure-app-pr-closure")).toHaveTextContent(
-      "On pull request merged or closed → Complete the task",
-    );
-    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
-    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
   });
 
   it("names each Verify listener from its source", async () => {
@@ -613,31 +591,85 @@ describe("LinesPage board", () => {
     expect(add.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(add);
     expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-pr-feedback-template-discussion")).toHaveTextContent("Pull request discussion");
     expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
   });
 
-  it("hides add when every feedback source already has a handler", () => {
-    useFactoryPRFeedbackHandlers.mockReturnValue({
-      data: [
-        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
-        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
-      ],
-    });
-    renderLinesBoard();
-
-    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
-  });
-
-  it("does not offer a source that already has a handler", async () => {
-    useFactoryPRFeedbackHandlers.mockReturnValue({
-      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
-    });
+  it("opens the checks setup page from the Verify picker", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-template-discussion")).toBeDisabled();
-    expect(screen.getByTestId("add-pr-feedback-template-checks")).toBeEnabled();
+    await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
+
+    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("opens the comments setup page instead of creating the handler immediately", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    await user.click(screen.getByTestId("add-pr-feedback-template-discussion"));
+
+    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("shows comments as open after onboarding", () => {
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "How should pull request comments be handled?",
+    );
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/3");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
+    );
+    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure");
+  });
+
+  it("hides next steps when the comments handler is configured", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+  });
+
+  it("opens the comments setup page from the next-step CTA", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-cta-pr-comments-handler"));
+
+    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    for (const menuTestId of ["lines-backlog-menu", "lines-verify-menu", "lines-done-menu"]) {
+      await user.click(screen.getByTestId(menuTestId));
+      expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+    }
   });
 
   it("lists two intakes on the same source", () => {
@@ -871,23 +903,24 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
-  it("hides Edit Agent and Edit Automation on the automation menu", async () => {
+  it("opens the automation view from the header icon without an Edit menu", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
+    expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).not.toBeInTheDocument();
   });
 
   it("stages and commits the canvas agent on Save Agent", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("column-automation-row-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
     await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
@@ -1046,11 +1079,25 @@ describe("LinesPage board editing", () => {
 
     const header = screen.getByTestId("lines-detail-header");
     expect(within(header).queryByText(/→/)).not.toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-scope-all")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
-    expect(within(header).getByTestId("work-orders-scope-my")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-filter-trigger")).toBeInTheDocument();
-    expect(within(header).getByTestId("work-orders-search-trigger")).toBeInTheDocument();
+    const actions = within(header).getByTestId("workspace-page-header-actions");
+    const scopeAll = within(actions).getByTestId("work-orders-scope-all");
+    const filter = within(actions).getByTestId("work-orders-filter-trigger");
+    const search = within(actions).getByTestId("work-orders-search-trigger");
+    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toBeInTheDocument();
+    expect(scopeAll.className).toMatch(/rounded-full/);
+    expect(filter).toHaveAccessibleName("Filter");
+    expect(filter).not.toHaveTextContent("Filter");
+    expect(within(filter).queryByText("F")).not.toBeInTheDocument();
+    expect(scopeAll.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(filter.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(header).queryByTestId("lines-edit-menu")).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
+    expect(within(header).getByTestId("lines-board-view-menu")).toBeInTheDocument();
+    expect(
+      filter.compareDocumentPosition(within(header).getByTestId("lines-board-view-menu")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
 
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
@@ -1076,16 +1123,40 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
-  it("opens Edit from the line overflow menu", async () => {
-    const user = userEvent.setup();
+  it("does not show a line overflow Edit menu", () => {
     renderLinesBoard();
 
-    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-edit-menu"));
-    await user.click(screen.getByTestId("lines-edit-menu-edit"));
+    expect(screen.queryByTestId("lines-edit-menu")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Plan and Implement menu" })).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      editFactoryLinePath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
-    );
+  it("shows automation names and the header view menu by default", () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-backlog-automation-rows")).toHaveTextContent("Listens to GitHub issues");
+    expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
+  });
+
+  it("lets the header view menu switch automation names to icons and persist the choice", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    const user = userEvent.setup();
+    const first = renderLinesBoard();
+
+    expect(screen.getByTestId("lines-backlog-automation-rows")).toHaveTextContent("Listens to GitHub issues");
+    expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByTestId("lines-board-view-icons"));
+
+    expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();
+
+    first.unmount();
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();
   });
 });

@@ -32,12 +32,10 @@ function waitingOrder(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWor
 }
 
 /**
- * The canonical task card. These stories focus on the footer attention
- * area, and in particular on the compact, icon-only "Status checks passed"
- * mark that sits next to the full "Waiting for user review" chip. The card
- * is width-constrained to a board column (`min-w-72`) so the stories show
- * how the mark keeps the footer on one line where a second full chip would
- * overflow.
+ * The canonical task card. These stories focus on the middle status
+ * row, and in particular on the compact, icon-only "Status checks passed"
+ * mark that sits next to the full "Waiting for user review" pill. The card
+ * is width-constrained to a board column (`min-w-72`).
  */
 const meta = {
   title: "Factories/Components/WorkOrderCard",
@@ -92,9 +90,27 @@ export const ReviewOnly: Story = {
 };
 
 /**
- * A long title stresses the footer. The checks-passed mark stays compact
- * next to the review chip, so the footer does not wrap or crowd the owner
- * and task age even on a narrow board card.
+ * Open task with no attention chip. The footer keeps created time on the
+ * left and the owner given name plus avatar on the right.
+ */
+export const OpenOwned: Story = {
+  name: "Open with owner",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-open",
+        title: "Add refund reconciliation test",
+        statusNotes: [],
+        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      }),
+      factory,
+    ),
+  },
+};
+
+/**
+ * A long title stresses the card. Status pills stay on the middle row,
+ * so the footer keeps created time and the owner on one line.
  */
 export const ChecksPassedLongTitle: Story = {
   name: "Checks passed + long title",

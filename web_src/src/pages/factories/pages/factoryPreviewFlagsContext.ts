@@ -13,12 +13,18 @@ export interface FactoryPreviewFlags {
    * Set false to keep lane listener banners (legacy Storybook).
    */
   columnAutomations?: boolean;
+  /**
+   * Sentence rows under each column title, plus a header cog that
+   * switches back to the title icons. On by default.
+   */
+  columnAutomationRows?: boolean;
 }
 
 export const FactoryPreviewFlagsContext = createContext<FactoryPreviewFlags | null>(null);
 
 const SHIPPED_PREVIEW_FLAGS: Partial<FactoryPreviewFlags> = {
   columnAutomations: true,
+  columnAutomationRows: true,
 };
 
 /** Returns the shipped default when no preview provider is present. */

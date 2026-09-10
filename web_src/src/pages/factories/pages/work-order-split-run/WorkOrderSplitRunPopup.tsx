@@ -23,12 +23,7 @@ import {
   type SplitRunPhase,
   type SplitRunPhaseId,
 } from "./splitRunMocks";
-import {
-  defaultSplitRunPopupTab,
-  type SplitRunPopupTab,
-  splitRunPhaseAutomationHref,
-  splitRunPhaseRunHref,
-} from "./splitRunPopupModel";
+import { defaultSplitRunPopupTab, type SplitRunPopupTab, splitRunPhaseRunHref } from "./splitRunPopupModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -36,6 +31,7 @@ import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
+import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
@@ -52,11 +48,22 @@ function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNu
   return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
 }
 
-function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
+function footerMutationHandlers(
+  canUpdate: boolean,
+  footerActions: SplitRunFooterActions,
+  fixture: SplitRunFixture,
+  onDismiss?: () => void,
+) {
   if (!canUpdate) {
     return {};
   }
   return {
+    onArchive: async () => {
+      const archived = await footerActions.handleArchive();
+      if (archived) {
+        onDismiss?.();
+      }
+    },
     onReject: () => void footerActions.handleReject(),
     onBackToDraft: () => footerActions.handleBackToDraft(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
@@ -237,7 +244,6 @@ function SplitRunPhaseLogItem({
       onStop={onStop}
       onRerun={onRerun}
       runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
-      editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
       actionBusy={actionBusy}
       onToggle={onToggle}
       onUsageOpenChange={setUsageOpen}
@@ -263,6 +269,7 @@ export function WorkOrderSplitRunPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  canRefine = true,
   onRefine,
 }: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
@@ -271,11 +278,13 @@ export function WorkOrderSplitRunPopup({
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  canRefine?: boolean;
   onRefine?: () => void;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
+  const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
   const edits = useSplitRunWorkOrderEdits({
     organizationId,
@@ -341,7 +350,9 @@ export function WorkOrderSplitRunPopup({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         canAct={canUpdate}
+        canRefine={canRefine}
         onStart={draftStart}
+        onArchive={mutations.onArchive}
         onReject={mutations.onReject}
         onRefine={onRefine}
         onBackToDraft={backToDraft}

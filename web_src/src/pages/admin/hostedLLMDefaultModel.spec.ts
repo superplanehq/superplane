@@ -7,6 +7,7 @@ const openRouter = (overrides: Partial<HostedLLMProvider> = {}): HostedLLMProvid
   provider: "openrouter",
   enabled: false,
   api_key_configured: true,
+  management_key_configured: false,
   base_url: "",
   allowed_models: ["openai/gpt-4.1", "anthropic/claude-sonnet-4"],
   ...overrides,
@@ -15,6 +16,7 @@ const openRouter = (overrides: Partial<HostedLLMProvider> = {}): HostedLLMProvid
 const emptyForm = (overrides: Partial<ProviderForm> = {}): ProviderForm => ({
   enabled: false,
   apiKey: "",
+  managementKey: "",
   baseURL: "",
   allowedModels: [],
   listedModels: [],
