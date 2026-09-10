@@ -200,6 +200,15 @@ func TestLoad_PoolValidation(t *testing.T) {
 		{"negative_headroom", func(s string) string {
 			return strings.Replace(s, `"headroom": 2`, `"headroom": -2`, 1)
 		}, "headroom"},
+		{"pool_volume_size_negative", func(s string) string {
+			return strings.Replace(s, `"headroom": 2`, `"headroom": 2, "volume_size_gb": -1`, 1)
+		}, "volume_size_gb"},
+		{"pool_volume_iops_too_low", func(s string) string {
+			return strings.Replace(s, `"headroom": 2`, `"headroom": 2, "volume_iops": 100`, 1)
+		}, "volume_iops"},
+		{"pool_volume_throughput_too_high", func(s string) string {
+			return strings.Replace(s, `"headroom": 2`, `"headroom": 2, "volume_throughput_mbps": 2000`, 1)
+		}, "volume_throughput_mbps"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -369,6 +378,12 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	if cfg.VolumeSizeGB != 30 {
 		t.Errorf("VolumeSizeGB = %d", cfg.VolumeSizeGB)
 	}
+	if cfg.VolumeIOPS != 0 {
+		t.Errorf("VolumeIOPS = %d, want 0 (AWS gp3 default)", cfg.VolumeIOPS)
+	}
+	if cfg.VolumeThroughputMBps != 0 {
+		t.Errorf("VolumeThroughputMBps = %d, want 0 (AWS gp3 default)", cfg.VolumeThroughputMBps)
+	}
 	if cfg.BootGraceSec != 300 {
 		t.Errorf("BootGraceSec = %d", cfg.BootGraceSec)
 	}
@@ -392,6 +407,39 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	}
 	if cfg.RunnerProcessLogGroup != "/superplane/runner-process" {
 		t.Errorf("RunnerProcessLogGroup = %q", cfg.RunnerProcessLogGroup)
+	}
+}
+
+func TestToPoolConfig_VolumeSettingsArePerPool(t *testing.T) {
+	body := strings.Replace(validConfigJSON(),
+		`"headroom": 2`,
+		`"headroom": 2, "volume_size_gb": 30, "volume_iops": 3000, "volume_throughput_mbps": 125`, 1)
+	body = strings.Replace(body,
+		`"headroom": 1`,
+		`"headroom": 1, "volume_size_gb": 100, "volume_iops": 12000, "volume_throughput_mbps": 500`, 1)
+	f, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	tiny := f.ToPoolConfig(f.Pools[0])
+	if tiny.VolumeSizeGB != 30 || tiny.VolumeIOPS != 3000 || tiny.VolumeThroughputMBps != 125 {
+		t.Errorf("tiny: size=%d iops=%d throughput=%d", tiny.VolumeSizeGB, tiny.VolumeIOPS, tiny.VolumeThroughputMBps)
+	}
+	large := f.ToPoolConfig(f.Pools[1])
+	if large.VolumeSizeGB != 100 || large.VolumeIOPS != 12000 || large.VolumeThroughputMBps != 500 {
+		t.Errorf("large: size=%d iops=%d throughput=%d", large.VolumeSizeGB, large.VolumeIOPS, large.VolumeThroughputMBps)
+	}
+}
+
+func TestToPoolConfig_PoolVolumeSizeFallsBackToGlobal(t *testing.T) {
+	body := strings.Replace(validConfigJSON(), `"volume_size_gb": 30,`, `"volume_size_gb": 40,`, 1)
+	f, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	cfg := f.ToPoolConfig(f.Pools[0])
+	if cfg.VolumeSizeGB != 40 {
+		t.Errorf("VolumeSizeGB = %d, want global 40", cfg.VolumeSizeGB)
 	}
 }
 

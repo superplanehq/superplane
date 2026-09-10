@@ -39,11 +39,12 @@ type File struct {
 
 	// --- global VM defaults (shared across pools for now; per-pool override is a future move) ---
 	// SubnetID is a single launch subnet (legacy). Prefer SubnetIDs for multi-AZ capacity fallback.
-	SubnetID                     string     `json:"subnet_id"`
-	SubnetIDs                    []string   `json:"subnet_ids,omitempty"`
-	SecurityGroupIDs             []string   `json:"security_group_ids"`
-	IAMInstanceProfile           string     `json:"iam_instance_profile"`
-	KeyName                      string     `json:"key_name"`
+	SubnetID           string   `json:"subnet_id"`
+	SubnetIDs          []string `json:"subnet_ids,omitempty"`
+	SecurityGroupIDs   []string `json:"security_group_ids"`
+	IAMInstanceProfile string   `json:"iam_instance_profile"`
+	KeyName            string   `json:"key_name"`
+	// VolumeSizeGB is the default root volume size when a pool omits volume_size_gb.
 	VolumeSizeGB                 int32      `json:"volume_size_gb"`
 	BootGraceSec                 int        `json:"boot_grace_sec"`
 	RunnerHealthPort             int        `json:"runner_health_port"`
@@ -76,6 +77,12 @@ type Pool struct {
 	RunnerS3URI      string `json:"runner_s3_uri"`
 	HotInstanceCount int    `json:"hot_instance_count"`
 	Headroom         int    `json:"headroom"`
+	// VolumeSizeGB overrides the global volume_size_gb when > 0.
+	VolumeSizeGB int32 `json:"volume_size_gb,omitempty"`
+	// VolumeIOPS / VolumeThroughputMBps are optional gp3 provisioned performance.
+	// Zero omits the field from RunInstances (AWS gp3 defaults: 3000 IOPS, 125 MiB/s).
+	VolumeIOPS           int32 `json:"volume_iops,omitempty"`
+	VolumeThroughputMBps int32 `json:"volume_throughput_mbps,omitempty"`
 }
 
 // Defaults applied when fields are absent or zero.
@@ -89,6 +96,12 @@ const (
 	defaultRunnerHealthPort             = 9090
 	defaultRunnerHealthTimeoutSec       = 15
 	defaultRunnerHealthFailureThreshold = 3
+
+	// gp3 provisioned-performance bounds (AWS). 0 means "use AWS defaults".
+	minVolumeIOPS           int32 = 3000
+	maxVolumeIOPS           int32 = 64000
+	minVolumeThroughputMBps int32 = 125
+	maxVolumeThroughputMBps int32 = 1000
 )
 
 // Load reads path, parses JSON, applies defaults, and validates. Returns an error
@@ -229,6 +242,22 @@ func (f *File) validate() error {
 		if p.Headroom < 0 {
 			return fmt.Errorf("pools[%d].headroom must be non-negative", i)
 		}
+		if p.VolumeSizeGB < 0 {
+			return fmt.Errorf("pools[%d].volume_size_gb must be 0 (use global default) or a positive integer (GiB)", i)
+		}
+		if err := validateGp3Performance(fmt.Sprintf("pools[%d].", i), p.VolumeIOPS, p.VolumeThroughputMBps); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateGp3Performance(prefix string, iops, throughput int32) error {
+	if iops != 0 && (iops < minVolumeIOPS || iops > maxVolumeIOPS) {
+		return fmt.Errorf("%svolume_iops must be 0 (AWS default) or between %d and %d", prefix, minVolumeIOPS, maxVolumeIOPS)
+	}
+	if throughput != 0 && (throughput < minVolumeThroughputMBps || throughput > maxVolumeThroughputMBps) {
+		return fmt.Errorf("%svolume_throughput_mbps must be 0 (AWS default) or between %d and %d", prefix, minVolumeThroughputMBps, maxVolumeThroughputMBps)
 	}
 	return nil
 }
@@ -279,10 +308,19 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 		RunnerCloudWatchLogStreamPrefix: f.CloudWatch.StreamPrefix,
 		RunnerProcessLogGroup:           f.CloudWatch.ProcessLogGroup,
 		RunnerProcessLogRegion:          f.CloudWatch.ProcessLogRegion,
-		VolumeSizeGB:                    f.VolumeSizeGB,
+		VolumeSizeGB:                    firstPositive(p.VolumeSizeGB, f.VolumeSizeGB),
+		VolumeIOPS:                      p.VolumeIOPS,
+		VolumeThroughputMBps:            p.VolumeThroughputMBps,
 		BootGraceSec:                    f.BootGraceSec,
 		RunnerHealthPort:                f.RunnerHealthPort,
 		RunnerHealthTimeoutSec:          f.RunnerHealthTimeoutSec,
 		RunnerHealthFailureThreshold:    f.RunnerHealthFailureThreshold,
 	}
+}
+
+func firstPositive(pool, global int32) int32 {
+	if pool > 0 {
+		return pool
+	}
+	return global
 }
