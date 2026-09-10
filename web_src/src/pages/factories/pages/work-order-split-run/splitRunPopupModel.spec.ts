@@ -18,9 +18,9 @@ import {
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
   resolveSplitRunPopupPullRequests,
-  SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
+  splitRunIntentDocument,
   splitRunLinkedArtifacts,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
@@ -29,10 +29,6 @@ import {
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
-  it("uses a 3/2 pane split for Description", () => {
-    expect(SPLIT_RUN_PANE_GRID_CLASSNAME).toContain("minmax(0,3fr)_minmax(0,2fr)");
-  });
-
   it("opens the automation run for the preferred phase, then the latest phase run", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
     const implementHref = getWorkOrderRunHref(
@@ -145,6 +141,26 @@ describe("splitRunPopupModel", () => {
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(splitRunIntentDocument({ artifacts, description }).summary).toBeTruthy();
+    expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
+  });
+
+  it("keeps intent.md out of the Artifacts list", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "## Executive summary\n\nA retry loop." },
+      },
+      {
+        id: "art-plan",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "plan.md", body: "Add a retry." },
+      },
+    ];
+
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-plan"]);
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("A retry loop.");
   });
 
   it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {

@@ -16,6 +16,7 @@ import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } 
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
+import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import {
   autoExpandedPhaseId,
   splitRunStatusLabel,
@@ -329,10 +330,6 @@ export function WorkOrderSplitRunPopup({
         fixture={fixture}
         edits={edits}
         artifacts={popupData.artifacts}
-        artifactsLoading={popupData.artifactsLoading}
-        pullRequests={popupData.pullRequests}
-        pullRequestsLoading={popupData.pullRequestsLoading}
-        pullRequestsError={popupData.pullRequestsError}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
@@ -412,10 +409,6 @@ function SplitRunPopupTabs({
   fixture,
   edits,
   artifacts,
-  artifactsLoading,
-  pullRequests,
-  pullRequestsLoading,
-  pullRequestsError,
   organizationId,
   factoryId,
   factoryKey,
@@ -430,10 +423,6 @@ function SplitRunPopupTabs({
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
   artifacts: ReturnType<typeof useSplitRunPopupData>["artifacts"];
-  artifactsLoading: boolean;
-  pullRequests: ReturnType<typeof useSplitRunPopupData>["pullRequests"];
-  pullRequestsLoading: boolean;
-  pullRequestsError: Error | null;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -478,24 +467,16 @@ function SplitRunPopupTabs({
       </div>
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkOrderSplitRunOverview
+          title={edits.title}
           description={edits.description}
           artifacts={artifacts}
           checks={fixture.checks}
-          artifactsLoading={artifactsLoading}
-          pullRequests={pullRequests}
-          pullRequestsLoading={pullRequestsLoading}
-          pullRequestsError={pullRequestsError}
+          isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
           organizationId={organizationId}
-          factoryId={factoryId}
           factoryKey={factoryKey}
-          orderId={orderId}
           orderNumber={orderNumber}
           files={liveWorkOrder.data?.files}
           expandFirstCheck={fixture.footer.kind === "draft"}
-          canEditDescription={edits.canEditDescription}
-          descriptionBusy={edits.descriptionBusy}
-          onDescriptionSave={edits.saveDescription}
-          source={fixture.source}
         />
       </TabsContent>
       <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

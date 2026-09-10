@@ -239,9 +239,8 @@ describe("Line board job popup", () => {
     );
 
     const dialog = await screen.findByTestId("work-order-split-run");
-    const source = within(dialog).getByTestId("split-run-source");
-    expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
-    expect(within(source).getByText("Created manually")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-source")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
       "Let a user add emoji reactions on a task itself (not only on comments).",
     );
