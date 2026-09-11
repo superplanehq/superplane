@@ -22,8 +22,8 @@ TASK_BROKER_HOST_PORT ?= 8091
 AUTH_TOKEN ?= $(LOCAL_STACK_AUTH_TOKEN)
 export TASK_BROKER_HOST_PORT AUTH_TOKEN
 
-# Number of runner processes for `make runner` (default 1).
-N ?= 1
+# Number of local runner workers for `make dev` and `make runner`.
+N ?= 10
 
 .PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-linux-arm64 runner-linux-all runner-publish-s3 runner-publish-s3-all
 .PHONY: dev dev.down doctor-local fleet-manager task-broker runner register-local-fleet register-superplane-fleets local-dev-help
@@ -45,18 +45,19 @@ local-dev-help:
 	@echo "  make task-broker"
 	@echo "  make register-local-fleet"
 	@echo "  make register-superplane-fleets"
-	@echo "  make runner N=3"
+	@echo "  make runner N=10"
 	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
 
-# One-command local stack: Postgres, task-broker, SuperPlane fleets, one worker.
+# One-command local stack: Postgres, task-broker, SuperPlane fleets, N workers.
 # Broker is on host port 8091 (8081 is SuperPlane pgweb). SuperPlane app in Docker
 # should use TASK_BROKER_BASE_URL=http://host.docker.internal:8091
 dev:
-	docker compose up -d --wait --build
+	docker compose up -d --wait --build --scale runner=$(N)
 	@echo "Local runner stack is up."
 	@echo "  broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
 	@echo "  AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN)"
 	@echo "  fleet_id=$(LOCAL_FLEET_ID)"
+	@echo "  workers=$(N)"
 	@echo "SuperPlane (.env or compose override):"
 	@echo "  TASK_BROKER_BASE_URL=http://host.docker.internal:$(TASK_BROKER_HOST_PORT)"
 	@echo "  TASK_BROKER_PUBLIC_URL=http://localhost:$(TASK_BROKER_HOST_PORT)"

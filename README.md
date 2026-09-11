@@ -104,7 +104,7 @@ go build -o bin/task-broker ./task-broker/cmd/task-broker
 
 ### Local dev
 
-**One command:** **`make dev`** starts Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`), and one runner worker. Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb). **`make dev.down`** stops the stack.
+**One command:** **`make dev`** starts Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`), and 10 runner workers. Override the count with **`N=1 make dev`**. Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb). **`make dev.down`** stops the stack.
 
 SuperPlane compose defaults already point at this stack. Full steps, webhook URLs, and factory CLIs on the Compose worker: [docs/local-dev.md](./docs/local-dev.md).
 

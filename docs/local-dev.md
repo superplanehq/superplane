@@ -10,7 +10,7 @@ make dev
 ```
 
 That command starts Postgres, task-broker, SuperPlane fleets (`local` and
-`e1-*`), and one runner worker.
+`e1-*`), and 10 runner workers. Override the count with `N=1 make dev`.
 
 The broker listens on **http://127.0.0.1:8091**. SuperPlane pgweb already uses
 host port **8081**.
@@ -45,7 +45,7 @@ Do not run two brokers at the same time.
 1. Open SuperPlane at http://localhost:8000.
 2. Add a Runner, Run Bash, Run Python, Run JavaScript, Run Claude Code, or
    Run Codex node.
-3. Run the canvas. The local worker claims the task.
+3. Run the canvas. A local worker claims the task.
 
 Live logs in the UI stream from `http://localhost:8091`. The local worker does
 not use CloudWatch. Host-mode tasks get a fresh `HOME` each run
