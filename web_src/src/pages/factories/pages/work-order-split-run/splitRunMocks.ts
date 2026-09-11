@@ -31,6 +31,7 @@ import {
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
+  confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
 } from "../../lib/confidenceScore";
@@ -38,6 +39,7 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import { analysisFinishedStatus, analysisFirstResultDelivered } from "../../lib/analysisOutcome";
 import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -329,6 +331,8 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Task files used to decide if a cancelled analysis already delivered a plan. */
+  artifacts?: FactoriesWorkOrderArtifact[];
   /**
    * Whether the Backlog automation is still scoring this draft. Covers the
    * optimistic window where a fresh draft is known to be analyzing before its
@@ -423,6 +427,7 @@ function reviewSurfaces(
         note: draftFooterNote(order),
         status: displayStatus,
         isAnalyzing: draftIsAnalyzing(input),
+        confidenceScore: confidenceScoreFromChecks(checks),
       }),
       [],
       checks,
@@ -614,7 +619,7 @@ function phasesForOrder(
   const apiChecks = options?.checks;
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
-    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
+    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
@@ -627,18 +632,31 @@ const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
  * its run, so the log panel streams the analysis while the automation
  * still works. The newest phase carries the reported score.
  */
-function phasesForAnalysisRuns(runs: BacklogAnalysisRun[], apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+function phasesForAnalysisRuns(
+  runs: BacklogAnalysisRun[],
+  apiChecks?: FactoriesWorkOrderCheck[],
+  artifacts?: FactoriesWorkOrderArtifact[],
+): SplitRunPhase[] {
   const ordered = [...runs]
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+  const delivered = analysisFirstResultDelivered({ checks: apiChecks, artifacts });
 
   return ordered.map((entry, index) =>
-    analysisRunToPhase(entry, index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined),
+    analysisRunToPhase(
+      entry,
+      index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined,
+      index === ordered.length - 1 && delivered,
+    ),
   );
 }
 
-function analysisRunToPhase(entry: BacklogAnalysisRun, checks?: WorkOrderCheckPresentation[]): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+function analysisRunToPhase(
+  entry: BacklogAnalysisRun,
+  checks?: WorkOrderCheckPresentation[],
+  delivered = false,
+): SplitRunPhase {
+  const status = analysisFinishedStatus(statusForCanvasRun(entry.run), delivered);
   const componentName = CONFIDENCE_CHECK_NAME;
   const duration = durationForExecution(
     {

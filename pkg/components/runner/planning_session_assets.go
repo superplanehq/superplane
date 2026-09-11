@@ -10,6 +10,9 @@ import _ "embed"
 //go:embed planning_session_mcp.js
 var planningSessionMCPScript string
 
+//go:embed analysis_protocol.js
+var analysisProtocolScript string
+
 //go:embed mcp.json
 var planningSessionMCPConfig string
 
@@ -39,11 +42,14 @@ func PlanningSessionMCPConfigFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"}
 }
 
-// PlanningSessionMCPFiles returns the MCP server + static config task files.
-// Only attach these when HasPlanningSessionToken is true; line automations
-// never receive them.
+func PlanningSessionProtocolFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "analysis_protocol.js", Content: analysisProtocolScript, Mode: "0644"}
+}
+
+// PlanningSessionMCPFiles returns the MCP server, static config, and analysis
+// protocol task files. Only attach these when HasPlanningSessionToken is true.
 func PlanningSessionMCPFiles() []BrokerTaskFile {
-	return []BrokerTaskFile{PlanningSessionMCPScriptFile(), PlanningSessionMCPConfigFile()}
+	return []BrokerTaskFile{PlanningSessionMCPScriptFile(), PlanningSessionMCPConfigFile(), PlanningSessionProtocolFile()}
 }
 
 // FollowUpLoopFile returns the shared wait-loop task file. Only attach this

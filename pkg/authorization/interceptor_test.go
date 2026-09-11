@@ -297,10 +297,11 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 
 func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
-	requiredFeatures := []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}
+	requiredFeatures := []string{features.FeatureFactories}
 	routes := []HTTPRoute{
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"},
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"},
 		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"},
