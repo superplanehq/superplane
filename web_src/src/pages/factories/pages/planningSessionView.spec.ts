@@ -4,6 +4,7 @@ import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   applyPlanningSessionLiveRun,
   createWithAgentViewFromSession,
+  planningSessionHasPendingSurvey,
   workspacePlanningRepository,
 } from "./planningSessionView";
 
@@ -157,6 +158,12 @@ describe("createWithAgentViewFromSession", () => {
       id: "pending-survey",
       questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
     });
+    expect(
+      planningSessionHasPendingSurvey({
+        survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
+      }),
+    ).toBe(true);
+    expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
     expect(view.messages).toEqual([
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);

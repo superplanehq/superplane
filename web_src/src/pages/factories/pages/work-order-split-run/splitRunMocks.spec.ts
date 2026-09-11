@@ -160,16 +160,14 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
   });
 
-  it("narrates source, plan, and confidence reasons on a scored draft footer", () => {
+  it("uses the ready-band note on a scored draft footer", () => {
     const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
     const note = fixture.footer.note;
 
-    expect(note?.headline).toBe("Review the plan, then start");
-    expect(note?.text).toContain("[PAY-842](https://github.com/acme/payments-service/issues/842)");
-    expect(note?.text).toContain("**plan.md**");
-    expect(note?.text).toContain("Confidence 5/5 (High):");
-    expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
+    expect(note?.headline).toBe("This task is ready to start");
+    expect(note?.text).toContain("Review the summary and the plan");
+    expect(fixture.footer.confidenceScore).toBe(5);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -744,7 +742,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
@@ -1030,7 +1028,7 @@ describe("line board work-order examples", () => {
     expect(analysis?.runId).toBe("run-analysis");
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
     expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
   // A freshly created draft is known to be analyzing before its run appears in
@@ -1043,7 +1041,7 @@ describe("line board work-order examples", () => {
     });
 
     expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
     expect(fixture.footer.actions.map((action) => action.label)).not.toContain("Reject");
   });
 
@@ -1132,7 +1130,7 @@ describe("line board work-order examples", () => {
     expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
     expect(fixture.openPhaseId).toBeUndefined();
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
   it("appends matching PR feedback runs after line steps, oldest first", () => {

@@ -1,11 +1,12 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
-import { useMemo } from "react";
+import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { useWorkOrderPlanningSurvey } from "./useWorkOrderPlanningSurvey";
 
 export function LineBoardOrderCard({
   order,
@@ -46,11 +47,27 @@ export function LineBoardWorkOrderCard({
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const { data: checks = [] } = useWorkOrderChecks(
+  const { data: checks = [], refetch } = useWorkOrderChecks(
     workOrderCardContext.organizationId,
     workOrderCardContext.factoryId ?? "",
     order.id ?? "",
-    { enabled: showConfidence },
+    {
+      enabled: showConfidence,
+      refetchInterval: isAnalyzing ? ANALYZING_WORK_ORDER_CHECKS_POLL_MS : false,
+    },
+  );
+  const wasAnalyzing = useRef(isAnalyzing);
+  useEffect(() => {
+    if (wasAnalyzing.current && !isAnalyzing && showConfidence) {
+      void refetch?.();
+    }
+    wasAnalyzing.current = isAnalyzing;
+  }, [isAnalyzing, refetch, showConfidence]);
+  const hasAgentQuestion = useWorkOrderPlanningSurvey(
+    workOrderCardContext.organizationId,
+    workOrderCardContext.factoryId ?? "",
+    order.id ?? "",
+    isAnalyzing,
   );
 
   return (
@@ -59,6 +76,7 @@ export function LineBoardWorkOrderCard({
       entry={entry}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
       isAnalyzing={showConfidence && isAnalyzing}
+      hasAgentQuestion={hasAgentQuestion}
       onOpen={onOpen}
     />
   );

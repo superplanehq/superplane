@@ -47,7 +47,7 @@ function reviewRunHref(
 }
 
 /**
- * Decision note under Description and Automations. Header stays Close only.
+ * Decision note under the plan on Description, and under Automations.
  */
 export function SplitRunReview({
   footer,
@@ -90,7 +90,9 @@ export function SplitRunReview({
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
-  const actions = canAct ? footer.actions.filter((action) => canRefine || action.kind !== "refine") : [];
+  const actions = canAct
+    ? footer.actions.filter((action) => action.kind !== "refine" || (canRefine && footer.kind !== "draft"))
+    : [];
   const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
     start: onStart,
     archive: onArchive,

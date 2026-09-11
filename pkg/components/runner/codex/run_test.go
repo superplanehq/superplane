@@ -34,6 +34,19 @@ func TestCodexExecArgsUsesReadOnlySandboxForPlanning(t *testing.T) {
 	assert.Contains(t, joined, `approval_policy="never"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
+	assert.NotContains(t, joined, "developer_instructions")
+}
+
+func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, "developer_instructions=")
+	assert.Contains(t, joined, "propose_spec")
+	assert.Contains(t, joined, "Do not call propose_draft")
 }
 
 func TestPlanningEnabledFromScript(t *testing.T) {

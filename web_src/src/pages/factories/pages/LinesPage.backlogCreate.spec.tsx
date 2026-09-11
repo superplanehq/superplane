@@ -113,7 +113,12 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -238,26 +243,8 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByRole("button", { name: "Create task manually" })).toBeInTheDocument();
   });
 
-  it("opens the agent session from Refine on a backlog draft", async () => {
+  it("does not refine a backlog draft from the task popup", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    Element.prototype.scrollIntoView = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        session: {
-          id: "session-1",
-          repository: "acme/payments",
-          canvasRunId: "run-1",
-          messages: [],
-          draft: {
-            title: DRAFT_WORK_ORDER.title,
-            description: DRAFT_WORK_ORDER.description,
-            workOrderId: DRAFT_WORK_ORDER.id,
-          },
-        },
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
     useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
@@ -266,28 +253,11 @@ describe("LinesPage backlog create", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
-    });
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/105`,
-    );
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([url, init]) => {
-          return (
-            String(url).includes("/planning-sessions") &&
-            !String(url).includes("/messages") &&
-            init?.method === "POST" &&
-            String(init?.body).includes(`"work_order_id":"${DRAFT_WORK_ORDER.id}"`)
-          );
-        }),
-      ).toBe(true);
-    });
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/messages"))).toBe(false);
-    expect(screen.getByRole("heading", { name: "Refine this task" })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
   it("hides Refine when the feature is off", async () => {

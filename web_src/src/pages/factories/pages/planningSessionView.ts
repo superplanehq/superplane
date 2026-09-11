@@ -102,6 +102,12 @@ function planningSessionSurveyFromPayload(
   return { id: survey?.id, questions };
 }
 
+export function planningSessionHasPendingSurvey(
+  session: Pick<PlanningSessionPayload, "survey"> | null | undefined,
+): boolean {
+  return Boolean(planningSessionSurveyFromPayload(session?.survey));
+}
+
 export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
   return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
 }

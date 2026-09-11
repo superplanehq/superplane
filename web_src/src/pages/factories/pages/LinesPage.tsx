@@ -851,7 +851,7 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
-          canRefine={canCreateWithAgent}
+          canRefine={canCreateWithAgent && peekOrder.state !== "STATE_DRAFT"}
           onClose={onClosePeek}
           onRefine={() => {
             const id = peekOrder.id?.trim();

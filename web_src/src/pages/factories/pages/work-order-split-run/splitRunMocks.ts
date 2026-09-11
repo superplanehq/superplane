@@ -31,6 +31,7 @@ import {
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
+  confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
 } from "../../lib/confidenceScore";
@@ -423,6 +424,7 @@ function reviewSurfaces(
         note: draftFooterNote(order),
         status: displayStatus,
         isAnalyzing: draftIsAnalyzing(input),
+        confidenceScore: confidenceScoreFromChecks(checks),
       }),
       [],
       checks,

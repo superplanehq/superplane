@@ -632,3 +632,61 @@ func rewritePlanningCanvasLivePrompt(t *testing.T, canvasID uuid.UUID, prompt st
 	live.Nodes = datatypes.NewJSONSlice(nodes)
 	return database.DB(t.Context()).Model(live).Select("Nodes").Updates(live).Error
 }
+
+func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:   factoryModel.ID.String(),
+		Repository:  "acme/payments",
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.Error(t, err)
+
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "backlog", "start")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+
+	found, err := FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, session.ID.String(), found.Session.Id)
+	assert.Equal(t, order.ID.String(), found.Session.Draft.WorkOrderId)
+	assert.Empty(t, found.Session.ExecutionId)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, intakeAnalysisNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("run_id", run.ID).Error)
+
+	found, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, execution.ID.String(), found.Session.ExecutionId)
+}

@@ -702,6 +702,17 @@ service Factories {
     };
   }
 
+  rpc FindPlanningSessionByWorkOrder(FindPlanningSessionByWorkOrderRequest) returns (FindPlanningSessionByWorkOrderResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Find planning session by work order";
+      description: "Returns the analysis planning session for a draft work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -2278,5 +2289,14 @@ message ReloadPlanningSessionAgentRequest {
 }
 
 message ReloadPlanningSessionAgentResponse {
+  PlanningSession session = 1;
+}
+
+message FindPlanningSessionByWorkOrderRequest {
+  string factory_id = 1;
+  string work_order_id = 2;
+}
+
+message FindPlanningSessionByWorkOrderResponse {
   PlanningSession session = 1;
 }

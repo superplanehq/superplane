@@ -24,6 +24,7 @@ export function PopupShell({
   wide = false,
   canvas = false,
   fullPage = false,
+  className,
   onDismiss,
 }: {
   testId: string;
@@ -32,6 +33,7 @@ export function PopupShell({
   wide?: boolean;
   canvas?: boolean;
   fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
   return (
@@ -41,6 +43,7 @@ export function PopupShell({
       wide={wide}
       canvas={canvas}
       fullPage={fullPage}
+      className={className}
       onDismiss={onDismiss}
     >
       {children}

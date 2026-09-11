@@ -292,7 +292,14 @@ func planningSessionRunInput(factoryModel *Factory, repository, modelKey string,
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Model(&FactoryPlanningSession{}).
-		Where("organization_id = ? AND factory_id = ? AND state <> ?", organizationID, factoryID, PlanningSessionStateEnded).
+		Joins("INNER JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
+		Where(
+			"factory_planning_sessions.organization_id = ? AND factory_planning_sessions.factory_id = ? AND factory_planning_sessions.state <> ? AND workflows.name = ?",
+			organizationID,
+			factoryID,
+			PlanningSessionStateEnded,
+			PlanningCanvasName,
+		).
 		Count(&count).Error
 	return count, err
 }
@@ -346,8 +353,10 @@ func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]Fac
 	var sessions []FactoryPlanningSession
 	cutoff := now.Add(-PlanningSessionHeartbeatStale)
 	err := tx.
-		Where("state <> ? AND heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
-		Order("heartbeat_at ASC").
+		Joins("LEFT JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
+		Where("factory_planning_sessions.state <> ? AND factory_planning_sessions.heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
+		Where("workflows.name = ? OR workflows.id IS NULL", PlanningCanvasName).
+		Order("factory_planning_sessions.heartbeat_at ASC").
 		Limit(limit).
 		Find(&sessions).Error
 	return sessions, err

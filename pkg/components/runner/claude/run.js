@@ -23,18 +23,49 @@ const SYSTEM_PROMPT =
 const PLANNING_SYSTEM_PROMPT =
   " This is a SuperPlane planning session. Call mcp__superplane__propose_draft only when the user asked for a task in this turn. Call mcp__superplane__survey to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain text.";
 
+function loadAnalysisProtocol() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file).analysisProtocol();
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return "";
+}
+
 const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // Planning sessions may only explore the repo (Read/Bash) and use the planning
 // MCP tools. Edit/Write are intentionally excluded so the agent cannot make
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__survey"];
+const ANALYSIS_ALLOWED_TOOLS = [
+  "mcp__superplane__propose_spec",
+  "mcp__superplane__propose_confidence",
+  "mcp__superplane__survey",
+];
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
+function planningAnalysisEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+}
+
+function planningSystemPrompt(env = process.env) {
+  if (planningAnalysisEnabled(env)) {
+    return ` ${loadAnalysisProtocol()}`;
+  }
+  return PLANNING_SYSTEM_PROMPT;
+}
+
 function allowedClaudeTools(env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
+    return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...ANALYSIS_ALLOWED_TOOLS].join(",");
+  }
   if (envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
     return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
   }
@@ -105,7 +136,7 @@ async function runPrompt(promptFile, model) {
   if (mcpToolsEnabled()) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
-    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + PLANNING_SYSTEM_PROMPT;
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt();
     const mcpConfigPath = path.join(sp, "mcp.runtime.json");
     fs.writeFileSync(
       mcpConfigPath,
@@ -745,4 +776,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { allowedClaudeTools, claudePermissionMode, formatStreamJsonLines };
+module.exports = { allowedClaudeTools, claudePermissionMode, formatStreamJsonLines, planningSystemPrompt };
