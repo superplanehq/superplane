@@ -199,8 +199,7 @@ func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
 	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
 	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
-	assert.NotContains(t, result.output, "Switching to")
-	assert.NotContains(t, result.output, "OpenRouter model rotation:")
+	assert.NotContains(t, result.spawns[1], "--session")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
@@ -224,10 +223,34 @@ func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) 
 	require.Len(t, result.spawns, 2)
 	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
-	assert.NotContains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_fail")
 	assert.Equal(t, []float64{30000}, result.sleeps)
 	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
 	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+}
+
+func TestRunPromptContinuesSessionWhenRetryableFailureMadeProgress(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_work","part":{"type":"step-start"}}`,
+					`{"type":"tool_use","sessionID":"ses_work","part":{"callID":"call_1","tool":"bash","state":{"status":"completed","input":{"command":"git status"},"output":"On branch main"}}}`,
+					`{"type":"error","sessionID":"ses_work","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.NotContains(t, result.spawns[0], "--session")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_work")
 }
 
 func TestRunPromptRetriesNestedRateLimitOnSelectedModel(t *testing.T) {
@@ -561,6 +584,28 @@ func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
 	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
+		},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stderr:   "HTTP 503 Service Unavailable",
+			Stdout: []string{
+				`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.Contains(t, result.output, "Temporary error wait exceeded the execution timeout")
+	assert.NotContains(t, result.output, "Rate limit wait exceeded the execution timeout")
 }
 
 func TestRunPromptDoesNotWaitWhenRetryExceedsRemainingTimeout(t *testing.T) {

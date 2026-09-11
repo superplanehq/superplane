@@ -163,6 +163,10 @@ function stoppedAfterAttemptsLine(kind, model) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
 }
 
+function waitExceededTimeoutLine(kind) {
+  return `${errorKindLabel(kind)} wait exceeded the execution timeout`;
+}
+
 function readSessionID(taskDir) {
   const file = path.join(taskDir, SESSION_FILE);
   if (!fs.existsSync(file)) {
@@ -382,8 +386,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
     }
     const classKind = classifyOpenRouterError(lastErrorText);
     const failedExit = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
-    sessionID = sessionBeforeAttempt;
-    restoreSession(sp, sessionID);
+    if (!spawnResult.sessionID) {
+      sessionID = sessionBeforeAttempt;
+      restoreSession(sp, sessionID);
+    }
     if (!isRetryableKind(classKind)) {
       failed = true;
       exitCode = failedExit;
@@ -409,7 +415,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       if (lastErrorText) {
         println(truncateText(lastErrorText));
       }
-      println("Rate limit wait exceeded the execution timeout");
+      println(waitExceededTimeoutLine(classKind));
       break;
     }
     if (lastErrorText) {
@@ -756,6 +762,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
       usage = emptyUsage();
       cost = 0;
       roundOpen = false;
+      sessionID = "";
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
