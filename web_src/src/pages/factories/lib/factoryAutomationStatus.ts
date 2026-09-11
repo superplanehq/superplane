@@ -183,7 +183,8 @@ function compareRunsNewestFirst(left: FactoryAutomationRunCard, right: FactoryAu
  * Finds the task for this canvas run, if any.
  * Line and PR steps match on execution run id. Intake matches on
  * sourceRunId after Create Task. Backlog analysis matches the work
- * order id in the trigger payload. Trigger-only runs have no task.
+ * order id in the trigger payload. A unique task title matches when
+ * a run has no stored id link yet. Trigger-only runs have no task.
  */
 export function findWorkOrderForAutomationRun(
   workOrders: FactoriesWorkOrder[],
@@ -211,13 +212,32 @@ export function findWorkOrderForAutomationRun(
   }
 
   const analyzedId = analyzedWorkOrderId(run);
-  if (!analyzedId) {
-    return undefined;
+  if (analyzedId) {
+    const byAnalyzed = workOrders.find((order) => order.id === analyzedId);
+    if (byAnalyzed) {
+      return byAnalyzed;
+    }
   }
 
-  return workOrders.find((order) => order.id === analyzedId);
+  return findWorkOrderByUniqueRunTitle(workOrders, run);
 }
 
 function workOrderSourceRunId(order: FactoriesWorkOrder): string | undefined {
   return order.sourceRunId?.trim() || undefined;
+}
+
+function findWorkOrderByUniqueRunTitle(
+  workOrders: FactoriesWorkOrder[],
+  run: Pick<CanvasesCanvasRun, "rootEvent">,
+): FactoriesWorkOrder | undefined {
+  const title = run.rootEvent?.customName?.trim();
+  if (!title) {
+    return undefined;
+  }
+
+  const matches = workOrders.filter((order) => order.title?.trim() === title);
+  if (matches.length !== 1) {
+    return undefined;
+  }
+  return matches[0];
 }

@@ -26,6 +26,7 @@ interface FactoryAutomationRunsSidebarProps {
   canvasId: string;
   organizationId?: string;
   factoryId?: string;
+  factoryKey?: string;
   runHrefFor?: RunsSidebarHrefForRun;
   selectedRunId: string | null;
   onSelectRun: (runId: string | null) => void;
@@ -36,6 +37,7 @@ export function FactoryAutomationRunsSidebar({
   canvasId,
   organizationId: organizationIdProp,
   factoryId: factoryIdProp,
+  factoryKey: factoryKeyProp,
   runHrefFor,
   selectedRunId,
   onSelectRun,
@@ -43,7 +45,7 @@ export function FactoryAutomationRunsSidebar({
   const layout = useOptionalFactoriesLayout();
   const organizationId = layout?.organizationId ?? organizationIdProp ?? "";
   const factoryId = layout?.factoryId ?? factoryIdProp ?? "";
-  const factoryKey = layout?.factoryKey ?? "";
+  const factoryKey = layout?.factoryKey ?? factoryKeyProp ?? "";
   const factory = layout?.factory ?? null;
   const { sidebarRef, width, isResizing, handleMouseDown } = useAuxiliarySidebarWidth(
     true,
@@ -68,8 +70,8 @@ export function FactoryAutomationRunsSidebar({
       factoryId,
       factoryKey,
       factoryLines: factory?.lines ?? [],
-      canDispatch: Boolean(layout),
-      canAssign: Boolean(layout),
+      canDispatch: Boolean(organizationId && factoryKey),
+      canAssign: Boolean(organizationId && factoryKey),
       addressingFeedbackOrderIds: attention.addressingFeedbackOrderIds,
       addressingFeedbackLabels: attention.addressingFeedbackLabels,
       waitingOnChecksOrderIds: attention.waitingOnChecksOrderIds,
@@ -78,7 +80,7 @@ export function FactoryAutomationRunsSidebar({
       pullRequests,
       ...cardActions,
     };
-  }, [attention, cardActions, factory?.lines, factoryId, factoryKey, layout, organizationId, pullRequests]);
+  }, [attention, cardActions, factory?.lines, factoryId, factoryKey, organizationId, pullRequests]);
 
   const visibleRuns = useMemo(
     () =>

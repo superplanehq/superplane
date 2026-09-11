@@ -188,9 +188,8 @@ describe("FactoryAutomationRunsSidebar", () => {
   it("shows the Kanban task card when the run belongs to a task", () => {
     mockRuns([makeRun({ id: "run-intake" })]);
     renderSidebar(
-      {},
+      { organizationId: "org-1", factoryId: "factory-1", factoryKey: "RF" },
       {
-        withLayout: true,
         workOrders: [
           {
             id: "wo-1",
