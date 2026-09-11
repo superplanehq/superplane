@@ -46,7 +46,18 @@ describe("ColumnAutomationRows", () => {
     render(<ColumnAutomationRows title="Review" automations={[]} rowCount={2} testId="rows" />);
 
     expect(screen.getByTestId("rows-empty")).toHaveTextContent("No automations");
+    expect(screen.queryByRole("button", { name: "Add automation for Review" })).not.toBeInTheDocument();
     expect(screen.getAllByTestId("rows-blank")).toHaveLength(1);
+  });
+
+  it("offers Add automation when the empty row can open a picker", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn();
+    render(<ColumnAutomationRows title="Review" automations={[]} rowCount={1} onAdd={onAdd} testId="rows" />);
+
+    await user.click(screen.getByRole("button", { name: "Add automation for Review" }));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("rows-empty")).toHaveTextContent("Add automation");
   });
 
   it("marks an automation that needs repair", () => {
@@ -79,7 +90,14 @@ describe("ColumnAutomationRows", () => {
     expect(onRowAction).toHaveBeenCalledWith(GITHUB_INTAKE, "settings");
     expect(screen.queryByTestId("rows-menu-intake-github")).not.toBeInTheDocument();
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-    expect(screen.getByTestId("rows-row-intake-github").className).toContain("group/automation");
+    expect(screen.getByTestId("rows-settings-intake-github")).toBeInTheDocument();
+    expect(screen.getByTestId("rows-row-intake-github").className).toContain("hover:bg-black/10");
+  });
+
+  it("hides the settings icon when the row cannot open settings", () => {
+    render(<ColumnAutomationRows title="Backlog" automations={[GITHUB_INTAKE]} rowCount={1} testId="rows" />);
+
+    expect(screen.queryByTestId("rows-settings-intake-github")).not.toBeInTheDocument();
   });
 
   it("does not draw a box around the rows", () => {

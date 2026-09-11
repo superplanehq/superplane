@@ -10,6 +10,7 @@ export function columnAutomationRowsSubheader(args: {
   automations?: ColumnAutomation[];
   rowCount?: number;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAdd?: () => void;
   testId: string;
 }): ReactNode {
   if (!args.rowCount || !args.automations) {
@@ -21,6 +22,7 @@ export function columnAutomationRowsSubheader(args: {
       automations={args.automations}
       rowCount={args.rowCount}
       onRowAction={args.onRowAction}
+      onAdd={args.onAdd}
       testId={args.testId}
     />
   );
