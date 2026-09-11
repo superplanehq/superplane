@@ -62,8 +62,7 @@ export function OrganizationSettingsBillingPage() {
         plan={model.plan}
         planSource={model.planSource}
         cancelAtPeriodEnd={model.cancelAtPeriodEnd}
-        cancelPending={model.cancelPending}
-        keepPending={model.keepPending}
+        subscriptionPending={model.cancelPending || model.keepPending}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
@@ -100,8 +99,7 @@ function BillingPageBody({
   plan,
   planSource,
   cancelAtPeriodEnd,
-  cancelPending,
-  keepPending,
+  subscriptionPending,
   portalPending,
   purchased,
   remaining,
@@ -133,8 +131,7 @@ function BillingPageBody({
   plan?: string;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
-  cancelPending: boolean;
-  keepPending: boolean;
+  subscriptionPending: boolean;
   portalPending: boolean;
   purchased: number;
   remaining: number;
@@ -176,7 +173,7 @@ function BillingPageBody({
         planSource={planSource}
         cancelAtPeriodEnd={cancelAtPeriodEnd}
         currentPeriodEnd={currentPeriodEnd}
-        pending={businessCheckoutPending || cancelPending || keepPending}
+        pending={businessCheckoutPending || subscriptionPending}
         onSubscribe={onSubscribe}
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}

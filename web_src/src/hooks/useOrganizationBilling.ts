@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -7,6 +8,8 @@ import {
   organizationsResumeOrganizationSubscription,
   organizationsSyncOrganizationBilling,
 } from "@/api-client";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export function organizationBillingQueryKey(organizationId: string) {
@@ -95,4 +98,32 @@ export function useResumeOrganizationSubscription(organizationId: string) {
       queryClient.setQueryData(organizationBillingQueryKey(organizationId), data);
     },
   });
+}
+
+export function useOrganizationSubscriptionActions(organizationId: string) {
+  const cancelSubscription = useCancelOrganizationSubscription(organizationId);
+  const resumeSubscription = useResumeOrganizationSubscription(organizationId);
+
+  const onCancelSubscription = useCallback(async () => {
+    try {
+      await cancelSubscription.mutateAsync();
+    } catch (cancelError) {
+      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
+    }
+  }, [cancelSubscription]);
+
+  const onKeepSubscription = useCallback(async () => {
+    try {
+      await resumeSubscription.mutateAsync();
+    } catch (keepError) {
+      showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
+    }
+  }, [resumeSubscription]);
+
+  return {
+    cancelPending: cancelSubscription.isPending,
+    keepPending: resumeSubscription.isPending,
+    onCancelSubscription,
+    onKeepSubscription,
+  };
 }
