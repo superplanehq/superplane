@@ -66,23 +66,13 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		if plan != nil && plan.PlanSource == models.BillingPlanSourceAdmin {
 			return nil
 		}
-		if grantIncluded {
-			if periodEnd == nil {
-				return nil
-			}
-			_, err = models.AddIncludedLLMCreditGrant(
-				inner,
-				orgID,
-				models.CentsToMicros(models.DefaultIncludedGrantCents),
-				models.IncludedGrantKey(data.ID, *periodEnd),
-				*periodEnd,
-			)
-			return err
-		}
-		if plan != nil && !plan.IsActiveBusiness() {
-			return models.ExpireOpenIncludedGrants(inner, orgID)
-		}
-		return nil
+		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
+			OrganizationID:   orgID,
+			SubscriptionID:   data.ID,
+			PeriodEnd:        periodEnd,
+			GrantIncluded:    grantIncluded,
+			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
+		})
 	})
 }
 

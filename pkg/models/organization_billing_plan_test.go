@@ -50,6 +50,72 @@ func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
 	assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
 }
 
+func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+	require.NotNil(t, plan.CurrentPeriodStart)
+	require.NotNil(t, plan.CurrentPeriodEnd)
+	assert.True(t, plan.CurrentPeriodEnd.After(*plan.CurrentPeriodStart))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	summary, err = models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+}
+
+func Test__SetAdminOrganizationPlanBusinessGrantsIncludedWhenPeriodWasMissing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{
+			"plan":                 models.BillingPlanBusiness,
+			"plan_source":          models.BillingPlanSourceAdmin,
+			"current_period_start": nil,
+			"current_period_end":   nil,
+		}).Error)
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	require.NotNil(t, plan.CurrentPeriodStart)
+	require.NotNil(t, plan.CurrentPeriodEnd)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+}
+
+func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
+	assert.False(t, plan.IsActiveBusiness())
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+}
+
 func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

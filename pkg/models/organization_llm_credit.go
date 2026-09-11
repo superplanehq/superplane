@@ -574,6 +574,36 @@ func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) 
 	return AssertFactoryHostedBudgetAvailable(tx, factory)
 }
 
+type IncludedUsageSync struct {
+	OrganizationID   uuid.UUID
+	SubscriptionID   string
+	PeriodEnd        *time.Time
+	GrantIncluded    bool
+	IsActiveBusiness bool
+}
+
+// SyncIncludedLLMCreditGrant grants or expires Business included usage the same
+// way Polar subscription webhooks do.
+func SyncIncludedLLMCreditGrant(tx *gorm.DB, sync IncludedUsageSync) error {
+	if sync.GrantIncluded {
+		if sync.PeriodEnd == nil {
+			return nil
+		}
+		_, err := AddIncludedLLMCreditGrant(
+			tx,
+			sync.OrganizationID,
+			CentsToMicros(DefaultIncludedGrantCents),
+			IncludedGrantKey(sync.SubscriptionID, *sync.PeriodEnd),
+			*sync.PeriodEnd,
+		)
+		return err
+	}
+	if !sync.IsActiveBusiness {
+		return ExpireOpenIncludedGrants(tx, sync.OrganizationID)
+	}
+	return nil
+}
+
 func AddIncludedLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string, expiresAt time.Time) (*OrganizationLLMCreditGrant, error) {
 	if amountMicros <= 0 {
 		return nil, ErrCreditGrantNotPositive

@@ -29,8 +29,9 @@ const (
 	PolarSubscriptionStatusPastDue    = "past_due"
 	PolarSubscriptionStatusIncomplete = "incomplete"
 
-	DefaultIncludedGrantCents int64 = 5000
-	DefaultTopupGrantMonths         = 12
+	DefaultIncludedGrantCents  int64 = 5000
+	DefaultIncludedGrantMonths       = 1
+	DefaultTopupGrantMonths          = 12
 )
 
 var (
@@ -161,52 +162,71 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		return nil, ErrInvalidBillingPlan
 	}
 
-	now := time.Now()
-	plan := OrganizationBillingPlan{
-		OrganizationID: orgID,
-		Plan:           planName,
-		PlanSource:     BillingPlanSourceAdmin,
-		UpdatedAt:      now,
-	}
-	if planName == BillingPlanTrial {
-		trialEnd := now.Add(DefaultWelcomeGrantTTL)
-		plan.TrialStartedAt = &now
-		plan.TrialEndsAt = &trialEnd
-	}
-
-	existing, err := FindOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		plan.PolarSubscriptionID = existing.PolarSubscriptionID
-		plan.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
-		plan.CurrentPeriodStart = existing.CurrentPeriodStart
-		plan.CurrentPeriodEnd = existing.CurrentPeriodEnd
-		if planName != BillingPlanTrial {
-			plan.TrialStartedAt = existing.TrialStartedAt
-			plan.TrialEndsAt = existing.TrialEndsAt
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		existing, err := FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
 		}
-	}
 
-	err = tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "organization_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"plan",
-			"plan_source",
-			"polar_subscription_id",
-			"polar_subscription_status",
-			"current_period_start",
-			"current_period_end",
-			"trial_started_at",
-			"trial_ends_at",
-			"updated_at",
-		}),
-	}).Create(&plan).Error
+		now := time.Now()
+		next := OrganizationBillingPlan{
+			OrganizationID: orgID,
+			Plan:           planName,
+			PlanSource:     BillingPlanSourceAdmin,
+			UpdatedAt:      now,
+		}
+		if planName == BillingPlanTrial {
+			trialEnd := now.Add(DefaultWelcomeGrantTTL)
+			next.TrialStartedAt = &now
+			next.TrialEndsAt = &trialEnd
+		}
+		if existing != nil {
+			next.PolarSubscriptionID = existing.PolarSubscriptionID
+			next.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
+			next.CurrentPeriodStart = existing.CurrentPeriodStart
+			next.CurrentPeriodEnd = existing.CurrentPeriodEnd
+			if planName != BillingPlanTrial {
+				next.TrialStartedAt = existing.TrialStartedAt
+				next.TrialEndsAt = existing.TrialEndsAt
+			}
+		}
+		assignIncludedUsagePeriod(&next, now)
+
+		err = inner.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "organization_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"plan",
+				"plan_source",
+				"polar_subscription_id",
+				"polar_subscription_status",
+				"current_period_start",
+				"current_period_end",
+				"trial_started_at",
+				"trial_ends_at",
+				"updated_at",
+			}),
+		}).Create(&next).Error
+		if err != nil {
+			return err
+		}
+
+		saved, err = loadedOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		return SyncIncludedLLMCreditGrant(inner, IncludedUsageSync{
+			OrganizationID:   orgID,
+			SubscriptionID:   includedUsageSubscriptionID(saved),
+			PeriodEnd:        saved.CurrentPeriodEnd,
+			GrantIncluded:    shouldGrantIncludedUsage(existing, saved),
+			IsActiveBusiness: saved.IsActiveBusiness(),
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
-	return loadedOrganizationBillingPlan(tx, orgID)
+	return saved, nil
 }
 
 func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status string, periodStart, periodEnd *time.Time) (*OrganizationBillingPlan, bool, error) {
@@ -236,9 +256,6 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status
 		next.CurrentPeriodEnd = &end
 	}
 
-	periodChanged := periodStartChanged(existing.CurrentPeriodStart, next.CurrentPeriodStart)
-	becamePaid := !existing.IsActiveBusiness() && PolarSubscriptionIsPaid(next.PolarSubscriptionStatus)
-
 	if PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) {
 		next.Plan = BillingPlanBusiness
 	} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) {
@@ -263,12 +280,11 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status
 		return nil, false, err
 	}
 
-	shouldGrantIncluded := PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) && (becamePaid || periodChanged)
 	saved, err := loadedOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return nil, false, err
 	}
-	return saved, shouldGrantIncluded, nil
+	return saved, shouldGrantIncludedUsage(existing, saved), nil
 }
 
 func loadedOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -290,6 +306,42 @@ func periodStartChanged(previous, next *time.Time) bool {
 		return true
 	}
 	return !previous.Equal(*next)
+}
+
+func shouldGrantIncludedUsage(existing, next *OrganizationBillingPlan) bool {
+	if next == nil || !next.IsActiveBusiness() {
+		return false
+	}
+	becamePaid := existing == nil || !existing.IsActiveBusiness()
+	if becamePaid {
+		return true
+	}
+	return periodStartChanged(existing.CurrentPeriodStart, next.CurrentPeriodStart)
+}
+
+func assignIncludedUsagePeriod(plan *OrganizationBillingPlan, now time.Time) {
+	if plan == nil || plan.Plan != BillingPlanBusiness {
+		return
+	}
+	if plan.CurrentPeriodStart != nil && plan.CurrentPeriodEnd != nil {
+		return
+	}
+	start := now.UTC().Truncate(time.Second)
+	end := start.AddDate(0, DefaultIncludedGrantMonths, 0)
+	plan.CurrentPeriodStart = &start
+	plan.CurrentPeriodEnd = &end
+}
+
+func includedUsageSubscriptionID(plan *OrganizationBillingPlan) string {
+	if plan == nil {
+		return ""
+	}
+	if plan.PolarSubscriptionID != nil {
+		if id := strings.TrimSpace(*plan.PolarSubscriptionID); id != "" {
+			return id
+		}
+	}
+	return "admin:" + plan.OrganizationID.String()
 }
 
 func planAfterPaidSubscriptionEnds(plan *OrganizationBillingPlan, now time.Time) string {
