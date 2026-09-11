@@ -234,6 +234,19 @@ export function findClosureAutomationApp(
   return { id: match.id, name: match.name ?? "PR Closure" };
 }
 
+/** Factory-level Issue Closure automation. It is not a line step. */
+export function findIssueClosureAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find(
+    (app) => Boolean(app.id) && (app.name === "Issue Closure" || (app.id ?? "").includes("issue-closure")),
+  );
+  if (!match?.id) {
+    return undefined;
+  }
+  return { id: match.id, name: match.name ?? "Issue Closure" };
+}
+
 /** Backlog and Done are not canvas-backed columns. */
 export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "appId">): boolean {
   if (column.stepName.trim().toLowerCase() === "done") {

@@ -153,6 +153,10 @@ type FactoryWorkOrderStatusUpdate struct {
 	Run        *factory.RunRef
 	App        *factory.AppRef
 	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+	// IfState, when set, applies the transition only if the row is still in
+	// that state. A mismatch is a silent no-op (changed=false), including
+	// when a concurrent writer wins the row between load and update.
+	IfState string
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -304,14 +308,24 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // person opens the draft, they become the owner.
 //
 // The bool return reports whether a transition was actually recorded:
-// `true` on a real state change, `false` when SkipSame swallowed a no-op
-// (target state equals current state). Callers that fan out an
-// `order.status.updated` event downstream must check this so a re-run
-// doesn't emit a phantom transition — see FactoryContext.
+// `true` on a real state change, `false` when SkipSame or IfState
+// swallowed a no-op. Callers that fan out an `order.status.updated`
+// event downstream must check this so a re-run doesn't emit a phantom
+// transition — see FactoryContext.
 func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) (bool, error) {
 	toState := update.ToState
 	if !slices.Contains(factoryWorkOrderStates, toState) {
 		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
+	}
+
+	ifState := strings.TrimSpace(update.IfState)
+	if ifState != "" {
+		if !slices.Contains(factoryWorkOrderStates, ifState) {
+			return false, fmt.Errorf("%w: unknown ifState %q", ErrFactoryWorkOrderInvalidState, ifState)
+		}
+		if o.State != ifState {
+			return false, nil
+		}
 	}
 
 	if o.State == toState {
@@ -340,7 +354,10 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	}
 
 	fromResult := o.Result
+	previousUpdatedAt := o.UpdatedAt
+	previousStatusNote := o.StatusNote
 	now := time.Now()
+	skipped := false
 
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Reverting `open → draft` while a line dispatch is still active would
@@ -358,17 +375,26 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// note must always describe the state the order is in now.
 		o.StatusNote = nil
 
-		err := tx.
-			Model(o).
-			Updates(map[string]any{
-				"state":       o.State,
-				"result":      o.Result,
-				"status_note": nil,
-				"updated_at":  o.UpdatedAt,
-			}).
-			Error
-		if err != nil {
-			return err
+		query := tx.Model(o)
+		if ifState != "" {
+			query = query.Where("state = ?", ifState)
+		}
+		result := query.Updates(map[string]any{
+			"state":       o.State,
+			"result":      o.Result,
+			"status_note": nil,
+			"updated_at":  o.UpdatedAt,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if ifState != "" && result.RowsAffected == 0 {
+			o.State = fromState
+			o.Result = fromResult
+			o.UpdatedAt = previousUpdatedAt
+			o.StatusNote = previousStatusNote
+			skipped = true
+			return nil
 		}
 
 		// A closing order abandons any traversal still waiting in a step's
@@ -415,6 +441,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	})
 	if err != nil {
 		return false, err
+	}
+	if skipped {
+		return false, nil
 	}
 	return true, nil
 }

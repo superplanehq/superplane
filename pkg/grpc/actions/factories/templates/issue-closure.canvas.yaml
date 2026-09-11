@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Issue Closure
+  description: Close the task when the source GitHub issue closes, if the task is still in Backlog.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-issue-closed
+      targetId: is-github-issue
+    - channel: "true"
+      sourceId: is-github-issue
+      targetId: find-work-order
+    - channel: found
+      sourceId: find-work-order
+      targetId: reject-work-order
+  nodes:
+    - id: on-issue-closed
+      name: On Issue Closed
+      type: TYPE_TRIGGER
+      component: github.onIssue
+      configuration:
+        actions:
+          - closed
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 1272
+        'y': 72
+      isCollapsed: true
+    - id: is-github-issue
+      name: GitHub Issue?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: root().data.issue.pull_request == nil
+      position:
+        x: 1272
+        'y': 252
+      isCollapsed: true
+    - id: find-work-order
+      name: Find Task
+      type: TYPE_ACTION
+      component: findWorkOrder
+      configuration:
+        by: originUrl
+        originUrl: '{{ root().data.issue.html_url }}'
+      position:
+        x: 1272
+        'y': 432
+      isCollapsed: true
+    - id: reject-work-order
+      name: Reject Task
+      type: TYPE_ACTION
+      component: updateWorkOrderStatus
+      configuration:
+        orderId: '{{ $["Find Task"].data.workOrder.id }}'
+        result: rejected
+        status: closed
+        ifState: draft
+      position:
+        x: 1272
+        'y': 612
+      isCollapsed: true

@@ -99,7 +99,11 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "pr-closure",
+      "issue-closure",
+      "create-with-agent",
+    ]);
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
         factoryId: "pr-closure",
@@ -130,7 +134,8 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledTimes(2);
+    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "issue-closure" }));
     expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "create-with-agent" }));
   });
 
@@ -151,7 +156,8 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledTimes(2);
+    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "issue-closure" }));
     expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "create-with-agent" }));
   });
 
@@ -159,7 +165,8 @@ describe("provisionEventApps", () => {
     const installFactory = vi.fn();
     const listApps = vi.fn().mockResolvedValue([
       { id: "app-1", name: "PR Closure" },
-      { id: "app-2", name: "Create with an Agent" },
+      { id: "app-2", name: "Issue Closure" },
+      { id: "app-3", name: "Create with an Agent" },
     ]);
 
     await provisionEventApps({
@@ -192,7 +199,11 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "pr-closure",
+      "issue-closure",
+      "create-with-agent",
+    ]);
   });
 });
 
