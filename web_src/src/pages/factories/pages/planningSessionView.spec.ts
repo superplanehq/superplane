@@ -4,6 +4,7 @@ import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   applyPlanningSessionLiveRun,
   createWithAgentViewFromSession,
+  planningSessionHasPendingSurvey,
   workspacePlanningRepository,
 } from "./planningSessionView";
 
@@ -72,6 +73,21 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.canvasRunId).toBe("run-1");
   });
 
+  it("marks the machine passed when the session ended after a score and plan", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, analysisDelivered: true },
+    );
+
+    expect(view.machineStatus).toBe("passed");
+  });
+
   it("marks the machine failed before starting when the live run failed", () => {
     const view = applyPlanningSessionLiveRun(
       createWithAgentViewFromSession(
@@ -103,6 +119,24 @@ describe("createWithAgentViewFromSession", () => {
     );
 
     expect(view.machineStatus).toBe("failed");
+  });
+
+  it("marks a cancelled live run passed when a score and plan already exist", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_CANCELLED" },
+      true,
+    );
+
+    expect(view.machineStatus).toBe("passed");
   });
 
   it("keeps waiting when the live run is still open", () => {
@@ -157,6 +191,12 @@ describe("createWithAgentViewFromSession", () => {
       id: "pending-survey",
       questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
     });
+    expect(
+      planningSessionHasPendingSurvey({
+        survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
+      }),
+    ).toBe(true);
+    expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
     expect(view.messages).toEqual([
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);

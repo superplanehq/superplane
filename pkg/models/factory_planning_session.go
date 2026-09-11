@@ -292,7 +292,14 @@ func planningSessionRunInput(factoryModel *Factory, repository, modelKey string,
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Model(&FactoryPlanningSession{}).
-		Where("organization_id = ? AND factory_id = ? AND state <> ?", organizationID, factoryID, PlanningSessionStateEnded).
+		Joins("INNER JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
+		Where(
+			"factory_planning_sessions.organization_id = ? AND factory_planning_sessions.factory_id = ? AND factory_planning_sessions.state <> ? AND workflows.name = ?",
+			organizationID,
+			factoryID,
+			PlanningSessionStateEnded,
+			PlanningCanvasName,
+		).
 		Count(&count).Error
 	return count, err
 }
@@ -346,8 +353,10 @@ func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]Fac
 	var sessions []FactoryPlanningSession
 	cutoff := now.Add(-PlanningSessionHeartbeatStale)
 	err := tx.
-		Where("state <> ? AND heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
-		Order("heartbeat_at ASC").
+		Joins("LEFT JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
+		Where("factory_planning_sessions.state <> ? AND factory_planning_sessions.heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
+		Where("workflows.name = ? OR workflows.id IS NULL", PlanningCanvasName).
+		Order("factory_planning_sessions.heartbeat_at ASC").
 		Limit(limit).
 		Find(&sessions).Error
 	return sessions, err
@@ -384,6 +393,66 @@ func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
 		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindEnded})
 	}
 	return s.saveEndedState(tx)
+}
+
+func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
+	if s.State != PlanningSessionStateEnded {
+		return nil
+	}
+	now := time.Now()
+	s.State = PlanningSessionStateRunning
+	s.EndedAt = nil
+	s.HeartbeatAt = now
+	s.UpdatedAt = now
+	s.clearWait()
+	s.clearSurvey()
+	return tx.Model(s).Select(
+		"State",
+		"EndedAt",
+		"HeartbeatAt",
+		"UpdatedAt",
+		"WaitState",
+		"WaitKind",
+		"WaitText",
+		"WaitWorkOrderID",
+		"WaitWorkOrderKey",
+		"SurveyID",
+		"Survey",
+	).Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) IsAnalysisSession(tx *gorm.DB) bool {
+	return s.usesAnalysisFollowUp(tx)
+}
+
+func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
+	if !s.IsAnalysisSession(tx) {
+		return false
+	}
+	if s.State == PlanningSessionStateEnded {
+		return true
+	}
+	return !s.hasActiveAnalysisRun(tx)
+}
+
+func (s *FactoryPlanningSession) hasActiveAnalysisRun(tx *gorm.DB) bool {
+	if s.CanvasID == nil || s.CanvasRunID == nil {
+		return false
+	}
+	run, err := FindCanvasRunInTransaction(tx, *s.CanvasID, *s.CanvasRunID)
+	if err != nil {
+		return false
+	}
+	return run.State == CanvasRunStatePending || run.State == CanvasRunStateStarted
+}
+
+func (s *FactoryPlanningSession) DetachAgentRun(tx *gorm.DB) error {
+	s.CanvasRunID = nil
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id": nil,
+		"updated_at":    s.UpdatedAt,
+	}).Error
 }
 
 func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, error) {

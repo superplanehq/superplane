@@ -24,6 +24,21 @@ func (PlanningSessionMessage) TableName() string {
 	return "factory_planning_session_messages"
 }
 
+func sessionWaitText(tx *gorm.DB, session *FactoryPlanningSession, text string, refined bool) string {
+	return planningWaitTextForKind(text, refined, session.Draft(), session.usesAnalysisFollowUp(tx))
+}
+
+func (s *FactoryPlanningSession) usesAnalysisFollowUp(tx *gorm.DB) bool {
+	if s.CanvasID == nil || s.DraftWorkOrderID == nil {
+		return false
+	}
+	var name string
+	if err := tx.Model(&Canvas{}).Select("name").Where("id = ?", *s.CanvasID).Scan(&name).Error; err != nil || name == "" {
+		return false
+	}
+	return name != PlanningCanvasName
+}
+
 func ListPlanningSessionMessages(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionMessage, error) {
 	var messages []PlanningSessionMessage
 	err := tx.Where("session_id = ?", sessionID).Order("created_at ASC, id ASC").Find(&messages).Error
@@ -72,7 +87,7 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 		}
 		if s.WaitState == PlanningWaitPending {
 			message.Delivered = true
-			s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningWaitText(body, refined, s.Draft())})
+			s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: sessionWaitText(inner, s, body, refined)})
 		}
 		if err := inner.Create(&message).Error; err != nil {
 			return err
@@ -91,6 +106,15 @@ func (s *FactoryPlanningSession) reloadMessages(tx *gorm.DB) error {
 	}
 	s.Messages = messages
 	return nil
+}
+
+func (s *FactoryPlanningSession) MarkUserMessagesDelivered(tx *gorm.DB) error {
+	if err := tx.Model(&PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ? AND delivered = ?", s.ID, PlanningSessionMessageRoleUser, false).
+		Update("delivered", true).Error; err != nil {
+		return err
+	}
+	return s.reloadMessages(tx)
 }
 
 func (s *FactoryPlanningSession) nextUndeliveredUserMessage(tx *gorm.DB) (PlanningSessionMessage, bool, error) {
@@ -112,7 +136,7 @@ func (s *FactoryPlanningSession) deliverUserMessage(tx *gorm.DB, message Plannin
 	if err := tx.Model(&message).Select("Delivered").Updates(PlanningSessionMessage{Delivered: true}).Error; err != nil {
 		return err
 	}
-	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningWaitText(message.Text, refined, s.Draft())})
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: sessionWaitText(tx, s, message.Text, refined)})
 	return nil
 }
 
