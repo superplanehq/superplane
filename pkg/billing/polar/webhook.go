@@ -22,6 +22,13 @@ const (
 	orderPaidType          = "order.paid"
 	orderRefundedType      = "order.refunded"
 	billingReasonPurchase  = "purchase"
+
+	subscriptionCreatedType    = "subscription.created"
+	subscriptionUpdatedType    = "subscription.updated"
+	subscriptionActiveType     = "subscription.active"
+	subscriptionCanceledType   = "subscription.canceled"
+	subscriptionUncanceledType = "subscription.uncanceled"
+	subscriptionRevokedType    = "subscription.revoked"
 )
 
 var (
@@ -105,7 +112,83 @@ func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*
 	return event, nil
 }
 
-func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (*OrderWebhookEvent, error) {
+type SubscriptionWebhookEvent struct {
+	Type string           `json:"type"`
+	Data SubscriptionData `json:"data"`
+}
+
+type SubscriptionData struct {
+	ID                 string        `json:"id"`
+	Status             string        `json:"status"`
+	CurrentPeriodStart polarTime     `json:"current_period_start"`
+	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
+	CustomerID         string        `json:"customer_id"`
+	ExternalCustomerID string        `json:"external_customer_id"`
+	Customer           OrderCustomer `json:"customer"`
+}
+
+func (d SubscriptionData) organizationExternalID() string {
+	if id := strings.TrimSpace(d.Customer.ExternalID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(d.ExternalCustomerID)
+}
+
+type polarTime struct {
+	time.Time
+}
+
+func (p *polarTime) UnmarshalJSON(raw []byte) error {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return nil
+	}
+	if strings.HasPrefix(trimmed, "\"") {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return err
+		}
+		if strings.TrimSpace(s) == "" {
+			return nil
+		}
+		parsed, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			parsed, err = time.Parse(time.RFC3339Nano, s)
+		}
+		if err != nil {
+			return err
+		}
+		p.Time = parsed
+		return nil
+	}
+	var unix int64
+	if err := json.Unmarshal(raw, &unix); err != nil {
+		return err
+	}
+	if unix <= 0 {
+		return nil
+	}
+	p.Time = time.Unix(unix, 0).UTC()
+	return nil
+}
+
+type ParsedWebhook struct {
+	Type         string
+	Order        *OrderWebhookEvent
+	Subscription *SubscriptionWebhookEvent
+}
+
+func isSubscriptionEventType(eventType string) bool {
+	switch eventType {
+	case subscriptionCreatedType, subscriptionUpdatedType, subscriptionActiveType,
+		subscriptionCanceledType, subscriptionUncanceledType, subscriptionRevokedType:
+		return true
+	default:
+		return false
+	}
+}
+
+func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*ParsedWebhook, error) {
 	if _, err := decodeWebhookSecret(secret); err != nil {
 		return nil, err
 	}
@@ -113,19 +196,62 @@ func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (
 		return nil, err
 	}
 
+	var envelope struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnusableWebhookPayload, err)
+	}
+
+	switch {
+	case envelope.Type == orderPaidType || envelope.Type == orderRefundedType:
+		event, err := parseOrderEvent(body)
+		if err != nil {
+			return nil, err
+		}
+		return &ParsedWebhook{Type: event.Type, Order: event}, nil
+	case isSubscriptionEventType(envelope.Type):
+		event, err := parseSubscriptionEvent(body)
+		if err != nil {
+			return nil, err
+		}
+		return &ParsedWebhook{Type: event.Type, Subscription: event}, nil
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, envelope.Type)
+	}
+}
+
+func parseOrderEvent(body []byte) (*OrderWebhookEvent, error) {
 	var event OrderWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnusableWebhookPayload, err)
-	}
-	switch event.Type {
-	case orderPaidType, orderRefundedType:
-	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, event.Type)
 	}
 	if strings.TrimSpace(event.Data.ID) == "" {
 		return nil, fmt.Errorf("%w: order id is required", ErrUnusableWebhookPayload)
 	}
 	return &event, nil
+}
+
+func parseSubscriptionEvent(body []byte) (*SubscriptionWebhookEvent, error) {
+	var event SubscriptionWebhookEvent
+	if err := json.Unmarshal(body, &event); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnusableWebhookPayload, err)
+	}
+	if strings.TrimSpace(event.Data.ID) == "" {
+		return nil, fmt.Errorf("%w: subscription id is required", ErrUnusableWebhookPayload)
+	}
+	return &event, nil
+}
+
+func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (*OrderWebhookEvent, error) {
+	parsed, err := VerifyAndParseWebhook(headers, body, secret)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.Order == nil {
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, parsed.Type)
+	}
+	return parsed.Order, nil
 }
 
 func verifySignature(headers http.Header, body []byte, secret string) error {

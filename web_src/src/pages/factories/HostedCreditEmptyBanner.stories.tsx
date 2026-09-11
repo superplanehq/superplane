@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
-import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
+import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "./HostedCreditEmptyBanner";
 
 /**
  * Status banner for hosted credit. A healthy trial uses quiet chrome.
@@ -93,6 +93,12 @@ export const TrialEnded: Story = {
     billingEnabled: true,
     kind: "trial-expired",
   },
+};
+
+/** The organization has no plan. The amber chip sits next to the page title. */
+export const NoPlan: Story = {
+  name: "No plan",
+  render: (args) => <HostedCreditHeaderKicker kind="lapsed" spendingHref={args.spendingHref} />,
 };
 
 /** Purchased hosted credit remains at or below $20. The action opens Billing. */

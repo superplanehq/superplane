@@ -2,18 +2,21 @@ import { formatUsdCents } from "./workOrderUsage";
 
 export const CREDIT_GRANT_KIND_WELCOME = "welcome";
 export const CREDIT_GRANT_KIND_ADMIN = "admin";
-export const CREDIT_GRANT_KIND_POLAR = "polar";
-export const CREDIT_GRANT_KIND_POLAR_REFUND = "polar_refund";
+export const CREDIT_GRANT_KIND_INCLUDED = "included";
+export const CREDIT_GRANT_KIND_TOPUP = "topup";
+export const CREDIT_GRANT_KIND_TOPUP_REFUND = "topup_refund";
 
 export function creditGrantSourceLabel(kind: string | undefined): string {
   switch (kind) {
     case CREDIT_GRANT_KIND_WELCOME:
-      return "Welcome credit";
+      return "Trial";
     case CREDIT_GRANT_KIND_ADMIN:
       return "SuperPlane grant";
-    case CREDIT_GRANT_KIND_POLAR:
-      return "Purchased";
-    case CREDIT_GRANT_KIND_POLAR_REFUND:
+    case CREDIT_GRANT_KIND_INCLUDED:
+      return "Included";
+    case CREDIT_GRANT_KIND_TOPUP:
+      return "Top-up";
+    case CREDIT_GRANT_KIND_TOPUP_REFUND:
       return "Refund";
     default:
       return "Credit";
@@ -40,7 +43,7 @@ export function creditGrantDetails(
     parts.push(`Granted by ${actorName}`);
   }
   const orderId = grant.polarOrderId?.trim();
-  if ((grant.kind === CREDIT_GRANT_KIND_POLAR || grant.kind === CREDIT_GRANT_KIND_POLAR_REFUND) && orderId) {
+  if ((grant.kind === CREDIT_GRANT_KIND_TOPUP || grant.kind === CREDIT_GRANT_KIND_TOPUP_REFUND) && orderId) {
     parts.push(`Order ${orderId}`);
   }
   const expiry = welcomeCreditExpiryDetail(grant.kind, grant.expiresAt, now);
@@ -55,7 +58,10 @@ export function welcomeCreditExpiryDetail(
   expiresAt: string | undefined,
   now: Date = new Date(),
 ): string | null {
-  if (kind !== CREDIT_GRANT_KIND_WELCOME || !expiresAt) {
+  if (kind !== CREDIT_GRANT_KIND_WELCOME && kind !== CREDIT_GRANT_KIND_INCLUDED && kind !== CREDIT_GRANT_KIND_TOPUP) {
+    return null;
+  }
+  if (!expiresAt) {
     return null;
   }
   const parsed = new Date(expiresAt);
