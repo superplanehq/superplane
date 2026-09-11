@@ -21,14 +21,17 @@ describe("HostedCreditEmptyBanner", () => {
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
   });
 
-  it("links to billing with a view action when billing is off", () => {
+  it("hides the action when billing is off", () => {
     render(
       <MemoryRouter>
         <HostedCreditEmptyBanner billingEnabled={false} spendingHref={billingHref} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(screen.queryByRole("link", { name: "Add credits" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent(
+      "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
+    );
   });
 
   it("shows Add credits for a non-owner when billing is on", () => {
@@ -42,7 +45,7 @@ describe("HostedCreditEmptyBanner", () => {
     expect(screen.queryByRole("link", { name: "Add hosted credit" })).not.toBeInTheDocument();
   });
 
-  it("shows remaining trial credit and an Add credits action", () => {
+  it("shows remaining trial credit and a Subscribe action", () => {
     render(
       <MemoryRouter>
         <HostedCreditEmptyBanner
@@ -61,7 +64,11 @@ describe("HostedCreditEmptyBanner", () => {
     expect(banner).toHaveTextContent("14 days remaining");
     expect(banner).toHaveAttribute("data-tone", "info");
     expect(banner).not.toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
+    expect(screen.getByRole("link", { name: "See pricing" })).toHaveAttribute(
+      "href",
+      "https://superplane.com/pricing/",
+    );
   });
 
   it("warns that tasks stop when remaining trial credit is low", () => {
@@ -108,8 +115,8 @@ describe("HostedCreditEmptyBanner", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Trial credit is empty");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Trial credit is used up");
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
   });
 
   it("shows trial-expired copy", () => {
@@ -120,7 +127,7 @@ describe("HostedCreditEmptyBanner", () => {
     );
 
     expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Trial ended");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
   });
 
   it("shows remaining purchased credit when the balance is low", () => {
@@ -140,7 +147,7 @@ describe("HostedCreditEmptyBanner", () => {
 });
 
 describe("HostedCreditHeaderKicker", () => {
-  it("shows remaining trial days and an Add credits action", () => {
+  it("shows remaining trial days and a Subscribe action", () => {
     const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
     render(
       <MemoryRouter>
@@ -156,8 +163,8 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker).toHaveTextContent("Trial");
     expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
     expect(kicker).toHaveTextContent("$41.24");
-    expect(kicker).toHaveTextContent("Add credits");
-    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+    expect(kicker).toHaveTextContent("Subscribe");
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
   });
 
   it("falls back to a 14-day trial label when expiry is missing", () => {

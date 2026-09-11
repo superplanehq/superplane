@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SUPERPLANE_PRICING_URL } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 import { formatUsdCents } from "./lib/workOrderUsage";
@@ -22,6 +23,7 @@ interface HostedCreditEmptyBannerProps {
   kind?: HostedCreditBannerKind;
   remainingCreditCents?: number;
   welcomeCreditExpiresAt?: string;
+  subscriptionCheckoutEnabled?: boolean;
 }
 
 const BANNER_TONE_CLASS = {
@@ -41,12 +43,14 @@ export function HostedCreditEmptyBanner({
   kind = "empty",
   remainingCreditCents = 0,
   welcomeCreditExpiresAt,
+  subscriptionCheckoutEnabled,
 }: HostedCreditEmptyBannerProps) {
   const copy = hostedCreditBannerCopy({
     kind,
     billingEnabled,
     remainingCreditCents,
     welcomeCreditExpiresAt: parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt) ?? undefined,
+    subscriptionCheckoutEnabled,
   });
   const isWarning = copy.tone === "warning";
   const Icon = isWarning ? TriangleAlert : Sparkles;
@@ -79,9 +83,20 @@ export function HostedCreditEmptyBanner({
           </p>
         )}
       </div>
-      <Button asChild variant="outline" size="sm">
-        <Link to={spendingHref}>{copy.actionLabel}</Link>
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {copy.showPricingLink ? (
+          <Button asChild variant="ghost" size="sm">
+            <a href={SUPERPLANE_PRICING_URL} target="_blank" rel="noreferrer">
+              See pricing
+            </a>
+          </Button>
+        ) : null}
+        {copy.showAction !== false ? (
+          <Button asChild variant="outline" size="sm">
+            <Link to={spendingHref}>{copy.actionLabel}</Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -103,7 +118,7 @@ export function HostedCreditHeaderKicker({
   return (
     <Link
       to={spendingHref}
-      aria-label="Add credits"
+      aria-label="Subscribe"
       data-testid="hosted-credit-header-kicker"
       className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-violet-100 py-1 pl-2.5 pr-1.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900"
     >
@@ -115,7 +130,7 @@ export function HostedCreditHeaderKicker({
         {remaining}
       </span>
       <span className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white">
-        Add credits
+        Subscribe
       </span>
     </Link>
   );
