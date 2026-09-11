@@ -45,6 +45,8 @@ spec:
             - secretRef:
                 name: {{ include "secrets.email.name" . }}
             - secretRef:
+                name: {{ include "secrets.feedback.name" . }}
+            - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
           env:
             - name: START_CONSUMERS
