@@ -25,7 +25,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "List tasks in a workspace",
 		Long: `List tasks in a workspace.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
 from "superplane workspace active" is used.
 
 --assignees accepts user UUIDs or emails (comma-separated or repeated).
@@ -43,7 +43,7 @@ Examples:
   superplane tasks list --state all`,
 		Args: cobra.NoArgs,
 	}
-	taskListCmd.Flags().StringVar(&taskListWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
+	taskListCmd.Flags().StringVar(&taskListWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
 	taskListCmd.Flags().StringSliceVar(&taskListAssignees, "assignees", nil, "filter by assignee user UUID or email (repeatable)")
 	taskListCmd.Flags().StringSliceVar(&taskListStates, "state", nil, "filter by task state (repeatable, e.g. open or STATE_OPEN); defaults to open when omitted; pass 'all' to include every state")
 	taskListCmd.Flags().StringSliceVar(&taskListResults, "result", nil, "filter by task result (repeatable, e.g. completed or RESULT_COMPLETED)")
@@ -67,15 +67,15 @@ Examples:
 		Long: `Show a task's title, assignees, description, comments, and
 timeline of events.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123).
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
 
 Example:
-  superplane tasks describe --workspace shipping --task "$TID"`,
+  superplane tasks describe --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
-	taskDescribeCmd.Flags().StringVar(&taskDescribeWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
+	taskDescribeCmd.Flags().StringVar(&taskDescribeWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
 	bindTaskIDFlag(taskDescribeCmd, &taskDescribeTaskID)
 	core.Bind(taskDescribeCmd, &taskDescribeCommand{
 		workspace: &taskDescribeWorkspace,
@@ -95,7 +95,7 @@ Example:
 		Short: "Create a task",
 		Long: `Create a task in draft state.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
 from "superplane workspace active" is used. --title is required.
 --description sets the description inline; -f/--file reads it from a
 file (or - for stdin) instead; the two are mutually exclusive.
@@ -113,7 +113,7 @@ Examples:
     --assignee bob@example.com`,
 		Args: cobra.NoArgs,
 	}
-	taskCreateCmd.Flags().StringVar(&taskCreateWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
+	taskCreateCmd.Flags().StringVar(&taskCreateWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
 	taskCreateCmd.Flags().StringVar(&taskCreateTitle, "title", "", "task title (required)")
 	taskCreateCmd.Flags().StringVar(&taskCreateDescription, "description", "", "task description (inline)")
 	taskCreateCmd.Flags().StringVarP(&taskCreateFile, "file", "f", "", "read description from file (or - for stdin)")
@@ -137,17 +137,17 @@ Examples:
 		Short: "Dispatch a task to a workspace line",
 		Long: `Dispatch a task to a workspace line, starting its execution.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123). --line is the target workspace line's name.
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823). --line is the target workspace line's name.
 
 A draft task moves to the open state on its first dispatch.
 
 Example:
-  superplane tasks dispatch --task "$TID" --line build`,
+  superplane tasks dispatch --workspace super --task 1823 --line build`,
 		Args: cobra.NoArgs,
 	}
-	taskDispatchCmd.Flags().StringVar(&taskDispatchWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
+	taskDispatchCmd.Flags().StringVar(&taskDispatchWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
 	bindTaskIDFlag(taskDispatchCmd, &taskDispatchTaskID)
 	taskDispatchCmd.Flags().StringVar(&taskDispatchLine, "line", "", "workspace line name (required)")
 	core.Bind(taskDispatchCmd, &taskDispatchCommand{
@@ -167,19 +167,19 @@ Example:
 		Short: "Set a task's assignees",
 		Long: `Set a task's assignees.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123).
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
 
 --assignee accepts a user UUID or email and is repeatable; at least one is
 required. This command replaces the entire assignee list with the ones
 given — it does not add to the existing list.
 
 Example:
-  superplane tasks assign --task "$TID" --assignee alice@example.com --assignee bob@example.com`,
+  superplane tasks assign --workspace super --task 1823 --assignee alice@example.com --assignee bob@example.com`,
 		Args: cobra.NoArgs,
 	}
-	taskAssignCmd.Flags().StringVar(&taskAssignWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
+	taskAssignCmd.Flags().StringVar(&taskAssignWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
 	bindTaskIDFlag(taskAssignCmd, &taskAssignTaskID)
 	taskAssignCmd.Flags().StringArrayVar(&taskAssignAssignees, "assignee", nil, "assignee user UUID or email (repeatable, required); replaces the full assignee list")
 	core.Bind(taskAssignCmd, &taskAssignCommand{
@@ -210,41 +210,41 @@ Example:
 		Short: "Attach an artifact to a task",
 		Long: `Attach a typed artifact to a task.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug.
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID.
 --type is one of: markdown, branch, link.
 
 Examples:
-  superplane tasks artifacts list --workspace shipping --task "$TID"
+  superplane tasks artifacts list --workspace super --task 1823
 
   # Uses the active workspace
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type markdown \
     --title "PLAN.md" \
     -f ./PLAN.md
 
   superplane tasks artifacts add \
-    --workspace shipping \
-    --task "$TID" \
+    --workspace super \
+    --task 1823 \
     --type markdown \
     --title "PLAN.md" \
     -f ./PLAN.md
 
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type branch \
     --name feature/login
 
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type link \
     --url https://preview.example.com/pr-42 \
     --title Preview`,
 		Args: cobra.NoArgs,
 	}
-	artifactAddCmd.Flags().StringVar(&artifactAddWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
-	artifactAddCmd.Flags().StringVar(&artifactAddTaskID, "task", "", "task UUID or slug (e.g. prefix-123)")
+	artifactAddCmd.Flags().StringVar(&artifactAddWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
+	artifactAddCmd.Flags().StringVar(&artifactAddTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
 	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, or link")
 	artifactAddCmd.Flags().StringVar(&artifactAddTitle, "title", "", "artifact title")
 	artifactAddCmd.Flags().StringVar(&artifactAddBody, "body", "", "markdown body (inline)")
@@ -273,15 +273,15 @@ Examples:
 		Short: "List artifacts on a task",
 		Long: `List artifacts on a task.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace name, key, or UUID. When omitted, the active workspace
 from "superplane workspace active" is used.
 
 Example:
-  superplane tasks artifacts list --workspace shipping --task "$TID"`,
+  superplane tasks artifacts list --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
-	artifactListCmd.Flags().StringVar(&artifactListWorkspace, "workspace", "", "workspace name or UUID (default: active workspace)")
-	artifactListCmd.Flags().StringVar(&artifactListTaskID, "task", "", "task UUID or slug (e.g. prefix-123)")
+	artifactListCmd.Flags().StringVar(&artifactListWorkspace, "workspace", "", "workspace name, key, or UUID (default: active workspace)")
+	artifactListCmd.Flags().StringVar(&artifactListTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
 	_ = artifactListCmd.MarkFlagRequired("task")
 	core.Bind(artifactListCmd, &artifactListCommand{
 		workspace: &artifactListWorkspace,
@@ -302,5 +302,5 @@ Example:
 }
 
 func bindTaskIDFlag(cmd *cobra.Command, dest *string) {
-	cmd.Flags().StringVar(dest, "task", "", "task UUID or slug (e.g. prefix-123)")
+	cmd.Flags().StringVar(dest, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
 }

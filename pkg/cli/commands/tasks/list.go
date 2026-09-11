@@ -71,12 +71,12 @@ func (c *taskListCommand) Execute(ctx core.CommandContext) error {
 		}
 
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(writer, "ID\tTITLE\tSTATE\tRESULT\tASSIGNEES\tEXECUTIONS\tCREATED")
+		_, _ = fmt.Fprintln(writer, "NUMBER\tTITLE\tSTATE\tRESULT\tASSIGNEES\tEXECUTIONS\tCREATED")
 		for _, task := range tasks {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
-				task.GetId(),
+				taskDisplayID(task),
 				task.GetTitle(),
 				formatTaskState(task.GetState()),
 				formatTaskResult(task.GetResult()),

@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func ResolveWorkspaceID(ctx core.CommandContext, workspaceFlag string) (string, error) {
@@ -20,7 +19,7 @@ func ResolveWorkspaceID(ctx core.CommandContext, workspaceFlag string) (string, 
 	if trimmed == "" {
 		return "", errWorkspaceRequired()
 	}
-	return FindWorkspaceID(ctx, trimmed)
+	return trimmed, nil
 }
 
 func errWorkspaceRequired() error {
@@ -30,33 +29,23 @@ func errWorkspaceRequired() error {
 func FindWorkspaceID(ctx core.CommandContext, nameOrID string) (string, error) {
 	trimmed := strings.TrimSpace(nameOrID)
 	if trimmed == "" {
-		return "", fmt.Errorf("workspace name or id is required")
+		return "", fmt.Errorf("workspace name, key, or id is required")
 	}
 	if _, err := uuid.Parse(trimmed); err == nil {
 		return trimmed, nil
 	}
 
-	response, _, err := ctx.API.FactoryAPI.FactoriesListFactories(ctx.Context).Execute()
+	response, _, err := ctx.API.FactoryAPI.FactoriesDescribeFactory(ctx.Context, trimmed).Execute()
 	if err != nil {
 		return "", err
 	}
-
-	var matches []openapi_client.FactoriesFactory
-	for _, ws := range response.GetFactories() {
-		if ws.GetName() == trimmed {
-			matches = append(matches, ws)
-		}
+	if response == nil || !response.HasFactory() {
+		return "", fmt.Errorf("workspace %q is missing an id", trimmed)
 	}
-
-	if len(matches) == 0 {
-		return "", fmt.Errorf("workspace %q not found", trimmed)
-	}
-	if len(matches) > 1 {
-		return "", fmt.Errorf("multiple workspaces named %q found", trimmed)
-	}
-	if !matches[0].HasId() {
+	factory := response.GetFactory()
+	if !factory.HasId() {
 		return "", fmt.Errorf("workspace %q is missing an id", trimmed)
 	}
 
-	return matches[0].GetId(), nil
+	return factory.GetId(), nil
 }
