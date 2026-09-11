@@ -189,4 +189,24 @@ describe("findWorkOrderForAutomationRun", () => {
   it("returns undefined when no execution matches the run", () => {
     expect(findWorkOrderForAutomationRun(orders, "run-missing")).toBeUndefined();
   });
+
+  it("matches an intake run by the task source run id", () => {
+    const intakeOrder: FactoriesWorkOrder = {
+      id: "wo-intake",
+      title: "Opened from GitHub",
+      sourceRunId: "run-intake",
+    };
+
+    expect(findWorkOrderForAutomationRun([intakeOrder], "run-intake")?.id).toBe("wo-intake");
+  });
+
+  it("matches a backlog analysis run from the trigger payload", () => {
+    const draft: FactoriesWorkOrder = { id: "wo-draft", title: "Draft from intake" };
+    const run: CanvasesCanvasRun = {
+      id: "run-backlog",
+      rootEvent: { data: { data: { workOrder: { id: "wo-draft" } } } },
+    };
+
+    expect(findWorkOrderForAutomationRun([draft], "run-backlog", run)?.id).toBe("wo-draft");
+  });
 });

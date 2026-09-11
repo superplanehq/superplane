@@ -127,7 +127,7 @@ describe("ColumnAutomationViewPopup", () => {
     expect(edit.className).toMatch(/absolute/);
     expect(edit.className).toMatch(/right-2/);
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
-    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
   });
 
   it("lists canvas runs beside the automation when a canvas id is given", () => {
@@ -136,7 +136,9 @@ describe("ColumnAutomationViewPopup", () => {
       runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-refund-implementer?run=${runId}`,
     });
 
-    const sidebar = within(screen.getByTestId("column-automation-view-canvas")).getByTestId("canvas-runs-sidebar");
+    const sidebar = within(screen.getByTestId("column-automation-view-canvas")).getByTestId(
+      "factory-automation-runs-sidebar",
+    );
     expect(within(sidebar).getByText("Add refund reconciliation test")).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: "Add refund reconciliation test" })).toHaveAttribute(
       "href",

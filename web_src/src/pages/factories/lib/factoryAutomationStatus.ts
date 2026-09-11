@@ -1,5 +1,6 @@
 import type { CanvasesCanvasRun, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { shortId } from "@/ui/Runs/runPresentation";
+import { analyzedWorkOrderId } from "./backlogAnalysis";
 import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type FactoryAutomationTick = "running" | "waiting" | "queued" | "passed" | "failed" | "cancelled" | null;
@@ -179,17 +180,44 @@ function compareRunsNewestFirst(left: FactoryAutomationRunCard, right: FactoryAu
 }
 
 /**
- * Finds the task that produced this canvas run, if any.
- * Trigger-only runs have no task. Match on run id alone: ids are unique
- * and Storybook ListRuns is shared across automations.
+ * Finds the task for this canvas run, if any.
+ * Line and PR steps match on execution run id. Intake matches on
+ * sourceRunId after Create Task. Backlog analysis matches the work
+ * order id in the trigger payload. Trigger-only runs have no task.
  */
 export function findWorkOrderForAutomationRun(
   workOrders: FactoriesWorkOrder[],
   runId: string,
+  run?: Pick<CanvasesCanvasRun, "rootEvent">,
 ): FactoriesWorkOrder | undefined {
   if (!runId) {
     return undefined;
   }
 
-  return workOrders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === runId));
+  const byStep = workOrders.find((order) =>
+    flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === runId),
+  );
+  if (byStep) {
+    return byStep;
+  }
+
+  const bySource = workOrders.find((order) => workOrderSourceRunId(order) === runId);
+  if (bySource) {
+    return bySource;
+  }
+
+  if (!run) {
+    return undefined;
+  }
+
+  const analyzedId = analyzedWorkOrderId(run);
+  if (!analyzedId) {
+    return undefined;
+  }
+
+  return workOrders.find((order) => order.id === analyzedId);
+}
+
+function workOrderSourceRunId(order: FactoriesWorkOrder): string | undefined {
+  return order.sourceRunId?.trim() || undefined;
 }
