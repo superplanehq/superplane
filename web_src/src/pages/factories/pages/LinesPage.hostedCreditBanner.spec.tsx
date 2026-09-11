@@ -11,6 +11,8 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import {
   BUSINESS_ORGANIZATION_BILLING,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
   LOW_CREDIT_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
@@ -94,6 +96,29 @@ describe("LinesPage hosted credit banner", () => {
     expect(banner).toHaveTextContent(HOSTED_CREDIT_RUNS_STOP_HINT);
     expect(banner).toHaveAttribute("data-tone", "warning");
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/settings/organization/billing"),
+    );
+  }, 10000);
+
+  it("shows a no-plan chip next to the line title when the plan is none", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
+        }}
+      />,
+    );
+
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveAttribute("data-kind", "lapsed");
+    expect(kicker).toHaveTextContent("No plan");
+    expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );

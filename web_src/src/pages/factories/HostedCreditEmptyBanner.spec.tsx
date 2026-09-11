@@ -160,6 +160,7 @@ describe("HostedCreditHeaderKicker", () => {
     );
 
     const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveAttribute("data-kind", "trial");
     expect(kicker).toHaveTextContent("Trial");
     expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
     expect(kicker).toHaveTextContent("$41.24");
@@ -176,5 +177,33 @@ describe("HostedCreditHeaderKicker", () => {
 
     expect(screen.getByTestId("hosted-credit-header-kicker")).toHaveTextContent("Trial");
     expect(screen.getByTestId("hosted-credit-header-kicker")).toHaveTextContent("14 days");
+  });
+
+  it("shows a no-plan chip with a Subscribe action", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker kind="lapsed" spendingHref={billingHref} remainingCreditCents={5000} />
+      </MemoryRouter>,
+    );
+
+    const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveAttribute("data-kind", "lapsed");
+    expect(kicker).toHaveTextContent("No plan");
+    expect(kicker).toHaveTextContent("Subscribe");
+    expect(kicker).not.toHaveTextContent("$50.00");
+    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
+  });
+
+  it("shows a trial-ended chip", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker kind="trial-expired" spendingHref={billingHref} />
+      </MemoryRouter>,
+    );
+
+    const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveAttribute("data-kind", "trial-expired");
+    expect(kicker).toHaveTextContent("Trial ended");
+    expect(kicker).toHaveTextContent("Subscribe");
   });
 });

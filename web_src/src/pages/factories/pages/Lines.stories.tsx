@@ -19,6 +19,8 @@ import {
 } from "../__fixtures__/backlogIntakeItemFixtures";
 import {
   BUSINESS_ORGANIZATION_BILLING,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
   LOW_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
 } from "../__fixtures__/usageReportFixtures";
@@ -303,6 +305,24 @@ export const LineBoardHostedCreditLow: Story = {
           ...lineMetricsFactoriesFixture,
           organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT,
           organizationBilling: BUSINESS_ORGANIZATION_BILLING,
+        }}
+      />
+    );
+  },
+};
+
+/** The organization has no plan. The amber chip sits next to the line title. */
+export const LineBoardNoPlan: Story = {
+  name: "Line board — no plan",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{
+          ...lineMetricsFactoriesFixture,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
         }}
       />
     );

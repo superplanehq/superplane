@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 
 import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "../HostedCreditEmptyBanner";
 import { factorySettingsSectionPath } from "./factoryPagePaths";
-import { hostedCreditBannerKind } from "./hostedCreditEmpty";
+import { hostedCreditBannerKind, isHostedCreditHeaderKickerKind } from "./hostedCreditEmpty";
 
 function hostedCreditChromeState(
   spendData: OrganizationsDescribeOrganizationWorkspaceUsageResponse | undefined,
@@ -49,10 +49,11 @@ export function useHostedCreditChrome(
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
   const canManageBilling = canAct("org", "update");
 
-  if (kind === "trial") {
+  if (isHostedCreditHeaderKickerKind(kind)) {
     return {
       headerKicker: (
         <HostedCreditHeaderKicker
+          kind={kind}
           spendingHref={spendingHref}
           welcomeCreditExpiresAt={welcomeCreditExpiresAt}
           remainingCreditCents={remainingCreditCents}

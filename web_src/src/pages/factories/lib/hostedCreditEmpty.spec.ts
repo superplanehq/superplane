@@ -7,7 +7,9 @@ import {
   hostedCreditBannerTone,
   hostedCreditBillingBalanceCopy,
   hostedCreditEmptyBannerCopy,
+  hostedCreditHeaderKickerLabel,
   hostedCreditRunsStopHint,
+  isHostedCreditHeaderKickerKind,
   isHostedCreditTrialOrg,
   isLowHostedCreditRemaining,
   shouldShowHostedCreditEmptyBanner,
@@ -218,6 +220,24 @@ describe("hostedCreditBannerKind", () => {
         now,
       }),
     ).toBe("trial");
+  });
+});
+
+describe("isHostedCreditHeaderKickerKind", () => {
+  it("uses the title chip for trial, trial ended, and no-plan states", () => {
+    expect(isHostedCreditHeaderKickerKind("trial")).toBe(true);
+    expect(isHostedCreditHeaderKickerKind("trial-expired")).toBe(true);
+    expect(isHostedCreditHeaderKickerKind("lapsed")).toBe(true);
+    expect(isHostedCreditHeaderKickerKind("trial-empty")).toBe(false);
+    expect(isHostedCreditHeaderKickerKind("empty")).toBe(false);
+  });
+});
+
+describe("hostedCreditHeaderKickerLabel", () => {
+  it("names the chip for each header kind", () => {
+    expect(hostedCreditHeaderKickerLabel("trial")).toBe("Trial");
+    expect(hostedCreditHeaderKickerLabel("trial-expired")).toBe("Trial ended");
+    expect(hostedCreditHeaderKickerLabel("lapsed")).toBe("No plan");
   });
 });
 

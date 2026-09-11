@@ -108,6 +108,23 @@ export function shouldShowHostedCreditEmptyBanner(args: HostedCreditBannerInput)
   return hostedCreditBannerKind(args) != null;
 }
 
+/** Compact header chip kinds. These sit next to the page title, not in the banner row. */
+export type HostedCreditHeaderKickerKind = "trial" | "trial-expired" | "lapsed";
+
+export function isHostedCreditHeaderKickerKind(kind: HostedCreditBannerKind): kind is HostedCreditHeaderKickerKind {
+  return kind === "trial" || kind === "trial-expired" || kind === "lapsed";
+}
+
+export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind): string {
+  if (kind === "trial-expired") {
+    return "Trial ended";
+  }
+  if (kind === "lapsed") {
+    return "No plan";
+  }
+  return "Trial";
+}
+
 export type HostedCreditBannerTone = "info" | "warning";
 
 export interface HostedCreditBannerCopy {
