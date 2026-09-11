@@ -14,6 +14,7 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	listCmd, _, err := root.Find([]string{"list"})
 	require.NoError(t, err)
 	require.NotNil(t, listCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, listCmd.Flags().Lookup("factory"))
 	require.NotNil(t, listCmd.Flags().Lookup("assignees"))
 	require.NotNil(t, listCmd.Flags().Lookup("state"))
 	require.NotNil(t, listCmd.Flags().Lookup("result"))
@@ -22,7 +23,9 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	describeCmd, _, err := root.Find([]string{"describe"})
 	require.NoError(t, err)
 	require.NotNil(t, describeCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, describeCmd.Flags().Lookup("factory"))
 	require.NotNil(t, describeCmd.Flags().Lookup("task"))
+	require.NotNil(t, describeCmd.Flags().Lookup("order"))
 
 	createCmd, _, err := root.Find([]string{"create"})
 	require.NoError(t, err)
@@ -63,4 +66,20 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 func TestNewCommand_Aliases(t *testing.T) {
 	root := NewCommand(core.BindOptions{})
 	assert.Contains(t, root.Aliases, "task")
+}
+
+func TestNewCommand_DeprecatedFactoryAndOrderFlags(t *testing.T) {
+	root := NewCommand(core.BindOptions{})
+
+	listCmd, _, err := root.Find([]string{"list"})
+	require.NoError(t, err)
+	require.NoError(t, listCmd.ParseFlags([]string{"--factory", "shipping"}))
+	assert.Equal(t, "shipping", listCmd.Flags().Lookup("factory").Value.String())
+	assert.Equal(t, "shipping", listCmd.Flags().Lookup("workspace").Value.String())
+
+	describeCmd, _, err := root.Find([]string{"describe"})
+	require.NoError(t, err)
+	require.NoError(t, describeCmd.ParseFlags([]string{"--order", "tid-1"}))
+	assert.Equal(t, "tid-1", describeCmd.Flags().Lookup("order").Value.String())
+	assert.Equal(t, "tid-1", describeCmd.Flags().Lookup("task").Value.String())
 }
