@@ -74,6 +74,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
         continue;
       }
       for (const tool of event.tools) {
+        const toolOrderKey = tool.started_at ?? orderKey;
         notes.push({
           id: tool.id,
           nodeId,
@@ -85,7 +86,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentName: tool.text,
           status: streamStatus(tool.status),
           detail: tool.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n") || undefined,
-          ...orderKeyProps(orderKey),
+          ...orderKeyProps(toolOrderKey),
         });
       }
     }

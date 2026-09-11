@@ -29,6 +29,7 @@ export type CommandTool = {
   lines: string[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
+  started_at?: number | null;
 };
 
 export type CommandSectionEvent = { kind: "note"; text: string } | { kind: "tools"; id: string; tools: CommandTool[] };
