@@ -41,6 +41,10 @@ func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Regis
 		return nil, grpcerrors.Internal(err, "failed to find integration")
 	}
 
+	if _, err := registry.GetSetupProvider(integration.AppName); err == nil {
+		integration.Capabilities = mergeCapabilityStates(registry.AllCapabilities(integration.AppName), integration.Capabilities)
+	}
+
 	changes := findChanges(integration.Capabilities, capabilities)
 	if len(changes) == 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "no changes")
