@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   BILLING_SPEND_ORDER_COPY,
+  BILLING_SPEND_ORDER_WITH_GRANT_COPY,
   BILLING_TRIAL_TTL_COPY,
+  adminCreditGrantCents,
   billingCreditBucketsView,
   billingCreditRemainingShares,
+  billingSpendOrderCopy,
 } from "./billingCreditBuckets";
 
 describe("billingCreditBucketsView", () => {
@@ -78,6 +81,64 @@ describe("billingCreditBucketsView", () => {
     expect(included.remainingLabel).toBe("$0.00 remaining");
     expect(included.footer).toBe("Included with Business.");
   });
+
+  it("shows SuperPlane grant after top-up when remaining grant is greater than zero", () => {
+    const buckets = billingCreditBucketsView({
+      welcomeRemainingCents: 0,
+      includedRemainingCents: 0,
+      purchasedRemainingCents: 104278,
+      purchasedCents: 104278,
+      adminRemainingCents: 11000,
+      adminGrantCents: 11000,
+    });
+
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["trial", "included", "topup", "grant"]);
+    expect(buckets[2]).toMatchObject({
+      heading: "Top-up credit",
+      spendOrderLabel: "Spend third",
+      remainingLabel: "$1042.78 remaining",
+    });
+    expect(buckets[3]).toMatchObject({
+      heading: "SuperPlane grant",
+      spendOrderLabel: "Spend last",
+      remainingLabel: "$110.00 remaining",
+      usedPercent: 0,
+      footer: null,
+    });
+    expect(buckets.reduce((sum, bucket) => sum + bucket.remainingCents, 0)).toBe(115278);
+  });
+
+  it("uses SuperPlane grant amounts as the used-percent denominator", () => {
+    const [, , , grant] = billingCreditBucketsView({
+      welcomeRemainingCents: 0,
+      includedRemainingCents: 0,
+      purchasedRemainingCents: 0,
+      purchasedCents: 0,
+      adminRemainingCents: 5500,
+      adminGrantCents: 11000,
+    });
+
+    expect(grant).toMatchObject({
+      key: "grant",
+      usedPercent: 50,
+      remainingLabel: "$55.00 remaining",
+    });
+  });
+
+  it("does not show SuperPlane grant when remaining grant is zero", () => {
+    const buckets = billingCreditBucketsView({
+      welcomeRemainingCents: 4124,
+      includedRemainingCents: 0,
+      purchasedRemainingCents: 0,
+      purchasedCents: 0,
+      adminRemainingCents: 0,
+      adminGrantCents: 1500,
+    });
+
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["trial", "included", "topup"]);
+    expect(buckets[2].spendOrderLabel).toBe("Spend last");
+    expect(buckets.some((bucket) => bucket.heading === "SuperPlane grant")).toBe(false);
+  });
 });
 
 describe("billingCreditRemainingShares", () => {
@@ -110,6 +171,24 @@ describe("billingCreditRemainingShares", () => {
       { key: "topup", percent: 0 },
     ]);
   });
+
+  it("includes SuperPlane grant in remaining bar shares", () => {
+    const buckets = billingCreditBucketsView({
+      welcomeRemainingCents: 0,
+      includedRemainingCents: 0,
+      purchasedRemainingCents: 104278,
+      purchasedCents: 104278,
+      adminRemainingCents: 11000,
+      adminGrantCents: 11000,
+    });
+
+    expect(billingCreditRemainingShares(buckets)).toEqual([
+      { key: "trial", percent: 0 },
+      { key: "included", percent: 0 },
+      { key: "topup", percent: 90 },
+      { key: "grant", percent: 10 },
+    ]);
+  });
 });
 
 describe("BILLING_SPEND_ORDER_COPY", () => {
@@ -117,5 +196,22 @@ describe("BILLING_SPEND_ORDER_COPY", () => {
     expect(BILLING_SPEND_ORDER_COPY).toBe(
       "Hosted runs spend trial credit first, then included usage, then top-up credit.",
     );
+  });
+
+  it("names SuperPlane grant only when that row is visible", () => {
+    expect(billingSpendOrderCopy(false)).toBe(BILLING_SPEND_ORDER_COPY);
+    expect(billingSpendOrderCopy(true)).toBe(BILLING_SPEND_ORDER_WITH_GRANT_COPY);
+  });
+});
+
+describe("adminCreditGrantCents", () => {
+  it("sums kind admin grant amounts", () => {
+    expect(
+      adminCreditGrantCents([
+        { kind: "admin", amountCents: "11000" },
+        { kind: "welcome", amountCents: "5000" },
+        { kind: "admin", amountCents: "2500" },
+      ]),
+    ).toBe(13500);
   });
 });
