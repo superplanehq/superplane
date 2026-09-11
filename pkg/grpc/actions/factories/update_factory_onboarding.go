@@ -98,13 +98,6 @@ func validateFactoryOnboardingResources(
 			return invalidArgument("coding agent integration does not match the selected agent")
 		}
 	} else {
-		credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
-		if err != nil {
-			return err
-		}
-		if credit.RemainingMicros <= 0 {
-			return models.ErrFactoryOnboardingAgentIntegrationRequired
-		}
 		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
 		if hostedErr != nil {
 			return hostedErr

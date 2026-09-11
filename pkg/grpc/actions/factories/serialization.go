@@ -143,15 +143,20 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	graph := resolveIntakeGraph(intake.Source, spec)
 
 	serialized := &pb.FactoryIntake{
-		Id:        intake.ID.String(),
-		FactoryId: intake.FactoryID.String(),
-		CanvasId:  intake.CanvasID.String(),
-		Name:      intake.Name(),
-		Source:    serializeFactoryIntakeSource(intake.Source),
-		Settings:  serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
-		Healthy:   graph.Healthy(spec.Edges),
-		CreatedAt: timestamppb.New(intake.CreatedAt),
-		UpdatedAt: timestamppb.New(intake.UpdatedAt),
+		Id:                  intake.ID.String(),
+		FactoryId:           intake.FactoryID.String(),
+		CanvasId:            intake.CanvasID.String(),
+		Name:                intake.Name(),
+		Source:              serializeFactoryIntakeSource(intake.Source),
+		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Healthy:             graph.Healthy(spec.Edges),
+		CreatedAt:           timestamppb.New(intake.CreatedAt),
+		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
+		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+	}
+	if intake.InitialImportItemCount != nil {
+		itemCount := int32(*intake.InitialImportItemCount)
+		serialized.InitialImportItemCount = &itemCount
 	}
 
 	if intake.Canvas != nil {
@@ -159,6 +164,21 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
+	switch status {
+	case models.FactoryIntakeInitialImportStatusPending:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_PENDING
+	case models.FactoryIntakeInitialImportStatusCompleted:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED
+	case models.FactoryIntakeInitialImportStatusFailed:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_FAILED
+	case models.FactoryIntakeInitialImportStatusSkipped:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED
+	default:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_UNSPECIFIED
+	}
 }
 
 func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {

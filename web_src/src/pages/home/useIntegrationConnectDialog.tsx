@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import type {
   IntegrationsIntegrationDefinition,
@@ -272,7 +272,29 @@ function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefini
   };
 }
 
-function useHostedGitHubConnect({
+type QueuedHostedGitHubConnect = {
+  forceNew: boolean;
+  preferredIntegrationId?: string;
+  result: Promise<boolean>;
+  resolve: (navigationStarted: boolean) => void;
+};
+
+function queueHostedGitHubConnect(
+  pending: RefObject<QueuedHostedGitHubConnect | null>,
+  forceNew: boolean,
+  preferredIntegrationId?: string,
+): Promise<boolean> {
+  if (pending.current) return pending.current.result;
+
+  let resolve!: (navigationStarted: boolean) => void;
+  const result = new Promise<boolean>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  pending.current = { forceNew, preferredIntegrationId, result, resolve };
+  return result;
+}
+
+export function useHostedGitHubConnect({
   organizationId,
   returnTo,
   connected,
@@ -294,22 +316,22 @@ function useHostedGitHubConnect({
   }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
 }) {
   const navigate = useNavigate();
-  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean; preferredIntegrationId?: string }>(false);
+  const pendingGitHubConnectRef = useRef<QueuedHostedGitHubConnect | null>(null);
 
   const connectGitHubWithoutDialog = useCallback(
     async (forceNew = false, preferredIntegrationId?: string): Promise<boolean> => {
       const userGate = hostedGitHubConnectUserGate(currentUserId, currentUserResolved);
       if (userGate !== "run") {
         if (userGate === "queue") {
-          pendingGitHubConnectRef.current = { forceNew, preferredIntegrationId };
+          return queueHostedGitHubConnect(pendingGitHubConnectRef, forceNew, preferredIntegrationId);
         } else {
-          pendingGitHubConnectRef.current = false;
+          pendingGitHubConnectRef.current = null;
           showErrorToast("Failed to connect GitHub");
         }
         return false;
       }
 
-      pendingGitHubConnectRef.current = false;
+      pendingGitHubConnectRef.current = null;
       try {
         return await startDirectGitHubConnect({
           organizationId,
@@ -344,16 +366,14 @@ function useHostedGitHubConnect({
   );
 
   useEffect(() => {
-    if (!pendingGitHubConnectRef.current) {
-      return;
-    }
+    const pending = pendingGitHubConnectRef.current;
+    if (!pending) return;
     if (hostedGitHubConnectUserGate(currentUserId, currentUserResolved) === "queue") {
       return;
     }
 
-    const { forceNew, preferredIntegrationId } = pendingGitHubConnectRef.current;
-    pendingGitHubConnectRef.current = false;
-    void connectGitHubWithoutDialog(forceNew, preferredIntegrationId);
+    pendingGitHubConnectRef.current = null;
+    void connectGitHubWithoutDialog(pending.forceNew, pending.preferredIntegrationId).then(pending.resolve);
   }, [connectGitHubWithoutDialog, currentUserId, currentUserResolved]);
 
   return connectGitHubWithoutDialog;

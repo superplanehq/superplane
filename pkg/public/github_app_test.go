@@ -42,9 +42,34 @@ func Test__HandleGitHubAppSetup_ownerApprovedInstallWithoutState(t *testing.T) {
 	assert.Equal(t, "/github/approved", rec.Header().Get("Location"))
 }
 
+func Test__HandleGitHubAppSetup_updateWithoutStateReturnsToApp(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/github/app/setup?installation_id=159131070&setup_action=update",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+
+	server.HandleGitHubAppSetup(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/", rec.Header().Get("Location"))
+}
+
 func Test__HandleGitHubAppSetup_installWithoutInstallationIDStaysMissingState(t *testing.T) {
 	server := &Server{}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?setup_action=install", nil)
+	rec := httptest.NewRecorder()
+
+	server.HandleGitHubAppSetup(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func Test__HandleGitHubAppSetup_updateWithoutInstallationIDStaysMissingState(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?setup_action=update", nil)
 	rec := httptest.NewRecorder()
 
 	server.HandleGitHubAppSetup(rec, req)

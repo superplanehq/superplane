@@ -102,6 +102,22 @@ func Test__GitHubAppSetup_ownerApprovedWithoutSession(t *testing.T) {
 	assert.Equal(t, "/github/approved", rec.Header().Get("Location"))
 }
 
+func Test__GitHubAppSetup_updateWithoutSessionReturnsToApp(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _ := setupTestServer(r, t)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		server.BasePath+"/github/app/setup?installation_id=159131070&setup_action=update",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/", rec.Header().Get("Location"))
+}
+
 func Test__GetAccount(t *testing.T) {
 	r := support.Setup(t)
 	server, _, token := setupTestServer(r, t)
@@ -240,7 +256,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
 		require.Error(t, err)
-		assert.Equal(t, "signup must be started from the signup page", err.Error())
+		assert.Equal(t, authentication.SignupDisabledError, err.Error())
 		assert.Nil(t, resultAccount)
 	})
 

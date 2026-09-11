@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/e2e/queries"
 )
 
@@ -56,6 +57,7 @@ func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeo
 func (s *TestSession) Start() {
 	s.resetDatabase()
 	s.setupUserAndOrganization()
+	middleware.MarkOwnerSetupCompleted()
 }
 
 // StartWithoutUser resets the database but does not seed any user or
@@ -136,7 +138,7 @@ func (s *TestSession) resetDatabase() {
             SELECT tablename
             FROM pg_tables
             WHERE schemaname = 'public'
-              AND tablename NOT IN ('schema_migrations')
+              AND tablename NOT IN ('schema_migrations', 'usage_price_books', 'usage_price_book_rates')
         ) LOOP
             EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP;

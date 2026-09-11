@@ -127,9 +127,17 @@ func CreateFactoryIntake(
 	}
 
 	// An intake works without a first batch, so a source that cannot be read
-	// now costs the head start and nothing more.
-	if err := SeedIntake(ctx, deps, db, canvasID, source, binding); err != nil {
-		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, err)
+	// now costs the head start and nothing more. Persist the result so clients
+	// can distinguish an empty source from an import that did not run.
+	seedResult, seedErr := SeedIntake(ctx, deps, db, canvasID, source, binding)
+	if err := recordInitialImport(db, intake, seedResult, seedErr); err != nil {
+		// The intake, canvas, and seed events already exist. Returning an error
+		// would invite a retry that creates a duplicate intake and emits the
+		// same events again.
+		log.Errorf("factory %s: intake %s initial import result was not recorded: %v", factory.ID, intake.ID, err)
+	}
+	if seedErr != nil {
+		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, seedErr)
 	}
 
 	intake, err = factory.FindIntake(db, intake.ID)
@@ -145,6 +153,21 @@ func CreateFactoryIntake(
 	return &pb.CreateFactoryIntakeResponse{
 		Intake: serializeFactoryIntake(intake, spec[canvasID]),
 	}, nil
+}
+
+func recordInitialImport(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	seedResult intakeSeedResult,
+	seedErr error,
+) error {
+	if seedErr != nil {
+		return intake.FailInitialImport(tx)
+	}
+	if seedResult.skipped {
+		return intake.SkipInitialImport(tx)
+	}
+	return intake.CompleteInitialImport(tx, seedResult.itemCount)
 }
 
 // intakeCanvasRequest describes the graph to generate for a new intake.

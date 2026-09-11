@@ -1,4 +1,5 @@
 import { useAccount } from "@/contexts/useAccount";
+import { integrationKeys } from "@/hooks/useIntegrations";
 import { meKeys } from "@/hooks/useMe";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -15,6 +16,12 @@ function isWorkspaceResolutionQuery(queryKey: readonly unknown[], organizationSl
   return queryKey[0] === "factories" && queryKey[1] === organizationSlug && queryKey.length <= 3;
 }
 
+function remapQueries(queryClient: QueryClient, currentPrefix: QueryKey, nextPrefix: QueryKey): [QueryKey, unknown][] {
+  return queryClient
+    .getQueriesData({ queryKey: currentPrefix })
+    .map(([queryKey, data]) => [[...nextPrefix, ...queryKey.slice(currentPrefix.length)], data]);
+}
+
 function workspaceResolutionQueries(
   queryClient: QueryClient,
   currentSlug: string,
@@ -25,6 +32,9 @@ function workspaceResolutionQueries(
   });
   const currentUser = queryClient.getQueryData(meKeys.me(currentSlug));
   if (currentUser !== undefined) queries.push([meKeys.me(nextSlug), currentUser]);
+  queries.push(
+    ...remapQueries(queryClient, integrationKeys.connected(currentSlug), integrationKeys.connected(nextSlug)),
+  );
   return queries;
 }
 
@@ -49,9 +59,9 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
 
   // A new organization can receive the slug of an earlier onboarding
   // organization that was later renamed. Clear that organization's cached
-  // data, but retain the seeded factory data and current permissions. These
-  // queries keep the repository step mounted while the new slug resolves;
-  // all other organization data must load again.
+  // data, but retain the seeded factory data, current permissions, and active
+  // integration data. These queries keep the repository step mounted while
+  // the new slug resolves; all other organization data must load again.
   const adoptWorkspace = useCallback(
     (provisioned: ProvisionedWorkspace) => {
       if (workspaceRef.current?.organizationSlug !== provisioned.organizationSlug) {

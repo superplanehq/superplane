@@ -87,43 +87,26 @@ func TestMagicCodeLogin(t *testing.T) {
 		steps.assertMagicCodeFormVisible()
 	})
 
-	t.Run("new user on login sees create prompt then receives a code", func(t *testing.T) {
+	t.Run("new user on login receives a code and creates an account", func(t *testing.T) {
 		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		email := support.RandomName("magic") + "@superplane.local"
 		steps.enterEmailAndRequestCode(email)
-		steps.assertEmailSignupPromptVisible()
-		steps.assertMagicCodeCount(email, 0)
-		steps.assertSignupRequiredErrorHidden()
-		steps.clickCreateAccount()
 		steps.assertCodeStepVisible()
 		steps.assertMagicCodeCount(email, 1)
 		steps.insertKnownMagicCode(email, "222222")
-		steps.enterCodeAndCreate("222222")
+		steps.enterCodeAndSubmit("222222")
 		steps.assertAccountCreated(email)
 	})
 
-	t.Run("use a different account on email prompt returns to the email form", func(t *testing.T) {
-		steps := &magicCodeSteps{t: t}
-		steps.start()
-		steps.visitLoginPage()
-		email := support.RandomName("magic") + "@superplane.local"
-		steps.enterEmailAndRequestCode(email)
-		steps.assertEmailSignupPromptVisible()
-		steps.clickUseADifferentAccount()
-		steps.assertMagicCodeFormVisible()
-		steps.assertMagicCodeCount(email, 0)
-	})
-
-	t.Run("new user on signup receives a code without the create prompt", func(t *testing.T) {
+	t.Run("new user on signup receives a code", func(t *testing.T) {
 		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitSignupPage()
 		email := support.RandomName("magic") + "@superplane.local"
 		steps.enterEmailAndRequestCode(email)
 		steps.assertCodeStepVisible()
-		steps.assertSignupRequiredErrorHidden()
 		steps.assertMagicCodeCount(email, 1)
 	})
 }
@@ -188,40 +171,10 @@ func (s *magicCodeSteps) enterCodeAndSubmit(code string) {
 	s.session.Sleep(1500)
 }
 
-func (s *magicCodeSteps) enterCodeAndCreate(code string) {
-	s.session.FillIn(q.Locator(`input[name="code"]`), code)
-	s.session.Click(q.Text("Create account"))
-	s.session.Sleep(1500)
-}
-
-func (s *magicCodeSteps) assertEmailSignupPromptVisible() {
-	s.session.AssertVisible(q.Text("No account found"))
-	s.session.AssertVisible(q.Text("This email does not have a SuperPlane account."))
-	s.session.AssertVisible(q.Text("Create an account to continue."))
-	s.session.AssertVisible(q.Text("Create account"))
-	s.session.AssertVisible(q.Text("Use a different account"))
-}
-
-func (s *magicCodeSteps) clickCreateAccount() {
-	s.session.Click(q.Text("Create account"))
-	s.session.Sleep(500)
-}
-
-func (s *magicCodeSteps) clickUseADifferentAccount() {
-	s.session.Click(q.Text("Use a different account"))
-	s.session.Sleep(300)
-}
-
 func (s *magicCodeSteps) assertMagicCodeCount(email string, expected int64) {
 	count, err := models.CountRecentMagicCodes(strings.ToLower(strings.TrimSpace(email)), time.Now().Add(-time.Hour))
 	require.NoError(s.t, err)
 	assert.Equal(s.t, expected, count)
-}
-
-func (s *magicCodeSteps) assertSignupRequiredErrorHidden() {
-	content, err := s.session.Page().Content()
-	require.NoError(s.t, err)
-	assert.NotContains(s.t, content, "signup must be started from the signup page")
 }
 
 func (s *magicCodeSteps) assertRedirectedToOrganization() {
