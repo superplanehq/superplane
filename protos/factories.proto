@@ -1427,6 +1427,9 @@ message WorkOrder {
   // Ready files for this task. Present on DescribeWorkOrder only.
   // The stored description uses sp-file:// refs, not download URLs.
   repeated Superplane.Files.File files = 18;
+  // Canvas run that created this task, when Create Task produced it.
+  // Empty for tasks opened in the UI or imported without a source run.
+  string source_run_id = 19;
 }
 
 message WorkOrderOrigin {
