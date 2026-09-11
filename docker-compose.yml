@@ -67,7 +67,7 @@ services:
       RUNNER_TRANSPORT: http
       RUNNER_SHELL_USE_PIPE: "1"
       RUNNER_RESET_TASK_HOME: "1"
-      RUNNER_ID: local-1
+      # Leave RUNNER_ID unset so each scaled replica uses its container hostname.
       BROKER_AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
