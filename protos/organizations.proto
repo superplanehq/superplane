@@ -277,6 +277,30 @@ service Organizations {
     };
   }
 
+  rpc CancelOrganizationSubscription(CancelOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel organization subscription";
+      description: "Cancels the Polar Business subscription at the end of the current period";
+      tags: "Organization";
+    };
+  }
+
+  rpc ResumeOrganizationSubscription(ResumeOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/resume"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume organization subscription";
+      description: "Clears a scheduled Polar Business cancellation so the subscription renews";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -779,6 +803,7 @@ message DescribeOrganizationBillingResponse {
   bool has_billing_customer = 13;
   int64 welcome_remaining_cents = 14;
   int64 admin_remaining_cents = 15;
+  bool cancel_at_period_end = 16;
 }
 
 message CreateBusinessCheckoutRequest {
@@ -790,6 +815,14 @@ message CreateBusinessCheckoutResponse {
 }
 
 message SyncOrganizationBillingRequest {
+  string id = 1;
+}
+
+message CancelOrganizationSubscriptionRequest {
+  string id = 1;
+}
+
+message ResumeOrganizationSubscriptionRequest {
   string id = 1;
 }
 

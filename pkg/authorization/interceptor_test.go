@@ -409,6 +409,24 @@ func TestSyncOrganizationBillingUsesOrgRead(t *testing.T) {
 	assert.Equal(t, "read", rule.Action)
 }
 
+func TestCancelOrganizationSubscriptionUsesOrgUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/billing/cancel"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+}
+
+func TestResumeOrganizationSubscriptionUsesOrgUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/billing/resume"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+}
+
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

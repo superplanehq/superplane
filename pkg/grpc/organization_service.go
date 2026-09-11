@@ -196,6 +196,22 @@ func (s *OrganizationService) SyncOrganizationBilling(
 	return organizations.SyncOrganizationBilling(ctx, orgID, req)
 }
 
+func (s *OrganizationService) CancelOrganizationSubscription(
+	ctx context.Context,
+	req *pb.CancelOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.CancelOrganizationSubscription(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ResumeOrganizationSubscription(
+	ctx context.Context,
+	req *pb.ResumeOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ResumeOrganizationSubscription(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {

@@ -58,6 +58,7 @@ func ResetOrganizationBillingTrial(tx *gorm.DB, orgID uuid.UUID) error {
 			plan_source = ?,
 			polar_subscription_id = NULL,
 			polar_subscription_status = '',
+			cancel_at_period_end = FALSE,
 			current_period_start = NULL,
 			current_period_end = NULL,
 			trial_started_at = ?,
