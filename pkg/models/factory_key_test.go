@@ -104,14 +104,13 @@ func TestFindFactoryByRef(t *testing.T) {
 		assert.Equal(t, factory.ID, found.ID)
 	})
 
-	t.Run("finds by name case-insensitively", func(t *testing.T) {
-		found, err := models.FindFactoryByRef(db, r.Organization.ID, "superplane")
-		require.NoError(t, err)
-		assert.Equal(t, factory.ID, found.ID)
+	t.Run("rejects a workspace name", func(t *testing.T) {
+		_, err := models.FindFactoryByRef(db, r.Organization.ID, "SuperPlane")
+		assert.ErrorIs(t, err, models.ErrFactoryKeyInvalid)
 	})
 
-	t.Run("returns not found for unknown ref", func(t *testing.T) {
-		_, err := models.FindFactoryByRef(db, r.Organization.ID, "missing")
+	t.Run("returns not found for unknown key", func(t *testing.T) {
+		_, err := models.FindFactoryByRef(db, r.Organization.ID, "ZZZZ")
 		assert.ErrorIs(t, err, models.ErrFactoryNotFound)
 	})
 }

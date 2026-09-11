@@ -29,7 +29,7 @@ func errWorkspaceRequired() error {
 func FindWorkspaceID(ctx core.CommandContext, nameOrID string) (string, error) {
 	trimmed := strings.TrimSpace(nameOrID)
 	if trimmed == "" {
-		return "", fmt.Errorf("workspace name, key, or id is required")
+		return "", fmt.Errorf("workspace key or id is required")
 	}
 	if _, err := uuid.Parse(trimmed); err == nil {
 		return trimmed, nil

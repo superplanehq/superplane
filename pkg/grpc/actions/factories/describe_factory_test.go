@@ -7,14 +7,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
+
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/gorm"
 )
 
-func Test__DescribeFactory_AcceptsKeyAndName(t *testing.T) {
+func Test__DescribeFactory_AcceptsKey(t *testing.T) {
 	r := support.Setup(t)
 	ctx := t.Context()
 	db := database.DB(ctx)
@@ -28,10 +31,10 @@ func Test__DescribeFactory_AcceptsKeyAndName(t *testing.T) {
 		assert.Equal(t, factoryModel.ID.String(), resp.Factory.GetId())
 	})
 
-	t.Run("describes by workspace name", func(t *testing.T) {
-		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), "superplane")
-		require.NoError(t, err)
-		assert.Equal(t, factoryModel.ID.String(), resp.Factory.GetId())
+	t.Run("rejects a workspace name", func(t *testing.T) {
+		_, err := DescribeFactory(ctx, r.Organization.ID.String(), "SuperPlane")
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 }
 

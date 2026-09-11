@@ -46,13 +46,6 @@ func TestFindWorkspaceID(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, workspaceID, got)
 	})
-
-	t.Run("resolves workspace name through the API", func(t *testing.T) {
-		ctx, _ := cli.NewCommandContext(t, newDescribeServer(t, "/api/v1/factories/SuperPlane"), "text")
-		got, err := FindWorkspaceID(ctx, "SuperPlane")
-		require.NoError(t, err)
-		assert.Equal(t, workspaceID, got)
-	})
 }
 
 func TestResolveWorkspaceID(t *testing.T) {

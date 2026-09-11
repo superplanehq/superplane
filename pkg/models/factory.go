@@ -241,9 +241,8 @@ func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Facto
 }
 
 // FindFactoryByRef resolves ref to a factory. ref is tried as a UUID first,
-// then as a workspace key, then as a workspace name. Callers that receive a
-// factory identifier from a client path or flag go through this helper so
-// UUID, key, and name URLs keep working against the same UUID-keyed data.
+// then as a workspace key. Workspace names are not accepted: they can
+// contain spaces and do not belong in `/factories/{id}` paths.
 func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Factory, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
@@ -253,36 +252,7 @@ func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Facto
 		return FindFactory(tx, organizationID, id)
 	}
 
-	normalizedKey := NormalizeFactoryKey(trimmed)
-	if ValidateFactoryKey(normalizedKey) == nil {
-		factory, err := FindFactoryByKey(tx, organizationID, normalizedKey)
-		if err == nil || !errors.Is(err, ErrFactoryNotFound) {
-			return factory, err
-		}
-	}
-
-	return FindFactoryByName(tx, organizationID, trimmed)
-}
-
-func FindFactoryByName(tx *gorm.DB, organizationID uuid.UUID, name string) (*Factory, error) {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return nil, ErrFactoryNotFound
-	}
-
-	var factory Factory
-	err := tx.
-		Where("organization_id = ? AND LOWER(name) = LOWER(?)", organizationID, trimmed).
-		First(&factory).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryNotFound
-		}
-		return nil, err
-	}
-
-	return &factory, nil
+	return FindFactoryByKey(tx, organizationID, trimmed)
 }
 
 func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
