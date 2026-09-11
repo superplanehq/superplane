@@ -1,20 +1,27 @@
 import type { ReactNode } from "react";
 
-import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
 import { WorkOrderIntentDocument, type IntentAnalysisChat } from "./WorkOrderIntentDocument";
+import type { SplitRunSource } from "./splitRunSource";
+import { WorkOrderSplitRunOverviewSidebar } from "./WorkOrderSplitRunOverviewSidebar";
 
 /**
- * Description tab: original request as a chat and the generated plan.
+ * Description tab. Drafts keep analysis chat on the left. After Start,
+ * the left pane shows source, artifacts, and pull requests.
  */
 export function WorkOrderSplitRunOverview({
   title,
   description,
   artifacts,
+  artifactsLoading = false,
+  pullRequests = [],
+  pullRequestsLoading = false,
+  pullRequestsError = null,
   checks,
   isAnalyzing = false,
   organizationId,
@@ -24,10 +31,16 @@ export function WorkOrderSplitRunOverview({
   files,
   resultFooter,
   analysis,
+  source,
+  showContextSidebar = false,
 }: {
   title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
+  artifactsLoading?: boolean;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  pullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   checks: WorkOrderCheckPresentation[];
   isAnalyzing?: boolean;
   organizationId?: string;
@@ -37,6 +50,8 @@ export function WorkOrderSplitRunOverview({
   files?: FilesFile[];
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
+  source?: SplitRunSource;
+  showContextSidebar?: boolean;
 }) {
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
   const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
@@ -72,8 +87,18 @@ export function WorkOrderSplitRunOverview({
           ) : null
         }
         resultFooter={resultFooter}
-        analysis={
-          analysis && organizationId ? { ...analysis, organizationId } : analysis
+        analysis={analysis && organizationId ? { ...analysis, organizationId } : analysis}
+        contextSidebar={
+          showContextSidebar ? (
+            <WorkOrderSplitRunOverviewSidebar
+              source={source}
+              artifacts={artifacts}
+              artifactsLoading={artifactsLoading}
+              pullRequests={pullRequests}
+              pullRequestsLoading={pullRequestsLoading}
+              pullRequestsError={pullRequestsError}
+            />
+          ) : undefined
         }
       />
     </div>

@@ -102,6 +102,34 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
   });
 
+  it("puts source context and confidence on the left after Start", () => {
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        confidence={{
+          id: "check-confidence",
+          name: CONFIDENCE_CHECK_NAME,
+          score: 4,
+          maxScore: 5,
+          level: "positive",
+          summary: confidenceSuitabilitySummary("High"),
+        }}
+        contextSidebar={<aside data-testid="split-run-overview-sidebar">Source</aside>}
+      />,
+    );
+
+    const request = screen.getByTestId("split-run-intent-request");
+    const result = screen.getByTestId("split-run-intent-result");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toHaveTextContent("Source");
+    expect(within(request).getByTestId("split-run-overview-checks")).toHaveTextContent(CONFIDENCE_CHECK_NAME);
+    expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
+  });
+
   it("keeps a decision note on the plan pane", () => {
     renderDocument(
       <WorkOrderIntentDocument

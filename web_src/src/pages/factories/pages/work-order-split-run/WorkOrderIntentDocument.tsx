@@ -27,8 +27,9 @@ import { useFollowLogScroll } from "./useFollowLogScroll";
 const SESSION_TITLE_FALLBACK = "Task";
 
 /**
- * Description-tab reading pane: original request plus live analysis chat
- * on the left, generated summary or plan and sticky confidence on the right.
+ * Description-tab reading pane. Drafts keep analysis chat on the left and
+ * the plan plus confidence on the right. After Start, the left pane shows
+ * source context and confidence. The plan stays on the right.
  */
 export type IntentAnalysisChat = {
   organizationId: string;
@@ -51,6 +52,7 @@ export function WorkOrderIntentDocument({
   resultAfterBody,
   resultFooter,
   analysis,
+  contextSidebar,
 }: {
   title: string;
   description: string;
@@ -61,6 +63,7 @@ export function WorkOrderIntentDocument({
   resultAfterBody?: ReactNode;
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
+  contextSidebar?: ReactNode;
 }) {
   const [showPlan, setShowPlan] = useState(false);
   const split = useSplitRunPanePercent({ defaultPercent: DEFAULT_INTENT_LEFT_PERCENT, minPercent: 28, maxPercent: 68 });
@@ -76,7 +79,12 @@ export function WorkOrderIntentDocument({
           style={{ ["--intent-left" as string]: `${split.percent}%` }}
           data-testid="split-run-intent-request"
         >
-          {analysis ? (
+          {contextSidebar ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-hidden">{contextSidebar}</div>
+              <IntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+            </div>
+          ) : analysis ? (
             <AnalysisRequestChat title={sessionTitle} description={description} files={files} analysis={analysis} />
           ) : (
             <>
@@ -120,7 +128,7 @@ export function WorkOrderIntentDocument({
             />
             {resultAfterBody}
           </div>
-          <IntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+          {contextSidebar ? null : <IntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />}
           {resultFooter}
         </div>
       </div>

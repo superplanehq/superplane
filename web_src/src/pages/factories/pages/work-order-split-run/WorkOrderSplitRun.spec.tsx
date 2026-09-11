@@ -748,6 +748,21 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
+  it("replaces chat with source, artifacts, and pull requests after Start", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER) });
+
+    const request = screen.getByTestId("split-run-intent-request");
+    const result = screen.getByTestId("split-run-intent-result");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(request).getByTestId("split-run-overview-checks")).toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(within(request).queryByTestId("split-run-intent-chat")).toBeNull();
+    expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
+  });
+
   it("hides source, artifacts, and pull requests on the description tab", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
@@ -885,8 +900,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
 
-    expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument();
+    const request = screen.getByTestId("split-run-intent-request");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(request).getByTestId("split-run-overview-checks")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-overview-checks")).toBeNull();
   });
 
   it("explains a rejected result without Reopen", () => {
@@ -907,8 +927,7 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false }),
     });
 
-    expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "closure.md" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();

@@ -392,7 +392,7 @@ export function WorkOrderSplitRunPopup({
       <SplitRunPopupTabs
         fixture={fixture}
         edits={edits}
-        artifacts={popupData.artifacts}
+        popupData={popupData}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
@@ -445,7 +445,7 @@ function returnToBacklogAction(
 function SplitRunPopupTabs({
   fixture,
   edits,
-  artifacts,
+  popupData,
   organizationId,
   factoryId,
   factoryKey,
@@ -461,7 +461,7 @@ function SplitRunPopupTabs({
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
-  artifacts: ReturnType<typeof useSplitRunPopupData>["artifacts"];
+  popupData: ReturnType<typeof useSplitRunPopupData>;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -510,7 +510,11 @@ function SplitRunPopupTabs({
         <WorkOrderSplitRunOverview
           title={edits.title}
           description={edits.description}
-          artifacts={artifacts}
+          artifacts={popupData.artifacts}
+          artifactsLoading={popupData.artifactsLoading}
+          pullRequests={popupData.pullRequests}
+          pullRequestsLoading={popupData.pullRequestsLoading}
+          pullRequestsError={popupData.pullRequestsError}
           checks={fixture.checks}
           isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
           organizationId={organizationId}
@@ -520,6 +524,8 @@ function SplitRunPopupTabs({
           expandFirstCheck={fixture.footer.kind === "draft"}
           resultFooter={resultFooter}
           analysis={analysis}
+          source={fixture.source}
+          showContextSidebar={fixture.footer.kind !== "draft"}
         />
       </TabsContent>
       <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
