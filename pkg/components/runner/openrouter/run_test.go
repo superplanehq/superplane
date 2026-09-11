@@ -83,6 +83,16 @@ func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
 	require.Equal(t, 2, len(command))
 	assert.Equal(t, "node", command[0])
 	assert.Equal(t, "/task/planning_session_mcp.js", command[1])
+	assert.Nil(t, config["instructions"])
+}
+
+func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
+	})
+	instructions, _ := config["instructions"].([]any)
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
 }
 
 func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {

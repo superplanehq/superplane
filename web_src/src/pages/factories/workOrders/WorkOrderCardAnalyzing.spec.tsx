@@ -21,7 +21,7 @@ const order: FactoriesWorkOrder = {
   assignees: [],
 };
 
-function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number }) {
+function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; hasAgentQuestion?: boolean }) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -69,5 +69,36 @@ describe("Confidence score on a backlog card", () => {
     renderCard({});
 
     expect(screen.getByTestId("work-order-card-wo-1").className).toContain("hover:bg-slate-100");
+  });
+
+  it("shows Agent question when the analysis waits for an answer", () => {
+    renderCard({ isAnalyzing: true, hasAgentQuestion: true });
+
+    expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
+  });
+
+  it("hides Agent question after the task leaves the backlog", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry({ ...order, state: "STATE_OPEN" }, factory)}
+            organizationId="org-1"
+            factoryKey="RF"
+            factoryLines={[{ id: "line-a", name: "hotfix" }]}
+            canDispatch
+            canAssign
+            dispatchingOrderIds={new Set()}
+            isAssigneesSaving={false}
+            onDispatch={vi.fn().mockResolvedValue(undefined)}
+            onAssigneesSave={vi.fn().mockResolvedValue(undefined)}
+            isAnalyzing
+            hasAgentQuestion
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByTestId("work-order-card-agent-question-wo-1")).not.toBeInTheDocument();
   });
 });

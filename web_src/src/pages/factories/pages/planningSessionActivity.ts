@@ -1,4 +1,3 @@
-import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import type { SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
@@ -12,7 +11,7 @@ export function planningSessionPhase(
 ): SplitRunPhase {
   return {
     id: PLANNING_SESSION_PHASE_ID,
-    name: CREATE_WITH_AGENT_COPY.menu,
+    name: "Planning session",
     status: planningSessionPhaseStatus(view.machineStatus),
     duration: "",
     componentName: PLANNING_AGENT_NAME,

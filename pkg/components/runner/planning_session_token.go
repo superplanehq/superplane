@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -13,13 +14,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
-	PlanningSessionTokenPurpose = "planning_session"
-	EnvSuperplanePlanningID     = "SUPERPLANE_PLANNING_SESSION_ID"
-	EnvSuperplaneBaseURL        = "SUPERPLANE_BASE_URL"
-	EnvSuperplaneRunToken       = "SUPERPLANE_RUN_TOKEN"
+	PlanningSessionTokenPurpose   = "planning_session"
+	EnvSuperplanePlanningID       = "SUPERPLANE_PLANNING_SESSION_ID"
+	EnvSuperplanePlanningAnalysis = "SUPERPLANE_PLANNING_ANALYSIS"
+	EnvSuperplaneBaseURL          = "SUPERPLANE_BASE_URL"
+	EnvSuperplaneRunToken         = "SUPERPLANE_RUN_TOKEN"
 )
 
 type PlanningSessionScope struct {
@@ -101,7 +104,7 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		return environment
 	}
 
-	baseURL := PublicSuperplaneBaseURL(ctx.BaseURL)
+	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
 		if ctx.Logger != nil {
 			ctx.Logger.Warn("skip planning session token: public SuperPlane URL is missing")
@@ -138,10 +141,36 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
 	}
-	return append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
+	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,
 		Value: session.ID.String(),
 	})
+	if IsAnalysisPlanningSession(session, planningSessionCanvasName(database.DB(context.Background()), session)) {
+		environment = append(environment, BrokerEnvironmentVariable{
+			Name:  EnvSuperplanePlanningAnalysis,
+			Value: "1",
+		})
+	}
+	return environment
+}
+
+func IsAnalysisPlanningSession(session *models.FactoryPlanningSession, canvasName string) bool {
+	if session == nil || session.DraftWorkOrderID == nil || *session.DraftWorkOrderID == uuid.Nil {
+		return false
+	}
+	name := strings.TrimSpace(canvasName)
+	return name != "" && name != models.PlanningCanvasName
+}
+
+func planningSessionCanvasName(tx *gorm.DB, session *models.FactoryPlanningSession) string {
+	if session == nil || session.CanvasID == nil {
+		return ""
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, *session.CanvasID)
+	if err != nil {
+		return ""
+	}
+	return canvas.Name
 }
 
 func planningSessionEnvVars(baseURL, token string) []BrokerEnvironmentVariable {
@@ -165,6 +194,47 @@ func PublicSuperplaneBaseURL(fallback string) string {
 		return normalized
 	}
 	return ""
+}
+
+// RunnerSuperplaneBaseURL is the SuperPlane origin the runner process can
+// reach. A local Docker broker talks to the compose app on the host, even
+// when BASE_URL is a public tunnel for GitHub.
+func RunnerSuperplaneBaseURL(fallback string) string {
+	if isLocalTaskBrokerURL(os.Getenv("TASK_BROKER_BASE_URL")) {
+		return localComposeSuperplaneBaseURL(fallback)
+	}
+	return PublicSuperplaneBaseURL(fallback)
+}
+
+func localComposeSuperplaneBaseURL(fallback string) string {
+	for _, candidate := range []string{os.Getenv("BASE_URL"), fallback} {
+		if rewritten := rewriteLoopbackHostForDocker(candidate); rewritten != "" {
+			return rewritten
+		}
+	}
+	port := strings.TrimSpace(os.Getenv("PUBLIC_API_PORT"))
+	if port == "" {
+		port = "8000"
+	}
+	return "http://host.docker.internal:" + port
+}
+
+func rewriteLoopbackHostForDocker(raw string) string {
+	normalized := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if normalized == "" || !isLoopbackBaseURL(normalized) {
+		return ""
+	}
+	parsed, err := url.Parse(normalized)
+	if err != nil {
+		return ""
+	}
+	port := parsed.Port()
+	if port == "" {
+		parsed.Host = "host.docker.internal"
+	} else {
+		parsed.Host = net.JoinHostPort("host.docker.internal", port)
+	}
+	return strings.TrimRight(parsed.String(), "/")
 }
 
 func parsePlanningClaimUUID(claims map[string]interface{}, key string) (uuid.UUID, error) {

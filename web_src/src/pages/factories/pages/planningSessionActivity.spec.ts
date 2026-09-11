@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   PLANNING_SESSION_AGENT_LINE_ID,
   PLANNING_SESSION_PHASE_ID,
@@ -18,7 +17,7 @@ describe("planningSessionPhase", () => {
     });
 
     expect(phase.id).toBe(PLANNING_SESSION_PHASE_ID);
-    expect(phase.name).toBe(CREATE_WITH_AGENT_COPY.menu);
+    expect(phase.name).toBe("Planning session");
     expect(phase.status).toBe("running");
     expect(phase.appId).toBeUndefined();
     expect(phase.stream).toEqual([
