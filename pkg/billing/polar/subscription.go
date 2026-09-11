@@ -27,7 +27,11 @@ func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *Subscriptio
 	if !isSubscriptionEventType(event.Type) {
 		return nil
 	}
-	return ApplySubscription(ctx, tx, event.Data)
+	data := event.Data
+	if data.ModifiedAt.Time.IsZero() && !event.Timestamp.Time.IsZero() {
+		data.ModifiedAt = event.Timestamp
+	}
+	return ApplySubscription(ctx, tx, data)
 }
 
 func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) error {
@@ -64,6 +68,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				PeriodStart:       periodStart,
 				PeriodEnd:         periodEnd,
 				CancelAtPeriodEnd: data.CancelAtPeriodEnd,
+				ModifiedAt:        data.ModifiedAt.TimePtr(),
 			},
 		)
 		if err != nil {

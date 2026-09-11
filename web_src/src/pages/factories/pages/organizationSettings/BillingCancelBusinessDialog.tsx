@@ -1,13 +1,12 @@
+import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alertDialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { BILLING_CANCEL_LABEL, BILLING_KEEP_LABEL, billingCancelBusinessConfirmCopy } from "../../lib/billingPlans";
 
@@ -25,29 +24,49 @@ export function BillingCancelBusinessDialog({
   onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid="billing-cancel-subscription-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Cancel Business?</AlertDialogTitle>
-          <AlertDialogDescription>{billingCancelBusinessConfirmCopy(currentPeriodEnd)}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel data-testid="billing-cancel-subscription-dismiss">{BILLING_KEEP_LABEL}</AlertDialogCancel>
-          <AlertDialogAction
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending && !next) {
+          return;
+        }
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent data-testid="billing-cancel-subscription-dialog">
+        <DialogHeader>
+          <DialogTitle>Cancel Business?</DialogTitle>
+          <DialogDescription>{billingCancelBusinessConfirmCopy(currentPeriodEnd)}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            data-testid="billing-cancel-subscription-dismiss"
+            onClick={() => onOpenChange(false)}
+          >
+            {BILLING_KEEP_LABEL}
+          </Button>
+          <Button
+            type="button"
             disabled={pending}
             data-testid="billing-cancel-subscription-confirm"
-            onClick={(event) => {
-              event.preventDefault();
+            onClick={() => {
               void (async () => {
-                await onConfirm();
-                onOpenChange(false);
+                try {
+                  await onConfirm();
+                  onOpenChange(false);
+                } catch {
+                  // Keep the dialog open so the owner can retry.
+                }
               })();
             }}
           >
             {pending ? "Canceling Business..." : BILLING_CANCEL_LABEL}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -254,6 +254,31 @@ func Test__ResumeOrganizationSubscriptionClearsPeriodEndCancel(t *testing.T) {
 	assert.False(t, plan.CancelAtPeriodEnd)
 }
 
+func Test__ApplySubscriptionIgnoresStaleCancelAfterResume(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	older := periodStart.Add(-time.Minute)
+	newer := periodStart
+
+	resumed := subscriptionEvent(r.Organization.ID, "sub_order", "active", periodStart, periodEnd)
+	resumed.Data.ModifiedAt = polarTime{Time: newer}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, resumed))
+
+	staleCancel := subscriptionEvent(r.Organization.ID, "sub_order", "active", periodStart, periodEnd)
+	staleCancel.Data.CancelAtPeriodEnd = true
+	staleCancel.Data.ModifiedAt = polarTime{Time: older}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, staleCancel))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.False(t, plan.CancelAtPeriodEnd)
+	require.NotNil(t, plan.PolarModifiedAt)
+	assert.True(t, plan.PolarModifiedAt.Equal(newer))
+}
+
 func Test__CancelOrganizationSubscriptionRejectsTrial(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

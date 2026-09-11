@@ -460,6 +460,63 @@ func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
 	assert.True(t, after.IsActiveBusiness())
 }
 
+func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	older := now.Add(-time.Minute)
+	newer := now
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_stale",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &older,
+		},
+	)
+	require.NoError(t, err)
+
+	resumed, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_stale",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &newer,
+		},
+	)
+	require.NoError(t, err)
+	require.False(t, resumed.CancelAtPeriodEnd)
+	require.NotNil(t, resumed.PolarModifiedAt)
+	assert.True(t, resumed.PolarModifiedAt.Equal(newer))
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_stale",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+			ModifiedAt:        &older,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.False(t, after.CancelAtPeriodEnd)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	require.NotNil(t, after.PolarModifiedAt)
+	assert.True(t, after.PolarModifiedAt.Equal(newer))
+}
+
 func Test__ResolveOrganizationBillingPlanLapsesEndedCancelAtPeriodEnd(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

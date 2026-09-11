@@ -109,6 +109,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
       await cancelSubscription.mutateAsync();
     } catch (cancelError) {
       showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
+      throw cancelError;
     }
   }, [cancelSubscription]);
 
@@ -117,6 +118,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
       await resumeSubscription.mutateAsync();
     } catch (keepError) {
       showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
+      throw keepError;
     }
   }, [resumeSubscription]);
 

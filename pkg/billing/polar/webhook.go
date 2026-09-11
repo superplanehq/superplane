@@ -113,14 +113,16 @@ func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*
 }
 
 type SubscriptionWebhookEvent struct {
-	Type string           `json:"type"`
-	Data SubscriptionData `json:"data"`
+	Type      string           `json:"type"`
+	Timestamp polarTime        `json:"timestamp"`
+	Data      SubscriptionData `json:"data"`
 }
 
 type SubscriptionData struct {
 	ID                 string        `json:"id"`
 	Status             string        `json:"status"`
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`
+	ModifiedAt         polarTime     `json:"modified_at"`
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
 	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
 	CustomerID         string        `json:"customer_id"`
@@ -171,6 +173,14 @@ func (p *polarTime) UnmarshalJSON(raw []byte) error {
 	}
 	p.Time = time.Unix(unix, 0).UTC()
 	return nil
+}
+
+func (p polarTime) TimePtr() *time.Time {
+	if p.Time.IsZero() {
+		return nil
+	}
+	parsed := p.Time.UTC()
+	return &parsed
 }
 
 type ParsedWebhook struct {

@@ -47,6 +47,7 @@ type OrganizationBillingPlan struct {
 	PolarSubscriptionID     *string
 	PolarSubscriptionStatus string
 	CancelAtPeriodEnd       bool
+	PolarModifiedAt         *time.Time
 	CurrentPeriodStart      *time.Time
 	CurrentPeriodEnd        *time.Time
 	TrialStartedAt          *time.Time
@@ -61,6 +62,7 @@ type PolarSubscriptionApply struct {
 	PeriodStart       *time.Time
 	PeriodEnd         *time.Time
 	CancelAtPeriodEnd bool
+	ModifiedAt        *time.Time
 }
 
 func (OrganizationBillingPlan) TableName() string {
@@ -221,6 +223,8 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		if existing != nil {
 			next.PolarSubscriptionID = existing.PolarSubscriptionID
 			next.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
+			next.CancelAtPeriodEnd = existing.CancelAtPeriodEnd
+			next.PolarModifiedAt = existing.PolarModifiedAt
 			next.CurrentPeriodStart = existing.CurrentPeriodStart
 			next.CurrentPeriodEnd = existing.CurrentPeriodEnd
 			if planName != BillingPlanTrial {
@@ -238,6 +242,7 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 				"polar_subscription_id",
 				"polar_subscription_status",
 				"cancel_at_period_end",
+				"polar_modified_at",
 				"current_period_start",
 				"current_period_end",
 				"trial_started_at",
@@ -275,11 +280,15 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 	if existing.PlanSource == BillingPlanSourceAdmin {
 		return existing, false, nil
 	}
+	if polarSnapshotIsStale(existing, sub.ModifiedAt) {
+		return existing, false, nil
+	}
 
 	now := time.Now()
 	next := *existing
 	next.PlanSource = BillingPlanSourcePolar
 	next.UpdatedAt = now
+	next.PolarModifiedAt = polarSnapshotModifiedAt(sub.ModifiedAt, now)
 	if strings.TrimSpace(sub.ID) != "" {
 		id := strings.TrimSpace(sub.ID)
 		next.PolarSubscriptionID = &id
@@ -309,6 +318,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			"polar_subscription_id",
 			"polar_subscription_status",
 			"cancel_at_period_end",
+			"polar_modified_at",
 			"current_period_start",
 			"current_period_end",
 			"trial_started_at",
@@ -403,6 +413,22 @@ func polarPaidAccessContinues(plan *OrganizationBillingPlan, now time.Time) bool
 
 func polarScheduledCancelEnded(plan *OrganizationBillingPlan, now time.Time) bool {
 	return plan != nil && plan.CancelAtPeriodEnd && !periodStillOpen(plan.CurrentPeriodEnd, now)
+}
+
+func polarSnapshotIsStale(existing *OrganizationBillingPlan, incoming *time.Time) bool {
+	if existing == nil || existing.PolarModifiedAt == nil || incoming == nil {
+		return false
+	}
+	return incoming.Before(*existing.PolarModifiedAt)
+}
+
+func polarSnapshotModifiedAt(incoming *time.Time, now time.Time) *time.Time {
+	if incoming != nil {
+		at := incoming.UTC()
+		return &at
+	}
+	at := now.UTC()
+	return &at
 }
 
 func (p *OrganizationBillingPlan) shouldLapseEndedPolarBusiness(now time.Time) bool {
