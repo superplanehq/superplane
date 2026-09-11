@@ -10,18 +10,17 @@ import {
 } from "./columnAutomationActivity";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
+import {
+  findBacklogAutomationApp,
+  findClosureAutomationApp,
+  findIssueClosureAutomationApp,
+  type LinePhaseColumn,
+} from "./linePhaseRuns";
 
 export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
 
 export type ColumnAutomationKind =
-  | "intake"
-  | "analysis"
-  | "agent-step"
-  | "custom"
-  | "pr-discussion"
-  | "pr-checks"
-  | "pr-closure";
+  "intake" | "analysis" | "agent-step" | "custom" | "pr-discussion" | "pr-checks" | "pr-closure" | "issue-closure";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -67,6 +66,7 @@ const ANALYSIS_CATALOG_ID = "analysis";
 const AGENT_STEP_CATALOG_ID = "agent-step";
 const CUSTOM_CATALOG_ID = "custom";
 const PR_CLOSURE_CATALOG_ID = "pr-closure";
+const ISSUE_CLOSURE_CATALOG_ID = "issue-closure";
 
 const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -111,6 +111,18 @@ const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   description: "Complete the task when the pull request merges or closes.",
   trigger: "On pull request merged or closed",
   action: "Complete the task",
+  iconSrc: githubIcon,
+  iconAlt: "GitHub",
+  unique: true,
+};
+
+const ISSUE_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
+  id: ISSUE_CLOSURE_CATALOG_ID,
+  kind: "issue-closure",
+  name: "Issue closure",
+  description: "Close the task when the GitHub issue closes, if the task is still in Backlog.",
+  trigger: "On GitHub issue closed",
+  action: "Close the task",
   iconSrc: githubIcon,
   iconAlt: "GitHub",
   unique: true,
@@ -173,6 +185,7 @@ export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[]
         unique: true,
       })),
       ANALYSIS_ENTRY,
+      ISSUE_CLOSURE_ENTRY,
     ];
   }
   if (key === "verify") {
@@ -218,7 +231,11 @@ function automationsForColumn(
   workOrders: FactoriesWorkOrder[],
 ): ColumnAutomation[] {
   if (key === "backlog") {
-    return [...intakeAutomations(input.intakes ?? [], workOrders), ...analysisAutomation(input.apps ?? [], workOrders)];
+    return [
+      ...intakeAutomations(input.intakes ?? [], workOrders),
+      ...analysisAutomation(input.apps ?? [], workOrders),
+      ...issueClosureAutomation(input.apps ?? [], workOrders),
+    ];
   }
   if (key === "verify") {
     return prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders);
@@ -331,6 +348,31 @@ function prFeedbackAutomations(
     const automation = prFeedbackAutomation(handler, workOrders);
     return automation ? [automation] : [];
   });
+}
+
+function issueClosureAutomation(
+  apps: Array<{ id?: string; name?: string }>,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
+  const app = findIssueClosureAutomationApp(apps);
+  if (!app) {
+    return [];
+  }
+  return [
+    {
+      id: `issue-closure-${app.id}`,
+      kind: "issue-closure",
+      name: app.name,
+      trigger: ISSUE_CLOSURE_ENTRY.trigger,
+      action: ISSUE_CLOSURE_ENTRY.action,
+      iconSrc: githubIcon,
+      iconAlt: "GitHub",
+      health: "healthy",
+      runningCount: runningCountForApp(app.id, workOrders),
+      catalogId: ISSUE_CLOSURE_CATALOG_ID,
+      canvasId: app.id,
+    },
+  ];
 }
 
 function closureAutomation(

@@ -11,6 +11,7 @@ describe("resolveFactoryAppTemplate", () => {
   it.each([
     ["onrun-implement", "line-implementation"],
     ["on-pr-closed", "pr-closure"],
+    ["on-issue-closed", "issue-closure"],
     ["onrun-create-with-agent", "create-with-agent"],
   ])("matches %s to %s", (nodeId, templateId) => {
     expect(resolveFactoryAppTemplate(canvasWith([{ id: nodeId }]))?.id).toBe(templateId);

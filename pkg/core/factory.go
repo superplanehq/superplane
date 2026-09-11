@@ -21,9 +21,9 @@ var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity alre
 
 type FactoryContext interface {
 	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
-	// FindWorkOrder resolves a work order by id or by one of its
-	// artifacts' keys, without requiring the current run to be attached
-	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
+	// FindWorkOrder resolves a work order by id, artifact key, or origin
+	// URL, without requiring the current run to be attached to a
+	// `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
 	// (wrapped) when nothing matches.
 	FindWorkOrder(params FindWorkOrderParams) (*WorkOrder, error)
 	// UpdateWorkOrderStatus reports whether the row actually transitioned
@@ -58,11 +58,13 @@ type WorkOrderParams struct {
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects
 // the lookup strategy: "id" resolves OrderID directly, "artifactKey"
-// resolves the work order that owns the artifact tagged with ArtifactKey.
+// resolves the work order that owns the artifact tagged with ArtifactKey,
+// and "originUrl" resolves the work order created from that origin URL.
 type FindWorkOrderParams struct {
 	By          string
 	OrderID     string
 	ArtifactKey string
+	OriginURL   string
 }
 
 type UpdateWorkOrderStatusParams struct {
@@ -73,6 +75,9 @@ type UpdateWorkOrderStatusParams struct {
 	OrderID string
 	State   string
 	Result  string
+	// IfState, when set, applies the transition only if the work order
+	// is still in that state. A mismatch is a silent no-op.
+	IfState string
 }
 
 type AddWorkOrderCommentParams struct {
