@@ -109,7 +109,7 @@ export const NoPlan: Story = {
   },
 };
 
-/** Tasks list with remaining hosted credit empty. The banner sits above the board. */
+/** Tasks list with remaining trial credit empty. The trial chip sits next to the title. */
 export const Tasks: Story = {
   render: () => {
     window.localStorage.setItem("sp:work-orders:layout", "board");
