@@ -408,7 +408,9 @@ func TestRunPromptAddsUsageAcrossBilledRetries(t *testing.T) {
 		},
 	})
 	assert.Equal(t, 0, result.exitCode)
-	assertResultUsage(t, resultPayload(t, result.resultFile), 15, 11, 0.015)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 15, 11, 0.015)
+	assertTurnUsageSum(t, payload, 15, 11)
 }
 
 func TestRunPromptUsesSessionStoreWhenJsonlMissesStepFinish(t *testing.T) {
@@ -434,7 +436,9 @@ func TestRunPromptUsesSessionStoreWhenJsonlMissesStepFinish(t *testing.T) {
 		}},
 	})
 	assert.Equal(t, 0, result.exitCode)
-	assertResultUsage(t, resultPayload(t, result.resultFile), 40, 12, 0.02)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	assertTurnUsageSum(t, payload, 40, 12)
 }
 
 func TestRunPromptReadsSessionJsonWhenJsonlMissesStepFinish(t *testing.T) {
@@ -451,7 +455,9 @@ func TestRunPromptReadsSessionJsonWhenJsonlMissesStepFinish(t *testing.T) {
 		}},
 	})
 	assert.Equal(t, 0, result.exitCode)
-	assertResultUsage(t, resultPayload(t, result.resultFile), 40, 12, 0.02)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	assertTurnUsageSum(t, payload, 40, 12)
 }
 
 func TestReadSessionUsageSumsStepFinishJsonParts(t *testing.T) {
@@ -1212,6 +1218,36 @@ func assertResultUsage(t *testing.T, payload map[string]any, input, output, cost
 	assert.Equal(t, output, usage["output_tokens"])
 	require.Contains(t, payload, "total_cost_usd")
 	assert.InDelta(t, cost, payload["total_cost_usd"], 1e-9)
+}
+
+func assertTurnUsageSum(t *testing.T, payload map[string]any, input, output float64) {
+	t.Helper()
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok, "result payload must include telemetry")
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok, "telemetry must include turns")
+	var inputSum, outputSum float64
+	for _, raw := range turns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		usage, ok := turn["usage"].(map[string]any)
+		require.True(t, ok)
+		inputSum += usageNumber(usage["input_tokens"])
+		outputSum += usageNumber(usage["output_tokens"])
+	}
+	assert.Equal(t, input, inputSum)
+	assert.Equal(t, output, outputSum)
+}
+
+func usageNumber(value any) float64 {
+	switch n := value.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	default:
+		return 0
+	}
 }
 
 func jsReadSessionUsage(t *testing.T, taskDir string) map[string]any {

@@ -431,9 +431,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   );
   const usage = recorded;
   lastCost = Number(recorded.total_cost_usd) || lastCost;
-  if (tokenTotal(usage) > 0) {
-    telemetry.updateCurrentUsage(usage);
-  }
+  applyRecordedUsageToTelemetry(telemetry, usage);
   const payload = {
     type: "result",
     result: resultTextFrom(lastResult, formatter),
@@ -698,6 +696,31 @@ function preferRecordedUsage(left, right) {
     usage.total_cost_usd = cost;
   }
   return usage;
+}
+
+function telemetryUsageTotal(telemetry) {
+  const snapshot = telemetry && typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  let total = emptyUsage();
+  for (const turn of turns) {
+    total = mergeUsage(total, turn && turn.usage);
+  }
+  return total;
+}
+
+function applyRecordedUsageToTelemetry(telemetry, recorded) {
+  if (!telemetry || tokenTotal(recorded) <= 0) {
+    return;
+  }
+  const live = telemetryUsageTotal(telemetry);
+  const gap = subtractUsage(recorded, live);
+  if (tokenTotal(gap) <= 0 && !(Number(gap.total_cost_usd) > 0)) {
+    return;
+  }
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
+  telemetry.updateCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
 }
 
 function openCodeDataHome(taskDir) {
