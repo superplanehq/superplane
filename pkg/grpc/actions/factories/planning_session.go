@@ -158,9 +158,12 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return nil, err
 	}
 	db := database.DB(ctx)
-	restartAnalysis := session.State == models.PlanningSessionStateEnded && session.IsAnalysisSession(db)
+	restartAnalysis := session.NeedsAnalysisRestart(db)
 	if restartAnalysis {
 		if err := session.Reopen(db); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to send planning session message")
+		}
+		if err := session.DetachAgentRun(db); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to send planning session message")
 		}
 	}

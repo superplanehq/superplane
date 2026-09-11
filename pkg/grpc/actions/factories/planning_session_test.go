@@ -725,6 +725,7 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sent.Session)
 	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
+	assert.Empty(t, sent.Session.CanvasRunId)
 	require.GreaterOrEqual(t, len(sent.Session.Messages), 1)
 	assert.Equal(t, "Keep the existing retry helper.", sent.Session.Messages[len(sent.Session.Messages)-1].Text)
 
@@ -734,6 +735,89 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	payload, ok := events[0].Data.Data().(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+}
+
+func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, finishCanvasRun(db, run, models.CanvasRunResultCancelled))
+	require.Equal(t, models.PlanningSessionStateRunning, session.State)
+
+	before, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
+	require.NoError(t, err)
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Keep the existing retry helper.",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, sent.Session)
+	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
+	assert.Empty(t, sent.Session.CanvasRunId)
+	require.GreaterOrEqual(t, len(sent.Session.Messages), 1)
+	assert.Equal(t, "Keep the existing retry helper.", sent.Session.Messages[len(sent.Session.Messages)-1].Text)
+
+	after, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
+	require.NoError(t, err)
+	require.Greater(t, len(after), len(before))
+	payload, ok := after[0].Data.Data().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+}
+
+func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	before, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
+	require.NoError(t, err)
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Keep the existing retry helper.",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, sent.Session)
+	assert.Equal(t, run.ID.String(), sent.Session.CanvasRunId)
+
+	after, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, len(before), len(after))
 }
 
 func Test__SendPlanningSessionMessage__RejectsEndedPlanningSession(t *testing.T) {
@@ -812,4 +896,18 @@ func createOnWorkOrderCanvas(t *testing.T, r *support.ResourceRegistry, factoryI
 		return tx.Create(&version).Error
 	}))
 	return canvas
+}
+
+func finishCanvasRun(db *gorm.DB, run *models.CanvasRun, result string) error {
+	now := time.Now()
+	run.State = models.CanvasRunStateFinished
+	run.Result = result
+	run.FinishedAt = &now
+	run.UpdatedAt = &now
+	return db.Model(run).Updates(map[string]any{
+		"state":       run.State,
+		"result":      run.Result,
+		"finished_at": run.FinishedAt,
+		"updated_at":  run.UpdatedAt,
+	}).Error
 }

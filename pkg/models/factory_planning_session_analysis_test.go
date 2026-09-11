@@ -47,6 +47,38 @@ func TestFactory_AttachAnalysisSessionReusesEndedSession(t *testing.T) {
 	assert.Equal(t, "The retry lives in billing/retry.ts.", again.Messages[0].Text)
 }
 
+func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-restart")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	assert.False(t, session.NeedsAnalysisRestart(db))
+
+	now := time.Now()
+	require.NoError(t, db.Model(run).Updates(map[string]any{
+		"state":       CanvasRunStateFinished,
+		"result":      CanvasRunResultCancelled,
+		"finished_at": &now,
+		"updated_at":  &now,
+	}).Error)
+	assert.True(t, session.NeedsAnalysisRestart(db))
+
+	require.NoError(t, session.End(db))
+	assert.True(t, session.NeedsAnalysisRestart(db))
+}
+
 func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-continue")
