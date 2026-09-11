@@ -1,7 +1,7 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "project": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.mjs"],
-  "ignoreDependencies": ["monaco-editor", "tippy.js"],
+  "ignoreDependencies": ["tippy.js"],
   "paths": {
     "@factory-templates/*": ["../pkg/grpc/actions/factories/templates/*"]
   },
