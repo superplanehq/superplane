@@ -35,7 +35,7 @@ func (c *activeCommand) setActive(ctx core.CommandContext, nameOrID string) erro
 func (c *activeCommand) printActive(ctx core.CommandContext) error {
 	active := strings.TrimSpace(ctx.Config.GetActiveWorkspace())
 	if active == "" {
-		return fmt.Errorf("no active workspace; pass a name or id, or run interactively")
+		return fmt.Errorf("no active workspace; pass a name, key, or id, or run interactively")
 	}
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(map[string]string{"id": active})

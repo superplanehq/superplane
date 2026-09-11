@@ -21,23 +21,13 @@ func ListWorkOrderArtifacts(
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
-	}
-
 	db := database.DB(ctx)
-	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	factoryModel, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}
 
-	order, err := factoryModel.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factoryModel, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}

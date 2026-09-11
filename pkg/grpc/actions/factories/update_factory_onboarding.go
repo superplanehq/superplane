@@ -21,13 +21,8 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
-	id, err := parseFactoryID(req.GetId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, id)
+	factory, err := findFactory(db, orgID, req.GetId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}

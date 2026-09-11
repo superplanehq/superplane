@@ -30,15 +30,11 @@ func SyncFactoryVelocity(
 		return nil, factoryErrorToStatus(err, "failed to sync factory velocity")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	factory, err := findFactory(database.DB(ctx), orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to sync factory velocity")
 	}
-
-	factory, err := models.FindFactory(database.DB(ctx), orgID, factoryID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to sync factory velocity")
-	}
+	factoryID := factory.ID
 
 	// A workspace with no repository has nothing to read, and the UI explains
 	// that instead of showing progress that never finishes.

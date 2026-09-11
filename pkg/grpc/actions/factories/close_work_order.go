@@ -30,32 +30,23 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to create work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
-
 	result, err := closeWorkOrderResult(req.GetResult())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
 	logger := logging.ForFactory(*factory)
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
+	orderID := order.ID
 
 	logger = logging.WithWorkOrder(logger, *order)
 	fromState := order.State
