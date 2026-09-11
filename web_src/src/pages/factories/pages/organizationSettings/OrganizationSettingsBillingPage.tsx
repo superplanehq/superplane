@@ -84,6 +84,41 @@ export function OrganizationSettingsBillingPage() {
   );
 }
 
+type BillingPageBodyProps = {
+  billingContactMessage?: string;
+  billingEnabled: boolean;
+  businessCheckoutPending: boolean;
+  canManageBilling: boolean;
+  checkoutPending: boolean;
+  creditPurchaseAllowed: boolean;
+  creditRefreshStatus: HostedCreditRefreshStatus;
+  error: unknown;
+  grants: OrganizationsOrganizationCreditGrant[];
+  hasBillingCustomer: boolean;
+  invoices: OrganizationsHostedCreditInvoice[];
+  isLoading: boolean;
+  packs: OrganizationsHostedCreditProduct[];
+  plan?: string;
+  planSource?: string;
+  cancelAtPeriodEnd: boolean;
+  subscriptionPending: boolean;
+  portalPending: boolean;
+  purchased: number;
+  remaining: number;
+  includedRemaining: number;
+  purchasedRemaining: number;
+  welcomeRemaining: number;
+  adminRemaining: number;
+  currentPeriodEnd?: string;
+  trialEndsAt?: string;
+  welcomeCreditExpiresAt?: string;
+  onAddCredit: (productId: string) => void | Promise<void>;
+  onSubscribe: () => void | Promise<void>;
+  onCancelSubscription: () => void | Promise<void>;
+  onKeepSubscription: () => void | Promise<void>;
+  onManageInvoices: () => void | Promise<void>;
+};
+
 function BillingPageBody({
   billingContactMessage,
   billingEnabled,
@@ -117,40 +152,7 @@ function BillingPageBody({
   onCancelSubscription,
   onKeepSubscription,
   onManageInvoices,
-}: {
-  billingContactMessage?: string;
-  billingEnabled: boolean;
-  businessCheckoutPending: boolean;
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  creditPurchaseAllowed: boolean;
-  creditRefreshStatus: HostedCreditRefreshStatus;
-  error: unknown;
-  grants: OrganizationsOrganizationCreditGrant[];
-  hasBillingCustomer: boolean;
-  invoices: OrganizationsHostedCreditInvoice[];
-  isLoading: boolean;
-  packs: OrganizationsHostedCreditProduct[];
-  plan?: string;
-  planSource?: string;
-  cancelAtPeriodEnd: boolean;
-  subscriptionPending: boolean;
-  portalPending: boolean;
-  purchased: number;
-  remaining: number;
-  includedRemaining: number;
-  purchasedRemaining: number;
-  welcomeRemaining: number;
-  adminRemaining: number;
-  currentPeriodEnd?: string;
-  trialEndsAt?: string;
-  welcomeCreditExpiresAt?: string;
-  onAddCredit: (productId: string) => void | Promise<void>;
-  onSubscribe: () => void | Promise<void>;
-  onCancelSubscription: () => void | Promise<void>;
-  onKeepSubscription: () => void | Promise<void>;
-  onManageInvoices: () => void | Promise<void>;
-}) {
+}: BillingPageBodyProps) {
   if (isLoading) {
     return (
       <FactorySettingsCard>
