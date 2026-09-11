@@ -15,9 +15,10 @@ import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/li
 import { cn } from "@/lib/utils";
 
 import {
-  BILLING_SPEND_ORDER_COPY,
+  adminCreditGrantCents,
   billingCreditBucketsView,
   billingCreditRemainingShares,
+  billingSpendOrderCopy,
   type BillingCreditBarShare,
   type BillingCreditBucketKey,
   type BillingCreditBucketView,
@@ -66,6 +67,7 @@ export function OrganizationSettingsBillingPage() {
         includedRemaining={model.includedRemaining}
         purchasedRemaining={model.purchasedRemaining}
         welcomeRemaining={model.welcomeRemaining}
+        adminRemaining={model.adminRemaining}
         currentPeriodEnd={model.currentPeriodEnd}
         trialEndsAt={model.trialEndsAt}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
@@ -98,6 +100,7 @@ function BillingPageBody({
   includedRemaining,
   purchasedRemaining,
   welcomeRemaining,
+  adminRemaining,
   currentPeriodEnd,
   trialEndsAt,
   welcomeCreditExpiresAt,
@@ -125,6 +128,7 @@ function BillingPageBody({
   includedRemaining: number;
   purchasedRemaining: number;
   welcomeRemaining: number;
+  adminRemaining: number;
   currentPeriodEnd?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
@@ -176,6 +180,8 @@ function BillingPageBody({
         trialEndsAt={trialEndsAt}
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
         welcomeRemaining={welcomeRemaining}
+        adminRemaining={adminRemaining}
+        grants={grants}
         onAddCredit={onAddCredit}
       />
       {showInvoices ? (
@@ -185,6 +191,29 @@ function BillingPageBody({
     </>
   );
 }
+
+type HostedCreditRemainingCardProps = {
+  billingContactMessage?: string;
+  billingEnabled: boolean;
+  canManageBilling: boolean;
+  checkoutPending: boolean;
+  creditPurchaseAllowed: boolean;
+  creditRefreshStatus: HostedCreditRefreshStatus;
+  currentPeriodEnd?: string;
+  hasBillingCustomer: boolean;
+  includedRemaining: number;
+  packs: OrganizationsHostedCreditProduct[];
+  plan?: string;
+  purchased: number;
+  purchasedRemaining: number;
+  remaining: number;
+  trialEndsAt?: string;
+  welcomeCreditExpiresAt?: string;
+  welcomeRemaining: number;
+  adminRemaining: number;
+  grants: OrganizationsOrganizationCreditGrant[];
+  onAddCredit: (productId: string) => void | Promise<void>;
+};
 
 function HostedCreditRemainingCard({
   billingContactMessage,
@@ -204,27 +233,10 @@ function HostedCreditRemainingCard({
   trialEndsAt,
   welcomeCreditExpiresAt,
   welcomeRemaining,
+  adminRemaining,
+  grants,
   onAddCredit,
-}: {
-  billingContactMessage?: string;
-  billingEnabled: boolean;
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  creditPurchaseAllowed: boolean;
-  creditRefreshStatus: HostedCreditRefreshStatus;
-  currentPeriodEnd?: string;
-  hasBillingCustomer: boolean;
-  includedRemaining: number;
-  packs: OrganizationsHostedCreditProduct[];
-  plan?: string;
-  purchased: number;
-  purchasedRemaining: number;
-  remaining: number;
-  trialEndsAt?: string;
-  welcomeCreditExpiresAt?: string;
-  welcomeRemaining: number;
-  onAddCredit: (productId: string) => void | Promise<void>;
-}) {
+}: HostedCreditRemainingCardProps) {
   const copy = hostedCreditBillingBalanceCopy({
     remainingCents: remaining,
     purchasedCents: purchased,
@@ -240,6 +252,8 @@ function HostedCreditRemainingCard({
     includedRemainingCents: includedRemaining,
     purchasedRemainingCents: purchasedRemaining,
     purchasedCents: purchased,
+    adminRemainingCents: adminRemaining,
+    adminGrantCents: adminCreditGrantCents(grants),
     plan,
     trialEndsAt,
     welcomeCreditExpiresAt,
@@ -248,6 +262,7 @@ function HostedCreditRemainingCard({
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
   const remainingShares = billingCreditRemainingShares(buckets);
+  const spendOrderCopy = billingSpendOrderCopy(buckets.some((bucket) => bucket.key === "grant"));
 
   return (
     <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
@@ -269,7 +284,7 @@ function HostedCreditRemainingCard({
         <p className="mt-0.5 text-xs text-muted-foreground">{HOSTED_CREDIT_REMAINING_CAPTION}</p>
         <RemainingSharesBar shares={remainingShares} />
         <p className="mt-2 text-xs text-muted-foreground" data-testid="billing-credit-spend-order">
-          {BILLING_SPEND_ORDER_COPY}
+          {spendOrderCopy}
         </p>
       </div>
       <ul className="mt-4 divide-y divide-border">
@@ -378,6 +393,8 @@ function bucketAccentClassName(key: BillingCreditBucketKey) {
       return "bg-foreground";
     case "topup":
       return "bg-sky-500";
+    case "grant":
+      return "bg-emerald-500";
   }
 }
 

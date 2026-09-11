@@ -23,6 +23,7 @@ func Test__AllocateHostedCreditSpendWelcomeBeforeIncludedAndTopup(t *testing.T) 
 	assert.Equal(t, CentsToMicros(3000), spend.WelcomeRemainingMicros)
 	assert.Equal(t, CentsToMicros(5000), spend.IncludedRemainingMicros)
 	assert.Equal(t, CentsToMicros(5000), spend.PurchasedRemainingMicros)
+	assert.Equal(t, int64(0), spend.AdminRemainingMicros)
 }
 
 func Test__AllocateHostedCreditSpendDoesNotCountWelcomeAsIncluded(t *testing.T) {
@@ -90,4 +91,31 @@ func Test__AllocateHostedCreditSpendExpiredWelcomeDoesNotReduceTopup(t *testing.
 	spend := allocateHostedCreditSpend(grants, CentsToMicros(2000), billedBefore, now)
 	assert.Equal(t, CentsToMicros(2500), spend.RemainingMicros)
 	assert.Equal(t, CentsToMicros(2500), spend.PurchasedRemainingMicros)
+}
+
+func Test__AllocateHostedCreditSpendAdminLast(t *testing.T) {
+	now := time.Now()
+	welcomeEnd := now.Add(14 * 24 * time.Hour)
+	includedEnd := now.Add(10 * 24 * time.Hour)
+	topupEnd := now.AddDate(0, 12, 0)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(5000), ExpiresAt: &welcomeEnd, CreatedAt: now},
+		{Kind: LLMCreditGrantKindIncluded, AmountMicros: CentsToMicros(5000), ExpiresAt: &includedEnd, CreatedAt: now},
+		{Kind: LLMCreditGrantKindTopup, AmountMicros: CentsToMicros(104278), ExpiresAt: &topupEnd, CreatedAt: now},
+		{Kind: LLMCreditGrantKindAdmin, AmountMicros: CentsToMicros(11000), CreatedAt: now},
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(0), map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(125278), spend.RemainingMicros)
+	assert.Equal(t, CentsToMicros(5000), spend.WelcomeRemainingMicros)
+	assert.Equal(t, CentsToMicros(5000), spend.IncludedRemainingMicros)
+	assert.Equal(t, CentsToMicros(104278), spend.PurchasedRemainingMicros)
+	assert.Equal(t, CentsToMicros(11000), spend.AdminRemainingMicros)
+
+	spent := allocateHostedCreditSpend(grants, CentsToMicros(124278), map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(1000), spent.RemainingMicros)
+	assert.Equal(t, int64(0), spent.WelcomeRemainingMicros)
+	assert.Equal(t, int64(0), spent.IncludedRemainingMicros)
+	assert.Equal(t, int64(0), spent.PurchasedRemainingMicros)
+	assert.Equal(t, CentsToMicros(1000), spent.AdminRemainingMicros)
 }

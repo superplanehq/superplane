@@ -324,6 +324,7 @@ export interface FactoriesFixture {
     includedRemainingCents?: string;
     purchasedRemainingCents?: string;
     welcomeRemainingCents?: string;
+    adminRemainingCents?: string;
     billingEnabled?: boolean;
     subscriptionCheckoutEnabled?: boolean;
     creditPurchaseAllowed?: boolean;
