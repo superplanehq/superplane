@@ -68,11 +68,12 @@ export function useFactoryAppCanvasPageModel() {
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
+  const setSearchParams = route.setSearchParams;
   const handleSelectRun = useCallback(
     (runId: string | null) => {
-      route.setSearchParams((current) => setFactoryAppSelectedRun(current, runId), { replace: true });
+      setSearchParams((current) => setFactoryAppSelectedRun(current, runId), { replace: true });
     },
-    [route.setSearchParams],
+    [setSearchParams],
   );
   const editActions = useFactoryAppCanvasEditActions({
     organizationId: route.organizationId,
@@ -89,7 +90,7 @@ export function useFactoryAppCanvasPageModel() {
     canvas: route.canvas,
     canUpdateCanvas,
     configureActionsRef,
-    setSearchParams: route.setSearchParams,
+    setSearchParams,
     navigate,
   });
 
