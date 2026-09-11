@@ -1,6 +1,6 @@
 import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 
-export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "low" | "empty";
+export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "low" | "empty" | "lapsed";
 
 /** At or below this remaining balance, paid organizations see a low-credit warning. */
 export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
@@ -26,6 +26,10 @@ export interface HostedCreditBannerInput {
   purchasedCreditCents?: string | number;
   billingEnabled?: boolean;
   welcomeCreditExpiresAt?: string;
+  plan?: string;
+  trialEndsAt?: string;
+  subscriptionCheckoutEnabled?: boolean;
+  creditPurchaseAllowed?: boolean;
   now?: Date;
 }
 
@@ -46,10 +50,16 @@ export function isWelcomeCreditExpired(value: string | undefined, now: Date = ne
 }
 
 export function isHostedCreditTrialOrg(
-  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt">,
+  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt">,
 ): boolean {
+  if (args.plan === "business" || args.plan === "none") {
+    return false;
+  }
+  if (args.plan === "trial") {
+    return true;
+  }
   const purchased = parseWorkOrderMetric(args.purchasedCreditCents);
-  const expiresAt = parseWelcomeCreditExpiresAt(args.welcomeCreditExpiresAt);
+  const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
   return expiresAt != null && purchased === 0;
 }
 
@@ -65,7 +75,7 @@ function hasHadHostedCredit(args: HostedCreditBannerInput, purchased: number): b
 export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCreditBannerKind | null {
   const remaining = parseWorkOrderMetric(args.remainingCreditCents);
   const purchased = parseWorkOrderMetric(args.purchasedCreditCents);
-  const expiresAt = parseWelcomeCreditExpiresAt(args.welcomeCreditExpiresAt);
+  const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
   const now = args.now ?? new Date();
   const isTrialOrg = isHostedCreditTrialOrg(args);
 
@@ -79,11 +89,15 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
     return "trial";
   }
 
+  if (args.plan === "none") {
+    return "lapsed";
+  }
+
   if (remaining > LOW_HOSTED_CREDIT_THRESHOLD_CENTS) {
     return null;
   }
 
-  if (!hasHadHostedCredit(args, purchased)) {
+  if (!hasHadHostedCredit(args, purchased) && args.plan !== "business") {
     return null;
   }
 
@@ -104,23 +118,25 @@ export interface HostedCreditBannerCopy {
   expiryLabel?: string;
   consequenceHint?: string;
   tone: HostedCreditBannerTone;
+  showAction?: boolean;
+  showPricingLink?: boolean;
 }
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-export function welcomeCreditExpirySentence(expiresAt: Date, now: Date = new Date()): string {
+export function trialExpirySentence(expiresAt: Date, now: Date = new Date()): string {
   const ms = expiresAt.getTime() - now.getTime();
   if (ms <= 0) {
-    return "Free hosted credit expired.";
+    return "The trial has ended.";
   }
   if (ms < ONE_DAY_MS) {
-    return "It expires today.";
+    return "The trial ends today.";
   }
   const days = Math.ceil(ms / ONE_DAY_MS);
   if (days === 1) {
-    return "It expires in 1 day.";
+    return "The trial ends in 1 day.";
   }
-  return `It expires in ${days} days.`;
+  return `The trial ends in ${days} days.`;
 }
 
 /** Duration segment in the title chip, e.g. "13 days". */
@@ -181,27 +197,31 @@ export function hostedCreditBannerCopy(args: {
   billingEnabled: boolean;
   remainingCreditCents?: number;
   welcomeCreditExpiresAt?: Date;
+  subscriptionCheckoutEnabled?: boolean;
   now?: Date;
 }): HostedCreditBannerCopy {
   const now = args.now ?? new Date();
   const tone = hostedCreditBannerTone(args.kind, args.welcomeCreditExpiresAt, now, args.remainingCreditCents);
+  const showSubscribe = args.subscriptionCheckoutEnabled !== false && args.billingEnabled;
 
   if (args.kind === "trial") {
     const remaining = formatUsdCents(args.remainingCreditCents ?? 0);
     const expirySentence = args.welcomeCreditExpiresAt
-      ? welcomeCreditExpirySentence(args.welcomeCreditExpiresAt, now)
-      : "It expires in 14 days.";
+      ? trialExpirySentence(args.welcomeCreditExpiresAt, now)
+      : "The trial ends in 14 days.";
     const expiryLabel = args.welcomeCreditExpiresAt
       ? welcomeCreditExpiryLabel(args.welcomeCreditExpiresAt, now)
       : "14 days remaining";
     return withRunsStopHint(
       {
         title: "Trial",
-        description: `You have ${remaining} of free hosted credit. ${expirySentence}`,
+        description: `You have a 14-day Business trial with ${remaining} for machines and managed models. ${expirySentence} Subscribe to keep hosted runs.`,
         remainingLabel: `${remaining} remaining`,
         expiryLabel,
-        actionLabel: "Add credits",
+        actionLabel: "Subscribe",
         tone,
+        showAction: showSubscribe,
+        showPricingLink: true,
       },
       args.remainingCreditCents,
     );
@@ -209,19 +229,34 @@ export function hostedCreditBannerCopy(args: {
 
   if (args.kind === "trial-empty") {
     return {
-      title: "Trial credit is empty",
-      description: "SuperPlane-hosted runs cannot start.",
-      actionLabel: "Add credits",
+      title: "Trial credit is used up",
+      description: "Hosted runs cannot start. Subscribe to Business to continue.",
+      actionLabel: "Subscribe",
       tone,
+      showAction: showSubscribe,
+      showPricingLink: true,
     };
   }
 
   if (args.kind === "trial-expired") {
     return {
       title: "Trial ended",
-      description: "Free hosted credit expired. SuperPlane-hosted runs cannot start.",
-      actionLabel: "Add credits",
+      description: "Hosted runs cannot start. Subscribe to Business to continue.",
+      actionLabel: "Subscribe",
       tone,
+      showAction: showSubscribe,
+      showPricingLink: true,
+    };
+  }
+
+  if (args.kind === "lapsed") {
+    return {
+      title: "Business subscription required",
+      description: "Hosted runs cannot start. Subscribe to Business to continue.",
+      actionLabel: "Subscribe",
+      tone,
+      showAction: showSubscribe,
+      showPricingLink: true,
     };
   }
 
@@ -239,6 +274,7 @@ export function hostedCreditBannerCopy(args: {
           remainingLabel,
           actionLabel: "Add credits",
           tone,
+          showAction: true,
         },
         args.remainingCreditCents,
       );
@@ -250,6 +286,7 @@ export function hostedCreditBannerCopy(args: {
         remainingLabel,
         actionLabel: "Add credits",
         tone,
+        showAction: false,
       },
       args.remainingCreditCents,
     );
@@ -258,9 +295,10 @@ export function hostedCreditBannerCopy(args: {
   if (args.billingEnabled) {
     return {
       title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start.",
+      description: "SuperPlane-hosted runs cannot start. Add hosted credit to continue.",
       actionLabel: "Add credits",
       tone,
+      showAction: true,
     };
   }
 
@@ -269,6 +307,7 @@ export function hostedCreditBannerCopy(args: {
     description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
     actionLabel: "Add credits",
     tone,
+    showAction: false,
   };
 }
 
@@ -293,30 +332,39 @@ export interface HostedCreditBillingBalanceInput {
   hasBillingCustomer: boolean;
   billingEnabled: boolean;
   welcomeCreditExpiresAt?: string;
+  plan?: string;
+  trialEndsAt?: string;
+  creditPurchaseAllowed?: boolean;
   now?: Date;
 }
 
-/** Copy for the Billing remaining-credit card when Polar has no customer. */
+/** Copy for the Billing remaining-credit card. */
 export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceInput): HostedCreditBillingBalanceCopy {
-  if (args.hasBillingCustomer) {
-    return { badge: null, description: null };
-  }
-
   const now = args.now ?? new Date();
   const trial = isHostedCreditTrialOrg({
     purchasedCreditCents: args.purchasedCents,
     welcomeCreditExpiresAt: args.welcomeCreditExpiresAt,
+    plan: args.plan,
+    trialEndsAt: args.trialEndsAt,
   });
-  const expiresAt = parseWelcomeCreditExpiresAt(args.welcomeCreditExpiresAt);
+  const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
   const expired = expiresAt != null && expiresAt.getTime() <= now.getTime();
 
-  if (trial && args.remainingCents > 0 && !expired && expiresAt) {
+  if (args.plan === "business" && args.creditPurchaseAllowed) {
+    return { badge: "Business", description: null };
+  }
+
+  if (trial) {
     return {
       badge: "Trial",
-      description:
-        `This remaining balance is welcome credit. Welcome credit is a free trial grant. ` +
-        `Unused credit expires on ${expiresAt.toLocaleDateString()}. ` +
-        `Purchase hosted credit to keep SuperPlane-hosted runs after the trial.`,
+      description: trialBillingDescription(args.remainingCents, expired, expiresAt),
+    };
+  }
+
+  if (args.plan === "none") {
+    return {
+      badge: null,
+      description: "Hosted runs cannot start. Subscribe to Business to continue.",
     };
   }
 
@@ -324,29 +372,39 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
     return { badge: null, description: null };
   }
 
-  if (trial && expired) {
+  if (args.billingEnabled && args.creditPurchaseAllowed) {
     return {
-      badge: "Trial",
-      description: expiredWelcomeCreditDescription(args.billingEnabled),
+      badge: null,
+      description: "Hosted credit is empty. Add hosted credit to keep SuperPlane-hosted runs.",
     };
   }
 
   return {
-    badge: trial ? "Trial" : null,
+    badge: null,
     description: emptyHostedCreditDescription(args.billingEnabled),
   };
 }
 
-function expiredWelcomeCreditDescription(billingEnabled: boolean): string {
-  if (billingEnabled) {
-    return "Welcome credit expired. SuperPlane-hosted runs cannot start. Click Buy more to purchase hosted credit.";
+function trialBillingDescription(remainingCents: number, expired: boolean, expiresAt: Date | null): string {
+  if (expired) {
+    return "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.";
   }
-  return "Welcome credit expired. SuperPlane-hosted runs cannot start.";
+  if (remainingCents <= 0) {
+    return "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.";
+  }
+  if (expiresAt) {
+    return (
+      `This is trial usage for machines and managed models. ` +
+      `The trial ends on ${expiresAt.toLocaleDateString()}. ` +
+      `Subscribe to Business to keep hosted runs.`
+    );
+  }
+  return "Subscribe to Business to keep hosted runs.";
 }
 
 function emptyHostedCreditDescription(billingEnabled: boolean): string {
   if (billingEnabled) {
-    return "Hosted credit is empty. Click Buy more to purchase hosted credit.";
+    return "Hosted credit is empty. Click Top up to purchase hosted credit.";
   }
   return "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
 }

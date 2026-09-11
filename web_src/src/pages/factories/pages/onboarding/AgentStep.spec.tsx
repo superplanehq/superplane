@@ -48,7 +48,7 @@ describe("AgentStep", () => {
     expect(screen.getByText("SuperPlane-hosted credit")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "This organization has $41.24 of hosted credit. You can continue without connecting your own keys.",
+        "This organization has $41.24 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
       ),
     ).toBeInTheDocument();
   });
@@ -78,7 +78,9 @@ describe("AgentStep", () => {
     });
 
     expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
-    expect(screen.getByText("Hosted credit is empty. Connect a provider to continue.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Trial credit is used up. Subscribe to Business or connect a provider to continue."),
+    ).toBeInTheDocument();
   });
 
   it("connects OpenAI without selecting a single harness", async () => {
