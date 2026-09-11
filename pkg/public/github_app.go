@@ -24,8 +24,8 @@ const githubInstallApprovedPath = "/github/approved"
 // GitHub sends every install to this one Setup URL. The CSRF state finds
 // the pending SuperPlane connection.
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
-	if isGitHubOwnerApprovedSetup(r) {
-		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
+	if path, ok := githubAppSetupRedirectWithoutState(r); ok {
+		http.Redirect(w, r, path, http.StatusFound)
 		return
 	}
 
@@ -38,19 +38,28 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	middleware.AccountAuthMiddleware(s.jwt)(http.HandlerFunc(s.dispatchGitHubAppByState)).ServeHTTP(w, r)
 }
 
-// isGitHubOwnerApprovedSetup is the GitHub admin-approve callback. GitHub
-// sends installation_id and setup_action=install and omits the original
-// CSRF state, so this request cannot find the pending SuperPlane connection.
-func isGitHubOwnerApprovedSetup(r *http.Request) bool {
+// githubAppSetupRedirectWithoutState handles completed setup callbacks that
+// GitHub cannot associate with the original SuperPlane connection. GitHub can
+// omit state after an admin approves an install and after a user updates an
+// existing installation. Do not trust or bind the supplied installation ID;
+// signed webhooks synchronize installation updates independently.
+func githubAppSetupRedirectWithoutState(r *http.Request) (string, bool) {
 	query := r.URL.Query()
 	if query.Get("state") != "" {
-		return false
+		return "", false
 	}
-	if query.Get("setup_action") != "install" {
-		return false
+	if strings.TrimSpace(query.Get("installation_id")) == "" {
+		return "", false
 	}
 
-	return strings.TrimSpace(query.Get("installation_id")) != ""
+	switch query.Get("setup_action") {
+	case "install":
+		return githubInstallApprovedPath, true
+	case "update":
+		return "/", true
+	default:
+		return "", false
+	}
 }
 
 func (s *Server) HandleGitHubAppOAuthCallback(w http.ResponseWriter, r *http.Request) {
