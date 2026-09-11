@@ -3,16 +3,19 @@ package factories
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
@@ -631,4 +634,182 @@ func rewritePlanningCanvasLivePrompt(t *testing.T, canvasID uuid.UUID, prompt st
 	}
 	live.Nodes = datatypes.NewJSONSlice(nodes)
 	return database.DB(t.Context()).Model(live).Select("Nodes").Updates(live).Error
+}
+
+func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:   factoryModel.ID.String(),
+		Repository:  "acme/payments",
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.Error(t, err)
+
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "backlog", "start")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+
+	found, err := FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, session.ID.String(), found.Session.Id)
+	assert.Equal(t, order.ID.String(), found.Session.Draft.WorkOrderId)
+	assert.Empty(t, found.Session.ExecutionId)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, intakeAnalysisNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("run_id", run.ID).Error)
+
+	found, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, execution.ID.String(), found.Session.ExecutionId)
+}
+
+func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
+	require.NoError(t, session.End(db))
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Keep the existing retry helper.",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, sent.Session)
+	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
+	require.GreaterOrEqual(t, len(sent.Session.Messages), 1)
+	assert.Equal(t, "Keep the existing retry helper.", sent.Session.Messages[len(sent.Session.Messages)-1].Text)
+
+	events, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload, ok := events[0].Data.Data().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+}
+
+func Test__SendPlanningSessionMessage__RejectsEndedPlanningSession(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	started, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	_, err = EndPlanningSession(ctx, r.Organization.ID.String(), &pb.EndPlanningSessionRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: started.Session.Id,
+	})
+	require.NoError(t, err)
+
+	_, err = SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: started.Session.Id,
+		Text:      "Add refund retries",
+	})
+	require.Error(t, err)
+}
+
+func createOnWorkOrderCanvas(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID) *models.Canvas {
+	t.Helper()
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           "Backlog",
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     "start",
+			Name:       "On Task",
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factory.OnWorkOrderTriggerName},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{{
+				ID:   "start",
+				Name: "On Task",
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: factory.OnWorkOrderTriggerName}},
+			}}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+	return canvas
 }

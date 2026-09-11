@@ -295,6 +295,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, run.ID, nil
 	}
 
+	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
+		w.logger.WithError(err).Warnf("failed to attach analysis session for run %s", run.ID)
+	}
+
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)

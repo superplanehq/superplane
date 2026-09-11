@@ -22,12 +22,19 @@ func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order); err != nil {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil); err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
 }
 
-func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) error {
+func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
+		return nil
+	}
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID)
+}
+
+func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, onlyCanvas uuid.UUID) error {
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
 		return err
@@ -55,6 +62,9 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
+		if onlyCanvas != uuid.Nil && live[i].ID != onlyCanvas {
+			continue
+		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
 			continue

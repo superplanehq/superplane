@@ -30,12 +30,51 @@ const PLANNING_SYSTEM_PROMPT =
   "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
   "edit or write any files.";
 
+function loadAnalysisProtocolModule() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
+  if (!planningAnalysisEnabled(env)) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
+
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+}
+
+function planningSystemPrompt(env = process.env) {
+  if (planningAnalysisEnabled(env)) {
+    return loadAnalysisProtocol();
+  }
+  return PLANNING_SYSTEM_PROMPT;
 }
 
 function catalogModelId(model) {
@@ -245,6 +284,15 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
+  if (planningAnalysisEnabled(env) && taskDir) {
+    const protocolPath = path.join(taskDir, "analysis_protocol.md");
+    try {
+      fs.writeFileSync(protocolPath, `${loadAnalysisProtocol()}\n`);
+    } catch (_err) {
+      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+    }
+    config.instructions = [protocolPath];
+  }
   return config;
 }
 
@@ -305,17 +353,19 @@ async function runPrompt(promptFile, model, helpers = {}) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
   const planning = planningEnabled(env);
-  if (planning) {
+  if (planning && !planningAnalysisEnabled(env)) {
     println("Planning session tools enabled");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
+    prompt = `${prompt}\n\n${planningSystemPrompt(env)}`;
+  } else if (planning) {
+    println("Planning session tools enabled");
   }
 
   ensureXdgDirs(sp);
