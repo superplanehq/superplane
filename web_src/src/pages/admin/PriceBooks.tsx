@@ -9,38 +9,12 @@ import { BookOpen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatDate } from "./formatDate";
 import { formatCentsPerMillionUsd, formatMatchMode, formatMicrosPerSecondUsdPerMinute } from "./priceBookFormat";
-
-type PriceBookVersion = {
-  version: string;
-  effective_at: string;
-  created_at: string;
-};
-
-type PriceBookModelRate = {
-  match_key: string;
-  match_mode: string;
-  input_cents_per_million: number;
-  output_cents_per_million: number;
-  cache_read_cents_per_million: number;
-  cache_write_cents_per_million: number;
-  reasoning_cents_per_million: number;
-};
-
-type PriceBookVMRate = {
-  match_key: string;
-  match_mode: string;
-  micros_per_second: number;
-};
-
-type PriceBooksResponse = {
-  current_version: string;
-  version: string;
-  effective_at: string;
-  created_at: string;
-  versions: PriceBookVersion[];
-  models: PriceBookModelRate[];
-  vms: PriceBookVMRate[];
-};
+import {
+  fetchPriceBooks,
+  type PriceBookModelRate,
+  type PriceBooksResponse,
+  type PriceBookVMRate,
+} from "./priceBooksApi";
 
 type PriceBooksTab = "models" | "vms";
 
@@ -237,14 +211,7 @@ export function PriceBooks() {
     const generation = ++loadGeneration.current;
 
     try {
-      const path = version ? `/admin/api/price-books?version=${encodeURIComponent(version)}` : "/admin/api/price-books";
-      const response = await fetch(path, { credentials: "include", signal: controller.signal });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text.trim() || "Failed to load price books");
-      }
-
-      const payload: PriceBooksResponse = await response.json();
+      const payload = await fetchPriceBooks(version, controller.signal);
       if (generation !== loadGeneration.current) {
         return;
       }
