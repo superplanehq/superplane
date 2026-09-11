@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 
@@ -53,6 +54,7 @@ func DescribeOrganizationBilling(
 		PurchasedRemainingCents:     pricebook.MicrosToCents(credit.PurchasedRemainingMicros),
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
 		AdminRemainingCents:         pricebook.MicrosToCents(credit.AdminRemainingMicros),
+		CancelAtPeriodEnd:           plan.CancelAtPeriodEnd,
 	}, nil
 }
 
@@ -138,4 +140,51 @@ func businessCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) string
 		origin = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 	}
 	return origin + "/" + organizationID.String() + "/organization/billing?subscribed=1"
+}
+
+func CancelOrganizationSubscription(
+	ctx context.Context,
+	orgID string,
+	req *pb.CancelOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := polar.CancelOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
+		return nil, subscriptionCancelError(err, "failed to cancel Business")
+	}
+	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
+}
+
+func ResumeOrganizationSubscription(
+	ctx context.Context,
+	orgID string,
+	req *pb.ResumeOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
+		return nil, subscriptionCancelError(err, "failed to keep Business")
+	}
+	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
+}
+
+func subscriptionCancelError(err error, fallback string) error {
+	switch {
+	case errors.Is(err, polar.ErrSubscriptionCheckoutDisabled):
+		return grpcerrors.FailedPrecondition(err, "Business checkout is not configured")
+	case errors.Is(err, polar.ErrAdminPlanCannotCancel):
+		return grpcerrors.FailedPrecondition(err, "An admin plan cannot be canceled from Billing.")
+	case errors.Is(err, polar.ErrSubscriptionNotCancelable), polar.IsNotFound(err):
+		return grpcerrors.FailedPrecondition(err, "This organization has no Business subscription to cancel.")
+	case errors.Is(err, polar.ErrSubscriptionAlreadyCanceling):
+		return grpcerrors.FailedPrecondition(err, "Business is already set to end at the period end.")
+	case errors.Is(err, polar.ErrSubscriptionNotCanceling):
+		return grpcerrors.FailedPrecondition(err, "Business is not set to end at the period end.")
+	default:
+		return polarBillingError(err, fallback)
+	}
 }
