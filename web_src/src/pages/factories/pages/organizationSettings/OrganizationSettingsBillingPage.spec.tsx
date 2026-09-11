@@ -128,9 +128,9 @@ describe("OrganizationSettingsBillingPage", () => {
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(balance).toHaveTextContent(
-      "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.",
-    );
+    expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
+    expect(balance).toHaveTextContent(`The trial ends on ${WELCOME_EXPIRY_LABEL}.`);
+    expect(balance).toHaveTextContent("Subscribe to Business to keep hosted runs.");
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
   }, 10000);

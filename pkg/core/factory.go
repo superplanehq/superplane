@@ -131,14 +131,20 @@ type SetWorkOrderStatusNoteParams struct {
 	ShowOnlyWhenWaiting bool
 }
 
+type WorkOrderOrigin struct {
+	URL   string `json:"url"`
+	Label string `json:"label,omitempty"`
+}
+
 type WorkOrder struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	State       string `json:"state"`
-	Result      string `json:"result,omitempty"`
-	Number      int64  `json:"number,omitempty"`
-	Key         string `json:"key,omitempty"`
+	ID          string           `json:"id"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	State       string           `json:"state"`
+	Result      string           `json:"result,omitempty"`
+	Number      int64            `json:"number,omitempty"`
+	Key         string           `json:"key,omitempty"`
+	Origin      *WorkOrderOrigin `json:"origin,omitempty"`
 }
 
 type PullRequest struct {

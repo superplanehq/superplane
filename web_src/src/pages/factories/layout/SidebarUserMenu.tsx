@@ -31,7 +31,7 @@ interface SidebarUserMenuProps {
   userAvatarUrl?: string | null;
   organizationName: string;
   defaultOpen?: boolean;
-  isTrial?: boolean;
+  planLabel?: string;
 }
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -53,7 +53,7 @@ export function SidebarUserMenu({
   userAvatarUrl,
   organizationName,
   defaultOpen = false,
-  isTrial = false,
+  planLabel,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
@@ -105,7 +105,7 @@ export function SidebarUserMenu({
             organizationId={organizationId}
             organizationName={organizationName}
             organizationHref={organizationHref}
-            isTrial={isTrial}
+            planLabel={planLabel}
           />
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -145,12 +145,12 @@ function OrganizationMenuHeader({
   organizationId,
   organizationName,
   organizationHref,
-  isTrial,
+  planLabel,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
-  isTrial: boolean;
+  planLabel?: string;
 }) {
   const navigate = useNavigate();
 
@@ -173,9 +173,9 @@ function OrganizationMenuHeader({
         </DropdownMenuItem>
         <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
       </div>
-      {isTrial ? (
+      {planLabel ? (
         <p className="px-2 text-[11px] text-muted-foreground" data-testid="factories-sidebar-plan-status">
-          Trial
+          {planLabel}
         </p>
       ) : null}
     </div>

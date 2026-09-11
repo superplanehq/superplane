@@ -84,7 +84,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-header-kicker")).not.toBeInTheDocument();
   }, 10000);
 
-  it("shows the banner on Tasks when remaining hosted credit is empty", async () => {
+  it("keeps the trial chip on Tasks when remaining hosted credit is empty", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
@@ -95,16 +95,19 @@ describe("WorkOrdersPage hosted credit banner", () => {
       />,
     );
 
-    const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Trial credit is used up");
-    expect(banner).toHaveTextContent("Hosted runs cannot start.");
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveAttribute("data-kind", "trial");
+    expect(kicker).toHaveTextContent(defaultTrialLabel);
+    expect(kicker).toHaveTextContent("$0.00");
+    expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
   }, 10000);
 
-  it("shows the banner on the production Tasks page when remaining credit is empty", async () => {
+  it("keeps the trial chip on the production Tasks page when remaining credit is empty", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
@@ -116,7 +119,10 @@ describe("WorkOrdersPage hosted credit banner", () => {
       />,
     );
 
-    expect(await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 })).toBeInTheDocument();
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveAttribute("data-kind", "trial");
+    expect(kicker).toHaveTextContent("$0.00");
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
   }, 10000);
 
   it("shows a no-plan chip next to the title when the plan is none", async () => {
