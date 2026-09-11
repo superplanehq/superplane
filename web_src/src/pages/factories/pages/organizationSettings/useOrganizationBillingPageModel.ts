@@ -12,18 +12,15 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
 import {
-  useCancelOrganizationSubscription,
   useOrganizationBilling,
-  useResumeOrganizationSubscription,
+  useOrganizationSubscriptionActions,
   syncOrganizationBilling,
 } from "@/hooks/useOrganizationBilling";
 import { useOrganizationBillingSync } from "@/hooks/useOrganizationBillingSync";
 import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { getApiErrorMessage } from "@/lib/errors";
 import type { HostedCreditRefreshStatus } from "@/lib/hostedCredit";
-import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
 type HostedCreditBillingActions = {
@@ -146,24 +143,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await syncOrganizationBilling(organizationId);
   }, [organizationId]);
 
-  const cancelSubscription = useCancelOrganizationSubscription(organizationId);
-  const resumeSubscription = useResumeOrganizationSubscription(organizationId);
-
-  const onCancelSubscription = useCallback(async () => {
-    try {
-      await cancelSubscription.mutateAsync();
-    } catch (cancelError) {
-      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
-    }
-  }, [cancelSubscription]);
-
-  const onKeepSubscription = useCallback(async () => {
-    try {
-      await resumeSubscription.mutateAsync();
-    } catch (keepError) {
-      showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
-    }
-  }, [resumeSubscription]);
+  const subscription = useOrganizationSubscriptionActions(organizationId);
 
   useOrganizationBillingSync({
     organizationId,
@@ -198,10 +178,10 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     currentPeriodEnd: flags.currentPeriodEnd,
     planSource: flags.planSource,
     cancelAtPeriodEnd: flags.cancelAtPeriodEnd,
-    cancelPending: cancelSubscription.isPending,
-    keepPending: resumeSubscription.isPending,
-    onCancelSubscription,
-    onKeepSubscription,
+    cancelPending: subscription.cancelPending,
+    keepPending: subscription.keepPending,
+    onCancelSubscription: subscription.onCancelSubscription,
+    onKeepSubscription: subscription.onKeepSubscription,
     superplaneGrant: metrics.superplaneGrant,
     welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,
     hasBillingCustomer: metrics.hasBillingCustomer,
