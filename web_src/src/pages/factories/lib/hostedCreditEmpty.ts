@@ -122,6 +122,28 @@ export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind
   return "Trial";
 }
 
+export function organizationPlanLabel(
+  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt"> & {
+    now?: Date;
+  },
+): string | undefined {
+  if (args.plan === "business") {
+    return "Business";
+  }
+  if (args.plan === "none") {
+    return "No plan";
+  }
+  if (!isHostedCreditTrialOrg(args)) {
+    return undefined;
+  }
+  const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
+  const now = args.now ?? new Date();
+  if (expiresAt != null && expiresAt.getTime() <= now.getTime()) {
+    return "Trial ended";
+  }
+  return "Trial";
+}
+
 export type HostedCreditBannerTone = "info" | "warning";
 
 export interface HostedCreditBannerCopy {
