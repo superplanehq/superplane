@@ -127,6 +127,37 @@ func TestExpressionUsesOrderAssignees(t *testing.T) {
 	}
 }
 
+func TestExpressionUsesOrderCreatedBy(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "order assignees", raw: `order().assignees`, want: false},
+		{name: "dot created_by", raw: `order().created_by`, want: true},
+		{name: "bracket created_by", raw: `order()["created_by"]`, want: true},
+		{name: "nested name", raw: `order().created_by.name`, want: true},
+		{name: "nil check", raw: `order().created_by != nil`, want: true},
+		{name: "footer", raw: `task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : ""`, want: true},
+		{name: "task alias", raw: `task().created_by`, want: true},
+		{name: "unrelated", raw: `root().data.work_order`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderCreatedBy(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpressionUsesOrderComments(t *testing.T) {
 	cases := []struct {
 		name string

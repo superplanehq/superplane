@@ -233,7 +233,7 @@ spec:
 
           <hr>
 
-          Created via [SuperPlane](https://superplane.com).
+          Created via [SuperPlane](https://superplane.com){{ task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : "" }}.
         draft: false
         head: '{{ $["Implement From Task Description"].data.result.branch }}'
         repository: '{{ task().repository }}'
@@ -261,7 +261,7 @@ spec:
 
           <hr>
 
-          Created via [SuperPlane](https://superplane.com).
+          Created via [SuperPlane](https://superplane.com){{ task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : "" }}.
       position:
         x: 1724
         'y': 984

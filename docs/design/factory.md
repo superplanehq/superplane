@@ -64,7 +64,9 @@ expression references it (e.g. `len(order().comments)`), returning each
 comment as `{id, body, author, created_at, run}` decoded from the
 `order.comment.added` events. `order().assignees` is a list field loaded
 lazily only when the expression references it, returning each assignee as
-`{id, name, email}`. `root().data.work_order` remains the onRun
+`{id, name, email}`. `order().created_by` is loaded lazily only when the
+expression references it. It is `{id, name}` when a SuperPlane user opened
+the work order, and `nil` when automation opened it. `root().data.work_order` remains the onRun
 snapshot and does not include artifacts or comments.
 
 ## Work order lifecycle
