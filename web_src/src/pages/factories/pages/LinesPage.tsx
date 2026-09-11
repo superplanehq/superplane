@@ -706,11 +706,14 @@ function LineDetail({
   onClosePeek: () => void;
 }) {
   const steps = line.steps ?? [];
+  const peekOrderId = peekOrder?.id ?? null;
   const incomingPlacements = useMemo(
     () => lineBoardCardPlacements(line, workOrders ?? [], apps),
     [apps, line, workOrders],
   );
-  const displayedWorkOrders = useKanbanDisplayedBoard(workOrders ?? [], incomingPlacements);
+  const displayedWorkOrders = useKanbanDisplayedBoard(workOrders ?? [], incomingPlacements, {
+    overlayOpen: Boolean(peekOrderId),
+  });
   const fullBoard = useMemo(
     () => buildLinePhaseBoard(line, displayedWorkOrders, apps),
     [apps, displayedWorkOrders, line],
@@ -722,7 +725,6 @@ function LineDetail({
     () => collectLineDoneOrders(displayedWorkOrders, line, fullBoard),
     [displayedWorkOrders, fullBoard, line],
   );
-  const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
   const { factory } = useFactoriesLayout();
   const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);

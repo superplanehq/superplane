@@ -58,6 +58,21 @@ export const KANBAN_CARD_TRANSITION_CLASS = "kanban-card";
 /** Skip motion when more cards than this enter, leave, or change column. */
 export const MAX_ANIMATED_KANBAN_CHANGES = 8;
 
+/** Class on each animated card list item, so CSS can drop names under a modal. */
+export const KANBAN_CARD_MOTION_ITEM_CLASS = "kanban-card-motion-item";
+
+/** Modal dialog that covers the board, including the work-order task overlay. */
+export const KANBAN_OVERLAY_SELECTOR = '[role="dialog"][aria-modal="true"]';
+
+export type KanbanDisplayedBoardOptions = {
+  /**
+   * When true, skip view transitions. Named card snapshots paint in a top
+   * layer above the task overlay; motion must not run while that overlay is
+   * open.
+   */
+  overlayOpen?: boolean;
+};
+
 export type KanbanCardPlacement = {
   id: string;
   column: string;
@@ -109,6 +124,12 @@ export function canStartKanbanViewTransition(
   return typeof doc?.startViewTransition === "function";
 }
 
+export function isKanbanOverlayOpen(
+  doc: Pick<Document, "querySelector"> | undefined = typeof document === "undefined" ? undefined : document,
+): boolean {
+  return Boolean(doc?.querySelector(KANBAN_OVERLAY_SELECTOR));
+}
+
 export function shouldAnimateKanbanBoard(
   previous: KanbanCardPlacement[],
   next: KanbanCardPlacement[],
@@ -116,10 +137,14 @@ export function shouldAnimateKanbanBoard(
     reducedMotion?: boolean;
     canStartViewTransition?: boolean;
     maxChanges?: number;
+    overlayOpen?: boolean;
   },
 ): boolean {
   const canStart = options?.canStartViewTransition ?? canStartKanbanViewTransition();
   if (!canStart) {
+    return false;
+  }
+  if (options?.overlayOpen) {
     return false;
   }
   if (options?.reducedMotion ?? prefersKanbanReducedMotion()) {
@@ -183,9 +208,19 @@ type DisplayedBoard<T> = {
  * Holds the previous board snapshot until a view transition can capture it,
  * then commits the incoming snapshot. Content-only updates skip motion.
  */
-export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPlacement[]): T {
+export function useKanbanDisplayedBoard<T>(
+  incoming: T,
+  placements: KanbanCardPlacement[],
+  options?: KanbanDisplayedBoardOptions,
+): T {
   const signature = kanbanBoardSignature(placements);
   const displayedRef = useRef<DisplayedBoard<T>>({ value: incoming, placements, signature });
+  const incomingRef = useRef(incoming);
+  const placementsRef = useRef(placements);
+  const overlayOpenRef = useRef(options?.overlayOpen);
+  incomingRef.current = incoming;
+  placementsRef.current = placements;
+  overlayOpenRef.current = options?.overlayOpen;
   const [, setTick] = useState(0);
 
   if (signature === displayedRef.current.signature) {
@@ -197,18 +232,24 @@ export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPl
       return;
     }
 
+    const nextPlacements = placementsRef.current;
     const previousPlacements = displayedRef.current.placements;
-    const next: DisplayedBoard<T> = { value: incoming, placements, signature };
     let cancelled = false;
     const commit = () => {
       if (cancelled) {
         return;
       }
-      displayedRef.current = next;
+      displayedRef.current = {
+        value: incomingRef.current,
+        placements: nextPlacements,
+        signature,
+      };
       setTick((tick) => tick + 1);
     };
 
-    const animate = shouldAnimateKanbanBoard(previousPlacements, placements);
+    const animate = shouldAnimateKanbanBoard(previousPlacements, nextPlacements, {
+      overlayOpen: overlayOpenRef.current ?? isKanbanOverlayOpen(),
+    });
     if (!animate) {
       commit();
       return;
@@ -237,13 +278,12 @@ export function useKanbanDisplayedBoard<T>(incoming: T, placements: KanbanCardPl
       void transition.finished.finally(clearRoot);
       return () => {
         cancelled = true;
-        clearRoot();
       };
     } catch {
       clearRoot();
       commit();
     }
-  }, [incoming, placements, signature]);
+  }, [signature]);
 
   return displayedRef.current.value;
 }

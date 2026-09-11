@@ -2,7 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { KanbanCardMotionItem } from "./KanbanCardMotionItem";
-import { KANBAN_CARD_TRANSITION_CLASS, kanbanViewTransitionName } from "./kanbanCardMotion";
+import {
+  KANBAN_CARD_MOTION_ITEM_CLASS,
+  KANBAN_CARD_TRANSITION_CLASS,
+  kanbanViewTransitionName,
+} from "./kanbanCardMotion";
 
 describe("KanbanCardMotionItem", () => {
   it("sets a view-transition name from the work-order id", () => {
@@ -13,6 +17,7 @@ describe("KanbanCardMotionItem", () => {
     );
 
     const item = screen.getByText("Card");
+    expect(item).toHaveClass(KANBAN_CARD_MOTION_ITEM_CLASS);
     expect(item.style.viewTransitionName).toBe(kanbanViewTransitionName("9f2a291e-057d-4159-8eba-b4c59a125df2"));
     expect(item.style.viewTransitionClass).toBe(KANBAN_CARD_TRANSITION_CLASS);
   });

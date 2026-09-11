@@ -1030,6 +1030,15 @@ html.kanban-board-motion::view-transition-old(.kanban-card):only-child {
   animation: kanban-card-exit 200ms ease-in both;
 }
 
+/*
+ * Named card snapshots paint in the view-transition top layer, above the
+ * task overlay. Drop names while a modal covers the board so cards stay
+ * behind the overlay.
+ */
+html:has([role="dialog"][aria-modal="true"]) .kanban-card-motion-item {
+  view-transition-name: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.kanban-board-motion::view-transition-group(*),
   html.kanban-board-motion::view-transition-old(*),
