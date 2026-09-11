@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { showErrorToast } from "@/lib/toast";
 import { BookOpen } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatDate } from "./formatDate";
 import { formatCentsPerMillionUsd, formatMatchMode, formatMicrosPerSecondUsdPerMinute } from "./priceBookFormat";
 
@@ -67,7 +67,7 @@ function PriceBooksHeader() {
   );
 }
 
-function PriceBooksMessage({ message, action }: { message: string; action?: React.ReactNode }) {
+function PriceBooksMessage({ message, action }: { message: string; action?: ReactNode }) {
   return (
     <div className="space-y-6">
       <PriceBooksHeader />
@@ -216,11 +216,13 @@ function PriceBooksCatalog({
   );
 }
 
-const PriceBooks: React.FC = () => {
+export function PriceBooks() {
   const [data, setData] = useState<PriceBooksResponse | null>(null);
   const [tab, setTab] = useState<PriceBooksTab>("models");
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const loadAbort = useRef<AbortController | null>(null);
+  const loadGeneration = useRef(0);
 
   const loadPriceBooks = useCallback(async (version?: string) => {
     const isFirstLoad = version === undefined;
@@ -229,25 +231,38 @@ const PriceBooks: React.FC = () => {
       setLoadFailed(false);
     }
 
+    loadAbort.current?.abort();
+    const controller = new AbortController();
+    loadAbort.current = controller;
+    const generation = ++loadGeneration.current;
+
     try {
       const path = version ? `/admin/api/price-books?version=${encodeURIComponent(version)}` : "/admin/api/price-books";
-      const response = await fetch(path, { credentials: "include" });
+      const response = await fetch(path, { credentials: "include", signal: controller.signal });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text.trim() || "Failed to load price books");
       }
 
       const payload: PriceBooksResponse = await response.json();
+      if (generation !== loadGeneration.current) {
+        return;
+      }
+
       setData(payload);
       setLoadFailed(false);
     } catch (error) {
+      if (generation !== loadGeneration.current || controller.signal.aborted) {
+        return;
+      }
+
       showErrorToast(error instanceof Error ? error.message : "Failed to load price books");
       if (isFirstLoad) {
         setLoadFailed(true);
         setData(null);
       }
     } finally {
-      if (isFirstLoad) {
+      if (isFirstLoad && generation === loadGeneration.current) {
         setLoading(false);
       }
     }
@@ -255,6 +270,9 @@ const PriceBooks: React.FC = () => {
 
   useEffect(() => {
     void loadPriceBooks();
+    return () => {
+      loadAbort.current?.abort();
+    };
   }, [loadPriceBooks]);
 
   useReportPageReady(!loading);
@@ -293,6 +311,4 @@ const PriceBooks: React.FC = () => {
       onVersionChange={(version) => void loadPriceBooks(version)}
     />
   );
-};
-
-export default PriceBooks;
+}
