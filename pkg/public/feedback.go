@@ -40,7 +40,13 @@ func (s *Server) handleSubmitFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, int64(services.MaxSupportFeedbackRequestBytes))
 	if err := parseFeedbackForm(r); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			writeFeedbackError(w, http.StatusRequestEntityTooLarge, "The feedback form is too large.")
+			return
+		}
 		writeFeedbackError(w, http.StatusBadRequest, "SuperPlane could not read the feedback form.")
 		return
 	}
@@ -91,7 +97,7 @@ func (s *Server) handleSubmitFeedback(w http.ResponseWriter, r *http.Request) {
 func parseFeedbackForm(r *http.Request) error {
 	contentType := r.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		return r.ParseMultipartForm(int64(services.MaxSupportFeedbackAttachmentBytes) + 1<<20)
+		return r.ParseMultipartForm(int64(services.MaxSupportFeedbackRequestBytes))
 	}
 	return r.ParseForm()
 }

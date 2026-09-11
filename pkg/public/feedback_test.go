@@ -74,6 +74,29 @@ func TestHandleSubmitFeedback(t *testing.T) {
 		assert.Equal(t, []byte("png-bytes"), published.Attachment.Content)
 	})
 
+	t.Run("rejects a request that exceeds the body limit", func(t *testing.T) {
+		originalPublish := publishSupportFeedback
+		publishSupportFeedback = func(message messages.SupportFeedbackRequestedMessage) error {
+			t.Fatal("publish must not run")
+			return nil
+		}
+		t.Cleanup(func() { publishSupportFeedback = originalPublish })
+
+		body, contentType := multipartFeedback(t, map[string]string{
+			"category": services.FeedbackCategoryBug,
+			"details":  "The canvas did not load.",
+		}, "huge.bin", "application/octet-stream", bytes.Repeat([]byte("a"), services.MaxSupportFeedbackRequestBytes+1))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/me/feedback", body)
+		req.Header.Set("Content-Type", contentType)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey, user))
+		rec := httptest.NewRecorder()
+
+		(&Server{}).handleSubmitFeedback(rec, req)
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Equal(t, "The feedback form is too large.", jsonMessage(t, rec))
+	})
+
 	t.Run("rejects a missing category", func(t *testing.T) {
 		originalPublish := publishSupportFeedback
 		publishSupportFeedback = func(message messages.SupportFeedbackRequestedMessage) error {

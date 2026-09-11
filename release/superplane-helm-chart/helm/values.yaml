@@ -253,6 +253,7 @@ email:
 #
 # In-app feedback delivery. The worker sends mail to support@superplane.com
 # and posts the same report to this Discord webhook when the URL is set.
+# Helm stores the webhook in a dedicated feedback secret, not the email secret.
 #
 feedback:
   discordWebhookUrl: ""

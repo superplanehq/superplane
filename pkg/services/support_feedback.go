@@ -17,6 +17,7 @@ const (
 	DefaultSupportFeedbackToEmail       = "support@superplane.com"
 	MaxSupportFeedbackDetailsRunes      = 8000
 	MaxSupportFeedbackAttachmentBytes   = 5 << 20
+	MaxSupportFeedbackRequestBytes      = MaxSupportFeedbackAttachmentBytes + 1<<20
 	MaxSupportFeedbackPagePathRunes     = 500
 	MaxSupportFeedbackAttachmentNameLen = 255
 )

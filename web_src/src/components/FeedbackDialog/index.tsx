@@ -167,14 +167,16 @@ function FeedbackCategoryPicker({
           const selected = category === option.value;
           const OptionIcon = option.Icon;
           return (
-            <button
+            <Button
               key={option.value}
               type="button"
+              variant="outline"
               aria-pressed={selected}
+              disabled={disabled}
               data-testid={`feedback-category-${option.value}`}
               onClick={() => onChange(option.value)}
               className={cn(
-                "flex flex-col items-start gap-1 rounded-md border px-3 py-2 text-left transition",
+                "h-auto w-full flex-col items-start gap-1 rounded-md px-3 py-2 text-left whitespace-normal font-normal",
                 selected
                   ? "border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-950/40"
                   : "border-slate-950/20 hover:bg-slate-50 dark:border-gray-700/70 dark:hover:bg-gray-800",
@@ -183,7 +185,7 @@ function FeedbackCategoryPicker({
               <OptionIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" aria-hidden />
               <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{option.label}</span>
               <span className="text-[13px] text-gray-500 dark:text-gray-400">{option.description}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -234,15 +236,17 @@ function FeedbackAttachmentField({
         <div className="flex items-center gap-2 rounded-md border border-slate-950/20 px-3 py-2 text-sm dark:border-gray-700/70">
           <Paperclip className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
           <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">{file.name}</span>
-          <button
+          <Button
             type="button"
-            className="rounded-md p-1 text-gray-500 hover:bg-slate-100 hover:text-gray-800 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            variant="ghost"
+            size="icon-xs"
+            className="rounded-md text-gray-500 hover:bg-slate-100 hover:text-gray-800 dark:hover:bg-gray-800 dark:hover:text-gray-100"
             onClick={() => onFileChange(undefined)}
             disabled={disabled}
             aria-label="Remove attached file"
           >
             <X className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </div>
       ) : (
         <Button
