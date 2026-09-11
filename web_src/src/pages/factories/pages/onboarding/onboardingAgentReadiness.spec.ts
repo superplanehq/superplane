@@ -249,7 +249,7 @@ describe("hosted credit grant copy", () => {
 
   it("explains that remaining credit lets the user continue without keys", () => {
     expect(hostedCreditGrantCopy(5000)).toBe(
-      "This organization has $50.00 of hosted credit. You can continue without connecting your own keys.",
+      "This organization has $50.00 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
     );
   });
 
