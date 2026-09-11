@@ -3,14 +3,17 @@ import { Link } from "react-router";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SUPERPLANE_PRICING_URL } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 import { formatUsdCents } from "./lib/workOrderUsage";
 import {
   hostedCreditBannerCopy,
+  hostedCreditHeaderKickerLabel,
   parseWelcomeCreditExpiresAt,
   welcomeCreditHeaderLabel,
   type HostedCreditBannerKind,
+  type HostedCreditHeaderKickerKind,
 } from "./lib/hostedCreditEmpty";
 
 interface HostedCreditEmptyBannerProps {
@@ -22,6 +25,7 @@ interface HostedCreditEmptyBannerProps {
   kind?: HostedCreditBannerKind;
   remainingCreditCents?: number;
   welcomeCreditExpiresAt?: string;
+  subscriptionCheckoutEnabled?: boolean;
 }
 
 const BANNER_TONE_CLASS = {
@@ -41,12 +45,14 @@ export function HostedCreditEmptyBanner({
   kind = "empty",
   remainingCreditCents = 0,
   welcomeCreditExpiresAt,
+  subscriptionCheckoutEnabled,
 }: HostedCreditEmptyBannerProps) {
   const copy = hostedCreditBannerCopy({
     kind,
     billingEnabled,
     remainingCreditCents,
     welcomeCreditExpiresAt: parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt) ?? undefined,
+    subscriptionCheckoutEnabled,
   });
   const isWarning = copy.tone === "warning";
   const Icon = isWarning ? TriangleAlert : Sparkles;
@@ -79,51 +85,107 @@ export function HostedCreditEmptyBanner({
           </p>
         )}
       </div>
-      <Button asChild variant="outline" size="sm">
-        <Link to={spendingHref}>{copy.actionLabel}</Link>
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {copy.showPricingLink ? (
+          <Button asChild variant="ghost" size="sm">
+            <a href={SUPERPLANE_PRICING_URL} target="_blank" rel="noreferrer">
+              See pricing
+            </a>
+          </Button>
+        ) : null}
+        {copy.showAction !== false ? (
+          <Button asChild variant="outline" size="sm">
+            <Link to={spendingHref}>{copy.actionLabel}</Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-/** Compact trial chip to the right of the workspace page title. */
+/** Compact subscribe chip next to the workspace page title. */
 export function HostedCreditHeaderKicker({
   spendingHref,
   welcomeCreditExpiresAt,
   remainingCreditCents = 0,
+  kind = "trial",
 }: {
   spendingHref: string;
   welcomeCreditExpiresAt?: string;
   remainingCreditCents?: number;
+  kind?: HostedCreditHeaderKickerKind;
 }) {
-  const expiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
-  const duration = expiresAt ? welcomeCreditHeaderLabel(expiresAt) : "14 days";
-  const remaining = formatUsdCents(remainingCreditCents);
+  const palette = kind === "trial" ? TRIAL_KICKER_PALETTE : LAPSED_KICKER_PALETTE;
+  const label = hostedCreditHeaderKickerLabel(kind);
+  const details = kind === "trial" ? trialKickerDetails(welcomeCreditExpiresAt, remainingCreditCents) : [];
 
   return (
     <Link
       to={spendingHref}
-      aria-label="Add credits"
+      aria-label="Subscribe"
       data-testid="hosted-credit-header-kicker"
-      className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-violet-100 py-1 pl-2.5 pr-1.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900"
+      data-kind={kind}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center gap-2 rounded-full py-1 pl-2.5 pr-1.5 text-[12px]",
+        palette.shell,
+      )}
     >
-      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">Trial</span>
-      <ChipDot />
-      <span className="whitespace-nowrap font-medium text-violet-800 dark:text-violet-200">{duration}</span>
-      <ChipDot />
-      <span className="whitespace-nowrap font-semibold tabular-nums text-violet-950 dark:text-violet-50">
-        {remaining}
-      </span>
-      <span className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white">
-        Add credits
+      <span className={cn("whitespace-nowrap font-medium", palette.text)}>{label}</span>
+      {details.map((detail) => (
+        <span key={detail.key} className="inline-flex items-center gap-2">
+          <ChipDot className={palette.dot} />
+          <span
+            className={cn(
+              "whitespace-nowrap",
+              detail.emphasis ? cn("font-semibold tabular-nums", palette.amount) : cn("font-medium", palette.text),
+            )}
+          >
+            {detail.text}
+          </span>
+        </span>
+      ))}
+      <span
+        className={cn(
+          "inline-flex h-5 items-center rounded-full px-2.5 text-[11px] leading-none font-medium text-white",
+          palette.action,
+        )}
+      >
+        Subscribe
       </span>
     </Link>
   );
 }
 
-function ChipDot() {
+const TRIAL_KICKER_PALETTE = {
+  shell: "bg-violet-100 hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900",
+  text: "text-violet-800 dark:text-violet-200",
+  amount: "text-violet-950 dark:text-violet-50",
+  dot: "text-violet-400 dark:text-violet-600",
+  action: "bg-violet-600",
+} as const;
+
+const LAPSED_KICKER_PALETTE = {
+  shell: "bg-amber-100 hover:bg-amber-200/80 dark:bg-amber-950 dark:hover:bg-amber-900",
+  text: "text-amber-900 dark:text-amber-200",
+  amount: "text-amber-950 dark:text-amber-50",
+  dot: "text-amber-400 dark:text-amber-600",
+  action: "bg-amber-600",
+} as const;
+
+function trialKickerDetails(
+  welcomeCreditExpiresAt: string | undefined,
+  remainingCreditCents: number,
+): Array<{ key: string; text: string; emphasis?: boolean }> {
+  const expiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
+  return [
+    { key: "duration", text: expiresAt ? welcomeCreditHeaderLabel(expiresAt) : "14 days" },
+    { key: "remaining", text: formatUsdCents(remainingCreditCents), emphasis: true },
+  ];
+}
+
+function ChipDot({ className }: { className: string }) {
   return (
-    <span className="select-none text-violet-400 dark:text-violet-600" aria-hidden>
+    <span className={cn("select-none", className)} aria-hidden>
       ·
     </span>
   );

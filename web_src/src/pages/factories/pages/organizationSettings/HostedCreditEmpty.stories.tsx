@@ -3,7 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
+  EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
   LOW_TRIAL_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
@@ -70,7 +73,7 @@ export const TrialLowCredit: Story = {
   },
 };
 
-/** Tasks list after welcome credit expires. The banner sits above the board. */
+/** Tasks list after welcome credit expires. The chip sits next to the title. */
 export const TrialEnded: Story = {
   name: "Trial ended",
   render: () => {
@@ -81,6 +84,25 @@ export const TrialEnded: Story = {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          organizationBilling: EXPIRED_TRIAL_ORGANIZATION_BILLING,
+        }}
+      />
+    );
+  },
+};
+
+/** Tasks list when the organization has no plan. The chip sits next to the title. */
+export const NoPlan: Story = {
+  name: "No plan",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
         }}
       />
     );

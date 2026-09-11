@@ -4,22 +4,31 @@ import {
   useCreateHostedCreditCheckout,
   useHostedCreditProducts,
 } from "@/hooks/useLLMModelAllowlists";
+import { useCreateBusinessCheckout } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { clearHostedCreditGrantSnapshot, rememberHostedCreditGrantSnapshot } from "@/lib/hostedCredit";
 import { hostedCreditOwnerContactCopy } from "@/lib/hostedCreditOwnerContact";
 import { showErrorToast } from "@/lib/toast";
 
-export function useHostedCreditActions(organizationId: string, billingEnabled: boolean, grantTotalCents: number) {
-  // Fetch packs whenever Polar may be on. Do not wait for the spend report —
-  // the header needs packs as soon as the owner opens Billing.
-  const productsQuery = useHostedCreditProducts(organizationId, Boolean(organizationId) && billingEnabled);
+export function useHostedCreditActions(
+  organizationId: string,
+  billingEnabled: boolean,
+  grantTotalCents: number,
+  creditPurchaseAllowed = false,
+) {
+  const productsQuery = useHostedCreditProducts(
+    organizationId,
+    Boolean(organizationId) && billingEnabled && creditPurchaseAllowed,
+  );
   const checkout = useCreateHostedCreditCheckout(organizationId);
+  const businessCheckout = useCreateBusinessCheckout(organizationId);
   const portal = useCreateBillingPortalSession(organizationId);
 
   return {
     products: productsQuery.data?.products ?? [],
     productsLoading: productsQuery.isLoading,
     checkoutPending: checkout.isPending,
+    businessCheckoutPending: businessCheckout.isPending,
     portalPending: portal.isPending,
     startCheckout: async (productId: string) => {
       rememberHostedCreditGrantSnapshot(organizationId, grantTotalCents);
@@ -28,6 +37,14 @@ export function useHostedCreditActions(organizationId: string, billingEnabled: b
         window.location.assign(url);
       } catch (checkoutError) {
         clearHostedCreditGrantSnapshot(organizationId);
+        showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
+      }
+    },
+    startBusinessCheckout: async () => {
+      try {
+        const url = await businessCheckout.mutateAsync();
+        window.location.assign(url);
+      } catch (checkoutError) {
         showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
       }
     },

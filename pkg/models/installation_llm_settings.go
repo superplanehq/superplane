@@ -13,7 +13,7 @@ const (
 
 	DefaultWelcomeGrantCents   int64 = 5000
 	DefaultWelcomeGrantTTL           = 14 * 24 * time.Hour
-	DefaultMarkupBPS                 = 2000
+	DefaultMarkupBPS                 = 1000
 	DefaultWarningThresholdBPS       = 2000
 	MarkupBaseBPS                    = 10000
 	MicrosPerCent              int64 = 10_000
