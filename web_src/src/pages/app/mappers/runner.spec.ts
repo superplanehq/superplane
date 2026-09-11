@@ -57,7 +57,7 @@ describe("runnerConfigurationDetails", () => {
         execution_timeout_seconds: 0,
       },
       {
-        "Machine type": "e1-large-arm64",
+        "Machine type": "Large ARM",
         "Execution mode": "Host",
         "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },

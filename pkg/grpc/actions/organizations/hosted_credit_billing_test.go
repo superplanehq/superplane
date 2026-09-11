@@ -57,6 +57,8 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 			}))
 		})
 		usePolarTestServer(t, server)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		require.NoError(t, err)
 
 		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
 		require.NoError(t, err)
@@ -69,6 +71,8 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 
 func Test__CreateHostedCreditCheckout(t *testing.T) {
 	r := support.Setup(t)
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
 
 	t.Run("invalid organization id", func(t *testing.T) {
 		_, err := CreateHostedCreditCheckout(context.Background(), "bad", &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
@@ -264,6 +268,8 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 
 	t.Run("creates a polar team customer per organization with the same owner", func(t *testing.T) {
 		other, err := models.CreateOrganization(support.RandomName("billing-org"), "")
+		require.NoError(t, err)
+		_, err = models.SetAdminOrganizationPlan(database.Conn(), other.ID, models.BillingPlanBusiness)
 		require.NoError(t, err)
 		created := map[string]string{}
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
