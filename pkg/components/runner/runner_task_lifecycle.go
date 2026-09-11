@@ -23,10 +23,7 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
-		"task_id":         taskID,
-		"organization_id": ctx.OrganizationID,
-	}, pollInterval)
+	return scheduleBrokerPoll(ctx.Requests, taskID, ctx.OrganizationID)
 }
 
 func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
@@ -51,17 +48,13 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 
 	task, err := broker.FetchTaskStatus(taskID)
 	if err != nil {
-		if ctx.ExecutionState.IsFinished() {
-			revokeOpenRouterChildKeyOrReschedule(ctx)
-			return nil
-		}
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
 		}
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
-			"task_id":         taskID,
-			"organization_id": organizationID,
-		}, pollInterval)
+		if ctx.ExecutionState.IsFinished() {
+			revokeOpenRouterChildKeyOrReschedule(ctx)
+		}
+		return scheduleBrokerPoll(ctx.Requests, taskID, organizationID)
 	}
 
 	sink := taskLogFromBrokerTask(task)
@@ -77,13 +70,8 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 
 	if ctx.ExecutionState.IsFinished() {
 		revokeOpenRouterChildKeyOrReschedule(ctx)
-		return nil
 	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
-		"task_id":         taskID,
-		"organization_id": organizationID,
-	}, pollInterval)
+	return scheduleBrokerPoll(ctx.Requests, taskID, organizationID)
 }
 
 func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType string) (int, *core.WebhookResponseBody, error) {
@@ -248,10 +236,10 @@ func recordTerminalBrokerUsage(ctx core.ExecutionContext, broker *BrokerClient, 
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("runner: fetch after cancel failed")
 		}
-		return nil
+		return scheduleBrokerPollAfterCancel(ctx, taskID)
 	}
 	if !task.IsInTerminalState() {
-		return nil
+		return scheduleBrokerPollAfterCancel(ctx, taskID)
 	}
 	return processBrokerTaskStatus(
 		ctx.ExecutionState,
@@ -262,4 +250,21 @@ func recordTerminalBrokerUsage(ctx core.ExecutionContext, broker *BrokerClient, 
 		ctx.Usage,
 		ctx.Configuration,
 	)
+}
+
+func scheduleBrokerPoll(requests core.RequestContext, taskID, organizationID string) error {
+	if requests == nil {
+		return nil
+	}
+	return requests.ScheduleActionCall(hookActionPoll, map[string]any{
+		"task_id":         taskID,
+		"organization_id": organizationID,
+	}, pollInterval)
+}
+
+func scheduleBrokerPollAfterCancel(ctx core.ExecutionContext, taskID string) error {
+	if err := scheduleBrokerPoll(ctx.Requests, taskID, ctx.OrganizationID); err != nil && ctx.Logger != nil {
+		ctx.Logger.WithError(err).Warn("runner: failed to schedule poll after cancel")
+	}
+	return nil
 }

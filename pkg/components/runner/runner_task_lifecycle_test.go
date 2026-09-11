@@ -63,6 +63,65 @@ func TestPollBrokerTaskRecordsUsageWhenSuperPlaneAlreadyFinished(t *testing.T) {
 	assert.True(t, state.Finished)
 }
 
+func TestPollBrokerTaskKeepsPollingWhenFinishedAndBrokerNotTerminal(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	recorder := &recordingUsage{}
+	requests := &contexts.RequestContext{}
+	state := &contexts.ExecutionStateContext{Finished: true}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{runningBrokerTaskResponse()}}
+
+	err := pollBrokerTask(core.ActionHookContext{
+		Parameters: map[string]any{
+			"task_id":         "task-1",
+			"organization_id": "org-1",
+		},
+		HTTP:           httpContext,
+		ExecutionState: state,
+		Usage:          recorder,
+		Configuration:  hostedClaudeConfiguration(),
+		Logger:         log.NewEntry(log.New()),
+		Requests:       requests,
+	}, "runnerClaudeCode.finished")
+	require.NoError(t, err)
+	assert.Empty(t, recorder.records)
+	assert.Empty(t, recorder.computes)
+	assert.Equal(t, hookActionPoll, requests.Action)
+	assert.Equal(t, "task-1", requests.Params["task_id"])
+	assert.Equal(t, "org-1", requests.Params["organization_id"])
+	assert.Equal(t, pollInterval, requests.Duration)
+}
+
+func TestPollBrokerTaskKeepsPollingWhenFinishedAndFetchFails(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	recorder := &recordingUsage{}
+	requests := &contexts.RequestContext{}
+	state := &contexts.ExecutionStateContext{Finished: true}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`error`))},
+	}}
+
+	err := pollBrokerTask(core.ActionHookContext{
+		Parameters: map[string]any{
+			"task_id":         "task-1",
+			"organization_id": "org-1",
+		},
+		HTTP:           httpContext,
+		ExecutionState: state,
+		Usage:          recorder,
+		Configuration:  hostedClaudeConfiguration(),
+		Logger:         log.NewEntry(log.New()),
+		Requests:       requests,
+	}, "runnerClaudeCode.finished")
+	require.NoError(t, err)
+	assert.Empty(t, recorder.records)
+	assert.Equal(t, hookActionPoll, requests.Action)
+	assert.Equal(t, "task-1", requests.Params["task_id"])
+}
+
 func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
@@ -88,10 +147,48 @@ func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
 	assert.Equal(t, FailedOutputChannel, state.Channel)
 }
 
+func TestCancelBrokerTaskSchedulesPollWhenBrokerNotTerminal(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	recorder := &recordingUsage{}
+	requests := &contexts.RequestContext{}
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "task-1"}}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+		runningBrokerTaskResponse(),
+	}}
+
+	err := cancelBrokerTask(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: state,
+		Usage:          recorder,
+		Configuration:  hostedClaudeConfiguration(),
+		Logger:         log.NewEntry(log.New()),
+		Requests:       requests,
+		OrganizationID: "org-1",
+	}, "runnerClaudeCode.finished")
+	require.NoError(t, err)
+	assert.Empty(t, recorder.records)
+	assert.Empty(t, recorder.computes)
+	assert.Empty(t, state.Channel)
+	assert.Equal(t, hookActionPoll, requests.Action)
+	assert.Equal(t, "task-1", requests.Params["task_id"])
+	assert.Equal(t, "org-1", requests.Params["organization_id"])
+	assert.Equal(t, pollInterval, requests.Duration)
+}
+
 func hostedClaudeConfiguration() map[string]any {
 	return map[string]any{
 		"credentials": map[string]any{"source": "hosted"},
 		"model":       "sonnet",
+	}
+}
+
+func runningBrokerTaskResponse() *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"id":"task-1","status":"running"}`)),
 	}
 }
 
