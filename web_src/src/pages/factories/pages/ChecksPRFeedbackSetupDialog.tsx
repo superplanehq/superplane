@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { cn } from "@/lib/utils";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
@@ -12,14 +13,17 @@ import {
   isChecksHandlerCIIntegration,
   type ChecksHandlerIntegrationRow,
 } from "./checksPRFeedbackSetup";
+import { ChecksPRFeedbackSetupPreview } from "./ChecksPRFeedbackSetupPreview";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
+import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import {
   integrationDefinitionLabel,
   useChecksPRFeedbackSetup,
   type ChecksPRFeedbackSetupModel,
 } from "./useChecksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
+import { writeDeferredWorkspaceNextStep } from "./workspaceNextStepDeferral";
 
 interface ChecksPRFeedbackSetupDialogProps {
   organizationId: string;
@@ -42,9 +46,26 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
   return (
     <>
       {setup.connectName ? null : (
-        <div className="space-y-6" data-testid="checks-pr-feedback-setup">
+        <PRFeedbackSetupWizardShell
+          testId="checks-pr-feedback-setup"
+          preview={
+            <ChecksPRFeedbackSetupPreview
+              step={setup.step}
+              catalog={setup.catalog}
+              selectedNames={setup.checkNames}
+              catalogEmpty={setup.catalogEmpty}
+              maximumAttempts={setup.maximumAttempts}
+              toolsAccess={setup.toolsAccess}
+              suggestedNames={setup.suggestedNames}
+              runnerIntegrationIds={setup.runnerIntegrationIds}
+              connected={setup.connected}
+            />
+          }
+        >
           <SetupHeader
             step={setup.step}
+            catalogEmpty={setup.catalogEmpty}
+            toolsAccess={setup.toolsAccess}
             onBack={() => {
               if (setup.step === "tools") {
                 setup.setStep("checks");
@@ -54,18 +75,7 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
             }}
           />
           <div>
-            {setup.step === "checks" ? (
-              <StatusCheckPicker
-                names={setup.checkNames}
-                catalog={setup.catalog}
-                loading={setup.catalogLoading}
-                loadError={setup.catalogQuery.isError}
-                onToggle={setup.toggleCheckName}
-                hideHeading
-              />
-            ) : (
-              <ToolsStep setup={setup} />
-            )}
+            <SetupStepBody setup={setup} />
             {setup.error ? (
               <p className="workspace-body-text mt-4 text-destructive" role="alert">
                 {setup.error}
@@ -74,9 +84,15 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
           </div>
           <div className="space-y-3">
             {setup.step === "tools" ? <ToolsAccessWarning warning={toolsAccessWarning(setup)} /> : null}
-            <SetupFooter setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
+            <SetupFooter
+              setup={setup}
+              factoryId={props.factoryId}
+              source={props.source}
+              onClose={props.onClose}
+              onCreated={props.onCreated}
+            />
           </div>
-        </div>
+        </PRFeedbackSetupWizardShell>
       )}
       <IntegrationCreateDialog
         open={Boolean(setup.connectName)}
@@ -106,13 +122,21 @@ export function ChecksPRFeedbackSetupDialog(props: ChecksPRFeedbackSetupDialogPr
   );
 }
 
-function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () => void }) {
+function SetupHeader({
+  step,
+  catalogEmpty,
+  toolsAccess,
+  onBack,
+}: {
+  step: "checks" | "tools";
+  catalogEmpty: boolean;
+  toolsAccess: ChecksPRFeedbackSetupModel["toolsAccess"];
+  onBack: () => void;
+}) {
   const stepTitle =
     step === "checks"
       ? PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichChecks
       : PR_FEEDBACK_SETTINGS_COPY.wizardStepWhichTools;
-  const stepHelper =
-    step === "checks" ? PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper : PR_FEEDBACK_SETTINGS_COPY.wizardToolsDescription;
 
   return (
     <header className="text-left">
@@ -128,9 +152,104 @@ function SetupHeader({ step, onBack }: { step: "checks" | "tools"; onBack: () =>
         </span>
       </button>
       <h1 className={factoryPageTitleClassName}>{stepTitle}</h1>
-      <p className="workspace-body-text mt-2 text-muted-foreground">{stepHelper}</p>
+      <SetupHeaderHelper step={step} catalogEmpty={catalogEmpty} toolsAccess={toolsAccess} />
     </header>
   );
+}
+
+function SetupHeaderHelper({
+  step,
+  catalogEmpty,
+  toolsAccess,
+}: {
+  step: "checks" | "tools";
+  catalogEmpty: boolean;
+  toolsAccess: ChecksPRFeedbackSetupModel["toolsAccess"];
+}) {
+  if (step === "checks") {
+    if (catalogEmpty) {
+      return null;
+    }
+    return (
+      <p className="workspace-body-text mt-2 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper}</p>
+    );
+  }
+  if (toolsAccess === "github-actions") {
+    return (
+      <p className="workspace-body-text mt-2 text-muted-foreground" data-testid="checks-setup-tools-github-actions">
+        {PR_FEEDBACK_SETTINGS_COPY.wizardToolsGitHubActions}
+      </p>
+    );
+  }
+  if (toolsAccess === "none") {
+    return (
+      <p className="workspace-body-text mt-2 text-muted-foreground" data-testid="checks-setup-tools-no-access">
+        {PR_FEEDBACK_SETTINGS_COPY.wizardToolsNoAccess}
+      </p>
+    );
+  }
+  return null;
+}
+
+function MaximumAttemptsField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <section className="space-y-6">
+      <div>
+        <h2 className={factoryPageTitleClassName}>
+          <label htmlFor="checks-setup-maximum-attempts">{PR_FEEDBACK_SETTINGS_COPY.wizardMaximumAttempts}</label>
+        </h2>
+        <p className="workspace-body-text mt-2 text-muted-foreground">
+          {PR_FEEDBACK_SETTINGS_COPY.maximumAttemptsHelper}
+        </p>
+      </div>
+      <Input
+        id="checks-setup-maximum-attempts"
+        type="number"
+        min={1}
+        max={10}
+        step={1}
+        value={String(value)}
+        onChange={(event) => onChange(Number(event.target.value))}
+        data-testid="checks-setup-maximum-attempts"
+      />
+    </section>
+  );
+}
+
+function EmptyChecksMessage() {
+  return (
+    <div className="workspace-body-text space-y-2 text-muted-foreground" data-testid="checks-setup-empty">
+      <p>{PR_FEEDBACK_SETTINGS_COPY.wizardChecksEmpty}</p>
+      <p>{PR_FEEDBACK_SETTINGS_COPY.wizardChecksEmptyDetail}</p>
+    </div>
+  );
+}
+
+function SetupStepBody({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
+  if (setup.step === "checks") {
+    if (setup.catalogEmpty) {
+      return <EmptyChecksMessage />;
+    }
+    return (
+      <div className="space-y-6">
+        <StatusCheckPicker
+          names={setup.checkNames}
+          catalog={setup.catalog}
+          loading={setup.catalogLoading}
+          loadError={setup.catalogQuery.isError}
+          onToggle={setup.toggleCheckName}
+          hideHeading
+        />
+        {setup.catalog.length > 0 ? (
+          <MaximumAttemptsField value={setup.maximumAttempts} onChange={setup.setMaximumAttempts} />
+        ) : null}
+      </div>
+    );
+  }
+  if (setup.toolsAccess === "suggested") {
+    return <ToolsStep setup={setup} />;
+  }
+  return null;
 }
 
 function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
@@ -143,13 +262,15 @@ function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
     ),
   );
   const suggested = setup.available.filter((integration) => setup.suggestedNames.includes(integration.name ?? ""));
-  const others = setup.available.filter((integration) => !setup.suggestedNames.includes(integration.name ?? ""));
 
   return (
     <div className="space-y-5">
       {suggested.length > 0 ? (
         <IntegrationChoiceList
-          title={PR_FEEDBACK_SETTINGS_COPY.wizardSuggested}
+          description={[
+            PR_FEEDBACK_SETTINGS_COPY.wizardSuggestedHelper,
+            PR_FEEDBACK_SETTINGS_COPY.wizardSuggestedHelperDetail,
+          ]}
           definitions={suggested}
           ready={ready}
           selectedIds={setup.runnerIntegrationIds}
@@ -157,19 +278,10 @@ function ToolsStep({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
           onConnect={setup.setConnectName}
         />
       ) : null}
-      {others.length > 0 ? (
-        <IntegrationChoiceList
-          title={
-            setup.suggestedNames.length > 0
-              ? PR_FEEDBACK_SETTINGS_COPY.wizardOtherTools
-              : PR_FEEDBACK_SETTINGS_COPY.integrationsLabel
-          }
-          definitions={others}
-          ready={ready}
-          selectedIds={setup.runnerIntegrationIds}
-          onToggle={setup.setRunnerIntegrationIds}
-          onConnect={setup.setConnectName}
-        />
+      {setup.usesGitHubActions ? (
+        <p className="workspace-body-text text-muted-foreground" data-testid="checks-setup-tools-github-actions">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardToolsGitHubActionsNote}
+        </p>
       ) : null}
     </div>
   );
@@ -179,7 +291,7 @@ type ToolsAccessWarningContent = { testId: string; lines: string[] };
 
 function toolsAccessWarning(setup: ChecksPRFeedbackSetupModel): ToolsAccessWarningContent | null {
   if (setup.suggestedNames.length === 0) {
-    return { testId: "checks-setup-tools-unknown", lines: [PR_FEEDBACK_SETTINGS_COPY.wizardToolsUnknown] };
+    return null;
   }
   const ready = (setup.connected ?? []).filter(
     (integration) =>
@@ -217,14 +329,14 @@ function ToolsAccessWarning({ warning }: { warning: ToolsAccessWarningContent | 
 }
 
 function IntegrationChoiceList({
-  title,
+  description,
   definitions,
   ready,
   selectedIds,
   onToggle,
   onConnect,
 }: {
-  title: string;
+  description?: string[];
   definitions: Array<{ name?: string; label?: string }>;
   ready: Array<{ metadata?: { id?: string; name?: string; integrationName?: string } }>;
   selectedIds: string[];
@@ -236,11 +348,18 @@ function IntegrationChoiceList({
     label: getIntegrationTypeDisplayName(definition.label, definition.name ?? ""),
   }));
   const rows = checksHandlerIntegrationRows(labeled, ready);
+  const lines = description?.filter((line) => line.trim()) ?? [];
 
   return (
     <section>
-      <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</h3>
-      <div className="mt-2 rounded-lg border border-border">
+      {lines.length > 0 ? (
+        <div className="workspace-body-text space-y-1 text-muted-foreground">
+          {lines.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
+      ) : null}
+      <div className={cn("rounded-lg border border-border", lines.length > 0 && "mt-5")}>
         <ul className="divide-y divide-border">
           {rows.map((row) => (
             <IntegrationChoiceRow
@@ -311,18 +430,37 @@ function IntegrationChoiceRow({
 
 function SetupFooter({
   setup,
+  factoryId,
   source,
   onClose,
   onCreated,
 }: {
   setup: ChecksPRFeedbackSetupModel;
+  factoryId: string;
   source: PRFeedbackSource;
   onClose: () => void;
   onCreated: (handlerId: string) => void;
 }) {
-  return (
-    <footer className="flex items-center justify-end gap-3 pt-2">
-      {setup.step === "checks" ? (
+  if (setup.step === "checks" && setup.catalogEmpty) {
+    return (
+      <footer className="flex items-center justify-end gap-3 pt-2">
+        <Button
+          type="button"
+          onClick={() => {
+            writeDeferredWorkspaceNextStep(factoryId, "pr-checks-handler");
+            onClose();
+          }}
+          data-testid="checks-setup-finish"
+        >
+          {PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
+        </Button>
+      </footer>
+    );
+  }
+
+  if (setup.step === "checks") {
+    return (
+      <footer className="flex items-center justify-end gap-3 pt-2">
         <Button
           type="button"
           disabled={!setup.canContinue}
@@ -331,25 +469,29 @@ function SetupFooter({
         >
           {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
         </Button>
-      ) : (
-        <Button
-          type="button"
-          disabled={setup.createHandler.isPending}
-          onClick={() => {
-            void setup.finish(source).then((handler) => {
-              if (handler?.id) {
-                onCreated(handler.id);
-                onClose();
-              }
-            });
-          }}
-          data-testid="checks-setup-finish"
-        >
-          {setup.createHandler.isPending
-            ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
-            : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-        </Button>
-      )}
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="flex items-center justify-end gap-3 pt-2">
+      <Button
+        type="button"
+        disabled={setup.createHandler.isPending}
+        onClick={() => {
+          void setup.finish(source).then((handler) => {
+            if (handler?.id) {
+              onCreated(handler.id);
+              onClose();
+            }
+          });
+        }}
+        data-testid="checks-setup-finish"
+      >
+        {setup.createHandler.isPending
+          ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
+          : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
+      </Button>
     </footer>
   );
 }

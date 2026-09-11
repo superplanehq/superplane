@@ -110,7 +110,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
 	})
 
-	t.Run("complete without agent integration rejects when hosted credit is empty", func(t *testing.T) {
+	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {
 		emptyOrg := support.CreateOrganization(t, r, r.User)
 		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&models.OrganizationLLMCreditGrant{}).Error)
 
@@ -124,10 +124,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		_, err = UpdateFactoryOnboarding(context.Background(), emptyOrg.ID.String(), req)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
+		upsertHostedOnboardingProvider(t, db)
+		response, err := UpdateFactoryOnboarding(context.Background(), emptyOrg.ID.String(), req)
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
 	})
 
 	t.Run("complete without agent integration rejects when no hosted provider is offered", func(t *testing.T) {

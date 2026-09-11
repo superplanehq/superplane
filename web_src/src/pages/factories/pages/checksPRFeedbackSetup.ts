@@ -13,19 +13,11 @@ export function catalogStatusCheckNames(catalog: OrganizationsIntegrationResourc
 }
 
 export function suggestIntegrationFromCheckURL(rawURL: string | undefined): string {
-  const value = rawURL?.trim();
-  if (!value) {
+  const parsed = parseCheckURL(rawURL);
+  if (!parsed) {
     return "";
   }
-  let host: string;
-  try {
-    host = new URL(value).hostname.toLowerCase();
-  } catch {
-    return "";
-  }
-  if (!host) {
-    return "";
-  }
+  const host = parsed.hostname.toLowerCase();
   if (hostHasSuffix(host, "semaphoreci.com") || hostHasSuffix(host, "semaphore.com")) {
     return "semaphore";
   }
@@ -36,6 +28,54 @@ export function suggestIntegrationFromCheckURL(rawURL: string | undefined): stri
     return "harness";
   }
   return "";
+}
+
+export function isGitHubActionsCheckURL(rawURL: string | undefined): boolean {
+  const parsed = parseCheckURL(rawURL);
+  if (!parsed) {
+    return false;
+  }
+  if (!hostHasSuffix(parsed.hostname, "github.com")) {
+    return false;
+  }
+  return parsed.pathname.toLowerCase().includes("/actions/");
+}
+
+export function selectedChecksUseGitHubActions(
+  catalog: OrganizationsIntegrationResourceRef[],
+  selectedNames: string[],
+): boolean {
+  const selected = new Set(selectedNames.map((name) => name.toLowerCase()));
+  return catalog.some((check) => {
+    if (!check.name || !selected.has(check.name.toLowerCase())) {
+      return false;
+    }
+    return isGitHubActionsCheckURL(check.url);
+  });
+}
+
+export type ChecksToolsAccess = "suggested" | "github-actions" | "none";
+
+export function checksToolsAccess(suggestedNames: string[], usesGitHubActions: boolean): ChecksToolsAccess {
+  if (suggestedNames.length > 0) {
+    return "suggested";
+  }
+  if (usesGitHubActions) {
+    return "github-actions";
+  }
+  return "none";
+}
+
+function parseCheckURL(rawURL: string | undefined): URL | undefined {
+  const value = rawURL?.trim();
+  if (!value) {
+    return undefined;
+  }
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function hostHasSuffix(host: string, suffix: string): boolean {
@@ -150,18 +190,31 @@ export function checksHandlerIntegrationRows(
   return rows;
 }
 
+export function selectedSuggestedIntegrationNames(
+  suggestedNames: string[],
+  selectedIds: string[],
+  ready: Array<{ metadata?: { id?: string; integrationName?: string } }>,
+): string[] {
+  if (suggestedNames.length === 0) {
+    return [];
+  }
+  const selected = new Set(selectedIds);
+  const grantedTypes = new Set<string>();
+  for (const item of ready) {
+    const id = item.metadata?.id;
+    const type = item.metadata?.integrationName?.trim().toLowerCase();
+    if (!id || !type || !selected.has(id)) {
+      continue;
+    }
+    grantedTypes.add(type);
+  }
+  return suggestedNames.filter((name) => grantedTypes.has(name.trim().toLowerCase()));
+}
+
 export function hasSelectedSuggestedIntegration(
   suggestedNames: string[],
   selectedIds: string[],
   ready: Array<{ metadata?: { id?: string; integrationName?: string } }>,
 ): boolean {
-  if (suggestedNames.length === 0) {
-    return false;
-  }
-  const selected = new Set(selectedIds);
-  return ready.some((item) => {
-    const id = item.metadata?.id;
-    const type = item.metadata?.integrationName?.trim().toLowerCase();
-    return Boolean(id && type && selected.has(id) && suggestedNames.includes(type));
-  });
+  return selectedSuggestedIntegrationNames(suggestedNames, selectedIds, ready).length > 0;
 }

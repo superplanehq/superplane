@@ -73,6 +73,14 @@ func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	assert.Nil(t, mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy())
 }
 
+func TestSerializeWorkOrder_SourceRunID(t *testing.T) {
+	runID := uuid.New()
+	order := &models.FactoryWorkOrder{ID: uuid.New(), SourceRunID: &runID}
+
+	assert.Equal(t, runID.String(), mustSerializeWorkOrder(t, nil, order, nil, nil).GetSourceRunId())
+	assert.Empty(t, mustSerializeWorkOrder(t, nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil).GetSourceRunId())
+}
+
 func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
 	steps := []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp},

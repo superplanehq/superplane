@@ -395,7 +395,11 @@ CREATE TABLE public.factory_intakes (
     canvas_id uuid NOT NULL,
     source character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
+    initial_import_item_count integer,
+    CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
+    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
 
@@ -890,6 +894,26 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: organization_billing_plans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_plans (
+    organization_id uuid NOT NULL,
+    plan text NOT NULL,
+    plan_source text DEFAULT ''::text NOT NULL,
+    polar_subscription_id text,
+    polar_subscription_status text DEFAULT ''::text NOT NULL,
+    current_period_start timestamp with time zone,
+    current_period_end timestamp with time zone,
+    trial_started_at timestamp with time zone,
+    trial_ends_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
+    CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
+);
+
+
+--
 -- Name: organization_byok_model_allowlists; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -947,8 +971,8 @@ CREATE TABLE public.organization_llm_credit_grants (
     polar_order_id text,
     polar_refund_id text,
     expires_at timestamp with time zone,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'topup_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text])))
 );
 
 
@@ -1918,6 +1942,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_plans
+    ADD CONSTRAINT organization_billing_plans_pkey PRIMARY KEY (organization_id);
+
+
+--
 -- Name: organization_byok_model_allowlists organization_byok_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2865,7 +2897,7 @@ CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_gra
 -- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = ANY (ARRAY['topup'::text, 'included'::text])));
 
 
 --
@@ -4377,7 +4409,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260909151005	f
+20260911070308	f
 \.
 
 

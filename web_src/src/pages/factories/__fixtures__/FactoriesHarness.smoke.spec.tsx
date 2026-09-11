@@ -75,6 +75,11 @@ describe("FactoriesHarness tasks", () => {
     expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-split-run-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
+
+    const sidebar = await screen.findByTestId("factory-automation-runs-sidebar", {}, { timeout: 8000 });
+    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("work-order-card-wo-failed-refunds")).toBeInTheDocument();
+    expect(within(sidebar).getByText("Ship idempotent refund retries")).toBeInTheDocument();
   }, 15000);
 
   it("shows the edit workspace chrome in factory Configure", async () => {

@@ -14,12 +14,10 @@ const { spawn, spawnSync } = require("child_process");
 
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
-const NEW_ACCOUNT_RPM_WAIT_MS = 60_000;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
-const FALLBACK_MODELS_FILE = "openrouter_models.json";
 const SESSION_FILE = "opencode_session";
-const MODEL_FILE = "opencode_model";
-const RETRYABLE_WAIT_MS = 5_000;
+const MAX_ATTEMPTS = 4;
+const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
 const PLANNING_SYSTEM_PROMPT =
   "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
@@ -96,23 +94,20 @@ function parseRetryAfterMs(text) {
   return seconds * 1000;
 }
 
-function rateLimitWaitMs(errorText) {
+function retryWaitMs(errorText, failedAttempt) {
   const fromHeader = parseRetryAfterMs(errorText);
   if (fromHeader != null) {
     return fromHeader;
   }
-  return NEW_ACCOUNT_RPM_WAIT_MS;
+  const index = Math.max(0, Number(failedAttempt) - 1);
+  if (index >= RETRY_WAIT_MS.length) {
+    return RETRY_WAIT_MS[RETRY_WAIT_MS.length - 1];
+  }
+  return RETRY_WAIT_MS[index];
 }
 
-function retryWaitMs(kind, errorText) {
-  if (kind === "rate_limit") {
-    return rateLimitWaitMs(errorText);
-  }
-  const fromHeader = parseRetryAfterMs(errorText);
-  if (fromHeader != null) {
-    return fromHeader;
-  }
-  return RETRYABLE_WAIT_MS;
+function isRetryableKind(kind) {
+  return kind === "rate_limit" || kind === "retryable";
 }
 
 function uniqueCatalogModels(ids) {
@@ -130,50 +125,6 @@ function uniqueCatalogModels(ids) {
   return out;
 }
 
-function orderedFallbackModels(selected, allowed) {
-  return uniqueCatalogModels([selected, ...(Array.isArray(allowed) ? allowed : [])]);
-}
-
-function loadFallbackModels(taskDir, selected) {
-  const file = path.join(taskDir, FALLBACK_MODELS_FILE);
-  let fromFile = [];
-  if (fs.existsSync(file)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-      if (Array.isArray(parsed)) {
-        fromFile = parsed;
-      }
-    } catch (_err) {
-      fromFile = [];
-    }
-  }
-  const ordered = uniqueCatalogModels(fromFile);
-  const selectedId = catalogModelId(selected);
-  if (selectedId && !ordered.includes(selectedId)) {
-    ordered.push(selectedId);
-  }
-  if (ordered.length === 0 && selectedId) {
-    return [selectedId];
-  }
-  return ordered;
-}
-
-function readPersistedModel(taskDir) {
-  const file = path.join(taskDir, MODEL_FILE);
-  if (!fs.existsSync(file)) {
-    return "";
-  }
-  return catalogModelId(fs.readFileSync(file, "utf8"));
-}
-
-function writePersistedModel(taskDir, model) {
-  const id = catalogModelId(model);
-  if (!id) {
-    return;
-  }
-  fs.writeFileSync(path.join(taskDir, MODEL_FILE), `${id}\n`);
-}
-
 function clearSession(taskDir) {
   const file = path.join(taskDir, SESSION_FILE);
   if (fs.existsSync(file)) {
@@ -181,50 +132,39 @@ function clearSession(taskDir) {
   }
 }
 
+function restoreSession(taskDir, sessionID) {
+  if (sessionID) {
+    writeSessionID(taskDir, sessionID);
+    return;
+  }
+  clearSession(taskDir);
+}
+
 function waitSecondsLabel(ms) {
   const seconds = Math.max(1, Math.round(Number(ms) / 1000));
   return `${seconds} seconds`;
 }
 
-function logRotationPlan(models, selected, continuing) {
-  const selectedId = catalogModelId(selected);
-  if (!models.length) {
-    return;
-  }
-  if (models.length === 1) {
-    if (!continuing) {
-      println(`OpenRouter model: ${models[0]}. No other allowed models are available to rotate to.`);
-    }
-    return;
-  }
-  println(`OpenRouter model rotation: ${models.join(" → ")}`);
-  if (continuing) {
-    return;
-  }
-  if (selectedId && models[0] !== selectedId) {
-    println(`This run starts on ${models[0]}. Selected model ${selectedId} is later in the rotation.`);
-  }
-}
-
-function switchReasonLine(kind, fromModel, toModel) {
-  const from = catalogModelId(fromModel);
+function errorKindLabel(kind) {
   if (kind === "rate_limit") {
-    return `Rate limit on ${from}. Switching to ${toModel}.`;
+    return "Rate limit";
   }
   if (kind === "retryable") {
-    return `Temporary error on ${from}. Switching to ${toModel}.`;
+    return "Temporary error";
   }
-  return `Error on ${from}. Switching to ${toModel}.`;
+  return "Error";
 }
 
-function kindWaitLabel(kind) {
-  if (kind === "rate_limit") {
-    return "rate limit";
-  }
-  if (kind === "retryable") {
-    return "temporary error";
-  }
-  return "error";
+function retryWaitLine(kind, model, waitMs, nextAttempt) {
+  return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Waiting ${waitSecondsLabel(waitMs)}, then retrying (attempt ${nextAttempt} of ${MAX_ATTEMPTS}).`;
+}
+
+function stoppedAfterAttemptsLine(kind, model) {
+  return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
+}
+
+function waitExceededTimeoutLine(kind) {
+  return `${errorKindLabel(kind)} wait exceeded the execution timeout`;
 }
 
 function readSessionID(taskDir) {
@@ -281,7 +221,7 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
     modelEntries[id] = {
       options: {
         provider: {
-          allow_fallbacks: true,
+          allow_fallbacks: false,
           sort: "throughput",
         },
       },
@@ -380,24 +320,16 @@ async function runPrompt(promptFile, model, helpers = {}) {
 
   ensureXdgDirs(sp);
 
-  const catalog = loadFallbackModels(sp, model);
-  const persisted = readPersistedModel(sp);
-  let models = catalog;
-  if (persisted && catalog.includes(persisted)) {
-    models = orderedFallbackModels(persisted, catalog);
-  }
-  let currentModel = models[0] || catalogModelId(model);
-  writeOpenCodeConfig(sp, env, models);
+  const currentModel = catalogModelId(model);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
   const childEnv = openCodeProcessEnv(sp, env);
 
-  const usedThisWindow = new Set();
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
   let lastUsage = emptyUsage();
   let lastCost = 0;
   let sessionID = readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
-  logRotationPlan(models, model, continuing);
   if (continuing) {
     println(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
   } else {
@@ -419,13 +351,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let exitCode = 0;
   let lastErrorText = "";
   let attemptLabel = "";
-  let switchedModel = false;
+  let attempt = 1;
 
   while (true) {
     if (attemptLabel) {
       println(attemptLabel);
       attemptLabel = "";
     }
+    const sessionBeforeAttempt = sessionID;
     const args = opencodeRunArgs({
       model: currentModel,
       sessionID: sessionID || undefined,
@@ -449,78 +382,49 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (!spawnFailed) {
       failed = false;
       exitCode = 0;
-      writePersistedModel(sp, currentModel);
-      if (switchedModel) {
-        println(`OpenCode finished on ${catalogModelId(currentModel)}`);
-      }
       break;
     }
     const classKind = classifyOpenRouterError(lastErrorText);
-    if (classKind === "hard") {
+    const failedExit = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
+    if (!spawnResult.sessionID) {
+      sessionID = sessionBeforeAttempt;
+      restoreSession(sp, sessionID);
+    }
+    if (!isRetryableKind(classKind)) {
       failed = true;
-      exitCode = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
+      exitCode = failedExit;
       if (lastErrorText) {
         println(truncateText(lastErrorText));
-      }
-      if (models.length > 1) {
-        println("This error does not rotate to another model.");
       }
       break;
     }
-
-    usedThisWindow.add(catalogModelId(currentModel));
-    const nextModel = models.find((id) => !usedThisWindow.has(id));
-    if (nextModel) {
-      println(switchReasonLine(classKind, currentModel, nextModel));
+    if (attempt >= MAX_ATTEMPTS) {
+      failed = true;
+      exitCode = failedExit;
       if (lastErrorText) {
         println(truncateText(lastErrorText));
       }
-      println(`Starting a new OpenCode session on ${nextModel}.`);
-      clearSession(sp);
-      sessionID = "";
-      currentModel = nextModel;
-      switchedModel = true;
-      continue;
+      println(stoppedAfterAttemptsLine(classKind, currentModel));
+      break;
     }
-
-    if (classKind === "rate_limit" || classKind === "retryable") {
-      const waitMs = retryWaitMs(classKind, lastErrorText);
-      const remaining = deadline == null ? waitMs : Math.max(0, deadline - now());
-      if (remaining <= 0) {
-        failed = true;
-        exitCode = 1;
-        println("Rate limit wait exceeded the execution timeout");
-        break;
-      }
+    const waitMs = retryWaitMs(lastErrorText, attempt);
+    const remaining = deadline == null ? waitMs : deadline - now();
+    if (remaining < waitMs || remaining <= 0) {
+      failed = true;
+      exitCode = 1;
       if (lastErrorText) {
         println(truncateText(lastErrorText));
       }
-      const retryModel = models[0] || currentModel;
-      const waitFor = waitSecondsLabel(Math.min(waitMs, remaining));
-      if (models.length <= 1) {
-        const label = classKind === "rate_limit" ? "Rate limit" : "Temporary error";
-        println(`${label} on ${catalogModelId(retryModel)}. Waiting ${waitFor}, then retrying.`);
-      } else {
-        println(
-          `All models in the rotation returned a ${kindWaitLabel(classKind)}. Waiting ${waitFor}, then retrying ${catalogModelId(retryModel)}.`,
-        );
-      }
-      await sleep(Math.min(waitMs, remaining));
-      usedThisWindow.clear();
-      currentModel = retryModel;
-      attemptLabel = `Retrying OpenCode · ${openRouterModelId(currentModel)}`;
-      continue;
+      println(waitExceededTimeoutLine(classKind));
+      break;
     }
-
-    failed = true;
-    exitCode = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
     if (lastErrorText) {
       println(truncateText(lastErrorText));
     }
-    if (models.length > 1) {
-      println("All models in the rotation failed.");
-    }
-    break;
+    println(retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    await sleep(waitMs);
+    attempt += 1;
+    attemptLabel = `Retrying OpenCode · ${openRouterModelId(currentModel)}`;
   }
 
   formatter.flush(failed);
@@ -858,6 +762,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
       usage = emptyUsage();
       cost = 0;
       roundOpen = false;
+      sessionID = "";
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -1169,12 +1074,7 @@ module.exports = {
   classifyOpenRouterError,
   openRouterModelId,
   buildOpenCodeConfig,
-  orderedFallbackModels,
-  loadFallbackModels,
-  rateLimitWaitMs,
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,
-  switchReasonLine,
-  logRotationPlan,
 };

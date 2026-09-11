@@ -43,7 +43,6 @@ describe("resolveOnboardingAgent", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openrouter"),
-        remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"] },
       }),
     ).toEqual({
@@ -61,7 +60,6 @@ describe("resolveOnboardingAgent", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openrouter"),
-        remainingCreditCents: 5000,
         hostedModels: {
           ...noHostedModels,
           openrouter: ["anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6"],
@@ -78,7 +76,6 @@ describe("resolveOnboardingAgent", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("claude"),
-        remainingCreditCents: 0,
         hostedModels: noHostedModels,
       }),
     ).toMatchObject({
@@ -88,11 +85,10 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  it("uses hosted SuperPlane when credit remains and a default model is set", () => {
+  it("uses hosted SuperPlane when a default model is set", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected(),
-        remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1"] },
         defaultHostedProvider: "openrouter",
         defaultHostedModel: "openai/gpt-4.1",
@@ -106,21 +102,19 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  it("does not plan SuperPlane when credit remains without a default model", () => {
+  it("does not plan SuperPlane without a default model", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected(),
-        remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openai: ["gpt-5", "gpt-4.1"] },
       }),
     ).toBeUndefined();
   });
 
-  it("uses a connected provider when hosted credit has no default model", () => {
+  it("uses a connected provider when no hosted default is available", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openai"),
-        remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
       })?.providerId,
     ).toBe("openai");
@@ -130,7 +124,6 @@ describe("resolveOnboardingAgent", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("claude"),
-        remainingCreditCents: 5000,
         hostedModels: noHostedModels,
         defaultHostedProvider: "anthropic",
         defaultHostedModel: "claude-sonnet-4-6",
@@ -219,19 +212,17 @@ describe("firstWorkOrderAgentError", () => {
     ).toBe("Ask an installation admin to set a SuperPlane agent model.");
   });
 
-  it("returns null when a plan is ready", () => {
+  it("allows a hosted plan when credit is empty", () => {
     expect(
       firstWorkOrderAgentError({
-        remainingCreditCents: 5000,
+        remainingCreditCents: 0,
         hostedModelsLoading: false,
         plan: {
-          providerId: "openrouter",
-          component: "runnerOpenRouter",
+          component: "runnerSuperPlane",
           credentialsSource: "hosted",
-          integrationName: "openrouter",
-          harness: "AGENT_HARNESS_CLAUDE_CODE",
-          model: "openai/gpt-4.1",
-          planningModel: "openai/gpt-4.1",
+          harness: "AGENT_HARNESS_SUPERPLANE",
+          model: "",
+          planningModel: "",
         },
       }),
     ).toBeNull();
@@ -249,11 +240,13 @@ describe("hosted credit grant copy", () => {
 
   it("explains that remaining credit lets the user continue without keys", () => {
     expect(hostedCreditGrantCopy(5000)).toBe(
-      "This organization has $50.00 of hosted credit. You can continue without connecting your own keys.",
+      "This organization has $50.00 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
     );
   });
 
   it("asks the user to connect a provider when remaining credit is empty", () => {
-    expect(hostedCreditGrantCopy(0)).toBe("Hosted credit is empty. Connect a provider to continue.");
+    expect(hostedCreditGrantCopy(0)).toBe(
+      "Trial credit is used up. Subscribe to Business or connect a provider to continue.",
+    );
   });
 });

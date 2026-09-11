@@ -9,6 +9,7 @@ import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Wallet } from "lucide-react";
 
 import { useOrgLLMCredit, type OrganizationLLMCredit } from "./useOrgLLMCredit";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
   const credit = useOrgLLMCredit(orgId);
@@ -38,13 +39,42 @@ function OrgHostedCreditCard(args: {
   setNote: (value: string) => void;
   markupPercent: string;
   setMarkupPercent: (value: string) => void;
+  planValue: string;
+  setPlanValue: (value: string) => void;
   savingGrant: boolean;
   savingMarkup: boolean;
+  savingPlan: boolean;
   addGrant: () => void;
   saveMarkup: () => void;
+  savePlan: () => void;
 }) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
+      <div className="mb-4 max-w-sm">
+        <Label className="mb-2 block text-left">Billing plan</Label>
+        <Select value={args.planValue} onValueChange={args.setPlanValue}>
+          <SelectTrigger data-testid="admin-org-billing-plan">
+            <SelectValue placeholder="Select a plan" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="trial">Trial</SelectItem>
+            <SelectItem value="business">Business</SelectItem>
+            <SelectItem value="none">None</SelectItem>
+          </SelectContent>
+        </Select>
+        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Admin Business skips Polar payment. Polar webhooks do not change this plan.
+        </Text>
+        <Button
+          type="button"
+          className="mt-3"
+          data-testid="admin-org-billing-plan-save"
+          onClick={args.savePlan}
+          disabled={args.savingPlan}
+        >
+          {args.savingPlan ? "Saving..." : "Save plan"}
+        </Button>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <CreditMetric label="Remaining hosted credit" value={formatUsdCents(args.credit.remaining_credit_cents)} />
         <CreditMetric label="SuperPlane grant" value={formatUsdCents(args.credit.superplane_grant_cents)} />

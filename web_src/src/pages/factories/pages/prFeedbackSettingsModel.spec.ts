@@ -394,6 +394,17 @@ describe("prFeedbackDraftIsValid", () => {
         }),
       ),
     ).toBe(false);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
+          checkNames: ["lint"],
+          maximumAttempts: 5.5,
+        }),
+      ),
+    ).toBe(false);
   });
 });
 

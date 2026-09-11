@@ -32,7 +32,20 @@ describe("searchFactorySettings", () => {
 
   it("returns Billing and not Spending for a billing query", () => {
     const titles = searchFactorySettings(index, "billing").map((result) => result.title);
-    expect(titles).toEqual(["Billing"]);
+    expect(titles).toEqual(["Billing", "Hosted credit", "Invoices"]);
+  });
+
+  it("returns the Invoices card for an invoices query", () => {
+    const results = searchFactorySettings(index, "invoices");
+    expect(results[0]?.title).toBe("Invoices");
+    expect(results[0]?.anchor).toBe("billing-polar-invoices");
+    expect(results.map((result) => result.title)).not.toContain("Billing");
+  });
+
+  it("returns the Hosted credit card for a hosted credit query", () => {
+    const results = searchFactorySettings(index, "hosted credit");
+    expect(results[0]?.title).toBe("Hosted credit");
+    expect(results[0]?.anchor).toBe("billing-credit-balance");
   });
 
   it("returns Workspace key under Workspace General", () => {

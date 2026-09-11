@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { leaveFactoryConfigureSearchParams, setSearchParamFlag } from "./factoryAppSearchParamFlag";
+import {
+  leaveFactoryConfigureSearchParams,
+  setFactoryAppSelectedRun,
+  setSearchParamFlag,
+} from "./factoryAppSearchParamFlag";
 
 describe("leaveFactoryConfigureSearchParams", () => {
   it("drops Configure chrome flags and keeps run context", () => {
@@ -18,6 +22,26 @@ describe("leaveFactoryConfigureSearchParams", () => {
   it("returns the same params when Configure flags are already absent", () => {
     const current = new URLSearchParams("from=automations&run=r1");
     expect(leaveFactoryConfigureSearchParams(current)).toBe(current);
+  });
+});
+
+describe("setFactoryAppSelectedRun", () => {
+  it("sets the run id and keeps other flags", () => {
+    const next = setFactoryAppSelectedRun(new URLSearchParams("from=lines&lineId=l1"), "run-9");
+    expect(next.get("run")).toBe("run-9");
+    expect(next.get("from")).toBe("lines");
+    expect(next.get("lineId")).toBe("l1");
+  });
+
+  it("clears the run id", () => {
+    const next = setFactoryAppSelectedRun(new URLSearchParams("from=automations&run=run-9"), null);
+    expect(next.get("run")).toBeNull();
+    expect(next.get("from")).toBe("automations");
+  });
+
+  it("returns the same params when the run id already matches", () => {
+    const current = new URLSearchParams("run=run-9");
+    expect(setFactoryAppSelectedRun(current, "run-9")).toBe(current);
   });
 });
 

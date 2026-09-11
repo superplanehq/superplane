@@ -92,6 +92,61 @@ func Test__IntakeSeed(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, runs.GetRuns())
 	})
+
+	t.Run("reseeding an unbound intake stays empty", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_GITHUB_ISSUES,
+		})
+		require.NoError(t, err)
+
+		intake, err := factory.FindIntake(database.DB(t.Context()), uuid.MustParse(response.GetIntake().GetId()))
+		require.NoError(t, err)
+		require.NoError(t, SeedExistingIntake(ctx, deps, database.DB(t.Context()), intake))
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+	})
+
+	t.Run("live binding reads the canvas trigger not onboarding config", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		backlogRepository := "acme/backlog"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSIntegrationID:  &integrationID,
+			BacklogRepository: &backlogRepository,
+		}))
+
+		response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_GITHUB_ISSUES,
+		})
+		require.NoError(t, err)
+
+		otherRepository := "acme/other"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			BacklogRepository: &otherRepository,
+		}))
+
+		intake, err := factory.FindIntake(database.DB(t.Context()), uuid.MustParse(response.GetIntake().GetId()))
+		require.NoError(t, err)
+
+		binding, err := liveIntakeBinding(database.DB(t.Context()), intake)
+		require.NoError(t, err)
+		require.NotNil(t, binding)
+		assert.Equal(t, backlogRepository, binding.Configuration["repository"])
+		require.NotNil(t, binding.Installation)
+		assert.Equal(t, integrationID, binding.Installation.ID.String())
+	})
 }
 
 func Test__GitHubIssueEvents(t *testing.T) {

@@ -56,8 +56,8 @@ func Test__DescribeOrganizationSpendingReport(t *testing.T) {
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderOpenAI,
 		Model:           "gpt-4o",
-		InputTokens:     2000,
-		TotalTokens:     2000,
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
 	}))
 	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
 		OrganizationID:  r.Organization.ID,
@@ -87,11 +87,11 @@ func Test__DescribeOrganizationSpendingReport(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp.KpiTotals)
-	assert.Equal(t, int64(2000), resp.KpiTotals.TotalTokens)
+	assert.Equal(t, int64(1_000_000), resp.KpiTotals.TotalTokens)
 	assert.Equal(t, int64(60), resp.KpiTotals.DurationSeconds)
 	assert.Positive(t, resp.KpiTotals.CostCents)
 	require.NotNil(t, resp.ExplorerTotals)
-	assert.Equal(t, int64(2000), resp.ExplorerTotals.TotalTokens)
+	assert.Equal(t, int64(1_000_000), resp.ExplorerTotals.TotalTokens)
 	require.NotEmpty(t, resp.Breakdown)
 	assert.Equal(t, factory.ID.String(), resp.Breakdown[0].Id)
 	assert.Equal(t, factory.Name, resp.Breakdown[0].Label)

@@ -1,10 +1,13 @@
+import { Plus, Settings2 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationGlyph, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 
-const ROW_CLASSNAME = "flex h-5 w-full items-center gap-1.5 text-left text-[12px] leading-5";
+const ROW_CLASSNAME = "flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] leading-4";
+const ROW_HOVER_CLASSNAME = "transition-colors hover:bg-black/10 dark:hover:bg-black/20";
 
 /**
  * Header rows that name the automations behind a column. Every column on
@@ -16,12 +19,14 @@ export function ColumnAutomationRows({
   automations,
   rowCount,
   onRowAction,
+  onAdd,
   testId,
 }: {
   title: string;
   automations: ColumnAutomation[];
   rowCount: number;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAdd?: () => void;
   testId: string;
 }) {
   const blankCount = Math.max(0, rowCount - Math.max(1, automations.length));
@@ -29,9 +34,7 @@ export function ColumnAutomationRows({
   return (
     <div role="list" aria-label={`${title} automations`} className="flex flex-col gap-0.5" data-testid={testId}>
       {automations.length === 0 ? (
-        <p className={cn(ROW_CLASSNAME, "text-muted-foreground/70")} data-testid={`${testId}-empty`}>
-          {COLUMN_AUTOMATIONS_COPY.rowsEmpty}
-        </p>
+        <EmptyAutomationRow title={title} onAdd={onAdd} testId={testId} />
       ) : (
         automations.map((automation) => (
           <ColumnAutomationRow key={automation.id} automation={automation} onRowAction={onRowAction} testId={testId} />
@@ -41,6 +44,29 @@ export function ColumnAutomationRows({
         <div key={`blank-${index}`} className={ROW_CLASSNAME} aria-hidden data-testid={`${testId}-blank`} />
       ))}
     </div>
+  );
+}
+
+function EmptyAutomationRow({ title, onAdd, testId }: { title: string; onAdd?: () => void; testId: string }) {
+  if (!onAdd) {
+    return (
+      <p className={cn(ROW_CLASSNAME, "text-muted-foreground")} data-testid={`${testId}-empty`}>
+        {COLUMN_AUTOMATIONS_COPY.rowsEmpty}
+      </p>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      data-testid={`${testId}-empty`}
+      aria-label={`${COLUMN_AUTOMATIONS_COPY.addLabel} for ${title}`}
+      onClick={onAdd}
+      className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "text-muted-foreground hover:text-foreground")}
+    >
+      <Plus className="size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1 truncate">{COLUMN_AUTOMATIONS_COPY.addLabel}</span>
+    </button>
   );
 }
 
@@ -58,21 +84,26 @@ function ColumnAutomationRow({
   const headline = columnAutomationHeadline(automation);
   const className = cn(
     ROW_CLASSNAME,
-    "min-w-0 text-muted-foreground",
+    "text-foreground",
     disabled && "line-through opacity-60",
-    onRowAction && "group/automation cursor-pointer",
+    onRowAction && ROW_HOVER_CLASSNAME,
   );
   const content = (
     <>
       <ColumnAutomationGlyph automation={automation} className="size-3.5" />
-      <span className={cn("min-w-0 flex-1 truncate", onRowAction && "group-hover/automation:text-foreground")}>
-        {headline}
-      </span>
+      <span className="min-w-0 flex-1 truncate">{headline}</span>
       {needsRepair ? (
         <span
           className="size-1.5 shrink-0 rounded-full bg-amber-500"
           title={COLUMN_AUTOMATIONS_COPY.needsRepairLabel}
           data-testid={`${testId}-needs-repair-${automation.id}`}
+        />
+      ) : null}
+      {onRowAction ? (
+        <Settings2
+          className="size-3.5 shrink-0 text-muted-foreground"
+          aria-hidden
+          data-testid={`${testId}-settings-${automation.id}`}
         />
       ) : null}
     </>

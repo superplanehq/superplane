@@ -81,8 +81,7 @@ func TestRunSuperPlaneExecuteUsesNodeModelOverDefault(t *testing.T) {
 	})
 	assert.Equal(t, "sk-or-v1-child", requireEnvironmentValue(t, req.Environment, envOpenRouterAPIKey))
 	assert.Equal(t, "3600", requireEnvironmentValue(t, req.Environment, runner.EnvExecutionTimeoutSeconds))
-	modelsFile := requireTaskFile(t, req.Files, "openrouter_models.json")
-	assert.JSONEq(t, `["anthropic/claude-sonnet-4-6","x-ai/grok-4.6"]`, modelsFile.Content)
+	assert.False(t, hasTaskFile(req.Files, "openrouter_models.json"))
 	prepare := requireTaskFile(t, req.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "opencode CLI not found")
 	assert.NotContains(t, strings.Join(commandStrings(req.Commands), "\n"), " 128")
@@ -247,13 +246,11 @@ func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 		"",
 		nil,
 		[]runner.BrokerEnvironmentVariable{{Name: runner.EnvSuperplanePlanningID, Value: "session-1"}},
-		[]string{"anthropic/claude-sonnet-4-6"},
-		"",
 	)
 	require.NoError(t, err)
 	assert.True(t, hasTaskFile(files, "planning_session_mcp.js"))
 	assert.True(t, hasTaskFile(files, "mcp.json"))
-	assert.True(t, hasTaskFile(files, "openrouter_models.json"))
+	assert.False(t, hasTaskFile(files, "openrouter_models.json"))
 }
 
 func TestRunSuperPlaneExecuteUsesNodeModelWhenDefaultIsMissing(t *testing.T) {

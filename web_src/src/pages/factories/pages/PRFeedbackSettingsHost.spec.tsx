@@ -146,7 +146,7 @@ describe("PRFeedbackSettingsHost", () => {
       "/org-1/workspaces/rf/apps/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
     );
     expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-pr-discussion", {}, true);
-    const sidebar = within(automation).getByTestId("canvas-runs-sidebar");
+    const sidebar = within(automation).getByTestId("factory-automation-runs-sidebar");
     expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
       "href",
       "/org-1/workspaces/rf/apps/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",

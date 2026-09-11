@@ -93,13 +93,13 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
-func TestBuildOpenCodeConfigSetsThroughputRoutingForModels(t *testing.T) {
+func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
 	payload, err := json.Marshal(map[string]any{
 		"taskDir": "/task",
 		"env":     map[string]string{"OPENROUTER_API_KEY": "sk-or"},
-		"models":  []string{"x-ai/grok-4.6", "anthropic/claude-sonnet-4-6"},
+		"models":  []string{"x-ai/grok-4.6"},
 	})
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
@@ -111,10 +111,11 @@ func TestBuildOpenCodeConfigSetsThroughputRoutingForModels(t *testing.T) {
 	openrouter, _ := provider["openrouter"].(map[string]any)
 	models, _ := openrouter["models"].(map[string]any)
 	require.Contains(t, models, "x-ai/grok-4.6")
+	assert.Len(t, models, 1)
 	grok, _ := models["x-ai/grok-4.6"].(map[string]any)
 	options, _ := grok["options"].(map[string]any)
 	routing, _ := options["provider"].(map[string]any)
-	assert.Equal(t, true, routing["allow_fallbacks"])
+	assert.Equal(t, false, routing["allow_fallbacks"])
 	assert.Equal(t, "throughput", routing["sort"])
 }
 
@@ -181,106 +182,80 @@ func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
 	assert.Equal(t, "✓ done · 1 turns · $0.0022 · 1.6s\n", output)
 }
 
-func TestRunPromptSwitchesModelAfterNewAccountRPM(t *testing.T) {
+func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "x-ai/grok-4.6",
-		fallback: []string{
-			"x-ai/grok-4.6",
-			"anthropic/claude-sonnet-4-6",
-		},
 		spawns: []spawnScript{
-			{
-				ExitCode: 1,
-				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Rate limit reached: new accounts are limited to 20 requests per minute for this model. Please retry shortly.",
-				Stdout: []string{
-					`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
-					`{"type":"error","sessionID":"ses_1","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Rate limit reached: new accounts are limited to 20 requests per minute for this model. Please retry shortly."}}}`,
-				},
-			},
-			{
-				ExitCode: 0,
-				Stdout: []string{
-					`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
-					`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"working"}}`,
-					`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","reason":"stop","cost":0.002,"tokens":{"input":11,"output":3,"cache":{"read":0,"write":0}}}}`,
-				},
-			},
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly."),
+			successSpawn("working"),
 		},
 	})
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
-	assert.Contains(t, result.spawns[0], "-m")
 	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
-	assert.NotContains(t, result.spawns[0], "--session")
-	assert.NotContains(t, result.spawns[1], "--session")
-	assert.Contains(t, result.spawns[1], "openrouter/anthropic/claude-sonnet-4-6")
-	assert.Contains(t, result.output, "OpenRouter model rotation: x-ai/grok-4.6 → anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.NotContains(t, result.spawns[1], "anthropic/")
+	assert.Equal(t, []float64{30000}, result.sleeps)
 	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Switching to anthropic/claude-sonnet-4-6.")
-	assert.Contains(t, result.output, "Starting a new OpenCode session on anthropic/claude-sonnet-4-6.")
-	assert.Contains(t, result.output, "OpenCode finished on anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	assert.NotContains(t, result.spawns[1], "--session")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
 }
 
-func TestRunPromptKeepsFileOrderAndLogsStartModel(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "x-ai/grok-4.6",
-		fallback: []string{"anthropic/claude-sonnet-4-6", "x-ai/grok-4.6"},
-		spawns: []spawnScript{{
-			ExitCode: 0,
-			Stdout: []string{
-				`{"type":"text","sessionID":"ses_rot","part":{"type":"text","text":"ok"}}`,
-				`{"type":"step_finish","sessionID":"ses_rot","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
-			},
-		}},
-	})
-	assert.Equal(t, 0, result.exitCode)
-	require.Len(t, result.spawns, 1)
-	assert.Contains(t, result.spawns[0], "openrouter/anthropic/claude-sonnet-4-6")
-	assert.Contains(t, result.output, "OpenRouter model rotation: anthropic/claude-sonnet-4-6 → x-ai/grok-4.6")
-	assert.Contains(t, result.output, "This run starts on anthropic/claude-sonnet-4-6. Selected model x-ai/grok-4.6 is later in the rotation.")
-	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
-}
-
-func TestRunPromptSwitchesModelAfterTemporaryProviderError(t *testing.T) {
+func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "x-ai/grok-4.6",
-		fallback: []string{
-			"x-ai/grok-4.6",
-			"anthropic/claude-sonnet-4-6",
-		},
 		spawns: []spawnScript{
 			{
 				ExitCode: 1,
 				Stderr:   "HTTP 503 Service Unavailable",
 				Stdout: []string{
-					`{"type":"error","sessionID":"ses_1","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+					`{"type":"error","sessionID":"ses_fail","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
 				},
 			},
-			{
-				ExitCode: 0,
-				Stdout: []string{
-					`{"type":"text","sessionID":"ses_2","part":{"type":"text","text":"recovered"}}`,
-					`{"type":"step_finish","sessionID":"ses_2","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
-				},
-			},
+			successSpawn("recovered"),
 		},
 	})
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
-	assert.NotContains(t, result.spawns[1], "--session")
-	assert.Contains(t, result.spawns[1], "openrouter/anthropic/claude-sonnet-4-6")
-	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Switching to anthropic/claude-sonnet-4-6.")
-	assert.Contains(t, result.output, "Starting a new OpenCode session on anthropic/claude-sonnet-4-6.")
-	assert.Contains(t, result.output, "OpenCode finished on anthropic/claude-sonnet-4-6")
+	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_fail")
+	assert.Equal(t, []float64{30000}, result.sleeps)
+	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
 }
 
-func TestRunPromptSwitchesOnNestedRateLimitStatus(t *testing.T) {
+func TestRunPromptContinuesSessionWhenRetryableFailureMadeProgress(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "x-ai/grok-4.6",
-		fallback: []string{"x-ai/grok-4.6", "openai/gpt-4.1"},
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_work","part":{"type":"step-start"}}`,
+					`{"type":"tool_use","sessionID":"ses_work","part":{"callID":"call_1","tool":"bash","state":{"status":"completed","input":{"command":"git status"},"output":"On branch main"}}}`,
+					`{"type":"error","sessionID":"ses_work","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.NotContains(t, result.spawns[0], "--session")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_work")
+}
+
+func TestRunPromptRetriesNestedRateLimitOnSelectedModel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
 		spawns: []spawnScript{
 			{
 				ExitCode: 1,
@@ -288,55 +263,78 @@ func TestRunPromptSwitchesOnNestedRateLimitStatus(t *testing.T) {
 					`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":429,"responseBody":"{\"error\":{\"code\":429,\"message\":\"Rate limit exceeded\"}}"}}}`,
 				},
 			},
-			{
-				ExitCode: 0,
-				Stdout: []string{
-					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"ok"}}`,
-					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
-				},
-			},
+			successSpawn("ok"),
 		},
 	})
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Switching to openai/gpt-4.1.")
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.Equal(t, []float64{30000}, result.sleeps)
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
 }
 
-func TestRunPromptWaitsWhenOnlyOneModelIsRateLimited(t *testing.T) {
+func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "x-ai/grok-4.6",
-		fallback: []string{"x-ai/grok-4.6"},
+		model: "x-ai/grok-4.6",
 		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
 			{
 				ExitCode: 1,
-				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly.",
-				Stdout:   []string{`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly."}}}`},
-			},
-			{
-				ExitCode: 0,
+				Stderr:   "HTTP 503 Service Unavailable",
 				Stdout: []string{
-					`{"type":"text","sessionID":"ses_wait","part":{"type":"text","text":"ok"}}`,
-					`{"type":"step_finish","sessionID":"ses_wait","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+					`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
 				},
 			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 4)
+	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
+	assert.Contains(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	assert.Contains(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
+	assert.Contains(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
+	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+}
+
+func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly. Retry-After: 90"),
+			successSpawn("ok"),
 		},
 	})
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
-	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
-	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
-	assert.Equal(t, []float64{60000}, result.sleeps)
-	assert.Contains(t, result.output, "OpenRouter model: x-ai/grok-4.6. No other allowed models are available to rotate to.")
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 60 seconds, then retrying.")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
-	assert.NotContains(t, result.output, "Switching to")
+	assert.Equal(t, []float64{90000}, result.sleeps)
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
+	assert.NotContains(t, result.output, "Waiting 30 seconds")
+}
+
+func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 4)
+	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
+	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	assert.NotContains(t, result.output, "attempt 5")
+	assert.Regexp(t, `✗ failed`, result.output)
 }
 
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
-		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -355,9 +353,8 @@ func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
-		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -383,8 +380,7 @@ func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testi
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
+		model: "google/gemma-4-31b-it",
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -401,9 +397,8 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *tes
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
-		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -427,9 +422,8 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
-		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -445,9 +439,8 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithUsageOnly(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
-		env:      map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -463,8 +456,7 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithUsageOnly(t *testing.T) {
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithoutReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "google/gemma-4-31b-it",
-		fallback: []string{"google/gemma-4-31b-it"},
+		model: "google/gemma-4-31b-it",
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stderr:   "opencode crashed",
@@ -477,8 +469,7 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithoutReply(t *testing.T) {
 
 func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "anthropic/claude-sonnet-4-6",
-		fallback: []string{"anthropic/claude-sonnet-4-6", "openai/gpt-4.1"},
+		model: "anthropic/claude-sonnet-4-6",
 		spawns: []spawnScript{
 			{
 				ExitCode: 1,
@@ -490,9 +481,9 @@ func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.NotContains(t, result.output, "Switching to")
+	assert.NotContains(t, result.output, "Waiting")
+	assert.NotContains(t, result.output, "Retrying")
 	assert.Contains(t, result.output, "Invalid API key")
-	assert.Contains(t, result.output, "This error does not rotate to another model.")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
 
@@ -501,7 +492,6 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("first"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "openrouter_models.json"), []byte(`["anthropic/claude-sonnet-4-6"]`), 0o644))
 
 	first := runPromptInDir(t, dir, "prompt.txt", "anthropic/claude-sonnet-4-6", []spawnScript{{
 		ExitCode: 0,
@@ -557,10 +547,9 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
 }
 
-func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
+func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:    "x-ai/grok-4.6",
-		fallback: []string{"x-ai/grok-4.6", "anthropic/claude-sonnet-4-6"},
+		model: "x-ai/grok-4.6",
 		spawns: []spawnScript{{
 			ExitCode: 0,
 			Stderr:   "HTTP 429 Too Many Requests",
@@ -574,9 +563,8 @@ func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.NotContains(t, result.output, "Switching to")
-	assert.NotContains(t, result.output, "waiting to continue")
-	assert.NotContains(t, result.output, "Waiting 60 seconds")
+	assert.NotContains(t, result.output, "Waiting")
+	assert.NotContains(t, result.output, "Retrying")
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "recovered", payload["result"])
 }
@@ -584,16 +572,52 @@ func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
 func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model:     "x-ai/grok-4.6",
-		fallback:  []string{"x-ai/grok-4.6"},
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
+		},
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
 		nowValues: []int64{0, 2000},
 		env: map[string]string{
 			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
 		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
-			Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
-			Stdout:   []string{`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`},
+			Stderr:   "HTTP 503 Service Unavailable",
+			Stdout: []string{
+				`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+			},
 		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.Contains(t, result.output, "Temporary error wait exceeded the execution timeout")
+	assert.NotContains(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestRunPromptDoesNotWaitWhenRetryExceedsRemainingTimeout(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "10",
+		},
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
 	})
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
@@ -625,7 +649,6 @@ type spawnScript struct {
 
 type promptHarness struct {
 	model     string
-	fallback  []string
 	spawns    []spawnScript
 	env       map[string]string
 	nowValues []int64
@@ -646,14 +669,25 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
-	fallback := harness.fallback
-	if len(fallback) == 0 {
-		fallback = []string{harness.model}
-	}
-	raw, err := json.Marshal(fallback)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "openrouter_models.json"), raw, 0o644))
 	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues)
+}
+
+func rateLimitSpawn(message string) spawnScript {
+	return spawnScript{
+		ExitCode: 1,
+		Stderr:   message,
+		Stdout:   []string{fmt.Sprintf(`{"type":"error","error":{"data":{"message":%q}}}`, message)},
+	}
+}
+
+func successSpawn(text string) spawnScript {
+	return spawnScript{
+		ExitCode: 0,
+		Stdout: []string{
+			fmt.Sprintf(`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":%q}}`, text),
+			`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+		},
+	}
 }
 
 func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64) openRouterPromptResult {

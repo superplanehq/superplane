@@ -71,7 +71,7 @@ export function hasActiveBacklogAnalysisRun(runs: BacklogAnalysisRun[]): boolean
   return runs.some((entry) => isActiveCanvasRun(entry.run));
 }
 
-function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
+export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
   const envelope = asRecord(run.rootEvent?.data);
   const payload = asRecord(envelope?.data) ?? envelope;
   const id = asRecord(payload?.workOrder)?.id;

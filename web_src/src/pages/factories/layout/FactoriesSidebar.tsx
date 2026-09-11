@@ -2,6 +2,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
@@ -28,7 +29,13 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const { data: organization } = useOrganization(organizationId);
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
-  const isTrial = spend.data ? isHostedCreditTrialOrg(spend.data) : false;
+  const billing = useOrganizationBilling(organizationId);
+  const isTrial = isHostedCreditTrialOrg({
+    purchasedCreditCents: spend.data?.purchasedCreditCents,
+    welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
+    plan: billing.data?.plan,
+    trialEndsAt: billing.data?.trialEndsAt,
+  });
 
   return (
     <aside

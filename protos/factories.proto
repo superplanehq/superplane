@@ -956,6 +956,14 @@ message FactoryIntake {
     SOURCE_PRODUCTIVE_TASKS = 4;
   }
 
+  enum InitialImportStatus {
+    INITIAL_IMPORT_STATUS_UNSPECIFIED = 0;
+    INITIAL_IMPORT_STATUS_PENDING = 1;
+    INITIAL_IMPORT_STATUS_COMPLETED = 2;
+    INITIAL_IMPORT_STATUS_FAILED = 3;
+    INITIAL_IMPORT_STATUS_SKIPPED = 4;
+  }
+
   // Settings that change what the intake does. They are stored in the canvas
   // graph, because the canvas is what the workers run. This block is a
   // read/write facade over that graph.
@@ -1007,6 +1015,10 @@ message FactoryIntake {
   bool healthy = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Result of the one-time import that runs when the intake is created.
+  InitialImportStatus initial_import_status = 11;
+  // Set when the initial import completed, including when it found zero items.
+  optional int32 initial_import_item_count = 12;
 }
 
 message FactoryIntakeRun {
@@ -1415,6 +1427,9 @@ message WorkOrder {
   // Ready files for this task. Present on DescribeWorkOrder only.
   // The stored description uses sp-file:// refs, not download URLs.
   repeated Superplane.Files.File files = 18;
+  // Canvas run that created this task, when Create Task produced it.
+  // Empty for tasks opened in the UI or imported without a source run.
+  string source_run_id = 19;
 }
 
 message WorkOrderOrigin {

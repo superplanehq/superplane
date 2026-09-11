@@ -80,7 +80,6 @@ export function isAgentStepReady(connected: Set<IntegrationId>, remainingCreditC
 
 export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
-  remainingCreditCents: number;
   hostedModels: HostedModelsByProvider;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
@@ -97,12 +96,9 @@ export function resolveOnboardingAgent(args: {
 }
 
 function hostedSuperPlanePlan(args: {
-  remainingCreditCents: number;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
-  if (args.remainingCreditCents <= 0) return undefined;
-
   const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
   const defaultModel = args.defaultHostedModel?.trim() ?? "";
   if (!defaultProvider || !defaultModel) return undefined;
@@ -121,8 +117,9 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * Hosted credit answers the agent question for the organization, so setup has
- * nothing left to ask about the agent.
+ * A hosted default answers the agent question for the organization, so setup
+ * has nothing left to ask about the agent. Billing controls hosted runs after
+ * setup. Installations without a hosted default still use the connection step.
  */
 export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
   return plan?.component === "runnerSuperPlane";
@@ -150,9 +147,9 @@ export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {
   if (remainingCreditCents > 0) {
-    return `This organization has ${formatUsdCents(remainingCreditCents)} of hosted credit. You can continue without connecting your own keys.`;
+    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.`;
   }
-  return "Hosted credit is empty. Connect a provider to continue.";
+  return "Trial credit is used up. Subscribe to Business or connect a provider to continue.";
 }
 
 function planForConnectedProvider(

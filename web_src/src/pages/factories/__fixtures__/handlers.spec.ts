@@ -12,6 +12,7 @@ import {
   REFUND_LINE_PLAN_ID,
   RUNNING_WORK_ORDER,
 } from "./factoryPageResponses";
+import { BUSINESS_ORGANIZATION_BILLING } from "./usageReportFixtures";
 
 describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
@@ -205,6 +206,26 @@ describe("matchFactoryPageFixture", () => {
     const body = (await afterCreate.json()) as { handlers: Array<{ source?: string }> };
     expect(body.handlers).toHaveLength(1);
     expect(body.handlers[0]?.source).toBe("SOURCE_PULL_REQUEST_CHECKS");
+  });
+
+  it("applies Polar billing after a billing sync", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      billingSyncCalls: 0,
+      billingAfterSync: BUSINESS_ORGANIZATION_BILLING,
+    };
+
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/sync`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      plan: "business",
+      creditPurchaseAllowed: true,
+    });
+    expect(fixture.billingSyncCalls).toBe(1);
+    expect(fixture.organizationBilling).toMatchObject({ plan: "business" });
   });
 
   it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
