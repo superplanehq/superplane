@@ -159,6 +159,14 @@ function retryWaitLine(kind, model, waitMs, nextAttempt) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Waiting ${waitSecondsLabel(waitMs)}, then retrying (attempt ${nextAttempt} of ${MAX_ATTEMPTS}).`;
 }
 
+function callingOpenCodeLine(model, attempt) {
+  const labeled = openRouterModelId(model) || String(model || "").trim();
+  if (labeled) {
+    return `Calling OpenCode · ${labeled} (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+  }
+  return `Calling OpenCode (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+}
+
 function stoppedAfterAttemptsLine(kind, model) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
 }
@@ -314,7 +322,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const cwd = helpers.cwd || process.cwd();
   const planning = planningEnabled(env);
   if (planning) {
-    println("Planning session tools enabled");
+    printLiveLogLine("Planning session tools enabled");
     prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
   }
 
@@ -331,13 +339,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let sessionID = readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
-    println(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
+    printLiveLogLine(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
   } else {
     const startModel = openRouterModelId(currentModel) || model;
     if (startModel) {
-      println(`Starting OpenCode · ${startModel}`);
+      printLiveLogLine(`Starting OpenCode · ${startModel}`);
     } else {
-      println("Starting OpenCode");
+      printLiveLogLine("Starting OpenCode");
     }
   }
 
@@ -350,14 +358,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let failed = false;
   let exitCode = 0;
   let lastErrorText = "";
-  let attemptLabel = "";
   let attempt = 1;
 
   while (true) {
-    if (attemptLabel) {
-      println(attemptLabel);
-      attemptLabel = "";
-    }
+    printLiveLogLine(callingOpenCodeLine(currentModel, attempt));
     const sessionBeforeAttempt = sessionID;
     const args = opencodeRunArgs({
       model: currentModel,
@@ -393,18 +397,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (!isRetryableKind(classKind)) {
       failed = true;
       exitCode = failedExit;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
+      printRetryOutcome(lastErrorText);
       break;
     }
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
-      println(stoppedAfterAttemptsLine(classKind, currentModel));
+      printRetryOutcome(lastErrorText, stoppedAfterAttemptsLine(classKind, currentModel));
       break;
     }
     const waitMs = retryWaitMs(lastErrorText, attempt);
@@ -412,19 +411,12 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (remaining < waitMs || remaining <= 0) {
       failed = true;
       exitCode = 1;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
-      println(waitExceededTimeoutLine(classKind));
+      printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
-    if (lastErrorText) {
-      println(truncateText(lastErrorText));
-    }
-    println(retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
     await sleep(waitMs);
     attempt += 1;
-    attemptLabel = `Retrying OpenCode · ${openRouterModelId(currentModel)}`;
   }
 
   formatter.flush(failed);
@@ -525,12 +517,18 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     child.stdin.end();
   }
   let stderrText = "";
-  if (child.stderr) {
+  const stderrDone = new Promise((resolve) => {
+    if (!child.stderr) {
+      resolve();
+      return;
+    }
     child.stderr.on("data", (chunk) => {
       stderrText += String(chunk);
       process.stderr.write(chunk);
     });
-  }
+    child.stderr.on("end", resolve);
+    child.stderr.on("error", resolve);
+  });
 
   const stdout = child.stdout;
   const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
@@ -555,16 +553,15 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     });
   } catch (err) {
-    await stdoutDone;
+    await Promise.all([stdoutDone, stderrDone]);
     throw err;
   }
-  await stdoutDone;
+  await Promise.all([stdoutDone, stderrDone]);
 
   const snapshot = formatter.snapshot();
-  const errorText = [snapshot.errorText, stderrText].filter(Boolean).join("\n");
   return {
     exitCode,
-    errorText,
+    errorText: combineErrorText(snapshot.errorText, stderrText),
     resultFailed: snapshot.resultFailed,
     sessionID: snapshot.sessionID,
     usage: snapshot.usage,
@@ -572,6 +569,21 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     lastEvent: snapshot.lastEvent,
     roundOpen: Boolean(snapshot.roundOpen),
   };
+}
+
+function combineErrorText(fromEvent, fromStderr) {
+  const eventText = String(fromEvent || "").trim();
+  const stderr = String(fromStderr || "").trim();
+  if (!eventText) {
+    return stderr;
+  }
+  if (!stderr || eventText.includes(stderr)) {
+    return eventText;
+  }
+  if (stderr.includes(eventText)) {
+    return stderr;
+  }
+  return `${eventText}\n${stderr}`;
 }
 
 function emptyUsage() {
@@ -716,12 +728,33 @@ function promptSeriesName(promptFile) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
+function writeStdout(chunk) {
+  fs.writeSync(1, chunk);
+}
+
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  writeStdout(`${JSON.stringify(rec)}\n`);
+}
+
+function printLiveLogLine(text) {
+  const line = String(text || "");
+  if (!line) {
+    return;
+  }
+  writeLiveLogRecord({ type: "line", text: line });
+}
+
+function printRetryOutcome(errorText, extraLine) {
+  if (errorText) {
+    printLiveLogLine(truncateText(errorText));
+  }
+  if (extraLine) {
+    printLiveLogLine(extraLine);
+  }
 }
 
 function println(text = "") {
-  process.stdout.write(`${text}\n`);
+  writeStdout(`${text}\n`);
 }
 
 function createOpenCodeFormatter(telemetry, onSession) {

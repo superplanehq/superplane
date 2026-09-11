@@ -1,6 +1,7 @@
 package openrouter
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -196,9 +197,13 @@ func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
 	assert.NotContains(t, result.spawns[1], "anthropic/")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Starting OpenCode")
+	requireNoBareStdoutLine(t, result.output, "Calling OpenCode")
+	requireNoBareStdoutLine(t, result.output, "Waiting 30 seconds")
 	assert.NotContains(t, result.spawns[1], "--session")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
@@ -226,8 +231,8 @@ func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) 
 	assert.Contains(t, result.spawns[1], "--session")
 	assert.Contains(t, result.spawns[1], "ses_fail")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
 }
 
 func TestRunPromptContinuesSessionWhenRetryableFailureMadeProgress(t *testing.T) {
@@ -270,7 +275,7 @@ func TestRunPromptRetriesNestedRateLimitOnSelectedModel(t *testing.T) {
 	require.Len(t, result.spawns, 2)
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
 }
 
 func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
@@ -292,10 +297,12 @@ func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 4)
 	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
-	assert.Contains(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
-	assert.Contains(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
+	requireLiveLogLine(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Waiting 45 seconds")
 }
 
 func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
@@ -309,7 +316,7 @@ func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
 	assert.Equal(t, []float64{90000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
 	assert.NotContains(t, result.output, "Waiting 30 seconds")
 }
 
@@ -326,7 +333,9 @@ func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 4)
 	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	requireNoBareStdoutLine(t, result.output, "Stopped after 4 attempts")
 	assert.NotContains(t, result.output, "attempt 5")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
@@ -483,7 +492,7 @@ func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 	assert.Empty(t, result.sleeps)
 	assert.NotContains(t, result.output, "Waiting")
 	assert.NotContains(t, result.output, "Retrying")
-	assert.Contains(t, result.output, "Invalid API key")
+	requireLiveLogLine(t, result.output, "Invalid API key")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
 
@@ -518,7 +527,9 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
 	assert.Contains(t, second.spawns[0], "ses_keep")
-	assert.Contains(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, second.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoBareStdoutLine(t, second.output, "Continuing OpenCode session")
 }
 
 func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
@@ -544,7 +555,9 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "--auto")
 	assert.Equal(t, "--pure", result.spawns[0][0])
 	assert.Equal(t, "run", result.spawns[0][1])
-	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Starting OpenCode")
 }
 
 func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
@@ -583,7 +596,8 @@ func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireNoBareStdoutLine(t, result.output, "wait exceeded the execution timeout")
 }
 
 func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
@@ -604,7 +618,7 @@ func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Temporary error wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Temporary error wait exceeded the execution timeout")
 	assert.NotContains(t, result.output, "Rate limit wait exceeded the execution timeout")
 }
 
@@ -622,7 +636,7 @@ func TestRunPromptDoesNotWaitWhenRetryExceedsRemainingTimeout(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Rate limit wait exceeded the execution timeout")
 }
 
 func TestWaitDeadlineMsUsesExecutionTimeoutSeconds(t *testing.T) {
@@ -782,11 +796,14 @@ runPrompt(%q, %q, {
 		}
 	}
 	cmd.Env = env
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	exitCode := 0
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)
-		require.Truef(t, ok, "node harness failed: %v\n%s", err, out)
+		require.Truef(t, ok, "node harness failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 		exitCode = exitErr.ExitCode()
 	}
 	recorded := struct {
@@ -798,7 +815,7 @@ runPrompt(%q, %q, {
 	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
 		exitCode:   exitCode,
-		output:     string(out),
+		output:     stdout.String(),
 		resultFile: resultFile,
 		taskDir:    dir,
 		spawns:     recorded.Calls,
@@ -939,6 +956,17 @@ func runTurnResult(t *testing.T, event map[string]any) string {
 func liveLogRecords(t *testing.T, output string) []map[string]any {
 	t.Helper()
 	var records []map[string]any
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+func typedLiveLogRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || !strings.HasPrefix(line, "{") {
@@ -948,11 +976,51 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 		if err := json.Unmarshal([]byte(line), &rec); err != nil {
 			continue
 		}
-		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
-			records = append(records, rec)
+		if strings.TrimSpace(fmt.Sprint(rec["type"])) == "" {
+			continue
 		}
+		records = append(records, rec)
 	}
 	return records
+}
+
+func liveLogLineTexts(t *testing.T, output string) []string {
+	t.Helper()
+	var texts []string
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] != "line" {
+			continue
+		}
+		text, ok := rec["text"].(string)
+		if !ok || text == "" {
+			continue
+		}
+		texts = append(texts, text)
+	}
+	return texts
+}
+
+func requireLiveLogLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, text := range liveLogLineTexts(t, output) {
+		if strings.Contains(text, needle) {
+			return
+		}
+	}
+	require.Failf(t, "missing typed live-log line", "wanted %q in type=line records; got %q", needle, liveLogLineTexts(t, output))
+}
+
+func requireNoBareStdoutLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "{") {
+			continue
+		}
+		if strings.Contains(trimmed, needle) {
+			require.Failf(t, "found bare stdout line", "wanted %q only as a type=line live-log record; found %q", needle, trimmed)
+		}
+	}
 }
 
 func resultPayload(t *testing.T, path string) map[string]any {
