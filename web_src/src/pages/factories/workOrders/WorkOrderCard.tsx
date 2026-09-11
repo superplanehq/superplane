@@ -1,5 +1,6 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
@@ -11,6 +12,7 @@ import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAt
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
+import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
 
 const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
@@ -61,6 +63,10 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
    * shows a spinner in the meter slot until the score arrives.
    */
   isAnalyzing?: boolean;
+  /** Extra surface classes. Use for sidebar hover and selected fills. */
+  className?: string;
+  /** True when this card is the active item in a list. */
+  selected?: boolean;
 }
 
 /**
@@ -93,6 +99,8 @@ export function WorkOrderCard({
   onOpen,
   confidenceScore,
   isAnalyzing = false,
+  className,
+  selected = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
@@ -111,8 +119,13 @@ export function WorkOrderCard({
 
   return (
     <article
-      className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
+      className={cn(
+        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow",
+        WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
+        className,
+      )}
       data-testid={`work-order-card-${entry.id}`}
+      data-selected={selected || undefined}
     >
       <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 

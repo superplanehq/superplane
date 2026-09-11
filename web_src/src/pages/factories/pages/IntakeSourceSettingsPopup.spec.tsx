@@ -263,7 +263,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
   });
 
   it("lists canvas runs beside the automation when a canvas id is given", async () => {
@@ -275,7 +275,9 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await user.click(screen.getByRole("tab", { name: "Automation" }));
 
-    const sidebar = within(screen.getByTestId("intake-source-automation")).getByTestId("canvas-runs-sidebar");
+    const sidebar = within(screen.getByTestId("intake-source-automation")).getByTestId(
+      "factory-automation-runs-sidebar",
+    );
     expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
     expect(within(sidebar).getByText("feat: Add console empty-state")).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: "feat: Add console empty-state" })).toHaveAttribute(

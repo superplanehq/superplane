@@ -543,7 +543,7 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(within(automation).queryByText("passed")).not.toBeInTheDocument();
     expect(within(automation).queryByText("failed")).not.toBeInTheDocument();
     expect(within(automation).queryByText("notFound")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("canvas-runs-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
   });
 
   it("lists canvas runs beside the automation when a canvas id is given", () => {
@@ -552,7 +552,7 @@ describe("PRFeedbackSettingsPopup automation", () => {
       runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-pr-feedback?run=${runId}`,
     });
 
-    const sidebar = within(screen.getByTestId("pr-feedback-automation")).getByTestId("canvas-runs-sidebar");
+    const sidebar = within(screen.getByTestId("pr-feedback-automation")).getByTestId("factory-automation-runs-sidebar");
     expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
     expect(within(sidebar).getByText("Please fix the lint error")).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
