@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
+  EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
   LOW_TRIAL_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
@@ -81,6 +82,7 @@ export const TrialEnded: Story = {
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          organizationBilling: EXPIRED_TRIAL_ORGANIZATION_BILLING,
         }}
       />
     );

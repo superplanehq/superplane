@@ -1,6 +1,7 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
 import { getColorClass } from "@/lib/colors";
+import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
@@ -54,7 +55,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
   const machineTypeRaw = c.machineType ?? c.machine_type;
   const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
   if (machineType) {
-    details["Machine type"] = machineType;
+    details["Machine type"] = machineTypeLabel(machineType);
   }
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
   if (rawMode === EXECUTION_MODE_DOCKER) {

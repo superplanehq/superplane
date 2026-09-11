@@ -71,7 +71,7 @@ func Test__DescribeFactoryHostedBudgetAccountsForComputeSpend(t *testing.T) {
 		NodeID:          "runner",
 		MachineType:     "e1-large-amd64",
 		FleetID:         "e1-large-amd64",
-		DurationSeconds: 3600,
+		DurationSeconds: 18_000,
 	}))
 
 	summary, err := models.DescribeFactoryHostedBudget(db, factory)
