@@ -128,8 +128,11 @@ describe("WorkOrderIntentDocument", () => {
       />,
     );
 
-    await user.click(screen.getByRole("switch", { name: "Show the full plan" }));
+    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show full plan" }));
     expect(screen.getByTestId("split-run-intent-plan")).toHaveTextContent("The empty state tells the user");
+    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-plan-panel")).toBeInTheDocument();
   });
 
   it("starts the request pane at one third width and lets the reader drag the split", () => {
@@ -239,7 +242,9 @@ describe("WorkOrderIntentDocument", () => {
       />,
     );
 
-    expect(within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-phase-planning")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-phase-planning"),
+    ).toBeInTheDocument();
   });
 
   it("collapses a long request and expands it on Show more", async () => {

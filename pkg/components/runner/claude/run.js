@@ -23,8 +23,17 @@ const SYSTEM_PROMPT =
 const PLANNING_SYSTEM_PROMPT =
   " This is a SuperPlane planning session. Call mcp__superplane__propose_draft only when the user asked for a task in this turn. Call mcp__superplane__survey to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain text.";
 
-const ANALYSIS_SYSTEM_PROMPT =
-  " This is a SuperPlane analysis session for an open task. After you write the specification, call mcp__superplane__propose_spec with the full spec markdown and mcp__superplane__propose_confidence with the 0-5 score and a one-sentence summary. Do not change the original request. Do not call propose_draft. Call mcp__superplane__survey only if you need the user to answer a question. SuperPlane waits after you stop. Write to the user in plain text.";
+function loadAnalysisProtocol() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file).analysisProtocol();
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return "";
+}
 
 const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // Planning sessions may only explore the repo (Read/Bash) and use the planning
@@ -48,7 +57,7 @@ function planningAnalysisEnabled(env = process.env) {
 
 function planningSystemPrompt(env = process.env) {
   if (planningAnalysisEnabled(env)) {
-    return ANALYSIS_SYSTEM_PROMPT;
+    return ` ${loadAnalysisProtocol()}`;
   }
   return PLANNING_SYSTEM_PROMPT;
 }

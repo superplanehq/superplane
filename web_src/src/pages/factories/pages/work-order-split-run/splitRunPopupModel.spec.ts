@@ -108,9 +108,28 @@ describe("splitRunPopupModel", () => {
 
   it("opens the description tab for drafts and done cards, and the log for later states", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+          analysisRuns: [
+            {
+              canvasId: "canvas-backlog",
+              workOrderId: DRAFT_WORK_ORDER.id ?? "",
+              run: {
+                id: "run-analysis",
+                canvasId: "canvas-backlog",
+                state: "STATE_STARTED",
+                createdAt: "2026-08-28T12:00:00Z",
+                updatedAt: "2026-08-28T12:00:00Z",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("log");
   });
 
   it("prefers the saved work-order description on a live order", () => {

@@ -203,10 +203,9 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
 
-	assert.Contains(t, session.Wait().Text, "Do not change the original request.")
-	assert.Contains(t, session.Wait().Text, "propose_spec")
+	assert.Equal(t, "The retry lives in billing/retry.ts.", session.Wait().Text)
+	assert.NotContains(t, session.Wait().Text, "propose_spec")
 	assert.NotContains(t, session.Wait().Text, "propose_draft")
-	assert.Contains(t, session.Wait().Text, "The retry lives in billing/retry.ts.")
 }
 
 func createAnalysisCanvas(t *testing.T, orgID, factoryID, userID uuid.UUID) *Canvas {

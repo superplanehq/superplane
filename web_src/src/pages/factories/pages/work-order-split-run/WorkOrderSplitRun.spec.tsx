@@ -721,7 +721,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
-  it("tells a draft is under analysis and hides Archive while it runs", () => {
+  it("tells a draft is under analysis and keeps Archive", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -740,11 +740,12 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
     expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("hides source, artifacts, and pull requests on the description tab", () => {
@@ -998,6 +999,8 @@ describe("WorkOrderSplitRunPopup", () => {
       orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
+
+    await openLogTab(user);
 
     const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
     const view = within(prCreation).getByRole("link", { name: "View automation run" });

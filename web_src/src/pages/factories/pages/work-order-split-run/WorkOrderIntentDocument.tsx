@@ -2,11 +2,10 @@ import { useState, type FormEvent, type ReactNode } from "react";
 
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -78,12 +77,7 @@ export function WorkOrderIntentDocument({
           data-testid="split-run-intent-request"
         >
           {analysis ? (
-            <AnalysisRequestChat
-              title={sessionTitle}
-              description={description}
-              files={files}
-              analysis={analysis}
-            />
+            <AnalysisRequestChat title={sessionTitle} description={description} files={files} analysis={analysis} />
           ) : (
             <>
               <header className="sticky top-0 z-10 shrink-0 px-5 py-3" data-testid="split-run-intent-session">
@@ -116,18 +110,14 @@ export function WorkOrderIntentDocument({
             <h2 className="min-w-0 text-[17px] leading-6 font-semibold tracking-tight text-foreground">
               {document.title || INTENT_DOCUMENT_TITLE}
             </h2>
-            <label className="flex shrink-0 items-center gap-2 pt-0.5">
-              <span className="text-[12px] text-muted-foreground">{showPlan ? "Plan" : "Summary"}</span>
-              <Switch
-                checked={showPlan}
-                disabled={!hasPlan}
-                onCheckedChange={setShowPlan}
-                aria-label="Show the full plan"
-              />
-            </label>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5" data-testid="split-run-intent-body">
-            <IntentDocumentBody document={document} showPlan={showPlan} />
+            <IntentDocumentBody
+              document={document}
+              showPlan={showPlan}
+              hasPlan={hasPlan}
+              onTogglePlan={() => setShowPlan((current) => !current)}
+            />
             {resultAfterBody}
           </div>
           <IntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
@@ -285,14 +275,55 @@ function RequestMessage({
   );
 }
 
-function IntentDocumentBody({ document, showPlan }: { document: IntentDocument; showPlan: boolean }) {
-  if (showPlan && document.plan.trim()) {
-    return <MarkdownContent content={document.plan} variant="workspace" data-testid="split-run-intent-plan" />;
+function IntentDocumentBody({
+  document,
+  showPlan,
+  hasPlan,
+  onTogglePlan,
+}: {
+  document: IntentDocument;
+  showPlan: boolean;
+  hasPlan: boolean;
+  onTogglePlan: () => void;
+}) {
+  if (!document.summary.trim() && !hasPlan) {
+    return <p className="text-[13px] text-muted-foreground">The analysis has not written a plan yet.</p>;
   }
-  if (document.summary.trim()) {
-    return <MarkdownContent content={document.summary} variant="workspace" data-testid="split-run-intent-summary" />;
-  }
-  return <p className="text-[13px] text-muted-foreground">The analysis has not written a plan yet.</p>;
+
+  return (
+    <div>
+      {document.summary.trim() ? (
+        <MarkdownContent content={document.summary} variant="workspace" data-testid="split-run-intent-summary" />
+      ) : (
+        <p className="text-[13px] text-muted-foreground">The analysis has not written a summary yet.</p>
+      )}
+      {hasPlan ? (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-[13px] text-muted-foreground"
+            onClick={onTogglePlan}
+            aria-expanded={showPlan}
+            data-testid="split-run-intent-plan-toggle"
+          >
+            <ChevronDown className={cn("size-3.5 transition-transform", showPlan && "rotate-180")} aria-hidden />
+            {showPlan ? "Hide full plan" : "Show full plan"}
+          </Button>
+          {showPlan ? (
+            <div
+              className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3"
+              data-testid="split-run-intent-plan-panel"
+            >
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plan</p>
+              <MarkdownContent content={document.plan} variant="workspace" data-testid="split-run-intent-plan" />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function IntentConfidenceFooter({

@@ -24,7 +24,7 @@ original request does not change.
 ## Product rules
 
 - New analysis writes `spec.md`. The UI splits it into Summary and Plan.
-- Confidence uses the existing 0–5 meter and check copy.
+- Confidence uses the existing 0–5 meter and one sentence that explains the score.
 - Refine is gone on backlog drafts.
 - Close the popup does not stop the run.
 - After a send succeeds, the runner owns that turn. Close the popup. The
@@ -58,7 +58,7 @@ Same MCP server as Create with Agent. New publish contract:
 | Tool | Writes |
 | --- | --- |
 | `propose_spec` | Full `spec.md` markdown (title, executive summary, plan) |
-| `propose_confidence` | Score and short check copy |
+| `propose_confidence` | Score and one sentence that explains why |
 | `survey` | Questions above the composer (unchanged) |
 
 The first turn calls `propose_spec` and `propose_confidence`. Later turns
@@ -101,6 +101,12 @@ If the run is dead, disable the composer.
 - After the 1 hour timeout, the composer is disabled.
 - Refine is absent on a backlog draft.
 - Board Create with Agent still opens.
+
+## Instruction layers
+
+Scoring and spec craft stay in the Analyze canvas prompt. Tool use, chat
+voice, and wait rules live in a hidden system pack. See
+[analysis-instruction-layers.md](./analysis-instruction-layers.md).
 
 ## Open implementation notes
 

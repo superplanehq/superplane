@@ -346,7 +346,9 @@ export function WorkOrderSplitRunPopup({
       actionBusy={footerActions.busy}
       startDisabled={!canDispatch}
       modelSelect={
-        fixture.footer.kind === "draft" && canPickDraftStartModel ? (
+        fixture.footer.kind === "draft" &&
+        canPickDraftStartModel &&
+        fixture.footer.actions.some((action) => action.kind === "start") ? (
           <DraftStartModelSelect
             organizationId={organizationId}
             factoryId={factoryId}

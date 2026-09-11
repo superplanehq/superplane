@@ -10,6 +10,7 @@ import type {
   FactoryApp,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
   factoryAppConfigurePath,
@@ -178,9 +179,17 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 const useWorkOrderChecks = vi.hoisted(() =>
-  vi.fn((_organizationId: string, _factoryId: string, _orderId: string, _options?: { enabled?: boolean }) => ({
-    data: [] as unknown[],
-  })),
+  vi.fn(
+    (
+      _organizationId: string,
+      _factoryId: string,
+      _orderId: string,
+      _options?: { enabled?: boolean; refetchInterval?: number | false },
+    ) => ({
+      data: [] as unknown[],
+      refetch: vi.fn(),
+    }),
+  ),
 );
 
 const useCanvasMock = vi.hoisted(() => vi.fn());
@@ -205,6 +214,11 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
 }));
 
 vi.mock("./ProductiveIntakeSetupDialog", () => ({
@@ -229,8 +243,14 @@ async function resetLinesBoardMocks() {
   enabledExperimentalFeatures.clear();
   useWorkOrderChecks.mockReset();
   useWorkOrderChecks.mockImplementation(
-    (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
+    (
+      _organizationId: string,
+      _factoryId: string,
+      orderId: string,
+      options?: { enabled?: boolean; refetchInterval?: number | false },
+    ) => ({
       data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
+      refetch: vi.fn(),
     }),
   );
   useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
@@ -310,7 +330,8 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Review the plan, then start" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
@@ -336,8 +357,9 @@ describe("LinesPage board", () => {
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    const analyzingOrderId = REVIEW_CANDIDATE_WORK_ORDERS[0].id!;
+    const analyzingOrder = { ...REVIEW_CANDIDATE_WORK_ORDERS[0], id: "wo-fresh-analyzing" };
+    useFactoryWorkOrders.mockReturnValue({ data: [analyzingOrder] });
+    const analyzingOrderId = analyzingOrder.id;
     // The board optimistically knows this draft is analyzing before its Backlog
     // run appears in the polled list. The popup must match the board card.
     markBacklogAnalysisPending(analyzingOrderId);
@@ -345,14 +367,23 @@ describe("LinesPage board", () => {
       const user = userEvent.setup();
       renderLinesBoard();
 
+      expect(
+        useWorkOrderChecks.mock.calls.some(
+          ([, , orderId, options]) =>
+            orderId === analyzingOrderId && options?.refetchInterval === ANALYZING_WORK_ORDER_CHECKS_POLL_MS,
+        ),
+      ).toBe(true);
+
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
       const dialog = screen.getByTestId("work-order-split-run");
       expect(
         within(dialog).getByRole("heading", { name: "SuperPlane is currently analyzing this task" }),
       ).toBeInTheDocument();
+      expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
       expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);

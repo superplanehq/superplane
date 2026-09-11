@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const fs = require("fs");
+
 /**
  * Stdio MCP server for Create with an Agent.
  * Talks to SuperPlane with SUPERPLANE_BASE_URL + SUPERPLANE_RUN_TOKEN.
@@ -76,12 +78,49 @@ async function proposeSurvey(input) {
   });
 }
 
+function analysisOutputPaths(env = process.env) {
+  return {
+    spec: String(env.SUPERPLANE_ANALYSIS_SPEC_FILE || "/tmp/spec.md"),
+    score: String(env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json"),
+  };
+}
+
+function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
+  const paths = analysisOutputPaths(env);
+  try {
+    if (spec != null) {
+      fs.writeFileSync(paths.spec, spec);
+    }
+    if (score != null && Number.isFinite(Number(score))) {
+      let existing = {};
+      try {
+        existing = JSON.parse(fs.readFileSync(paths.score, "utf8"));
+      } catch (_err) {
+        existing = {};
+      }
+      const reasons = Array.isArray(existing.reasons) ? existing.reasons : [];
+      fs.writeFileSync(
+        paths.score,
+        `${JSON.stringify({
+          score: Math.round(Number(score) * 20),
+          summary: summary != null ? String(summary) : String(existing.summary || ""),
+          reasons,
+        })}\n`,
+      );
+    }
+  } catch (_err) {
+    // Publish already succeeded. The exit graph reads these files when it can.
+  }
+}
+
 async function proposeSpec(input) {
   const body = String((input && input.body) || "").trim();
   if (!body) {
     throw new Error("body is required");
   }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+  writeAnalysisOutputs({ spec: body });
+  return result;
 }
 
 async function proposeConfidence(input) {
@@ -89,10 +128,13 @@ async function proposeConfidence(input) {
   if (!Number.isFinite(score)) {
     throw new Error("score is required");
   }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
+  const summary = String((input && input.summary) || "").trim();
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
     score,
-    summary: String((input && input.summary) || "").trim(),
+    summary,
   });
+  writeAnalysisOutputs({ score, summary });
+  return result;
 }
 
 const TOOLS = [
@@ -109,12 +151,20 @@ const TOOLS = [
   },
   {
     name: "propose_confidence",
-    description: "Publish the 0 through 5 confidence score and one sentence of check copy for the open task.",
+    description:
+      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check.",
     inputSchema: {
       type: "object",
       properties: {
-        score: { type: "number" },
-        summary: { type: "string" },
+        score: {
+          type: "number",
+          description: "Confidence from 0 through 5.",
+        },
+        summary: {
+          type: "string",
+          description:
+            "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+        },
       },
       required: ["score", "summary"],
     },
@@ -133,7 +183,8 @@ const TOOLS = [
   },
   {
     name: "survey",
-    description: "Show one or more multiple-choice questions above the chat. The user picks one option or writes an answer. Then stop.",
+    description:
+      "Ask the person a multiple-choice question when the task is unclear or two valid readings exist. Use 2 to 4 options. Then stop. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
@@ -334,4 +385,13 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { proposeDraft, proposeSpec, proposeConfidence, proposeSurvey, surveyQuestions, TOOLS };
+module.exports = {
+  proposeDraft,
+  proposeSpec,
+  proposeConfidence,
+  proposeSurvey,
+  surveyQuestions,
+  TOOLS,
+  writeAnalysisOutputs,
+  analysisOutputPaths,
+};

@@ -30,12 +30,17 @@ const PLANNING_SYSTEM_PROMPT =
   "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
   "edit or write any files.";
 
-const ANALYSIS_SYSTEM_PROMPT =
-  "This is a SuperPlane analysis session for an open task. After you write the specification, call propose_spec with the " +
-  "full spec markdown and propose_confidence with the 0-5 score and a one-sentence summary. Do not change the original " +
-  "request. Do not call propose_draft. Call survey only if you need the user to answer a question. SuperPlane waits " +
-  "after you stop. Write to the user in plain text. Only explore the repository (read files, search, run read-only " +
-  "commands); do not edit or write any files.";
+function loadAnalysisProtocol() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file).analysisProtocol();
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return "";
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
@@ -45,9 +50,13 @@ function planningEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
 }
 
+function planningAnalysisEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+}
+
 function planningSystemPrompt(env = process.env) {
-  if (envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS")) {
-    return ANALYSIS_SYSTEM_PROMPT;
+  if (planningAnalysisEnabled(env)) {
+    return loadAnalysisProtocol();
   }
   return PLANNING_SYSTEM_PROMPT;
 }
@@ -259,6 +268,15 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
+  if (planningAnalysisEnabled(env) && taskDir) {
+    const protocolPath = path.join(taskDir, "analysis_protocol.md");
+    try {
+      fs.writeFileSync(protocolPath, `${loadAnalysisProtocol()}\n`);
+    } catch (_err) {
+      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+    }
+    config.instructions = [protocolPath];
+  }
   return config;
 }
 
@@ -327,9 +345,11 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
   const planning = planningEnabled(env);
-  if (planning) {
+  if (planning && !planningAnalysisEnabled(env)) {
     println("Planning session tools enabled");
     prompt = `${prompt}\n\n${planningSystemPrompt(env)}`;
+  } else if (planning) {
+    println("Planning session tools enabled");
   }
 
   ensureXdgDirs(sp);
