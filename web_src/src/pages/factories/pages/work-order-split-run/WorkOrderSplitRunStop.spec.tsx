@@ -131,13 +131,12 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   });
 
   it("does not refine a draft from the note", () => {
-    const onRefine = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
           <ThemeProvider>
             <TooltipProvider>
-              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} onRefine={onRefine} />
+              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} />
             </TooltipProvider>
           </ThemeProvider>
         </MemoryRouter>

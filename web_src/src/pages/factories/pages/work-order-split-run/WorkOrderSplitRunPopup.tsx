@@ -277,8 +277,6 @@ export function WorkOrderSplitRunPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
-  canRefine = true,
-  onRefine,
 }: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
   fixed?: boolean;
@@ -286,8 +284,6 @@ export function WorkOrderSplitRunPopup({
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
-  canRefine?: boolean;
-  onRefine?: () => void;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
@@ -335,11 +331,9 @@ export function WorkOrderSplitRunPopup({
       factoryKey={factoryKey}
       orderNumber={orderNumber}
       canAct={canUpdate}
-      canRefine={canRefine}
       onStart={draftStart}
       onArchive={mutations.onArchive}
       onReject={mutations.onReject}
-      onRefine={onRefine}
       onBackToDraft={backToDraft}
       onStop={mutations.onStop}
       startBusy={isDispatching}

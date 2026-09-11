@@ -76,4 +76,29 @@ describe("Confidence score on a backlog card", () => {
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
   });
+
+  it("hides Agent question after the task leaves the backlog", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry({ ...order, state: "STATE_OPEN" }, factory)}
+            organizationId="org-1"
+            factoryKey="RF"
+            factoryLines={[{ id: "line-a", name: "hotfix" }]}
+            canDispatch
+            canAssign
+            dispatchingOrderIds={new Set()}
+            isAssigneesSaving={false}
+            onDispatch={vi.fn().mockResolvedValue(undefined)}
+            onAssigneesSave={vi.fn().mockResolvedValue(undefined)}
+            isAnalyzing
+            hasAgentQuestion
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByTestId("work-order-card-agent-question-wo-1")).not.toBeInTheDocument();
+  });
 });

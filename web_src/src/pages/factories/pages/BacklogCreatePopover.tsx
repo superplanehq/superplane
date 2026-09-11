@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { FilePlus, Loader2, Plus, Sparkles, type LucideIcon } from "lucide-react";
+import { FilePlus, Loader2, Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -288,7 +288,6 @@ type BacklogCreatePopoverProps = {
   onQueryChange: (query: string) => void;
   onFocusedIntakeChange: (intakeId: string | null) => void;
   onCreateManually: () => void;
-  onCreateWithAgent?: () => void;
   onImportItem: (item: BacklogIntakeItem) => void;
   isLoading?: boolean;
   isLoadingMore?: boolean;
@@ -308,7 +307,6 @@ export function BacklogCreatePopover({
   onQueryChange,
   onFocusedIntakeChange,
   onCreateManually,
-  onCreateWithAgent,
   onImportItem,
   isLoading = false,
   isLoadingMore = false,
@@ -380,18 +378,6 @@ export function BacklogCreatePopover({
         sideOffset={6}
         data-testid="lines-backlog-create-menu"
       >
-        {onCreateWithAgent ? (
-          <CreateMenuAction
-            testId="lines-backlog-create-with-agent"
-            icon={Sparkles}
-            title={BACKLOG_CREATE_COPY.createWithAgent}
-            hint={BACKLOG_CREATE_COPY.createWithAgentHint}
-            onClick={() => {
-              close();
-              onCreateWithAgent();
-            }}
-          />
-        ) : null}
         <CreateMenuAction
           testId="lines-backlog-create-manually"
           icon={FilePlus}

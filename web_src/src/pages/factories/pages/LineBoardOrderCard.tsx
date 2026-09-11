@@ -63,11 +63,12 @@ export function LineBoardWorkOrderCard({
     }
     wasAnalyzing.current = isAnalyzing;
   }, [isAnalyzing, refetch, showConfidence]);
+  const isDraft = entry.displayStatus === "draft";
   const hasAgentQuestion = useWorkOrderPlanningSurvey(
     workOrderCardContext.organizationId,
     workOrderCardContext.factoryId ?? "",
     order.id ?? "",
-    isAnalyzing,
+    isDraft && isAnalyzing,
   );
 
   return (
@@ -76,7 +77,7 @@ export function LineBoardWorkOrderCard({
       entry={entry}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
       isAnalyzing={showConfidence && isAnalyzing}
-      hasAgentQuestion={hasAgentQuestion}
+      hasAgentQuestion={isDraft && hasAgentQuestion}
       onOpen={onOpen}
     />
   );

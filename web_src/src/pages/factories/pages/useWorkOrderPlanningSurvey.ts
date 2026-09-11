@@ -25,5 +25,5 @@ export function useWorkOrderPlanningSurvey(
     enabled: enabled && Boolean(organizationId && factoryId && workOrderId),
     refetchInterval: enabled ? SURVEY_POLL_MS : false,
   });
-  return planningSessionHasPendingSurvey(data);
+  return enabled && planningSessionHasPendingSurvey(data);
 }

@@ -26,11 +26,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import {
-  FEATURE_FACTORY_CREATE_WITH_AGENT,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -59,11 +55,7 @@ import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
 import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
-import { workspacePlanningRepository } from "./planningSessionView";
-import { useCreateWithAgentSession } from "./useCreateWithAgentSession";
-import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -251,7 +243,6 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const canCreateWithAgent = hasExperimentalFeature(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
   const addIntakeTemplates = useMemo(() => {
@@ -558,7 +549,6 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
-            canCreateWithAgent={canCreateWithAgent}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
@@ -708,7 +698,6 @@ function LineDetail({
   apps,
   workOrders,
   canCreateWorkOrder,
-  canCreateWithAgent,
   canUpdate,
   onCreateWorkOrder,
   intakePanel,
@@ -731,7 +720,6 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
-  canCreateWithAgent: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
@@ -758,8 +746,6 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
-  const { factory } = useFactoriesLayout();
-  const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
     disabledIds: string[];
@@ -822,7 +808,6 @@ function LineDetail({
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
-          onCreateWithAgent={canCreateWithAgent ? agentSession.start : undefined}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           verifyListeners={verifyListeners}
@@ -851,66 +836,10 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
-          canRefine={canCreateWithAgent && peekOrder.state !== "STATE_DRAFT"}
           onClose={onClosePeek}
-          onRefine={() => {
-            const id = peekOrder.id?.trim();
-            const title = peekOrder.title?.trim();
-            if (!id || !title) {
-              return;
-            }
-            agentSession.start({
-              id,
-              title,
-              description: peekOrder.description ?? "",
-            });
-          }}
-        />
-      ) : null}
-      {canCreateWithAgent ? (
-        <LineCreateWithAgentDialog
-          factoryKey={factoryKey}
-          factoryId={factoryId}
-          organizationId={organizationId}
-          session={agentSession}
         />
       ) : null}
     </div>
-  );
-}
-
-function LineCreateWithAgentDialog({
-  factoryKey,
-  factoryId,
-  organizationId,
-  session,
-}: {
-  factoryKey: string;
-  factoryId: string;
-  organizationId: string;
-  session: ReturnType<typeof useCreateWithAgentSession>;
-}) {
-  const view = usePlanningSessionLiveRun(organizationId, session.view);
-  return (
-    <CreateWithAgentDialog
-      open={session.open}
-      workspaceName={factoryKey}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      view={view}
-      onComposerChange={session.onComposerChange}
-      onSend={session.onSend}
-      onSubmitSurvey={session.onSubmitSurvey}
-      onDraftTitleChange={session.onDraftTitleChange}
-      onCreateDraft={session.onCreateDraft}
-      onSkipDraft={session.onSkipDraft}
-      onSelectCreated={session.onSelectCreated}
-      onRefineCreated={session.onRefineCreated}
-      onRequestClose={session.onRequestClose}
-      onCancelEnd={session.onCancelEnd}
-      onConfirmEnd={session.onConfirmEnd}
-      onSelectModel={session.onSelectModel}
-    />
   );
 }
 
@@ -928,9 +857,7 @@ function LineBoardSplitRunPopup({
   onDispatch,
   analysisRuns,
   isAnalyzing,
-  canRefine,
   onClose,
-  onRefine,
 }: {
   organizationId: string;
   factoryId: string;
@@ -945,9 +872,7 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
-  canRefine: boolean;
   onClose: () => void;
-  onRefine: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
@@ -981,13 +906,11 @@ function LineBoardSplitRunPopup({
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
-      canRefine={canRefine}
       isDispatching={isDispatching}
       onDispatch={
         resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
       }
       onClose={onClose}
-      onRefine={onRefine}
       fixed
     />
   );
@@ -1107,7 +1030,6 @@ function PhaseBoard({
   canCreateWorkOrder,
   canRename,
   onCreateWorkOrder,
-  onCreateWithAgent,
   intakePanel,
   onAddIntake,
   verifyListeners,
@@ -1131,7 +1053,6 @@ function PhaseBoard({
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent?: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
   verifyListeners: LaneListener[];
@@ -1267,7 +1188,6 @@ function PhaseBoard({
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
           onCreateWorkOrder={onCreateWorkOrder}
-          onCreateWithAgent={onCreateWithAgent}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}

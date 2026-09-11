@@ -34,13 +34,24 @@ const INTENT = {
 
 ## Executive summary
 
-The billing page empty state does not name the next action.
+### Goal
 
-### Need
-- The empty view only shows a title.
+A person can add a payment method from the empty billing page.
 
-### Result
-- The empty state tells the user how to add a payment method.
+The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
+
+### Done when
+
+- The empty view names the next action.
+- The action opens add-payment-method.
+
+### Out of scope
+
+- The page after a card exists.
+
+### Key architecture decisions
+
+- Reuse the current empty view. Do not add a new page.
 
 ## Problem
 
@@ -87,10 +98,12 @@ describe("WorkOrderIntentDocument", () => {
     );
     expect(screen.getByRole("heading", { name: "Clearer empty state" })).toBeInTheDocument();
     const summary = screen.getByTestId("split-run-intent-summary");
-    expect(summary).toHaveTextContent("The billing page empty state does not name the next action.");
-    expect(within(summary).getByRole("heading", { name: "Need" })).toBeInTheDocument();
-    expect(within(summary).getByRole("heading", { name: "Result" })).toBeInTheDocument();
-    expect(within(summary).getAllByRole("listitem")).toHaveLength(2);
+    expect(summary).toHaveTextContent("A person can add a payment method from the empty billing page.");
+    expect(within(summary).getByRole("heading", { name: "Goal" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Done when" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Out of scope" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Key architecture decisions" })).toBeInTheDocument();
+    expect(within(summary).getAllByRole("listitem")).toHaveLength(4);
     const result = screen.getByTestId("split-run-intent-result");
     expect(within(result).getByTestId("split-run-overview-checks")).toHaveTextContent(CONFIDENCE_CHECK_NAME);
     expect(within(result).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(

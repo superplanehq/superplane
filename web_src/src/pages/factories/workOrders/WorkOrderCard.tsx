@@ -68,7 +68,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   className?: string;
   /** True when this card is the active item in a list. */
   selected?: boolean;
-  /** True when the analysis session waits for a multiple-choice answer. */
+  /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
 }
 
@@ -109,7 +109,9 @@ export function WorkOrderCard({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const showStart = entry.displayStatus === "draft";
+  const isDraft = entry.displayStatus === "draft";
+  const showStart = isDraft;
+  const showAgentQuestion = hasAgentQuestion && isDraft;
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -146,7 +148,7 @@ export function WorkOrderCard({
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
-          hasAgentQuestion={hasAgentQuestion}
+          hasAgentQuestion={showAgentQuestion}
         />
         <WorkOrderCardMetaRow
           entry={entry}

@@ -56,11 +56,9 @@ export function SplitRunReview({
   factoryKey,
   orderNumber,
   canAct = true,
-  canRefine = true,
   onStart,
   onArchive,
   onReject,
-  onRefine,
   onBackToDraft,
   onStop,
   startBusy = false,
@@ -74,11 +72,9 @@ export function SplitRunReview({
   factoryKey?: string;
   orderNumber?: string;
   canAct?: boolean;
-  canRefine?: boolean;
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
-  onRefine?: () => void;
   onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
@@ -90,14 +86,11 @@ export function SplitRunReview({
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
-  const actions = canAct
-    ? footer.actions.filter((action) => action.kind !== "refine" || (canRefine && footer.kind !== "draft"))
-    : [];
+  const actions = canAct ? footer.actions.filter((action) => action.kind !== "refine") : [];
   const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
     start: onStart,
     archive: onArchive,
     reject: onReject,
-    refine: onRefine,
     "back-to-draft": onBackToDraft,
   };
   const onAction = (action: SplitRunFooterAction) => {

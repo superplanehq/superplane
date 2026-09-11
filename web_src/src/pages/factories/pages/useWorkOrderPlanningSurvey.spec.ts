@@ -45,4 +45,19 @@ describe("useWorkOrderPlanningSurvey", () => {
     expect(result.current).toBe(false);
     expect(findPlanningSessionByWorkOrder).not.toHaveBeenCalled();
   });
+
+  it("does not keep a cached survey after polling stops", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValue({
+      survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST", "GraphQL"] }] },
+    });
+    const queryClient = new QueryClient();
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useWorkOrderPlanningSurvey("org-1", "factory-1", "wo-1", enabled),
+      { wrapper: createWrapper(queryClient), initialProps: { enabled: true } },
+    );
+
+    await waitFor(() => expect(result.current).toBe(true));
+    rerender({ enabled: false });
+    expect(result.current).toBe(false);
+  });
 });

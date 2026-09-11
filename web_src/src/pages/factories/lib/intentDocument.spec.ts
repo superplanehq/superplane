@@ -8,13 +8,24 @@ describe("intentDocument", () => {
 
 ## Executive summary
 
-The billing page does not name the next action.
+### Goal
 
-### Need
-- The empty view only shows a title.
+A person can add a payment method from the empty billing page.
 
-### Result
-- The empty state will tell the user how to add a card.
+The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
+
+### Done when
+
+- The empty view names the next action.
+- The action opens add-payment-method.
+
+### Out of scope
+
+- The page after a card exists.
+
+### Key architecture decisions
+
+- Reuse the current empty view. Do not add a new page.
 
 ## Problem
 
@@ -26,9 +37,11 @@ A person sees the next action on the billing page.
 `);
 
     expect(document.title).toBe("Clearer empty state");
-    expect(document.summary).toContain("The billing page does not name the next action.");
-    expect(document.summary).toContain("### Need");
-    expect(document.summary).toContain("### Result");
+    expect(document.summary).toContain("A person can add a payment method from the empty billing page.");
+    expect(document.summary).toContain("### Goal");
+    expect(document.summary).toContain("### Done when");
+    expect(document.summary).toContain("### Out of scope");
+    expect(document.summary).toContain("### Key architecture decisions");
     expect(document.summary).not.toContain("## Problem");
     expect(document.plan).toContain("## Problem");
     expect(document.plan).toContain("## Outcome");
