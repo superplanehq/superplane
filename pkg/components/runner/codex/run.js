@@ -21,12 +21,51 @@ const PLANNING_SYSTEM_PROMPT =
   "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
   "edit or write any files.";
 
+function loadAnalysisProtocolModule() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt) {
+  if (!planningAnalysisEnabled()) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
+
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+}
+
+function planningSystemPrompt(env = process.env) {
+  if (planningAnalysisEnabled(env)) {
+    return loadAnalysisProtocol();
+  }
+  return PLANNING_SYSTEM_PROMPT;
 }
 
 // Codex `exec` has no --ask-for-approval flag; approval_policy is set via a
@@ -38,6 +77,9 @@ function codexExecArgs(env = process.env, model, mcpScriptPath) {
   if (planningEnabled(env)) {
     args.push("--sandbox", "read-only", "-c", "approval_policy=\"never\"");
     args.push(...mcpConfigOverrides(mcpScriptPath));
+    if (planningAnalysisEnabled(env)) {
+      args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
+    }
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
   }
@@ -57,7 +99,11 @@ function mcpConfigOverrides(mcpScriptPath) {
 }
 
 function tomlString(value) {
-  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return `"${String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")}"`;
 }
 
 function tomlStringArray(values) {
@@ -88,9 +134,9 @@ async function runPrompt(promptFile, model) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
 
   const startedAt = Date.now();
   const planning = planningEnabled();
@@ -98,7 +144,9 @@ async function runPrompt(promptFile, model) {
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write("sandbox: read-only\n");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
+    if (!planningAnalysisEnabled()) {
+      prompt = `${prompt}\n\n${planningSystemPrompt()}`;
+    }
   }
   if (promptCount > 0) {
     process.stdout.write("Continuing Codex session in the current directory\n");
@@ -488,4 +536,6 @@ module.exports = {
   normalizeCodexToolKind,
   codexExecArgs,
   planningEnabled,
+  planningSystemPrompt,
+  planningAnalysisEnabled,
 };

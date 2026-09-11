@@ -30,6 +30,15 @@ type planningSurveyRequest struct {
 	Questions []models.PlanningSessionSurveyQuestion `json:"questions"`
 }
 
+type planningSpecRequest struct {
+	Body string `json:"body"`
+}
+
+type planningConfidenceRequest struct {
+	Score   float64 `json:"score"`
+	Summary string  `json:"summary"`
+}
+
 func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *http.Request) (*runneraction.PlanningSessionScope, bool) {
 	token := bearerToken(r.Header.Get("Authorization"))
 	if token == "" {
@@ -139,6 +148,50 @@ func (s *Server) handleRunnerPlanningDraft(w http.ResponseWriter, r *http.Reques
 		Title:       req.Title,
 		Description: req.Description,
 	}); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningSpecRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.ProposeSpec(database.DB(r.Context()), req.Body); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningConfidenceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.ProposeConfidence(database.DB(r.Context()), req.Score, req.Summary); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}

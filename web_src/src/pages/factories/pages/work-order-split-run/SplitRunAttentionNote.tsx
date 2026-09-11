@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   Bug,
   CheckCircle2,
+  CircleAlert,
   CircleX,
   ExternalLink,
   FileText,
@@ -9,6 +10,7 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
 
@@ -29,6 +31,24 @@ const TONE = {
     iconWrap: "bg-[color:var(--status-draft-dot)]/15",
     icon: "text-[color:var(--status-draft-fg)]",
     Icon: FileText,
+  },
+  "draft-blocked": {
+    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
+    iconWrap: "bg-[color:var(--status-failed-dot)]/15",
+    icon: "text-[color:var(--status-failed-fg)]",
+    Icon: CircleAlert,
+  },
+  "draft-caution": {
+    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
+    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
+    icon: "text-[color:var(--status-waiting-fg)]",
+    Icon: TriangleAlert,
+  },
+  "draft-ready": {
+    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
+    iconWrap: "bg-[color:var(--status-completed-dot)]/15",
+    icon: "text-[color:var(--status-completed-fg)]",
+    Icon: CheckCircle2,
   },
   waiting: {
     strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",

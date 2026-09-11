@@ -226,20 +226,48 @@ test("runLoop backs off silently on idle pending and empty-message waits", async
   assert.deepEqual(logs, []);
 });
 
-test("safeWaitRequest treats a fetch throw as pending", async () => {
+test("safeWaitRequest treats a fetch throw as unreachable pending", async () => {
   const got = await safeWaitRequest(async () => {
     throw new TypeError("fetch failed");
   });
-  assert.deepEqual(got, { status: "pending" });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
 });
 
-test("safeWaitRequest treats an abort as pending", async () => {
+test("runLoop exits after consecutive unreachable waits", async () => {
+  const logs = [];
+  const sleeps = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      if (waits > 10) {
+        throw new Error("loop did not exit after unreachable waits");
+      }
+      return { status: "pending", unreachable: true };
+    },
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+    maxUnreachableWaits: 3,
+  });
+  assert.equal(code, 1);
+  assert.equal(waits, 3);
+  assert.equal(sleeps.length, 2);
+  assert.match(logs.join(""), /unreachable|failed/i);
+});
+
+test("safeWaitRequest treats an abort as unreachable pending", async () => {
   const got = await safeWaitRequest(async () => {
     const err = new Error("This operation was aborted");
     err.name = "AbortError";
     throw err;
   });
-  assert.deepEqual(got, { status: "pending" });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
 });
 
 test("safeWaitRequest keeps a delivered user message", async () => {

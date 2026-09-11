@@ -47,6 +47,11 @@ describe("isPlanningSessionNoise", () => {
     expect(isPlanningSessionToolPayload('{"status":"shown"}')).toBe(true);
   });
 
+  it("treats spec and confidence JSON as tool payloads", () => {
+    expect(isPlanningSessionToolPayload('{"body":"# Add breed\\n## Executive summary"}')).toBe(true);
+    expect(isPlanningSessionToolPayload('{"score":4,"summary":"The files already exist."}')).toBe(true);
+  });
+
   it("treats say and draft JSON as tool payloads", () => {
     expect(isPlanningSessionToolPayload('{"message":"Hi! I am ready to help you plan work in this repository."}')).toBe(
       true,
@@ -129,6 +134,31 @@ describe("groupPlanningSessionLog", () => {
       expect.objectContaining({
         kind: "tools",
         tools: [expect.objectContaining({ id: "read" })],
+      }),
+    );
+  });
+
+  it("hides the Analyze and score prompt header", () => {
+    const groups = groupPlanningSessionLog([
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: "Analyze and score",
+      }),
+      note({
+        id: "talk",
+        noteParentId: "agent-step-2",
+        componentType: "note",
+        componentName: "I will read the ticket and the repository.",
+      }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.line.componentName).toBe("");
+    expect(groups[0]?.events[0]).toEqual(
+      expect.objectContaining({
+        kind: "note",
+        line: expect.objectContaining({ id: "talk" }),
       }),
     );
   });

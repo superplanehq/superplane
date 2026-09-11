@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   PLANNING_SESSION_AGENT_LINE_ID,
   PLANNING_SESSION_PHASE_ID,
@@ -18,7 +17,7 @@ describe("planningSessionPhase", () => {
     });
 
     expect(phase.id).toBe(PLANNING_SESSION_PHASE_ID);
-    expect(phase.name).toBe(CREATE_WITH_AGENT_COPY.menu);
+    expect(phase.name).toBe("Planning session");
     expect(phase.status).toBe("running");
     expect(phase.appId).toBeUndefined();
     expect(phase.stream).toEqual([
@@ -46,6 +45,18 @@ describe("planningSessionPhase", () => {
     expect(phase.appId).toBe("canvas-1");
     expect(phase.stream[0]?.executionId).toBe("execution-1");
     expect(phase.stream[0]?.status).toBe("running");
+  });
+
+  it("marks the agent line passed when the first analysis result already exists", () => {
+    const phase = planningSessionPhase({
+      canvasId: "canvas-1",
+      executionId: "execution-1",
+      messages: [],
+      machineStatus: "passed",
+    });
+
+    expect(phase.status).toBe("passed");
+    expect(phase.stream[0]?.status).toBe("passed");
   });
 
   it("marks the agent line failed when the machine stopped", () => {

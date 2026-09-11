@@ -169,6 +169,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
 	}
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

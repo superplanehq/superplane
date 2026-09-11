@@ -2,8 +2,6 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
-
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
@@ -152,18 +150,12 @@ export interface SplitRunFooter {
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
+  /** Draft Start readiness. 0–5. Missing while analysis has not scored yet. */
+  confidenceScore?: number;
 }
 
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
-const REFINE: SplitRunFooterAction = {
-  id: "refine",
-  kind: "refine",
-  label: CREATE_WITH_AGENT_COPY.refine,
-  emphasis: "quiet",
-  icon: "sparkles",
-  tooltip: CREATE_WITH_AGENT_COPY.refineTooltip,
-};
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
@@ -197,7 +189,7 @@ export const SPLIT_RUN_REJECTED_HEADLINE_ACTOR = "marked this task as unsuccessf
 
 export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
   headline: "This task is ready to start",
-  text: "Review the details. Change anything you need. Then click Start to send it to the line.",
+  text: "Review the summary and the plan. Then click Start to send it to the line.",
 };
 
 export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
@@ -205,11 +197,29 @@ export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
   text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
 };
 
-export type SplitRunDecisionTone = "draft" | "waiting" | "failed" | "done" | "rejected";
+export const SPLIT_RUN_DRAFT_BLOCKED_NOTE: SplitRunFooterNote = {
+  headline: "This task is not ready to start",
+  text: "The analysis is not clear enough. Add more context in the chat, or archive this task.",
+};
+
+export const SPLIT_RUN_DRAFT_CAUTION_NOTE: SplitRunFooterNote = {
+  headline: "Review the plan before you start",
+  text: "The work is still uncertain. Add more context, or start if you accept the risk.",
+};
+
+export type SplitRunDecisionTone =
+  | "draft"
+  | "draft-blocked"
+  | "draft-caution"
+  | "draft-ready"
+  | "waiting"
+  | "failed"
+  | "done"
+  | "rejected";
 
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
   if (footer.kind === "draft") {
-    return "draft";
+    return draftDecisionTone(footer.confidenceScore);
   }
   if (footer.kind === "waiting") {
     return "waiting";
@@ -284,10 +294,8 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
- * Draft keeps Refine, Archive, and Start. A draft still under Backlog
- * analysis drops Archive; archiving a task before its analysis finishes
- * makes no sense. Closed failed keeps Reopen. Completed and rejected
- * explain the result only.
+ * Draft always keeps Archive. Start follows the confidence band. Closed
+ * failed keeps Reopen. Completed and rejected explain the result only.
  */
 type FooterInput = {
   kind: SplitRunFooterKind;
@@ -301,11 +309,46 @@ type FooterInput = {
   automationName?: string;
   /** True while the Backlog automation still scores this draft. */
   isAnalyzing?: boolean;
+  confidenceScore?: number;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
-  return input.run ? { ...next, run: input.run } : next;
+  const withRun = input.run ? { ...next, run: input.run } : next;
+  return input.confidenceScore == null ? withRun : { ...withRun, confidenceScore: input.confidenceScore };
+}
+
+function draftDecisionTone(score?: number): SplitRunDecisionTone {
+  if (score == null) {
+    return "draft";
+  }
+  if (score <= 1) {
+    return "draft-blocked";
+  }
+  if (score <= 3) {
+    return "draft-caution";
+  }
+  return "draft-ready";
+}
+
+function draftReadinessNote(score?: number, isAnalyzing?: boolean): SplitRunFooterNote {
+  if (score == null) {
+    return isAnalyzing ? { ...SPLIT_RUN_ANALYZING_NOTE } : { ...SPLIT_RUN_DRAFT_NOTE };
+  }
+  if (score <= 1) {
+    return { ...SPLIT_RUN_DRAFT_BLOCKED_NOTE };
+  }
+  if (score <= 3) {
+    return { ...SPLIT_RUN_DRAFT_CAUTION_NOTE };
+  }
+  return { ...SPLIT_RUN_DRAFT_NOTE };
+}
+
+function draftDecisionActions(score?: number): SplitRunFooterAction[] {
+  if (score != null && score <= 1) {
+    return [ARCHIVE];
+  }
+  return [ARCHIVE, START];
 }
 
 function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
@@ -318,21 +361,15 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 }
 
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  if (input.isAnalyzing) {
-    return withFooterMeta(input, {
-      kind: "draft",
-      sentence: "SuperPlane is analyzing this task.",
-      note: { ...SPLIT_RUN_ANALYZING_NOTE },
-      attentionCard: true,
-      actions: [REFINE, START],
-    });
-  }
+  const score = input.confidenceScore;
+  const analyzing = Boolean(input.isAnalyzing) && score == null;
   return withFooterMeta(input, {
     kind: "draft",
-    sentence: "This task is a draft.",
-    note,
+    sentence: analyzing ? "SuperPlane is analyzing this task." : "This task is a draft.",
+    note:
+      analyzing || score != null ? draftReadinessNote(score, input.isAnalyzing) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
     attentionCard: true,
-    actions: [REFINE, ARCHIVE, START],
+    actions: draftDecisionActions(score),
   });
 }
 

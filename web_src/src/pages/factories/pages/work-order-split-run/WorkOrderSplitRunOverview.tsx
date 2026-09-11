@@ -1,21 +1,21 @@
+import type { ReactNode } from "react";
+
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
+import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
-import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
-import { WorkOrderPullRequestsList } from "../../WorkOrderPullRequestsList";
-import { SPLIT_RUN_PANE_GRID_CLASSNAME, splitRunLinkedArtifacts } from "./splitRunPopupModel";
+import { WorkOrderIntentDocument, type IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import type { SplitRunSource } from "./splitRunSource";
-import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
-import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
+import { WorkOrderSplitRunOverviewSidebar } from "./WorkOrderSplitRunOverviewSidebar";
 
 /**
- * Description tab: reading column on the left, Source, Artifacts, and Pull
- * requests on the right.
+ * Description tab. Drafts keep analysis chat on the left. After Start,
+ * the left pane shows source, artifacts, and pull requests.
  */
 export function WorkOrderSplitRunOverview({
+  title,
   description,
   artifacts,
   artifactsLoading = false,
@@ -23,18 +23,18 @@ export function WorkOrderSplitRunOverview({
   pullRequestsLoading = false,
   pullRequestsError = null,
   checks,
+  isAnalyzing = false,
   organizationId,
-  factoryId,
   factoryKey,
-  orderId,
   orderNumber,
   expandFirstCheck = false,
-  canEditDescription = false,
-  descriptionBusy = false,
-  onDescriptionSave,
-  source,
   files,
+  resultFooter,
+  analysis,
+  source,
+  showContextSidebar = false,
 }: {
+  title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
   artifactsLoading?: boolean;
@@ -42,42 +42,39 @@ export function WorkOrderSplitRunOverview({
   pullRequestsLoading?: boolean;
   pullRequestsError?: Error | null;
   checks: WorkOrderCheckPresentation[];
+  isAnalyzing?: boolean;
   organizationId?: string;
-  factoryId?: string;
   factoryKey?: string;
-  orderId?: string;
   orderNumber?: string;
   expandFirstCheck?: boolean;
-  canEditDescription?: boolean;
-  descriptionBusy?: boolean;
-  onDescriptionSave?: (next: string) => void | Promise<void>;
-  source?: SplitRunSource;
   files?: FilesFile[];
+  resultFooter?: ReactNode;
+  analysis?: IntentAnalysisChat;
+  source?: SplitRunSource;
+  showContextSidebar?: boolean;
 }) {
-  return (
-    <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
-      <div className="flex min-h-0 flex-col border-b border-border md:border-r md:border-b-0">
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-          <WorkOrderSplitRunDescription
-            description={description}
-            canEdit={canEditDescription}
-            busy={descriptionBusy}
-            onSave={onDescriptionSave}
-            files={files}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            orderId={orderId}
-          />
+  const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
+  const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
 
-          {checks.length > 0 ? (
-            <section className="mt-10" data-testid="split-run-overview-checks" aria-label="Checks">
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-work-order-tab">
+      <WorkOrderIntentDocument
+        title={title}
+        description={description}
+        artifacts={artifacts}
+        confidence={confidence}
+        isAnalyzing={isAnalyzing}
+        files={files}
+        resultAfterBody={
+          otherChecks.length > 0 ? (
+            <section className="mt-6" data-testid="split-run-overview-other-checks" aria-label="Checks">
               <h3 className="workspace-section-label">Checks</h3>
               <div className="mt-1">
-                {checks.map((check, index) => (
+                {otherChecks.map((check, index) => (
                   <WorkOrderCheckComment
                     key={check.id}
                     check={check}
-                    defaultOpen={expandFirstCheck && index === 0}
+                    defaultOpen={expandFirstCheck && !confidence && index === 0}
                     runHref={
                       organizationId && factoryKey
                         ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
@@ -87,28 +84,23 @@ export function WorkOrderSplitRunOverview({
                 ))}
               </div>
             </section>
-          ) : null}
-        </div>
-      </div>
-
-      <aside className="min-h-0 overflow-y-auto px-6 py-6" data-testid="split-run-overview-sidebar">
-        <div className="flex flex-col gap-6">
-          <section aria-label="Source">
-            <SidebarSectionHeading>Source</SidebarSectionHeading>
-            {source ? (
-              <WorkOrderSplitRunSource source={source} />
-            ) : (
-              <p className="mt-2 text-[13px] text-muted-foreground">No source yet.</p>
-            )}
-          </section>
-          <WorkOrderArtifactsList artifacts={splitRunLinkedArtifacts(artifacts, source)} isLoading={artifactsLoading} />
-          <WorkOrderPullRequestsList
-            pullRequests={pullRequests}
-            isLoading={pullRequestsLoading}
-            error={pullRequestsError}
-          />
-        </div>
-      </aside>
+          ) : null
+        }
+        resultFooter={resultFooter}
+        analysis={analysis && organizationId ? { ...analysis, organizationId } : analysis}
+        contextSidebar={
+          showContextSidebar ? (
+            <WorkOrderSplitRunOverviewSidebar
+              source={source}
+              artifacts={artifacts}
+              artifactsLoading={artifactsLoading}
+              pullRequests={pullRequests}
+              pullRequestsLoading={pullRequestsLoading}
+              pullRequestsError={pullRequestsError}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }
