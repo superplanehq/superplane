@@ -383,6 +383,64 @@ func Test__ListSubscriptionsRequiresExternalCustomerID(t *testing.T) {
 	assert.Contains(t, err.Error(), "external customer id is required")
 }
 
+func Test__CancelSubscriptionAtPeriodEndPatchesPolar(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_active", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, true, body["cancel_at_period_end"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_active",
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"current_period_start": "2026-09-01T12:00:00Z",
+			"current_period_end":   "2026-10-01T12:00:00Z",
+			"external_customer_id": "org-1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	sub, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "sub_active")
+	require.NoError(t, err)
+	assert.Equal(t, "sub_active", sub.ID)
+	assert.Equal(t, "active", sub.Status)
+	assert.True(t, sub.CancelAtPeriodEnd)
+}
+
+func Test__ResumeSubscriptionPatchesPolar(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_active", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, false, body["cancel_at_period_end"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_active",
+			"status":               "active",
+			"cancel_at_period_end": false,
+			"current_period_start": "2026-09-01T12:00:00Z",
+			"current_period_end":   "2026-10-01T12:00:00Z",
+			"external_customer_id": "org-1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	sub, err := client.ResumeSubscription(context.Background(), "sub_active")
+	require.NoError(t, err)
+	assert.Equal(t, "sub_active", sub.ID)
+	assert.False(t, sub.CancelAtPeriodEnd)
+}
+
+func Test__CancelSubscriptionAtPeriodEndRequiresID(t *testing.T) {
+	client := NewClient("http://polar.example", "oat_test", nil)
+	_, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "  ")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "subscription id is required")
+}
+
 func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/orders/", r.URL.Path)
