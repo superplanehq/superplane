@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 
 function renderDocument(ui: ReactElement) {
@@ -250,6 +251,54 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByText("The agent is writing the plan.")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+  });
+
+  it("does not send a multi-question survey when Next is clicked", async () => {
+    const user = userEvent.setup();
+    const onSubmitSurvey = vi.fn();
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        analysis={{
+          organizationId: "org-1",
+          view: {
+            repository: "acme/payments",
+            machineStatus: "waiting",
+            canvasId: "",
+            canvasRunId: "",
+            executionId: "",
+            messages: [],
+            composer: "",
+            created: [],
+            right: { kind: "empty" },
+            endConfirmOpen: false,
+            selectableModelKey: "",
+            refining: false,
+            survey: {
+              id: "survey-1",
+              questions: [
+                { prompt: "What is the priority?", options: ["High", "Low"] },
+                { prompt: "What is the scope?", options: ["One file", "The service"] },
+              ],
+            },
+          },
+          composer: "",
+          canSend: true,
+          onComposerChange: vi.fn(),
+          onSend: vi.fn(),
+          onSubmitSurvey,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+
+    expect(onSubmitSurvey).not.toHaveBeenCalled();
+    expect(screen.getByText("What is the scope?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
   });
 
   it("streams the analysis agent in the left chat", () => {
