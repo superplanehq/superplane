@@ -61,6 +61,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	require.True(t, ok, "expected create-pr body to be a string")
 	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
+	assert.Contains(t, body, `task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : ""`)
 	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
 
@@ -68,6 +69,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	updateBody, ok := updatePR.Configuration["body"].(string)
 	require.True(t, ok, "expected update-pr body to be a string")
 	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
+	assert.Contains(t, updateBody, `task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
