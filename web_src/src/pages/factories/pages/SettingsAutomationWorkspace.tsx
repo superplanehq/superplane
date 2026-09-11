@@ -7,7 +7,7 @@ import { Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
-import { SettingsAutomationRunsSidebar } from "./SettingsAutomationRunsSidebar";
+import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { useSettingsAutomationRunCanvas } from "./useSettingsAutomationRunCanvas";
 
@@ -57,13 +57,12 @@ export function SettingsAutomationCanvasEdit({ href, label, testId }: { href: st
   );
 }
 
-/** Read-only automation canvas with the canvas ListRuns sidebar on the left. */
+/** Read-only automation canvas with the factory task-card runs sidebar. */
 export function SettingsAutomationWorkspace({
   graph,
   testId,
   canvasId,
   runHrefFor,
-  workflowNodes,
   editHref,
   editLabel = DEFAULT_EDIT_LABEL,
   editTestId = DEFAULT_EDIT_TEST_ID,
@@ -91,10 +90,11 @@ export function SettingsAutomationWorkspace({
     >
       <div className="flex min-h-[18rem] min-w-0 flex-1 overflow-hidden">
         {canvasId ? (
-          <SettingsAutomationRunsSidebar
+          <FactoryAutomationRunsSidebar
             canvasId={canvasId}
+            organizationId={graph.organizationId}
+            factoryId={graph.factoryId}
             runHrefFor={runHrefFor}
-            workflowNodes={workflowNodes}
             selectedRunId={selectedRunId}
             onSelectRun={setSelectedRunId}
           />

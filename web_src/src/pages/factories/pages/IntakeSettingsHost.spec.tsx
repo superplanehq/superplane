@@ -211,7 +211,7 @@ describe("IntakeSettingsHost", () => {
       "/org-1/workspaces/rf/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
     );
     expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-github-issues-intake", {}, true);
-    const sidebar = within(automation).getByTestId("canvas-runs-sidebar");
+    const sidebar = within(automation).getByTestId("factory-automation-runs-sidebar");
     expect(within(sidebar).getByText("On mention on Issue")).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: "On mention on Issue" })).toHaveAttribute(
       "href",

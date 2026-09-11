@@ -360,7 +360,15 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {
+	if order.SourceRunID == nil {
+		return ""
+	}
+	return order.SourceRunID.String()
 }
 
 func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {
