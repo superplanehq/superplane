@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -84,4 +85,24 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 		assert.Equal(t, models.BillingPlanTrial, resp.Plan)
 		assert.False(t, resp.CreditPurchaseAllowed)
 	})
+}
+
+func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
+	r := support.Setup(t)
+	ended := time.Now().Add(-time.Hour)
+	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{
+			"plan":          models.BillingPlanTrial,
+			"trial_ends_at": ended,
+		}).Error)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanNone, resp.Plan)
+	assert.False(t, resp.CreditPurchaseAllowed)
+
+	stored, err := models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanNone, stored.Plan)
 }

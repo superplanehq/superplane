@@ -435,12 +435,9 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 }
 
 func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organizationBillingPlanResponse, error) {
-	plan, err := models.FindOrganizationBillingPlan(tx, orgID)
+	plan, err := models.ResolveOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return organizationBillingPlanResponse{}, err
-	}
-	if plan == nil {
-		return organizationBillingPlanResponse{Plan: models.BillingPlanNone}, nil
 	}
 	return organizationBillingPlanResponse{
 		Plan:                    plan.Plan,

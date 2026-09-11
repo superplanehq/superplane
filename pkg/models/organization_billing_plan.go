@@ -123,6 +123,26 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 	return &plan, nil
 }
 
+// ResolveOrganizationBillingPlan loads the org plan and writes plan=none when
+// there is no row or the trial window has ended.
+func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
+	if orgID == uuid.Nil {
+		return nil, fmt.Errorf("organization is required")
+	}
+
+	plan, err := FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if plan == nil {
+		return persistNoneBillingPlan(tx, orgID)
+	}
+	if plan.Plan == BillingPlanTrial && !plan.IsOpenTrial(time.Now()) {
+		return lapseExpiredTrial(tx, plan)
+	}
+	return plan, nil
+}
+
 func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
 	existing, err := FindOrganizationBillingPlan(tx, orgID)
 	if err != nil {
@@ -349,4 +369,54 @@ func planAfterPaidSubscriptionEnds(plan *OrganizationBillingPlan, now time.Time)
 		return BillingPlanTrial
 	}
 	return BillingPlanNone
+}
+
+func persistNoneBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
+	now := time.Now()
+	plan := OrganizationBillingPlan{
+		OrganizationID: orgID,
+		Plan:           BillingPlanNone,
+		PlanSource:     BillingPlanSourceSystem,
+		UpdatedAt:      now,
+	}
+	err := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}},
+		DoNothing: true,
+	}).Create(&plan).Error
+	if err != nil {
+		return nil, err
+	}
+	return loadedOrganizationBillingPlan(tx, orgID)
+}
+
+func lapseExpiredTrial(tx *gorm.DB, plan *OrganizationBillingPlan) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		now := time.Now()
+		result := inner.Model(&OrganizationBillingPlan{}).
+			Where("organization_id = ? AND plan = ?", plan.OrganizationID, BillingPlanTrial).
+			Where("trial_ends_at IS NULL OR trial_ends_at <= ?", now).
+			Updates(map[string]any{
+				"plan":       BillingPlanNone,
+				"updated_at": now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+
+		loaded, err := loadedOrganizationBillingPlan(inner, plan.OrganizationID)
+		if err != nil {
+			return err
+		}
+		saved = loaded
+		return SyncIncludedLLMCreditGrant(inner, IncludedUsageSync{
+			OrganizationID:   plan.OrganizationID,
+			SubscriptionID:   includedUsageSubscriptionID(saved),
+			IsActiveBusiness: saved.IsActiveBusiness(),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
 }

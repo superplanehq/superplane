@@ -734,9 +734,7 @@ func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
 	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
 	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
 
-	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, "canceled:"+includedKey)
-	require.NoError(t, err)
-	assert.Equal(t, models.LLMCreditGrantKindIncluded, grant.Kind)
+	grant := findCanceledIncludedGrant(t, db, r.Organization.ID)
 	require.NotNil(t, grant.ExpiresAt)
 	assert.False(t, grant.ExpiresAt.After(time.Now()))
 
@@ -749,4 +747,57 @@ func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(2500), summary.PurchasedRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.RemainingMicros)
+}
+
+func Test__ExpireOpenIncludedGrantsAfterResubscribeSameKey(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodEnd := time.Now().AddDate(0, 1, 0)
+	includedKey := models.IncludedGrantKey("sub_expire_again", periodEnd)
+
+	_, err := models.AddIncludedLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(models.DefaultIncludedGrantCents),
+		includedKey,
+		periodEnd,
+	)
+	require.NoError(t, err)
+	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
+
+	_, err = models.AddIncludedLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(models.DefaultIncludedGrantCents),
+		includedKey,
+		periodEnd,
+	)
+	require.NoError(t, err)
+	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+
+	_, err = models.FindLLMCreditGrantByPolarOrderID(db, includedKey)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func findCanceledIncludedGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) models.OrganizationLLMCreditGrant {
+	t.Helper()
+	grants, err := models.ListOrganizationLLMCreditGrants(db, orgID)
+	require.NoError(t, err)
+	now := time.Now()
+	for _, grant := range grants {
+		if grant.Kind != models.LLMCreditGrantKindIncluded {
+			continue
+		}
+		if !grant.IsExpired(now) {
+			continue
+		}
+		require.NotNil(t, grant.PolarOrderID)
+		return grant
+	}
+	require.FailNow(t, "canceled included grant not found")
+	return models.OrganizationLLMCreditGrant{}
 }

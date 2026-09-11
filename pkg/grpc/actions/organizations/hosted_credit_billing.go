@@ -28,7 +28,7 @@ func ListHostedCreditProducts(
 		return &pb.ListHostedCreditProductsResponse{}, nil
 	}
 
-	plan, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	plan, err := models.ResolveOrganizationBillingPlan(database.DB(ctx), organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list hosted credit products")
 	}
@@ -69,7 +69,7 @@ func CreateHostedCreditCheckout(
 	if !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
 	}
-	plan, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	plan, err := models.ResolveOrganizationBillingPlan(database.DB(ctx), organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
 	}

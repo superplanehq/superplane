@@ -26,7 +26,7 @@ func DescribeOrganizationBilling(
 	}
 
 	db := database.DB(ctx)
-	plan, err := models.FindOrganizationBillingPlan(db, organizationID)
+	plan, err := models.ResolveOrganizationBillingPlan(db, organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
 	}
@@ -37,7 +37,14 @@ func DescribeOrganizationBilling(
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
-	resp := &pb.DescribeOrganizationBillingResponse{
+	return &pb.DescribeOrganizationBillingResponse{
+		Plan:                        plan.Plan,
+		PlanSource:                  plan.PlanSource,
+		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
+		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
+		CurrentPeriodStart:          protoTimestamp(plan.CurrentPeriodStart),
+		CurrentPeriodEnd:            protoTimestamp(plan.CurrentPeriodEnd),
+		CreditPurchaseAllowed:       plan.AllowsCreditPurchase(),
 		BillingEnabled:              billingEnabled,
 		SubscriptionCheckoutEnabled: polar.SubscriptionCheckoutEnabled(),
 		HasBillingCustomer:          hasCustomer,
@@ -45,17 +52,7 @@ func DescribeOrganizationBilling(
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),
 		PurchasedRemainingCents:     pricebook.MicrosToCents(credit.PurchasedRemainingMicros),
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
-	}
-	if plan != nil {
-		resp.Plan = plan.Plan
-		resp.PlanSource = plan.PlanSource
-		resp.PolarSubscriptionStatus = plan.PolarSubscriptionStatus
-		resp.TrialEndsAt = protoTimestamp(plan.TrialEndsAt)
-		resp.CurrentPeriodStart = protoTimestamp(plan.CurrentPeriodStart)
-		resp.CurrentPeriodEnd = protoTimestamp(plan.CurrentPeriodEnd)
-		resp.CreditPurchaseAllowed = plan.AllowsCreditPurchase()
-	}
-	return resp, nil
+	}, nil
 }
 
 func SyncOrganizationBilling(

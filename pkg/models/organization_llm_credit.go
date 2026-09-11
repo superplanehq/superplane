@@ -545,15 +545,16 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 	return nil
 }
 
-// AssertHostedRunAllowed rejects a new hosted start when org remaining credit
-// is empty or the factory hosted budget is exhausted. Pass a committed
-// connection so remaining credit includes billed spend from other runs.
+// AssertHostedRunAllowed rejects a new hosted start when the organization has
+// no open trial or active Business plan, remaining credit is empty, or the
+// factory hosted budget is exhausted. Pass a committed connection so remaining
+// credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
 	if HostedPlanGatesEnabled() {
-		plan, err := FindOrganizationBillingPlan(tx, orgID)
+		plan, err := ResolveOrganizationBillingPlan(tx, orgID)
 		if err != nil {
 			return err
 		}
@@ -662,7 +663,7 @@ func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
 	for _, grant := range grants {
 		updates := map[string]any{"expires_at": now}
 		if grant.PolarOrderID != nil {
-			if canceled := canceledIncludedOrderID(*grant.PolarOrderID); canceled != "" {
+			if canceled := canceledIncludedOrderID(*grant.PolarOrderID, grant.ID); canceled != "" {
 				updates["polar_order_id"] = canceled
 			}
 		}
@@ -673,7 +674,7 @@ func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
 	return nil
 }
 
-func canceledIncludedOrderID(polarOrderID string) string {
+func canceledIncludedOrderID(polarOrderID string, grantID uuid.UUID) string {
 	trimmed := strings.TrimSpace(polarOrderID)
 	if trimmed == "" {
 		return ""
@@ -681,5 +682,5 @@ func canceledIncludedOrderID(polarOrderID string) string {
 	if strings.HasPrefix(trimmed, canceledIncludedGrantPrefix) {
 		return trimmed
 	}
-	return canceledIncludedGrantPrefix + trimmed
+	return canceledIncludedGrantPrefix + trimmed + ":" + grantID.String()
 }
