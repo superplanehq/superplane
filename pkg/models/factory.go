@@ -616,6 +616,33 @@ func (f *Factory) createWorkOrder(
 	return f.FindWorkOrder(tx, order.ID)
 }
 
+// FindWorkOrderByOriginURL resolves a work order from the external ticket
+// it was created from. When more than one order shares the URL, a draft
+// wins over later states, then the newest created_at wins. Delegates to
+// FindWorkOrder so the result gets the same preloads/scoping as every
+// other lookup path.
+func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*FactoryWorkOrder, error) {
+	trimmedURL := strings.TrimSpace(originURL)
+	if trimmedURL == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+
+	var order FactoryWorkOrder
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND origin_url = ?", f.OrganizationID, f.ID, trimmedURL).
+		Order("CASE WHEN state = 'draft' THEN 0 ELSE 1 END, created_at DESC").
+		First(&order).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return f.FindWorkOrder(tx, order.ID)
+}
+
 // FindWorkOrderByArtifactKey resolves a work order from one of its
 // artifacts' `key` values, then delegates to FindWorkOrder so the result
 // gets the same preloads/scoping as every other lookup path.

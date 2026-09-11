@@ -238,6 +238,23 @@ func TestFindWorkOrder_Execute(t *testing.T) {
 		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.findParams.ArtifactKey)
 	})
 
+	t.Run("passes through originUrl lookups", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{findOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"by":        "originUrl",
+				"originUrl": "https://github.com/acme/payments/issues/12",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "originUrl", factoryCtx.findParams.By)
+		assert.Equal(t, "https://github.com/acme/payments/issues/12", factoryCtx.findParams.OriginURL)
+	})
+
 	// A PR merge (or similar) unrelated to any tracked order must not
 	// red the run — the component emits on the notFound channel instead
 	// of failing, so the flow can branch on it explicitly.
@@ -306,6 +323,25 @@ func TestFindWorkOrder_ValidatesConfiguration(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"by":          "artifactKey",
 			"artifactKey": "https://github.com/example/repo/pull/1",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("requires originUrl when finding by originUrl", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"by": "originUrl",
+		})
+		if err == nil {
+			t.Fatal("expected error for by=originUrl without originUrl")
+		}
+	})
+
+	t.Run("accepts by originUrl with originUrl", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"by":        "originUrl",
+			"originUrl": "https://github.com/acme/payments/issues/12",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

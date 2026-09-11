@@ -121,7 +121,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 // Event-driven factory apps provisioned during onboarding. These listen for
 // GitHub events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
-export const ONBOARDING_EVENT_APPS = ["pr-closure", "create-with-agent"] as const;
+export const ONBOARDING_EVENT_APPS = ["pr-closure", "issue-closure", "create-with-agent"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -136,6 +136,12 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     title: "PR Closure",
     description: "Close the task when the attached pull request merges or is closed without a merge.",
     triggerNodeId: "on-pr-closed",
+  }),
+  "issue-closure": buildEventApp({
+    id: "issue-closure",
+    title: "Issue Closure",
+    description: "Close the task when the source GitHub issue closes, if the task is still in Backlog.",
+    triggerNodeId: "on-issue-closed",
   }),
   "create-with-agent": buildLineApp({
     id: "create-with-agent",

@@ -966,6 +966,76 @@ func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 	})
 }
 
+func TestFactory_FindWorkOrderByOriginURL(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-origin")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{
+		URL:   "https://github.com/acme/payments/issues/12",
+		Label: "acme/payments#12",
+	}
+
+	draft, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds",
+		"",
+		&userID,
+		nil,
+		nil,
+		origin,
+	)
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its origin URL", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, origin.URL)
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
+	})
+
+	t.Run("trims the lookup URL", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, "  "+origin.URL+"  ")
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown URL", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(tx, "https://github.com/acme/payments/issues/99")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank URL", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(tx, "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a URL belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-origin-other")
+
+		_, err := otherFactory.FindWorkOrderByOriginURL(tx, origin.URL)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("prefers a draft when more than one order shares the origin", func(t *testing.T) {
+		olderOpen, err := factoryModel.CreateWorkOrderWithOrigin(
+			tx,
+			"Older open copy",
+			"",
+			&userID,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+		_, err = olderOpen.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen})
+		require.NoError(t, err)
+
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, origin.URL)
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
+	})
+}
+
 func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
