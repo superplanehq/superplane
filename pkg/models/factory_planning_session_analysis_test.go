@@ -10,6 +10,73 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 )
 
+func TestFactory_AttachAnalysisSessionReusesEndedSession(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-reuse")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
+	require.NoError(t, session.End(db))
+
+	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	again, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     nextRun.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, session.ID, again.ID)
+	assert.Equal(t, PlanningSessionStateRunning, again.State)
+	assert.Equal(t, nextRun.ID, *again.CanvasRunID)
+	require.Len(t, again.Messages, 1)
+	assert.Equal(t, "The retry lives in billing/retry.ts.", again.Messages[0].Text)
+}
+
+func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-continue")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 4, "This issue is a good fit for an agent."))
+	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper."))
+
+	text, err := AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Continue this SuperPlane analysis session")
+	assert.Contains(t, text, "Stop double charges.")
+	assert.Contains(t, text, "4/5")
+	assert.Contains(t, text, "This issue is a good fit for an agent.")
+	assert.Contains(t, text, "Keep the existing retry helper.")
+}
+
 func TestFactory_AttachAnalysisSession(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-attach")

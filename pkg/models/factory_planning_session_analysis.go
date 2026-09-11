@@ -21,6 +21,8 @@ const (
 	PlanningConfidenceCheckKey  = "confidence"
 	PlanningConfidenceCheckName = "Confidence score"
 	PlanningConfidenceScoreMax  = 5
+
+	analysisContinuationMessageLimit = 20
 )
 
 type AttachAnalysisSessionParams struct {
@@ -38,6 +40,22 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 
 	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
 	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil, err
+	}
+
+	existing, err = FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
+	if err == nil {
+		if existing.State == PlanningSessionStateEnded {
+			if err := existing.Reopen(tx); err != nil {
+				return nil, err
+			}
+		}
+		if err := existing.AttachAgentRun(tx, params.CanvasRunID, existing.SelectableModelKey); err != nil {
+			return nil, err
+		}
 		return existing, nil
 	}
 	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
@@ -219,6 +237,119 @@ func planningConfidenceLevel(score float64) string {
 		return FactoryWorkOrderCheckLevelCaution
 	}
 	return FactoryWorkOrderCheckLevelCritical
+}
+
+func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (string, error) {
+	if session == nil {
+		return "", nil
+	}
+	messages := session.Messages
+	if len(messages) == 0 {
+		loaded, err := ListPlanningSessionMessages(tx, session.ID)
+		if err != nil {
+			return "", err
+		}
+		messages = loaded
+	}
+	spec, score, summary, err := analysisContinuationArtifacts(tx, session)
+	if err != nil {
+		return "", err
+	}
+	if spec == "" && score == "" && len(messages) == 0 {
+		return "", nil
+	}
+	if len(messages) > analysisContinuationMessageLimit {
+		messages = messages[len(messages)-analysisContinuationMessageLimit:]
+	}
+
+	var b strings.Builder
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the current specification and the score when the new context changes them.\n")
+	if spec != "" {
+		b.WriteString("\nCurrent specification:\n\n")
+		b.WriteString(spec)
+		b.WriteString("\n")
+	}
+	if score != "" {
+		b.WriteString("\nCurrent confidence score: ")
+		b.WriteString(score)
+		if summary != "" {
+			b.WriteString("\n")
+			b.WriteString(summary)
+		}
+		b.WriteString("\n")
+	}
+	if len(messages) > 0 {
+		b.WriteString("\nPrior messages:\n")
+		for _, message := range messages {
+			role := "User"
+			if message.Role == PlanningSessionMessageRoleAgent {
+				role = "Agent"
+			}
+			fmt.Fprintf(&b, "\n%s: %s\n", role, strings.TrimSpace(message.Text))
+		}
+	}
+	b.WriteString("\nApply the latest user message. Do not rewrite the specification from scratch unless the new context requires it.\n")
+	return b.String(), nil
+}
+
+func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession) (string, string, string, error) {
+	if session.DraftWorkOrderID == nil {
+		return "", "", "", nil
+	}
+	order, err := session.analysisWorkOrder(tx)
+	if err != nil {
+		if errors.Is(err, ErrFactoryPlanningSessionNoDraft) {
+			return "", "", "", nil
+		}
+		return "", "", "", err
+	}
+	spec, err := planningSpecBody(tx, order)
+	if err != nil {
+		return "", "", "", err
+	}
+	score, summary, err := planningConfidenceText(tx, order)
+	if err != nil {
+		return "", "", "", err
+	}
+	return spec, score, summary, nil
+}
+
+func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
+	artifacts, err := order.ListArtifacts(tx)
+	if err != nil {
+		return "", err
+	}
+	for i := range artifacts {
+		if !isPlanningSpecArtifact(artifacts[i]) {
+			continue
+		}
+		var data map[string]any
+		if json.Unmarshal(artifacts[i].Data, &data) != nil {
+			continue
+		}
+		if body := extractArtifactString(data, "body"); body != "" {
+			return body, nil
+		}
+	}
+	return "", nil
+}
+
+func planningConfidenceText(tx *gorm.DB, order *FactoryWorkOrder) (string, string, error) {
+	checks, err := order.ListChecks(tx)
+	if err != nil {
+		return "", "", err
+	}
+	for i := range checks {
+		if checks[i].Key != PlanningConfidenceCheckKey {
+			continue
+		}
+		score := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f", checks[i].Score), "0"), ".")
+		if score == "" {
+			score = "0"
+		}
+		return score + "/5", strings.TrimSpace(checks[i].Summary), nil
+	}
+	return "", "", nil
 }
 
 func FindPlanningSessionByDraftWorkOrder(

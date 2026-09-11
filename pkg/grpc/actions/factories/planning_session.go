@@ -157,14 +157,44 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	if err != nil {
 		return nil, err
 	}
-	if err := session.SendUserMessage(database.DB(ctx), req.GetText()); err != nil {
+	db := database.DB(ctx)
+	restartAnalysis := session.State == models.PlanningSessionStateEnded && session.IsAnalysisSession(db)
+	if restartAnalysis {
+		if err := session.Reopen(db); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to send planning session message")
+		}
+	}
+	if err := session.SendUserMessage(db, req.GetText()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
+	if restartAnalysis {
+		if err := session.MarkUserMessagesDelivered(db); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to send planning session message")
+		}
+		if err := restartAnalysisCanvasRun(db, factoryModel, session); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to send planning session message")
+		}
+	}
+	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
+}
+
+func restartAnalysisCanvasRun(db *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) error {
+	if session.DraftWorkOrderID == nil || session.CanvasID == nil {
+		return models.ErrFactoryPlanningSessionInvalid
+	}
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	if err != nil {
+		return err
+	}
+	if err := workersctx.EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, *session.CanvasID); err != nil {
+		log.WithError(err).Warnf("failed to restart analysis run for session %s", session.ID)
+		return err
+	}
+	return nil
 }
 
 func UpdatePlanningSessionDraft(ctx context.Context, organizationID string, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {

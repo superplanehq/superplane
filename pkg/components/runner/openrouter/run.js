@@ -30,16 +30,32 @@ const PLANNING_SYSTEM_PROMPT =
   "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
   "edit or write any files.";
 
-function loadAnalysisProtocol() {
+function loadAnalysisProtocolModule() {
   const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
   for (const file of candidates) {
     try {
-      return require(file).analysisProtocol();
+      return require(file);
     } catch (_err) {
       // try the next path
     }
   }
-  return "";
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
+  if (!planningAnalysisEnabled(env)) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
 }
 
 function envFlag(env, name) {
@@ -337,9 +353,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;

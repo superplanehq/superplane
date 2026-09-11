@@ -7,7 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { analysisProtocol } = require("./analysis_protocol");
+const { analysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
 const { writeAnalysisOutputs } = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
@@ -20,8 +20,20 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /Do not paste the specification/);
   assert.match(pack, /call survey with 2 to 4 options/);
   assert.match(pack, /If the score is 0 through 3/);
+  assert.match(pack, /this is a continuation/);
   assert.doesNotMatch(pack, /check copy/);
   assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
+});
+
+test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "analysis-continuation-"));
+  fs.writeFileSync(path.join(dir, "analysis_continuation.md"), "Continue this SuperPlane analysis session.\n");
+  assert.equal(
+    withAnalysisContinuation(dir, 0, "Analyze the task."),
+    "Continue this SuperPlane analysis session.\n\nAnalyze the task.",
+  );
+  assert.equal(withAnalysisContinuation(dir, 1, "Analyze the task."), "Analyze the task.");
+  assert.equal(withAnalysisContinuation(path.join(dir, "missing"), 0, "Analyze the task."), "Analyze the task.");
 });
 
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {

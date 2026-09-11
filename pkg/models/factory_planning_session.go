@@ -395,6 +395,36 @@ func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
 	return s.saveEndedState(tx)
 }
 
+func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
+	if s.State != PlanningSessionStateEnded {
+		return nil
+	}
+	now := time.Now()
+	s.State = PlanningSessionStateRunning
+	s.EndedAt = nil
+	s.HeartbeatAt = now
+	s.UpdatedAt = now
+	s.clearWait()
+	s.clearSurvey()
+	return tx.Model(s).Select(
+		"State",
+		"EndedAt",
+		"HeartbeatAt",
+		"UpdatedAt",
+		"WaitState",
+		"WaitKind",
+		"WaitText",
+		"WaitWorkOrderID",
+		"WaitWorkOrderKey",
+		"SurveyID",
+		"Survey",
+	).Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) IsAnalysisSession(tx *gorm.DB) bool {
+	return s.usesAnalysisFollowUp(tx)
+}
+
 func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, error) {
 	if s.State == PlanningSessionStateEnded {
 		return false, nil

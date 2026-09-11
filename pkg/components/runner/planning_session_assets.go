@@ -1,6 +1,16 @@
 package runner
 
-import _ "embed"
+import (
+	"context"
+	"strings"
+
+	_ "embed"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+)
 
 // Planning sessions run every code runner (Claude, Codex, OpenCode/OpenRouter)
 // in a read-only "explore, then propose a draft" mode. These assets are shared
@@ -56,4 +66,30 @@ func PlanningSessionMCPFiles() []BrokerTaskFile {
 // when HasPlanningSessionToken is true.
 func FollowUpLoopFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "follow_up_loop.js", Content: followUpLoopScript, Mode: "0644"}
+}
+
+func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, files []BrokerTaskFile) []BrokerTaskFile {
+	if !HasPlanningSessionToken(environment) {
+		return files
+	}
+	if file := PlanningSessionContinuationFile(ctx); file != nil {
+		return append(files, *file)
+	}
+	return files
+}
+
+func PlanningSessionContinuationFile(ctx core.ExecutionContext) *BrokerTaskFile {
+	if ctx.RunID == uuid.Nil {
+		return nil
+	}
+	db := database.DB(context.Background())
+	session, err := models.FindPlanningSessionByRun(db, ctx.RunID)
+	if err != nil {
+		return nil
+	}
+	text, err := models.AnalysisContinuationText(db, session)
+	if err != nil || strings.TrimSpace(text) == "" {
+		return nil
+	}
+	return &BrokerTaskFile{Path: "analysis_continuation.md", Content: text, Mode: "0644"}
 }

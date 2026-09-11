@@ -113,7 +113,11 @@ export function useAnalysisPlanningSession(args: {
       view.machineStatus !== "failed" &&
       view.machineStatus !== "passed",
   );
-  const canSend = canUpdate && isLive && !sendBusy;
+  const canRestart = Boolean(
+    sessionId &&
+      (session?.state === "ended" || view.machineStatus === "failed" || view.machineStatus === "passed"),
+  );
+  const canSend = canUpdate && !sendBusy && (isLive || canRestart);
 
   const onSend = useCallback(async () => {
     const text = composer.trim();

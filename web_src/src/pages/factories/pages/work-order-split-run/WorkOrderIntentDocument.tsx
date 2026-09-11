@@ -211,7 +211,11 @@ function AnalysisRequestChat({
             id="split-run-intent-composer"
             data-testid="split-run-intent-composer"
             value={analysis.composer}
-            placeholder={stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder}
+            placeholder={
+              !analysis.canSend && stopped
+                ? ANALYSIS_PLANNING_COPY.stopped
+                : ANALYSIS_PLANNING_COPY.composerPlaceholder
+            }
             disabled={!analysis.canSend}
             onChange={(event) => analysis.onComposerChange(event.target.value)}
             onKeyDown={(event) => {

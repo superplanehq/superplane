@@ -108,6 +108,15 @@ func (s *FactoryPlanningSession) reloadMessages(tx *gorm.DB) error {
 	return nil
 }
 
+func (s *FactoryPlanningSession) MarkUserMessagesDelivered(tx *gorm.DB) error {
+	if err := tx.Model(&PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ? AND delivered = ?", s.ID, PlanningSessionMessageRoleUser, false).
+		Update("delivered", true).Error; err != nil {
+		return err
+	}
+	return s.reloadMessages(tx)
+}
+
 func (s *FactoryPlanningSession) nextUndeliveredUserMessage(tx *gorm.DB) (PlanningSessionMessage, bool, error) {
 	var message PlanningSessionMessage
 	err := tx.
