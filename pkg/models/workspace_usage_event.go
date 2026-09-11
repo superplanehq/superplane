@@ -657,7 +657,7 @@ const workOrderRunUsageSelect = `
 	factory_work_orders.number AS work_order_number,
 	factory_work_orders.title AS title,
 	MAX(workspace_usage_events.occurred_at) AS last_occurred_at,
-	factory_work_orders.created_by_id AS user_id,
+	first_assignee.user_id AS user_id,
 	COALESCE(users.name, '') AS user_name,
 	COALESCE(users.email, '') AS user_email,
 	COALESCE(SUM(workspace_usage_events.total_tokens), 0) AS total_tokens,
@@ -688,13 +688,24 @@ type workOrderRunUsageScanRow struct {
 	MachineTypes         string
 }
 
+// First assignee by assignment time, then user id. Usage names the owner,
+// not the creator. Analysis rows with no assignee stay empty.
+const firstWorkOrderAssigneeJoin = `LEFT JOIN LATERAL (
+	SELECT user_id
+	FROM factory_work_order_assignees
+	WHERE work_order_id = factory_work_orders.id
+	ORDER BY created_at ASC, user_id ASC
+	LIMIT 1
+) first_assignee ON TRUE`
+
 func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 	return spendingScopedQuery(tx, filter, true).
-		Joins("LEFT JOIN users ON users.id = factory_work_orders.created_by_id").
+		Joins(firstWorkOrderAssigneeJoin).
+		Joins("LEFT JOIN users ON users.id = first_assignee.user_id").
 		Where("workspace_usage_events.work_order_id IS NOT NULL")
 }
 
-const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`
+const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, first_assignee.user_id, users.name, users.email`
 
 // ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
 // It does not write usage or change remaining hosted credit.

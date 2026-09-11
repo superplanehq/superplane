@@ -860,6 +860,64 @@ func Test__ListWorkOrderRunUsage__IncludesAnalysisWithoutExecution(t *testing.T)
 	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
 	assert.Contains(t, rows[0].BYOKModels, "anthropic/claude-sonnet-4-6")
 	assert.Empty(t, rows[0].MachineTypes)
+	assert.Empty(t, rows[0].UserName)
+	assert.Empty(t, rows[0].UserEmail)
+	assert.Nil(t, rows[0].UserID)
+}
+
+func Test__ListWorkOrderRunUsage__NamesTheFirstAssigneeNotTheCreator(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	assignee := support.CreateUser(t, r, r.Organization.ID)
+
+	order, err := factory.CreateWorkOrder(db, "Assigned run", "", &r.User, []uuid.UUID{assignee.ID}, nil)
+	require.NoError(t, err)
+	execution := dispatchExistingOrder(t, db, line, order)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, execution))))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	require.NotNil(t, rows[0].UserID)
+	assert.Equal(t, assignee.ID, *rows[0].UserID)
+	assert.Equal(t, assignee.Name, rows[0].UserName)
+	assert.Equal(t, assignee.GetEmail(), rows[0].UserEmail)
+	assert.NotEqual(t, r.UserModel.GetEmail(), rows[0].UserEmail)
+}
+
+func Test__ListWorkOrderRunUsage__NamesTheEarliestAssignee(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	first := support.CreateUser(t, r, r.Organization.ID)
+	second := support.CreateUser(t, r, r.Organization.ID)
+
+	order, err := factory.CreateWorkOrder(db, "Two owners", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{second.ID, first.ID}))
+	earlier := time.Now().Add(-time.Hour)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderAssignee{}).
+		Where("work_order_id = ? AND user_id = ?", order.ID, first.ID).
+		Update("created_at", earlier).Error)
+
+	execution := dispatchExistingOrder(t, db, line, order)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, execution))))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	require.NotNil(t, rows[0].UserID)
+	assert.Equal(t, first.ID, *rows[0].UserID)
+	assert.Equal(t, first.Name, rows[0].UserName)
 }
 
 func Test__ListWorkOrderRunUsage__KeepsAnalysisApartFromLineExecution(t *testing.T) {
@@ -1059,8 +1117,18 @@ func dispatchNamedOrder(
 ) *models.FactoryWorkOrderExecution {
 	t.Helper()
 	db := database.DB(t.Context())
-	order, err := factory.CreateWorkOrder(db, title, "", &r.User, nil, nil)
+	order, err := factory.CreateWorkOrder(db, title, "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
+	return dispatchExistingOrder(t, db, line, order)
+}
+
+func dispatchExistingOrder(
+	t *testing.T,
+	db *gorm.DB,
+	line *models.FactoryLine,
+	order *models.FactoryWorkOrder,
+) *models.FactoryWorkOrderExecution {
+	t.Helper()
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, result, dispatchErr := line.Dispatch(tx, order)
