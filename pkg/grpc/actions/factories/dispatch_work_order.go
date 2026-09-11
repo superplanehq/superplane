@@ -24,15 +24,18 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	factoryID := resolvedFactory.ID
 
-	orderID, err := parseOrderID(req.GetOrderId())
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	orderID := resolvedOrder.ID
 
 	lineName := strings.TrimSpace(req.GetLineName())
 	if lineName == "" {
@@ -54,7 +57,6 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var logger *log.Entry
 	var fromState string
 
-	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {

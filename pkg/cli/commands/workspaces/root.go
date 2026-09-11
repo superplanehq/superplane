@@ -17,7 +17,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Set or show the active workspace",
 		Long: `Set the active workspace used when --workspace is omitted.
 
-Pass a workspace name or UUID, or run with no args in an interactive terminal
+Pass a workspace key or UUID, or run with no args in an interactive terminal
 to pick from a list. Non-interactive with no args prints the active workspace id.`,
 		Args: cobra.MaximumNArgs(1),
 	}

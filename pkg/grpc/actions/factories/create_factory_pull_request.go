@@ -21,23 +21,13 @@ func CreateFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
-	}
-
-	orderID, err := parseOrderID(req.GetWorkOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
