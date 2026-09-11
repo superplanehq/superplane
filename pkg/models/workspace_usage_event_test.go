@@ -396,7 +396,7 @@ func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
 	assertInProgressExecutionUsage(t, db, execution.ID, 1_000_000, 300)
 }
 
-func Test__RecordUsage__HostedUnknownModelFailsClosed(t *testing.T) {
+func Test__RecordUsage__HostedUnknownModelStillRecordsTokens(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
@@ -412,7 +412,77 @@ func Test__RecordUsage__HostedUnknownModelFailsClosed(t *testing.T) {
 		TotalTokens:     100,
 		FundingSource:   models.UsageFundingSourceHosted,
 	})
-	require.ErrorIs(t, err, models.ErrHostedUsageUnpriced)
+	require.NoError(t, err)
+
+	event := requireUsageEventForRun(t, db, requireExecutionRunID(t, execution))
+	assert.Equal(t, int64(100), event.TotalTokens)
+	assert.Equal(t, int64(0), event.CostMicros)
+	assertInProgressExecutionUsage(t, db, execution.ID, 100, 0)
+}
+
+func Test__RecordUsage__HostedOpenRouterPrefixedModelIsPriced(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+
+	err := models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenRouter,
+		Model:           "openrouter/anthropic/claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	})
+	require.NoError(t, err)
+
+	event := requireUsageEventForRun(t, db, requireExecutionRunID(t, execution))
+	assert.Equal(t, int64(1_000_000), event.TotalTokens)
+	assert.Equal(t, int64(3_000_000), event.ProviderCostMicros)
+	assert.Positive(t, event.CostMicros)
+}
+
+func Test__SumUsageForWorkOrders__IncludesModelTokensAndCompute(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 429,
+		IdempotencyKey:  "runner:compute:" + uuid.New().String(),
+	}))
+
+	var modelEvent, computeEvent models.WorkspaceUsageEvent
+	require.NoError(t, db.Where("canvas_run_id = ? AND usage_kind = ?", runID, models.UsageKindModel).First(&modelEvent).Error)
+	require.NoError(t, db.Where("canvas_run_id = ? AND usage_kind = ?", runID, models.UsageKindCompute).First(&computeEvent).Error)
+
+	sums, err := models.SumUsageForWorkOrders(db, []uuid.UUID{execution.WorkOrderID})
+	require.NoError(t, err)
+	total := sums[execution.WorkOrderID]
+	assert.Equal(t, int64(1_000_000), total.TotalTokens)
+	assert.Equal(t, int64(429), total.DurationSeconds)
+	assert.Equal(t, modelEvent.CostMicros+computeEvent.CostMicros, total.CostMicros)
+	assert.Greater(t, total.CostCents(), pricebook.MicrosToCents(computeEvent.CostMicros))
 }
 
 func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
