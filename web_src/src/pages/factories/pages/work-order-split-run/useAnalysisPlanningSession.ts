@@ -28,8 +28,16 @@ export function useAnalysisPlanningSession(args: {
   workOrderId?: string;
   enabled: boolean;
   canUpdate: boolean;
+  analysisDelivered?: boolean;
 }) {
-  const { organizationId = "", factoryId = "", workOrderId = "", enabled, canUpdate } = args;
+  const {
+    organizationId = "",
+    factoryId = "",
+    workOrderId = "",
+    enabled,
+    canUpdate,
+    analysisDelivered = false,
+  } = args;
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PlanningSessionPayload | null>(null);
   const [composer, setComposer] = useState("");
@@ -92,12 +100,19 @@ export function useAnalysisPlanningSession(args: {
           composer,
           right: emptyCreateWithAgentView().right,
           endConfirmOpen: false,
+          analysisDelivered,
         })
       : emptyCreateWithAgentView(),
+    analysisDelivered,
   );
 
   const sessionId = session?.id ?? "";
-  const isLive = Boolean(sessionId && session?.state !== "ended" && view.machineStatus !== "failed");
+  const isLive = Boolean(
+    sessionId &&
+      session?.state !== "ended" &&
+      view.machineStatus !== "failed" &&
+      view.machineStatus !== "passed",
+  );
   const canSend = canUpdate && isLive && !sendBusy;
 
   const onSend = useCallback(async () => {

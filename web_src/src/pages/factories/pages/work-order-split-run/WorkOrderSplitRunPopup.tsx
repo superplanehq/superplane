@@ -7,6 +7,7 @@ import { useWorkOrder } from "@/hooks/useFactoryData";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
+import { analysisFirstResultDelivered } from "../../lib/analysisOutcome";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { JumpToLatestPill } from "./JumpToLatestPill";
@@ -311,6 +312,10 @@ export function WorkOrderSplitRunPopup({
     workOrderId: orderId,
     enabled: fixture.footer.kind === "draft" && Boolean(organizationId && factoryId && orderId),
     canUpdate,
+    analysisDelivered: analysisFirstResultDelivered({
+      checks: fixture.checks,
+      artifacts: popupData.artifacts,
+    }),
   });
   const draftStart = draftStartAction(
     fixture.footer.kind,

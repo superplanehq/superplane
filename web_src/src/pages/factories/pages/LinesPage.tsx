@@ -12,6 +12,7 @@ import {
   useFactoryPullRequests,
   useFactoryWorkOrders,
   useUpdateFactoryLine,
+  useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
@@ -875,6 +876,7 @@ function LineBoardSplitRunPopup({
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
     workOrderIds: [peekOrderId],
   });
@@ -894,6 +896,7 @@ function LineBoardSplitRunPopup({
       lineId={lineId}
       fixture={splitRunFixtureForWorkOrder(peekOrder, {
         checks: peekChecks,
+        artifacts: peekArtifacts,
         lineId,
         lineName: resolvedLineName,
         demoArtifacts: false,

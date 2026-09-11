@@ -152,7 +152,8 @@ function AnalysisRequestChat({
     analysis.view.messages.length,
     { resumeOnBottom: true },
   );
-  const failed = analysis.view.machineStatus === "failed";
+  const stopped =
+    analysis.view.machineStatus === "failed" || analysis.view.machineStatus === "passed";
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!analysis.canSend) {
@@ -210,7 +211,7 @@ function AnalysisRequestChat({
             id="split-run-intent-composer"
             data-testid="split-run-intent-composer"
             value={analysis.composer}
-            placeholder={failed ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder}
+            placeholder={stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder}
             disabled={!analysis.canSend}
             onChange={(event) => analysis.onComposerChange(event.target.value)}
             onKeyDown={(event) => {

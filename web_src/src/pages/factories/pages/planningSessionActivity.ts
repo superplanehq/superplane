@@ -26,8 +26,23 @@ function planningSessionPhaseStatus(machineStatus: CreateWithAgentView["machineS
   if (machineStatus === "failed") {
     return "failed";
   }
+  if (machineStatus === "passed") {
+    return "passed";
+  }
   if (machineStatus === "waiting") {
     return "waiting";
+  }
+  return "running";
+}
+
+function planningAgentLineStatus(
+  machineStatus: CreateWithAgentView["machineStatus"],
+): SplitRunStreamLine["status"] {
+  if (machineStatus === "failed") {
+    return "failed";
+  }
+  if (machineStatus === "passed") {
+    return "passed";
   }
   return "running";
 }
@@ -43,7 +58,7 @@ function planningAgentStreamLine(view: Pick<CreateWithAgentView, "executionId" |
     executionId: view.executionId || undefined,
     // Stay running while the machine is on. A waiting status tears down the
     // live log stream and the full log flickers back as collapsed tool calls.
-    status: view.machineStatus === "failed" ? "failed" : "running",
+    status: planningAgentLineStatus(view.machineStatus),
   };
 }
 

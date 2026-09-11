@@ -47,6 +47,18 @@ describe("planningSessionPhase", () => {
     expect(phase.stream[0]?.status).toBe("running");
   });
 
+  it("marks the agent line passed when the first analysis result already exists", () => {
+    const phase = planningSessionPhase({
+      canvasId: "canvas-1",
+      executionId: "execution-1",
+      messages: [],
+      machineStatus: "passed",
+    });
+
+    expect(phase.status).toBe("passed");
+    expect(phase.stream[0]?.status).toBe("passed");
+  });
+
   it("marks the agent line failed when the machine stopped", () => {
     const phase = planningSessionPhase({
       canvasId: "canvas-1",

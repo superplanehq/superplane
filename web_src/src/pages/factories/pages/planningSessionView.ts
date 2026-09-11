@@ -39,11 +39,13 @@ export type PlanningSessionSurveyPayload = {
 
 export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
-  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
+  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen"> & {
+    analysisDelivered?: boolean;
+  },
 ): CreateWithAgentView {
   return {
     repository: session.repository ?? "",
-    machineStatus: createWithAgentMachineStatus(session),
+    machineStatus: createWithAgentMachineStatus(session, extras.analysisDelivered),
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
@@ -115,22 +117,30 @@ export function isFailedPlanningCanvasRun(run: { result?: string } | null | unde
 export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
   run: { result?: string } | null | undefined,
+  analysisDelivered = false,
 ): CreateWithAgentView {
-  if (view.machineStatus === "failed") {
+  if (view.machineStatus === "failed" || view.machineStatus === "passed") {
     return view;
   }
   if (isFailedPlanningCanvasRun(run)) {
-    return { ...view, machineStatus: "failed" };
+    return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
   if (run?.result === "RESULT_PASSED" && view.machineStatus !== "waiting") {
-    return { ...view, machineStatus: "failed" };
+    return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
   return view;
 }
 
-function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
+function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["machineStatus"] {
+  return analysisDelivered ? "passed" : "failed";
+}
+
+function createWithAgentMachineStatus(
+  session: PlanningSessionPayload,
+  analysisDelivered?: boolean,
+): CreateWithAgentView["machineStatus"] {
   if (session.state === "ended") {
-    return "failed";
+    return analysisStopStatus(Boolean(analysisDelivered));
   }
   if (!session.executionId) {
     return "starting";
