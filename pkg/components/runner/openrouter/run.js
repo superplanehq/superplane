@@ -356,6 +356,8 @@ async function runPrompt(promptFile, model, helpers = {}) {
   });
   const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
   const sessionUsageBefore = loadSessionUsage(sp);
+  const sessionStepsBefore = readSessionStepUsages(sp);
+  const firstPromptTurn = telemetry.currentTurn() + 1;
 
   let failed = false;
   let exitCode = 0;
@@ -425,13 +427,18 @@ async function runPrompt(promptFile, model, helpers = {}) {
   }
 
   formatter.flush(failed);
+  const sessionSteps = newSessionStepUsages(readSessionStepUsages(sp), sessionStepsBefore);
   const recorded = preferRecordedUsage(
     usageWithCost(lastUsage, lastCost),
     subtractUsage(loadSessionUsage(sp), sessionUsageBefore),
   );
   const usage = recorded;
   lastCost = Number(recorded.total_cost_usd) || lastCost;
-  applyRecordedUsageToTelemetry(telemetry, usage);
+  if (sessionSteps.length > 0) {
+    applyRecordedStepsToTelemetry(telemetry, sessionSteps, firstPromptTurn);
+  } else {
+    applyRecordedUsageToTelemetry(telemetry, usage);
+  }
   const payload = {
     type: "result",
     result: resultTextFrom(lastResult, formatter),
@@ -720,7 +727,28 @@ function applyRecordedUsageToTelemetry(telemetry, recorded) {
   const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
-  telemetry.updateCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+  telemetry.mergeCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+}
+
+function newSessionStepUsages(after, before) {
+  const priorKeys = new Set((before || []).map((step) => step.key));
+  return (after || []).filter((step) => !priorKeys.has(step.key));
+}
+
+function applyRecordedStepsToTelemetry(telemetry, steps, firstTurn) {
+  if (!telemetry || !Array.isArray(steps)) {
+    return;
+  }
+  for (const [index, step] of steps.entries()) {
+    if (!step || tokenTotal(step.usage) <= 0) {
+      continue;
+    }
+    const turn = firstTurn + index;
+    if (telemetry.replaceTurnUsage(turn, step.usage)) {
+      continue;
+    }
+    telemetry.beginTurn(step.usage, { forceNew: true });
+  }
 }
 
 function openCodeDataHome(taskDir) {
@@ -779,21 +807,32 @@ function collectJsonFiles(dir, files = []) {
   return files;
 }
 
-function readSessionUsageFromJsonParts(openCodeHome) {
+function sessionStepUsage(key, raw) {
+  const usage = usageFromStoredPart(parseStoredPart(raw));
+  if (tokenTotal(usage) <= 0 && !(Number(usage.total_cost_usd) > 0)) {
+    return null;
+  }
+  return { key, usage };
+}
+
+function readSessionStepUsagesFromJsonParts(openCodeHome) {
   const roots = [path.join(openCodeHome, "storage", "part"), path.join(openCodeHome, "storage", "session", "part")];
-  let usage = emptyUsage();
+  const steps = [];
   for (const root of roots) {
-    for (const file of collectJsonFiles(root)) {
+    for (const file of collectJsonFiles(root).sort()) {
       let parsed;
       try {
         parsed = JSON.parse(fs.readFileSync(file, "utf8"));
       } catch {
         continue;
       }
-      usage = mergeUsage(usage, usageFromStoredPart(parseStoredPart(parsed)));
+      const step = sessionStepUsage(file, parsed);
+      if (step) {
+        steps.push(step);
+      }
     }
   }
-  return usage;
+  return steps;
 }
 
 function openCodeDatabasePaths(openCodeHome) {
@@ -809,11 +848,23 @@ function openCodeDatabasePaths(openCodeHome) {
   return entries.filter((name) => /^opencode.*\.db$/.test(name)).map((name) => path.join(openCodeHome, name));
 }
 
-function sumStepFinishRows(rows) {
-  let usage = emptyUsage();
+function stepUsagesFromRows(dbPath, rows) {
+  const steps = [];
   for (const row of rows || []) {
     const data = row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
-    usage = mergeUsage(usage, usageFromStoredPart(parseStoredPart(data)));
+    const id = row && row.id != null ? String(row.id) : String(steps.length);
+    const step = sessionStepUsage(`${dbPath}:${id}`, data);
+    if (step) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+
+function sumStepUsages(steps) {
+  let usage = emptyUsage();
+  for (const step of steps || []) {
+    usage = mergeUsage(usage, step && step.usage);
   }
   return usage;
 }
@@ -834,7 +885,7 @@ function withSilencedExperimentalWarnings(fn) {
   }
 }
 
-function readSessionUsageFromSqliteNative(dbPath) {
+function readSessionStepUsagesFromSqliteNative(dbPath) {
   return withSilencedExperimentalWarnings(() => {
     let DatabaseSync;
     try {
@@ -845,23 +896,29 @@ function readSessionUsageFromSqliteNative(dbPath) {
     const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const rows = db
-        .prepare(`SELECT data FROM part WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')`)
+        .prepare(
+          `SELECT id, data FROM part
+           WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+           ORDER BY time_created, id`,
+        )
         .all();
-      return sumStepFinishRows(rows);
+      return stepUsagesFromRows(dbPath, rows);
     } finally {
       db.close();
     }
   });
 }
 
-function readSessionUsageFromSqliteCli(dbPath) {
+function readSessionStepUsagesFromSqliteCli(dbPath) {
   const result = spawnSync(
     "sqlite3",
     [
       "-readonly",
       "-json",
       dbPath,
-      `SELECT data FROM part WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')`,
+      `SELECT id, data FROM part
+       WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+       ORDER BY time_created, id`,
     ],
     { encoding: "utf8" },
   );
@@ -872,17 +929,17 @@ function readSessionUsageFromSqliteCli(dbPath) {
   try {
     rows = JSON.parse(result.stdout);
   } catch {
-    return emptyUsage();
+    return [];
   }
-  return sumStepFinishRows(rows);
+  return stepUsagesFromRows(dbPath, rows);
 }
 
-function readSessionUsageFromSqlite(dbPath) {
+function readSessionStepUsagesFromSqlite(dbPath) {
   if (!dbPath || !fs.existsSync(dbPath)) {
-    return emptyUsage();
+    return [];
   }
   try {
-    const native = readSessionUsageFromSqliteNative(dbPath);
+    const native = readSessionStepUsagesFromSqliteNative(dbPath);
     if (native) {
       return native;
     }
@@ -890,22 +947,30 @@ function readSessionUsageFromSqlite(dbPath) {
     // Missing tables or a locked WAL file are expected. Try the sqlite3 CLI.
   }
   try {
-    return readSessionUsageFromSqliteCli(dbPath);
+    return readSessionStepUsagesFromSqliteCli(dbPath);
   } catch {
-    return emptyUsage();
+    return [];
   }
 }
 
-function readSessionUsage(taskDir) {
+function preferSessionSteps(left, right) {
+  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left)) ? right : left;
+}
+
+function readSessionStepUsages(taskDir) {
   if (!taskDir) {
-    return emptyUsage();
+    return [];
   }
   const openCodeHome = openCodeDataHome(taskDir);
-  let usage = emptyUsage();
+  let steps = [];
   for (const dbPath of openCodeDatabasePaths(openCodeHome)) {
-    usage = preferRecordedUsage(usage, readSessionUsageFromSqlite(dbPath));
+    steps = preferSessionSteps(steps, readSessionStepUsagesFromSqlite(dbPath));
   }
-  return preferRecordedUsage(usage, readSessionUsageFromJsonParts(openCodeHome));
+  return preferSessionSteps(steps, readSessionStepUsagesFromJsonParts(openCodeHome));
+}
+
+function readSessionUsage(taskDir) {
+  return sumStepUsages(readSessionStepUsages(taskDir));
 }
 
 function usageFromStepFinish(part) {
@@ -1023,7 +1088,7 @@ function printLiveLogLine(text) {
   if (!line) {
     return;
   }
-  writeLiveLogRecord({ type: "line", text: line });
+  println(line);
 }
 
 function printRetryOutcome(errorText, extraLine) {
@@ -1135,7 +1200,8 @@ function createOpenCodeFormatter(telemetry, onSession) {
           }
           formatToolUse(part, tools);
           break;
-        case "step_finish": {
+        case "step_finish":
+        case "step-finish": {
           const stepUsage = usageFromStepFinish(part);
           usage = mergeUsage(usage, stepUsage);
           if (part.cost != null && Number.isFinite(Number(part.cost))) {
@@ -1144,7 +1210,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
           if (!roundOpen) {
             beginRound(stepUsage, { message: lastText });
           } else {
-            tracker.updateCurrentUsage(usage);
+            tracker.mergeCurrentUsage(stepUsage);
           }
           roundOpen = false;
           break;
