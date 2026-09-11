@@ -108,17 +108,6 @@ describe("HostedCreditEmptyBanner", () => {
     expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Expires today");
   });
 
-  it("shows trial-empty copy", () => {
-    render(
-      <MemoryRouter>
-        <HostedCreditEmptyBanner billingEnabled kind="trial-empty" spendingHref={billingHref} />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Trial credit is used up");
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
-  });
-
   it("shows trial-expired copy", () => {
     render(
       <MemoryRouter>
@@ -166,6 +155,26 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker).toHaveTextContent("$41.24");
     expect(kicker).toHaveTextContent("Subscribe");
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
+  });
+
+  it("shows remaining trial days and $0.00 when trial credit is spent", () => {
+    const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker
+          spendingHref={billingHref}
+          welcomeCreditExpiresAt={expiresAt.toISOString()}
+          remainingCreditCents={0}
+        />
+      </MemoryRouter>,
+    );
+
+    const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveAttribute("data-kind", "trial");
+    expect(kicker).toHaveTextContent("Trial");
+    expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
+    expect(kicker).toHaveTextContent("$0.00");
+    expect(kicker).toHaveTextContent("Subscribe");
   });
 
   it("falls back to a 14-day trial label when expiry is missing", () => {

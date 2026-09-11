@@ -58,7 +58,7 @@ describe("LinesPage hosted credit banner", () => {
     );
   }, 10000);
 
-  it("shows a trial-empty banner that opens Billing when welcome credit is spent", async () => {
+  it("keeps the trial chip next to the line title when welcome credit is spent", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
@@ -69,9 +69,12 @@ describe("LinesPage hosted credit banner", () => {
       />,
     );
 
-    const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
-    expect(banner).toHaveTextContent("Trial credit is used up");
-    expect(banner).toHaveAttribute("data-tone", "warning");
+    const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
+    expect(kicker).toHaveAttribute("data-kind", "trial");
+    expect(kicker).toHaveTextContent(defaultTrialLabel);
+    expect(kicker).toHaveTextContent("$0.00");
+    expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
+    expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),

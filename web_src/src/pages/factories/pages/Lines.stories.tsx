@@ -279,7 +279,7 @@ export const LineDetailFivePhases: Story = {
   },
 };
 
-/** Welcome credit is empty. The board shows the trial-empty banner in the header. */
+/** Welcome credit is empty. The board shows the trial chip next to the title. */
 export const LineBoardHostedCreditEmpty: Story = {
   name: "Line board — hosted credit empty",
   render: () => {

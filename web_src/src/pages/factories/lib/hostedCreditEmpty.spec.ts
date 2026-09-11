@@ -66,7 +66,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
     });
   });
 
-  it("tells the owner to subscribe when trial usage is used up", () => {
+  it("keeps trial usage copy when trial credit is spent before expiry", () => {
     expect(
       hostedCreditBillingBalanceCopy({
         remainingCents: 0,
@@ -78,7 +78,10 @@ describe("hostedCreditBillingBalanceCopy", () => {
       }),
     ).toEqual({
       badge: "Trial",
-      description: "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.",
+      description:
+        `This is trial usage for machines and managed models. ` +
+        `The trial ends on ${new Date(inFourteenDays).toLocaleDateString()}. ` +
+        `Subscribe to Business to keep hosted runs.`,
     });
   });
 
@@ -127,7 +130,7 @@ describe("hostedCreditBannerKind", () => {
     ).toBe("trial");
   });
 
-  it("shows trial-empty when welcome credit is spent before expiry", () => {
+  it("keeps the trial kind when welcome credit is spent before expiry", () => {
     expect(
       hostedCreditBannerKind({
         remainingCreditCents: "0",
@@ -137,7 +140,7 @@ describe("hostedCreditBannerKind", () => {
         welcomeCreditExpiresAt: inFourteenDays,
         now,
       }),
-    ).toBe("trial-empty");
+    ).toBe("trial");
   });
 
   it("shows trial-expired when welcome credit expires", () => {
@@ -228,7 +231,6 @@ describe("isHostedCreditHeaderKickerKind", () => {
     expect(isHostedCreditHeaderKickerKind("trial")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("trial-expired")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("lapsed")).toBe(true);
-    expect(isHostedCreditHeaderKickerKind("trial-empty")).toBe(false);
     expect(isHostedCreditHeaderKickerKind("empty")).toBe(false);
   });
 });
@@ -336,7 +338,6 @@ describe("hostedCreditBannerTone", () => {
   });
 
   it("warns when hosted runs cannot start", () => {
-    expect(hostedCreditBannerTone("trial-empty")).toBe("warning");
     expect(hostedCreditBannerTone("trial-expired")).toBe("warning");
     expect(hostedCreditBannerTone("lapsed")).toBe("warning");
     expect(hostedCreditBannerTone("empty")).toBe("warning");
@@ -405,17 +406,6 @@ describe("hostedCreditBannerCopy", () => {
       remainingLabel: "$4.32 remaining",
       expiryLabel: "14 days remaining",
       consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
-      actionLabel: "Subscribe",
-      tone: "warning",
-      showAction: true,
-      showPricingLink: true,
-    });
-  });
-
-  it("tells the user to buy credit when the trial is empty", () => {
-    expect(hostedCreditBannerCopy({ kind: "trial-empty", billingEnabled: true })).toEqual({
-      title: "Trial credit is used up",
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
       actionLabel: "Subscribe",
       tone: "warning",
       showAction: true,
