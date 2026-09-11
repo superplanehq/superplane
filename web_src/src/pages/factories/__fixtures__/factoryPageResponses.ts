@@ -328,6 +328,7 @@ export interface FactoriesFixture {
     subscriptionCheckoutEnabled?: boolean;
     creditPurchaseAllowed?: boolean;
     hasBillingCustomer?: boolean;
+    cancelAtPeriodEnd?: boolean;
   };
   /** Count of POST /billing/sync calls in this fixture session. */
   billingSyncCalls?: number;

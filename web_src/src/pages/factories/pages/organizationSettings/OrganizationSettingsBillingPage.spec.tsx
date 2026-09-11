@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
@@ -8,8 +8,10 @@ import { DEFAULT_CREDIT_GRANTS, MIXED_CREDIT_GRANTS } from "../../__fixtures__/c
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
+  ADMIN_ORGANIZATION_BILLING,
   BUSINESS_ORGANIZATION_BILLING,
   DEFAULT_FACTORY_USAGE,
+  ENDING_ORGANIZATION_BILLING,
   EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
   LAPSED_ORGANIZATION_BILLING,
@@ -19,12 +21,31 @@ import {
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
+import { billingSubscriptionEndsCopy } from "../../lib/billingPlans";
 
 const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+const BUSINESS_PERIOD_END = "2026-10-09T12:00:00.000Z";
+let canUpdateOrg = true;
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) => {
+      if (resource === "org" && action === "update") {
+        return canUpdateOrg;
+      }
+      return true;
+    },
+    isLoading: false,
+  }),
+}));
 
 describe("OrganizationSettingsBillingPage", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  beforeEach(() => {
+    canUpdateOrg = true;
   });
 
   it("shows remaining welcome credit and trial copy when Polar has no customer", async () => {
@@ -45,6 +66,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(plans).queryByTestId("billing-plan-usage")).not.toBeInTheDocument();
     expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
     expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
@@ -303,6 +325,8 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$141.24");
     expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
@@ -384,6 +408,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
@@ -416,11 +441,93 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Trial");
     expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
     expect(balance).not.toHaveTextContent("Hosted runs cannot start.");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("cancels Polar Business at period end from the Plans card", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: { ...BUSINESS_ORGANIZATION_BILLING },
+        }}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Cancel Business" }));
+    expect(screen.getByTestId("billing-cancel-subscription-dialog")).toHaveTextContent(
+      `Business stays active until ${new Date(BUSINESS_PERIOD_END).toLocaleDateString()}. SuperPlane will not renew after that date.`,
+    );
+    await user.click(screen.getByTestId("billing-cancel-subscription-confirm"));
+    expect(await screen.findByTestId("billing-subscription-ends")).toHaveTextContent(
+      billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
+    );
+    expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep Business" })).toBeEnabled();
+  }, 10000);
+
+  it("keeps Polar Business when the owner reverses cancel", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: { ...ENDING_ORGANIZATION_BILLING },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("billing-subscription-ends")).toHaveTextContent(
+      billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
+    );
+    await user.click(screen.getByRole("button", { name: "Keep Business" }));
+    expect(await screen.findByRole("button", { name: "Cancel Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("hides cancel for an admin Business plan", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: ADMIN_ORGANIZATION_BILLING,
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("billing-current-plan")).toHaveTextContent("Current plan");
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows the end date to members and hides cancel", async () => {
+    canUpdateOrg = false;
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: ENDING_ORGANIZATION_BILLING,
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("billing-subscription-ends")).toHaveTextContent(
+      billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
+    );
+    expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
   }, 10000);
 });

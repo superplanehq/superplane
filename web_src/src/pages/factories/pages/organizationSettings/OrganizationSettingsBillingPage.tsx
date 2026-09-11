@@ -60,6 +60,9 @@ export function OrganizationSettingsBillingPage() {
         isLoading={model.isLoading}
         packs={packs}
         plan={model.plan}
+        planSource={model.planSource}
+        cancelAtPeriodEnd={model.cancelAtPeriodEnd}
+        subscriptionPending={model.cancelPending || model.keepPending}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
@@ -71,6 +74,8 @@ export function OrganizationSettingsBillingPage() {
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
         onSubscribe={model.billing.startBusinessCheckout}
+        onCancelSubscription={model.onCancelSubscription}
+        onKeepSubscription={model.onKeepSubscription}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
@@ -92,6 +97,9 @@ function BillingPageBody({
   isLoading,
   packs,
   plan,
+  planSource,
+  cancelAtPeriodEnd,
+  subscriptionPending,
   portalPending,
   purchased,
   remaining,
@@ -103,6 +111,8 @@ function BillingPageBody({
   welcomeCreditExpiresAt,
   onAddCredit,
   onSubscribe,
+  onCancelSubscription,
+  onKeepSubscription,
   onManageInvoices,
 }: {
   billingContactMessage?: string;
@@ -119,6 +129,9 @@ function BillingPageBody({
   isLoading: boolean;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
+  planSource?: string;
+  cancelAtPeriodEnd: boolean;
+  subscriptionPending: boolean;
   portalPending: boolean;
   purchased: number;
   remaining: number;
@@ -130,6 +143,8 @@ function BillingPageBody({
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
   onSubscribe: () => void | Promise<void>;
+  onCancelSubscription: () => void | Promise<void>;
+  onKeepSubscription: () => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
 }) {
   if (isLoading) {
@@ -155,8 +170,13 @@ function BillingPageBody({
       <BillingPlansSection
         canManageBilling={canManageBilling}
         creditPurchaseAllowed={creditPurchaseAllowed}
-        pending={businessCheckoutPending}
+        planSource={planSource}
+        cancelAtPeriodEnd={cancelAtPeriodEnd}
+        currentPeriodEnd={currentPeriodEnd}
+        pending={businessCheckoutPending || subscriptionPending}
         onSubscribe={onSubscribe}
+        onCancel={onCancelSubscription}
+        onKeep={onKeepSubscription}
       />
       <HostedCreditRemainingCard
         billingContactMessage={billingContactMessage}
