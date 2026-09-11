@@ -20,18 +20,13 @@ func DeleteFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to delete factory PR feedback handler")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to delete factory PR feedback handler")
-	}
-
 	handlerID, err := parsePRFeedbackHandlerID(req.GetHandlerId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory PR feedback handler")
 	}
 
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := models.FindFactory(tx, orgID, factoryID)
+		factory, err := findFactory(tx, orgID, req.GetFactoryId())
 		if err != nil {
 			return err
 		}

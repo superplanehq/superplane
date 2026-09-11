@@ -24,16 +24,6 @@ func CreateWorkOrderArtifact(
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
-	}
-
 	artifactType, ok := artifactTypeFromProto(req.GetType())
 	if !ok {
 		return nil, factoryErrorToStatus(invalidArgument("artifact type is required"), "failed to create work order artifact")
@@ -54,15 +44,17 @@ func CreateWorkOrderArtifact(
 	}
 
 	db := database.DB(ctx)
-	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	factoryModel, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
 	}
+	factoryID := factoryModel.ID
 
-	order, err := factoryModel.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factoryModel, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
 	}
+	orderID := order.ID
 
 	artifact, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
 		Type:      artifactType,

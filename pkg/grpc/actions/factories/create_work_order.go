@@ -25,11 +25,6 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-
 	title := strings.TrimSpace(req.GetTitle())
 	if title == "" {
 		return nil, factoryErrorToStatus(invalidArgument("title is required"), "failed to create work order")
@@ -46,7 +41,7 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}

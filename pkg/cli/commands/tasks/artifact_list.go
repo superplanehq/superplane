@@ -17,7 +17,7 @@ func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
 	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
 
 	if rawTaskID == "" {
-		return fmt.Errorf("--task must be a UUID or slug")
+		return fmt.Errorf("--task is required")
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
@@ -25,7 +25,7 @@ func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}

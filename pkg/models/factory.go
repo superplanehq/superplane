@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,13 @@ func MapFactoryConstraintError(err error) error {
 // MapFactoryConstraintError instead in new code.
 func MapFactoryNameUniqueConstraintError(err error) error {
 	return MapFactoryConstraintError(err)
+}
+
+// WorkOrderKey returns the display identifier used for a work order that
+// belongs to this factory. Format matches `<KEY>-<number>` (for example
+// `SP-42`).
+func (f *Factory) WorkOrderKey(number int64) string {
+	return fmt.Sprintf("%s-%d", f.Key, number)
 }
 
 func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key string) (*Factory, error) {
@@ -237,6 +245,23 @@ func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Facto
 	}
 
 	return &factory, nil
+}
+
+// FindFactoryByRef resolves ref to a factory. ref is a UUID or a workspace
+// key. Workspace names are not accepted.
+//
+// Names can contain spaces, so they do not belong in `/factories/{id}`.
+// Names are also not unique in an organization.
+func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Factory, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return FindFactory(tx, organizationID, id)
+	}
+
+	return FindFactoryByKey(tx, organizationID, trimmed)
 }
 
 func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
@@ -706,22 +731,28 @@ func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[
 }
 
 func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
-	var order FactoryWorkOrder
-	err := tx.
-		Preload("CreatedBy").
-		Preload("Assignees").
-		Preload("Assignees.User").
-		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, orderID).
-		First(&order).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderNotFound
-		}
-		return nil, err
-	}
+	return f.findWorkOrder(tx, "id = ?", orderID)
+}
 
-	return &order, nil
+func (f *Factory) FindWorkOrderByNumber(tx *gorm.DB, number int64) (*FactoryWorkOrder, error) {
+	return f.findWorkOrder(tx, "number = ?", number)
+}
+
+// FindWorkOrderByRef resolves ref to a work order in this factory. ref is
+// tried as a UUID first, then as the factory-scoped sequence number, then
+// as the display key (for example `SP-42`).
+func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return f.FindWorkOrder(tx, id)
+	}
+	if number, err := strconv.ParseInt(trimmed, 10, 64); err == nil && number > 0 {
+		return f.FindWorkOrderByNumber(tx, number)
+	}
+	return f.findWorkOrderByKey(tx, trimmed)
 }
 
 type ListFactoryWorkOrdersFilters struct {
@@ -789,6 +820,38 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	return orders, nil
 }
 
+func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	prefix := f.Key + "-"
+	if !strings.HasPrefix(strings.ToUpper(key), strings.ToUpper(prefix)) {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	number, err := strconv.ParseInt(key[len(prefix):], 10, 64)
+	if err != nil || number <= 0 {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	return f.FindWorkOrderByNumber(tx, number)
+}
+
+func (f *Factory) findWorkOrder(tx *gorm.DB, cond string, arg any) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.
+		Preload("CreatedBy").
+		Preload("Assignees").
+		Preload("Assignees.User").
+		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
+		Where(cond, arg).
+		First(&order).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return &order, nil
+}
+
 // allocateNextWorkOrderNumber atomically increments the factory's counter
 // and returns the value that the new work order should use. The UPDATE ...
 // RETURNING pattern serializes concurrent inserts inside Postgres without
@@ -812,11 +875,4 @@ func (f *Factory) allocateNextWorkOrderNumber(tx *gorm.DB) (int64, error) {
 
 	f.NextWorkOrderNumber = allocated + 1
 	return allocated, nil
-}
-
-// WorkOrderKey returns the display identifier used for a work order that
-// belongs to this factory. Format matches `<KEY>-<number>` (for example
-// `SP-42`).
-func (f *Factory) WorkOrderKey(number int64) string {
-	return fmt.Sprintf("%s-%d", f.Key, number)
 }

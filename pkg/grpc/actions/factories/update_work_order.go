@@ -32,22 +32,23 @@ func UpdateWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to update work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order")
-	}
-
 	title, description, err := workOrderContentFromRequest(req)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order")
 	}
 
 	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order")
+	}
+	orderID := resolvedOrder.ID
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
