@@ -11,12 +11,19 @@ import type {
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
-import { syncOrganizationBilling, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import {
+  useCancelOrganizationSubscription,
+  useOrganizationBilling,
+  useResumeOrganizationSubscription,
+  syncOrganizationBilling,
+} from "@/hooks/useOrganizationBilling";
 import { useOrganizationBillingSync } from "@/hooks/useOrganizationBillingSync";
 import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { getApiErrorMessage } from "@/lib/errors";
 import type { HostedCreditRefreshStatus } from "@/lib/hostedCredit";
+import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
 type HostedCreditBillingActions = {
@@ -52,6 +59,12 @@ export type OrganizationBillingPageModel = {
   purchasedRemaining: number;
   welcomeRemaining: number;
   currentPeriodEnd?: string;
+  planSource?: string;
+  cancelAtPeriodEnd: boolean;
+  cancelPending: boolean;
+  keepPending: boolean;
+  onCancelSubscription: () => Promise<void>;
+  onKeepSubscription: () => Promise<void>;
   superplaneGrant: number;
   welcomeCreditExpiresAt?: string;
   hasBillingCustomer: boolean;
@@ -85,6 +98,8 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
     creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
     describeBillingEnabled: billing?.billingEnabled === true,
+    planSource: billing?.planSource,
+    cancelAtPeriodEnd: billing?.cancelAtPeriodEnd === true,
   };
 }
 
@@ -129,6 +144,25 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await syncOrganizationBilling(organizationId);
   }, [organizationId]);
 
+  const cancelSubscription = useCancelOrganizationSubscription(organizationId);
+  const resumeSubscription = useResumeOrganizationSubscription(organizationId);
+
+  const onCancelSubscription = useCallback(async () => {
+    try {
+      await cancelSubscription.mutateAsync();
+    } catch (cancelError) {
+      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
+    }
+  }, [cancelSubscription]);
+
+  const onKeepSubscription = useCallback(async () => {
+    try {
+      await resumeSubscription.mutateAsync();
+    } catch (keepError) {
+      showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
+    }
+  }, [resumeSubscription]);
+
   useOrganizationBillingSync({
     organizationId,
     subscribed,
@@ -159,6 +193,12 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     purchasedRemaining: flags.purchasedRemaining,
     welcomeRemaining: flags.welcomeRemaining,
     currentPeriodEnd: flags.currentPeriodEnd,
+    planSource: flags.planSource,
+    cancelAtPeriodEnd: flags.cancelAtPeriodEnd,
+    cancelPending: cancelSubscription.isPending,
+    keepPending: resumeSubscription.isPending,
+    onCancelSubscription,
+    onKeepSubscription,
     superplaneGrant: metrics.superplaneGrant,
     welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,
     hasBillingCustomer: metrics.hasBillingCustomer,

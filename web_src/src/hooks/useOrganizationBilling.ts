@@ -1,8 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  organizationsCancelOrganizationSubscription,
   organizationsCreateBusinessCheckout,
   organizationsDescribeOrganizationBilling,
+  organizationsResumeOrganizationSubscription,
   organizationsSyncOrganizationBilling,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -53,6 +55,44 @@ export function useCreateBusinessCheckout(organizationId: string) {
         throw new Error("Checkout is not available");
       }
       return checkoutUrl;
+    },
+  });
+}
+
+export function useCancelOrganizationSubscription(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await organizationsCancelOrganizationSubscription(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId },
+          body: {},
+        }),
+      );
+      return response.data ?? {};
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(organizationBillingQueryKey(organizationId), data);
+    },
+  });
+}
+
+export function useResumeOrganizationSubscription(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await organizationsResumeOrganizationSubscription(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId },
+          body: {},
+        }),
+      );
+      return response.data ?? {};
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(organizationBillingQueryKey(organizationId), data);
     },
   });
 }
