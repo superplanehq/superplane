@@ -421,6 +421,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
 	).Methods(http.MethodPut)
 
+	s.Router.Handle(
+		"/api/v1/me/feedback",
+		orgAuthMiddleware(http.HandlerFunc(s.handleSubmitFeedback)),
+	).Methods(http.MethodPost)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)

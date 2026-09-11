@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"mime"
 	"net/smtp"
 	"strings"
 
@@ -155,7 +157,12 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	}
 
 	subject := "Your SuperPlane sign-in code"
-	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+	return s.sendEmail(settings, outgoingMail{
+		to:       []string{toEmail},
+		subject:  subject,
+		textBody: plainTextContent,
+		htmlBody: htmlContent,
+	})
 }
 
 func (s *SMTPEmailService) SendWorkOrderNotificationEmail(
@@ -177,26 +184,71 @@ func (s *SMTPEmailService) SendWorkOrderNotificationEmail(
 		return fmt.Errorf("failed to render work order notification HTML template: %w", err)
 	}
 
-	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+	return s.sendEmail(settings, outgoingMail{
+		to:       []string{toEmail},
+		subject:  subject,
+		textBody: plainTextContent,
+		htmlBody: htmlContent,
+	})
+}
+
+func (s *SMTPEmailService) SendSupportFeedbackEmail(toEmail string, feedback SupportFeedback) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+
+	data := feedback.TemplateData()
+	plainTextContent, err := s.renderTemplate("support_feedback.txt", data)
+	if err != nil {
+		return fmt.Errorf("failed to render support feedback plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("support_feedback.html", data)
+	if err != nil {
+		return fmt.Errorf("failed to render support feedback HTML template: %w", err)
+	}
+
+	mail := outgoingMail{
+		to:       []string{toEmail},
+		subject:  feedback.EmailSubject(),
+		textBody: plainTextContent,
+		htmlBody: htmlContent,
+		replyTo:  strings.TrimSpace(feedback.UserEmail),
+	}
+	if feedback.Attachment != nil {
+		mail.attachments = []SupportFeedbackAttachment{*feedback.Attachment}
+	}
+	return s.sendEmail(settings, mail)
 }
 
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	return renderEmailTemplate(s.templateDir, templateName, data)
 }
 
-func (s *SMTPEmailService) sendEmail(settings *SMTPSettings, to []string, bcc []string, subject, textBody, htmlBody string) error {
+type outgoingMail struct {
+	to          []string
+	bcc         []string
+	subject     string
+	textBody    string
+	htmlBody    string
+	replyTo     string
+	attachments []SupportFeedbackAttachment
+}
+
+func (s *SMTPEmailService) sendEmail(settings *SMTPSettings, mail outgoingMail) error {
 	from := formatFrom(settings.FromName, settings.FromEmail)
 	if settings.Host == "" || settings.Port == 0 || settings.FromEmail == "" {
 		return fmt.Errorf("smtp settings are incomplete")
 	}
 
-	recipients := append([]string{}, to...)
-	recipients = append(recipients, bcc...)
+	recipients := append([]string{}, mail.to...)
+	recipients = append(recipients, mail.bcc...)
 	if len(recipients) == 0 {
 		return nil
 	}
 
-	message, err := buildMultipartEmail(from, to, bcc, subject, textBody, htmlBody)
+	message, err := buildMultipartEmail(from, mail)
 	if err != nil {
 		return err
 	}
@@ -259,33 +311,88 @@ func (s *SMTPEmailService) sendEmail(settings *SMTPSettings, to []string, bcc []
 	return conn.Quit()
 }
 
-func buildMultipartEmail(from string, to []string, bcc []string, subject, textBody, htmlBody string) (string, error) {
-	boundary, err := randomBoundary()
+func buildMultipartEmail(from string, mail outgoingMail) (string, error) {
+	alternativeBoundary, err := randomBoundary()
 	if err != nil {
 		return "", err
 	}
 
+	alternative := alternativePart(alternativeBoundary, mail.textBody, mail.htmlBody)
+
 	headers := []string{
 		fmt.Sprintf("From: %s", sanitizeSMTPHeaderValue(from)),
-		fmt.Sprintf("Subject: %s", sanitizeSMTPHeaderValue(subject)),
+		fmt.Sprintf("Subject: %s", sanitizeSMTPHeaderValue(mail.subject)),
 		"MIME-Version: 1.0",
-		fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", boundary),
+	}
+	if len(mail.to) > 0 {
+		headers = append(headers, fmt.Sprintf("To: %s", sanitizeSMTPHeaderValue(strings.Join(mail.to, ", "))))
+	}
+	if mail.replyTo != "" {
+		headers = append(headers, fmt.Sprintf("Reply-To: %s", sanitizeSMTPHeaderValue(mail.replyTo)))
 	}
 
-	if len(to) > 0 {
-		headers = append(headers, fmt.Sprintf("To: %s", sanitizeSMTPHeaderValue(strings.Join(to, ", "))))
+	if len(mail.attachments) == 0 {
+		headers = append(headers, fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", alternativeBoundary))
+		return strings.Join(headers, "\r\n") + "\r\n\r\n" + alternative, nil
 	}
 
-	message := strings.Join(headers, "\r\n") + "\r\n\r\n"
-	message += fmt.Sprintf("--%s\r\n", boundary)
-	message += "Content-Type: text/plain; charset=\"UTF-8\"\r\n\r\n"
-	message += textBody + "\r\n\r\n"
-	message += fmt.Sprintf("--%s\r\n", boundary)
-	message += "Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
-	message += htmlBody + "\r\n\r\n"
-	message += fmt.Sprintf("--%s--\r\n", boundary)
+	mixedBoundary, err := randomBoundary()
+	if err != nil {
+		return "", err
+	}
+	headers = append(headers, fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"", mixedBoundary))
 
-	return message, nil
+	var b strings.Builder
+	b.WriteString(strings.Join(headers, "\r\n"))
+	b.WriteString("\r\n\r\n")
+	fmt.Fprintf(&b, "--%s\r\n", mixedBoundary)
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", alternativeBoundary)
+	b.WriteString(alternative)
+	for _, attachment := range mail.attachments {
+		fmt.Fprintf(&b, "--%s\r\n", mixedBoundary)
+		b.WriteString(attachmentPart(attachment))
+	}
+	fmt.Fprintf(&b, "--%s--\r\n", mixedBoundary)
+	return b.String(), nil
+}
+
+func alternativePart(boundary, textBody, htmlBody string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "--%s\r\n", boundary)
+	b.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n\r\n")
+	b.WriteString(textBody)
+	b.WriteString("\r\n\r\n")
+	fmt.Fprintf(&b, "--%s\r\n", boundary)
+	b.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n")
+	b.WriteString(htmlBody)
+	b.WriteString("\r\n\r\n")
+	fmt.Fprintf(&b, "--%s--\r\n", boundary)
+	return b.String()
+}
+
+func attachmentPart(attachment SupportFeedbackAttachment) string {
+	contentType := attachment.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Filename})
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Content-Type: %s; name=\"%s\"\r\n", contentType, sanitizeSMTPHeaderValue(attachment.Filename))
+	fmt.Fprintf(&b, "Content-Disposition: %s\r\n", disposition)
+	b.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(attachment.Content)))
+	base64.StdEncoding.Encode(encoded, attachment.Content)
+	for i := 0; i < len(encoded); i += 76 {
+		end := i + 76
+		if end > len(encoded) {
+			end = len(encoded)
+		}
+		b.Write(encoded[i:end])
+		b.WriteString("\r\n")
+	}
+	b.WriteString("\r\n")
+	return b.String()
 }
 
 func formatFrom(name, email string) string {
