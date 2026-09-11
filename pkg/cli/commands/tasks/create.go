@@ -1,4 +1,4 @@
-package factories
+package tasks
 
 import (
 	"fmt"
@@ -10,15 +10,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type orderCreateCommand struct {
-	factory     *string
+type taskCreateCommand struct {
+	workspace   *string
 	title       *string
 	description *string
 	file        *string
 	assignees   *[]string
 }
 
-func (c *orderCreateCommand) Execute(ctx core.CommandContext) error {
+func (c *taskCreateCommand) Execute(ctx core.CommandContext) error {
 	title := strings.TrimSpace(stringValue(c.title))
 	if title == "" {
 		return fmt.Errorf("--title is required")
@@ -29,7 +29,7 @@ func (c *orderCreateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
+	workspaceID, err := resolveWorkspace(ctx, c.workspace)
 	if err != nil {
 		return err
 	}
@@ -49,36 +49,32 @@ func (c *orderCreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	response, _, err := ctx.API.FactoryAPI.
-		FactoriesCreateWorkOrder(ctx.Context, factoryID).
+		FactoriesCreateWorkOrder(ctx.Context, workspaceID).
 		Body(*body).
 		Execute()
 	if err != nil {
 		return err
 	}
 
-	order := response.GetOrder()
+	task := response.GetOrder()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(order)
+		return ctx.Renderer.Render(task)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, err := fmt.Fprintf(
 			stdout,
-			"Work order created: %s (state: %s)\nTitle: %s\nAssignees: %s\n",
-			order.GetId(),
-			formatOrderState(order.GetState()),
-			order.GetTitle(),
-			formatAssigneeList(order.GetAssignees()),
+			"Task created: %s (state: %s)\nTitle: %s\nAssignees: %s\n",
+			task.GetId(),
+			formatTaskState(task.GetState()),
+			task.GetTitle(),
+			formatAssigneeList(task.GetAssignees()),
 		)
 		return err
 	})
 }
 
-// resolveDescription returns the work order description, either from
-// --description (inline) or from -f/--file (a path, or "-" for stdin).
-// The two are mutually exclusive; either may be omitted entirely, leaving
-// the work order with no description.
-func (c *orderCreateCommand) resolveDescription(ctx core.CommandContext) (string, error) {
+func (c *taskCreateCommand) resolveDescription(ctx core.CommandContext) (string, error) {
 	inline := stringValue(c.description)
 	filePath := stringValue(c.file)
 
@@ -107,12 +103,7 @@ func (c *orderCreateCommand) resolveDescription(ctx core.CommandContext) (string
 	return string(raw), nil
 }
 
-// resolveAssignees resolves --assignee values (UUIDs or emails) to user
-// UUIDs. When none were given (or all were blank), the order defaults to
-// the caller running the command, matching the work order description's
-// "if no --assignee is provided, the order will be assigned to the user
-// running the command".
-func (c *orderCreateCommand) resolveAssignees(ctx core.CommandContext) ([]string, error) {
+func (c *taskCreateCommand) resolveAssignees(ctx core.CommandContext) ([]string, error) {
 	var raw []string
 	if c.assignees != nil {
 		raw = *c.assignees
