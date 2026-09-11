@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, isNotFoundError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,21 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+});
+
+describe("isNotFoundError", () => {
+  it.each([
+    ["numeric gRPC codes", { code: 5, message: "Not found" }],
+    ["named gRPC codes", { code: "NOT_FOUND" }],
+    ["HTTP statuses", { status: 404 }],
+    ["nested HTTP responses", { response: { status: 404 } }],
+    ["nested messages", { error: { message: "Resource not found" } }],
+  ])("detects not-found API errors from %s", (_source, error) => {
+    expect(isNotFoundError(error)).toBe(true);
+  });
+
+  it("rejects other API errors", () => {
+    expect(isNotFoundError({ code: 13, message: "Service unavailable" })).toBe(false);
   });
 });

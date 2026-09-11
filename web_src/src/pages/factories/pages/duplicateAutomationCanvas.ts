@@ -6,11 +6,11 @@ import {
   type FactoryApp,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { isNotFoundError } from "@/lib/errors";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { fetchRepositorySpecFileContent } from "@/pages/app/lib/repository-spec-files";
 import { dematerializeConsoleSpec, materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
-import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
 import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "@/pages/home/uniqueCanvasName";
 import * as yaml from "js-yaml";
 
@@ -68,7 +68,7 @@ async function defaultFetchConsoleYaml(sourceCanvasId: string): Promise<string |
     const consoleYaml = await fetchRepositorySpecFileContent(sourceCanvasId, CONSOLE_YAML_PATH);
     return consoleYamlHasContent(consoleYaml) ? consoleYaml : undefined;
   } catch (error) {
-    if (isNotFoundError(error) || (error instanceof Error && /404|not found/i.test(error.message))) {
+    if (isNotFoundError(error)) {
       return undefined;
     }
     throw error;
