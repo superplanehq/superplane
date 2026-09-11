@@ -15,22 +15,39 @@ const twoQuestions = {
 describe("PlanningSessionSurveyForm", () => {
   it("shows one question at a time and pages with Next and Previous", async () => {
     const user = userEvent.setup();
-    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 2")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: /High/ }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
     expect(screen.queryByText("What is the priority?")).not.toBeInTheDocument();
     expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
 
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
+  });
+
+  it("does not send when Next is followed by the primary action before the next question is answered", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("What is the scope?")).toBeInTheDocument();
   });
 
   it("hides page controls when there is one question", () => {
@@ -55,6 +72,31 @@ describe("PlanningSessionSurveyForm", () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
+  });
+
+  it("sends answered and skipped questions from Skip on the last page", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey }));
+
+    expect(onSubmit).toHaveBeenCalledWith("What is the priority? High\nWhat is the scope? skipped");
+  });
+
+  it("sends every answer after the last question is picked", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+    await user.click(screen.getByRole("button", { name: /One file/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
+
+    expect(onSubmit).toHaveBeenCalledWith("What is the priority? High\nWhat is the scope? One file");
   });
 
   it("resets pages when a new survey mounts", () => {

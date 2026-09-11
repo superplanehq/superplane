@@ -298,6 +298,11 @@ func (s *FactoryService) DescribePlanningSession(ctx context.Context, req *pb.De
 	return actions.DescribePlanningSession(ctx, organizationID, req)
 }
 
+func (s *FactoryService) FindPlanningSessionByWorkOrder(ctx context.Context, req *pb.FindPlanningSessionByWorkOrderRequest) (*pb.FindPlanningSessionByWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.FindPlanningSessionByWorkOrder(ctx, organizationID, req)
+}
+
 func (s *FactoryService) EndPlanningSession(ctx context.Context, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.EndPlanningSession(ctx, organizationID, req)

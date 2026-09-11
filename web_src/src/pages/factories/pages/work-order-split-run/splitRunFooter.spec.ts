@@ -42,31 +42,23 @@ const BACK_TO_DRAFT = {
 };
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const ARCHIVE = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
-const REFINE = {
-  id: "refine",
-  kind: "refine",
-  label: "Refine",
-  emphasis: "quiet",
-  icon: "sparkles",
-  tooltip: "Ask an agent to update this task.",
-};
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 
 describe("buildSplitRunFooter", () => {
-  it("keeps a draft note with Refine, Archive, and Start", () => {
+  it("keeps a draft note with Archive and Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
       sentence: "This task is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       attentionCard: true,
-      actions: [REFINE, ARCHIVE, START],
+      actions: [ARCHIVE, START],
     });
   });
 
-  it("tells a draft is under analysis and drops Archive", () => {
+  it("tells a draft is under analysis and keeps Archive", () => {
     const footer = buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, isAnalyzing: true });
 
     expect(footer).toEqual({
@@ -77,9 +69,37 @@ describe("buildSplitRunFooter", () => {
         text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
       },
       attentionCard: true,
-      actions: [REFINE, START],
+      actions: [ARCHIVE, START],
     });
-    expect(footer.actions).not.toContainEqual(expect.objectContaining({ kind: "archive" }));
+  });
+
+  it("blocks Start when confidence is 0 or 1", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 1 });
+
+    expect(footer.note?.headline).toBe("This task is not ready to start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive"]);
+    expect(footer.confidenceScore).toBe(1);
+  });
+
+  it("warns before Start when confidence is 2 or 3", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 3 });
+
+    expect(footer.note?.headline).toBe("Review the plan before you start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+  });
+
+  it("invites Start when confidence is 4 or 5", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("This task is ready to start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+  });
+
+  it("keeps Archive after analysis writes a score", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", isAnalyzing: true, confidenceScore: 4 });
+
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(footer.note?.headline).toBe("This task is ready to start");
   });
 
   it("keeps no close actions on a running order", () => {
