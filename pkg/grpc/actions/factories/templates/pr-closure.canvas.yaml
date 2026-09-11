@@ -137,7 +137,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: task().origin != nil && split(task().origin.url, "https://github.com/")[0] == "" && len(split(task().origin.url, "/issues/")) == 2
+        expression: $["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2
       position:
         x: 1132
         'y': 1512
@@ -147,8 +147,8 @@ spec:
       type: TYPE_ACTION
       component: github.createIssueComment
       configuration:
-        repository: '{{ split(split(task().origin.url, "https://github.com/")[1], "/issues/")[0] }}'
-        issueNumber: '{{ split(task().origin.url, "/issues/")[1] }}'
+        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
         body: 'SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).'
       position:
         x: 1132
@@ -159,8 +159,8 @@ spec:
       type: TYPE_ACTION
       component: github.updateIssue
       configuration:
-        repository: '{{ split(split(task().origin.url, "https://github.com/")[1], "/issues/")[0] }}'
-        issueNumber: '{{ split(task().origin.url, "/issues/")[1] }}'
+        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
         state: closed
       position:
         x: 1132

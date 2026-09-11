@@ -576,7 +576,7 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
-	return &core.WorkOrder{
+	item := &core.WorkOrder{
 		ID:          order.ID.String(),
 		Title:       order.Title,
 		Description: order.Description,
@@ -584,6 +584,13 @@ func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
 		Result:      order.Result,
 		Number:      order.Number,
 	}
+	if origin := order.Origin(); origin != nil {
+		item.Origin = &core.WorkOrderOrigin{
+			URL:   origin.URL,
+			Label: origin.Label,
+		}
+	}
+	return item
 }
 
 func pullRequestToCore(pullRequest *models.FactoryPullRequest) *core.PullRequest {

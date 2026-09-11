@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -671,6 +672,89 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
+	})
+}
+
+func Test_NodeConfigurationBuilder_PRClosureSourceIssueOrigin(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	findPullRequestNode := "find-pull-request"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: findPullRequestNode,
+				Name:   "Find Pull Request",
+				Type:   models.NodeTypeComponent,
+			},
+			{
+				NodeID: "has-github-issue-origin",
+				Name:   "Has GitHub Issue Origin?",
+				Type:   models.NodeTypeComponent,
+			},
+		},
+		[]models.Edge{
+			{SourceID: findPullRequestNode, TargetID: "has-github-issue-origin", Channel: "found"},
+		},
+	)
+
+	originExpression := `$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`
+	repositoryTemplate := `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`
+	issueNumberTemplate := `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`
+
+	t.Run("parses a GitHub issue origin from Find Pull Request", func(t *testing.T) {
+		raw, err := json.Marshal(map[string]any{
+			"data": map[string]any{
+				"workOrder": &core.WorkOrder{
+					ID: "wo-1",
+					Origin: &core.WorkOrderOrigin{
+						URL:   "https://github.com/acme/payments/issues/12",
+						Label: "acme/payments#12",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(raw, &payload))
+
+		builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+			WithInput(map[string]any{findPullRequestNode: payload})
+
+		hasGitHubIssueOrigin, err := builder.ResolveExpression(originExpression)
+		require.NoError(t, err)
+		assert.Equal(t, true, hasGitHubIssueOrigin)
+
+		built, err := builder.Build(map[string]any{
+			"repository":  repositoryTemplate,
+			"issueNumber": issueNumberTemplate,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "acme/payments", built["repository"])
+		assert.Equal(t, "12", built["issueNumber"])
+	})
+
+	t.Run("skips when Find Pull Request work order has no origin", func(t *testing.T) {
+		raw, err := json.Marshal(map[string]any{
+			"data": map[string]any{
+				"workOrder": &core.WorkOrder{ID: "wo-1"},
+			},
+		})
+		require.NoError(t, err)
+
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(raw, &payload))
+
+		builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+			WithInput(map[string]any{findPullRequestNode: payload})
+
+		hasGitHubIssueOrigin, err := builder.ResolveExpression(originExpression)
+		require.NoError(t, err)
+		assert.Equal(t, false, hasGitHubIssueOrigin)
 	})
 }
 

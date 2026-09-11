@@ -95,15 +95,15 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.Equal(t, "if", hasGitHubOrigin.Component)
 	assert.Equal(
 		t,
-		`task().origin != nil && split(task().origin.url, "https://github.com/")[0] == "" && len(split(task().origin.url, "/issues/")) == 2`,
+		`$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`,
 		hasGitHubOrigin.Configuration["expression"],
 	)
 
 	comment := findYAMLNode(t, canvas, "comment-source-issue")
 	assert.Equal(t, "github.createIssueComment", comment.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
-	assert.Equal(t, `{{ split(split(task().origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
-	assert.Equal(t, `{{ split(task().origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
+	assert.Equal(t, `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
+	assert.Equal(t, `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
 	assert.Equal(
 		t,
 		`SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).`,
