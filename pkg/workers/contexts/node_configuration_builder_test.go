@@ -365,6 +365,12 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "", closingLine["body"])
+
+		hasGitHubIssueOrigin, err := builder.ResolveExpression(
+			`task().origin != nil && split(task().origin.url, "https://github.com/")[0] == "" && len(split(task().origin.url, "/issues/")) == 2`,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, false, hasGitHubIssueOrigin)
 	})
 
 	t.Run("exposes origin for GitHub closing keywords", func(t *testing.T) {
@@ -387,10 +393,20 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, originLabel, label)
 
 		built, err := builder.Build(map[string]any{
-			"body": `{{ task().origin != nil ? "Closes " + task().origin.label : "" }}`,
+			"body":        `{{ task().origin != nil ? "Closes " + task().origin.label : "" }}`,
+			"repository":  `{{ split(split(task().origin.url, "https://github.com/")[1], "/issues/")[0] }}`,
+			"issueNumber": `{{ split(task().origin.url, "/issues/")[1] }}`,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "Closes acme/payments#12", built["body"])
+		assert.Equal(t, "acme/payments", built["repository"])
+		assert.Equal(t, "12", built["issueNumber"])
+
+		hasGitHubIssueOrigin, err := builder.ResolveExpression(
+			`task().origin != nil && split(task().origin.url, "https://github.com/")[0] == "" && len(split(task().origin.url, "/issues/")) == 2`,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, true, hasGitHubIssueOrigin)
 	})
 
 	t.Run("uses workspace values for legacy work orders", func(t *testing.T) {
