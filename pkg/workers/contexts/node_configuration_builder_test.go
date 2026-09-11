@@ -351,6 +351,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
 		assert.NotContains(t, payload, "assignees")
+		assert.NotContains(t, payload, "created_by")
 		assert.NotContains(t, payload, "origin")
 
 		source, ok := payload["source"].(map[string]any)
@@ -622,6 +623,45 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.Equal(t, "Co-authored-by: "+r.UserModel.Name+" <"+r.UserModel.GetEmail()+">", trailer)
+	})
+
+	t.Run("created_by exposes the SuperPlane user who opened the work order", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`task().created_by`)
+		require.NoError(t, err)
+		createdBy, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, r.User.String(), createdBy["id"])
+		assert.Equal(t, r.UserModel.Name, createdBy["name"])
+
+		name, err := builder.ResolveExpression(`task().created_by.name`)
+		require.NoError(t, err)
+		assert.Equal(t, r.UserModel.Name, name)
+
+		built, err := builder.Build(map[string]any{
+			"body": `Created via [SuperPlane](https://superplane.com){{ task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : "" }}.`,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Created via [SuperPlane](https://superplane.com) by "+r.UserModel.Name+".", built["body"])
+	})
+
+	t.Run("created_by is nil when automation opened the work order", func(t *testing.T) {
+		orderWithoutCreator, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation task", "", nil, nil, nil)
+		require.NoError(t, err)
+
+		canvas2, nodeExecution2, run2 := setupFactoryAppExecution(t, r, factoryModel.ID)
+		linkRunToWorkOrder(t, r, factoryModel, orderWithoutCreator.ID, run2.ID)
+		builderNoCreator := NewNodeConfigurationBuilder(database.Conn(), canvas2.ID).
+			WithRootEvent(&nodeExecution2.RootEventID)
+
+		result, err := builderNoCreator.ResolveExpression(`task().created_by`)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+
+		built, err := builderNoCreator.Build(map[string]any{
+			"body": `Created via [SuperPlane](https://superplane.com){{ task().created_by != nil && task().created_by.name != "" ? " by " + task().created_by.name : "" }}.`,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Created via [SuperPlane](https://superplane.com).", built["body"])
 	})
 
 	t.Run("none and any over artifact types", func(t *testing.T) {

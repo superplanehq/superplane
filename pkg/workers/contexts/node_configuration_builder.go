@@ -1053,9 +1053,10 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments, and
-// assignees are loaded only when the expression AST references those fields
-// on order() or task(). Origin is attached whenever the work order has one.
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and created_by are loaded only when the expression AST
+// references those fields on order() or task(). Origin is attached whenever
+// the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1207,6 +1208,18 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["assignees"] = assigneePayloads
 	}
 
+	usesCreatedBy, err := expressionvalidation.ExpressionUsesOrderCreatedBy(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesCreatedBy {
+		createdBy, err := orderCreatorExpressionPayload(b.tx, order)
+		if err != nil {
+			return nil, err
+		}
+		payload["created_by"] = createdBy
+	}
+
 	return payload, nil
 }
 
@@ -1309,6 +1322,32 @@ func assigneeExpressionPayload(assignee *models.FactoryWorkOrderAssignee) map[st
 		payload["email"] = assignee.User.GetEmail()
 	}
 	return payload
+}
+
+func orderCreatorExpressionPayload(tx *gorm.DB, order *models.FactoryWorkOrder) (any, error) {
+	if order.CreatedByID == nil {
+		return nil, nil
+	}
+
+	user, err := models.FindMaybeDeletedUserByIDInTransaction(
+		tx,
+		order.OrganizationID.String(),
+		order.CreatedByID.String(),
+	)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return map[string]any{
+				"id":   order.CreatedByID.String(),
+				"name": "",
+			}, nil
+		}
+		return nil, fmt.Errorf("order() could not load created_by: %w", err)
+	}
+
+	return map[string]any{
+		"id":   user.ID.String(),
+		"name": user.Name,
+	}, nil
 }
 
 func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {

@@ -27,6 +27,13 @@ func ExpressionUsesOrderAssignees(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "assignees")
 }
 
+// ExpressionUsesOrderCreatedBy reports whether the expression accesses
+// order().created_by or task().created_by (dot or bracket). Used to load
+// the SuperPlane user who opened the work order only when needed.
+func ExpressionUsesOrderCreatedBy(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "created_by")
+}
+
 // ExpressionUsesOrderURL reports whether the expression accesses order().url
 // or task().url (dot or bracket). Used to resolve the work order permalink
 // only when needed, since it costs an extra lookup of the factory that owns
