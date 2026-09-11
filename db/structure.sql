@@ -2831,6 +2831,13 @@ CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_orde
 
 
 --
+-- Name: idx_factory_work_orders_factory_origin_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_factory_origin_url ON public.factory_work_orders USING btree (factory_id, origin_url) WHERE (origin_url IS NOT NULL);
+
+
+--
 -- Name: idx_factory_work_orders_factory_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4409,7 +4416,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260911070308	f
+20260911160000	f
 \.
 
 

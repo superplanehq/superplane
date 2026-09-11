@@ -188,12 +188,14 @@ func TestUpdateWorkOrderStatus_Execute_PassesThroughOrderID(t *testing.T) {
 			"orderId": "wo-1",
 			"status":  "closed",
 			"result":  "completed",
+			"ifState": "draft",
 		},
 		ExecutionState: stateCtx,
 		Factory:        factoryCtx,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "wo-1", factoryCtx.lastStatusParams.OrderID)
+	assert.Equal(t, "draft", factoryCtx.lastStatusParams.IfState)
 }
 
 func TestFindWorkOrder_Execute(t *testing.T) {
@@ -409,6 +411,30 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts ifState draft", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "rejected",
+			"ifState": "draft",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("rejects unknown ifState", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "rejected",
+			"ifState": "bogus",
+		})
+		if err == nil {
+			t.Fatal("expected error for invalid ifState option")
 		}
 	})
 }

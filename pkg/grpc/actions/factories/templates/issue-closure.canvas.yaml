@@ -13,9 +13,6 @@ spec:
       targetId: find-work-order
     - channel: found
       sourceId: find-work-order
-      targetId: is-in-backlog
-    - channel: "true"
-      sourceId: is-in-backlog
       targetId: reject-work-order
   nodes:
     - id: on-issue-closed
@@ -51,16 +48,6 @@ spec:
         x: 1272
         'y': 432
       isCollapsed: true
-    - id: is-in-backlog
-      name: In Backlog?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: $["Find Task"].data.workOrder.state == "draft"
-      position:
-        x: 1272
-        'y': 612
-      isCollapsed: true
     - id: reject-work-order
       name: Reject Task
       type: TYPE_ACTION
@@ -69,7 +56,8 @@ spec:
         orderId: '{{ $["Find Task"].data.workOrder.id }}'
         result: rejected
         status: closed
+        ifState: draft
       position:
         x: 1272
-        'y': 792
+        'y': 612
       isCollapsed: true

@@ -233,6 +233,44 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_IfStateMismatchIsNoop(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+
+	var notifications int
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, _ string) { notifications++ })
+
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultRejected,
+		IfState: models.FactoryWorkOrderStateDraft,
+	})
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+	assert.Equal(t, 0, notifications)
+
+	loaded, err := factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, loaded.State)
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

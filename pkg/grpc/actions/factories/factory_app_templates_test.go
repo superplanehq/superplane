@@ -155,20 +155,16 @@ func TestMaterializeIssueClosureRejectsBacklogTaskOnIssueClose(t *testing.T) {
 	assert.Equal(t, "originUrl", findTask.Configuration["by"])
 	assert.Equal(t, "{{ root().data.issue.html_url }}", findTask.Configuration["originUrl"])
 
-	inBacklog := findYAMLNode(t, canvas, "is-in-backlog")
-	assert.Equal(t, "if", inBacklog.Component)
-	assert.Equal(t, `$["Find Task"].data.workOrder.state == "draft"`, inBacklog.Configuration["expression"])
-
 	reject := findYAMLNode(t, canvas, "reject-work-order")
 	assert.Equal(t, "updateWorkOrderStatus", reject.Component)
 	assert.Equal(t, `{{ $["Find Task"].data.workOrder.id }}`, reject.Configuration["orderId"])
 	assert.Equal(t, "closed", reject.Configuration["status"])
 	assert.Equal(t, "rejected", reject.Configuration["result"])
+	assert.Equal(t, "draft", reject.Configuration["ifState"])
 
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-issue-closed", TargetID: "is-github-issue", Channel: "default"})
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "is-github-issue", TargetID: "find-work-order", Channel: "true"})
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "find-work-order", TargetID: "is-in-backlog", Channel: "found"})
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "is-in-backlog", TargetID: "reject-work-order", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "find-work-order", TargetID: "reject-work-order", Channel: "found"})
 }
 
 func TestMaterializeFactoryTemplates(t *testing.T) {

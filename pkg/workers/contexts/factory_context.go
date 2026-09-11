@@ -228,6 +228,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    params.State,
 		Result:     params.Result,
+		IfState:    params.IfState,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
 		App:        c.appRef(),

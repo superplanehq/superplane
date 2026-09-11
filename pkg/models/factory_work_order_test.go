@@ -308,6 +308,96 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "if-state")
+
+	t.Run("applies the transition when the row is still in ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Still draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, order.Result)
+	})
+
+	t.Run("no-ops when the loaded state does not match ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Already open", "", &userID, nil, nil)
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateOpen, order.State)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+		assert.Empty(t, loaded.Result)
+	})
+
+	t.Run("no-ops when a concurrent writer leaves ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Racy draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		fresh, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		_, err = fresh.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+		assert.Empty(t, loaded.Result)
+	})
+
+	t.Run("rejects an unknown ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Bad ifState", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: "bogus",
+			Actor:   &userID,
+		})
+		require.Error(t, err)
+		assert.False(t, changed)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+	})
+}
+
 func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

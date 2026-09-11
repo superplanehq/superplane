@@ -75,6 +75,9 @@ type UpdateWorkOrderStatusParams struct {
 	OrderID string
 	State   string
 	Result  string
+	// IfState, when set, applies the transition only if the work order
+	// is still in that state. A mismatch is a silent no-op.
+	IfState string
 }
 
 type AddWorkOrderCommentParams struct {
