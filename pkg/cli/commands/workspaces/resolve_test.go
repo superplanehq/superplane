@@ -25,7 +25,7 @@ func TestResolveWorkspaceID(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		ctx, _ := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
-			ActiveFactory: "ignored",
+			ActiveWorkspace: "ignored",
 		})
 		got, err := ResolveWorkspaceID(ctx, "shipping")
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestResolveWorkspaceID(t *testing.T) {
 
 	t.Run("falls back to active workspace", func(t *testing.T) {
 		ctx, _ := cli.NewCommandContextWithConfig(t, nil, "text", &cli.FakeConfig{
-			ActiveFactory: workspaceID,
+			ActiveWorkspace: workspaceID,
 		})
 		got, err := ResolveWorkspaceID(ctx, "")
 		require.NoError(t, err)

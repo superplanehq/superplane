@@ -21,8 +21,8 @@ type ConfigContext struct {
 	OrganizationID string  `json:"organizationId,omitempty" yaml:"organizationId,omitempty"`
 	APIToken       string  `json:"apiToken" yaml:"apiToken"`
 	App            *string `json:"app,omitempty" yaml:"app,omitempty"`
-	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"` // deprecated: use app
-	Factory        *string `json:"factory,omitempty" yaml:"factory,omitempty"`
+	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`   // deprecated: use app
+	Factory        *string `json:"factory,omitempty" yaml:"factory,omitempty"` // deprecated: use workspace
 	Workspace      *string `json:"workspace,omitempty" yaml:"workspace,omitempty"`
 }
 
@@ -368,33 +368,11 @@ func (c *CurrentContext) SetActiveApp(appID string) error {
 	return err
 }
 
-func (c *CurrentContext) GetActiveFactory() string {
-	if c.context.Factory != nil {
-		if v := strings.TrimSpace(*c.context.Factory); v != "" {
-			return v
-		}
-	}
-	if c.context.Workspace != nil {
-		return strings.TrimSpace(*c.context.Workspace)
-	}
-	return ""
-}
-
-func (c *CurrentContext) SetActiveFactory(factoryID string) error {
-	if c.readOnly {
-		return fmt.Errorf("cannot set active factory when using %s and %s; pass --factory instead", EnvURL, EnvToken)
-	}
-
-	factoryID = strings.TrimSpace(factoryID)
-	c.context.Factory = &factoryID
-	c.context.Workspace = &factoryID
-	_, err := UpsertContext(c.context)
-	return err
-}
-
 func (c *CurrentContext) GetActiveWorkspace() string {
 	if c.context.Workspace != nil {
-		return strings.TrimSpace(*c.context.Workspace)
+		if v := strings.TrimSpace(*c.context.Workspace); v != "" {
+			return v
+		}
 	}
 	if c.context.Factory != nil {
 		return strings.TrimSpace(*c.context.Factory)
@@ -409,7 +387,6 @@ func (c *CurrentContext) SetActiveWorkspace(workspaceID string) error {
 
 	workspaceID = strings.TrimSpace(workspaceID)
 	c.context.Workspace = &workspaceID
-	c.context.Factory = &workspaceID
 	_, err := UpsertContext(c.context)
 	return err
 }

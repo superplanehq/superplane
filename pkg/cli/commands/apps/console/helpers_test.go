@@ -29,8 +29,6 @@ type fakeConfig struct {
 
 func (f *fakeConfig) GetActiveApp() string            { return f.activeApp }
 func (f *fakeConfig) SetActiveApp(string) error       { return nil }
-func (f *fakeConfig) GetActiveFactory() string        { return "" }
-func (f *fakeConfig) SetActiveFactory(string) error   { return nil }
 func (f *fakeConfig) GetActiveWorkspace() string      { return "" }
 func (f *fakeConfig) SetActiveWorkspace(string) error { return nil }
 func (f *fakeConfig) GetURL() string                  { return "" }

@@ -22,7 +22,7 @@ func TestActiveCommand_PrintActive(t *testing.T) {
 		ctx := core.CommandContext{
 			Cmd:      &cobra.Command{},
 			Renderer: renderer,
-			Config:   &cli.FakeConfig{ActiveFactory: workspaceID},
+			Config:   &cli.FakeConfig{ActiveWorkspace: workspaceID},
 		}
 		require.NoError(t, (&activeCommand{}).printActive(ctx))
 		assert.Equal(t, workspaceID+"\n", stdout.String())
@@ -36,7 +36,7 @@ func TestActiveCommand_PrintActive(t *testing.T) {
 		ctx := core.CommandContext{
 			Cmd:      &cobra.Command{},
 			Renderer: renderer,
-			Config:   &cli.FakeConfig{ActiveFactory: workspaceID},
+			Config:   &cli.FakeConfig{ActiveWorkspace: workspaceID},
 		}
 		require.NoError(t, (&activeCommand{}).printActive(ctx))
 		assert.Contains(t, stdout.String(), workspaceID)
