@@ -20,6 +20,9 @@ func Test__LoadCurrentPriceBook__MatchesHardcodedRates(t *testing.T) {
 	assert.Equal(t, int64(3_000_000), pricebook.EstimateMicros("anthropic", "claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0))
 	assert.Equal(t, int64(2_500_000), pricebook.EstimateMicros("openai", "gpt-4o", 1_000_000, 0, 0, 0, 0))
 	assert.Equal(t, int64(15_000_000), pricebook.EstimateMicros("anthropic", "claude-3-opus-20240229", 1_000_000, 0, 0, 0, 0))
+	assert.True(t, pricebook.IsPriced("claude-sonnet-4-6"))
+	assert.True(t, pricebook.IsPriced("gpt-4o"))
+	assert.True(t, pricebook.IsPriced("openrouter/anthropic/claude-sonnet-4-6"))
 	assert.Equal(t, 10*pricebook.MicrosPerSecondE1Large, pricebook.EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
 	assert.Equal(t, int64(0), pricebook.EstimateComputeMicros("e1-large-amd64", "local", 10))
 }
