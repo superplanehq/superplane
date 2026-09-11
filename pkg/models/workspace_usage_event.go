@@ -651,6 +651,8 @@ func SummarizeComputeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, 
 	return totals, byMachine, nil
 }
 
+const workOrderRunUsageGroupKey = `COALESCE(workspace_usage_events.work_order_execution_id, workspace_usage_events.canvas_run_id)`
+
 const workOrderRunUsageSelect = `
 	workspace_usage_events.work_order_execution_id,
 	factory_work_orders.id AS work_order_id,
@@ -705,7 +707,7 @@ func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 		Where("workspace_usage_events.work_order_id IS NOT NULL")
 }
 
-const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, first_assignee.user_id, users.name, users.email`
+const workOrderRunUsageGroupBy = workOrderRunUsageGroupKey + `, workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, first_assignee.user_id, users.name, users.email`
 
 // ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
 // It does not write usage or change remaining hosted credit.
@@ -714,7 +716,7 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 		Count int64
 	}
 	err := workOrderRunUsageQuery(tx, filter).
-		Select("COUNT(DISTINCT COALESCE(workspace_usage_events.work_order_execution_id, workspace_usage_events.work_order_id)) AS count").
+		Select("COUNT(DISTINCT " + workOrderRunUsageGroupKey + ") AS count").
 		Scan(&totalRow).Error
 	if err != nil {
 		return nil, 0, err

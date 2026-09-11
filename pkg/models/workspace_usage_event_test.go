@@ -960,6 +960,41 @@ func Test__ListWorkOrderRunUsage__KeepsAnalysisApartFromLineExecution(t *testing
 	assert.Equal(t, order.ID, executionRow.WorkOrderID)
 }
 
+func Test__ListWorkOrderRunUsage__KeepsAnalysisRunsApart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	event := map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	}
+	firstRun := startFactoryCanvasRun(t, r, factory.ID, event)
+	secondRun := startFactoryCanvasRun(t, r, factory.ID, event)
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, firstRun.ID)))
+	second := sonnetUsage(t, r, secondRun.ID)
+	second.InputTokens = 500_000
+	second.TotalTokens = 500_000
+	require.NoError(t, models.RecordUsage(db, second))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Len(t, rows, 2)
+	assert.Equal(t, uuid.Nil, rows[0].WorkOrderExecutionID)
+	assert.Equal(t, uuid.Nil, rows[1].WorkOrderExecutionID)
+	assert.Equal(t, order.ID, rows[0].WorkOrderID)
+	assert.Equal(t, order.ID, rows[1].WorkOrderID)
+
+	tokens := []int64{rows[0].TotalTokens, rows[1].TotalTokens}
+	assert.ElementsMatch(t, []int64{1_000_000, 500_000}, tokens)
+}
+
 func Test__CreateWorkOrder__AttachesPriorCanvasUsage(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
