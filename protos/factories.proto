@@ -57,7 +57,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory";
-      description: "Returns a factory by ID or workspace key";
+      description: "Returns a factory by ID or workspace key. Workspace names are not accepted: they are not unique and can contain spaces.";
       tags: "Factory";
     };
   }
@@ -725,7 +725,8 @@ message CreateFactoryResponse {
 }
 
 message DescribeFactoryRequest {
-  // Factory UUID or workspace key.
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string id = 1;
 }
 
@@ -1583,7 +1584,8 @@ message WorkOrderExecutionStep {
 }
 
 message DescribeWorkOrderRequest {
-  // Factory UUID or workspace key.
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string factory_id = 1;
   // Work order UUID, sequence number, or display key (for example `SP-42`).
   string order_id = 2;

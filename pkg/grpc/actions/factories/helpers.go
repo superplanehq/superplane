@@ -28,6 +28,8 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
+// findFactory resolves a factory path id for describe, update, and delete.
+// Accept UUID or workspace key only. See models.FindFactoryByRef.
 func findFactory(tx *gorm.DB, organizationID uuid.UUID, ref string) (*models.Factory, error) {
 	if strings.TrimSpace(ref) == "" {
 		return nil, invalidArgument("invalid factory id")
