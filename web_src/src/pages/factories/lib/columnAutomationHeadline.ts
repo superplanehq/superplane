@@ -24,6 +24,7 @@ const FIXED_HEADLINES: Record<Exclude<ColumnAutomationKind, "intake" | "agent-st
   "pr-discussion": "Addresses pull request comments",
   "pr-checks": "Fixes failing status checks",
   "pr-closure": "Closes tasks when pull requests merge",
+  "issue-closure": "Closes backlog tasks when GitHub issues close",
 };
 
 /**

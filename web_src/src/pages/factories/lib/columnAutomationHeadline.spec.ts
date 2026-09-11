@@ -50,6 +50,9 @@ describe("columnAutomationHeadline", () => {
     expect(columnAutomationHeadline(automation({ kind: "pr-discussion" }))).toBe("Addresses pull request comments");
     expect(columnAutomationHeadline(automation({ kind: "pr-checks" }))).toBe("Fixes failing status checks");
     expect(columnAutomationHeadline(automation({ kind: "pr-closure" }))).toBe("Closes tasks when pull requests merge");
+    expect(columnAutomationHeadline(automation({ kind: "issue-closure" }))).toBe(
+      "Closes backlog tasks when GitHub issues close",
+    );
   });
 });
 

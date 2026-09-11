@@ -387,10 +387,10 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	return statusNoteToCore(order, note), nil
 }
 
-// FindWorkOrder resolves a work order by id or by an artifact key,
+// FindWorkOrder resolves a work order by id, artifact key, or origin URL,
 // independent of the current run's `factory_work_order_executions` row.
-// This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
-// locate a work order to act on.
+// This is what lets a plain webhook-triggered run (e.g. github.onPullRequest
+// or github.onIssue) locate a work order to act on.
 func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
 	if c.canvas.FactoryID == nil {
 		return nil, errors.New("app is not owned by a factory")
@@ -411,6 +411,8 @@ func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.W
 		order, err = f.FindWorkOrder(c.tx, orderID)
 	case "artifactKey":
 		order, err = f.FindWorkOrderByArtifactKey(c.tx, params.ArtifactKey)
+	case "originUrl":
+		order, err = f.FindWorkOrderByOriginURL(c.tx, params.OriginURL)
 	default:
 		return nil, fmt.Errorf("unknown findWorkOrder lookup %q", params.By)
 	}

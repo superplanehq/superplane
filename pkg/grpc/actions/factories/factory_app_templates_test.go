@@ -123,6 +123,54 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.NotContains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "reject-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
 }
 
+func TestMaterializeIssueClosureRejectsBacklogTaskOnIssueClose(t *testing.T) {
+	result, err := materializeFactoryTemplate("issue-closure", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "Issue Closure",
+		installParams: map[string]string{
+			"backlogRepository": "acme/backlog",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Issue Closure", canvas.Metadata.Name)
+
+	trigger := findYAMLNode(t, canvas, "on-issue-closed")
+	assert.Equal(t, "github.onIssue", trigger.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, trigger.Integration)
+	assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
+	assert.Equal(t, []any{"closed"}, trigger.Configuration["actions"])
+
+	isIssue := findYAMLNode(t, canvas, "is-github-issue")
+	assert.Equal(t, "if", isIssue.Component)
+	assert.Equal(t, `root().data.issue.pull_request == nil`, isIssue.Configuration["expression"])
+
+	findTask := findYAMLNode(t, canvas, "find-work-order")
+	assert.Equal(t, "findWorkOrder", findTask.Component)
+	assert.Equal(t, "originUrl", findTask.Configuration["by"])
+	assert.Equal(t, "{{ root().data.issue.html_url }}", findTask.Configuration["originUrl"])
+
+	inBacklog := findYAMLNode(t, canvas, "is-in-backlog")
+	assert.Equal(t, "if", inBacklog.Component)
+	assert.Equal(t, `$["Find Task"].data.workOrder.state == "draft"`, inBacklog.Configuration["expression"])
+
+	reject := findYAMLNode(t, canvas, "reject-work-order")
+	assert.Equal(t, "updateWorkOrderStatus", reject.Component)
+	assert.Equal(t, `{{ $["Find Task"].data.workOrder.id }}`, reject.Configuration["orderId"])
+	assert.Equal(t, "closed", reject.Configuration["status"])
+	assert.Equal(t, "rejected", reject.Configuration["result"])
+
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-issue-closed", TargetID: "is-github-issue", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "is-github-issue", TargetID: "find-work-order", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "find-work-order", TargetID: "is-in-backlog", Channel: "found"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "is-in-backlog", TargetID: "reject-work-order", Channel: "true"})
+}
+
 func TestMaterializeFactoryTemplates(t *testing.T) {
 	for id := range factoryAppTemplates {
 		t.Run(id, func(t *testing.T) {

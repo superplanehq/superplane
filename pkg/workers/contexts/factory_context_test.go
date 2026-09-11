@@ -558,6 +558,48 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_FindWorkOrder_ByOriginURL(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	originURL := "https://github.com/acme/payments/issues/12"
+	order, err := factory.CreateWorkOrderWithOrigin(
+		database.Conn(),
+		"Find by origin URL target",
+		"",
+		&r.User,
+		nil,
+		nil,
+		models.WorkOrderOrigin{URL: originURL, Label: "acme/payments#12"},
+	)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("finds the order", func(t *testing.T) {
+		found, err := ctx.FindWorkOrder(core.FindWorkOrderParams{
+			By:        "originUrl",
+			OriginURL: originURL,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), found.ID)
+		require.NotNil(t, found.Origin)
+		assert.Equal(t, originURL, found.Origin.URL)
+	})
+
+	t.Run("returns ErrWorkOrderNotFound for an unknown URL", func(t *testing.T) {
+		_, err := ctx.FindWorkOrder(core.FindWorkOrderParams{
+			By:        "originUrl",
+			OriginURL: "https://github.com/acme/payments/issues/99",
+		})
+		assert.ErrorIs(t, err, core.ErrWorkOrderNotFound)
+	})
+}
+
 func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
