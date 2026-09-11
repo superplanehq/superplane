@@ -28,21 +28,17 @@ func ListFactoryWorkOrderRunUsage(
 		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
-	}
-
 	since, until, err := resolveWorkOrderRunUsageWindow(req)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, err.Error())
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
 	}
+	factoryID := factory.ID
 
 	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
 		OrganizationID: orgID,

@@ -14,6 +14,27 @@ import (
 	"gorm.io/gorm"
 )
 
+func Test__DescribeFactory_AcceptsKeyAndName(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "SuperPlane", "", "SUPER")
+	require.NoError(t, err)
+
+	t.Run("describes by workspace key", func(t *testing.T) {
+		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), "super")
+		require.NoError(t, err)
+		assert.Equal(t, factoryModel.ID.String(), resp.Factory.GetId())
+	})
+
+	t.Run("describes by workspace name", func(t *testing.T) {
+		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), "superplane")
+		require.NoError(t, err)
+		assert.Equal(t, factoryModel.ID.String(), resp.Factory.GetId())
+	})
+}
+
 func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 	r := support.Setup(t)
 	ctx := t.Context()

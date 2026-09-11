@@ -65,7 +65,7 @@ func (c *taskCreateCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(
 			stdout,
 			"Task created: %s (state: %s)\nTitle: %s\nAssignees: %s\n",
-			task.GetId(),
+			taskDisplayID(task),
 			formatTaskState(task.GetState()),
 			task.GetTitle(),
 			formatAssigneeList(task.GetAssignees()),
