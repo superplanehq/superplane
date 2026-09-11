@@ -126,7 +126,7 @@ function mergeResult(resultFile, taskDir) {
     try {
       parsed = JSON.parse(fs.readFileSync(resultFile, "utf8"));
     } catch (_err) {
-      return;
+      parsed = {};
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return;

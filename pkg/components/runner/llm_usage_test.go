@@ -150,6 +150,26 @@ func TestAccumulateLLMUsageCreatesResultFileWhenMissing(t *testing.T) {
 	assert.Equal(t, float64(3), usage["input_tokens"])
 }
 
+func TestMergeLLMUsageWritesSidecarWhenResultJSONIsInvalid(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"plan":"partial"`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "llm_usage.json"), []byte(`{"model":"sonnet","usage":{"input_tokens":6,"output_tokens":2,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":0},"total_cost_usd":0.003}`+"\n"), 0o644))
+
+	runMerge(t, taskDir, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Nil(t, merged["plan"])
+	assert.Equal(t, "sonnet", merged["model"])
+	usage := merged["usage"].(map[string]any)
+	assert.Equal(t, float64(6), usage["input_tokens"])
+	assert.Equal(t, float64(2), usage["output_tokens"])
+	assert.InDelta(t, 0.003, merged["total_cost_usd"], 1e-9)
+}
+
 func TestWrapAgentStepCommandMergesUsageAfterFailedStep(t *testing.T) {
 	t.Parallel()
 
