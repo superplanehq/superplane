@@ -1,6 +1,7 @@
 package models
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -45,18 +46,52 @@ func (UsagePriceBookRate) TableName() string {
 	return "usage_price_book_rates"
 }
 
+// ListUsagePriceBooks returns every catalog version, newest effective_at first.
+func ListUsagePriceBooks(tx *gorm.DB) ([]UsagePriceBook, error) {
+	var books []UsagePriceBook
+	err := tx.Order("effective_at DESC").Find(&books).Error
+	if err != nil {
+		return nil, err
+	}
+	return books, nil
+}
+
+// FindUsagePriceBook returns one catalog version.
+func FindUsagePriceBook(tx *gorm.DB, version string) (*UsagePriceBook, error) {
+	var book UsagePriceBook
+	err := tx.Where("version = ?", version).First(&book).Error
+	if err != nil {
+		return nil, err
+	}
+	return &book, nil
+}
+
+// ListUsagePriceBookRates returns the match rules for one catalog version.
+func ListUsagePriceBookRates(tx *gorm.DB, version string) ([]UsagePriceBookRate, error) {
+	var rows []UsagePriceBookRate
+	err := tx.Where("version = ?", version).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	slices.SortFunc(rows, compareUsagePriceBookRates)
+	return rows, nil
+}
+
 // LoadCurrentPriceBook installs the latest database catalog into the
 // in-memory price book. Callers keep the compiled-in fallback when this
 // returns an error (empty table or missing migration).
 func LoadCurrentPriceBook(tx *gorm.DB) error {
-	var book UsagePriceBook
-	err := tx.Order("effective_at DESC").First(&book).Error
+	books, err := ListUsagePriceBooks(tx)
 	if err != nil {
 		return err
 	}
+	if len(books) == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	book := books[0]
 
-	var rows []UsagePriceBookRate
-	err = tx.Where("version = ?", book.Version).Find(&rows).Error
+	rows, err := ListUsagePriceBookRates(tx, book.Version)
 	if err != nil {
 		return err
 	}
@@ -94,4 +129,11 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 
 	pricebook.Replace(loaded)
 	return nil
+}
+
+func compareUsagePriceBookRates(a, b UsagePriceBookRate) int {
+	if keyOrder := strings.Compare(a.MatchKey, b.MatchKey); keyOrder != 0 {
+		return keyOrder
+	}
+	return strings.Compare(a.MatchMode, b.MatchMode)
 }
