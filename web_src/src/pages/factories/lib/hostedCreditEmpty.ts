@@ -1,6 +1,6 @@
 import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 
-export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "low" | "empty" | "lapsed";
+export type HostedCreditBannerKind = "trial" | "trial-expired" | "low" | "empty" | "lapsed";
 
 /** At or below this remaining balance, paid organizations see a low-credit warning. */
 export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
@@ -82,9 +82,6 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
   if (isTrialOrg && expiresAt) {
     if (expiresAt.getTime() <= now.getTime()) {
       return "trial-expired";
-    }
-    if (remaining <= 0) {
-      return "trial-empty";
     }
     return "trial";
   }
@@ -244,17 +241,6 @@ export function hostedCreditBannerCopy(args: {
     );
   }
 
-  if (args.kind === "trial-empty") {
-    return {
-      title: "Trial credit is used up",
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
-      actionLabel: "Subscribe",
-      tone,
-      showAction: showSubscribe,
-      showPricingLink: true,
-    };
-  }
-
   if (args.kind === "trial-expired") {
     return {
       title: "Trial ended",
@@ -374,7 +360,7 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
   if (trial) {
     return {
       badge: "Trial",
-      description: trialBillingDescription(args.remainingCents, expired, expiresAt),
+      description: trialBillingDescription(expired, expiresAt),
     };
   }
 
@@ -402,12 +388,9 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
   };
 }
 
-function trialBillingDescription(remainingCents: number, expired: boolean, expiresAt: Date | null): string {
+function trialBillingDescription(expired: boolean, expiresAt: Date | null): string {
   if (expired) {
     return "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.";
-  }
-  if (remainingCents <= 0) {
-    return "Trial credit is used up. Hosted runs cannot start. Subscribe to Business to continue.";
   }
   if (expiresAt) {
     return (
