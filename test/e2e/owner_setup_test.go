@@ -13,6 +13,9 @@ import (
 )
 
 func TestOwnerSetupFlow(t *testing.T) {
+	t.Cleanup(func() {
+		middleware.MarkOwnerSetupCompleted()
+	})
 	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()

@@ -330,4 +330,84 @@ describe("WorkOrderDescriptionEditor", () => {
 
     expect(input.querySelector("strong")).toHaveTextContent("Hello world");
   });
+
+  it("resolves sp-file image refs to download URLs when fileUrls are provided", async () => {
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    const img = input.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
+
+  it("keeps sp-file refs in the markdown output when fileUrls are provided", async () => {
+    const user = userEvent.setup();
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard(" ");
+
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain(`sp-file://${fileId}`);
+    expect(onChange.mock.calls.at(-1)?.[0]).not.toContain(downloadUrl);
+  });
+
+  it("does not re-scan or modify document when fileUrls reference changes with identical mappings", async () => {
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+
+    const { rerender } = render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    const img = input.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+
+    // Re-render with a new object reference containing the exact same mapping
+    rerender(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
 });
