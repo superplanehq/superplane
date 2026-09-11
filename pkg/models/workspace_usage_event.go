@@ -1,12 +1,12 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,8 +27,6 @@ const (
 
 	UsageIdempotencyKeyRunner = "runner"
 )
-
-var ErrHostedUsageUnpriced = errors.New("hosted LLM usage has no price for this model")
 
 // WorkspaceUsageEvent is one append-only spend row (model tokens or VM
 // seconds). It is the source of truth for reports. Factory execution
@@ -131,7 +129,10 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 		version = pricebook.Version + "+provider"
 	} else {
 		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Model) {
-			return fmt.Errorf("%w: %s %s", ErrHostedUsageUnpriced, in.Provider, in.Model)
+			log.WithFields(log.Fields{
+				"provider": in.Provider,
+				"model":    in.Model,
+			}).Warn("hosted LLM usage has no price for this model; recording tokens at zero cost")
 		}
 		providerCostMicros = pricebook.EstimateMicros(
 			in.Provider,

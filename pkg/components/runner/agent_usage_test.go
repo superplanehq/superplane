@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -156,6 +157,40 @@ func TestRecordRunnerLLMUsageFromSuperPlaneFinishedEvent(t *testing.T) {
 	assert.Equal(t, models.UsageProviderOpenRouter, recorder.records[0].Provider)
 	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", recorder.records[0].Model)
+}
+
+func TestParsedSuperPlaneOpenRouterModelsArePriced(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		model string
+	}{
+		{name: "anthropic prefix", model: "anthropic/claude-sonnet-4-6"},
+		{name: "openrouter gateway", model: "openrouter/anthropic/claude-sonnet-4-6"},
+		{name: "gemini", model: "google/gemini-3.7-flash"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := json.Marshal(map[string]any{
+				"model": tc.model,
+				"usage": map[string]any{"input_tokens": 5, "output_tokens": 2},
+			})
+			require.NoError(t, err)
+
+			record, ok := ParseRunnerLLMUsage(
+				models.UsageProviderOpenRouter,
+				map[string]any{
+					"model":       tc.model,
+					"credentials": map[string]any{"source": CredentialsSourceHosted},
+				},
+				result,
+			)
+			require.True(t, ok)
+			assert.Equal(t, tc.model, record.Model)
+			assert.True(t, pricebook.IsPriced(record.Model))
+		})
+	}
 }
 
 func TestProcessBrokerTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
