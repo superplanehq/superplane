@@ -40,11 +40,11 @@ func Test__ListOrganizationCreditGrants(t *testing.T) {
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(resp.Grants), 4)
 
-		assert.Equal(t, models.LLMCreditGrantKindPolarRefund, resp.Grants[0].Kind)
+		assert.Equal(t, models.LLMCreditGrantKindTopupRefund, resp.Grants[0].Kind)
 		assert.Equal(t, int64(-500), resp.Grants[0].AmountCents)
 		assert.Equal(t, orderID, resp.Grants[0].PolarOrderId)
 
-		assert.Equal(t, models.LLMCreditGrantKindPolar, resp.Grants[1].Kind)
+		assert.Equal(t, models.LLMCreditGrantKindTopup, resp.Grants[1].Kind)
 		assert.Equal(t, int64(2500), resp.Grants[1].AmountCents)
 
 		assert.Equal(t, models.LLMCreditGrantKindAdmin, resp.Grants[2].Kind)
@@ -57,6 +57,6 @@ func Test__ListOrganizationCreditGrants(t *testing.T) {
 		assert.Equal(t, r.Account.Name, resp.Grants[3].ActorName)
 		require.NotNil(t, resp.Grants[3].ExpiresAt)
 		assert.Nil(t, resp.Grants[2].ExpiresAt)
-		assert.Nil(t, resp.Grants[1].ExpiresAt)
+		assert.NotNil(t, resp.Grants[1].ExpiresAt)
 	})
 }

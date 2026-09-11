@@ -54,7 +54,7 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[0]).toHaveTextContent("$0.03");
     expect(rows[0]).toHaveTextContent("$0.50");
     expect(rows[0]).toHaveTextContent("anthropic/claude-sonnet-4-6 (your keys)");
-    expect(rows[0]).toHaveTextContent("e1-large-amd64");
+    expect(rows[0]).toHaveTextContent("Large x64");
     expect(rows[0]).toHaveTextContent("Leonardo DiCaprio");
     expect(within(rows[0]).getByRole("link", { name: "RF-101" })).toHaveAttribute(
       "href",
@@ -73,7 +73,7 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[1]).toHaveTextContent("Arnold Schwarzenegger");
 
     expect(rows[2]).toHaveTextContent("anthropic/claude-haiku-4-5 · anthropic/claude-sonnet-4-6 (your keys)");
-    expect(rows[2]).toHaveTextContent("e1-large-amd64");
+    expect(rows[2]).toHaveTextContent("Large x64");
     expect(rows[2]).toHaveTextContent("$1.23");
     expect(rows[2]).toHaveTextContent("$0.17");
   }, 10000);

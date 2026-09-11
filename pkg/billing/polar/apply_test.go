@@ -23,7 +23,7 @@ func Test__ApplyOrderPaidGrantsFaceValueOnce(t *testing.T) {
 
 	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
 	require.NoError(t, err)
-	assert.Equal(t, models.LLMCreditGrantKindPolar, grant.Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopup, grant.Kind)
 	assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 
 	settings, err := models.FindOrganizationLLMSettings(db, r.Organization.ID)

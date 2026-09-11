@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
 
@@ -59,6 +60,90 @@ func seedIntake(
 
 	// The remaining sources cannot be read yet, so they start empty.
 	return intakeSeedResult{skipped: true}, nil
+}
+
+// SeedExistingIntake reseeds one intake from its live trigger binding, so a
+// later canvas edit still reads the repository the trigger listens on.
+func SeedExistingIntake(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) error {
+	binding, err := liveIntakeBinding(tx, intake)
+	if err != nil {
+		return err
+	}
+
+	_, err = seedIntake(ctx, deps, tx, intake.CanvasID, intake.Source, binding)
+	return err
+}
+
+// SeedFactoryIntakes reseeds every intake of a workspace. A source that
+// cannot be read now is logged and skipped, matching intake create.
+func SeedFactoryIntakes(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	factory *models.Factory,
+) error {
+	intakes, err := factory.ListIntakes(tx)
+	if err != nil {
+		return fmt.Errorf("list intakes: %w", err)
+	}
+
+	for i := range intakes {
+		intake := &intakes[i]
+		if err := SeedExistingIntake(ctx, deps, tx, intake); err != nil {
+			log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, err)
+		}
+	}
+
+	return nil
+}
+
+func liveIntakeBinding(tx *gorm.DB, intake *models.FactoryIntake) (*intakeBinding, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, intake.CanvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load intake canvas: %w", err)
+	}
+
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	if err != nil {
+		return nil, fmt.Errorf("load intake graph: %w", err)
+	}
+
+	var trigger *models.Node
+	for i := range version.Nodes {
+		if version.Nodes[i].ID == intakeTriggerNodeID {
+			trigger = &version.Nodes[i]
+			break
+		}
+	}
+	if trigger == nil || trigger.IntegrationID == nil {
+		return nil, nil
+	}
+
+	integrationID, err := uuid.Parse(*trigger.IntegrationID)
+	if err != nil {
+		log.Warnf("intake %s: seed left unbound, invalid integration id %q", intake.ID, *trigger.IntegrationID)
+		return nil, nil
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, intake.OrganizationID, integrationID)
+	if err != nil {
+		log.Warnf("intake %s: seed left unbound, integration %s not found: %v", intake.ID, integrationID, err)
+		return nil, nil
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: trigger.Configuration,
+		Installation:  integration,
+	}, nil
 }
 
 func seedGitHubIssues(

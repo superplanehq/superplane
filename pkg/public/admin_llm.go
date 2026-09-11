@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -86,6 +87,18 @@ type addOrganizationLLMCreditRequest struct {
 
 type organizationLLMMarkupRequest struct {
 	MarkupBPS *int `json:"markup_bps"`
+}
+
+type organizationBillingPlanResponse struct {
+	Plan                    string  `json:"plan"`
+	PlanSource              string  `json:"plan_source"`
+	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
+	TrialEndsAt             *string `json:"trial_ends_at"`
+	CurrentPeriodEnd        *string `json:"current_period_end"`
+}
+
+type organizationBillingPlanRequest struct {
+	Plan string `json:"plan"`
 }
 
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
@@ -378,6 +391,72 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 		return
 	}
 	respondJSON(w, response)
+}
+
+func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization billing plan: %v", err)
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, response)
+}
+
+func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+
+	var req organizationBillingPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization billing plan: %v", err)
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, response)
+}
+
+func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organizationBillingPlanResponse, error) {
+	plan, err := models.FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return organizationBillingPlanResponse{}, err
+	}
+	if plan == nil {
+		return organizationBillingPlanResponse{Plan: models.BillingPlanNone}, nil
+	}
+	return organizationBillingPlanResponse{
+		Plan:                    plan.Plan,
+		PlanSource:              plan.PlanSource,
+		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
+		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
+		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
+	}, nil
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil || value.IsZero() {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
 }
 
 func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettingsResponse, error) {

@@ -573,7 +573,7 @@ func Test__FactoryHostedBudgetHardStopWhenSpentOnCompute(t *testing.T) {
 		NodeID:          "runner",
 		MachineType:     "e1-large-amd64",
 		FleetID:         "e1-large-amd64",
-		DurationSeconds: 60,
+		DurationSeconds: 180,
 	}))
 
 	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
@@ -698,12 +698,55 @@ func Test__ListOrganizationLLMCreditGrants(t *testing.T) {
 	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(grants), 4)
-	assert.Equal(t, models.LLMCreditGrantKindPolarRefund, grants[0].Kind)
-	assert.Equal(t, models.LLMCreditGrantKindPolar, grants[1].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopupRefund, grants[0].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopup, grants[1].Kind)
 	assert.Equal(t, models.LLMCreditGrantKindAdmin, grants[2].Kind)
 	assert.Equal(t, models.LLMCreditGrantKindWelcome, grants[3].Kind)
 
 	names, err := models.CreditGrantActorNames(db, grants)
 	require.NoError(t, err)
 	assert.Equal(t, r.Account.Name, names[actor])
+}
+
+func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	_, err := models.AddTopupLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(2500),
+		orderID,
+	)
+	require.NoError(t, err)
+
+	periodEnd := time.Now().AddDate(0, 1, 0)
+	includedKey := models.IncludedGrantKey("sub_expire", periodEnd)
+	_, err = models.AddIncludedLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(models.DefaultIncludedGrantCents),
+		includedKey,
+		periodEnd,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
+	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, "canceled:"+includedKey)
+	require.NoError(t, err)
+	assert.Equal(t, models.LLMCreditGrantKindIncluded, grant.Kind)
+	require.NotNil(t, grant.ExpiresAt)
+	assert.False(t, grant.ExpiresAt.After(time.Now()))
+
+	_, err = models.FindLLMCreditGrantByPolarOrderID(db, includedKey)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(2500), summary.PurchasedRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.RemainingMicros)
 }
