@@ -558,6 +558,77 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("includes origin when the task has one", func(t *testing.T) {
+		originURL := "https://github.com/acme/payments/issues/12"
+		originLabel := "acme/payments#12"
+		order, err := factory.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Close origin after merge",
+			"",
+			&r.User,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: originURL, Label: originLabel},
+		)
+		require.NoError(t, err)
+
+		pullRequest, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     42,
+			URL:        "https://github.com/acme/payments/pull/42",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		match, err := ctx.FindPullRequest(core.FindPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     42,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, match.PullRequest)
+		assert.Equal(t, pullRequest.ID.String(), match.PullRequest.ID)
+		require.NotNil(t, match.WorkOrder)
+		require.NotNil(t, match.WorkOrder.Origin)
+		assert.Equal(t, originURL, match.WorkOrder.Origin.URL)
+		assert.Equal(t, originLabel, match.WorkOrder.Origin.Label)
+	})
+
+	t.Run("omits origin when the task has none", func(t *testing.T) {
+		order, err := factory.CreateWorkOrder(database.Conn(), "No origin", "", &r.User, nil, nil)
+		require.NoError(t, err)
+
+		_, err = order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     43,
+			URL:        "https://github.com/acme/payments/pull/43",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		match, err := ctx.FindPullRequest(core.FindPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     43,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, match.WorkOrder)
+		assert.Nil(t, match.WorkOrder.Origin)
+	})
+}
+
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
