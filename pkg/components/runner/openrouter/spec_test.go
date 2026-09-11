@@ -1,8 +1,6 @@
 package openrouter
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,7 +111,7 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	task := buildOpenRouterBrokerTask(spec, "", nil, nil, "")
+	task := buildOpenRouterBrokerTask(spec, "", nil)
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
@@ -122,47 +120,27 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil, "")
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	require.Contains(t, prepare, "opencode CLI not found on PATH; install OpenCode on the runner")
 	require.Contains(t, prepare, "command -v opencode")
 	require.Contains(t, prepare, "command -v node")
 }
 
-func TestBuildOpenRouterBrokerTaskWritesFallbackModels(t *testing.T) {
+func TestBuildOpenRouterBrokerTaskOmitsFallbackModelsFile(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(
-		validOpenRouterSpec("fix tests"),
-		"",
-		nil,
-		[]string{"openai/gpt-4.1", "anthropic/claude-sonnet-4-6"},
-		"",
-	)
-	file := requireTaskFile(t, task.Files, "openrouter_models.json")
-	var models []string
-	require.NoError(t, json.Unmarshal([]byte(file.Content), &models))
-	require.Equal(t, []string{"anthropic/claude-sonnet-4-6", "openai/gpt-4.1"}, models)
-}
-
-func TestBuildOpenRouterBrokerTaskRotatesFallbackModelsWithSeed(t *testing.T) {
-	t.Parallel()
-
-	spec := validOpenRouterSpec("fix tests")
-	allowed := []string{"openai/gpt-4.1", "x-ai/grok-4.6"}
-	seed := "exec-1"
-	task := buildOpenRouterBrokerTask(spec, "", nil, allowed, seed)
-	file := requireTaskFile(t, task.Files, "openrouter_models.json")
-	var models []string
-	require.NoError(t, json.Unmarshal([]byte(file.Content), &models))
-	require.Equal(t, FallbackModelList(spec.Model, allowed, seed), models)
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil)
+	for _, file := range task.Files {
+		assert.NotEqual(t, "openrouter_models.json", file.Path)
+	}
 }
 
 func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("fix tests")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, "")
+	base := buildOpenRouterBrokerTask(spec, "", nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	require.Len(t, got.Commands, len(base.Commands))
 	require.Len(t, got.Files, len(base.Files))
@@ -175,7 +153,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 32
 	spec.Steps[0].WorkingDirectory = "repo"
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, "")
+	base := buildOpenRouterBrokerTask(spec, "", nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
@@ -203,57 +181,13 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("greet")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, "")
+	base := buildOpenRouterBrokerTask(spec, "", nil)
 	got := attachPlanningSessionFiles(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}})
 	require.Equal(t, runner.PlanningSessionMCPScript(), requireTaskFile(t, got.Files, "planning_session_mcp.js").Content)
 	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
-}
-
-func TestOrderedFallbackModelsPutsSelectedFirst(t *testing.T) {
-	t.Parallel()
-
-	got := OrderedFallbackModels("x-ai/grok-4.6", []string{"anthropic/claude-sonnet-4-6", "x-ai/grok-4.6", "openai/gpt-4.1"})
-	require.Equal(t, []string{"x-ai/grok-4.6", "anthropic/claude-sonnet-4-6", "openai/gpt-4.1"}, got)
-}
-
-func TestRotateFallbackModelsKeepsOrderWithoutSeed(t *testing.T) {
-	t.Parallel()
-
-	models := []string{"a", "b", "c"}
-	require.Equal(t, models, RotateFallbackModels(models, ""))
-}
-
-func TestRotateFallbackModelsOffsetsBySeed(t *testing.T) {
-	t.Parallel()
-
-	models := []string{"a", "b", "c"}
-	got := RotateFallbackModels(models, "run-1")
-	require.Equal(t, models, []string{"a", "b", "c"})
-	require.ElementsMatch(t, models, got)
-	offset := 0
-	for i, id := range models {
-		if id == got[0] {
-			offset = i
-			break
-		}
-	}
-	expected := append(append([]string{}, models[offset:]...), models[:offset]...)
-	require.Equal(t, expected, got)
-}
-
-func TestRotateFallbackModelsSpreadsDifferentSeeds(t *testing.T) {
-	t.Parallel()
-
-	models := []string{"a", "b", "c", "d", "e"}
-	starts := map[string]struct{}{}
-	for i := 0; i < 40; i++ {
-		got := RotateFallbackModels(models, fmt.Sprintf("exec-%d", i))
-		starts[got[0]] = struct{}{}
-	}
-	require.Greater(t, len(starts), 1)
 }
 
 func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {
@@ -267,9 +201,10 @@ func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {
 	assert.Contains(t, runScript, "OPENCODE_DISABLE_MODELS_FETCH")
 	assert.Contains(t, runScript, "OPENROUTER_BASE_URL")
 	assert.NotContains(t, runScript, "/chat/completions")
-	assert.Contains(t, runScript, "OpenRouter model rotation:")
-	assert.Contains(t, runScript, "Switching to")
-	assert.Contains(t, runScript, "Starting a new OpenCode session")
+	assert.Contains(t, runScript, "Retrying OpenCode")
+	assert.Contains(t, runScript, "Stopped after")
+	assert.NotContains(t, runScript, "OpenRouter model rotation:")
+	assert.NotContains(t, runScript, "Switching to")
 	assert.NotContains(t, runScript, "--agent")
 	assert.NotContains(t, runScript, "proposeDraft")
 }
