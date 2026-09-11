@@ -7,4 +7,9 @@ metadata:
 type: Opaque
 data:
   RESEND_API_KEY: {{ .Values.email.resendApiKey | b64enc }}
+  {{- $discordWebhookUrl := "" }}
+  {{- if and .Values.feedback .Values.feedback.discordWebhookUrl }}
+  {{- $discordWebhookUrl = .Values.feedback.discordWebhookUrl }}
+  {{- end }}
+  DISCORD_FEEDBACK_WEBHOOK_URL: {{ $discordWebhookUrl | b64enc }}
 {{- end }}

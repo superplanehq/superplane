@@ -357,22 +357,35 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		FromName:          os.Getenv("EMAIL_FROM_NAME"),
 		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
 	})
-	if emailService == nil {
+	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
+
+	if emailService == nil && !discord.Enabled() {
 		log.Warn("Email Consumers not started - missing required environment variables")
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
+	startEmailConsumersWithService(rabbitMQURL, emailService, discord, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
-	log.Println("Starting Magic Code Email Consumer")
-	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go magicCodeEmailConsumer.Start()
+func startEmailConsumersWithService(
+	rabbitMQURL string,
+	emailService services.EmailService,
+	discord *services.DiscordWebhookClient,
+	baseURL string,
+) {
+	if emailService != nil {
+		log.Println("Starting Magic Code Email Consumer")
+		magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
+		go magicCodeEmailConsumer.Start()
 
-	log.Println("Starting Factory Notification Consumer")
-	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
-	go factoryNotificationConsumer.Start()
+		log.Println("Starting Factory Notification Consumer")
+		factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+		go factoryNotificationConsumer.Start()
+	}
+
+	log.Println("Starting Support Feedback Consumer")
+	supportFeedbackConsumer := workers.NewSupportFeedbackConsumer(rabbitMQURL, emailService, discord)
+	go supportFeedbackConsumer.Start()
 }
 
 func buildGRPCServices(

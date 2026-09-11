@@ -249,3 +249,10 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# In-app feedback delivery. The worker sends mail to support@superplane.com
+# and posts the same report to this Discord webhook when the URL is set.
+#
+feedback:
+  discordWebhookUrl: ""
