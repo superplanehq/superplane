@@ -109,7 +109,8 @@ func TestParseRunnerLLMUsageFromMergedPlanResult(t *testing.T) {
 }
 
 type recordingUsage struct {
-	records []core.UsageRecord
+	records  []core.UsageRecord
+	computes []core.ComputeUsageRecord
 }
 
 func (r *recordingUsage) Record(record core.UsageRecord) error {
@@ -117,7 +118,8 @@ func (r *recordingUsage) Record(record core.UsageRecord) error {
 	return nil
 }
 
-func (r *recordingUsage) RecordCompute(core.ComputeUsageRecord) error {
+func (r *recordingUsage) RecordCompute(record core.ComputeUsageRecord) error {
+	r.computes = append(r.computes, record)
 	return nil
 }
 

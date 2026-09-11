@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,6 +110,46 @@ func TestMergeLLMUsageLeavesFileUnchangedWithoutSidecar(t *testing.T) {
 	assert.Equal(t, original, string(body))
 }
 
+func TestAccumulateLLMUsageMergesIntoResultFile(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"plan":"abc"}`+"\n"), 0o644))
+
+	runAccumulate(t, taskDir, map[string]any{
+		"model":          "google/gemini-3.7-flash",
+		"usage":          map[string]any{"input_tokens": 9, "output_tokens": 4},
+		"total_cost_usd": 0.002,
+	}, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "abc", merged["plan"])
+	assert.Equal(t, "google/gemini-3.7-flash", merged["model"])
+	usage := merged["usage"].(map[string]any)
+	assert.Equal(t, float64(9), usage["input_tokens"])
+	assert.Equal(t, float64(4), usage["output_tokens"])
+}
+
+func TestAccumulateLLMUsageCreatesResultFileWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+
+	runAccumulate(t, taskDir, map[string]any{
+		"model": "sonnet",
+		"usage": map[string]any{"input_tokens": 3, "output_tokens": 1},
+	}, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "sonnet", merged["model"])
+	usage := merged["usage"].(map[string]any)
+	assert.Equal(t, float64(3), usage["input_tokens"])
+}
+
 func TestWrapAgentStepCommandMergesUsageAfterFailedStep(t *testing.T) {
 	t.Parallel()
 
@@ -139,17 +181,53 @@ func TestWrapAgentStepCommandMergesUsageAfterFailedStep(t *testing.T) {
 	assert.Equal(t, float64(7), usage["output_tokens"])
 }
 
+func TestWrapAgentStepCommandMergesUsageOnSIGTERM(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"plan":"partial"}`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "llm_usage.json"), []byte(`{"model":"sonnet","usage":{"input_tokens":6,"output_tokens":2,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":0}}`+"\n"), 0o644))
+
+	wrapped := WrapAgentStepCommand(`sleep 30`)
+	assert.Contains(t, wrapped, "trap '_sp_merge_llm_usage' EXIT")
+	assert.Contains(t, wrapped, "trap 'exit 143' TERM")
+	assert.Contains(t, wrapped, "trap 'exit 130' INT")
+	cmd := exec.Command("bash", "-c", wrapped)
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultFile,
+	)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	require.NoError(t, cmd.Start())
+	time.Sleep(50 * time.Millisecond)
+	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM))
+	err := cmd.Wait()
+	require.Error(t, err)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "partial", merged["plan"])
+	usage := merged["usage"].(map[string]any)
+	assert.Equal(t, float64(6), usage["input_tokens"])
+	assert.Equal(t, float64(2), usage["output_tokens"])
+}
+
 func writeLLMUsageScript(t *testing.T, taskDir string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "llm_usage.js"), []byte(LLMUsageScript), 0o644))
 }
 
-func runAccumulate(t *testing.T, taskDir string, payload map[string]any) {
+func runAccumulate(t *testing.T, taskDir string, payload map[string]any, resultFile ...string) {
 	t.Helper()
 	raw, err := json.Marshal(payload)
 	require.NoError(t, err)
 	cmd := exec.Command("node", filepath.Join(taskDir, "llm_usage.js"), "accumulate", string(raw))
-	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+taskDir)
+	env := append(os.Environ(), "SUPERPLANE_TASK_DIR="+taskDir)
+	if len(resultFile) > 0 {
+		env = append(env, "SUPERPLANE_RESULT_FILE="+resultFile[0])
+	}
+	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 }

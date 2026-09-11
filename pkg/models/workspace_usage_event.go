@@ -657,7 +657,7 @@ const workOrderRunUsageSelect = `
 	factory_work_orders.number AS work_order_number,
 	factory_work_orders.title AS title,
 	MAX(workspace_usage_events.occurred_at) AS last_occurred_at,
-	factory_work_orders.created_by_id AS user_id,
+	first_assignee.user_id AS user_id,
 	COALESCE(users.name, '') AS user_name,
 	COALESCE(users.email, '') AS user_email,
 	COALESCE(SUM(workspace_usage_events.total_tokens), 0) AS total_tokens,
@@ -688,13 +688,24 @@ type workOrderRunUsageScanRow struct {
 	MachineTypes         string
 }
 
+// First assignee by assignment time, then user id. Usage names the owner,
+// not the creator. Analysis rows with no assignee stay empty.
+const firstWorkOrderAssigneeJoin = `LEFT JOIN LATERAL (
+	SELECT user_id
+	FROM factory_work_order_assignees
+	WHERE work_order_id = factory_work_orders.id
+	ORDER BY created_at ASC, user_id ASC
+	LIMIT 1
+) first_assignee ON TRUE`
+
 func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 	return spendingScopedQuery(tx, filter, true).
-		Joins("LEFT JOIN users ON users.id = factory_work_orders.created_by_id").
-		Where("workspace_usage_events.work_order_execution_id IS NOT NULL")
+		Joins(firstWorkOrderAssigneeJoin).
+		Joins("LEFT JOIN users ON users.id = first_assignee.user_id").
+		Where("workspace_usage_events.work_order_id IS NOT NULL")
 }
 
-const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`
+const workOrderRunUsageGroupBy = `workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, first_assignee.user_id, users.name, users.email`
 
 // ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
 // It does not write usage or change remaining hosted credit.
@@ -703,7 +714,7 @@ func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset 
 		Count int64
 	}
 	err := workOrderRunUsageQuery(tx, filter).
-		Select("COUNT(DISTINCT workspace_usage_events.work_order_execution_id) AS count").
+		Select("COUNT(DISTINCT COALESCE(workspace_usage_events.work_order_execution_id, workspace_usage_events.work_order_id)) AS count").
 		Scan(&totalRow).Error
 	if err != nil {
 		return nil, 0, err
@@ -822,4 +833,37 @@ func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
 			"updated_at":       now,
 		}).Error
 	})
+}
+
+func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRunID uuid.UUID) error {
+	runIDs, err := canvasRunIDsInTree(tx, sourceRunID)
+	if err != nil || len(runIDs) == 0 {
+		return err
+	}
+	return tx.Model(&WorkspaceUsageEvent{}).
+		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
+		Update("work_order_id", workOrderID).Error
+}
+
+func canvasRunIDsInTree(tx *gorm.DB, rootID uuid.UUID) ([]uuid.UUID, error) {
+	ids := []uuid.UUID{rootID}
+	seen := map[uuid.UUID]struct{}{rootID: {}}
+	frontier := []uuid.UUID{rootID}
+	for len(frontier) > 0 {
+		var children []CanvasRun
+		err := tx.Select("id").Where("parent_run_id IN ?", frontier).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+		frontier = frontier[:0]
+		for _, child := range children {
+			if _, exists := seen[child.ID]; exists {
+				continue
+			}
+			seen[child.ID] = struct{}{}
+			ids = append(ids, child.ID)
+			frontier = append(frontier, child.ID)
+		}
+	}
+	return ids, nil
 }

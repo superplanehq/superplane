@@ -27,7 +27,7 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, nil, nil)
+	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(db, "ship", nil)
