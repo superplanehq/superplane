@@ -29,18 +29,13 @@ func ListFactoryIntakeRuns(
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
-	}
-
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}

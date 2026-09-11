@@ -19,23 +19,13 @@ func ListWorkOrderChecks(
 		return nil, factoryErrorToStatus(err, "failed to list work order checks")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
 	db := database.DB(ctx)
-	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	factoryModel, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order checks")
 	}
 
-	order, err := factoryModel.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factoryModel, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order checks")
 	}

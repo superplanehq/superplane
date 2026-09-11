@@ -25,19 +25,15 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
-	}
-
 	period := clampUsagePeriodDays(int(req.GetPeriodDays()))
 	since := time.Now().AddDate(0, 0, -period)
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
+	factoryID := factory.ID
 
 	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
 		OrganizationID: orgID,

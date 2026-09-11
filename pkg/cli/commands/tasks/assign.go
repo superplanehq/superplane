@@ -41,7 +41,7 @@ func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(
 			stdout,
 			"Task assignees updated: %s\nAssignees: %s\n",
-			task.GetId(),
+			taskDisplayID(task),
 			formatAssigneeList(task.GetAssignees()),
 		)
 		return err

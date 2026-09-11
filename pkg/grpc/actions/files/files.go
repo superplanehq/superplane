@@ -3,6 +3,7 @@ package files
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,13 +19,13 @@ import (
 )
 
 func CreateFactoryFile(ctx context.Context, organizationID string, req *pb.CreateFactoryFileRequest) (*pb.CreateFactoryFileResponse, error) {
-	orgID, factoryID, createdByID, err := parseWriteContext(ctx, organizationID, req.GetFactoryId())
+	createdByID, err := parseCreatedBy(ctx)
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create workspace file")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := resolveFactory(db, organizationID, req.GetFactoryId())
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create workspace file")
 	}
@@ -45,17 +46,13 @@ func CreateFactoryFile(ctx context.Context, organizationID string, req *pb.Creat
 }
 
 func ListFactoryFiles(ctx context.Context, organizationID string, req *pb.ListFactoryFilesRequest) (*pb.ListFactoryFilesResponse, error) {
-	orgID, factoryID, err := parseFactoryIDs(organizationID, req.GetFactoryId())
+	db := database.DB(ctx)
+	factory, err := resolveFactory(db, organizationID, req.GetFactoryId())
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to list workspace files")
 	}
 
-	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
-		return nil, fileErrorToStatus(err, "failed to list workspace files")
-	}
-
-	records, err := models.ListReadyWorkspaceFiles(db, factoryID)
+	records, err := models.ListReadyWorkspaceFiles(db, factory.ID)
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to list workspace files")
 	}
@@ -68,21 +65,18 @@ func ListFactoryFiles(ctx context.Context, organizationID string, req *pb.ListFa
 }
 
 func CreateWorkOrderFile(ctx context.Context, organizationID string, req *pb.CreateWorkOrderFileRequest) (*pb.CreateWorkOrderFileResponse, error) {
-	orgID, factoryID, createdByID, err := parseWriteContext(ctx, organizationID, req.GetFactoryId())
-	if err != nil {
-		return nil, fileErrorToStatus(err, "failed to create task file")
-	}
-	orderID, err := parseID(req.GetOrderId(), "order id")
+	createdByID, err := parseCreatedBy(ctx)
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create task file")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := resolveFactory(db, organizationID, req.GetFactoryId())
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create task file")
 	}
-	if _, err := factory.FindWorkOrder(db, orderID); err != nil {
+	order, err := resolveWorkOrder(db, factory, req.GetOrderId())
+	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create task file")
 	}
 
@@ -90,7 +84,7 @@ func CreateWorkOrderFile(ctx context.Context, organizationID string, req *pb.Cre
 		Scope:          blob.ScopeTask,
 		OrganizationID: factory.OrganizationID,
 		FactoryID:      factory.ID,
-		WorkOrderID:    orderID,
+		WorkOrderID:    order.ID,
 		Filename:       req.GetFilename(),
 		ContentType:    req.GetContentType(),
 		CreatedByID:    createdByID,
@@ -103,25 +97,17 @@ func CreateWorkOrderFile(ctx context.Context, organizationID string, req *pb.Cre
 }
 
 func ListWorkOrderFiles(ctx context.Context, organizationID string, req *pb.ListWorkOrderFilesRequest) (*pb.ListWorkOrderFilesResponse, error) {
-	orgID, factoryID, err := parseFactoryIDs(organizationID, req.GetFactoryId())
-	if err != nil {
-		return nil, fileErrorToStatus(err, "failed to list task files")
-	}
-	orderID, err := parseID(req.GetOrderId(), "order id")
-	if err != nil {
-		return nil, fileErrorToStatus(err, "failed to list task files")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := resolveFactory(db, organizationID, req.GetFactoryId())
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to list task files")
 	}
-	if _, err := factory.FindWorkOrder(db, orderID); err != nil {
+	order, err := resolveWorkOrder(db, factory, req.GetOrderId())
+	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to list task files")
 	}
 
-	records, err := models.ListReadyTaskFiles(db, orderID)
+	records, err := models.ListReadyTaskFiles(db, order.ID)
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to list task files")
 	}
@@ -164,32 +150,34 @@ func serializeFile(file *models.File, downloadURL, uploadURL string) *pb.File {
 	return serialized
 }
 
-func parseWriteContext(ctx context.Context, organizationID, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
-	orgID, factoryUUID, err := parseFactoryIDs(organizationID, factoryID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
-	}
+func parseCreatedBy(ctx context.Context) (uuid.UUID, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return uuid.Nil, uuid.Nil, uuid.Nil, errUnauthenticated
+		return uuid.Nil, errUnauthenticated
 	}
 	createdByID, err := uuid.Parse(userID)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, invalidArgument("invalid user id")
+		return uuid.Nil, invalidArgument("invalid user id")
 	}
-	return orgID, factoryUUID, createdByID, nil
+	return createdByID, nil
 }
 
-func parseFactoryIDs(organizationID, factoryID string) (uuid.UUID, uuid.UUID, error) {
+func resolveFactory(db *gorm.DB, organizationID, factoryRef string) (*models.Factory, error) {
 	orgID, err := parseID(organizationID, "organization id")
 	if err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return nil, err
 	}
-	factoryUUID, err := parseID(factoryID, "factory id")
-	if err != nil {
-		return uuid.Nil, uuid.Nil, err
+	if strings.TrimSpace(factoryRef) == "" {
+		return nil, invalidArgument("invalid factory id")
 	}
-	return orgID, factoryUUID, nil
+	return models.FindFactoryByRef(db, orgID, factoryRef)
+}
+
+func resolveWorkOrder(db *gorm.DB, factory *models.Factory, orderRef string) (*models.FactoryWorkOrder, error) {
+	if strings.TrimSpace(orderRef) == "" {
+		return nil, invalidArgument("invalid order id")
+	}
+	return factory.FindWorkOrderByRef(db, orderRef)
 }
 
 func parseID(value, name string) (uuid.UUID, error) {

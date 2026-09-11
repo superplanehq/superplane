@@ -31,7 +31,7 @@ func (c *taskDispatchCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (c *taskDispatchCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(
 			stdout,
 			"Task dispatched: %s -> line %q (state: %s)\n",
-			task.GetId(),
+			taskDisplayID(task),
 			lineName,
 			formatTaskState(task.GetState()),
 		)

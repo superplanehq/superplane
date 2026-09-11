@@ -57,7 +57,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory";
-      description: "Returns a factory by its ID";
+      description: "Returns a factory by ID or workspace key";
       tags: "Factory";
     };
   }
@@ -395,7 +395,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory work order";
-      description: "Returns a work order by its ID";
+      description: "Returns a work order by ID, number, or key";
       tags: "Factory";
     };
   }
@@ -725,6 +725,7 @@ message CreateFactoryResponse {
 }
 
 message DescribeFactoryRequest {
+  // Factory UUID or workspace key.
   string id = 1;
 }
 
@@ -1582,7 +1583,9 @@ message WorkOrderExecutionStep {
 }
 
 message DescribeWorkOrderRequest {
+  // Factory UUID or workspace key.
   string factory_id = 1;
+  // Work order UUID, sequence number, or display key (for example `SP-42`).
   string order_id = 2;
 }
 
