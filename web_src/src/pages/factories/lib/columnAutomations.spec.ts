@@ -148,6 +148,23 @@ describe("buildColumnAutomations", () => {
     });
   });
 
+  it("builds the Backlog issue closure automation", () => {
+    const automations = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [{ id: "app-issue-closure", name: "Issue Closure" }],
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({
+        kind: "issue-closure",
+        trigger: "On GitHub issue closed",
+        action: "Close the task",
+        catalogId: "issue-closure",
+        canvasId: "app-issue-closure",
+      }),
+    ]);
+  });
+
   it("marks an unhealthy intake as needs-repair", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
@@ -232,7 +249,11 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual(["github-issues", "analysis"]);
-    expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
+    expect(catalog.map((entry) => entry.id)).toEqual([
+      ...LINE_INTAKE_SOURCES.map((source) => source.id),
+      "analysis",
+      "issue-closure",
+    ]);
   });
 
   it("offers discussion and status-check setup in the verify catalog", () => {

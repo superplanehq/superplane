@@ -14,6 +14,7 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  findIssueClosureAutomationApp,
   isDoneLineColumn,
   linePhaseRunHref,
   resolvePhaseRunStatus,
@@ -518,6 +519,24 @@ describe("findClosureAutomationApp", () => {
     expect(findClosureAutomationApp([{ id: "app-refund-done" }])).toEqual({
       id: "app-refund-done",
       name: "PR Closure",
+    });
+  });
+});
+
+describe("findIssueClosureAutomationApp", () => {
+  it("returns the factory Issue Closure automation", () => {
+    expect(
+      findIssueClosureAutomationApp([
+        { id: "app-plan", name: "Plan" },
+        { id: "app-issue-closure", name: "Issue Closure" },
+      ]),
+    ).toEqual({ id: "app-issue-closure", name: "Issue Closure" });
+  });
+
+  it("matches an app id that contains issue-closure", () => {
+    expect(findIssueClosureAutomationApp([{ id: "canvas-issue-closure" }])).toEqual({
+      id: "canvas-issue-closure",
+      name: "Issue Closure",
     });
   });
 });

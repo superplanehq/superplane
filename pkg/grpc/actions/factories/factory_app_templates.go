@@ -57,6 +57,15 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 			"github.updateIssue":        "github",
 		},
 	},
+	"issue-closure": {
+		id:               "issue-closure",
+		entrypointNodeID: "on-issue-closed",
+		canvasFile:       "templates/issue-closure.canvas.yaml",
+		consoleFile:      "templates/issue-closure.console.yaml",
+		componentIntegrations: map[string]string{
+			"github.onIssue": "github",
+		},
+	},
 	"issue-intake": {
 		id:               "issue-intake",
 		entrypointNodeID: "on-issue-labeled",

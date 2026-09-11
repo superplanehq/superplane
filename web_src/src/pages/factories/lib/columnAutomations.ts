@@ -3,14 +3,14 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
 import { PR_FEEDBACK_SOURCES, availablePRFeedbackSources, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
-import {
-  buildColumnAutomationActivity,
-  emptyColumnAutomationActivity,
-  type ColumnAutomationActivity,
-} from "./columnAutomationActivity";
-import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
+import { buildColumnAutomationActivity, type ColumnAutomationActivity } from "./columnAutomationActivity";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
+import {
+  findBacklogAutomationApp,
+  findClosureAutomationApp,
+  findIssueClosureAutomationApp,
+  type LinePhaseColumn,
+} from "./linePhaseRuns";
 
 export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
 
@@ -21,7 +21,8 @@ export type ColumnAutomationKind =
   | "custom"
   | "pr-discussion"
   | "pr-checks"
-  | "pr-closure";
+  | "pr-closure"
+  | "issue-closure";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -67,6 +68,7 @@ const ANALYSIS_CATALOG_ID = "analysis";
 const AGENT_STEP_CATALOG_ID = "agent-step";
 const CUSTOM_CATALOG_ID = "custom";
 const PR_CLOSURE_CATALOG_ID = "pr-closure";
+const ISSUE_CLOSURE_CATALOG_ID = "issue-closure";
 
 const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -111,6 +113,18 @@ const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   description: "Complete the task when the pull request merges or closes.",
   trigger: "On pull request merged or closed",
   action: "Complete the task",
+  iconSrc: githubIcon,
+  iconAlt: "GitHub",
+  unique: true,
+};
+
+const ISSUE_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
+  id: ISSUE_CLOSURE_CATALOG_ID,
+  kind: "issue-closure",
+  name: "Issue closure",
+  description: "Close the task when the GitHub issue closes, if the task is still in Backlog.",
+  trigger: "On GitHub issue closed",
+  action: "Close the task",
   iconSrc: githubIcon,
   iconAlt: "GitHub",
   unique: true,
@@ -173,6 +187,7 @@ export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[]
         unique: true,
       })),
       ANALYSIS_ENTRY,
+      ISSUE_CLOSURE_ENTRY,
     ];
   }
   if (key === "verify") {
@@ -218,7 +233,11 @@ function automationsForColumn(
   workOrders: FactoriesWorkOrder[],
 ): ColumnAutomation[] {
   if (key === "backlog") {
-    return [...intakeAutomations(input.intakes ?? [], workOrders), ...analysisAutomation(input.apps ?? [], workOrders)];
+    return [
+      ...intakeAutomations(input.intakes ?? [], workOrders),
+      ...analysisAutomation(input.apps ?? [], workOrders),
+      ...issueClosureAutomation(input.apps ?? [], workOrders),
+    ];
   }
   if (key === "verify") {
     return prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders);
@@ -333,6 +352,31 @@ function prFeedbackAutomations(
   });
 }
 
+function issueClosureAutomation(
+  apps: Array<{ id?: string; name?: string }>,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
+  const app = findIssueClosureAutomationApp(apps);
+  if (!app) {
+    return [];
+  }
+  return [
+    {
+      id: `issue-closure-${app.id}`,
+      kind: "issue-closure",
+      name: app.name,
+      trigger: ISSUE_CLOSURE_ENTRY.trigger,
+      action: ISSUE_CLOSURE_ENTRY.action,
+      iconSrc: githubIcon,
+      iconAlt: "GitHub",
+      health: "healthy",
+      runningCount: runningCountForApp(app.id, workOrders),
+      catalogId: ISSUE_CLOSURE_CATALOG_ID,
+      canvasId: app.id,
+    },
+  ];
+}
+
 function closureAutomation(
   apps: Array<{ id?: string; name?: string }>,
   workOrders: FactoriesWorkOrder[],
@@ -406,103 +450,11 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
   return count;
 }
 
-/** Path for an existing column automation. Opens the popup on the first tab. */
-export function columnAutomationOpenPath(
-  automation: ColumnAutomation,
-  args: { organizationId: string; factoryKey: string; lineId?: string },
-): string | undefined {
-  if (automation.kind === "intake") {
-    return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
-  }
-  if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
-    return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
-  }
-  if (!automation.canvasId) {
-    return undefined;
-  }
-  return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
-}
-
-export type ColumnAutomationViewTab = "general" | "agent" | "automation";
-
-/** Tab order: form first, then agent, then the canvas. */
-export function columnAutomationViewTabs(input: { hasGeneral: boolean; hasAgent: boolean }): ColumnAutomationViewTab[] {
-  const tabs: ColumnAutomationViewTab[] = [];
-  if (input.hasGeneral) {
-    tabs.push("general");
-  }
-  if (input.hasAgent) {
-    tabs.push("agent");
-  }
-  tabs.push("automation");
-  return tabs;
-}
-
-export function applyColumnAutomationsOverlay(
-  automations: ColumnAutomation[],
-  extra: ColumnAutomation[] | undefined,
-  disabledIds: readonly string[],
-  removedIds: readonly string[],
-): ColumnAutomation[] {
-  const removed = new Set(removedIds);
-  const disabled = new Set(disabledIds);
-  return [...automations, ...(extra ?? [])]
-    .filter((automation) => !removed.has(automation.id))
-    .map((automation) => (disabled.has(automation.id) ? { ...automation, health: "disabled" } : automation));
-}
-
-export function catalogEntryToAutomation(
-  entry: ColumnAutomationCatalogEntry,
-  columnTitle: string,
-  id: string,
-): ColumnAutomation {
-  const trigger = entry.kind === "agent-step" || entry.kind === "custom" ? `On task in ${columnTitle}` : entry.trigger;
-  const action =
-    entry.kind === "agent-step"
-      ? `Run the ${columnTitle} agent`
-      : entry.kind === "custom"
-        ? `Run the ${columnTitle} automation`
-        : entry.action;
-  return {
-    id,
-    kind: entry.kind,
-    name: entry.name,
-    trigger,
-    action,
-    iconSrc: entry.iconSrc,
-    iconAlt: entry.iconAlt,
-    health: "healthy",
-    runningCount: 0,
-    catalogId: entry.id,
-    activity: emptyColumnAutomationActivity(0),
-  };
-}
-
-export const COLUMN_AUTOMATIONS_COPY = {
-  menuLabel: "Automations",
-  addLabel: "Add automation",
-  addHint: "Choose a trigger and an action.",
-  pickerTitle: "Add automation",
-  pickerDescription: "Choose an automation for this column.",
-  sourceTaken: "This automation is already configured.",
-  needsRepairLabel: "Needs repair",
-  disabledLabel: "Disabled",
-  editLabel: "Edit automation",
-  tabsLabel: "Automation sections",
-  generalTab: "General",
-  agentTab: "Agent",
-  automationTab: "Automation",
-  viewLoading: "The automation is loading.",
-  viewEmpty: "This automation has no canvas yet.",
-  viewError: "SuperPlane could not load the automation.",
-  viewRetry: "Try again",
-  rowsEmpty: "No automations",
-  rowMenu: "Open automation",
-  viewMenuLabel: "Board view",
-  viewOptions: "View options",
-  viewNames: "Automation names",
-  viewIcons: "Automation icons",
-  lastRunPassed: "Passed",
-  lastRunFailed: "Failed",
-  activityRunning: "running",
-} as const;
+export {
+  applyColumnAutomationsOverlay,
+  catalogEntryToAutomation,
+  COLUMN_AUTOMATIONS_COPY,
+  columnAutomationOpenPath,
+  columnAutomationViewTabs,
+  type ColumnAutomationViewTab,
+} from "./columnAutomationView";

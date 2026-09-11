@@ -308,6 +308,97 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "if-state")
+	tx := database.DB(t.Context())
+
+	t.Run("applies the transition when the row is still in ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(tx, "Still draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, order.Result)
+	})
+
+	t.Run("no-ops when the loaded state does not match ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(tx, "Already open", "", &userID, nil, nil)
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateOpen, order.State)
+
+		loaded, err := factoryModel.FindWorkOrder(tx, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+		assert.Empty(t, loaded.Result)
+	})
+
+	t.Run("no-ops when a concurrent writer leaves ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(tx, "Racy draft", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		fresh, err := factoryModel.FindWorkOrder(tx, order.ID)
+		require.NoError(t, err)
+		_, err = fresh.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+
+		loaded, err := factoryModel.FindWorkOrder(tx, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+		assert.Empty(t, loaded.Result)
+	})
+
+	t.Run("rejects an unknown ifState", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(tx, "Bad ifState", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			IfState: "bogus",
+			Actor:   &userID,
+		})
+		require.Error(t, err)
+		assert.False(t, changed)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+	})
+}
+
 func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -963,6 +1054,76 @@ func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 		_, err = otherOrder.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "open"})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactNotFound)
+	})
+}
+
+func TestFactory_FindWorkOrderByOriginURL(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-origin")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{
+		URL:   "https://github.com/acme/payments/issues/12",
+		Label: "acme/payments#12",
+	}
+
+	draft, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds",
+		"",
+		&userID,
+		nil,
+		nil,
+		origin,
+	)
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its origin URL", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, origin.URL)
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
+	})
+
+	t.Run("trims the lookup URL", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, "  "+origin.URL+"  ")
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown URL", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(tx, "https://github.com/acme/payments/issues/99")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank URL", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByOriginURL(tx, "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a URL belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-origin-other")
+
+		_, err := otherFactory.FindWorkOrderByOriginURL(tx, origin.URL)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("prefers a draft when more than one order shares the origin", func(t *testing.T) {
+		olderOpen, err := factoryModel.CreateWorkOrderWithOrigin(
+			tx,
+			"Older open copy",
+			"",
+			&userID,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+		_, err = olderOpen.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen})
+		require.NoError(t, err)
+
+		found, err := factoryModel.FindWorkOrderByOriginURL(tx, origin.URL)
+		require.NoError(t, err)
+		assert.Equal(t, draft.ID, found.ID)
 	})
 }
 

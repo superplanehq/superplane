@@ -188,12 +188,14 @@ func TestUpdateWorkOrderStatus_Execute_PassesThroughOrderID(t *testing.T) {
 			"orderId": "wo-1",
 			"status":  "closed",
 			"result":  "completed",
+			"ifState": "draft",
 		},
 		ExecutionState: stateCtx,
 		Factory:        factoryCtx,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "wo-1", factoryCtx.lastStatusParams.OrderID)
+	assert.Equal(t, "draft", factoryCtx.lastStatusParams.IfState)
 }
 
 func TestFindWorkOrder_Execute(t *testing.T) {
@@ -236,6 +238,23 @@ func TestFindWorkOrder_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "artifactKey", factoryCtx.findParams.By)
 		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.findParams.ArtifactKey)
+	})
+
+	t.Run("passes through originUrl lookups", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{findOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"by":        "originUrl",
+				"originUrl": "https://github.com/acme/payments/issues/12",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "originUrl", factoryCtx.findParams.By)
+		assert.Equal(t, "https://github.com/acme/payments/issues/12", factoryCtx.findParams.OriginURL)
 	})
 
 	// A PR merge (or similar) unrelated to any tracked order must not
@@ -311,6 +330,25 @@ func TestFindWorkOrder_ValidatesConfiguration(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("requires originUrl when finding by originUrl", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"by": "originUrl",
+		})
+		if err == nil {
+			t.Fatal("expected error for by=originUrl without originUrl")
+		}
+	})
+
+	t.Run("accepts by originUrl with originUrl", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"by":        "originUrl",
+			"originUrl": "https://github.com/acme/payments/issues/12",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
@@ -373,6 +411,30 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts ifState draft", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "rejected",
+			"ifState": "draft",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("rejects unknown ifState", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "rejected",
+			"ifState": "bogus",
+		})
+		if err == nil {
+			t.Fatal("expected error for invalid ifState option")
 		}
 	})
 }
