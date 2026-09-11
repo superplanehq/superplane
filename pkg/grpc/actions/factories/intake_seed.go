@@ -33,10 +33,10 @@ type intakeSeedResult struct {
 	skipped   bool
 }
 
-// SeedIntake gives an intake work at once: the newest open items of the
+// seedIntake gives a new intake work at once: the newest open items of the
 // source enter the graph as if they had just arrived. Without a seed the intake
 // stays empty until the source sends its next event, which can take days.
-func SeedIntake(
+func seedIntake(
 	ctx context.Context,
 	deps IntakeDependencies,
 	tx *gorm.DB,
@@ -75,7 +75,7 @@ func SeedExistingIntake(
 		return err
 	}
 
-	_, err = SeedIntake(ctx, deps, tx, intake.CanvasID, intake.Source, binding)
+	_, err = seedIntake(ctx, deps, tx, intake.CanvasID, intake.Source, binding)
 	return err
 }
 
