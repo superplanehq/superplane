@@ -19,6 +19,27 @@ describe("parseGitHubRepoParam", () => {
   it("returns null for invalid values", () => {
     expect(parseGitHubRepoParam("github.com/only-owner")).toBeNull();
   });
+
+  it("strips .git before trailing slash", () => {
+    expect(parseGitHubRepoParam("https://github.com/acme/widgets.git/")).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    });
+  });
+
+  it("strips .git before multiple trailing slashes", () => {
+    expect(parseGitHubRepoParam("https://github.com/acme/widgets.git///")).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    });
+  });
+
+  it("strips trailing slash with no scheme", () => {
+    expect(parseGitHubRepoParam("github.com/acme/widgets/")).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    });
+  });
 });
 
 describe("formatGitHubRepoParam", () => {
