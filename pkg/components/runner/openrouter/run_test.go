@@ -484,6 +484,41 @@ func TestRunPromptReadsSessionJsonWhenJsonlMissesStepFinish(t *testing.T) {
 	assertTurnRecordUsage(t, liveTurns[2], 20, 6, 0, 0, 0)
 }
 
+func TestRunPromptDoesNotCopyRetryUsageOntoFailedAttemptTurn(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_fail","part":{"type":"step-start"}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_ok","part":{"type":"step-start"}}`,
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":40,"output":12}}}`,
+				},
+				SessionParts: []string{
+					`{"type":"step-finish","cost":0.02,"tokens":{"input":40,"output":12}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	turns := resultTurnRecords(t, payload)
+	require.Len(t, turns, 2)
+	assertTurnRecordUsage(t, turns[0], 0, 0, 0, 0, 0)
+	assertTurnRecordUsage(t, turns[1], 40, 12, 0, 0, 0)
+	assertTurnUsageSum(t, payload, 40, 12)
+}
+
 func TestReadSessionUsageSumsStepFinishJsonParts(t *testing.T) {
 	dir := t.TempDir()
 	partDir := filepath.Join(dir, "xdg", "data", "opencode", "storage", "part", "msg_1")

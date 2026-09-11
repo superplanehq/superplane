@@ -735,16 +735,27 @@ function newSessionStepUsages(after, before) {
   return (after || []).filter((step) => !priorKeys.has(step.key));
 }
 
+function promptTurnNumbers(telemetry, firstTurn) {
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  return turns
+    .map((item) => Number(item && item.turn))
+    .filter((turn) => Number.isFinite(turn) && turn >= firstTurn);
+}
+
 function applyRecordedStepsToTelemetry(telemetry, steps, firstTurn) {
   if (!telemetry || !Array.isArray(steps)) {
     return;
   }
-  for (const [index, step] of steps.entries()) {
-    if (!step || tokenTotal(step.usage) <= 0) {
-      continue;
-    }
-    const turn = firstTurn + index;
-    if (telemetry.replaceTurnUsage(turn, step.usage)) {
+  const billed = steps.filter((step) => step && tokenTotal(step.usage) > 0);
+  if (!billed.length) {
+    return;
+  }
+  const liveTurns = promptTurnNumbers(telemetry, firstTurn);
+  const offset = Math.max(0, liveTurns.length - billed.length);
+  for (const [index, step] of billed.entries()) {
+    const turn = liveTurns[offset + index];
+    if (turn && telemetry.replaceTurnUsage(turn, step.usage)) {
       continue;
     }
     telemetry.beginTurn(step.usage, { forceNew: true });
