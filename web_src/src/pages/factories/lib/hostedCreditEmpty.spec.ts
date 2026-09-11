@@ -11,6 +11,7 @@ import {
   hostedCreditRunsStopHint,
   isHostedCreditHeaderKickerKind,
   isHostedCreditTrialOrg,
+  organizationPlanLabel,
   isLowHostedCreditRemaining,
   shouldShowHostedCreditEmptyBanner,
   welcomeCreditExpiryLabel,
@@ -240,6 +241,42 @@ describe("hostedCreditHeaderKickerLabel", () => {
     expect(hostedCreditHeaderKickerLabel("trial")).toBe("Trial");
     expect(hostedCreditHeaderKickerLabel("trial-expired")).toBe("Trial ended");
     expect(hostedCreditHeaderKickerLabel("lapsed")).toBe("No plan");
+  });
+});
+
+describe("organizationPlanLabel", () => {
+  it("names Business, Trial, Trial ended, and No plan", () => {
+    expect(organizationPlanLabel({ plan: "business" })).toBe("Business");
+    expect(
+      organizationPlanLabel({
+        plan: "trial",
+        trialEndsAt: inFourteenDays,
+        now,
+      }),
+    ).toBe("Trial");
+    expect(
+      organizationPlanLabel({
+        plan: "trial",
+        trialEndsAt: yesterday,
+        now,
+      }),
+    ).toBe("Trial ended");
+    expect(organizationPlanLabel({ plan: "none" })).toBe("No plan");
+  });
+
+  it("names inferred trial from welcome credit when plan is unset", () => {
+    expect(
+      organizationPlanLabel({
+        purchasedCreditCents: "0",
+        welcomeCreditExpiresAt: inFourteenDays,
+        now,
+      }),
+    ).toBe("Trial");
+  });
+
+  it("returns undefined when the plan is unknown", () => {
+    expect(organizationPlanLabel({})).toBeUndefined();
+    expect(organizationPlanLabel({ plan: "enterprise" })).toBeUndefined();
   });
 });
 
