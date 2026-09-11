@@ -52,6 +52,7 @@ func DescribeOrganizationBilling(
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),
 		PurchasedRemainingCents:     pricebook.MicrosToCents(credit.PurchasedRemainingMicros),
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
+		AdminRemainingCents:         pricebook.MicrosToCents(credit.AdminRemainingMicros),
 	}, nil
 }
 
