@@ -312,12 +312,13 @@ func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "if-state")
+	tx := database.DB(t.Context())
 
 	t.Run("applies the transition when the row is still in ifState", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Still draft", "", &userID, nil, nil)
+		order, err := factoryModel.CreateWorkOrder(tx, "Still draft", "", &userID, nil, nil)
 		require.NoError(t, err)
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			IfState: FactoryWorkOrderStateDraft,
@@ -330,15 +331,15 @@ func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
 	})
 
 	t.Run("no-ops when the loaded state does not match ifState", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Already open", "", &userID, nil, nil)
+		order, err := factoryModel.CreateWorkOrder(tx, "Already open", "", &userID, nil, nil)
 		require.NoError(t, err)
-		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		_, err = order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
 		})
 		require.NoError(t, err)
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			IfState: FactoryWorkOrderStateDraft,
@@ -348,25 +349,25 @@ func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
 		assert.False(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateOpen, order.State)
 
-		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		loaded, err := factoryModel.FindWorkOrder(tx, order.ID)
 		require.NoError(t, err)
 		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
 		assert.Empty(t, loaded.Result)
 	})
 
 	t.Run("no-ops when a concurrent writer leaves ifState", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Racy draft", "", &userID, nil, nil)
+		order, err := factoryModel.CreateWorkOrder(tx, "Racy draft", "", &userID, nil, nil)
 		require.NoError(t, err)
 
-		fresh, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		fresh, err := factoryModel.FindWorkOrder(tx, order.ID)
 		require.NoError(t, err)
-		_, err = fresh.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		_, err = fresh.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
 		})
 		require.NoError(t, err)
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			IfState: FactoryWorkOrderStateDraft,
@@ -376,17 +377,17 @@ func TestFactoryWorkOrder_UpdateStatusIfState(t *testing.T) {
 		assert.False(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
 
-		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		loaded, err := factoryModel.FindWorkOrder(tx, order.ID)
 		require.NoError(t, err)
 		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
 		assert.Empty(t, loaded.Result)
 	})
 
 	t.Run("rejects an unknown ifState", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Bad ifState", "", &userID, nil, nil)
+		order, err := factoryModel.CreateWorkOrder(tx, "Bad ifState", "", &userID, nil, nil)
 		require.NoError(t, err)
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			IfState: "bogus",
