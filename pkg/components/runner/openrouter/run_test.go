@@ -1,6 +1,7 @@
 package openrouter
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -196,9 +197,13 @@ func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
 	assert.NotContains(t, result.spawns[1], "anthropic/")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Starting OpenCode")
+	requireNoBareStdoutLine(t, result.output, "Calling OpenCode")
+	requireNoBareStdoutLine(t, result.output, "Waiting 30 seconds")
 	assert.NotContains(t, result.spawns[1], "--session")
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
@@ -226,8 +231,8 @@ func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) 
 	assert.Contains(t, result.spawns[1], "--session")
 	assert.Contains(t, result.spawns[1], "ses_fail")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
 }
 
 func TestRunPromptContinuesSessionWhenRetryableFailureMadeProgress(t *testing.T) {
@@ -270,7 +275,7 @@ func TestRunPromptRetriesNestedRateLimitOnSelectedModel(t *testing.T) {
 	require.Len(t, result.spawns, 2)
 	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
 	assert.Equal(t, []float64{30000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
 }
 
 func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
@@ -292,10 +297,12 @@ func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 4)
 	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
-	assert.Contains(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
-	assert.Contains(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
-	assert.Contains(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
-	assert.Contains(t, result.output, "Retrying OpenCode · openrouter/x-ai/grok-4.6")
+	requireLiveLogLine(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
+	requireLiveLogLine(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Waiting 45 seconds")
 }
 
 func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
@@ -309,7 +316,7 @@ func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	require.Len(t, result.spawns, 2)
 	assert.Equal(t, []float64{90000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
 	assert.NotContains(t, result.output, "Waiting 30 seconds")
 }
 
@@ -326,7 +333,9 @@ func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 4)
 	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireLiveLogLine(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	requireNoBareStdoutLine(t, result.output, "Stopped after 4 attempts")
 	assert.NotContains(t, result.output, "attempt 5")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
@@ -349,6 +358,163 @@ func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "Hello! How can I help you today?", payload["result"])
 	assert.Regexp(t, `✓ done`, result.output)
+}
+
+func TestRunPromptKeepsBilledUsageWhenRetrySucceedsWithoutStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_bill","part":{"type":"step-start"}}`,
+					`{"type":"text","sessionID":"ses_bill","part":{"type":"text","text":"partial"}}`,
+					`{"type":"step_finish","sessionID":"ses_bill","part":{"type":"step-finish","cost":0.012,"tokens":{"input":10,"output":8}}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	assertResultUsage(t, resultPayload(t, result.resultFile), 10, 8, 0.012)
+}
+
+func TestRunPromptAddsUsageAcrossBilledRetries(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.01,"tokens":{"input":10,"output":8}}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_2","part":{"type":"text","text":"done"}}`,
+					`{"type":"step_finish","sessionID":"ses_2","part":{"type":"step-finish","cost":0.005,"tokens":{"input":5,"output":3}}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 15, 11, 0.015)
+	assertTurnUsageSum(t, payload, 15, 11)
+}
+
+func TestRunPromptUsesSessionStoreWhenJsonlMissesStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		sessionUsage: []map[string]any{
+			{
+				"input_tokens":   100,
+				"output_tokens":  20,
+				"total_cost_usd": 0.1,
+			},
+			{
+				"input_tokens":   140,
+				"output_tokens":  32,
+				"total_cost_usd": 0.12,
+			},
+		},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	assertTurnUsageSum(t, payload, 40, 12)
+}
+
+func TestRunPromptReadsSessionJsonWhenJsonlMissesStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+			},
+			SessionParts: []string{
+				`{"type":"step-finish","cost":0.02,"tokens":{"input":40,"output":12}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	assertTurnUsageSum(t, payload, 40, 12)
+}
+
+func TestReadSessionUsageSumsStepFinishJsonParts(t *testing.T) {
+	dir := t.TempDir()
+	partDir := filepath.Join(dir, "xdg", "data", "opencode", "storage", "part", "msg_1")
+	require.NoError(t, os.MkdirAll(partDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_1.json"), []byte(`{"type":"step-finish","cost":0.01,"tokens":{"input":10,"output":8,"reasoning":1,"cache":{"read":4,"write":2}}}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_text.json"), []byte(`{"type":"text","text":"hi"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_2.json"), []byte(`{"part":{"type":"step-finish","cost":0.005,"tokens":{"input":5,"output":3,"cache":{"read":1,"write":0}}}}`), 0o644))
+	usage := jsReadSessionUsage(t, dir)
+	assert.Equal(t, float64(15), usage["input_tokens"])
+	assert.Equal(t, float64(11), usage["output_tokens"])
+	assert.Equal(t, float64(5), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
+	assert.InDelta(t, 0.015, usage["total_cost_usd"], 1e-9)
+}
+
+func TestReadSessionUsageSumsStepFinishSqliteParts(t *testing.T) {
+	dir := t.TempDir()
+	dbDir := filepath.Join(dir, "xdg", "data", "opencode")
+	require.NoError(t, os.MkdirAll(dbDir, 0o755))
+	dbPath := filepath.Join(dbDir, "opencode.db")
+	cmd := exec.Command("node", "-e", `
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = require("node:sqlite"));
+} catch {
+  process.exit(2);
+}
+const db = new DatabaseSync(process.env.OPENCODE_DB);
+db.exec("CREATE TABLE part (id TEXT PRIMARY KEY, data TEXT NOT NULL)");
+const insert = db.prepare("INSERT INTO part (id, data) VALUES (?, ?)");
+insert.run("prt_1", JSON.stringify({
+  type: "step-finish",
+  cost: 0.01,
+  tokens: { input: 10, output: 8, reasoning: 1, cache: { read: 4, write: 2 } },
+}));
+insert.run("prt_2", JSON.stringify({ type: "text", text: "hi" }));
+db.close();
+`)
+	cmd.Env = append(os.Environ(), "OPENCODE_DB="+dbPath, "NODE_NO_WARNINGS=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if ok && exitErr.ExitCode() == 2 {
+			t.Skip("node:sqlite is not available")
+		}
+		require.NoError(t, err, string(out))
+	}
+	usage := jsReadSessionUsage(t, dir)
+	assert.Equal(t, float64(10), usage["input_tokens"])
+	assert.Equal(t, float64(8), usage["output_tokens"])
+	assert.Equal(t, float64(4), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
+	assert.InDelta(t, 0.01, usage["total_cost_usd"], 1e-9)
 }
 
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
@@ -483,7 +649,7 @@ func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 	assert.Empty(t, result.sleeps)
 	assert.NotContains(t, result.output, "Waiting")
 	assert.NotContains(t, result.output, "Retrying")
-	assert.Contains(t, result.output, "Invalid API key")
+	requireLiveLogLine(t, result.output, "Invalid API key")
 	assert.Regexp(t, `✗ failed`, result.output)
 }
 
@@ -500,7 +666,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil)
+	}}, nil, nil, nil)
 	assert.Equal(t, 0, first.exitCode)
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
@@ -513,12 +679,14 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil)
+	}}, nil, nil, nil)
 	assert.Equal(t, 0, second.exitCode)
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
 	assert.Contains(t, second.spawns[0], "ses_keep")
-	assert.Contains(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, second.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoBareStdoutLine(t, second.output, "Continuing OpenCode session")
 }
 
 func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
@@ -544,7 +712,9 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "--auto")
 	assert.Equal(t, "--pure", result.spawns[0][0])
 	assert.Equal(t, "run", result.spawns[0][1])
-	assert.Contains(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+	requireLiveLogLine(t, result.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoBareStdoutLine(t, result.output, "Starting OpenCode")
 }
 
 func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
@@ -583,7 +753,8 @@ func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireNoBareStdoutLine(t, result.output, "wait exceeded the execution timeout")
 }
 
 func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
@@ -604,7 +775,7 @@ func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Temporary error wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Temporary error wait exceeded the execution timeout")
 	assert.NotContains(t, result.output, "Rate limit wait exceeded the execution timeout")
 }
 
@@ -622,7 +793,7 @@ func TestRunPromptDoesNotWaitWhenRetryExceedsRemainingTimeout(t *testing.T) {
 	assert.Equal(t, 1, result.exitCode)
 	require.Len(t, result.spawns, 1)
 	assert.Empty(t, result.sleeps)
-	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireLiveLogLine(t, result.output, "Rate limit wait exceeded the execution timeout")
 }
 
 func TestWaitDeadlineMsUsesExecutionTimeoutSeconds(t *testing.T) {
@@ -642,16 +813,18 @@ func TestOpenCodeProcessEnvSetsPureAndIsolatesHomes(t *testing.T) {
 }
 
 type spawnScript struct {
-	ExitCode int      `json:"exitCode"`
-	Stdout   []string `json:"stdout"`
-	Stderr   string   `json:"stderr"`
+	ExitCode     int      `json:"exitCode"`
+	Stdout       []string `json:"stdout"`
+	Stderr       string   `json:"stderr"`
+	SessionParts []string `json:"sessionParts"`
 }
 
 type promptHarness struct {
-	model     string
-	spawns    []spawnScript
-	env       map[string]string
-	nowValues []int64
+	model        string
+	spawns       []spawnScript
+	env          map[string]string
+	nowValues    []int64
+	sessionUsage []map[string]any
 }
 
 type openRouterPromptResult struct {
@@ -669,7 +842,7 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
-	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues)
+	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage)
 }
 
 func rateLimitSpawn(message string) spawnScript {
@@ -690,7 +863,7 @@ func successSpawn(text string) spawnScript {
 	}
 }
 
-func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64) openRouterPromptResult {
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any) openRouterPromptResult {
 	t.Helper()
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
@@ -702,6 +875,8 @@ func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnS
 	}
 	nowJSON, err := json.Marshal(nowValues)
 	require.NoError(t, err)
+	sessionJSON, err := json.Marshal(sessionUsage)
+	require.NoError(t, err)
 	harnessFile := filepath.Join(dir, "harness.js")
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
@@ -709,10 +884,12 @@ const { PassThrough } = require("stream");
 const { runPrompt } = require(%q);
 const spawns = %s;
 const nowValues = %s;
+const sessionReads = %s;
 const calls = [];
 const sleeps = [];
 let index = 0;
 let nowIndex = 0;
+let sessionReadIndex = 0;
 function mockChild(spec) {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -740,11 +917,18 @@ function mockChild(spec) {
   });
   return child;
 }
-runPrompt(%q, %q, {
+const helpers = {
   spawnOpenCode(args) {
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
     index += 1;
     calls.push(args);
+    if (Array.isArray(spec.sessionParts) && spec.sessionParts.length) {
+      const partDir = require("path").join(process.env.SUPERPLANE_TASK_DIR, "xdg", "data", "opencode", "storage", "part", "msg_live");
+      fs.mkdirSync(partDir, { recursive: true });
+      spec.sessionParts.forEach((body, i) => {
+        fs.writeFileSync(require("path").join(partDir, "prt_" + i + ".json"), body);
+      });
+    }
     return mockChild(spec);
   },
   sleep(ms) {
@@ -755,7 +939,15 @@ runPrompt(%q, %q, {
     ? () => nowValues[Math.min(nowIndex++, nowValues.length - 1)]
     : undefined,
   cwd: %q,
-})
+};
+if (Array.isArray(sessionReads)) {
+  helpers.readSessionUsage = () => {
+    const row = sessionReadIndex < sessionReads.length ? sessionReads[sessionReadIndex] : {};
+    sessionReadIndex += 1;
+    return row;
+  };
+}
+runPrompt(%q, %q, helpers)
   .then((code) => {
     fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
     process.exit(code);
@@ -765,7 +957,7 @@ runPrompt(%q, %q, {
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, nowJSON, filepath.Join(dir, promptName), model, dir)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, dir, filepath.Join(dir, promptName), model)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
@@ -782,11 +974,14 @@ runPrompt(%q, %q, {
 		}
 	}
 	cmd.Env = env
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	exitCode := 0
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)
-		require.Truef(t, ok, "node harness failed: %v\n%s", err, out)
+		require.Truef(t, ok, "node harness failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 		exitCode = exitErr.ExitCode()
 	}
 	recorded := struct {
@@ -798,7 +993,7 @@ runPrompt(%q, %q, {
 	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
 		exitCode:   exitCode,
-		output:     string(out),
+		output:     stdout.String(),
 		resultFile: resultFile,
 		taskDir:    dir,
 		spawns:     recorded.Calls,
@@ -939,6 +1134,17 @@ func runTurnResult(t *testing.T, event map[string]any) string {
 func liveLogRecords(t *testing.T, output string) []map[string]any {
 	t.Helper()
 	var records []map[string]any
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+func typedLiveLogRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || !strings.HasPrefix(line, "{") {
@@ -948,11 +1154,51 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 		if err := json.Unmarshal([]byte(line), &rec); err != nil {
 			continue
 		}
-		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
-			records = append(records, rec)
+		if strings.TrimSpace(fmt.Sprint(rec["type"])) == "" {
+			continue
 		}
+		records = append(records, rec)
 	}
 	return records
+}
+
+func liveLogLineTexts(t *testing.T, output string) []string {
+	t.Helper()
+	var texts []string
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] != "line" {
+			continue
+		}
+		text, ok := rec["text"].(string)
+		if !ok || text == "" {
+			continue
+		}
+		texts = append(texts, text)
+	}
+	return texts
+}
+
+func requireLiveLogLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, text := range liveLogLineTexts(t, output) {
+		if strings.Contains(text, needle) {
+			return
+		}
+	}
+	require.Failf(t, "missing typed live-log line", "wanted %q in type=line records; got %q", needle, liveLogLineTexts(t, output))
+}
+
+func requireNoBareStdoutLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "{") {
+			continue
+		}
+		if strings.Contains(trimmed, needle) {
+			require.Failf(t, "found bare stdout line", "wanted %q only as a type=line live-log record; found %q", needle, trimmed)
+		}
+	}
 }
 
 func resultPayload(t *testing.T, path string) map[string]any {
@@ -962,4 +1208,63 @@ func resultPayload(t *testing.T, path string) map[string]any {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(raw, &payload))
 	return payload
+}
+
+func assertResultUsage(t *testing.T, payload map[string]any, input, output, cost float64) {
+	t.Helper()
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok, "result payload must include usage")
+	assert.Equal(t, input, usage["input_tokens"])
+	assert.Equal(t, output, usage["output_tokens"])
+	require.Contains(t, payload, "total_cost_usd")
+	assert.InDelta(t, cost, payload["total_cost_usd"], 1e-9)
+}
+
+func assertTurnUsageSum(t *testing.T, payload map[string]any, input, output float64) {
+	t.Helper()
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok, "result payload must include telemetry")
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok, "telemetry must include turns")
+	var inputSum, outputSum float64
+	for _, raw := range turns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		usage, ok := turn["usage"].(map[string]any)
+		require.True(t, ok)
+		inputSum += usageNumber(usage["input_tokens"])
+		outputSum += usageNumber(usage["output_tokens"])
+	}
+	assert.Equal(t, input, inputSum)
+	assert.Equal(t, output, outputSum)
+}
+
+func usageNumber(value any) float64 {
+	switch n := value.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	default:
+		return 0
+	}
+}
+
+func jsReadSessionUsage(t *testing.T, taskDir string) map[string]any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { readSessionUsage } = require(process.argv[1]); process.stdout.write(JSON.stringify(readSessionUsage(process.argv[2])));`, script, taskDir)
+	cmd.Env = append(os.Environ(), "NODE_NO_WARNINGS=1")
+	out, err := cmd.Output()
+	if err != nil {
+		stderr := ""
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			stderr = string(exitErr.Stderr)
+		}
+		require.NoError(t, err, stderr)
+	}
+	var usage map[string]any
+	require.NoError(t, json.Unmarshal(out, &usage), string(out))
+	return usage
 }
