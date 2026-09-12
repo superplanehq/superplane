@@ -313,16 +313,17 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 # Local only. Writes this worktree's superplane_dev to
-# .local/superplane_dev.dump. PUBLIC_API_PORT in .env is the UI port.
-# Postgres in this stack is db:5432. The dump is gitignored.
+# .local/superplane_dev.dump. Postgres in this stack is db:5432.
+# The dump is gitignored.
 db.snapshot:
-	./scripts/db_exec_on_ui_instance.sh ./scripts/db_snapshot.sh superplane_dev
+	@$(COMPOSE) exec app ./scripts/db_snapshot.sh superplane_dev
 
 # Local only. Replaces this worktree's superplane_dev from
 # .local/superplane_dev.dump, then applies pending migrations. It does not
-# touch superplane_test. Run make db.snapshot again after migrate.
+# touch superplane_test. Restart make dev.server after restore if it is
+# already running. Run make db.snapshot again after migrate.
 db.restore:
-	./scripts/db_exec_on_ui_instance.sh ./scripts/db_restore.sh superplane_dev
+	@$(COMPOSE) exec app ./scripts/db_restore.sh superplane_dev
 
 # Local only. Puts every org on a 14-day trial, clears Polar ids, and
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
