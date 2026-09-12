@@ -63,3 +63,22 @@ func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "P123ABC", OriginLabelFromURL("https://acme.example.com/incidents/P123ABC"))
 	assert.Equal(t, "1", OriginLabelFromURL("https://example.com/item/1"))
 }
+
+func TestParseGitHubIssueOrigin(t *testing.T) {
+	ref, ok := ParseGitHubIssueOrigin("https://github.com/acme/payments/issues/12")
+	assert.True(t, ok)
+	assert.Equal(t, GitHubIssueOrigin{Repository: "acme/payments", Number: 12}, ref)
+
+	ref, ok = ParseGitHubIssueOrigin("https://github.com/acme/payments/issues/12#issuecomment-1")
+	assert.True(t, ok)
+	assert.Equal(t, GitHubIssueOrigin{Repository: "acme/payments", Number: 12}, ref)
+
+	_, ok = ParseGitHubIssueOrigin("https://github.com/acme/payments/pull/8")
+	assert.False(t, ok)
+
+	_, ok = ParseGitHubIssueOrigin("https://app.productive.io/12345/tasks/91")
+	assert.False(t, ok)
+
+	_, ok = ParseGitHubIssueOrigin("")
+	assert.False(t, ok)
+}
