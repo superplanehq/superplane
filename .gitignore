@@ -25,6 +25,7 @@ CLAUDE.local.md
 .superpowers/
 docs/superpowers/
 coverage-go.out
+.local/
 
 # Generated protobuf and OpenAPI artifacts
 /pkg/protos/
