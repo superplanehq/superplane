@@ -545,12 +545,15 @@ describe("HomePage canvas folders", () => {
 
   it("opens a folder-scoped installed app when folder membership update fails", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 }))
-      .mockResolvedValueOnce(
+    const fetchMock = vi.fn((input: RequestInfo) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      if (String(url).includes("/apps/install/preview")) {
+        return Promise.resolve(new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 }));
+      }
+      return Promise.resolve(
         new Response(JSON.stringify({ canvasId: "canvas-installed", organizationId: "org-123" }), { status: 200 }),
       );
+    });
     vi.stubGlobal("fetch", fetchMock);
     mutationMocks.updateCanvasFolderMembership.mockRejectedValue(new Error("Failed to fetch"));
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
