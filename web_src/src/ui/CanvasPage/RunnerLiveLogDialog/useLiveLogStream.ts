@@ -221,7 +221,11 @@ function startReplayedTool(
     return state;
   }
   return withClearedError(
-    startToolOnLatestSection(state, tool.kind, tool.text, tool.sourceId, tool.commandIndex, tool.startedAtMs),
+    startToolOnLatestSection(state, tool.kind, tool.text, {
+      sourceId: tool.sourceId,
+      commandIndex: tool.commandIndex,
+      startedAtMs: tool.startedAtMs,
+    }),
   );
 }
 

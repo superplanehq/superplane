@@ -101,10 +101,9 @@ export function startToolOnLatestSection(
   state: LogState,
   kind: string,
   text: string,
-  sourceId?: string,
-  commandIndex?: number,
-  startedAtMs?: number | null,
+  options?: { sourceId?: string; commandIndex?: number; startedAtMs?: number | null },
 ): LogState {
+  const { sourceId, commandIndex, startedAtMs } = options ?? {};
   const sectionPos = commandSectionPosition(state, commandIndex);
   if (sectionPos < 0) {
     return state;
