@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
@@ -160,7 +160,9 @@ vi.mock("@/lib/canvasNameGenerator", () => ({
 }));
 
 function openPalette() {
-  openGlobalCommandPalette();
+  act(() => {
+    openGlobalCommandPalette();
+  });
 }
 
 function renderPalette(path = "/org-1") {

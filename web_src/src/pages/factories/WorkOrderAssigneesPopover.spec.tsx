@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SuperplaneUsersUser } from "@/api-client";
@@ -40,6 +40,7 @@ describe("WorkOrderAssigneesPopover", () => {
     const { rerender } = render(<Host selectedIds={["alice", "bob"]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Assignees" }));
+    await screen.findByRole("listitem");
 
     const bobCheckbox = checkboxFor("Bob Brown");
     expect(bobCheckbox).toBeChecked();
@@ -56,7 +57,10 @@ describe("WorkOrderAssigneesPopover", () => {
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith(["alice"]));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(["alice"]);
+      expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument();
+    });
   });
 
   it("supports unassigning everyone", async () => {
@@ -69,13 +73,17 @@ describe("WorkOrderAssigneesPopover", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Assignees" }));
+    await screen.findByRole("listitem");
 
     fireEvent.click(checkboxFor("Alice Anderson"));
     fireEvent.click(checkboxFor("Bob Brown"));
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith([]));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith([]);
+      expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument();
+    });
   });
 
   it("does not call onSave when closing without any actual change", async () => {
@@ -88,6 +96,7 @@ describe("WorkOrderAssigneesPopover", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Assignees" }));
+    await screen.findByRole("listitem");
 
     // Toggle off and back on again — net no-op.
     const aliceCheckbox = checkboxFor("Alice Anderson");
@@ -96,11 +105,11 @@ describe("WorkOrderAssigneesPopover", () => {
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument());
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("pins assigned users to the top of the list", () => {
+  it("pins assigned users to the top of the list", async () => {
     render(
       <WorkOrderAssigneesPopover organizationId="org-1" selectedIds={["bob"]} onSave={vi.fn()}>
         <button>Assignees</button>
@@ -108,6 +117,7 @@ describe("WorkOrderAssigneesPopover", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Assignees" }));
+    await screen.findByRole("listitem");
 
     const items = screen.getAllByRole("listitem");
     expect(items[0].textContent).toContain("Bob Brown");
