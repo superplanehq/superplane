@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 import { createAlertingPolicyMapper, updateAlertingPolicyMapper } from "./monitoring";

@@ -1,5 +1,5 @@
 import { isUsagePageForced } from "@/lib/env";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 afterEach(() => {
   vi.unstubAllEnvs();

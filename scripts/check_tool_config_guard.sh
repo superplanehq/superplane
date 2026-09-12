@@ -21,7 +21,6 @@ candidates=(
 	web_src/eslint.config.cjs
 	web_src/vite.config.ts
 	web_src/vite.config.js
-	web_src/vitest.config.ts
 	web_src/openapi-ts.config.ts
 	web_src/.storybook/main.ts
 	web_src/.storybook/manager.ts

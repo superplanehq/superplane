@@ -18,7 +18,7 @@ import type {
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/lib/colors";
-import { getTriggerRenderer, getState, getStateMap } from "..";
+import { getTriggerRenderer, getState, getStateMap } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { PushThroughHandler } from "@/pages/app/components/PushThroughHandler";
 

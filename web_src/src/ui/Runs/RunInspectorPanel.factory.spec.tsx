@@ -1,7 +1,8 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { executions, renderInspector } from "./RunInspectorPanel.spec.fixtures";
 
 vi.mock("@uiw/react-json-view", () => ({
@@ -12,8 +13,8 @@ vi.mock("@uiw/react-json-view", () => ({
   ),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesReemitTriggerEvent: vi.fn(),
