@@ -312,16 +312,15 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
-# Local only. Writes superplane_dev to .local/superplane_dev.dump.
-# Uses PUBLIC_API_PORT from .env to select the Compose stack that serves
-# that UI. Postgres inside that stack is db:5432. The dump is gitignored.
+# Local only. Writes this worktree's superplane_dev to
+# .local/superplane_dev.dump. PUBLIC_API_PORT in .env is the UI port.
+# Postgres in this stack is db:5432. The dump is gitignored.
 db.snapshot:
 	./scripts/db_exec_on_ui_instance.sh ./scripts/db_snapshot.sh superplane_dev
 
-# Local only. Replaces superplane_dev from .local/superplane_dev.dump, then
-# applies pending migrations. Uses PUBLIC_API_PORT from .env to select the
-# Compose stack that serves that UI. It does not touch superplane_test.
-# Run make db.snapshot again to refresh the dump after migrate.
+# Local only. Replaces this worktree's superplane_dev from
+# .local/superplane_dev.dump, then applies pending migrations. It does not
+# touch superplane_test. Run make db.snapshot again after migrate.
 db.restore:
 	./scripts/db_exec_on_ui_instance.sh ./scripts/db_restore.sh superplane_dev
 
