@@ -1,161 +1,21 @@
-import { createContext, isValidElement, useContext, type ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
-import { toChartColorVarName } from "@/components/ui/chartColorVarName";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
-const tooltipContentProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
-const tooltipWrapperProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+import {
+  chartUiTestDoubles,
+  rechartsTestDoubles,
+  tooltipContentProps,
+  tooltipWrapperProps,
+} from "./widgetChartTestDoubles";
 
-type ChartRow = Record<string, unknown>;
-type ChartConfig = Record<string, { label?: ReactNode; color?: string }>;
-const ChartDataContext = createContext<ChartRow[]>([]);
-const ChartConfigContext = createContext<ChartConfig>({});
-
-function ChartFrame({ children, data }: { children?: ReactNode; data?: ChartRow[] }) {
-  return (
-    <div className="recharts-wrapper">
-      {<ChartDataContext.Provider value={data ?? []}>{children}</ChartDataContext.Provider>}
-    </div>
-  );
-}
-
-function SeriesLayer({ className, fill, children }: { className: string; fill?: string; children?: ReactNode }) {
-  return (
-    <div className={className}>
-      <div className="recharts-bar-rectangle">
-        <path fill={fill} style={{ fill: fill ?? "" }} />
-      </div>
-      {children}
-    </div>
-  );
-}
-
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: ReactNode }) => (
-    <div data-testid="responsive-container" style={{ width: 600, height: 400 }}>
-      {children}
-    </div>
-  ),
-  BarChart: ({ children, data }: { children?: ReactNode; data?: ChartRow[] }) => (
-    <ChartFrame data={data}>{children}</ChartFrame>
-  ),
-  AreaChart: ({ children, data }: { children?: ReactNode; data?: ChartRow[] }) => (
-    <ChartFrame data={data}>{children}</ChartFrame>
-  ),
-  LineChart: ({ children, data }: { children?: ReactNode; data?: ChartRow[] }) => (
-    <ChartFrame data={data}>{children}</ChartFrame>
-  ),
-  PieChart: ({ children }: { children?: ReactNode }) => <ChartFrame>{children}</ChartFrame>,
-  Bar: ({ fill, children }: { fill?: string; children?: ReactNode }) => (
-    <SeriesLayer className="recharts-bar" fill={fill}>
-      {children}
-    </SeriesLayer>
-  ),
-  Area: ({ fill }: { fill?: string }) => <SeriesLayer className="recharts-area" fill={fill} />,
-  Line: ({ stroke }: { stroke?: string }) => <SeriesLayer className="recharts-line" fill={stroke} />,
-  Pie: ({ children }: { children?: ReactNode }) => <div className="recharts-pie">{children}</div>,
-  Cell: ({ fill }: { fill?: string }) => <path fill={fill} style={{ fill: fill ?? "" }} />,
-  Rectangle: () => null,
-  CartesianGrid: () => null,
-  XAxis: ({ tickFormatter }: { tickFormatter?: (value: unknown, index: number) => string }) => {
-    const data = useContext(ChartDataContext);
-    return (
-      <div className="recharts-xAxis-tick-labels">
-        {data.map((row, index) => (
-          <span key={index} className="recharts-cartesian-axis-tick-value">
-            {tickFormatter ? tickFormatter(row.x, index) : String(row.x ?? "")}
-          </span>
-        ))}
-      </div>
-    );
-  },
-  YAxis: ({ label, tickFormatter }: { label?: { value?: string }; tickFormatter?: (value: number) => string }) => {
-    const data = useContext(ChartDataContext);
-    const values = data.flatMap((row) =>
-      Object.entries(row)
-        .filter(([key]) => key !== "x")
-        .map(([, value]) => Number(value))
-        .filter((value) => !Number.isNaN(value)),
-    );
-    return (
-      <div className="recharts-yAxis">
-        {label?.value ? <span className="recharts-label">{label.value}</span> : null}
-        <div className="recharts-yAxis-tick-labels">
-          {(values.length > 0 ? values : [90]).map((value, index) => (
-            <span key={index} className="recharts-cartesian-axis-tick-value">
-              {tickFormatter ? tickFormatter(value) : String(value)}
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  },
-  Legend: ({ content }: { content?: ReactNode }) => <div className="recharts-legend-wrapper">{content}</div>,
-}));
-
-vi.mock("@/components/ui/chart", () => {
-  function ChartStyle({ id, config }: { id: string; config: Record<string, { color?: string }> }) {
-    const colorConfig = Object.entries(config).filter(([, item]) => item.color);
-    if (!colorConfig.length) {
-      return null;
-    }
-    const css = colorConfig.map(([key, item]) => `  --color-${toChartColorVarName(key)}: ${item.color};`).join("\n");
-    return <style>{`[data-chart=${id}] {\n${css}\n}`}</style>;
-  }
-
-  function ChartContainer({ children, config }: { children: ReactNode; config: ChartConfig }) {
-    return (
-      <ChartConfigContext.Provider value={config}>
-        <div data-chart="widget-chart">
-          <ChartStyle id="widget-chart" config={config} />
-          {children}
-        </div>
-      </ChartConfigContext.Provider>
-    );
-  }
-
-  return {
-    ChartContainer,
-    ChartTooltip: (props: Record<string, unknown>) => {
-      tooltipWrapperProps.value = props;
-      const content = props.content;
-      if (isValidElement(content)) {
-        tooltipContentProps.value = content.props as Record<string, unknown>;
-      }
-      return null;
-    },
-    ChartTooltipContent: (props: Record<string, unknown>) => {
-      tooltipContentProps.value = props;
-      return null;
-    },
-    ChartLegend: ({ content }: { content?: ReactNode }) => <div className="recharts-legend-wrapper">{content}</div>,
-    ChartLegendContent: () => {
-      const config = useContext(ChartConfigContext);
-      return (
-        <div>
-          {Object.values(config).map((item) => (
-            <span key={String(item.label)}>{item.label}</span>
-          ))}
-        </div>
-      );
-    },
-  };
-});
+vi.mock("recharts", () => rechartsTestDoubles());
+vi.mock("@/components/ui/chart", () => chartUiTestDoubles());
 
 import { WidgetChart } from "./WidgetChart";
 import type { WidgetChartRender } from "./types";
-
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 const ROWS = [
   { service: "ec2", cost: 1200, errors: 4 },

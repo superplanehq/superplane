@@ -26,7 +26,34 @@ if (!GlobalRegistrator.isRegistered) {
       disableJavaScriptFileLoading: true,
       disableCSSFileLoading: true,
       disableIframePageLoading: true,
+      // Happy DOM's fetch/XHR use Node http.request. Unmocked /api calls
+      // resolve against http://localhost/ (port 80) and print ECONNREFUSED.
+      fetch: {
+        interceptor: {
+          beforeAsyncRequest: async ({ request, window: fetchWindow }) => {
+            if (isOfflineSafeFetchUrl(request.url)) {
+              return;
+            }
+            return new fetchWindow.Response("", { status: 404, statusText: "Not Found" });
+          },
+          beforeSyncRequest: ({ request, window: fetchWindow }) => {
+            if (isOfflineSafeFetchUrl(request.url)) {
+              return;
+            }
+            return {
+              status: 404,
+              statusText: "Not Found",
+              ok: false,
+              url: request.url,
+              redirected: false,
+              headers: new fetchWindow.Headers(),
+              body: null,
+            };
+          },
+        },
+      },
       navigation: {
+        disableMainFrameNavigation: true,
         disableChildFrameNavigation: true,
         disableChildPageNavigation: true,
       },
@@ -38,6 +65,15 @@ syncWindowUrl("http://localhost/");
 patchHistoryLocation();
 patchFormMethod();
 patchVitestCompat(vi as unknown as Record<string, unknown>);
+
+function isOfflineSafeFetchUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "data:" || protocol === "blob:";
+  } catch {
+    return false;
+  }
+}
 
 await import("./setup");
 
@@ -76,30 +112,7 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
       enumerable: true,
       value: () => undefined,
     },
-    advanceTimersByTimeAsync: {
-      configurable: true,
-      enumerable: true,
-      value: async (ms: number) => {
-        advanceTimersByTime(ms);
-        await Promise.resolve();
-      },
-    },
-    runOnlyPendingTimersAsync: {
-      configurable: true,
-      enumerable: true,
-      value: async () => {
-        runOnlyPendingTimers();
-        await Promise.resolve();
-      },
-    },
-    runAllTimersAsync: {
-      configurable: true,
-      enumerable: true,
-      value: async () => {
-        runAllTimers();
-        await Promise.resolve();
-      },
-    },
+    ...timerAsyncAliases(advanceTimersByTime, runOnlyPendingTimers, runAllTimers),
     stubEnv: {
       configurable: true,
       enumerable: true,
@@ -172,6 +185,39 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
       },
     },
   });
+}
+
+function timerAsyncAliases(
+  advanceTimersByTime: (ms: number) => void,
+  runOnlyPendingTimers: () => void,
+  runAllTimers: () => void,
+) {
+  return {
+    advanceTimersByTimeAsync: {
+      configurable: true,
+      enumerable: true,
+      value: async (ms: number) => {
+        advanceTimersByTime(ms);
+        await Promise.resolve();
+      },
+    },
+    runOnlyPendingTimersAsync: {
+      configurable: true,
+      enumerable: true,
+      value: async () => {
+        runOnlyPendingTimers();
+        await Promise.resolve();
+      },
+    },
+    runAllTimersAsync: {
+      configurable: true,
+      enumerable: true,
+      value: async () => {
+        runAllTimers();
+        await Promise.resolve();
+      },
+    },
+  };
 }
 
 function locationStubFromGlobal(name: string, value: unknown): object | undefined {
