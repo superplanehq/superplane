@@ -396,7 +396,7 @@ func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
 	assertInProgressExecutionUsage(t, db, execution.ID, 1_000_000, 300)
 }
 
-func Test__RecordUsage__HostedUnknownModelFailsClosed(t *testing.T) {
+func Test__RecordUsage__HostedUnknownModelStillRecordsTokens(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
@@ -412,7 +412,77 @@ func Test__RecordUsage__HostedUnknownModelFailsClosed(t *testing.T) {
 		TotalTokens:     100,
 		FundingSource:   models.UsageFundingSourceHosted,
 	})
-	require.ErrorIs(t, err, models.ErrHostedUsageUnpriced)
+	require.NoError(t, err)
+
+	event := requireUsageEventForRun(t, db, requireExecutionRunID(t, execution))
+	assert.Equal(t, int64(100), event.TotalTokens)
+	assert.Equal(t, int64(0), event.CostMicros)
+	assertInProgressExecutionUsage(t, db, execution.ID, 100, 0)
+}
+
+func Test__RecordUsage__HostedOpenRouterPrefixedModelIsPriced(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+
+	err := models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenRouter,
+		Model:           "openrouter/anthropic/claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	})
+	require.NoError(t, err)
+
+	event := requireUsageEventForRun(t, db, requireExecutionRunID(t, execution))
+	assert.Equal(t, int64(1_000_000), event.TotalTokens)
+	assert.Equal(t, int64(3_000_000), event.ProviderCostMicros)
+	assert.Positive(t, event.CostMicros)
+}
+
+func Test__SumUsageForWorkOrders__IncludesModelTokensAndCompute(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 429,
+		IdempotencyKey:  "runner:compute:" + uuid.New().String(),
+	}))
+
+	var modelEvent, computeEvent models.WorkspaceUsageEvent
+	require.NoError(t, db.Where("canvas_run_id = ? AND usage_kind = ?", runID, models.UsageKindModel).First(&modelEvent).Error)
+	require.NoError(t, db.Where("canvas_run_id = ? AND usage_kind = ?", runID, models.UsageKindCompute).First(&computeEvent).Error)
+
+	sums, err := models.SumUsageForWorkOrders(db, []uuid.UUID{execution.WorkOrderID})
+	require.NoError(t, err)
+	total := sums[execution.WorkOrderID]
+	assert.Equal(t, int64(1_000_000), total.TotalTokens)
+	assert.Equal(t, int64(429), total.DurationSeconds)
+	assert.Equal(t, modelEvent.CostMicros+computeEvent.CostMicros, total.CostMicros)
+	assert.Greater(t, total.CostCents(), pricebook.MicrosToCents(computeEvent.CostMicros))
 }
 
 func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
@@ -766,6 +836,196 @@ func Test__ListWorkOrderRunUsage__OmitsOtherFactoriesAndRowsWithoutExecution(t *
 	assert.Equal(t, kept.ID, rows[0].WorkOrderExecutionID)
 }
 
+func Test__ListWorkOrderRunUsage__IncludesAnalysisWithoutExecution(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	assert.Equal(t, uuid.Nil, rows[0].WorkOrderExecutionID)
+	assert.Equal(t, order.ID, rows[0].WorkOrderID)
+	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
+	assert.Contains(t, rows[0].BYOKModels, "anthropic/claude-sonnet-4-6")
+	assert.Empty(t, rows[0].MachineTypes)
+	assert.Empty(t, rows[0].UserName)
+	assert.Empty(t, rows[0].UserEmail)
+	assert.Nil(t, rows[0].UserID)
+}
+
+func Test__ListWorkOrderRunUsage__NamesTheFirstAssigneeNotTheCreator(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	assignee := support.CreateUser(t, r, r.Organization.ID)
+
+	order, err := factory.CreateWorkOrder(db, "Assigned run", "", &r.User, []uuid.UUID{assignee.ID}, nil)
+	require.NoError(t, err)
+	execution := dispatchExistingOrder(t, db, line, order)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, execution))))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	require.NotNil(t, rows[0].UserID)
+	assert.Equal(t, assignee.ID, *rows[0].UserID)
+	assert.Equal(t, assignee.Name, rows[0].UserName)
+	assert.Equal(t, assignee.GetEmail(), rows[0].UserEmail)
+	assert.NotEqual(t, r.UserModel.GetEmail(), rows[0].UserEmail)
+}
+
+func Test__ListWorkOrderRunUsage__NamesTheEarliestAssignee(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	first := support.CreateUser(t, r, r.Organization.ID)
+	second := support.CreateUser(t, r, r.Organization.ID)
+
+	order, err := factory.CreateWorkOrder(db, "Two owners", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{second.ID, first.ID}))
+	earlier := time.Now().Add(-time.Hour)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderAssignee{}).
+		Where("work_order_id = ? AND user_id = ?", order.ID, first.ID).
+		Update("created_at", earlier).Error)
+
+	execution := dispatchExistingOrder(t, db, line, order)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, execution))))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	require.NotNil(t, rows[0].UserID)
+	assert.Equal(t, first.ID, *rows[0].UserID)
+	assert.Equal(t, first.Name, rows[0].UserName)
+}
+
+func Test__ListWorkOrderRunUsage__KeepsAnalysisApartFromLineExecution(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, line := setupFactoryLine(t, r)
+	execution := dispatchNamedOrder(t, r, factory, line, "Ship it")
+	order, err := factory.FindWorkOrder(db, execution.WorkOrderID)
+	require.NoError(t, err)
+
+	analysis := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, analysis.ID)))
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, requireExecutionRunID(t, execution))))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Len(t, rows, 2)
+
+	var analysisRow, executionRow *models.WorkOrderRunUsage
+	for i := range rows {
+		if rows[i].WorkOrderExecutionID == uuid.Nil {
+			analysisRow = &rows[i]
+			continue
+		}
+		executionRow = &rows[i]
+	}
+	require.NotNil(t, analysisRow)
+	require.NotNil(t, executionRow)
+	assert.Equal(t, order.ID, analysisRow.WorkOrderID)
+	assert.Equal(t, execution.ID, executionRow.WorkOrderExecutionID)
+	assert.Equal(t, order.ID, executionRow.WorkOrderID)
+}
+
+func Test__ListWorkOrderRunUsage__KeepsAnalysisRunsApart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	event := map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	}
+	firstRun := startFactoryCanvasRun(t, r, factory.ID, event)
+	secondRun := startFactoryCanvasRun(t, r, factory.ID, event)
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, firstRun.ID)))
+	second := sonnetUsage(t, r, secondRun.ID)
+	second.InputTokens = 500_000
+	second.TotalTokens = 500_000
+	require.NoError(t, models.RecordUsage(db, second))
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Len(t, rows, 2)
+	assert.Equal(t, uuid.Nil, rows[0].WorkOrderExecutionID)
+	assert.Equal(t, uuid.Nil, rows[1].WorkOrderExecutionID)
+	assert.Equal(t, order.ID, rows[0].WorkOrderID)
+	assert.Equal(t, order.ID, rows[1].WorkOrderID)
+
+	tokens := []int64{rows[0].TotalTokens, rows[1].TotalTokens}
+	assert.ElementsMatch(t, []int64{1_000_000, 500_000}, tokens)
+}
+
+func Test__CreateWorkOrder__AttachesPriorCanvasUsage(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	run := startFactoryCanvasRun(t, r, factory.ID, nil)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	event := requireUsageEventForRun(t, db, run.ID)
+	assert.Nil(t, event.WorkOrderID)
+
+	order, err := factory.CreateWorkOrder(db, "From intake", "", &r.User, nil, &run.ID)
+	require.NoError(t, err)
+
+	event = requireUsageEventForRun(t, db, run.ID)
+	require.NotNil(t, event.WorkOrderID)
+	assert.Equal(t, order.ID, *event.WorkOrderID)
+	assert.Nil(t, event.WorkOrderExecutionID)
+
+	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &factory.ID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	assert.Equal(t, order.ID, rows[0].WorkOrderID)
+	assert.Equal(t, uuid.Nil, rows[0].WorkOrderExecutionID)
+	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
+}
+
 func Test__ListWorkOrderRunUsage__PaginatesAndRespectsWindow(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -892,8 +1152,18 @@ func dispatchNamedOrder(
 ) *models.FactoryWorkOrderExecution {
 	t.Helper()
 	db := database.DB(t.Context())
-	order, err := factory.CreateWorkOrder(db, title, "", &r.User, nil, nil)
+	order, err := factory.CreateWorkOrder(db, title, "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
+	return dispatchExistingOrder(t, db, line, order)
+}
+
+func dispatchExistingOrder(
+	t *testing.T,
+	db *gorm.DB,
+	line *models.FactoryLine,
+	order *models.FactoryWorkOrder,
+) *models.FactoryWorkOrderExecution {
+	t.Helper()
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, result, dispatchErr := line.Dispatch(tx, order)

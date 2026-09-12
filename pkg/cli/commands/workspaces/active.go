@@ -1,4 +1,4 @@
-package factories
+package workspaces
 
 import (
 	"bufio"
@@ -25,17 +25,17 @@ func (c *activeCommand) Execute(ctx core.CommandContext) error {
 }
 
 func (c *activeCommand) setActive(ctx core.CommandContext, nameOrID string) error {
-	factoryID, err := FindFactoryID(ctx, nameOrID)
+	workspaceID, err := FindWorkspaceID(ctx, nameOrID)
 	if err != nil {
 		return err
 	}
-	return ctx.Config.SetActiveFactory(factoryID)
+	return ctx.Config.SetActiveWorkspace(workspaceID)
 }
 
 func (c *activeCommand) printActive(ctx core.CommandContext) error {
-	active := strings.TrimSpace(ctx.Config.GetActiveFactory())
+	active := strings.TrimSpace(ctx.Config.GetActiveWorkspace())
 	if active == "" {
-		return fmt.Errorf("no active factory; pass a name or id, or run interactively")
+		return fmt.Errorf("no active workspace; pass a key or id, or run interactively")
 	}
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(map[string]string{"id": active})
@@ -52,20 +52,20 @@ func (c *activeCommand) setActiveInteractively(ctx core.CommandContext) error {
 		return err
 	}
 
-	factories := response.GetFactories()
-	if len(factories) == 0 {
-		return fmt.Errorf("no factories found")
+	workspaces := response.GetFactories()
+	if len(workspaces) == 0 {
+		return fmt.Errorf("no workspaces found")
 	}
 
 	err = ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		for i, factory := range factories {
+		for i, ws := range workspaces {
 			prefix := " "
-			if factory.GetId() == ctx.Config.GetActiveFactory() {
+			if ws.GetId() == ctx.Config.GetActiveWorkspace() {
 				prefix = "*"
 			}
-			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", prefix, i+1, factory.GetName(), factory.GetId())
+			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", prefix, i+1, ws.GetName(), ws.GetId())
 		}
-		_, _ = fmt.Fprint(stdout, "Select a factory number: ")
+		_, _ = fmt.Fprint(stdout, "Select a workspace number: ")
 		return nil
 	})
 	if err != nil {
@@ -75,20 +75,20 @@ func (c *activeCommand) setActiveInteractively(ctx core.CommandContext) error {
 	reader := bufio.NewReader(ctx.Cmd.InOrStdin())
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read selected factory: %w", err)
+		return fmt.Errorf("failed to read selected workspace: %w", err)
 	}
 
 	selectedIndex, err := strconv.Atoi(strings.TrimSpace(input))
 	if err != nil {
-		return fmt.Errorf("invalid factory selection %q", strings.TrimSpace(input))
+		return fmt.Errorf("invalid workspace selection %q", strings.TrimSpace(input))
 	}
-	if selectedIndex < 1 || selectedIndex > len(factories) {
-		return fmt.Errorf("factory selection must be between 1 and %d", len(factories))
+	if selectedIndex < 1 || selectedIndex > len(workspaces) {
+		return fmt.Errorf("workspace selection must be between 1 and %d", len(workspaces))
 	}
 
-	selected := factories[selectedIndex-1]
+	selected := workspaces[selectedIndex-1]
 	if !selected.HasId() {
-		return fmt.Errorf("selected factory is missing an id")
+		return fmt.Errorf("selected workspace is missing an id")
 	}
-	return ctx.Config.SetActiveFactory(selected.GetId())
+	return ctx.Config.SetActiveWorkspace(selected.GetId())
 }

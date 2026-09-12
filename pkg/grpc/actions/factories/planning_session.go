@@ -189,10 +189,6 @@ func planningSessionActor(ctx context.Context, organizationID, factoryID string)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
-	parsedFactoryID, err := parseFactoryID(factoryID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
-	}
 	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return uuid.Nil, uuid.Nil, uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -201,7 +197,11 @@ func planningSessionActor(ctx context.Context, organizationID, factoryID string)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to load planning session")
 	}
-	return orgID, parsedFactoryID, userID, nil
+	factory, err := findFactory(database.DB(ctx), orgID, factoryID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
+	}
+	return orgID, factory.ID, userID, nil
 }
 
 func parseSessionID(sessionID string) (uuid.UUID, error) {

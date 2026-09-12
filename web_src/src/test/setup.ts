@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 
 // jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
 // Provide a no-op so every test file gets it for free instead of having to

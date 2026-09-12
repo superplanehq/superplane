@@ -75,6 +75,54 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
 }
 
+func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
+	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "PR Closure",
+		installParams: map[string]string{
+			"appRepository": "acme/refunds",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	hasGitHubOrigin := findYAMLNode(t, canvas, "has-github-issue-origin")
+	assert.Equal(t, "if", hasGitHubOrigin.Component)
+	assert.Equal(
+		t,
+		`$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`,
+		hasGitHubOrigin.Configuration["expression"],
+	)
+
+	comment := findYAMLNode(t, canvas, "comment-source-issue")
+	assert.Equal(t, "github.createIssueComment", comment.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
+	assert.Equal(t, `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
+	assert.Equal(t, `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
+	assert.Equal(
+		t,
+		`SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).`,
+		comment.Configuration["body"],
+	)
+
+	closeIssue := findYAMLNode(t, canvas, "close-source-issue")
+	assert.Equal(t, "github.updateIssue", closeIssue.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, closeIssue.Integration)
+	assert.Equal(t, comment.Configuration["repository"], closeIssue.Configuration["repository"])
+	assert.Equal(t, comment.Configuration["issueNumber"], closeIssue.Configuration["issueNumber"])
+	assert.Equal(t, "closed", closeIssue.Configuration["state"])
+
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "complete-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-github-issue-origin", TargetID: "comment-source-issue", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "comment-source-issue", TargetID: "close-source-issue", Channel: "default"})
+	assert.NotContains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "reject-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
+}
+
 func TestMaterializeFactoryTemplates(t *testing.T) {
 	for id := range factoryAppTemplates {
 		t.Run(id, func(t *testing.T) {

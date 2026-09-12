@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 const (
@@ -118,17 +119,24 @@ func resolveAPIToken(integrationCtx core.IntegrationContext) (string, error) {
 }
 
 func organizationURL(integrationCtx core.IntegrationContext) string {
+	var raw string
 	if !integrationCtx.LegacySetup() {
-		url, err := integrationCtx.Properties().GetString(PropertyOrganizationURL)
+		value, err := integrationCtx.Properties().GetString(PropertyOrganizationURL)
 		if err != nil {
 			return ""
 		}
-		return strings.TrimRight(strings.TrimSpace(url), "/")
+		raw = value
+	} else {
+		value, err := integrationCtx.GetConfig("organizationUrl")
+		if err != nil {
+			return ""
+		}
+		raw = string(value)
 	}
 
-	raw, err := integrationCtx.GetConfig("organizationUrl")
+	parsed, err := common.ParseOrganizationURL(raw)
 	if err != nil {
 		return ""
 	}
-	return strings.TrimRight(strings.TrimSpace(string(raw)), "/")
+	return parsed
 }

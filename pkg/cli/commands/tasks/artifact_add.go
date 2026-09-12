@@ -1,4 +1,4 @@
-package factories
+package tasks
 
 import (
 	"fmt"
@@ -6,31 +6,35 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 type artifactAddCommand struct {
-	factory *string
-	orderID *string
-	typ     *string
-	title   *string
-	body    *string
-	file    *string
-	url     *string
-	name    *string
+	workspace *string
+	taskID    *string
+	typ       *string
+	title     *string
+	body      *string
+	file      *string
+	url       *string
+	name      *string
 }
 
 func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
-	orderID := strings.TrimSpace(stringValue(c.orderID))
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
 	artifactType := strings.ToLower(strings.TrimSpace(stringValue(c.typ)))
 
-	if _, err := uuid.Parse(orderID); err != nil {
-		return fmt.Errorf("--order-id must be a UUID")
+	if rawTaskID == "" {
+		return fmt.Errorf("--task is required")
 	}
 
-	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
+	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}
@@ -45,7 +49,7 @@ func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
 	body.SetData(data)
 
 	response, _, err := ctx.API.FactoryAPI.
-		FactoriesCreateWorkOrderArtifact(ctx.Context, factoryID, orderID).
+		FactoriesCreateWorkOrderArtifact(ctx.Context, workspaceID, taskID).
 		Body(*body).
 		Execute()
 	if err != nil {
@@ -141,11 +145,4 @@ func (c *artifactAddCommand) resolveMarkdownBody(ctx core.CommandContext) (strin
 		return "", fmt.Errorf("markdown body is empty")
 	}
 	return body, nil
-}
-
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

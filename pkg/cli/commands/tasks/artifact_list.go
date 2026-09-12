@@ -1,33 +1,37 @@
-package factories
+package tasks
 
 import (
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
 type artifactListCommand struct {
-	factory *string
-	orderID *string
+	workspace *string
+	taskID    *string
 }
 
 func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
-	orderID := strings.TrimSpace(stringValue(c.orderID))
+	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
 
-	if _, err := uuid.Parse(orderID); err != nil {
-		return fmt.Errorf("--order-id must be a UUID")
+	if rawTaskID == "" {
+		return fmt.Errorf("--task is required")
 	}
 
-	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
+	workspaceID, err := resolveWorkspace(ctx, c.workspace)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}
 
 	response, _, err := ctx.API.FactoryAPI.
-		FactoriesListWorkOrderArtifacts(ctx.Context, factoryID, orderID).
+		FactoriesListWorkOrderArtifacts(ctx.Context, workspaceID, taskID).
 		Execute()
 	if err != nil {
 		return err

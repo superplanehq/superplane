@@ -24,7 +24,7 @@ func Test__ListFactoryWorkOrderRunUsage(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, nil, nil)
+	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(db, "ship", nil)
@@ -79,6 +79,8 @@ func Test__ListFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Equal(t, factory.WorkOrderKey(order.Number), row.WorkOrderKey)
 	assert.Equal(t, "Publish draft", row.Title)
 	assert.Equal(t, r.UserModel.GetEmail(), row.UserEmail)
+	assert.Equal(t, r.UserModel.Name, row.UserName)
+	assert.Equal(t, r.User.String(), row.UserId)
 	assert.Equal(t, int64(1_000_000), row.TotalTokens)
 	assert.Equal(t, int64(90), row.DurationSeconds)
 	assert.Contains(t, row.ByokModels, "anthropic/claude-sonnet-4-6")

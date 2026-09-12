@@ -52,7 +52,9 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		canvasFile:       "templates/pr-closure.canvas.yaml",
 		consoleFile:      "templates/event-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"github.onPullRequest": "github",
+			"github.createIssueComment": "github",
+			"github.onPullRequest":      "github",
+			"github.updateIssue":        "github",
 		},
 	},
 	"issue-intake": {

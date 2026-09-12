@@ -28,21 +28,17 @@ func ListFactoryWorkOrderRunUsage(
 		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
-	}
-
 	since, until, err := resolveWorkOrderRunUsageWindow(req)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, err.Error())
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory work order run usage")
 	}
+	factoryID := factory.ID
 
 	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
 		OrganizationID: orgID,
@@ -98,22 +94,24 @@ func serializeWorkOrderRunUsageRows(factory *models.Factory, rows []models.WorkO
 
 func serializeWorkOrderRunUsageRow(factory *models.Factory, row models.WorkOrderRunUsage) *pb.WorkOrderRunUsageRow {
 	item := &pb.WorkOrderRunUsageRow{
-		WorkOrderExecutionId: row.WorkOrderExecutionID.String(),
-		WorkOrderId:          row.WorkOrderID.String(),
-		WorkOrderNumber:      row.WorkOrderNumber,
-		WorkOrderKey:         factory.WorkOrderKey(row.WorkOrderNumber),
-		Title:                row.Title,
-		LastOccurredAt:       timestamppb.New(row.LastOccurredAt),
-		UserName:             row.UserName,
-		UserEmail:            row.UserEmail,
-		TotalTokens:          row.TotalTokens,
-		DurationSeconds:      row.DurationSeconds,
-		CostCents:            row.CostCents(),
-		HostedCostCents:      row.HostedCostCents(),
-		ByokCostCents:        row.BYOKCostCents(),
-		Models:               row.Models,
-		ByokModels:           row.BYOKModels,
-		MachineTypes:         row.MachineTypes,
+		WorkOrderId:     row.WorkOrderID.String(),
+		WorkOrderNumber: row.WorkOrderNumber,
+		WorkOrderKey:    factory.WorkOrderKey(row.WorkOrderNumber),
+		Title:           row.Title,
+		LastOccurredAt:  timestamppb.New(row.LastOccurredAt),
+		UserName:        row.UserName,
+		UserEmail:       row.UserEmail,
+		TotalTokens:     row.TotalTokens,
+		DurationSeconds: row.DurationSeconds,
+		CostCents:       row.CostCents(),
+		HostedCostCents: row.HostedCostCents(),
+		ByokCostCents:   row.BYOKCostCents(),
+		Models:          row.Models,
+		ByokModels:      row.BYOKModels,
+		MachineTypes:    row.MachineTypes,
+	}
+	if row.WorkOrderExecutionID != uuid.Nil {
+		item.WorkOrderExecutionId = row.WorkOrderExecutionID.String()
 	}
 	if row.UserID != nil && *row.UserID != uuid.Nil {
 		item.UserId = row.UserID.String()

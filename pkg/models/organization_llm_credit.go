@@ -73,6 +73,7 @@ type OrganizationLLMCreditSummary struct {
 	IncludedRemainingMicros  int64
 	PurchasedRemainingMicros int64
 	WelcomeRemainingMicros   int64
+	AdminRemainingMicros     int64
 	MarkupBPS                int
 	Warning                  bool
 	WelcomeCreditExpiresAt   *time.Time
@@ -475,6 +476,7 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 		IncludedRemainingMicros:  spend.IncludedRemainingMicros,
 		PurchasedRemainingMicros: spend.PurchasedRemainingMicros,
 		WelcomeRemainingMicros:   spend.WelcomeRemainingMicros,
+		AdminRemainingMicros:     spend.AdminRemainingMicros,
 		MarkupBPS:                markupBPS,
 		Warning:                  warning,
 		WelcomeCreditExpiresAt:   spend.WelcomeCreditExpiresAt,

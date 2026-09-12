@@ -170,10 +170,17 @@ cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
 // SUPERPLANE_RESULT_FILE even when command exits non-zero.
 func WrapAgentStepCommand(command string) string {
 	return `_sp_status=0
+_sp_merge_llm_usage() {
+  node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
+}
+trap '_sp_merge_llm_usage' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 {
 ` + WithTaskBinOnPath(command) + `
 } || _sp_status=$?
-node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
+_sp_merge_llm_usage
+trap - EXIT TERM INT
 if [ "$_sp_status" -ne 0 ]; then
   return "$_sp_status" 2>/dev/null || exit "$_sp_status"
 fi`

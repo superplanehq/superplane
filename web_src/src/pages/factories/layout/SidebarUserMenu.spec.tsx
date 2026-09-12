@@ -32,7 +32,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderMenu(isTrial = false) {
+function renderMenu(planLabel?: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -47,7 +47,7 @@ function renderMenu(isTrial = false) {
                   factoryKey="RFSDR"
                   userName="Ada Lovelace"
                   organizationName="SuperPlane"
-                  isTrial={isTrial}
+                  planLabel={planLabel}
                 />
               }
             />
@@ -111,9 +111,23 @@ describe("SidebarUserMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
   });
 
+  it("shows the plan below the organization name in the open menu", async () => {
+    const user = userEvent.setup();
+    renderMenu("Business");
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Business");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+  });
+
   it("shows Trial in the open menu but never under the avatar for a trial organization", async () => {
     const user = userEvent.setup();
-    renderMenu(true);
+    renderMenu("Trial");
 
     const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
     expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");

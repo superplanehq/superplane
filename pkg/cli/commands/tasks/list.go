@@ -1,4 +1,4 @@
-package factories
+package tasks
 
 import (
 	"fmt"
@@ -7,25 +7,26 @@ import (
 	"text/tabwriter"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/cli/commands/workspaces"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type orderListCommand struct {
-	factory    *string
+type taskListCommand struct {
+	workspace  *string
 	assignees  *[]string
 	states     *[]string
 	results    *[]string
 	unassigned *bool
 }
 
-func (c *orderListCommand) Execute(ctx core.CommandContext) error {
-	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
+func (c *taskListCommand) Execute(ctx core.CommandContext) error {
+	workspaceID, err := workspaces.ResolveWorkspaceID(ctx, stringValue(c.workspace))
 	if err != nil {
 		return err
 	}
 
-	request := ctx.API.FactoryAPI.FactoriesListWorkOrders(ctx.Context, factoryID)
+	request := ctx.API.FactoryAPI.FactoriesListWorkOrders(ctx.Context, workspaceID)
 
 	if c.assignees != nil && len(*c.assignees) > 0 {
 		assigneeIDs, err := resolveAssigneeIDs(ctx, *c.assignees)
@@ -42,11 +43,11 @@ func (c *orderListCommand) Execute(ctx core.CommandContext) error {
 		rawStates = *c.states
 	}
 	if resolved := resolveStateFilter(rawStates); resolved != nil {
-		request = request.States(normalizeFilterValues(resolved, shortOrderStateTokens))
+		request = request.States(normalizeFilterValues(resolved, shortTaskStateTokens))
 	}
 
 	if c.results != nil && len(*c.results) > 0 {
-		request = request.Results(normalizeFilterValues(*c.results, shortOrderResultTokens))
+		request = request.Results(normalizeFilterValues(*c.results, shortTaskResultTokens))
 	}
 
 	if c.unassigned != nil && *c.unassigned {
@@ -58,39 +59,36 @@ func (c *orderListCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	orders := response.GetOrders()
+	tasks := response.GetOrders()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(orders)
+		return ctx.Renderer.Render(tasks)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		if len(orders) == 0 {
-			_, err := fmt.Fprintln(stdout, "No work orders found.")
+		if len(tasks) == 0 {
+			_, err := fmt.Fprintln(stdout, "No tasks found.")
 			return err
 		}
 
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(writer, "ID\tTITLE\tSTATE\tRESULT\tASSIGNEES\tEXECUTIONS\tCREATED")
-		for _, order := range orders {
+		_, _ = fmt.Fprintln(writer, "NUMBER\tTITLE\tSTATE\tRESULT\tASSIGNEES\tEXECUTIONS\tCREATED")
+		for _, task := range tasks {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
-				order.GetId(),
-				order.GetTitle(),
-				formatOrderState(order.GetState()),
-				formatOrderResult(order.GetResult()),
-				formatAssigneeList(order.GetAssignees()),
-				countStepExecutions(order.GetLineDispatches()),
-				formatRelativeTime(order.GetCreatedAt()),
+				taskDisplayID(task),
+				task.GetTitle(),
+				formatTaskState(task.GetState()),
+				formatTaskResult(task.GetResult()),
+				formatAssigneeList(task.GetAssignees()),
+				countStepExecutions(task.GetLineDispatches()),
+				formatRelativeTime(task.GetCreatedAt()),
 			)
 		}
 		return writer.Flush()
 	})
 }
 
-// countStepExecutions sums the step executions across every line dispatch,
-// matching the flat "executions" count the EXECUTIONS column showed before
-// line dispatches became first-class aggregates.
 func countStepExecutions(dispatches []openapi_client.FactoriesWorkOrderLineDispatch) int {
 	total := 0
 	for _, dispatch := range dispatches {
@@ -99,58 +97,36 @@ func countStepExecutions(dispatches []openapi_client.FactoriesWorkOrderLineDispa
 	return total
 }
 
-// shortOrderStateTokens maps short, case-insensitive state names to the
-// full proto enum token expected by the API, so --state is pleasant to
-// type interactively (e.g. "open" instead of "STATE_OPEN").
-var shortOrderStateTokens = map[string]string{
+var shortTaskStateTokens = map[string]string{
 	"draft":  "STATE_DRAFT",
 	"open":   "STATE_OPEN",
 	"closed": "STATE_CLOSED",
 }
 
-// orderStateAllToken is the special --state value that opts out of the
-// default "open only" filter and restores the "no filter" behavior,
-// returning work orders in every state.
-const orderStateAllToken = "all"
+const taskStateAllToken = "all"
 
-// defaultOrderStates is applied when --state is omitted entirely, so
-// "superplane factory orders list" only shows open work orders by default.
-var defaultOrderStates = []string{"open"}
+var defaultTaskStates = []string{"open"}
 
-// resolveStateFilter decides which state values (if any) should be sent to
-// the API as the "states" filter:
-//   - if the caller explicitly passed "all" (case-insensitively, anywhere in
-//     the list), no filter is applied at all (nil is returned), restoring the
-//     legacy "every state" behavior.
-//   - if no states were provided, the default of "open only" is used.
-//   - otherwise, the caller's explicit values are returned unchanged (to be
-//     normalized by normalizeFilterValues as usual).
 func resolveStateFilter(states []string) []string {
 	for _, state := range states {
-		if strings.EqualFold(strings.TrimSpace(state), orderStateAllToken) {
+		if strings.EqualFold(strings.TrimSpace(state), taskStateAllToken) {
 			return nil
 		}
 	}
 
 	if len(states) == 0 {
-		return defaultOrderStates
+		return defaultTaskStates
 	}
 
 	return states
 }
 
-// shortOrderResultTokens maps short, case-insensitive result names to the
-// full proto enum token expected by the API (e.g. "completed" instead of
-// "RESULT_COMPLETED").
-var shortOrderResultTokens = map[string]string{
+var shortTaskResultTokens = map[string]string{
 	"completed": "RESULT_COMPLETED",
 	"rejected":  "RESULT_REJECTED",
 	"failed":    "RESULT_FAILED",
 }
 
-// normalizeFilterValues maps each value through the short-name lookup table,
-// passing unknown values through unchanged so the server can reject them
-// with a clear error rather than the CLI silently dropping them.
 func normalizeFilterValues(values []string, shortNames map[string]string) []string {
 	normalized := make([]string, len(values))
 	for i, value := range values {
@@ -164,10 +140,6 @@ func normalizeFilterValues(values []string, shortNames map[string]string) []stri
 	return normalized
 }
 
-// resolveAssigneeIDs converts CLI-supplied assignee identifiers (UUIDs or
-// emails) into the user UUIDs the API expects. Values that already parse as
-// a UUID pass straight through; everything else is resolved against the
-// organization's members by email.
 func resolveAssigneeIDs(ctx core.CommandContext, raw []string) ([]string, error) {
 	ids := make([]string, 0, len(raw))
 
