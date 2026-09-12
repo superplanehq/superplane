@@ -483,15 +483,15 @@ func (t *RunPipeline) poll(ctx core.ActionHookContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	firstWorkflow := workflows[0]
+	outcome := t.evaluateWorkflows(workflows)
 
-	if t.isRunning(firstWorkflow.Status) {
+	if outcome == pipelineRunning {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
 	payload := map[string]any{"pipeline": metadata.Pipeline}
 	channel := SuccessOutputChannel
-	if t.isFailed(firstWorkflow.Status) {
+	if outcome == pipelineFailed {
 		channel = FailedOutputChannel
 	}
 
@@ -529,6 +529,40 @@ func IsValidLocation(location string) bool {
 
 func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+// pipelineOutcome is the aggregate result of all workflows in a pipeline.
+type pipelineOutcome int
+
+const (
+	pipelineRunning pipelineOutcome = iota
+	pipelineSucceeded
+	pipelineFailed
+)
+
+// evaluateWorkflows reduces all workflows in a pipeline to one result.
+//
+// A CircleCI pipeline can contain more than one workflow. The pipeline is
+// complete only when all of its workflows are complete. The pipeline fails
+// if any one of its workflows fails.
+func (t *RunPipeline) evaluateWorkflows(workflows []WorkflowResponse) pipelineOutcome {
+	failed := false
+
+	for _, workflow := range workflows {
+		if t.isRunning(workflow.Status) {
+			return pipelineRunning
+		}
+
+		if t.isFailed(workflow.Status) {
+			failed = true
+		}
+	}
+
+	if failed {
+		return pipelineFailed
+	}
+
+	return pipelineSucceeded
 }
 
 func (t *RunPipeline) isFailed(workflowStatus string) bool {
