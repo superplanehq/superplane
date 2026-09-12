@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { LegacyWorkOrderPermalinkRedirect, LegacyWorkOrdersRedirect } from "./LegacyWorkOrderRouteRedirects";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { runnerConfigurationDetails, runnerMapper } from "./runner";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "./types";

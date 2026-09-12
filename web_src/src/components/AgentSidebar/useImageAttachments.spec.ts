@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MAX_IMAGE_ATTACHMENTS, MAX_TOTAL_IMAGE_BYTES, useImageAttachments } from "./useImageAttachments";
 
 vi.mock("@/lib/toast", () => ({

@@ -2,7 +2,7 @@ import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   clearBacklogAnalysisPending,
@@ -19,16 +19,12 @@ const { canvasesListRuns, factoriesListFactoryApps, factoriesListFactoryIntakes,
   }),
 );
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    canvasesListRuns,
-    factoriesListFactoryApps,
-    factoriesListFactoryIntakes,
-    factoriesListWorkOrders,
-  };
-});
+vi.mock("@/api-client", () => ({
+  canvasesListRuns,
+  factoriesListFactoryApps,
+  factoriesListFactoryIntakes,
+  factoriesListWorkOrders,
+}));
 
 import { useBacklogAnalysisRuns, useFactoryBacklogAnalysis } from "./useBacklogAnalysisRuns";
 

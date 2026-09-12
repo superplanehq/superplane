@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createDatabaseMapper } from "./create_database";
 import { deleteDatabaseMapper } from "./delete_database";

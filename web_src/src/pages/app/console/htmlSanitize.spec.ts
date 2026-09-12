@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { sanitizeHtml } from "./htmlSanitize";
 
 /**
- * The sanitizer runs in jsdom under vitest. Each test exercises one specific
+ * The sanitizer runs in Happy DOM under Bun. Each test exercises one specific
  * threat or allow-list rule documented in `htmlSanitize.ts`. Failures here
  * indicate a regression in the widget's security policy.
  */

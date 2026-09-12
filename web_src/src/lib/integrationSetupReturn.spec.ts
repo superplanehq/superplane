@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
   INTEGRATION_SETUP_RETURN_COOKIE,
@@ -13,10 +13,11 @@ import {
 
 function setupReturnCookie(): string | undefined {
   const prefix = `${INTEGRATION_SETUP_RETURN_COOKIE}=`;
-  return document.cookie
+  const value = document.cookie
     .split("; ")
     .find((part) => part.startsWith(prefix))
     ?.slice(prefix.length);
+  return value === undefined || value === "" ? undefined : value;
 }
 
 describe("integration setup return", () => {

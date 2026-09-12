@@ -1,19 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { factoriesDescribeFactoryVelocity } = vi.hoisted(() => ({
   factoriesDescribeFactoryVelocity: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    factoriesDescribeFactoryVelocity,
-  };
-});
+vi.mock("@/api-client", () => ({
+  factoriesDescribeFactoryVelocity,
+}));
 
 import { useFactoryVelocity } from "./useFactoryVelocity";
 

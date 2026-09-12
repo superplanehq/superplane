@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -10,13 +10,9 @@ const { canvasesListRuns } = vi.hoisted(() => ({
   canvasesListRuns: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    canvasesListRuns,
-  };
-});
+vi.mock("@/api-client", () => ({
+  canvasesListRuns,
+}));
 
 import { useSidebarEventRunLookup } from "./useSidebarEventRunLookup";
 

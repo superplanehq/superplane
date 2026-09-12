@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   FACTORY_NODE_CARD_HEIGHT,
   FACTORY_NODE_EDIT_VERTICAL_GAP,

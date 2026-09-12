@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   manageVMInstancePowerMapper,
   MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY,
