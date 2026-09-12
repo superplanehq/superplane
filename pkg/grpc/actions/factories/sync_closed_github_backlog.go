@@ -194,9 +194,9 @@ func syncDraftOrderFromGitHub(
 		return false, false
 	}
 
-	issueClosed, err := issueClosedFromSource(ctx, source, repository, ref.Number, lookups)
+	issueClosed, cached, err := issueClosedFromSource(ctx, source, repository, ref.Number, lookups)
 	if err != nil {
-		return false, true
+		return false, !cached
 	}
 	if !issueClosed {
 		return false, false
@@ -211,15 +211,15 @@ func issueClosedFromSource(
 	repository string,
 	number int,
 	lookups map[string]gitHubIssueClosedLookup,
-) (bool, error) {
+) (closed bool, cached bool, err error) {
 	key := repository + "#" + strconv.Itoa(number)
 	if lookup, ok := lookups[key]; ok {
-		return lookup.closed, lookup.err
+		return lookup.closed, true, lookup.err
 	}
 
-	closed, err := source.IsIssueClosed(ctx, number)
+	closed, err = source.IsIssueClosed(ctx, number)
 	lookups[key] = gitHubIssueClosedLookup{closed: closed, err: err}
-	return closed, err
+	return closed, false, err
 }
 
 func closeDraftWorkOrderIfCurrent(
@@ -229,7 +229,8 @@ func closeDraftWorkOrderIfCurrent(
 	orderID uuid.UUID,
 	closedBy uuid.UUID,
 ) (closed bool, failed bool) {
-	var closedOK bool
+	var closedOrder *models.FactoryWorkOrder
+	var fromState string
 	err := db.Transaction(func(tx *gorm.DB) error {
 		current, err := factory.FindWorkOrder(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orderID)
 		if err != nil {
@@ -238,17 +239,31 @@ func closeDraftWorkOrderIfCurrent(
 		if current.State != models.FactoryWorkOrderStateDraft {
 			return nil
 		}
-		if _, err := closeWorkOrderAsUser(tx, orgID, factory, current, models.FactoryWorkOrderResultRejected, closedBy); err != nil {
+		fromState = current.State
+		closedOrder, err = current.Close(tx, models.FactoryWorkOrderResultRejected, &closedBy)
+		if err != nil {
 			if errors.Is(err, models.ErrFactoryWorkOrderInvalidState) {
+				closedOrder = nil
 				return nil
 			}
 			return err
 		}
-		closedOK = true
 		return nil
 	})
 	if err != nil {
 		return false, true
 	}
-	return closedOK, false
+	if closedOrder == nil {
+		return false, false
+	}
+	publishWorkOrderClosed(
+		orgID,
+		factory,
+		closedOrder,
+		closedBy,
+		fromState,
+		models.FactoryWorkOrderResultRejected,
+		false,
+	)
+	return true, false
 }

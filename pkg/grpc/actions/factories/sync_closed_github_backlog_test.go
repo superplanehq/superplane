@@ -249,6 +249,25 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 		assert.Equal(t, 1, source.checks)
 	})
 
+	t.Run("counts a failed GitHub issue once for duplicate origins", func(t *testing.T) {
+		factory := newFactory(t)
+		createGitHubIntake(t, factory)
+		createDraft(t, factory, "First copy", githubOrigin)
+		createDraft(t, factory, "Second copy", githubOrigin)
+		source := &stubGitHubIssueStateSource{
+			repository: "acme/payments",
+			err:        errors.New("github unavailable"),
+		}
+
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(source), orgID, &pb.SyncClosedGitHubBacklogRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), response.GetClosedCount())
+		assert.Equal(t, int32(1), response.GetFailedCount())
+		assert.Equal(t, 1, source.checks)
+	})
+
 	t.Run("does not close a draft that was dispatched during the GitHub check", func(t *testing.T) {
 		factory := newFactory(t)
 		createGitHubIntake(t, factory)
