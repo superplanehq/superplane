@@ -44,6 +44,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => ({ data: [], isLoading: false, isError: false }),
   useImportFactoryIntakeItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSyncClosedGitHubBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
