@@ -27,15 +27,15 @@ const {
 }));
 
 vi.mock("../api-client/sdk.gen", () => ({
-    canvasFoldersUpdateCanvasFolder,
-    canvasesListRuns,
-    canvasesDescribeRun,
-    canvasesPutCanvasStaging,
-    canvasesCommitCanvasStaging,
-    canvasesDeleteCanvasStaging,
-    canvasesDescribeCanvasVersion,
-    canvasesListCanvasVersions,
-    canvasesGetCanvasStaging,
+  canvasFoldersUpdateCanvasFolder,
+  canvasesListRuns,
+  canvasesDescribeRun,
+  canvasesPutCanvasStaging,
+  canvasesCommitCanvasStaging,
+  canvasesDeleteCanvasStaging,
+  canvasesDescribeCanvasVersion,
+  canvasesListCanvasVersions,
+  canvasesGetCanvasStaging,
 }));
 
 import {

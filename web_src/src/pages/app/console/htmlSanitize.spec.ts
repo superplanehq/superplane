@@ -1,12 +1,20 @@
 import { describe, expect, it } from "bun:test";
+import type { WindowLike } from "dompurify";
+import { JSDOM } from "jsdom";
 
-import { sanitizeHtml } from "./htmlSanitize";
+import { sanitizeHtml as sanitizeHtmlIn } from "./htmlSanitize";
 
 /**
- * The sanitizer runs in Happy DOM under Bun. Each test exercises one specific
- * threat or allow-list rule documented in `htmlSanitize.ts`. Failures here
- * indicate a regression in the widget's security policy.
+ * DOMPurify does not sanitize correctly on Happy DOM (it skips child nodes
+ * and can fetch remote URLs while parsing). Host these policy checks on
+ * jsdom, which DOMPurify supports.
  */
+const sanitizeWindow = new JSDOM("", { url: "http://localhost/" }).window as unknown as WindowLike;
+
+function sanitizeHtml(raw: string, rootId: string): string {
+  return sanitizeHtmlIn(raw, rootId, sanitizeWindow);
+}
+
 const ROOT_ID = "html-root";
 
 /**
@@ -15,7 +23,7 @@ const ROOT_ID = "html-root";
  * matches the author's first `<div>`, not a wrapper introduced by the test.
  */
 function parse(html: string): Document {
-  return new DOMParser().parseFromString(html, "text/html");
+  return new sanitizeWindow.DOMParser().parseFromString(html, "text/html");
 }
 
 describe("sanitizeHtml - dangerous elements", () => {

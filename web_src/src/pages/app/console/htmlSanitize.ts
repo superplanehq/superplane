@@ -16,7 +16,7 @@
  * authored content. The backend stores the raw body untouched (same trust
  * model as markdown) and validates only shape, not contents.
  */
-import DOMPurify, { type Config } from "dompurify";
+import DOMPurify, { type Config, type WindowLike } from "dompurify";
 
 /**
  * Data attribute used to anchor scoped `<style>` selectors. Every cleaned
@@ -212,22 +212,29 @@ const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel):|#|\/(?![/\\])|(?![/\\])(?
  */
 const STYLE_BLOCKLIST = ["url(", "expression(", "@import", "behavior:", "javascript:", "vbscript:"];
 
-let hooksRegistered = false;
+const purifyByWindow = new WeakMap<object, ReturnType<typeof DOMPurify>>();
 
 /**
- * Install the global hooks exactly once. DOMPurify hooks are process-wide,
- * so we guard with a flag and use the (tag, attr) context inside the hook to
- * decide which rules apply rather than re-registering per call.
+ * DOMPurify bound to `hostWindow`, with the style/class hooks installed
+ * once per window. Happy DOM is not a supported host (it skips child
+ * nodes and can fetch remote URLs while parsing), so tests pass jsdom.
  */
-function ensureHooksRegistered(): void {
-  if (hooksRegistered) return;
-  hooksRegistered = true;
+function purifyForWindow(hostWindow: WindowLike): ReturnType<typeof DOMPurify> {
+  const existing = purifyByWindow.get(hostWindow);
+  if (existing) {
+    return existing;
+  }
 
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
-    if (!data) return;
+  const purify = DOMPurify(hostWindow);
+  purify.addHook("uponSanitizeAttribute", (_node, data) => {
+    if (!data) {
+      return;
+    }
     const name = data.attrName;
     const value = data.attrValue;
-    if (!name) return;
+    if (!name) {
+      return;
+    }
 
     if (name === "style") {
       const lower = (value ?? "").toLowerCase();
@@ -239,9 +246,10 @@ function ensureHooksRegistered(): void {
 
     if (name === "class") {
       data.attrValue = (value ?? "").replace(/\s+/g, " ").trim();
-      return;
     }
   });
+  purifyByWindow.set(hostWindow, purify);
+  return purify;
 }
 
 /**
@@ -467,9 +475,9 @@ function scanStringLiteral(css: string, start: number): number {
  * dropped. `<style>` blocks are kept but their rules are rewritten so they
  * apply only inside the matching root element.
  */
-export function sanitizeHtml(raw: string, rootId: string): string {
+export function sanitizeHtml(raw: string, rootId: string, hostWindow: WindowLike = window): string {
   if (!raw) return "";
-  ensureHooksRegistered();
+  const purify = purifyForWindow(hostWindow);
 
   const config: Config = {
     ALLOWED_TAGS,
@@ -490,8 +498,8 @@ export function sanitizeHtml(raw: string, rootId: string): string {
     FORCE_BODY: true,
   };
 
-  const purified = DOMPurify.sanitize(raw, config) as unknown as string;
-  return rescopeStyleBlocks(purified, rootId);
+  const purified = purify.sanitize(raw, config) as unknown as string;
+  return rescopeStyleBlocks(purified, rootId, hostWindow);
 }
 
 /**
@@ -504,10 +512,10 @@ export function sanitizeHtml(raw: string, rootId: string): string {
  * be attached to a document, and a hook running mid-sanitization sees the
  * detached node.
  */
-function rescopeStyleBlocks(html: string, rootId: string): string {
+function rescopeStyleBlocks(html: string, rootId: string, hostWindow: WindowLike): string {
   if (!html.includes("<style")) return html;
 
-  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  const doc = new hostWindow.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const wrapper = doc.body.firstElementChild;
   if (!wrapper) return html;
 

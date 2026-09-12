@@ -80,6 +80,7 @@ describe("OrganizationOnboardingRedirect", () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
+        href: "http://localhost/onboarding",
         pathname: "/onboarding",
         search: "",
         replace: location.replace,

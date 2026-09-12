@@ -118,20 +118,28 @@ describe("useFactoryBacklogAnalysis", () => {
   });
 
   it("merges a pending id into analyzingOrderIds and drops it once the real run appears", async () => {
-    const queryClient = new QueryClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     markBacklogAnalysisPending("wo-1");
 
-    const { result, rerender } = renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
+    const { result } = renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
       wrapper: createWrapper(queryClient),
     });
 
-    await waitFor(() => expect(result.current.analyzingOrderIds.has("wo-1")).toBe(true));
+    await waitFor(() => {
+      expect(result.current.analyzingOrderIds.has("wo-1")).toBe(true);
+      expect(
+        queryClient.getQueryCache().find({ queryKey: ["backlog-analysis-runs", "org-1", "app-analyzer"] }),
+      ).toBeDefined();
+    });
 
     canvasesListRuns.mockResolvedValue({
       data: { runs: [analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_STARTED" })] },
     });
-    await queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", "org-1"] });
-    rerender();
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", "org-1"] });
+    });
 
     await waitFor(() => expect(result.current.runsByWorkOrder.has("wo-1")).toBe(true));
     await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-1")).toBe(false));

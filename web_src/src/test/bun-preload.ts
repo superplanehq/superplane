@@ -19,7 +19,17 @@ Object.defineProperty(globalThis, "__IMPORT_META_ENV", {
 });
 
 if (!GlobalRegistrator.isRegistered) {
-  GlobalRegistrator.register();
+  GlobalRegistrator.register({
+    settings: {
+      disableJavaScriptFileLoading: true,
+      disableCSSFileLoading: true,
+      disableIframePageLoading: true,
+      navigation: {
+        disableChildFrameNavigation: true,
+        disableChildPageNavigation: true,
+      },
+    },
+  });
 }
 
 syncWindowUrl("http://localhost/");
@@ -260,15 +270,23 @@ function syncWindowUrl(url: string | URL) {
   }
 }
 
+function currentWindowHref(): string {
+  const href = window.location?.href;
+  return typeof href === "string" ? href : "";
+}
+
 function resolveWindowUrl(url: string | URL): string | undefined {
   const href = url.toString();
-  const currentHref = window.location.href;
+  const currentHref = currentWindowHref();
   const bases =
     currentHref.startsWith("http://") || currentHref.startsWith("https://")
       ? [currentHref, "http://localhost/"]
       : ["http://localhost/", currentHref];
 
   for (const base of bases) {
+    if (!base) {
+      continue;
+    }
     try {
       return new URL(href, base).href;
     } catch {
