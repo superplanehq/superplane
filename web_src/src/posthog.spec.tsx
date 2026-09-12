@@ -49,6 +49,7 @@ import { AccountProvider } from "@/contexts/AccountProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { initPostHog } from "@/posthog";
 
 const mockAccount = {
   id: "user-123",
@@ -73,7 +74,6 @@ describe("posthog init", () => {
     setOnce.mockClear();
     localStorage.clear();
     document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
-    vi.resetModules();
   });
 
   afterEach(() => {
@@ -83,26 +83,26 @@ describe("posthog init", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("calls init when SUPERPLANE_POSTHOG_KEY is set", async () => {
+  it("calls init when SUPERPLANE_POSTHOG_KEY is set", () => {
     (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY = "test-key";
-    await import("@/posthog");
+    expect(initPostHog()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       "test-key",
       expect.objectContaining({ autocapture: false, capture_pageview: false, person_profiles: "always" }),
     );
   });
 
-  it("does not call init when SUPERPLANE_POSTHOG_KEY is not set", async () => {
+  it("does not call init when SUPERPLANE_POSTHOG_KEY is not set", () => {
     delete (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY;
-    await import("@/posthog");
+    expect(initPostHog()).toBe(false);
     expect(init).not.toHaveBeenCalled();
   });
 
-  it("sets initial UTM person properties when PostHog initializes", async () => {
+  it("sets initial UTM person properties when PostHog initializes", () => {
     (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY = "test-key";
     window.history.replaceState({}, "", "/signup?utm_source=youtube&utm_campaign=erictech_beta");
 
-    await import("@/posthog");
+    expect(initPostHog()).toBe(true);
 
     expect(setOnce).toHaveBeenCalledWith({
       $initial_utm_source: "youtube",

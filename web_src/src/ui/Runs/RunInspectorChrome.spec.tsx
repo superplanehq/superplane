@@ -50,7 +50,7 @@ describe("RunInspectorChrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy run link" }));
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("http://localhost:3000/org-1/apps/app-1?run=run-1");
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/org-1/apps/app-1?run=run-1`);
     });
   });
 

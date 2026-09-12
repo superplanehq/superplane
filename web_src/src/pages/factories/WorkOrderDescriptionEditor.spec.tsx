@@ -274,9 +274,8 @@ describe("WorkOrderDescriptionEditor", () => {
 
     const input = await screen.findByTestId("work-order-description-input");
     await user.click(input);
-    fireEvent.paste(input, {
-      clipboardData: { getData: () => "" },
-    });
+    await user.paste("");
+    await user.click(input);
     await user.keyboard("{Control>}a{/Control}");
     await user.click(await screen.findByRole("button", { name: "Bold" }));
 

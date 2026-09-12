@@ -44,7 +44,8 @@ describe("createWithGeneratedName", () => {
 
     expect(name).toBe("github-puppies-inc");
     expect(result).toBe("created");
-    expect(create).toHaveBeenCalledExactlyOnceWith("github-puppies-inc");
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith("github-puppies-inc");
   });
 
   it("skips names that are known to be taken", async () => {

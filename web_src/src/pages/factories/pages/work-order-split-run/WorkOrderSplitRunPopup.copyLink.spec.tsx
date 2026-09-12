@@ -3,6 +3,16 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+vi.mock("@/hooks/useCanvasWebsocket", () => ({
+  useCanvasRuntimeWebsocket: () => undefined,
+  useCanvasWebsocket: () => undefined,
+}));
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: () => ({ data: undefined, isError: false, isLoading: false }),
+  useDescribeRun: () => ({ data: undefined, isError: false, isLoading: false }),
+}));
+
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 

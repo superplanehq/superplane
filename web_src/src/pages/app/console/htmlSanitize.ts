@@ -214,6 +214,17 @@ const STYLE_BLOCKLIST = ["url(", "expression(", "@import", "behavior:", "javascr
 
 const purifyByWindow = new WeakMap<object, ReturnType<typeof DOMPurify>>();
 
+let defaultHostWindow: WindowLike | undefined;
+
+/**
+ * Bind the default sanitizer window. Component tests under Happy DOM must
+ * pass jsdom: DOMPurify skips child nodes and can fetch remote URLs on
+ * Happy DOM.
+ */
+export function setSanitizeHtmlHostWindow(hostWindow?: WindowLike) {
+  defaultHostWindow = hostWindow;
+}
+
 /**
  * DOMPurify bound to `hostWindow`, with the style/class hooks installed
  * once per window. Happy DOM is not a supported host (it skips child
@@ -475,7 +486,11 @@ function scanStringLiteral(css: string, start: number): number {
  * dropped. `<style>` blocks are kept but their rules are rewritten so they
  * apply only inside the matching root element.
  */
-export function sanitizeHtml(raw: string, rootId: string, hostWindow: WindowLike = window): string {
+export function sanitizeHtml(
+  raw: string,
+  rootId: string,
+  hostWindow: WindowLike = defaultHostWindow ?? window,
+): string {
   if (!raw) return "";
   const purify = purifyForWindow(hostWindow);
 

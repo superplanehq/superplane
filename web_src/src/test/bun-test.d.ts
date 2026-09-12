@@ -1,3 +1,5 @@
+import type * as Vitest from "vitest";
+
 declare module "bun:test" {
   export {
     afterAll,
@@ -14,7 +16,7 @@ declare module "bun:test" {
     type MockInstance,
   } from "vitest";
 
-  export const mock: (typeof import("vitest"))["vi"]["fn"];
-  export const spyOn: (typeof import("vitest"))["vi"]["spyOn"];
-  export const setSystemTime: (typeof import("vitest"))["vi"]["setSystemTime"];
+  export const mock: Vitest.vi["fn"];
+  export const spyOn: Vitest.vi["spyOn"];
+  export const setSystemTime: Vitest.vi["setSystemTime"];
 }

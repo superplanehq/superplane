@@ -1,12 +1,29 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import type { WindowLike } from "dompurify";
+import { JSDOM } from "jsdom";
 
 import { canvasKeys, type CanvasMemoryEntry, type ConsolePanel } from "@/hooks/useCanvasData";
 
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
 import { HtmlPanelCard } from "./HtmlPanelCard";
+import { setSanitizeHtmlHostWindow } from "./htmlSanitize";
+
+/**
+ * DOMPurify does not sanitize correctly on Happy DOM. Bind the card's
+ * sanitizer to jsdom, the same host `htmlSanitize.spec.ts` uses.
+ */
+const sanitizeWindow = new JSDOM("", { url: "http://localhost/" }).window as unknown as WindowLike;
+
+beforeAll(() => {
+  setSanitizeHtmlHostWindow(sanitizeWindow);
+});
+
+afterAll(() => {
+  setSanitizeHtmlHostWindow();
+});
 
 function renderHtml(body: string) {
   return renderWithVariables({
