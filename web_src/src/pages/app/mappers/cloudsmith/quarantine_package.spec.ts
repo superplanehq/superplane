@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { quarantinePackageMapper, QUARANTINE_PACKAGE_STATE_REGISTRY } from "./quarantine_package";
 import { buildDetailsCtx, buildExecution, buildPackageData, buildPackageOutput } from "./test_helpers";
 

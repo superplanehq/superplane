@@ -2,7 +2,7 @@ import type { MeNotificationSettings } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";

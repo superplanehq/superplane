@@ -1,55 +1,21 @@
-import type { ReactNode } from "react";
-import { isValidElement } from "react";
-import type * as Recharts from "recharts";
+import { isValidElement, type ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
-vi.mock("recharts", async () => {
-  const actual = (await vi.importActual("recharts")) as typeof Recharts;
-  return {
-    ...actual,
-    ResponsiveContainer: ({ children }: { children: ReactNode }) => (
-      <div data-testid="responsive-container" style={{ width: 600, height: 400 }}>
-        <actual.ResponsiveContainer width={600} height={400}>
-          {children as never}
-        </actual.ResponsiveContainer>
-      </div>
-    ),
-  };
-});
+import {
+  chartUiTestDoubles,
+  rechartsTestDoubles,
+  tooltipContentProps,
+  tooltipWrapperProps,
+} from "./widgetChartTestDoubles";
 
-const tooltipContentProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
-const tooltipWrapperProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
-
-vi.mock("@/components/ui/chart", async () => {
-  const actual = (await vi.importActual("@/components/ui/chart")) as Record<string, unknown>;
-  const ChartTooltipContent = (props: Record<string, unknown>) => {
-    tooltipContentProps.value = props;
-    const Original = actual.ChartTooltipContent as (p: unknown) => ReactNode;
-    return <Original {...props} />;
-  };
-  const ChartTooltip = (props: Record<string, unknown>) => {
-    tooltipWrapperProps.value = props;
-    const Original = actual.ChartTooltip as (p: unknown) => ReactNode;
-    return <Original {...props} />;
-  };
-  return { ...actual, ChartTooltip, ChartTooltipContent };
-});
+vi.mock("recharts", () => rechartsTestDoubles());
+vi.mock("@/components/ui/chart", () => chartUiTestDoubles());
 
 import { WidgetChart } from "./WidgetChart";
 import type { WidgetChartRender } from "./types";
-
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 const ROWS = [
   { service: "ec2", cost: 1200, errors: 4 },

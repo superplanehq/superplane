@@ -2,11 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { AccountLinkedAccount } from "@/contexts/accountContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as AccountSettings from "@/lib/accountSettings";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfilePage";
@@ -42,8 +43,8 @@ vi.mock("./DeleteAccountDangerZone", () => ({
   DeleteAccountDangerZone: () => null,
 }));
 
-vi.mock("@/lib/accountSettings", async (importOriginal) => {
-  const actual = await importOriginal<typeof AccountSettings>();
+vi.mock("@/lib/accountSettings", () => {
+  const actual = unmockedSrc<typeof AccountSettings>("lib/accountSettings");
   return {
     ...actual,
     disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),
