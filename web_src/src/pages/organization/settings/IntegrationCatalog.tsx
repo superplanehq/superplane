@@ -368,9 +368,7 @@ function FactoriesConnectModal({ catalog }: { catalog: CatalogState }) {
               <Button
                 onClick={() => void catalog.handleConnect()}
                 disabled={
-                  catalog.createIntegrationMutation.isPending ||
-                  !catalog.integrationName.trim() ||
-                  !catalog.canCreateIntegrations
+                  catalog.createIntegrationMutation.isPending || !catalog.canConnect || !catalog.canCreateIntegrations
                 }
                 className="flex items-center gap-2"
               >
@@ -435,9 +433,7 @@ function LegacyConnectModal({ catalog }: { catalog: CatalogState }) {
               color="blue"
               onClick={() => void catalog.handleConnect()}
               disabled={
-                catalog.createIntegrationMutation.isPending ||
-                !catalog.integrationName.trim() ||
-                !catalog.canCreateIntegrations
+                catalog.createIntegrationMutation.isPending || !catalog.canConnect || !catalog.canCreateIntegrations
               }
               className="flex items-center gap-2"
             >

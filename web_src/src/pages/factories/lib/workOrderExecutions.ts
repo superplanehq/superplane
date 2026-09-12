@@ -121,7 +121,7 @@ export function getWorkOrderRunHref(
   }
 
   return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
-    from: "work-order",
+    from: "task",
     orderNumber: options?.orderNumber,
   });
 }

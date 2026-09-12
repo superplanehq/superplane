@@ -19,19 +19,17 @@ func MaterializeFactoryAppTemplate(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
-	}
 	appID, err := parseFactoryAppID(req.GetAppId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
+	factoryID := factory.ID
 	canvas, _, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
@@ -61,19 +59,17 @@ func MaterializeFactoryAppDefaults(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")
 	}
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")
-	}
 	appID, err := parseFactoryAppID(req.GetAppId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")
 	}
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")
 	}
+	factoryID := factory.ID
 	canvas, version, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")
@@ -86,20 +82,8 @@ func MaterializeFactoryAppDefaults(
 		result, err = materializeIntakeDefaults(db, canvas, version, intake)
 	case intakeErr != nil && !errors.Is(intakeErr, models.ErrFactoryIntakeNotFound):
 		err = intakeErr
-	case onWorkOrderNodeIDFromSpec(models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}) != "":
-		result, err = materializeBacklogDefaults(canvas, version)
 	default:
-		template, ok := resolveFactoryTemplate(version.Nodes)
-		if !ok {
-			return nil, factoryErrorToStatus(
-				invalidArgument("factory app has no bundled defaults"),
-				"failed to materialize factory app defaults",
-			)
-		}
-		result, err = materializeFactoryTemplate(
-			template.id,
-			deriveFactoryTemplateInput(db, canvas, version, template),
-		)
+		result, err = materializeNonIntakeFactoryAppDefaults(db, factory, canvas, version)
 	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app defaults")

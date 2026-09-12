@@ -109,7 +109,8 @@ async function runPrompt(promptFile, model) {
   child.stderr.pipe(process.stderr);
 
   let lastResult = {};
-  const formatter = createCodexFormatter();
+  const telemetry = loadTurnTelemetry();
+  const formatter = createCodexFormatter(telemetry);
   const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
   rl.on("line", (raw) => {
     const line = raw.trim();
@@ -145,21 +146,52 @@ async function runPrompt(promptFile, model) {
 
   formatter.flush(exitCode !== 0);
   const usage = extractUsage(lastResult);
+  if (tokenTotal(usage) > 0) {
+    telemetry.updateCurrentUsage(usage);
+  }
   const payload = {
     type: "result",
     result: lastResult.result || lastResult.text || "",
     model: lastResult.model || model,
     usage,
   };
+  telemetry.attachToResult(payload);
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   formatTurnResult({
     is_error: exitCode !== 0,
-    num_turns: 1,
+    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
     duration_ms: Date.now() - startedAt,
   });
   return exitCode;
+}
+
+function tokenTotal(usage) {
+  if (!usage || typeof usage !== "object") {
+    return 0;
+  }
+  return (
+    Number(usage.input_tokens || 0) +
+    Number(usage.output_tokens || 0) +
+    Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.reasoning_tokens || 0)
+  );
+}
+
+function loadTurnTelemetry() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const candidates = [];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "turn_telemetry.js"));
+  }
+  candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file).createTurnTelemetry();
+    }
+  }
+  return require("../turn_telemetry").createTurnTelemetry();
 }
 
 function extractUsage(event) {
@@ -188,10 +220,12 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(rec)}\n`);
 }
 
-function createCodexFormatter() {
+function createCodexFormatter(telemetry) {
+  const tracker = telemetry || loadTurnTelemetry();
   const open = new Map();
   const anonQueue = [];
   let anonSeq = 0;
+  let roundOpen = false;
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -231,13 +265,15 @@ function createCodexFormatter() {
       return;
     }
     tracked.emitted = true;
-    writeLiveLogRecord({
-      type: "tool_start",
-      id,
-      kind: tracked.kind,
-      text: tracked.text,
-      started_at: tracked.startedAt,
-    });
+    writeLiveLogRecord(
+      tracker.stampToolStart({
+        type: "tool_start",
+        id,
+        kind: tracked.kind,
+        text: tracked.text,
+        started_at: tracked.startedAt,
+      }),
+    );
   }
 
   function completeTool(item) {
@@ -256,13 +292,15 @@ function createCodexFormatter() {
     if (anonIndex >= 0) {
       anonQueue.splice(anonIndex, 1);
     }
-    writeLiveLogRecord({
-      type: "tool_end",
-      id,
-      kind: tracked.kind,
-      status: toolFailed(item) ? "failed" : "passed",
-      duration_ms: Math.max(0, Date.now() - tracked.startedAt),
-    });
+    writeLiveLogRecord(
+      tracker.stampToolEnd({
+        type: "tool_end",
+        id,
+        kind: tracked.kind,
+        status: toolFailed(item) ? "failed" : "passed",
+        duration_ms: Math.max(0, Date.now() - tracked.startedAt),
+      }),
+    );
   }
 
   return {
@@ -275,6 +313,12 @@ function createCodexFormatter() {
       if (isMessageItem(type)) {
         if (event.type === "item.completed") {
           const text = item.text || item.result || "";
+          if (!roundOpen) {
+            tracker.beginTurn(item.usage || event.usage, {
+              message: typeof text === "string" && type !== "reasoning" ? text : undefined,
+            });
+          }
+          roundOpen = false;
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
             process.stdout.write(`${text.replace(/\s+$/, "")}\n`);
           }
@@ -285,10 +329,18 @@ function createCodexFormatter() {
         return;
       }
       if (event.type === "item.started") {
+        if (!roundOpen) {
+          tracker.beginTurn(item.usage || event.usage);
+          roundOpen = true;
+        }
         rememberTool(item);
         return;
       }
       if (event.type === "item.completed") {
+        if (!roundOpen) {
+          tracker.beginTurn(item.usage || event.usage);
+          roundOpen = true;
+        }
         completeTool(item);
       }
     },
@@ -299,13 +351,15 @@ function createCodexFormatter() {
         if (!tracked) {
           continue;
         }
-        writeLiveLogRecord({
-          type: "tool_end",
-          id,
-          kind: tracked.kind,
-          status: failed ? "failed" : "passed",
-          duration_ms: Math.max(0, Date.now() - tracked.startedAt),
-        });
+        writeLiveLogRecord(
+          tracker.stampToolEnd({
+            type: "tool_end",
+            id,
+            kind: tracked.kind,
+            status: failed ? "failed" : "passed",
+            duration_ms: Math.max(0, Date.now() - tracked.startedAt),
+          }),
+        );
         open.delete(id);
       }
     },
@@ -408,7 +462,7 @@ function formatTurnResult(event) {
 }
 
 function formatCodexJsonLines(rawLines) {
-  const formatter = createCodexFormatter();
+  const formatter = createCodexFormatter(loadTurnTelemetry());
   for (const line of rawLines) {
     const trimmed = String(line).trim();
     if (!trimmed) {

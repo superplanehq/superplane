@@ -91,6 +91,8 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
 	case models.FactoryOnboardingAgentHarnessCodex:
 		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	case models.FactoryOnboardingAgentHarnessSuperPlane:
+		return pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE
 	default:
 		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
 	}
@@ -141,15 +143,20 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	graph := resolveIntakeGraph(intake.Source, spec)
 
 	serialized := &pb.FactoryIntake{
-		Id:        intake.ID.String(),
-		FactoryId: intake.FactoryID.String(),
-		CanvasId:  intake.CanvasID.String(),
-		Name:      intake.Name(),
-		Source:    serializeFactoryIntakeSource(intake.Source),
-		Settings:  serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
-		Healthy:   graph.Healthy(spec.Edges),
-		CreatedAt: timestamppb.New(intake.CreatedAt),
-		UpdatedAt: timestamppb.New(intake.UpdatedAt),
+		Id:                  intake.ID.String(),
+		FactoryId:           intake.FactoryID.String(),
+		CanvasId:            intake.CanvasID.String(),
+		Name:                intake.Name(),
+		Source:              serializeFactoryIntakeSource(intake.Source),
+		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Healthy:             graph.Healthy(spec.Edges),
+		CreatedAt:           timestamppb.New(intake.CreatedAt),
+		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
+		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+	}
+	if intake.InitialImportItemCount != nil {
+		itemCount := int32(*intake.InitialImportItemCount)
+		serialized.InitialImportItemCount = &itemCount
 	}
 
 	if intake.Canvas != nil {
@@ -157,6 +164,21 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
+	switch status {
+	case models.FactoryIntakeInitialImportStatusPending:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_PENDING
+	case models.FactoryIntakeInitialImportStatusCompleted:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED
+	case models.FactoryIntakeInitialImportStatusFailed:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_FAILED
+	case models.FactoryIntakeInitialImportStatusSkipped:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED
+	default:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_UNSPECIFIED
+	}
 }
 
 func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
@@ -167,6 +189,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
+	case models.FactoryIntakeSourceProductiveTasks:
+		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -180,6 +204,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceSentryExceptions, nil
 	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
+	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
+		return models.FactoryIntakeSourceProductiveTasks, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}
@@ -334,7 +360,15 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {
+	if order.SourceRunID == nil {
+		return ""
+	}
+	return order.SourceRunID.String()
 }
 
 func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {

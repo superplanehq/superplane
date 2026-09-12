@@ -1,3 +1,11 @@
+import {
+  applyPromptUsageRecord,
+  emptyPromptUsageState,
+  parseAgentTurnLiveLogText,
+  promptUsageSeries,
+  startPromptUsageSeries,
+  type AgentPromptUsageSeries,
+} from "@/lib/agentRunTelemetry";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 type LiveLogRecordEnvelope = {
@@ -8,6 +16,8 @@ type LiveLogRecordEnvelope = {
   id?: string;
   message?: string;
   index?: number;
+  turn?: number;
+  usage?: Record<string, number>;
   status?: "passed" | "failed";
   duration_ms?: number;
   started_at?: number;
@@ -20,12 +30,14 @@ type LiveLogSessionResponse = {
 };
 
 export type LiveLogStreamHandlers = {
-  onLogLine: (text: string) => void;
+  onOpen?: () => void;
+  onLogLine: (text: string, commandIndex?: number) => void;
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
-  onToolStart?: (kind: string, text: string, id?: string) => void;
-  onToolEnd?: (status: "passed" | "failed", durationMs: number, id?: string) => void;
+  onToolStart?: (kind: string, text: string, id?: string, turn?: number) => void;
+  onToolEnd?: (status: "passed" | "failed", durationMs: number, id?: string, turn?: number) => void;
+  onTurn?: (turn: number, usage: Record<string, number>, message?: string) => void;
 };
 
 async function fetchRunnerLiveLogSession(
@@ -95,7 +107,16 @@ function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
   if (rec.type !== "line" || typeof rec.text !== "string") {
     return false;
   }
-  handlers.onLogLine(rec.text);
+  const nestedTurn = parseAgentTurnLiveLogText(rec.text);
+  if (nestedTurn) {
+    handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
+    return true;
+  }
+  if (typeof rec.index === "number") {
+    handlers.onLogLine(rec.text, rec.index);
+  } else {
+    handlers.onLogLine(rec.text);
+  }
   return true;
 }
 
@@ -129,6 +150,7 @@ function dispatchToolStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogSt
     typeof rec.kind === "string" ? rec.kind : "tool",
     typeof rec.text === "string" ? rec.text : "",
     typeof rec.id === "string" ? rec.id : undefined,
+    typeof rec.turn === "number" ? rec.turn : undefined,
   );
   return true;
 }
@@ -141,7 +163,24 @@ function dispatchToolEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
   ) {
     return false;
   }
-  handlers.onToolEnd?.(rec.status, rec.duration_ms, typeof rec.id === "string" ? rec.id : undefined);
+  handlers.onToolEnd?.(
+    rec.status,
+    rec.duration_ms,
+    typeof rec.id === "string" ? rec.id : undefined,
+    typeof rec.turn === "number" ? rec.turn : undefined,
+  );
+  return true;
+}
+
+function dispatchTurnRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "turn" || typeof rec.turn !== "number") {
+    return false;
+  }
+  handlers.onTurn?.(
+    rec.turn,
+    rec.usage && typeof rec.usage === "object" ? rec.usage : {},
+    typeof rec.message === "string" ? rec.message : undefined,
+  );
   return true;
 }
 
@@ -174,7 +213,43 @@ function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
   if (dispatchToolStartRecord(rec, handlers)) {
     return;
   }
-  dispatchToolEndRecord(rec, handlers);
+  if (dispatchToolEndRecord(rec, handlers)) {
+    return;
+  }
+  dispatchTurnRecord(rec, handlers);
+}
+
+export function consumeLiveLogNdjsonLine(line: string, handlers: LiveLogStreamHandlers): void {
+  const rec = tryParseLiveLogRecord(line.trim());
+  if (rec) {
+    dispatchLiveLogRecord(rec, handlers);
+  }
+}
+
+export function reducePromptUsageFromLiveLogLines(lines: string[]): AgentPromptUsageSeries[] {
+  let state = emptyPromptUsageState();
+  const handlers: LiveLogStreamHandlers = {
+    onLogLine: () => undefined,
+    onStreamError: () => undefined,
+    onCmdStart: (index, text, _startedAtMs, kind) => {
+      if (kind === "prompt") {
+        state = startPromptUsageSeries(state, text, index);
+      }
+    },
+    onToolStart: (kind, text, id, turn) => {
+      state = applyPromptUsageRecord(state, { type: "tool_start", kind, text, id, turn });
+    },
+    onToolEnd: (status, durationMs, id, turn) => {
+      state = applyPromptUsageRecord(state, { type: "tool_end", status, duration_ms: durationMs, id, turn });
+    },
+    onTurn: (turn, usage, message) => {
+      state = applyPromptUsageRecord(state, { type: "turn", turn, usage, message });
+    },
+  };
+  for (const line of lines) {
+    consumeLiveLogNdjsonLine(line, handlers);
+  }
+  return promptUsageSeries(state);
 }
 
 /** Consumes complete NDJSON lines from buffer; returns the trailing incomplete fragment. */
@@ -187,10 +262,7 @@ function processCompleteLines(buffer: string, handlers: LiveLogStreamHandlers): 
     if (!line) {
       continue;
     }
-    const rec = tryParseLiveLogRecord(line);
-    if (rec) {
-      dispatchLiveLogRecord(rec, handlers);
-    }
+    consumeLiveLogNdjsonLine(line, handlers);
   }
   return remainder;
 }
@@ -245,6 +317,7 @@ export class LiveLogStream {
     const { streamUrl, token } = requireLiveLogSession(session);
     const res = await fetchRunnerLiveLogResponse(streamUrl, token, this.abortController.signal);
     const reader = requireBodyReader(res);
+    handlers.onOpen?.();
     await pumpReaderNdjson(reader, handlers);
   }
 }

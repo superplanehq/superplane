@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -91,6 +92,61 @@ func Test__IntakeSeed(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, runs.GetRuns())
 	})
+
+	t.Run("reseeding an unbound intake stays empty", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_GITHUB_ISSUES,
+		})
+		require.NoError(t, err)
+
+		intake, err := factory.FindIntake(database.DB(t.Context()), uuid.MustParse(response.GetIntake().GetId()))
+		require.NoError(t, err)
+		require.NoError(t, SeedExistingIntake(ctx, deps, database.DB(t.Context()), intake))
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+	})
+
+	t.Run("live binding reads the canvas trigger not onboarding config", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		backlogRepository := "acme/backlog"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSIntegrationID:  &integrationID,
+			BacklogRepository: &backlogRepository,
+		}))
+
+		response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_GITHUB_ISSUES,
+		})
+		require.NoError(t, err)
+
+		otherRepository := "acme/other"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			BacklogRepository: &otherRepository,
+		}))
+
+		intake, err := factory.FindIntake(database.DB(t.Context()), uuid.MustParse(response.GetIntake().GetId()))
+		require.NoError(t, err)
+
+		binding, err := liveIntakeBinding(database.DB(t.Context()), intake)
+		require.NoError(t, err)
+		require.NotNil(t, binding)
+		assert.Equal(t, backlogRepository, binding.Configuration["repository"])
+		require.NotNil(t, binding.Installation)
+		assert.Equal(t, integrationID, binding.Installation.ID.String())
+	})
 }
 
 func Test__GitHubIssueEvents(t *testing.T) {
@@ -130,6 +186,68 @@ func Test__GitHubIssueEvents(t *testing.T) {
 		assert.Equal(t, []any{}, payload["labels"])
 		assert.Equal(t, []any{}, payload["assignees"])
 	})
+}
+
+func Test__ProductiveTaskEvents(t *testing.T) {
+	t.Run("the newest task ends up on top of the intake", func(t *testing.T) {
+		events := productiveTaskEvents(productiveTaskPage([]string{"Newest task", "Older task"}))
+		require.Len(t, events, 2)
+
+		// Events are emitted oldest first, so the newest task ends up on top
+		// of the intake list.
+		assert.Equal(t, "Older task", taskEventTitle(t, events[0]))
+		assert.Equal(t, "Newest task", taskEventTitle(t, events[1]))
+	})
+
+	t.Run("an event carries what the graph reads", func(t *testing.T) {
+		document := map[string]any{
+			"id":   "91",
+			"type": "tasks",
+			"attributes": map[string]any{
+				"title":       "Fix payment retries",
+				"description": "Retries fail silently after the third attempt.",
+			},
+		}
+
+		events := productiveTaskEvents([]map[string]any{document})
+		require.Len(t, events, 1)
+
+		// The graph reads root().data.data.attributes, and a created task is
+		// what the intake filters on.
+		assert.Equal(t, map[string]any{"event": "task.created"}, events[0]["meta"])
+		assert.Equal(t, document, events[0]["data"])
+	})
+}
+
+// productiveTaskPage builds a page as the API returns it, so the titles are
+// given newest first.
+func productiveTaskPage(titles []string) []map[string]any {
+	documents := make([]map[string]any, 0, len(titles))
+	for i, title := range titles {
+		documents = append(documents, map[string]any{
+			"id":   strconv.Itoa(len(titles) - i),
+			"type": "tasks",
+			"attributes": map[string]any{
+				"title":       title,
+				"description": fmt.Sprintf("Description of %s", title),
+			},
+		})
+	}
+
+	return documents
+}
+
+func taskEventTitle(t *testing.T, event map[string]any) string {
+	t.Helper()
+
+	document, ok := event["data"].(map[string]any)
+	require.True(t, ok)
+	attributes, ok := document["attributes"].(map[string]any)
+	require.True(t, ok)
+	title, ok := attributes["title"].(string)
+	require.True(t, ok)
+
+	return title
 }
 
 // gitHubIssuePage builds a page as the API returns it, so the titles are given

@@ -29,6 +29,15 @@ export function lineStatusForDisplay(status: WorkOrderDisplayStatus): SplitRunPh
   return "pending";
 }
 
+export function displayStatusForLineStatus(status: SplitRunPhaseStatus): WorkOrderDisplayStatus {
+  if (status === "running") return "running";
+  if (status === "passed") return "completed";
+  if (status === "waiting") return "waiting";
+  if (status === "failed") return "failed";
+  if (status === "cancelled") return "cancelled";
+  return "draft";
+}
+
 export function elapsedForDisplay(
   status: WorkOrderDisplayStatus,
   order?: Pick<FactoriesWorkOrder, "createdAt" | "updatedAt">,

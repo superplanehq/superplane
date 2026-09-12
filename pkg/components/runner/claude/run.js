@@ -139,7 +139,7 @@ async function runPrompt(promptFile, model) {
     args = ["-oL", "-eL", "claude", ...claudeArgs];
   }
 
-  const formatter = createFormatter();
+  const formatter = createFormatter(promptFile);
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -156,11 +156,20 @@ async function runPrompt(promptFile, model) {
     new Promise((resolve) => rl.on("close", resolve)),
   ]).then(([code]) => code);
 
-  formatter.flush(exitCode !== 0);
-  const resultJSON = formatter.resultJSON();
+  // A nonzero exit code always means failure. But `claude -p` exits 0 even
+  // when its own result event reports is_error: it treated a soft failure
+  // (an invalid API key, a rate limit it never recovered from, …) as a
+  // completed turn. Trust that verdict too, so the node execution — and
+  // everything downstream that reads it — actually fails.
+  const failed = exitCode !== 0 || formatter.resultFailed();
+  formatter.flush(failed);
+  const resultJSON = formatter.resultWithTelemetry();
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (failed) {
+    return exitCode !== 0 ? exitCode : 1;
+  }
   return exitCode;
 }
 
@@ -191,13 +200,40 @@ function accumulateLLMUsage(raw, fallbackModel) {
   });
 }
 
-function createFormatter() {
+function loadTurnTelemetry() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const candidates = [];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "turn_telemetry.js"));
+  }
+  candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file).createTurnTelemetry();
+    }
+  }
+  return require("../turn_telemetry").createTurnTelemetry();
+}
+
+function promptSeriesName(promptFile) {
+  const base = path.basename(promptFile || "", path.extname(promptFile || ""));
+  const words = base.replace(/^\d+-/, "").split("-").filter(Boolean);
+  if (words.length === 0) {
+    return "";
+  }
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+function createFormatter(promptFile) {
   let streamedText = false;
   let inText = false;
   let textBuf = "";
   let lastLine = "";
   let resultLine = "";
-  const tools = createToolTracker();
+  let streamMessageId = "";
+  let resultFailed = false;
+  const telemetry = loadTurnTelemetry();
+  const tools = createToolTracker(telemetry);
 
   return {
     handleLine(raw) {
@@ -223,6 +259,7 @@ function createFormatter() {
           formatSystem(event);
           break;
         case "stream_event": {
+          streamMessageId = applyStreamTelemetry(event, telemetry, streamMessageId);
           const next = formatStreamEvent(event, streamedText, inText, textBuf);
           streamedText = next.streamedText;
           inText = next.inText;
@@ -233,6 +270,13 @@ function createFormatter() {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
+          const message = event.message && typeof event.message === "object" ? event.message : {};
+          telemetry.beginTurn(message.usage || event.usage, {
+            messageId: message.id || event.uuid || "",
+            message: assistantTextFromMessage(message),
+            hasTools:
+              Array.isArray(message.content) && message.content.some((block) => block && block.type === "tool_use"),
+          });
           formatAssistant(event, streamedText, tools);
           streamedText = false;
           break;
@@ -248,7 +292,9 @@ function createFormatter() {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
+          telemetry.applyBilledUsage(event.usage);
           resultLine = line;
+          resultFailed = Boolean(event.is_error);
           formatResult(event);
           break;
         }
@@ -272,6 +318,27 @@ function createFormatter() {
       }
       return "{}";
     },
+    resultWithTelemetry() {
+      let parsed;
+      try {
+        parsed = JSON.parse(this.resultJSON());
+      } catch (_err) {
+        parsed = {};
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        parsed = {};
+      }
+      telemetry.attachToResult(parsed, { name: promptSeriesName(promptFile) });
+      return JSON.stringify(parsed);
+    },
+    // Claude Code's own "result" event is the authoritative verdict: headless
+    // (-p) mode exits 0 even when the turn ended in an error (e.g. the API
+    // key it was given is invalid), because the CLI still produced a result,
+    // just one that says it failed. The process exit code alone would hide
+    // that failure from the rest of the pipeline.
+    resultFailed() {
+      return resultFailed;
+    },
   };
 }
 
@@ -283,7 +350,7 @@ function println(text = "") {
   process.stdout.write(`${text}\n`);
 }
 
-function createToolTracker() {
+function createToolTracker(telemetry) {
   const openTools = new Map();
   const fifo = [];
   let anonSeq = 0;
@@ -318,13 +385,15 @@ function createToolTracker() {
         return key;
       }
       tool.emitted = true;
-      writeLiveLogRecord({
-        type: "tool_start",
-        id: key,
-        kind: tool.kind,
-        text: tool.text,
-        started_at: tool.startedAt,
-      });
+      writeLiveLogRecord(
+        telemetry.stampToolStart({
+          type: "tool_start",
+          id: key,
+          kind: tool.kind,
+          text: tool.text,
+          started_at: tool.startedAt,
+        }),
+      );
       return key;
     },
     end(failed, id) {
@@ -342,13 +411,15 @@ function createToolTracker() {
       if (fifoIndex >= 0) {
         fifo.splice(fifoIndex, 1);
       }
-      writeLiveLogRecord({
-        type: "tool_end",
-        id: key,
-        kind: tool.kind,
-        status: failed ? "failed" : "passed",
-        duration_ms: Math.max(0, Date.now() - tool.startedAt),
-      });
+      writeLiveLogRecord(
+        telemetry.stampToolEnd({
+          type: "tool_end",
+          id: key,
+          kind: tool.kind,
+          status: failed ? "failed" : "passed",
+          duration_ms: Math.max(0, Date.now() - tool.startedAt),
+        }),
+      );
     },
     flush(failed) {
       for (const key of [...openTools.keys()]) {
@@ -385,6 +456,27 @@ function formatSystem(event) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }
   println();
+}
+
+function applyStreamTelemetry(event, telemetry, streamMessageId) {
+  const payload = event && event.event;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return streamMessageId;
+  }
+  if (payload.type === "message_start") {
+    const message = payload.message && typeof payload.message === "object" ? payload.message : {};
+    const messageId = message.id != null && String(message.id).trim() ? String(message.id).trim() : "";
+    telemetry.beginTurn(message.usage || payload.usage, { messageId });
+    return messageId;
+  }
+  if (payload.type === "message_delta" && payload.usage) {
+    if (streamMessageId) {
+      telemetry.beginTurn(payload.usage, { messageId: streamMessageId });
+      return streamMessageId;
+    }
+    telemetry.mergeCurrentUsage(payload.usage);
+  }
+  return streamMessageId;
 }
 
 function formatStreamEvent(event, streamedText, inText, textBuf) {
@@ -449,6 +541,15 @@ function endTextStream(inText, textBuf) {
     println();
   }
   return { inText: false, textBuf: "" };
+}
+
+function assistantTextFromMessage(message) {
+  const content = message && Array.isArray(message.content) ? message.content : [];
+  return content
+    .filter((block) => block && block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text.replace(/\s+$/, ""))
+    .filter((text) => text.trim())
+    .join("\n\n");
 }
 
 function formatAssistant(event, streamedText, tools) {
@@ -635,7 +736,9 @@ function formatStreamJsonLines(rawLines) {
   for (const line of rawLines) {
     formatter.handleLine(line);
   }
-  formatter.flush();
+  const failed = formatter.resultFailed();
+  formatter.flush(failed);
+  return { failed };
 }
 
 if (require.main === module) {

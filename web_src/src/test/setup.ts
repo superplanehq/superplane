@@ -1,8 +1,25 @@
-import "@testing-library/jest-dom";
+import { createElement, type ReactNode } from "react";
+import type * as Recharts from "recharts";
+import { vi } from "vitest";
 
-// jsdom doesn't ship ResizeObserver; several UI primitives (e.g. ModeToggle's
-// sliding pill) depend on it. Provide a no-op so every test file gets it for
-// free instead of having to declare it locally.
+import "@testing-library/jest-dom/vitest";
+
+// jsdom has no CSS layout. Recharts ResponsiveContainer then reads
+// getBoundingClientRect after mount, overwrites initialDimension with 0x0,
+// and warns that the chart width and height must be greater than 0.
+// A numeric size skips that measure so every chart test stays quiet.
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof Recharts>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: ReactNode }) =>
+      createElement(actual.ResponsiveContainer, { width: 760, height: 240, children }),
+  };
+});
+
+// jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
+// Provide a no-op so every test file gets it for free instead of having to
+// declare it locally.
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class {
     observe() {}

@@ -30,6 +30,9 @@ const (
 	prFeedbackDefaultMaximumAttempts = 3
 	prFeedbackMaximumAttemptsMin     = 1
 	prFeedbackMaximumAttemptsMax     = 10
+
+	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
+	prFeedbackChecksTemplateID     = "pr-feedback:checks"
 )
 
 var prFeedbackTriggerNodeIDs = []string{
@@ -66,9 +69,6 @@ func prFeedbackCanvasName(request prFeedbackBuildRequest, fallback string) strin
 func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 	name := prFeedbackCanvasName(request, prFeedbackDefaultName)
 	mention := strings.TrimSpace(request.Mention)
-	if mention == "" {
-		mention = prFeedbackDefaultMention
-	}
 
 	includeReviewSubmissions := false
 	return &yaml.Canvas{

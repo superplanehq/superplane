@@ -136,7 +136,8 @@ func (s *factorySteps) confirmDeleteFactory() {
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
-	s.session.WaitForBrowserPath("/" + s.session.OrgSlug + "/workspaces")
+	// Deleting the last workspace opens setup for a new workspace.
+	s.session.AssertVisible(q.TestID("workspace-setup"))
 }
 
 func (s *factorySteps) assertFactoryNotVisibleInList(name string) {

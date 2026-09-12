@@ -32,7 +32,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderMenu() {
+function renderMenu(planLabel?: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -47,6 +47,7 @@ function renderMenu() {
                   factoryKey="RFSDR"
                   userName="Ada Lovelace"
                   organizationName="SuperPlane"
+                  planLabel={planLabel}
                 />
               }
             />
@@ -102,9 +103,39 @@ describe("SidebarUserMenu", () => {
     expect(screen.queryByTestId("factories-sidebar-back-to-apps")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Back to Apps" })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Billing" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Installation Admin" })).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-sidebar-appearance")).toHaveTextContent("Appearance");
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("shows the plan below the organization name in the open menu", async () => {
+    const user = userEvent.setup();
+    renderMenu("Business");
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Business");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+  });
+
+  it("shows Trial in the open menu but never under the avatar for a trial organization", async () => {
+    const user = userEvent.setup();
+    renderMenu("Trial");
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Trial");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
   });
 
   it("opens Installation Admin for an installation admin", async () => {

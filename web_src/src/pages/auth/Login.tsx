@@ -20,18 +20,15 @@ import {
   savePendingSignupAnalyticsPreference,
 } from "@/lib/signupAnalytics";
 import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
+import { getSafeRedirectPath } from "@/lib/safeRedirectPath";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
 import {
-  SIGNUP_REQUIRED_AUTH_ERROR,
-  getLogoutHref,
-  getSignupRequiredAccountBody,
-  getSignupRequiredCreateHref,
-  isKnownAuthProvider,
-  shouldShowSignupRequiredPrompt,
-} from "./signupRequiredPrompt";
-import { getSignupUnavailableReason } from "./signupUnavailableReason";
+  SIGNUP_DISABLED_AUTH_ERROR,
+  getSignupUnavailableReason,
+  isSignupDisabledErrorBody,
+} from "./signupUnavailableReason";
 
 type AuthConfig = {
   providers: string[];
@@ -39,31 +36,6 @@ type AuthConfig = {
   signupEnabled: boolean;
   signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
-};
-
-const isValidRedirectPath = (path: string | null): path is string => {
-  if (!path || path[0] !== "/") {
-    return false;
-  }
-
-  if (path.length > 1 && path[1] === "/") {
-    return false;
-  }
-
-  return true;
-};
-
-const getSafeRedirectPath = (rawRedirect: string | null): string | null => {
-  if (!rawRedirect) {
-    return null;
-  }
-
-  try {
-    const decoded = decodeURIComponent(rawRedirect);
-    return isValidRedirectPath(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
 };
 
 const getProviderLabel = (provider: string) => {
@@ -131,8 +103,37 @@ const SignupClosedNotice: React.FC = () => (
   </p>
 );
 
-const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
+const SignUpTermsDisclosure: React.FC = () => (
+  <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+    {"By creating an account, you agree to the "}
+    <a
+      href="https://superplane.com/terms/"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-2 hover:text-gray-700 dark:hover:text-gray-300"
+    >
+      Terms of Service
+    </a>
+    {" and "}
+    <a
+      href="https://superplane.com/privacy/"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-2 hover:text-gray-700 dark:hover:text-gray-300"
+    >
+      Privacy Policy
+    </a>
+    ."
+  </p>
+);
+
+const updateSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
   if (!enabled) {
+    try {
+      clearPendingSignupAnalyticsPreference();
+    } catch {
+      // Analytics storage must not block authentication.
+    }
     return;
   }
 
@@ -273,6 +274,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
   const [magicCode, setMagicCode] = useState("");
+  const [emailSignupDisabled, setEmailSignupDisabled] = useState(false);
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
 
   const [lastUsedMethod, setLastUsedMethod] = useState<LastUsedLoginMethod | null>(null);
@@ -295,7 +297,6 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const magicLinkToken = searchParams.get("magic_link_token");
   const redirectTarget = safeRedirect || "";
   const authError = searchParams.get("auth_error");
-  const authProvider = searchParams.get("provider");
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response, authRedirectURL?: string) => {
@@ -311,29 +312,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
-      try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = (await orgsResponse.json()) as Array<{ id?: string; slug?: string }>;
-          if (organizations.length === 1) {
-            // Prefer the slug so the address bar never shows the org UID.
-            // The UID fallback only fires for an organization without a
-            // slug yet; OrganizationScope corrects that case on arrival.
-            const orgRef = organizations[0].slug || organizations[0].id;
-            if (orgRef) {
-              window.location.href = `/${orgRef}`;
-              return;
-            }
-          }
-        }
-      } catch {
-        // fall through to default redirect
-      }
-
-      window.location.href = finalURL;
+      // RootOrganizationRedirect picks the last organization and screen.
+      // Do not pick organizations[0] here — that sent people to abandoned orgs.
+      window.location.href = "/";
     },
     [redirectTarget],
   );
@@ -353,6 +334,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setFormError(null);
     setMagicCodeStep("email");
     setMagicCode("");
+    setEmailSignupDisabled(false);
     setShowPasswordLogin(false);
   }, [mode]);
 
@@ -454,8 +436,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
-  const isSignupRequiredReturn = authError === SIGNUP_REQUIRED_AUTH_ERROR;
-  const showSignupUnavailable = !configLoading && !canSignup && (isSignupMode || isSignupRequiredReturn);
+  const isSignupDisabledReturn = authError === SIGNUP_DISABLED_AUTH_ERROR || emailSignupDisabled;
+  const showSignupUnavailable = !configLoading && ((!canSignup && isSignupMode) || isSignupDisabledReturn);
   const hasConfiguredSignupWaitlist = hasSignupWaitlistConfig();
   const signupUnavailableReason = getSignupUnavailableReason(
     showSignupUnavailable,
@@ -470,10 +452,40 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
   const visibleFormError = formError ?? authErrorMessage;
-  const showSignupRequiredPrompt = !configLoading && shouldShowSignupRequiredPrompt(authError, canSignup);
-  const showAuthMethods = !configLoading && !isSignupRequiredReturn;
-  const signupRequiredCreateHref = getSignupRequiredCreateHref(authProvider, redirectQuery);
-  const logoutHref = getLogoutHref(redirectQuery);
+  const showTermsDisclosure =
+    !configLoading && !configError && !showSignupWaitlist && !showSignupClosedNotice && isSignupMode && canSignup;
+  const showAuthMethods = !configLoading && !isSignupDisabledReturn;
+  const logoutHref = redirectQuery ? `/logout${redirectQuery}` : "/logout";
+
+  const requestMagicCode = async (signup: boolean) => {
+    const response = await fetch("/auth/magic-code/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: buildMagicCodeRequestBody(magicCodeEmail, signup, redirectTarget),
+    });
+
+    if (response.ok) {
+      setEmailSignupDisabled(false);
+      if (signup) {
+        setIsSignupMode(true);
+      }
+      setMagicCodeStep("code");
+      setSubmitLoading(false);
+      return;
+    }
+
+    const errorBody = (await response.text()).trim();
+    if (response.status === 403 && isSignupDisabledErrorBody(errorBody)) {
+      setEmailSignupDisabled(true);
+      setFormError(null);
+      setSubmitLoading(false);
+      return;
+    }
+
+    clearSignupPreference(signup);
+    setFormError(errorBody || "Failed to send code. Please try again.");
+    setSubmitLoading(false);
+  };
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,31 +496,31 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       return;
     }
 
-    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
+    updateSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
 
     setSubmitLoading(true);
 
     try {
-      const response = await fetch("/auth/magic-code/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: buildMagicCodeRequestBody(magicCodeEmail, isSignupMode, redirectTarget),
-      });
-
-      if (!response.ok) {
-        clearSignupPreference(isSignupMode);
-        setFormError("Failed to send code. Please try again.");
-        setSubmitLoading(false);
-        return;
-      }
-
-      setMagicCodeStep("code");
-      setSubmitLoading(false);
+      await requestMagicCode(isSignupMode);
     } catch {
       clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
+  };
+
+  const applyMagicCodeVerifyFailure = async (response: Response) => {
+    const errorBody = await response.clone().text();
+    if (response.status === 403 && isSignupDisabledErrorBody(errorBody)) {
+      setEmailSignupDisabled(true);
+      setFormError(null);
+      setSubmitLoading(false);
+      return;
+    }
+
+    clearSignupPreference(isSignupMode);
+    setFormError(await getMagicCodeVerifyError(response));
+    setSubmitLoading(false);
   };
 
   const handleMagicCodeVerify = async (e: React.FormEvent) => {
@@ -538,9 +550,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
-        clearSignupPreference(isSignupMode);
-        setFormError(await getMagicCodeVerifyError(response));
-        setSubmitLoading(false);
+        await applyMagicCodeVerifyFailure(response);
         return;
       }
 
@@ -671,7 +681,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const handleProviderClick = (provider: string) => {
-    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn);
+    updateSignupPreference(isSignupMode, signupProductUpdatesOptIn);
 
     recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
   };
@@ -680,16 +690,14 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const providerButtonsNeedTopSpacing = useMagicCodePrimary && magicCodeStep === "email";
 
   const getHeading = () => {
-    if (showSignupRequiredPrompt) return "No account found";
-    if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
     if (showSignupClosedNotice) return "Signups are closed";
     if (showSignupWaitlist) return "SuperPlane Cloud";
+    if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
     if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
   const getSubheading = () => {
-    if (showSignupRequiredPrompt) return "Create an account to continue.";
     if (showSignupClosedNotice) return "New accounts are not available.";
     if (showSignupWaitlist) return "Join the waitlist for access.";
     if (isSignupMode) return "Set up your account.";
@@ -698,393 +706,381 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-400 flex items-center justify-center px-4 py-10 dark:bg-gray-950">
-      <div className="max-w-sm w-full rounded-3xl bg-white p-8 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
-        <div className="text-center">
-          <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8 dark:brightness-0 dark:invert" />
-          <h1 className="mt-2 !text-lg font-medium text-gray-900 dark:text-gray-100">{getHeading()}</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{getSubheading()}</p>
-        </div>
+    <div className="min-h-screen bg-gray-400 flex flex-col px-4 py-10 dark:bg-gray-950">
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="max-w-sm w-full rounded-3xl bg-white p-8 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
+          <div className="text-center">
+            <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8 dark:brightness-0 dark:invert" />
+            <h1 className="mt-2 !text-lg font-medium text-gray-900 dark:text-gray-100">{getHeading()}</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{getSubheading()}</p>
+          </div>
 
-        <div className="pt-6">
-          {configLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>}
+          <div className="pt-6">
+            {configLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>}
 
-          {configError && (
-            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
-              {configError}
-            </div>
-          )}
-
-          {!configLoading && showSignupWaitlist && <SignupWaitlist />}
-          {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
-          {!configLoading && isSignupRequiredReturn && !canSignup && (
-            <Button variant="outline" className="mt-4 w-full" asChild>
-              <a href={logoutHref}>Back to sign in</a>
-            </Button>
-          )}
-
-          {!configLoading && showSignupRequiredPrompt && (
-            <div className="space-y-4">
-              <p className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
-                {getSignupRequiredAccountBody(authProvider)}
-              </p>
-              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
-              <Button className="w-full" asChild>
-                <a
-                  href={signupRequiredCreateHref}
-                  onClick={() => {
-                    saveSignupPreference(true, signupProductUpdatesOptIn);
-                    if (isKnownAuthProvider(authProvider)) {
-                      recordLastUsedLoginMethod(authProvider);
-                    }
-                  }}
-                >
-                  Create account
-                </a>
-              </Button>
-              <Button variant="outline" className="w-full" asChild>
-                <a href={logoutHref}>Use a different account</a>
-              </Button>
-            </div>
-          )}
-
-          {showAuthMethods && !isSignupMode && !hasAnyFormMethod && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No login methods are configured.</p>
-          )}
-
-          {showAuthMethods && visibleFormError && (
-            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
-              {visibleFormError}
-            </div>
-          )}
-
-          {showAuthMethods && useMagicCodePrimary && magicCodeStep === "email" && (
-            <form onSubmit={handleMagicCodeRequest} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  name="email"
-                  placeholder="you@example.com"
-                  required
-                  autoComplete="email"
-                  value={magicCodeEmail}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCodeEmail(e.target.value)}
-                />
+            {configError && (
+              <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
+                {configError}
               </div>
+            )}
 
-              {isSignupMode && (
+            {!configLoading && showSignupWaitlist && <SignupWaitlist />}
+            {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
+            {!configLoading && isSignupDisabledReturn && (
+              <Button variant="outline" className="mt-4 w-full" asChild>
+                <a href={logoutHref}>Back to sign in</a>
+              </Button>
+            )}
+
+            {showAuthMethods && !isSignupMode && !hasAnyFormMethod && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No login methods are configured.</p>
+            )}
+
+            {showAuthMethods && visibleFormError && (
+              <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
+                {visibleFormError}
+              </div>
+            )}
+
+            {showAuthMethods && useMagicCodePrimary && magicCodeStep === "email" && (
+              <form onSubmit={handleMagicCodeRequest} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                    value={magicCodeEmail}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCodeEmail(e.target.value)}
+                  />
+                </div>
+
+                {isSignupMode && (
+                  <ProductUpdatesOptIn
+                    checked={signupProductUpdatesOptIn}
+                    onCheckedChange={setSignupProductUpdatesOptIn}
+                  />
+                )}
+
+                <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
+                  Continue with email
+                </LoadingButton>
+              </form>
+            )}
+
+            {showAuthMethods && useMagicCodePrimary && magicCodeStep === "code" && (
+              <form onSubmit={handleMagicCodeVerify} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Code</Label>
+                  <Input
+                    type="text"
+                    name="code"
+                    placeholder="Enter 6-digit code"
+                    required
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    maxLength={7}
+                    value={magicCode}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCode(e.target.value)}
+                  />
+                </div>
+
+                <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
+                  {isSignupMode ? "Create account" : "Sign in"}
+                </LoadingButton>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={handleMagicCodeBack}
+                    className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  >
+                    Use a different email
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {showAuthMethods && !isSignupMode && !useMagicCodePrimary && canLoginWithPassword && (
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    name="email"
+                    placeholder="Email"
+                    required
+                    autoComplete="email"
+                    value={loginEmail}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                    autoComplete="current-password"
+                    value={loginPassword}
+                    className="ph-no-capture"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginPassword(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <LoadingButton type="submit" loading={submitLoading} loadingText="Logging in..." className="w-full">
+                    Login
+                  </LoadingButton>
+                  {showLastUsedMethodHints && lastUsedMethod === "password" && <LastUsedHint label="email" />}
+                </div>
+              </form>
+            )}
+
+            {showAuthMethods && isSignupMode && canSignupWithPassword && (
+              <form onSubmit={handleSignupSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>First name</Label>
+                    <Input
+                      type="text"
+                      name="firstName"
+                      placeholder="First name"
+                      required
+                      autoComplete="given-name"
+                      value={signupFirstName}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last name</Label>
+                    <Input
+                      type="text"
+                      name="lastName"
+                      placeholder="Last name"
+                      required
+                      autoComplete="family-name"
+                      value={signupLastName}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    name="email"
+                    placeholder="Email"
+                    required
+                    autoComplete="email"
+                    value={signupEmail}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                    autoComplete="new-password"
+                    value={signupPassword}
+                    className="ph-no-capture"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Repeat password</Label>
+                  <Input
+                    type="password"
+                    name="passwordConfirm"
+                    placeholder="Repeat password"
+                    required
+                    autoComplete="new-password"
+                    value={signupConfirmPassword}
+                    className="ph-no-capture"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupConfirmPassword(e.target.value)}
+                  />
+                </div>
+
                 <ProductUpdatesOptIn
                   checked={signupProductUpdatesOptIn}
                   onCheckedChange={setSignupProductUpdatesOptIn}
                 />
+
+                <LoadingButton
+                  type="submit"
+                  disabled={!canSignup}
+                  loading={submitLoading}
+                  loadingText="Creating account..."
+                  className="w-full"
+                >
+                  Create account
+                </LoadingButton>
+              </form>
+            )}
+
+            {showAuthMethods &&
+              useMagicCodePrimary &&
+              !isSignupMode &&
+              magicCodeStep === "email" &&
+              canLoginWithPassword && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordLogin(true);
+                      setFormError(null);
+                    }}
+                    className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  >
+                    Sign in with password instead
+                  </button>
+                </div>
               )}
 
-              <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
-                Continue with email
-              </LoadingButton>
-            </form>
-          )}
-
-          {showAuthMethods && useMagicCodePrimary && magicCodeStep === "code" && (
-            <form onSubmit={handleMagicCodeVerify} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
-                <Input
-                  type="text"
-                  name="code"
-                  placeholder="Enter 6-digit code"
-                  required
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  maxLength={7}
-                  value={magicCode}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCode(e.target.value)}
-                />
-              </div>
-
-              <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
-                {isSignupMode ? "Create account" : "Sign in"}
-              </LoadingButton>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={handleMagicCodeBack}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
-                >
-                  Use a different email
-                </button>
-              </div>
-            </form>
-          )}
-
-          {showAuthMethods && !isSignupMode && !useMagicCodePrimary && canLoginWithPassword && (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  name="email"
-                  placeholder="Email"
-                  required
-                  autoComplete="email"
-                  value={loginEmail}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  name="password"
-                  placeholder="Password"
-                  required
-                  autoComplete="current-password"
-                  value={loginPassword}
-                  className="ph-no-capture"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginPassword(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <LoadingButton type="submit" loading={submitLoading} loadingText="Logging in..." className="w-full">
-                  Login
-                </LoadingButton>
-                {showLastUsedMethodHints && lastUsedMethod === "password" && <LastUsedHint label="email" />}
-              </div>
-            </form>
-          )}
-
-          {showAuthMethods && isSignupMode && canSignupWithPassword && (
-            <form onSubmit={handleSignupSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>First name</Label>
-                  <Input
-                    type="text"
-                    name="firstName"
-                    placeholder="First name"
-                    required
-                    autoComplete="given-name"
-                    value={signupFirstName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupFirstName(e.target.value)}
-                  />
+            {showAuthMethods &&
+              !isSignupMode &&
+              showPasswordLogin &&
+              !useMagicCodePrimary &&
+              authConfig.magicCodeEnabled && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordLogin(false);
+                      setFormError(null);
+                    }}
+                    className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  >
+                    Sign in with email code instead
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Last name</Label>
-                  <Input
-                    type="text"
-                    name="lastName"
-                    placeholder="Last name"
-                    required
-                    autoComplete="family-name"
-                    value={signupLastName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupLastName(e.target.value)}
-                  />
+              )}
+
+            {showAuthMethods &&
+              showProviderButtons &&
+              (isSignupMode
+                ? canSignupWithPassword
+                : useMagicCodePrimary
+                  ? magicCodeStep === "email"
+                  : canLoginWithPassword) && (
+                <div className="my-5 flex items-center gap-3 text-sm text-gray-800 dark:text-gray-300">
+                  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
+                  <span>or</span>
+                  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  name="email"
-                  placeholder="Email"
-                  required
-                  autoComplete="email"
-                  value={signupEmail}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupEmail(e.target.value)}
+            {showAuthMethods && showStandaloneProductUpdatesOptIn && (
+              <div className="mb-4">
+                <ProductUpdatesOptIn
+                  checked={signupProductUpdatesOptIn}
+                  onCheckedChange={setSignupProductUpdatesOptIn}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  name="password"
-                  placeholder="Password"
-                  required
-                  autoComplete="new-password"
-                  value={signupPassword}
-                  className="ph-no-capture"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Repeat password</Label>
-                <Input
-                  type="password"
-                  name="passwordConfirm"
-                  placeholder="Repeat password"
-                  required
-                  autoComplete="new-password"
-                  value={signupConfirmPassword}
-                  className="ph-no-capture"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupConfirmPassword(e.target.value)}
-                />
-              </div>
-
-              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
-
-              <LoadingButton
-                type="submit"
-                disabled={!canSignup}
-                loading={submitLoading}
-                loadingText="Creating account..."
-                className="w-full"
-              >
-                Create account
-              </LoadingButton>
-            </form>
-          )}
-
-          {showAuthMethods &&
-            useMagicCodePrimary &&
-            !isSignupMode &&
-            magicCodeStep === "email" &&
-            canLoginWithPassword && (
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPasswordLogin(true);
-                    setFormError(null);
-                  }}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
-                >
-                  Sign in with password instead
-                </button>
               </div>
             )}
 
-          {showAuthMethods &&
-            !isSignupMode &&
-            showPasswordLogin &&
-            !useMagicCodePrimary &&
-            authConfig.magicCodeEnabled && (
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPasswordLogin(false);
-                    setFormError(null);
-                  }}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
-                >
-                  Sign in with email code instead
-                </button>
+            {showAuthMethods && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
+              <div className={providerButtonsNeedTopSpacing ? "mt-4 space-y-3" : "space-y-3"}>
+                {activeProviders.map((provider) => (
+                  <div key={provider}>
+                    <Button variant="outline" className="w-full justify-center gap-2" asChild>
+                      <a
+                        href={providerAuthPath(provider, redirectQuery, isSignupMode)}
+                        onClick={() => handleProviderClick(provider)}
+                      >
+                        {provider === "github" && (
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                          </svg>
+                        )}
+                        {provider === "google" && (
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+                            <path
+                              fill="#4285F4"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            />
+                            <path
+                              fill="#34A853"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            />
+                            <path
+                              fill="#FBBC05"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            />
+                            <path
+                              fill="#EA4335"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            />
+                          </svg>
+                        )}
+                        <span>Continue with {getProviderLabel(provider)}</span>
+                      </a>
+                    </Button>
+                    {showLastUsedMethodHints && lastUsedMethod === provider && (
+                      <LastUsedHint label={getProviderLabel(provider)} />
+                    )}
+                  </div>
+                ))}
               </div>
             )}
 
-          {showAuthMethods &&
-            showProviderButtons &&
-            (isSignupMode
-              ? canSignupWithPassword
-              : useMagicCodePrimary
-                ? magicCodeStep === "email"
-                : canLoginWithPassword) && (
-              <div className="my-5 flex items-center gap-3 text-sm text-gray-800 dark:text-gray-300">
-                <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
-                <span>or</span>
-                <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
-              </div>
-            )}
-
-          {showAuthMethods && showStandaloneProductUpdatesOptIn && (
-            <div className="mb-4">
-              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
-            </div>
-          )}
-
-          {showAuthMethods && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
-            <div className={providerButtonsNeedTopSpacing ? "mt-4 space-y-3" : "space-y-3"}>
-              {activeProviders.map((provider) => (
-                <div key={provider}>
-                  <Button variant="outline" className="w-full justify-center gap-2" asChild>
-                    <a
-                      href={providerAuthPath(provider, redirectQuery, isSignupMode)}
-                      onClick={() => handleProviderClick(provider)}
-                    >
-                      {provider === "github" && (
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                        </svg>
-                      )}
-                      {provider === "google" && (
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-                          <path
-                            fill="#4285F4"
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          />
-                          <path
-                            fill="#34A853"
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          />
-                          <path
-                            fill="#FBBC05"
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          />
-                          <path
-                            fill="#EA4335"
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          />
-                        </svg>
-                      )}
-                      <span>Continue with {getProviderLabel(provider)}</span>
-                    </a>
-                  </Button>
-                  {showLastUsedMethodHints && lastUsedMethod === provider && (
-                    <LastUsedHint label={getProviderLabel(provider)} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {showAuthMethods && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
-            <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-              {"Don't have an account? "}
-              <Link
-                to={`/signup${redirectQuery}`}
-                className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
-              >
-                Create an account
-              </Link>
-            </div>
-          )}
-
-          {showAuthMethods && isSignupMode && (
-            <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-              Already have an account?{" "}
-              <Link
-                to={`/login${redirectQuery}`}
-                className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
-              >
-                Sign in
-              </Link>
-            </div>
-          )}
-
-          {showAuthMethods &&
-            useMagicCodePrimary &&
-            magicCodeStep === "email" &&
-            !isSignupMode &&
-            showSignupEntryPoint && (
-              <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            {showAuthMethods && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
+              <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
                 {"Don't have an account? "}
                 <Link
                   to={`/signup${redirectQuery}`}
                   className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
                 >
-                  Sign up
+                  Create an account
                 </Link>
               </div>
             )}
+
+            {showAuthMethods && isSignupMode && (
+              <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                Already have an account?{" "}
+                <Link
+                  to={`/login${redirectQuery}`}
+                  className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                >
+                  Sign in
+                </Link>
+              </div>
+            )}
+
+            {showAuthMethods &&
+              useMagicCodePrimary &&
+              magicCodeStep === "email" &&
+              !isSignupMode &&
+              showSignupEntryPoint && (
+                <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {"Don't have an account? "}
+                  <Link
+                    to={`/signup${redirectQuery}`}
+                    className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
+          </div>
         </div>
       </div>
+      {showTermsDisclosure && (
+        <div className="mt-8 text-center">
+          <SignUpTermsDisclosure />
+        </div>
+      )}
     </div>
   );
 };

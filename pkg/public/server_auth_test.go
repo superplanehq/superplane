@@ -1,16 +1,19 @@
 package public
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -99,6 +102,22 @@ func Test__GitHubAppSetup_ownerApprovedWithoutSession(t *testing.T) {
 	assert.Equal(t, "/github/approved", rec.Header().Get("Location"))
 }
 
+func Test__GitHubAppSetup_updateWithoutSessionReturnsToApp(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _ := setupTestServer(r, t)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		server.BasePath+"/github/app/setup?installation_id=159131070&setup_action=update",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/", rec.Header().Get("Location"))
+}
+
 func Test__GetAccount(t *testing.T) {
 	r := support.Setup(t)
 	server, _, token := setupTestServer(r, t)
@@ -138,6 +157,44 @@ func Test__ListAccountOrganizations(t *testing.T) {
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("marks unfinished initial organizations", func(t *testing.T) {
+		pendingOrg, err := models.CreateOrganization("pending-"+uuid.NewString(), "Pending Org")
+		require.NoError(t, err)
+		_, err = models.CreateUser(pendingOrg.ID, r.Account.ID, r.Account.Email, r.Account.Name)
+		require.NoError(t, err)
+
+		factory, err := models.CreateFactory(database.DB(t.Context()), pendingOrg.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		require.NoError(t, factory.SetInitialOnboardingAttempt(database.DB(t.Context()), uuid.New()))
+
+		req, _ := http.NewRequest(http.MethodGet, "/organizations", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body []struct {
+			ID                       string `json:"id"`
+			InitialOnboardingPending bool   `json:"initialOnboardingPending"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+
+		var pendingMarked, setupMarked bool
+		var pendingFound bool
+		for _, organization := range body {
+			if organization.ID == pendingOrg.ID.String() {
+				pendingFound = true
+				pendingMarked = organization.InitialOnboardingPending
+			}
+			if organization.ID == r.Organization.ID.String() {
+				setupMarked = organization.InitialOnboardingPending
+			}
+		}
+		assert.True(t, pendingFound)
+		assert.True(t, pendingMarked)
+		assert.False(t, setupMarked)
 	})
 }
 
@@ -199,7 +256,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
 		require.Error(t, err)
-		assert.Equal(t, "signup must be started from the signup page", err.Error())
+		assert.Equal(t, authentication.SignupDisabledError, err.Error())
 		assert.Nil(t, resultAccount)
 	})
 

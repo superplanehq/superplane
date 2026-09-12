@@ -87,6 +87,14 @@ func Configured() bool {
 	return strings.TrimSpace(os.Getenv("POLAR_ACCESS_TOKEN")) != ""
 }
 
+func BusinessProductID() string {
+	return strings.TrimSpace(os.Getenv("POLAR_BUSINESS_PRODUCT_ID"))
+}
+
+func SubscriptionCheckoutEnabled() bool {
+	return Configured() && BusinessProductID() != ""
+}
+
 func NewClientFromEnv() *Client {
 	return NewClient(APIBaseURL(), os.Getenv("POLAR_ACCESS_TOKEN"), nil)
 }
@@ -311,6 +319,46 @@ func (c *Client) GetOwnerMember(ctx context.Context, externalCustomerID, custome
 	return "", fmt.Errorf("%w: polar owner member not found", errNotFound)
 }
 
+func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, productID string) ([]SubscriptionData, error) {
+	externalID := strings.TrimSpace(externalCustomerID)
+	if externalID == "" {
+		return nil, fmt.Errorf("external customer id is required")
+	}
+
+	var items []SubscriptionData
+	page := 1
+	for {
+		query := url.Values{}
+		query.Set("external_customer_id", externalID)
+		query.Set("limit", "100")
+		query.Set("page", strconv.Itoa(page))
+		if id := strings.TrimSpace(productID); id != "" {
+			query.Set("product_id", id)
+		}
+		var payload listSubscriptionsJSON
+		if err := c.get(ctx, "/subscriptions/?"+query.Encode(), &payload); err != nil {
+			return nil, err
+		}
+		items = append(items, payload.Items...)
+		if len(payload.Items) == 0 || len(payload.Items) < 100 {
+			break
+		}
+		if payload.Pagination.MaxPage > 0 && page >= payload.Pagination.MaxPage {
+			break
+		}
+		page++
+	}
+
+	subscriptions := make([]SubscriptionData, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.ID) == "" {
+			continue
+		}
+		subscriptions = append(subscriptions, item)
+	}
+	return subscriptions, nil
+}
+
 func (c *Client) ListOrders(ctx context.Context, externalCustomerID string) ([]Order, error) {
 	externalID := strings.TrimSpace(externalCustomerID)
 	if externalID == "" {
@@ -483,8 +531,9 @@ type priceJSON struct {
 }
 
 type orderItemJSON struct {
-	Amount       int64     `json:"amount"`
-	ProductPrice priceJSON `json:"product_price"`
+	Amount       int64        `json:"amount"`
+	ProductPrice priceJSON    `json:"product_price"`
+	Product      OrderProduct `json:"product"`
 }
 
 type customerJSON struct {
@@ -511,6 +560,13 @@ type checkoutJSON struct {
 type customerSessionJSON struct {
 	CustomerPortalURL string `json:"customer_portal_url"`
 	CustomerID        string `json:"customer_id"`
+}
+
+type listSubscriptionsJSON struct {
+	Items      []SubscriptionData `json:"items"`
+	Pagination struct {
+		MaxPage int `json:"max_page"`
+	} `json:"pagination"`
 }
 
 type listOrdersJSON struct {

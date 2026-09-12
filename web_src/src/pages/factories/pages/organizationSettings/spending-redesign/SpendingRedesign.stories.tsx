@@ -124,6 +124,12 @@ function EmptyPage() {
   );
 }
 
+function LoadingPage() {
+  return (
+    <SpendingRedesignPage catalogs={SPENDING_CATALOGS} credit={SPENDING_CREDIT} isLoading now={SPENDING_REDESIGN_NOW} />
+  );
+}
+
 function renderSpending(Page: ComponentType) {
   return (
     <FactorySettingsNavProvider groups={ORG_SPENDING_ONLY_NAV_GROUPS}>
@@ -137,7 +143,7 @@ function renderSpending(Page: ComponentType) {
   );
 }
 
-/** Default explorer: last 30 days, all workspaces, stacked by workspace. */
+/** Default explorer: last 30 days, grouped by model and machine type. */
 export const LastThirtyDays: Story = {
   name: "Last 30 days",
   render: () => renderSpending(LastThirtyDaysPage),
@@ -176,4 +182,9 @@ export const FilteredWorkspaceAndModel: Story = {
 /** No ledger rows. Hosted credit is empty so the wallet warning stays visible. */
 export const Empty: Story = {
   render: () => renderSpending(EmptyPage),
+};
+
+/** First visit before either spending report has resolved. */
+export const Loading: Story = {
+  render: () => renderSpending(LoadingPage),
 };

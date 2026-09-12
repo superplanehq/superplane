@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -228,6 +228,17 @@ check.test.ui.shard:
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
 
+check.tool.configs:
+	bash ./scripts/check_tool_config_guard.sh
+
+check.fast.security:
+	bash ./scripts/check_fast_security.sh
+
+check.npm.audit.critical:
+	@echo "==> npm audit (critical, production, lockfile only)"
+	$(COMPOSE) exec app bash -c "cd web_src && npm audit --omit=dev --audit-level=critical --package-lock-only"
+	@echo "==> npm audit: PASS"
+
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 
@@ -301,6 +312,33 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+# Local only. Puts every org on a 14-day trial, clears Polar ids, and
+# deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
+# subscription separately.
+db.reset.billing.trial:
+	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+
+# Local only. Keeps org, workspace, GitHub, apps, lines, and intakes in
+# superplane_dev. Wipes tasks, runs, usage, subscription, and credits, then
+# reseeds intake from GitHub. Cancel the Polar sandbox subscription
+# separately. Run `make dev.server` so seeded intake events become tasks.
+db.reset.after.onboarding:
+	@$(COMPOSE) exec app ./scripts/db_reset_after_onboarding.sh superplane_dev
+
+# Local only. Inserts fake hosted model + runner VM usage into superplane_dev.
+# MONEY is the total dollar amount. It is spread across TASKS (default 20)
+# over DAYS (default 30). Requires an organization and a factory.
+# Example: make simulate.usage MONEY=20 TASKS=30 DAYS=30
+# Optional: ORGANIZATION_ID=<uuid> FACTORY_ID=<uuid>
+simulate.usage simulate-usage:
+	@$(COMPOSE) exec \
+		-e MONEY="$(MONEY)" \
+		-e TASKS="$(TASKS)" \
+		-e DAYS="$(DAYS)" \
+		-e ORGANIZATION_ID="$(ORGANIZATION_ID)" \
+		-e FACTORY_ID="$(FACTORY_ID)" \
+		app ./scripts/db_simulate_usage.sh superplane_dev
+
 db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
@@ -336,8 +374,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
-REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
+MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners,files
+REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,files
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models

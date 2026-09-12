@@ -7,7 +7,6 @@ export {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
-  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsAccountNotificationsPage,
@@ -22,6 +21,8 @@ export {
   FACTORY_SETTINGS_NAV_GROUPS,
   FACTORY_SETTINGS_NAV_ITEMS,
   LegacyWorkOrderDetailRedirect,
+  LegacyWorkOrderPermalinkRedirect,
+  LegacyWorkOrdersRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
@@ -37,4 +38,6 @@ export {
   WorkOrderDetailPage,
   WorkOrdersPage,
   WorkspaceOverviewPage,
+  ChecksPRFeedbackSetupPage,
+  DiscussionPRFeedbackSetupPage,
 } from "./pages";

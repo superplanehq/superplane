@@ -2,12 +2,19 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
+import {
+  EXPIRED_TRIAL_ORGANIZATION_BILLING,
+  EXPIRED_WELCOME_USAGE_REPORT,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
+  LOW_TRIAL_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+  STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+} from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 /**
- * Current Organization Spending UI when hosted credit is empty.
- * Hosted runs fail at execute. This page is the recovery screen.
+ * Empty hosted credit on Tasks. The banner action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Pages/Hosted Credit Empty",
@@ -35,7 +42,74 @@ export const OrganizationSpending: Story = {
   ),
 };
 
-/** Tasks list with remaining hosted credit empty. The banner sits above the board. */
+/** Tasks list on the welcome-credit trial. The banner sits above the board. */
+export const Trial: Story = {
+  name: "Trial",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Tasks list when remaining trial credit is low. The banner names the stop outcome. */
+export const TrialLowCredit: Story = {
+  name: "Trial low credit",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LOW_TRIAL_USAGE_REPORT,
+        }}
+      />
+    );
+  },
+};
+
+/** Tasks list after welcome credit expires. The chip sits next to the title. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          organizationBilling: EXPIRED_TRIAL_ORGANIZATION_BILLING,
+        }}
+      />
+    );
+  },
+};
+
+/** Tasks list when the organization has no plan. The chip sits next to the title. */
+export const NoPlan: Story = {
+  name: "No plan",
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
+        }}
+      />
+    );
+  },
+};
+
+/** Tasks list with remaining trial credit empty. The trial chip sits next to the title. */
 export const Tasks: Story = {
   render: () => {
     window.localStorage.setItem("sp:work-orders:layout", "board");

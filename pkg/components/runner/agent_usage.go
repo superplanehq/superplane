@@ -14,7 +14,7 @@ func RecordRunnerLLMUsage(usage core.UsageRecorder, logger *log.Entry, finishedE
 	if usage == nil {
 		return
 	}
-	provider, ok := providerForFinishedEvent(finishedEventType)
+	provider, ok := providerForFinishedEvent(finishedEventType, configuration)
 	if !ok {
 		return
 	}
@@ -58,7 +58,7 @@ func ParseRunnerLLMUsage(provider string, configuration any, result json.RawMess
 	}, true
 }
 
-func providerForFinishedEvent(finishedEventType string) (string, bool) {
+func providerForFinishedEvent(finishedEventType string, configuration any) (string, bool) {
 	switch finishedEventType {
 	case "runnerClaudeCode.finished":
 		return models.UsageProviderAnthropic, true
@@ -66,6 +66,12 @@ func providerForFinishedEvent(finishedEventType string) (string, bool) {
 		return models.UsageProviderOpenAI, true
 	case "runnerOpenRouter.finished":
 		return models.UsageProviderOpenRouter, true
+	case "runnerSuperPlane.finished":
+		provider := configurationString(configuration, "hostedProvider")
+		if provider == "" {
+			return "", false
+		}
+		return provider, true
 	default:
 		return "", false
 	}

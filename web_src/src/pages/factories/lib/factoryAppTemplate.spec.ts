@@ -9,7 +9,6 @@ function canvasWith(nodes: NonNullable<NonNullable<CanvasesCanvas["spec"]>["node
 
 describe("resolveFactoryAppTemplate", () => {
   it.each([
-    ["onrun-create-plan", "line-planning"],
     ["onrun-implement", "line-implementation"],
     ["on-pr-closed", "pr-closure"],
     ["onrun-create-with-agent", "create-with-agent"],
@@ -29,7 +28,7 @@ describe("hasFactoryAppDefaults", () => {
         canvasWith([
           {
             id: "entrypoint",
-            metadata: { factoryTemplate: { id: "line-planning", version: 1 } },
+            metadata: { factoryTemplate: { id: "line-implementation", version: 1 } },
           },
         ]),
       ),
@@ -46,6 +45,14 @@ describe("hasFactoryAppDefaults", () => {
 
   it("recognizes legacy backlog automations", () => {
     expect(hasFactoryAppDefaults(canvasWith([{ id: "on-issue-labeled" }, { id: "create-work-order" }]))).toBe(true);
+  });
+
+  it("recognizes generated PR feedback discussion canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pr-comment" }, { id: "address-pr-feedback" }]))).toBe(true);
+  });
+
+  it("recognizes generated PR feedback checks canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pull-request" }, { id: "wait-pr-checks" }]))).toBe(true);
   });
 
   it("rejects custom canvases", () => {

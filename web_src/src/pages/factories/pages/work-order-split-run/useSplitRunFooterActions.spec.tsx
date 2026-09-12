@@ -160,6 +160,9 @@ describe("useSplitRunFooterActions", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders", "wo-1"],
     });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+    });
   });
 
   it("cancels the canvas run before closing a running order", async () => {
@@ -190,14 +193,25 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Task returned to the Backlog.");
   });
 
-  it("closes a draft from Reject", async () => {
+  it("archives a draft as rejected", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
-    const deleted = await result.current.handleReject();
+    const archived = await result.current.handleArchive();
 
-    expect(deleted).toBe(true);
+    expect(archived).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Task closed as rejected.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+  });
+
+  it("keeps a draft open when archive fails", async () => {
+    closeMutateAsync.mockRejectedValue(new Error("Failed to fetch"));
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const archived = await result.current.handleArchive();
+
+    expect(archived).toBe(false);
+    expect(showSuccessToast).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to archive task");
   });
 
   it("does not mutate when the popup has no live order", async () => {
@@ -205,6 +219,7 @@ describe("useSplitRunFooterActions", () => {
 
     await result.current.handleStop("canceled", { kind: "running" });
     await result.current.handleReject();
+    await result.current.handleArchive();
     await result.current.handleBackToDraft();
 
     expect(closeMutateAsync).not.toHaveBeenCalled();

@@ -122,7 +122,10 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
 
 /**
  * Closed work that belongs on this line, plus open work still on a Done or
- * PR-closure step. Newest orders come first.
+ * PR-closure step. Newest orders come first. A draft rejected straight out
+ * of the Backlog never dispatched to a line, so it is excluded — it left
+ * the board when it closed, and Done is not the right home for work that
+ * never started. See isArchivedBacklogReject.
  */
 export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
@@ -133,6 +136,9 @@ export function collectLineDoneOrders(
 
   for (const order of workOrders) {
     if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
+      continue;
+    }
+    if (isArchivedBacklogReject(order)) {
       continue;
     }
     doneById.set(order.id, order);
@@ -241,6 +247,16 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
   return Boolean(order.id) && order.state === "STATE_DRAFT";
+}
+
+// A rejected order that never dispatched to any line was rejected straight
+// out of the Backlog — it never ran a single step. Reject on a scored or
+// imported draft the operator will not start should archive it off the
+// board, not park it in Done next to work that actually finished. A
+// rejected order that did dispatch (it started, then was later rejected)
+// keeps its place in Done; that decision is unaffected here.
+function isArchivedBacklogReject(order: FactoriesWorkOrder): boolean {
+  return order.result === "RESULT_REJECTED" && (order.lineDispatches ?? []).length === 0;
 }
 
 // A finished task belongs on this board when it ran on this line, or

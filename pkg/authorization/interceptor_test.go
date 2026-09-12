@@ -297,6 +297,23 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 
 func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
+	requiredFeatures := []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}
+	routes := []HTTPRoute{
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"},
+		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"},
+	}
+
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, requiredFeatures, rule.RequiredExperimentalFeatures)
+	}
 
 	start, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}]
 	require.True(t, ok)
@@ -306,6 +323,90 @@ func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	describe, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}]
 	require.True(t, ok)
 	assert.Equal(t, "read", describe.Action)
+
+	reload, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", reload.Resource)
+	assert.Equal(t, "update", reload.Action)
+}
+
+func TestSetUserOwnerRouteUsesMembersUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPatch, Pattern: "/api/v1/organizations/{id}/users/{user_id}/owner"}]
+	require.True(t, ok)
+	assert.Equal(t, "members", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+}
+
+func TestListSelectableLLMModelsUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/selectable-llm-models"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
+func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	createWorkspace, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", createWorkspace.Resource)
+	assert.Equal(t, "update", createWorkspace.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, createWorkspace.RequiredExperimentalFeatures)
+
+	listWorkspace, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", listWorkspace.Resource)
+	assert.Equal(t, "read", listWorkspace.Action)
+
+	createTask, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", createTask.Resource)
+	assert.Equal(t, "update", createTask.Action)
+
+	listTask, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", listTask.Resource)
+	assert.Equal(t, "read", listTask.Action)
+}
+
+func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/credit-grants"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
+func TestDescribeOrganizationBillingUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/billing"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
+func TestCreateBusinessCheckoutUsesOrgUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/business-checkout"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+}
+
+func TestSyncOrganizationBillingUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/billing/sync"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
 }
 
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {

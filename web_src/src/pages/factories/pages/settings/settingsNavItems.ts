@@ -3,15 +3,16 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  CircleDollarSign,
   CircleUser,
   Cpu,
   Grid3x3,
   Key,
   KeyRound,
   Plug,
+  Receipt,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
@@ -22,9 +23,10 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "automations"
   | "models"
   | "spending"
+  | "usage"
+  | "billing"
   | "members"
   | "integrations"
   | "api-keys"
@@ -41,6 +43,11 @@ export interface FactorySettingsNavItem {
    * Find settings matches these in addition to the nav label and group label.
    */
   keywords?: string[];
+  /**
+   * When set, hide this item unless the current user can perform the action.
+   * Account pages stay ungated.
+   */
+  permission?: { resource: string; action: string };
 }
 
 export interface FactorySettingsNavGroup {
@@ -122,6 +129,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Grid3x3,
         scope: "workspace",
         section: "general",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "name",
           "workspace key",
@@ -140,6 +148,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Blocks,
         scope: "workspace",
         section: "repository",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "github repository",
           "repo",
@@ -151,19 +160,12 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-automations",
-        label: "Automations",
-        Icon: Workflow,
-        scope: "workspace",
-        section: "automations",
-        keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
-      },
-      {
         id: "workspace-models",
         label: "Models",
         Icon: Cpu,
         scope: "workspace",
         section: "models",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "llm",
           "ai",
@@ -178,6 +180,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "save models",
         ],
       },
+      {
+        id: "workspace-usage",
+        label: "Usage",
+        Icon: Receipt,
+        scope: "workspace",
+        section: "usage",
+        permission: { resource: "org", action: "read" },
+        keywords: ["usage", "cost", "tokens", "vm time", "task spend", "your keys", "model", "machine"],
+      },
     ],
   },
   {
@@ -190,6 +201,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Settings,
         scope: "organization",
         section: "general",
+        permission: { resource: "org", action: "read" },
         keywords: ["name", "organization slug", "slug", "workspace url"],
       },
       {
@@ -198,6 +210,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Users,
         scope: "organization",
         section: "members",
+        permission: { resource: "members", action: "read" },
         keywords: [
           "invite",
           "invite link",
@@ -218,7 +231,29 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Plug,
         scope: "organization",
         section: "integrations",
+        permission: { resource: "integrations", action: "read" },
         keywords: ["connect", "filter integrations", "github", "slack", "request it"],
+      },
+      {
+        id: "organization-models",
+        label: "LLM Models",
+        Icon: Cpu,
+        scope: "organization",
+        section: "models",
+        permission: { resource: "org", action: "read" },
+        keywords: [
+          "llm",
+          "ai",
+          "allowlist",
+          "claude",
+          "openai",
+          "openrouter",
+          "anthropic",
+          "use your keys",
+          "byok",
+          "your keys",
+          "select models",
+        ],
       },
       {
         id: "organization-api-keys",
@@ -226,6 +261,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: KeyRound,
         scope: "organization",
         section: "api-keys",
+        permission: { resource: "api_keys", action: "read" },
         keywords: [
           "create api key",
           "programmatic access",
@@ -246,7 +282,29 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Key,
         scope: "organization",
         section: "secrets",
+        permission: { resource: "secrets", action: "read" },
         keywords: ["create secret", "secret name", "key-value pairs", "credentials", "env"],
+      },
+      {
+        id: "organization-billing",
+        label: "Billing",
+        Icon: CircleDollarSign,
+        scope: "organization",
+        section: "billing",
+        permission: { resource: "org", action: "read" },
+        keywords: [
+          "billing",
+          "credit",
+          "hosted credit",
+          "invoices",
+          "trial credit",
+          "included usage",
+          "top-up credit",
+          "remaining hosted credit",
+          "superplane grant",
+          "purchased hosted credit",
+          "buy more",
+        ],
       },
       {
         id: "organization-spending",
@@ -254,17 +312,13 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: BarChart3,
         scope: "organization",
         section: "spending",
+        permission: { resource: "org", action: "read" },
         keywords: [
-          "billing",
           "usage",
           "cost",
-          "credit",
           "tokens",
           "vm time",
           "estimated spend",
-          "remaining hosted credit",
-          "superplane grant",
-          "purchased hosted credit",
           "by model",
           "by machine type",
           "model usage",
@@ -326,4 +380,26 @@ export function factorySettingsRouteFromPathname(pathname: string) {
   const scope = segments[settingsIndex + 1];
   const section = segments[settingsIndex + 2];
   return FACTORY_SETTINGS_NAV_ITEMS.find((item) => item.scope === scope && item.section === section);
+}
+
+export function filterFactorySettingsNavGroupsByPermission(
+  groups: FactorySettingsNavGroup[],
+  canAct: (resource: string, action: string) => boolean,
+  permissionsLoading: boolean,
+): FactorySettingsNavGroup[] {
+  if (permissionsLoading) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (!item.permission) {
+          return true;
+        }
+        return canAct(item.permission.resource, item.permission.action);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 }

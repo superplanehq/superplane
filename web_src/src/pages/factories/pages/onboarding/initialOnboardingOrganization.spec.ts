@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { FactoriesFactory } from "@/api-client";
 
 import {
+  completeInitialOrganizationIdentity,
+  githubOwnerFromConnections,
   isOrganizationIdentityTaken,
   nameOrganizationFromGitHubOwner,
   organizationIdentityFromOwner,
@@ -60,6 +62,52 @@ describe("isOrganizationIdentityTaken", () => {
     expect(isOrganizationIdentityTaken("invalid organization update")).toBe(true);
     expect(isOrganizationIdentityTaken("duplicate key value violates unique constraint")).toBe(true);
     expect(isOrganizationIdentityTaken("Could not save the organization")).toBe(false);
+  });
+});
+
+describe("githubOwnerFromConnections", () => {
+  it("reads the owner of the selected GitHub connection", () => {
+    expect(
+      githubOwnerFromConnections(
+        [
+          { metadata: { id: "github-1" }, status: { metadata: { owner: "Acme Org" } } },
+          { metadata: { id: "github-2" }, status: { metadata: { owner: "Other" } } },
+        ],
+        "github-1",
+      ),
+    ).toBe("Acme Org");
+  });
+});
+
+describe("completeInitialOrganizationIdentity", () => {
+  it("renames an initial organization from the GitHub owner", async () => {
+    const update = vi.fn().mockResolvedValue("acme-org");
+
+    await expect(
+      completeInitialOrganizationIdentity({
+        factory: factoryWithOnboarding({ initial: true }),
+        owner: "Acme Org",
+        currentSlug: "test-test",
+        update,
+      }),
+    ).resolves.toBe("acme-org");
+
+    expect(update).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
+  });
+
+  it("keeps the current slug when the workspace is not initial onboarding", async () => {
+    const update = vi.fn();
+
+    await expect(
+      completeInitialOrganizationIdentity({
+        factory: factoryWithOnboarding({}),
+        owner: "Acme Org",
+        currentSlug: "test-test",
+        update,
+      }),
+    ).resolves.toBe("test-test");
+
+    expect(update).not.toHaveBeenCalled();
   });
 });
 

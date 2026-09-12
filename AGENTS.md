@@ -12,6 +12,7 @@ Read more only when the task needs it:
   [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
+- Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
 
 ## Read this first
 
@@ -90,17 +91,23 @@ Run these three steps once, in order:
    server. UI at http://localhost:8000; health check at
    http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
 
+Factory workspace onboarding needs a public SuperPlane GitHub App on a
+stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
+onboarding is blocked. See
+[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+
 To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
 only for a remote broker (see `.env.example`).
 
-The runner `make dev` image includes Claude Code, Codex, git, `gh`, and `jq`.
+The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, and `jq`.
 Factory line apps run on that worker. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you dispatch
 a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
 again so Compose rebuilds the worker. Check tools with `make doctor-local` in
-the runner repository.
+the runner repository. OpenCode must be on the runner `PATH` for Run OpenRouter
+Agent. SuperPlane does not download OpenCode in the prompt prepare step.
 
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
@@ -135,6 +142,13 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
   empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` where
   `DB_NAME` is `superplane_dev` or `superplane_test` (requires a running app
   container).
+- **NEVER DROP LOCAL DATABASES WITHOUT ASKING.** Do not run `make db.delete`,
+  `make db.recreate.all.dangerous`, `make dev.setup.no.cache`,
+  `make dev.pr.clean.checkout`, `dropdb`, or `DROP DATABASE` unless the user
+  explicitly asked. `make db.migrate.all` applies pending migrations and
+  rewrites `db/structure.sql`. It does not drop data. Do not pair it with
+  `db.delete`. If migrate fails (for example `no migration found for version`),
+  stop and ask. Do not recreate `superplane_dev` as a workaround.
 
 Cross-cutting rules when extending the backend:
 

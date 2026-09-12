@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { createOrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -80,7 +81,6 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toBe("implement");
     expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
       ["Backlog", "passed"],
-      ["Create plan", "passed"],
       ["Implement", "running"],
     ]);
   });
@@ -169,7 +169,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -414,7 +414,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       { lineId: "line-1" },
     );
 
-    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
   });
 
   it("prefers an older active dispatch over a newer finished rerun", () => {
@@ -459,7 +459,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       { lineId: "line-1" },
     );
 
-    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
     expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
   });
 
@@ -744,7 +744,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
@@ -757,6 +757,57 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(names).not.toContain("#510");
     expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
     expect(names.filter((name) => name !== "description.md")).toEqual([]);
+  });
+
+  it("uses the org member lookup for the owner avatar when one is supplied", () => {
+    const resolveUser = createOrgUserDisplayLookup(
+      new Map([
+        [
+          "user-1",
+          {
+            id: "user-1",
+            name: "Ada Lovelace",
+            initials: "AL",
+            avatarUrl: "https://example.com/ada.png",
+          },
+        ],
+      ]),
+    );
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+      avatarUrl: "https://example.com/ada.png",
+    });
+  });
+
+  it("falls back to initials when the owner is not in the org member lookup", () => {
+    const resolveUser = createOrgUserDisplayLookup(new Map());
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+    });
   });
 });
 
@@ -978,6 +1029,22 @@ describe("line board work-order examples", () => {
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+  });
+
+  // A freshly created draft is known to be analyzing before its run appears in
+  // the polled list. The optimistic flag keeps the popup in step with the board.
+  it("shows the analyzing state from the pending flag before a run appears", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [],
+      isAnalyzing: true,
+    });
+
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).not.toContain("Reject");
   });
 
   // Scoring runs on the task before a line plans it. The log must read
@@ -1064,6 +1131,8 @@ describe("line board work-order examples", () => {
     expect(analysis[0].checks).toBeUndefined();
     expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
     expect(fixture.openPhaseId).toBeUndefined();
+    expect(fixture.footer.note?.headline).toBe("This task is ready to start");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Archive", "Start"]);
   });
 
   it("appends matching PR feedback runs after line steps, oldest first", () => {
@@ -1317,7 +1386,6 @@ describe("line board work-order examples", () => {
       fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
     ).toEqual([
       ["backlog", "Backlog", "Created manually", "passed", "2s"],
-      ["planning-0", "Plan", "Planning", "passed", "2m 59s"],
       ["implementation-1", "Implement", "Implementation", "passed", "23m 56s"],
       ["pr-creation-2", "PR Creation", "PR Creation", "passed", "1m 23s"],
       ["ci-loop-3", "Verify", "Risk Assessment", "passed", "10m 12s"],
@@ -1331,7 +1399,6 @@ describe("line board work-order examples", () => {
       ],
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "backlog"))).toEqual(["description.md"]);
-    expect(outputNames(fixture.phases.find((phase) => phase.id === "planning-0"))).toEqual(["PLAN.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implementation-1"))).toEqual([
       "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9",
     ]);

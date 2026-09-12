@@ -24,6 +24,7 @@ describe("resolvePageObservability", () => {
   it("maps admin routes", () => {
     expect(resolvePageObservability("/admin")).toEqual({ pageKey: "adminOrganizations", attributes: {} });
     expect(resolvePageObservability("/admin/accounts")).toEqual({ pageKey: "adminAccounts", attributes: {} });
+    expect(resolvePageObservability("/admin/price-books")).toEqual({ pageKey: "adminPriceBooks", attributes: {} });
     expect(resolvePageObservability("/admin/organizations/org-1")).toEqual({
       pageKey: "adminOrganizationDetail",
       attributes: { organization_id: "org-1" },
@@ -87,6 +88,14 @@ describe("resolvePageObservability", () => {
     });
     expect(resolvePageObservability("/org-1/organization/spending")).toEqual({
       pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/billing")).toEqual({
+      pageKey: "organizationSettingsBilling",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/usage")).toEqual({
+      pageKey: "organizationSettingsUsage",
       attributes: { organization_id: "org-1" },
     });
     expect(resolvePageObservability("/org-1/organization/integrations")).toEqual({

@@ -17,8 +17,9 @@ export type LiveLogRecord =
   | { type: "error"; message: string }
   | { type: "cmd_start"; index: number; text: string; kind?: string; preview?: string; started_at?: number }
   | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number }
-  | { type: "tool_start"; id?: string; kind?: string; text?: string; started_at?: number }
-  | { type: "tool_end"; id?: string; kind?: string; status: "passed" | "failed"; duration_ms: number };
+  | { type: "tool_start"; id?: string; kind?: string; text?: string; started_at?: number; turn?: number }
+  | { type: "tool_end"; id?: string; kind?: string; status: "passed" | "failed"; duration_ms: number; turn?: number }
+  | { type: "turn"; turn: number; usage: Record<string, number> };
 
 export type CommandTool = {
   id: string;
@@ -49,5 +50,6 @@ export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
   error: string | null;
+  isLoading: boolean;
   isStreaming: boolean;
 };

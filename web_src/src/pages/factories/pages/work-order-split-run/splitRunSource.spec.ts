@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageIds";
+import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
@@ -26,6 +26,10 @@ describe("sourceTicketLabel", () => {
     );
     expect(sourceTicketLabel("https://acme.pagerduty.com/incidents/P123ABC")).toBe("acme#P123ABC");
     expect(sourceTicketLabel("https://acme.slack.com/archives/C0REFUNDS/p1710000000000000")).toBe("acme#C0REFUNDS");
+  });
+
+  it("uses the task id alone for Productive.io, whose link holds an organization id", () => {
+    expect(sourceTicketLabel("https://app.productive.io/48521/tasks/19976991")).toBe("#19976991");
   });
 });
 
@@ -111,6 +115,28 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  // A Productive.io webhook carries no link to the task, so the order has no
+  // origin and the automation is the only evidence of where it came from.
+  // Naming the source after the automation keeps it from reading as GitHub.
+  it("names the Productive.io intake when the order has no origin", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: undefined,
+        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive.io tasks" } },
+      }),
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks", iconAlt: "Productive.io" }));
+  });
+
+  it("names the Productive.io intake from a task link", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
+      }),
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks" }));
+  });
+
   it("uses the person and Created manually when a person opened the task", () => {
     expect(splitRunSourceForOrder(DRAFT_WORK_ORDER)).toEqual(
       expect.objectContaining({
@@ -119,6 +145,41 @@ describe("splitRunSourceForOrder", () => {
         person: expect.objectContaining({ name: "Leonardo DiCaprio" }),
       }),
     );
+  });
+
+  it("resolves the source person's avatar from the org members list when one is available", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId
+        ? { id: userId, name: name ?? "Member", initials: "M", avatarUrl: "https://example.com/avatar.jpg" }
+        : null;
+
+    const source = splitRunSourceForOrder(DRAFT_WORK_ORDER, resolveUser);
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "manual",
+        person: expect.objectContaining({
+          id: STORYBOOK_ME_USER_ID,
+          name: "Leonardo DiCaprio",
+          avatarUrl: "https://example.com/avatar.jpg",
+        }),
+      }),
+    );
+  });
+
+  it("falls back to initials when the org member has no avatar image", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId ? { id: userId, name: name ?? "Member", initials: "M" } : null;
+
+    const source = splitRunSourceForOrder(DRAFT_WORK_ORDER, resolveUser);
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "manual",
+        person: expect.objectContaining({ id: STORYBOOK_ME_USER_ID, name: "Leonardo DiCaprio" }),
+      }),
+    );
+    if (source.kind === "manual") {
+      expect(source.person.avatarUrl).toBeUndefined();
+    }
   });
 
   it("fills Source for every task on the populated line board", () => {

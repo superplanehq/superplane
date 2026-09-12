@@ -106,11 +106,11 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   expanded
                   collapsible={false}
                   stream={model.stream}
+                  streamLoading={model.streamLoading}
                   selectedNodeId={model.nodeId}
                   onSelectNode={model.setNodeId}
                   organizationId={model.organizationId}
                   canvasId={model.phase.appId}
-                  editHref={model.editHref}
                 />
               </li>
             </ol>

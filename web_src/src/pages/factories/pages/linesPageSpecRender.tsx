@@ -57,7 +57,15 @@ export function LinesBoardSpecHarness({
                 <Routes>
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-                  <Route path="/org-1/workspaces/:factoryKey/work-order/:orderNumber" element={<LinesPage />} />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/comments"
+                    element={<div data-testid="discussion-pr-feedback-setup">Comments setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/checks"
+                    element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
+                  />
+                  <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
                 <LocationProbe />
               </FactoriesLayoutContext.Provider>

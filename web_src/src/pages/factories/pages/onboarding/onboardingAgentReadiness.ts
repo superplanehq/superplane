@@ -9,13 +9,13 @@ export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number];
 
 export type HostedLLMProviderId = "anthropic" | "openai" | "openrouter";
 
-export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNESS_CODEX";
+export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNESS_CODEX" | "AGENT_HARNESS_SUPERPLANE";
 
 export type OnboardingAgentPlan = {
-  providerId: AgentProviderId;
-  component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter";
+  providerId?: AgentProviderId;
+  component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter" | "runnerSuperPlane";
   credentialsSource: "integration" | "hosted";
-  integrationName: AgentProviderId;
+  integrationName?: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
   /** Model for agents that weigh evidence rather than write code, such as planning. */
@@ -80,33 +80,36 @@ export function isAgentStepReady(connected: Set<IntegrationId>, remainingCreditC
 
 export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
-  remainingCreditCents: number;
   hostedModels: HostedModelsByProvider;
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
+  const hosted = hostedSuperPlanePlan(args);
+  if (hosted) return hosted;
+
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
     return planForConnectedProvider(providerId, args.hostedModels);
   }
 
-  if (args.remainingCreditCents <= 0) return undefined;
-
-  for (const providerId of AGENT_PROVIDER_IDS) {
-    const spec = AGENT_PROVIDER_SPECS[providerId];
-    const modelIds = args.hostedModels[spec.hostedProvider];
-    const model = pickHostedModel(spec.hostedProvider, modelIds);
-    if (!model) continue;
-    return {
-      providerId,
-      component: spec.component,
-      credentialsSource: "hosted",
-      integrationName: providerId,
-      harness: spec.harness,
-      model,
-      planningModel: planningModelFor(spec, modelIds, model),
-    };
-  }
-
   return undefined;
+}
+
+function hostedSuperPlanePlan(args: {
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
+}): OnboardingAgentPlan | undefined {
+  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
+  const defaultModel = args.defaultHostedModel?.trim() ?? "";
+  if (!defaultProvider || !defaultModel) return undefined;
+
+  return {
+    component: "runnerSuperPlane",
+    credentialsSource: "hosted",
+    harness: "AGENT_HARNESS_SUPERPLANE",
+    model: "",
+    planningModel: "",
+  };
 }
 
 export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{ isFetched: boolean }>): boolean {
@@ -114,16 +117,12 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * Hosted credentials answer the agent question for the whole organization, so
- * setup has nothing left to ask about the agent. A plan that still loads can
- * become a plan that needs a key, so setup waits for the hosted models.
+ * A hosted default answers the agent question for the organization, so setup
+ * has nothing left to ask about the agent. Billing controls hosted runs after
+ * setup. Installations without a hosted default still use the connection step.
  */
-export function isHostedAgentReady(args: {
-  hostedModelsLoading: boolean;
-  plan: OnboardingAgentPlan | undefined;
-}): boolean {
-  if (args.hostedModelsLoading) return false;
-  return args.plan?.credentialsSource === "hosted";
+export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
+  return plan?.component === "runnerSuperPlane";
 }
 
 export function firstWorkOrderAgentError(args: {
@@ -131,6 +130,7 @@ export function firstWorkOrderAgentError(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
 }): string | null {
+  if (args.plan?.component === "runnerSuperPlane") return null;
   if (args.hostedModelsLoading) {
     return "Hosted models are still loading. Try again.";
   }
@@ -138,7 +138,7 @@ export function firstWorkOrderAgentError(args: {
   if (args.remainingCreditCents <= 0) {
     return "Connect Anthropic, OpenAI, or OpenRouter, or use hosted credit.";
   }
-  return "Ask an installation admin to enable SuperPlane-hosted models.";
+  return "Ask an installation admin to set a SuperPlane agent model.";
 }
 
 export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
@@ -147,9 +147,9 @@ export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {
   if (remainingCreditCents > 0) {
-    return `This organization has ${formatUsdCents(remainingCreditCents)} of hosted credit. You can continue without connecting your own keys.`;
+    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.`;
   }
-  return "Hosted credit is empty. Connect a provider to continue.";
+  return "Trial credit is used up. Subscribe to Business or connect a provider to continue.";
 }
 
 function planForConnectedProvider(

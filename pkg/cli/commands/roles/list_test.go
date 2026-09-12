@@ -15,8 +15,8 @@ const listRolesPayload = `{
       "spec":     {"displayName":"Admin","description":"Full access","permissions":[{"resource":"members","action":"update"}]}
     },
     {
-      "metadata": {"name":"org_viewer"},
-      "spec":     {"displayName":"Viewer"}
+      "metadata": {"name":"org_operator"},
+      "spec":     {"displayName":"Operator"}
     }
   ]
 }`

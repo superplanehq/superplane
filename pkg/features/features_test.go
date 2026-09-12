@@ -23,6 +23,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryProductiveIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
+		assert.Equal(t, "Factory Productive.io Intake", f.Label)
+		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -37,6 +45,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureFactoryDraftStartModel, f.ID)
 		assert.Equal(t, "Draft Start Model", f.Label)
 		assert.Equal(t, "Show a model selector next to Start on a draft task", f.Description)
+	})
+
+	t.Run("known id returns create with agent feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCreateWithAgent)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
+		assert.Equal(t, "Create with an Agent", f.Label)
+		assert.Equal(t, "Create and refine factory tasks with an agent", f.Description)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -55,8 +71,10 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureFactoryDraftStartModel))
+	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

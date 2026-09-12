@@ -66,6 +66,15 @@ describe("findAgentNodes", () => {
     const trigger = agentNode({ id: "not-an-action", type: "TYPE_TRIGGER" });
     expect(findAgentNodes({ nodes: [trigger] })).toEqual([]);
   });
+
+  it("returns SuperPlane harness actions", () => {
+    const superplane = agentNode({
+      id: "superplane-agent",
+      component: "runnerSuperPlane",
+      configuration: { machineType: "e1-large-amd64", steps: implementerSteps },
+    });
+    expect(findAgentNodes({ nodes: [triggerNode(), superplane] })).toEqual([superplane]);
+  });
 });
 
 describe("primaryAgentNode", () => {
@@ -87,6 +96,7 @@ describe("planningReviewDraftFromCanvas", () => {
 
     expect(draft?.title).toBe("Implement From Task Description");
     expect(draft?.components).toHaveLength(1);
+    expect(draft?.components[0].component).toBe("runnerClaudeCode");
     expect(draft?.components[0].configuration).toEqual(implementerConfiguration);
     expect(draft?.components[0].configuration.credentials).toEqual({
       source: "integration",
@@ -159,6 +169,17 @@ describe("canvasNodeToPlanningReviewComponent", () => {
       component: "runnerCodex",
     });
     expect(component.title).toBe("Agent");
+    expect(component.component).toBe("runnerCodex");
     expect(component.concurrency).toEqual({ max: "1", key: "" });
+  });
+
+  it("keeps the Run SuperPlane Agent runner id", () => {
+    const component = canvasNodeToPlanningReviewComponent(
+      agentNode({
+        id: "superplane-agent",
+        component: "runnerSuperPlane",
+      }),
+    );
+    expect(component.component).toBe("runnerSuperPlane");
   });
 });

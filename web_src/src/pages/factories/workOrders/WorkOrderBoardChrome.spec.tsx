@@ -84,4 +84,23 @@ describe("WorkOrderKanbanBoard", () => {
 
     expect(onRename).toHaveBeenCalledWith("Inbox");
   });
+
+  it("packages the title and subheader as one header above a divider", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={1}
+        emptyDescription="Nothing here."
+        subheader={<p>Listens to GitHub issues</p>}
+        testId="lane-grouped"
+      >
+        <p>Card</p>
+      </WorkOrderBoardLane>,
+    );
+
+    const header = screen.getByTestId("lane-grouped-header");
+    expect(header).toHaveTextContent("Backlog");
+    expect(header).toHaveTextContent("Listens to GitHub issues");
+    expect(header.className).toContain("border-b");
+  });
 });

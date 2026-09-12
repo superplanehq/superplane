@@ -1,9 +1,13 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
+
+import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganization";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
@@ -13,13 +17,10 @@ import {
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
-  provisionPRFeedbackHandler,
   type CreateFactoryIntake,
-  type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
-  type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
@@ -51,8 +52,10 @@ export function finishOnboardingError(args: {
   return null;
 }
 
+export type OnboardingDestination = { organizationId: string; factoryKey: string; lineId: string };
+
 /** The line board, where the new GitHub intake sits at the foot of Backlog. */
-export function afterOnboardingPath(args: { organizationId: string; factoryKey: string; lineId: string }) {
+export function afterOnboardingPath(args: OnboardingDestination) {
   return factoryHomePath(args.organizationId, args.factoryKey, args.lineId);
 }
 
@@ -63,6 +66,41 @@ function navigateAfterFinish(
   lineId: string,
 ) {
   navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
+}
+
+export async function afterWorkspaceProvisioned(args: {
+  factory: FactoriesFactory | null;
+  owner?: string;
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  lineId: string;
+  updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
+  invalidateAccountOrganizations: () => void;
+  navigate: ReturnType<typeof useNavigate>;
+  onProvisioned?: (destination: OnboardingDestination) => void;
+}): Promise<void> {
+  let organizationId = args.organizationId;
+  if (args.updateOrganization) {
+    try {
+      organizationId = await completeInitialOrganizationIdentity({
+        factory: args.factory,
+        owner: args.owner,
+        currentSlug: args.organizationId,
+        update: args.updateOrganization,
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
+    }
+  }
+  args.invalidateAccountOrganizations();
+  markWorkspaceGettingStarted(organizationId, args.factoryId);
+  const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
+  if (args.onProvisioned) {
+    args.onProvisioned(destination);
+    return;
+  }
+  navigateAfterFinish(args.navigate, organizationId, args.factoryKey, args.lineId);
 }
 
 export async function provisionWorkspace(args: {
@@ -76,8 +114,6 @@ export async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
-  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
@@ -138,11 +174,6 @@ export async function provisionWorkspace(args: {
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
   });
-  await provisionPRFeedbackHandler({
-    listHandlers: args.listPRFeedbackHandlers,
-    createHandler: args.createPRFeedbackHandler,
-    repository: args.appRepository,
-  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
@@ -165,16 +196,18 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
-  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
+  githubOwner?: string;
+  updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
+  onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -216,10 +249,24 @@ export function useFinishOnboarding(args: {
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
         agentIntegrationId:
-          args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
+          args.plan.credentialsSource === "integration" && args.plan.integrationName
+            ? args.selections[args.plan.integrationName]?.id
+            : undefined,
       });
-      markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);
+      await afterWorkspaceProvisioned({
+        factory: args.factory,
+        owner: args.githubOwner,
+        organizationId: args.organizationId,
+        factoryId: args.factoryId,
+        factoryKey: args.factoryKey,
+        lineId: provisioned.lineId,
+        updateOrganization: args.updateOrganization,
+        invalidateAccountOrganizations: () => {
+          void queryClient.invalidateQueries({ queryKey: accountOrganizationsQueryKey });
+        },
+        navigate,
+        onProvisioned: args.onProvisioned,
+      });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

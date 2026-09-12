@@ -263,6 +263,16 @@ func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.Descr
 	return actions.DescribeFactoryUsage(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ListFactoryWorkOrderRunUsageRequest) (*pb.ListFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ExportFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ExportFactoryWorkOrderRunUsageRequest) (*pb.ExportFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ExportFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListFactoryLLMModelsRequest) (*pb.ListFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)
@@ -311,4 +321,9 @@ func (s *FactoryService) CreatePlanningSessionWorkOrder(ctx context.Context, req
 func (s *FactoryService) SkipPlanningSessionDraft(ctx context.Context, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SkipPlanningSessionDraft(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ReloadPlanningSessionAgent(ctx context.Context, req *pb.ReloadPlanningSessionAgentRequest) (*pb.ReloadPlanningSessionAgentResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ReloadPlanningSessionAgent(ctx, organizationID, req)
 }

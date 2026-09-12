@@ -22,7 +22,6 @@ import {
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
   splitRunLinkedArtifacts,
-  splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
   splitRunSourceDescription,
@@ -91,7 +90,7 @@ describe("splitRunPopupModel", () => {
       }),
     ).toBe(
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        from: "work-order",
+        from: "task",
         orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
         canvas: "closure",
       }),
@@ -116,14 +115,6 @@ describe("splitRunPopupModel", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("log");
-  });
-
-  it("maps log-tab dots to the line status colors", () => {
-    expect(splitRunLogTabDotClass("running")).toContain("--status-running-dot");
-    expect(splitRunLogTabDotClass("waiting")).toContain("--status-waiting-dot");
-    expect(splitRunLogTabDotClass("failed")).toContain("--status-failed-dot");
-    expect(splitRunLogTabDotClass("passed")).toContain("--status-completed-dot");
-    expect(splitRunLogTabDotClass("pending")).toContain("--status-draft-dot");
   });
 
   it("prefers the saved work-order description on a live order", () => {

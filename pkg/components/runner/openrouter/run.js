@@ -2,107 +2,33 @@
 "use strict";
 
 /**
- * SuperPlane OpenRouter agent: bash, read, edit, write tools.
- * Planning sessions (SUPERPLANE_PLANNING_SESSION_ID set) drop edit/write and
- * add the propose_draft/survey planning tools instead.
+ * Run OpenCode against OpenRouter and format JSONL into live logs.
  *
- *   node run.js <prompt-file> [model] [max-turns]
+ *   node run.js <prompt-file> [model]
  */
 
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
+const readline = require("readline");
+const { spawn, spawnSync } = require("child_process");
 
-const DEFAULT_MAX_TURNS = 128;
-const MAX_TURNS_LIMIT = 256;
-const BASE_SYSTEM_PROMPT =
-  "You are a coding agent on a SuperPlane fleet runner. Use bash, read, edit, and write tools. Write assistant messages as plain terminal text.";
+const TOOL_RESULT_MAX_CHARS = 800;
+const TOOL_RESULT_MAX_LINES = 24;
+const DEFAULT_WAIT_CAP_MS = 3_600_000;
+const SESSION_FILE = "opencode_session";
+const MAX_ATTEMPTS = 4;
+const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
+
 const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Use the bash and read tools only to explore the repository for context; " +
-  "do not edit or write any files. Call propose_draft only when the user asked for a task in this turn. Call survey " +
-  "to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or " +
-  "skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft " +
-  "unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and " +
-  "ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain " +
-  "text.";
-const WRAP_UP_PROMPT =
-  "You have no remaining tool turns. Do not call tools. Write a plain-text summary of what you completed and what remains.";
-const TOOL_NUDGE =
-  "Use the bash, read, edit, or write tools to do the work. Do not only describe the changes.";
-const PLANNING_TOOL_NUDGE =
-  "Use the bash or read tools to gather context, or call propose_draft/survey. Do not only describe the changes.";
-const TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "bash",
-      description: "Run a shell command in the current working directory.",
-      parameters: {
-        type: "object",
-        properties: { command: { type: "string" } },
-        required: ["command"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "read",
-      description: "Read a UTF-8 text file.",
-      parameters: {
-        type: "object",
-        properties: { path: { type: "string" } },
-        required: ["path"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "write",
-      description: "Write a UTF-8 text file, creating parent directories.",
-      parameters: {
-        type: "object",
-        properties: { path: { type: "string" }, content: { type: "string" } },
-        required: ["path", "content"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "edit",
-      description: "Replace the first exact occurrence of old_text in a file with new_text.",
-      parameters: {
-        type: "object",
-        properties: {
-          path: { type: "string" },
-          old_text: { type: "string" },
-          new_text: { type: "string" },
-        },
-        required: ["path", "old_text", "new_text"],
-      },
-    },
-  },
-];
-// Planning sessions may only explore the repo (bash is documented read-only
-// in its tool description and the system prompt; edit/write are dropped
-// entirely so the model has no structured way to change files).
-const PLANNING_TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "bash",
-      description: "Run a read-only shell command (inspect files, search, run tests). Do not modify the repository.",
-      parameters: {
-        type: "object",
-        properties: { command: { type: "string" } },
-        required: ["command"],
-      },
-    },
-  },
-  TOOLS[1], // read
-];
+  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
+  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
+  "After you show a draft, tell the user it is on the right and ask them to review it. " +
+  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
+  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
+  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
+  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
+  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
+  "edit or write any files.";
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
@@ -112,41 +38,263 @@ function planningEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
 }
 
-// The planning MCP server module is shipped alongside run.js only for
-// planning sessions (see runner.PlanningSessionMCPScriptFile). Reuse its
-// proposeDraft/proposeSurvey HTTP calls here instead of duplicating the
-// request contract.
-function loadPlanningHelpers(env = process.env) {
-  const taskDir = env.SUPERPLANE_TASK_DIR;
-  if (!taskDir) {
-    return null;
-  }
-  const script = path.join(taskDir, "planning_session_mcp.js");
-  if (!fs.existsSync(script)) {
-    return null;
-  }
-  return require(script);
+function catalogModelId(model) {
+  return String(model || "")
+    .trim()
+    .replace(/^openrouter\//, "");
 }
 
-function toFunctionTool(def) {
+function openRouterModelId(model) {
+  const trimmed = String(model || "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.startsWith("openrouter/")) {
+    return trimmed;
+  }
+  return `openrouter/${trimmed}`;
+}
+
+function classifyOpenRouterError(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  if (
+    /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
+      lower,
+    )
+  ) {
+    return "hard";
+  }
+  if (
+    /new-account-rpm|rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(lower) ||
+    /too many requests/.test(lower)
+  ) {
+    return "rate_limit";
+  }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|no endpoints|no available provider|temporarily|capacity|timeout|econnreset|fetch failed|provider returned error|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
+  return "other";
+}
+
+function parseRetryAfterMs(text) {
+  const match = String(text || "").match(/retry-after:\s*(\d+)/i);
+  if (!match) {
+    return null;
+  }
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+  return seconds * 1000;
+}
+
+function retryWaitMs(errorText, failedAttempt) {
+  const fromHeader = parseRetryAfterMs(errorText);
+  if (fromHeader != null) {
+    return fromHeader;
+  }
+  const index = Math.max(0, Number(failedAttempt) - 1);
+  if (index >= RETRY_WAIT_MS.length) {
+    return RETRY_WAIT_MS[RETRY_WAIT_MS.length - 1];
+  }
+  return RETRY_WAIT_MS[index];
+}
+
+function isRetryableKind(kind) {
+  return kind === "rate_limit" || kind === "retryable";
+}
+
+function uniqueCatalogModels(ids) {
+  const seen = new Set();
+  const out = [];
+  const list = Array.isArray(ids) ? ids : [];
+  for (const raw of list) {
+    const id = catalogModelId(raw);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function clearSession(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+function restoreSession(taskDir, sessionID) {
+  if (sessionID) {
+    writeSessionID(taskDir, sessionID);
+    return;
+  }
+  clearSession(taskDir);
+}
+
+function waitSecondsLabel(ms) {
+  const seconds = Math.max(1, Math.round(Number(ms) / 1000));
+  return `${seconds} seconds`;
+}
+
+function errorKindLabel(kind) {
+  if (kind === "rate_limit") {
+    return "Rate limit";
+  }
+  if (kind === "retryable") {
+    return "Temporary error";
+  }
+  return "Error";
+}
+
+function retryWaitLine(kind, model, waitMs, nextAttempt) {
+  return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Waiting ${waitSecondsLabel(waitMs)}, then retrying (attempt ${nextAttempt} of ${MAX_ATTEMPTS}).`;
+}
+
+function callingOpenCodeLine(model, attempt) {
+  const labeled = openRouterModelId(model) || String(model || "").trim();
+  if (labeled) {
+    return `Calling OpenCode · ${labeled} (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+  }
+  return `Calling OpenCode (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+}
+
+function stoppedAfterAttemptsLine(kind, model) {
+  return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
+}
+
+function waitExceededTimeoutLine(kind) {
+  return `${errorKindLabel(kind)} wait exceeded the execution timeout`;
+}
+
+function readSessionID(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (!fs.existsSync(file)) {
+    return "";
+  }
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function writeSessionID(taskDir, sessionID) {
+  const id = String(sessionID || "").trim();
+  if (!id) {
+    return;
+  }
+  fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
+}
+
+function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
+  const args = ["--pure", "run", "--format", "json", "--auto"];
+  const prefixed = openRouterModelId(model);
+  if (prefixed) {
+    args.push("-m", prefixed);
+  }
+  if (cwd) {
+    args.push("--dir", cwd);
+  }
+  if (sessionID) {
+    args.push("--session", sessionID);
+  }
+  args.push(prompt);
+  return args;
+}
+
+function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
+  const config = {
+    $schema: "https://opencode.ai/config.json",
+    permission: planning
+      ? { "*": "allow", edit: "deny", question: "deny" }
+      : { "*": "allow" },
+  };
+  const options = {};
+  const apiKey = String((env && env.OPENROUTER_API_KEY) || "").trim();
+  const baseURL = String((env && env.OPENROUTER_BASE_URL) || "").trim();
+  if (apiKey) {
+    options.apiKey = apiKey;
+  }
+  if (baseURL) {
+    options.baseURL = baseURL;
+  }
+  const modelIds = uniqueCatalogModels(models);
+  const modelEntries = {};
+  for (const id of modelIds) {
+    modelEntries[id] = {
+      options: {
+        provider: {
+          allow_fallbacks: false,
+          sort: "throughput",
+        },
+      },
+    };
+  }
+  if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
+    config.provider = { openrouter: {} };
+    if (Object.keys(options).length > 0) {
+      config.provider.openrouter.options = options;
+    }
+    if (Object.keys(modelEntries).length > 0) {
+      config.provider.openrouter.models = modelEntries;
+    }
+  }
+  if (planning && taskDir) {
+    config.mcp = {
+      superplane: {
+        type: "local",
+        command: ["node", path.join(taskDir, "planning_session_mcp.js")],
+        enabled: true,
+      },
+    };
+  }
+  return config;
+}
+
+function writeOpenCodeConfig(taskDir, env, models) {
+  const config = buildOpenCodeConfig({
+    taskDir,
+    env,
+    planning: planningEnabled(env),
+    models,
+  });
+  fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function openCodeProcessEnv(taskDir, baseEnv = process.env) {
+  const xdg = path.join(taskDir, "xdg");
   return {
-    type: "function",
-    function: { name: def.name, description: def.description, parameters: def.inputSchema },
+    ...baseEnv,
+    OPENCODE_CONFIG: path.join(taskDir, "opencode.json"),
+    OPENCODE_DISABLE_AUTOUPDATE: "1",
+    OPENCODE_DISABLE_MODELS_FETCH: "1",
+    OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
+    OPENCODE_DISABLE_CLAUDE_CODE: "1",
+    OPENCODE_PURE: "1",
+    XDG_DATA_HOME: path.join(xdg, "data"),
+    XDG_CONFIG_HOME: path.join(xdg, "config"),
+    XDG_CACHE_HOME: path.join(xdg, "cache"),
   };
 }
 
-function planningToolDefs(helpers) {
-  const defs = (helpers && Array.isArray(helpers.TOOLS) && helpers.TOOLS) || [];
-  return [...PLANNING_TOOLS, ...defs.map(toFunctionTool)];
+function ensureXdgDirs(taskDir) {
+  for (const name of ["data", "config", "cache"]) {
+    fs.mkdirSync(path.join(taskDir, "xdg", name), { recursive: true });
+  }
 }
 
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model] [max-turns]");
+    console.error("usage: node run.js <prompt-file> [model]");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "", args[2])
+  runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
       console.error(err && err.message ? err.message : err);
@@ -154,128 +302,1125 @@ function main() {
     });
 }
 
-async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
-  const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+async function runPrompt(promptFile, model, helpers = {}) {
+  const env = helpers.env || process.env;
+  const sp = env.SUPERPLANE_TASK_DIR;
+  if (!sp) {
+    throw new Error("SUPERPLANE_TASK_DIR is required");
+  }
+  const resultFile = env.SUPERPLANE_RESULT_FILE;
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required");
-  }
-  if (!model) {
-    throw new Error("model is required");
-  }
 
-  const planning = planningEnabled(process.env);
-  const planningHelpers = planning ? loadPlanningHelpers(process.env) : null;
-  const tools = planning ? planningToolDefs(planningHelpers) : TOOLS;
-  const toolNudge = planning ? PLANNING_TOOL_NUDGE : TOOL_NUDGE;
+  let prompt = fs.readFileSync(promptFile, "utf8");
+  const promptCountPath = path.join(sp, "prompt_count");
+  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const startedAt = Date.now();
+  const now = helpers.now || Date.now;
+  const sleep = helpers.sleep || defaultSleep;
+  const cwd = helpers.cwd || process.cwd();
+  const planning = planningEnabled(env);
   if (planning) {
-    process.stdout.write("Planning session tools enabled\n");
-    process.stdout.write(`allowed tools: ${tools.map((tool) => tool.function.name).join(", ")}\n`);
+    printLiveLogLine("Planning session tools enabled");
+    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
   }
 
-  const prompt = fs.readFileSync(promptFile, "utf8");
-  const baseURL = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
-  const messages = [
-    { role: "system", content: planning ? PLANNING_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT },
-    { role: "user", content: prompt },
-  ];
+  ensureXdgDirs(sp);
 
-  const usage = {
+  const currentModel = catalogModelId(model);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  const childEnv = openCodeProcessEnv(sp, env);
+
+  const deadline = waitDeadlineMs(env, now);
+  let lastResult = {};
+  let lastUsage = emptyUsage();
+  let lastCost = 0;
+  let sessionID = readSessionID(sp);
+  const continuing = promptCount > 0 && Boolean(sessionID);
+  if (continuing) {
+    printLiveLogLine(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
+  } else {
+    const startModel = openRouterModelId(currentModel) || model;
+    if (startModel) {
+      printLiveLogLine(`Starting OpenCode · ${startModel}`);
+    } else {
+      printLiveLogLine("Starting OpenCode");
+    }
+  }
+
+  const telemetry = loadTurnTelemetry();
+  const formatter = createOpenCodeFormatter(telemetry, (id) => {
+    sessionID = id || sessionID;
+    writeSessionID(sp, sessionID);
+  });
+  const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
+  const sessionUsageBefore = loadSessionUsage(sp);
+  const sessionStepsBefore = readSessionStepUsages(sp);
+  const firstPromptTurn = telemetry.currentTurn() + 1;
+
+  let failed = false;
+  let exitCode = 0;
+  let lastErrorText = "";
+  let attempt = 1;
+
+  while (true) {
+    printLiveLogLine(callingOpenCodeLine(currentModel, attempt));
+    const sessionBeforeAttempt = sessionID;
+    const args = opencodeRunArgs({
+      model: currentModel,
+      sessionID: sessionID || undefined,
+      prompt,
+      cwd,
+    });
+    const spawnResult = await spawnOpenCodeTurn(args, childEnv, cwd, formatter, helpers);
+    if (spawnResult.sessionID) {
+      sessionID = spawnResult.sessionID;
+      writeSessionID(sp, sessionID);
+    }
+    if (spawnResult.lastEvent) {
+      lastResult = spawnResult.lastEvent;
+    }
+    if (tokenTotal(spawnResult.usage) > 0) {
+      lastUsage = mergeUsage(lastUsage, spawnResult.usage);
+    }
+    const spawnCost = Number(spawnResult.cost);
+    if (Number.isFinite(spawnCost) && spawnCost > 0) {
+      lastCost += spawnCost;
+    }
+    lastErrorText = spawnResult.errorText || "";
+    const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
+    if (!spawnFailed) {
+      failed = false;
+      exitCode = 0;
+      break;
+    }
+    const classKind = classifyOpenRouterError(lastErrorText);
+    const failedExit = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
+    if (!spawnResult.sessionID) {
+      sessionID = sessionBeforeAttempt;
+      restoreSession(sp, sessionID);
+    }
+    if (!isRetryableKind(classKind)) {
+      failed = true;
+      exitCode = failedExit;
+      printRetryOutcome(lastErrorText);
+      break;
+    }
+    if (attempt >= MAX_ATTEMPTS) {
+      failed = true;
+      exitCode = failedExit;
+      printRetryOutcome(lastErrorText, stoppedAfterAttemptsLine(classKind, currentModel));
+      break;
+    }
+    const waitMs = retryWaitMs(lastErrorText, attempt);
+    const remaining = deadline == null ? waitMs : deadline - now();
+    if (remaining < waitMs || remaining <= 0) {
+      failed = true;
+      exitCode = 1;
+      printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
+      break;
+    }
+    printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    await sleep(waitMs);
+    attempt += 1;
+  }
+
+  formatter.flush(failed);
+  const sessionSteps = newSessionStepUsages(readSessionStepUsages(sp), sessionStepsBefore);
+  const recorded = preferRecordedUsage(
+    usageWithCost(lastUsage, lastCost),
+    subtractUsage(loadSessionUsage(sp), sessionUsageBefore),
+  );
+  const usage = recorded;
+  lastCost = Number(recorded.total_cost_usd) || lastCost;
+  if (sessionSteps.length > 0) {
+    applyRecordedStepsToTelemetry(telemetry, sessionSteps, firstPromptTurn);
+  } else {
+    applyRecordedUsageToTelemetry(telemetry, usage);
+  }
+  const payload = {
+    type: "result",
+    result: resultTextFrom(lastResult, formatter),
+    model: openRouterModelId(currentModel) || model,
+    usage,
+  };
+  if (lastCost) {
+    payload.total_cost_usd = lastCost;
+  }
+  telemetry.attachToResult(payload, { name: promptSeriesName(promptFile) });
+  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
+  accumulateLLMUsage(payload);
+  fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  formatTurnResult({
+    is_error: failed,
+    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    duration_ms: Date.now() - startedAt,
+    total_cost_usd: payload.total_cost_usd,
+  });
+  return failed ? exitCode || 1 : 0;
+}
+
+function waitDeadlineMs(env, now) {
+  const seconds = Number((env && env.SUPERPLANE_EXECUTION_TIMEOUT_SECONDS) || 0);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return now() + DEFAULT_WAIT_CAP_MS;
+  }
+  return now() + seconds * 1000;
+}
+
+function defaultSleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function commandExists(name) {
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  return result.status === 0;
+}
+
+function defaultSpawnOpenCode(args, options) {
+  let command = "opencode";
+  let spawnArgs = args;
+  if (commandExists("stdbuf")) {
+    command = "stdbuf";
+    spawnArgs = ["-oL", "-eL", "opencode", ...args];
+  }
+  return spawn(command, spawnArgs, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: options.env,
+    cwd: options.cwd,
+  });
+}
+
+function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
+  const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
+  if (!String(text || "").trim()) {
+    return false;
+  }
+  if (spawnResult && spawnResult.roundOpen) {
+    return false;
+  }
+  return tokenTotal(spawnResult && spawnResult.usage) > 0;
+}
+
+function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
+  if (spawnResult.resultFailed) {
+    return true;
+  }
+  if (spawnResult.exitCode === 0) {
+    return false;
+  }
+  const kind = classifyOpenRouterError(spawnResult.errorText || "");
+  if (kind === "rate_limit" || kind === "hard" || kind === "retryable") {
+    return true;
+  }
+  if (!allowSoftExitWithReply) {
+    return true;
+  }
+  return !spawnHasCompleteAssistantTurn(spawnResult, formatter);
+}
+
+async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
+  if (formatter && typeof formatter.beginSpawn === "function") {
+    formatter.beginSpawn();
+  }
+  const spawnOpenCode = helpers.spawnOpenCode || defaultSpawnOpenCode;
+  const child = spawnOpenCode(args, { env, cwd });
+  if (child.stdin && typeof child.stdin.end === "function") {
+    child.stdin.end();
+  }
+  let stderrText = "";
+  const stderrDone = new Promise((resolve) => {
+    if (!child.stderr) {
+      resolve();
+      return;
+    }
+    child.stderr.on("data", (chunk) => {
+      stderrText += String(chunk);
+      process.stderr.write(chunk);
+    });
+    child.stderr.on("end", resolve);
+    child.stderr.on("error", resolve);
+  });
+
+  const stdout = child.stdout;
+  const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
+  if (rl) {
+    rl.on("line", (raw) => formatter.handleLine(raw));
+  }
+  const stdoutDone = rl
+    ? new Promise((resolve) => {
+        rl.on("close", resolve);
+      })
+    : Promise.resolve();
+
+  let exitCode;
+  try {
+    exitCode = await new Promise((resolve, reject) => {
+      child.on("error", (err) => {
+        if (stdout && typeof stdout.destroy === "function") {
+          stdout.destroy();
+        }
+        reject(err);
+      });
+      child.on("close", (code) => resolve(code == null ? 1 : code));
+    });
+  } catch (err) {
+    await Promise.all([stdoutDone, stderrDone]);
+    throw err;
+  }
+  await Promise.all([stdoutDone, stderrDone]);
+
+  const snapshot = formatter.snapshot();
+  return {
+    exitCode,
+    errorText: combineErrorText(snapshot.errorText, stderrText),
+    resultFailed: snapshot.resultFailed,
+    sessionID: snapshot.sessionID,
+    usage: snapshot.usage,
+    cost: snapshot.cost,
+    lastEvent: snapshot.lastEvent,
+    roundOpen: Boolean(snapshot.roundOpen),
+  };
+}
+
+function combineErrorText(fromEvent, fromStderr) {
+  const eventText = String(fromEvent || "").trim();
+  const stderr = String(fromStderr || "").trim();
+  if (!eventText) {
+    return stderr;
+  }
+  if (!stderr || eventText.includes(stderr)) {
+    return eventText;
+  }
+  if (stderr.includes(eventText)) {
+    return stderr;
+  }
+  return `${eventText}\n${stderr}`;
+}
+
+function emptyUsage() {
+  return {
     input_tokens: 0,
     output_tokens: 0,
     cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
     reasoning_tokens: 0,
   };
-  let lastText = "";
-  let costMicros = 0;
-  let pendingToolCalls = false;
-  let nudgedForTools = false;
-  let numTurns = 0;
-  let exitCode = 1;
-  const startedAt = Date.now();
-  const turnLimit = resolveMaxTurns(maxTurns);
+}
 
-  try {
-    for (let turn = 0; turn < turnLimit; turn += 1) {
-      numTurns += 1;
-      const response = await chat(baseURL, apiKey, model, messages, true, tools);
-      addUsage(usage, response.usage);
-      costMicros += usageCostMicros(response.usage);
-
-      const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
-      messages.push(message);
-      const text = assistantText(message);
-      if (text) {
-        lastText = text;
-        process.stdout.write(`${lastText}\n`);
-      }
-
-      const toolCalls = extractToolCalls(message);
-      pendingToolCalls = toolCalls.length > 0;
-      if (!pendingToolCalls) {
-        if (!nudgedForTools) {
-          nudgedForTools = true;
-          process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
-          messages.push({ role: "user", content: toolNudge });
-          continue;
-        }
-        break;
-      }
-      for (const call of toolCalls) {
-        const name = call.function && call.function.name;
-        const args = parseArgs(call.function && call.function.arguments);
-        const kind = String(name || "tool").toLowerCase();
-        const startedAt = Date.now();
-        writeLiveLogRecord({
-          type: "tool_start",
-          id: call.id,
-          kind,
-          text: toolPreview(kind, args),
-          started_at: startedAt,
-        });
-        const result = await dispatchTool(name, args, { planning, planningHelpers });
-        if (result.output) {
-          process.stdout.write(`${result.output}\n`);
-        }
-        writeLiveLogRecord({
-          type: "tool_end",
-          id: call.id,
-          kind,
-          status: result.failed ? "failed" : "passed",
-          duration_ms: Math.max(0, Date.now() - startedAt),
-        });
-        messages.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content: result.output,
-        });
-      }
-    }
-
-    if (pendingToolCalls) {
-      const wrapUp = await requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit);
-      lastText = wrapUp.text;
-      costMicros += wrapUp.costMicros;
-      numTurns += 1;
-    }
-    exitCode = 0;
+function tokenTotal(usage) {
+  if (!usage || typeof usage !== "object") {
     return 0;
-  } catch (err) {
-    console.error(err && err.message ? err.message : err);
-    exitCode = 1;
-    return 1;
-  } finally {
-    writeResult(resultFile, model, usage, costMicros, lastText);
-    formatTurnResult({
-      is_error: exitCode !== 0,
-      num_turns: numTurns || 1,
-      total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
-      duration_ms: Date.now() - startedAt,
-    });
   }
+  return (
+    Number(usage.input_tokens || 0) +
+    Number(usage.output_tokens || 0) +
+    Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.cache_creation_input_tokens || 0) +
+    Number(usage.reasoning_tokens || 0)
+  );
+}
+
+function mergeUsage(left, right) {
+  const merged = {
+    input_tokens: Number((left && left.input_tokens) || 0) + Number((right && right.input_tokens) || 0),
+    output_tokens: Number((left && left.output_tokens) || 0) + Number((right && right.output_tokens) || 0),
+    cache_read_input_tokens:
+      Number((left && left.cache_read_input_tokens) || 0) + Number((right && right.cache_read_input_tokens) || 0),
+    cache_creation_input_tokens:
+      Number((left && left.cache_creation_input_tokens) || 0) + Number((right && right.cache_creation_input_tokens) || 0),
+    reasoning_tokens: Number((left && left.reasoning_tokens) || 0) + Number((right && right.reasoning_tokens) || 0),
+  };
+  const cost = Number((left && left.total_cost_usd) || 0) + Number((right && right.total_cost_usd) || 0);
+  if (cost) {
+    merged.total_cost_usd = cost;
+  }
+  return merged;
+}
+
+function usageWithCost(usage, cost) {
+  const next = mergeUsage(emptyUsage(), usage);
+  const usd = Number(cost);
+  if (Number.isFinite(usd) && usd > 0) {
+    next.total_cost_usd = usd;
+  }
+  return next;
+}
+
+function subtractUsage(after, before) {
+  const delta = {
+    input_tokens: Math.max(0, Number((after && after.input_tokens) || 0) - Number((before && before.input_tokens) || 0)),
+    output_tokens: Math.max(
+      0,
+      Number((after && after.output_tokens) || 0) - Number((before && before.output_tokens) || 0),
+    ),
+    cache_read_input_tokens: Math.max(
+      0,
+      Number((after && after.cache_read_input_tokens) || 0) - Number((before && before.cache_read_input_tokens) || 0),
+    ),
+    cache_creation_input_tokens: Math.max(
+      0,
+      Number((after && after.cache_creation_input_tokens) || 0) -
+        Number((before && before.cache_creation_input_tokens) || 0),
+    ),
+    reasoning_tokens: Math.max(
+      0,
+      Number((after && after.reasoning_tokens) || 0) - Number((before && before.reasoning_tokens) || 0),
+    ),
+  };
+  const cost = Math.max(
+    0,
+    Number((after && after.total_cost_usd) || 0) - Number((before && before.total_cost_usd) || 0),
+  );
+  if (cost) {
+    delta.total_cost_usd = cost;
+  }
+  return delta;
+}
+
+function preferRecordedUsage(left, right) {
+  const usage = {
+    input_tokens: Math.max(Number((left && left.input_tokens) || 0), Number((right && right.input_tokens) || 0)),
+    output_tokens: Math.max(Number((left && left.output_tokens) || 0), Number((right && right.output_tokens) || 0)),
+    cache_read_input_tokens: Math.max(
+      Number((left && left.cache_read_input_tokens) || 0),
+      Number((right && right.cache_read_input_tokens) || 0),
+    ),
+    cache_creation_input_tokens: Math.max(
+      Number((left && left.cache_creation_input_tokens) || 0),
+      Number((right && right.cache_creation_input_tokens) || 0),
+    ),
+    reasoning_tokens: Math.max(
+      Number((left && left.reasoning_tokens) || 0),
+      Number((right && right.reasoning_tokens) || 0),
+    ),
+  };
+  const cost = Math.max(Number((left && left.total_cost_usd) || 0), Number((right && right.total_cost_usd) || 0));
+  if (cost) {
+    usage.total_cost_usd = cost;
+  }
+  return usage;
+}
+
+function telemetryUsageTotal(telemetry) {
+  const snapshot = telemetry && typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  let total = emptyUsage();
+  for (const turn of turns) {
+    total = mergeUsage(total, turn && turn.usage);
+  }
+  return total;
+}
+
+function applyRecordedUsageToTelemetry(telemetry, recorded) {
+  if (!telemetry || tokenTotal(recorded) <= 0) {
+    return;
+  }
+  const live = telemetryUsageTotal(telemetry);
+  const gap = subtractUsage(recorded, live);
+  if (tokenTotal(gap) <= 0 && !(Number(gap.total_cost_usd) > 0)) {
+    return;
+  }
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
+  telemetry.mergeCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+}
+
+function newSessionStepUsages(after, before) {
+  const priorKeys = new Set((before || []).map((step) => step.key));
+  return (after || []).filter((step) => !priorKeys.has(step.key));
+}
+
+function promptTurnNumbers(telemetry, firstTurn) {
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  return turns
+    .map((item) => Number(item && item.turn))
+    .filter((turn) => Number.isFinite(turn) && turn >= firstTurn);
+}
+
+function applyRecordedStepsToTelemetry(telemetry, steps, firstTurn) {
+  if (!telemetry || !Array.isArray(steps)) {
+    return;
+  }
+  const billed = steps.filter((step) => step && tokenTotal(step.usage) > 0);
+  if (!billed.length) {
+    return;
+  }
+  const liveTurns = promptTurnNumbers(telemetry, firstTurn);
+  const offset = Math.max(0, liveTurns.length - billed.length);
+  for (const [index, step] of billed.entries()) {
+    const turn = liveTurns[offset + index];
+    if (turn && telemetry.replaceTurnUsage(turn, step.usage)) {
+      continue;
+    }
+    telemetry.beginTurn(step.usage, { forceNew: true });
+  }
+}
+
+function openCodeDataHome(taskDir) {
+  return path.join(taskDir, "xdg", "data", "opencode");
+}
+
+function parseStoredPart(raw) {
+  let value = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  if (value.part && typeof value.part === "object") {
+    return value.part;
+  }
+  return value;
+}
+
+function usageFromStoredPart(part) {
+  if (!part || typeof part !== "object") {
+    return emptyUsage();
+  }
+  const type = String(part.type || "");
+  if (type !== "step-finish" && type !== "step_finish") {
+    return emptyUsage();
+  }
+  return usageFromStepFinish(part);
+}
+
+function collectJsonFiles(dir, files = []) {
+  if (!dir || !fs.existsSync(dir)) {
+    return files;
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return files;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectJsonFiles(full, files);
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".json")) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+function sessionStepUsage(key, raw) {
+  const usage = usageFromStoredPart(parseStoredPart(raw));
+  if (tokenTotal(usage) <= 0 && !(Number(usage.total_cost_usd) > 0)) {
+    return null;
+  }
+  return { key, usage };
+}
+
+function readSessionStepUsagesFromJsonParts(openCodeHome) {
+  const roots = [path.join(openCodeHome, "storage", "part"), path.join(openCodeHome, "storage", "session", "part")];
+  const steps = [];
+  for (const root of roots) {
+    for (const file of collectJsonFiles(root).sort()) {
+      let parsed;
+      try {
+        parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      } catch {
+        continue;
+      }
+      const step = sessionStepUsage(file, parsed);
+      if (step) {
+        steps.push(step);
+      }
+    }
+  }
+  return steps;
+}
+
+function openCodeDatabasePaths(openCodeHome) {
+  if (!openCodeHome || !fs.existsSync(openCodeHome)) {
+    return [];
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(openCodeHome);
+  } catch {
+    return [];
+  }
+  return entries.filter((name) => /^opencode.*\.db$/.test(name)).map((name) => path.join(openCodeHome, name));
+}
+
+function stepUsagesFromRows(dbPath, rows) {
+  const steps = [];
+  for (const row of rows || []) {
+    const data = row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
+    const id = row && row.id != null ? String(row.id) : String(steps.length);
+    const step = sessionStepUsage(`${dbPath}:${id}`, data);
+    if (step) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+
+function sumStepUsages(steps) {
+  let usage = emptyUsage();
+  for (const step of steps || []) {
+    usage = mergeUsage(usage, step && step.usage);
+  }
+  return usage;
+}
+
+function withSilencedExperimentalWarnings(fn) {
+  const original = process.emitWarning;
+  process.emitWarning = function (warning, type, ...rest) {
+    const kind = typeof type === "string" ? type : warning && warning.name;
+    if (kind === "ExperimentalWarning") {
+      return;
+    }
+    return original.call(process, warning, type, ...rest);
+  };
+  try {
+    return fn();
+  } finally {
+    process.emitWarning = original;
+  }
+}
+
+function readSessionStepUsagesFromSqliteNative(dbPath) {
+  return withSilencedExperimentalWarnings(() => {
+    let DatabaseSync;
+    try {
+      ({ DatabaseSync } = require("node:sqlite"));
+    } catch {
+      return null;
+    }
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT id, data FROM part
+           WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+           ORDER BY time_created, id`,
+        )
+        .all();
+      return stepUsagesFromRows(dbPath, rows);
+    } finally {
+      db.close();
+    }
+  });
+}
+
+function readSessionStepUsagesFromSqliteCli(dbPath) {
+  const result = spawnSync(
+    "sqlite3",
+    [
+      "-readonly",
+      "-json",
+      dbPath,
+      `SELECT id, data FROM part
+       WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+       ORDER BY time_created, id`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0 || !String(result.stdout || "").trim()) {
+    return emptyUsage();
+  }
+  let rows;
+  try {
+    rows = JSON.parse(result.stdout);
+  } catch {
+    return [];
+  }
+  return stepUsagesFromRows(dbPath, rows);
+}
+
+function readSessionStepUsagesFromSqlite(dbPath) {
+  if (!dbPath || !fs.existsSync(dbPath)) {
+    return [];
+  }
+  try {
+    const native = readSessionStepUsagesFromSqliteNative(dbPath);
+    if (native) {
+      return native;
+    }
+  } catch {
+    // Missing tables or a locked WAL file are expected. Try the sqlite3 CLI.
+  }
+  try {
+    return readSessionStepUsagesFromSqliteCli(dbPath);
+  } catch {
+    return [];
+  }
+}
+
+function preferSessionSteps(left, right) {
+  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left)) ? right : left;
+}
+
+function readSessionStepUsages(taskDir) {
+  if (!taskDir) {
+    return [];
+  }
+  const openCodeHome = openCodeDataHome(taskDir);
+  let steps = [];
+  for (const dbPath of openCodeDatabasePaths(openCodeHome)) {
+    steps = preferSessionSteps(steps, readSessionStepUsagesFromSqlite(dbPath));
+  }
+  return preferSessionSteps(steps, readSessionStepUsagesFromJsonParts(openCodeHome));
+}
+
+function readSessionUsage(taskDir) {
+  return sumStepUsages(readSessionStepUsages(taskDir));
+}
+
+function usageFromStepFinish(part) {
+  const tokens = (part && part.tokens) || {};
+  const cache = tokens.cache || {};
+  const usage = {
+    input_tokens: Number(tokens.input || 0),
+    output_tokens: Number(tokens.output || 0),
+    cache_read_input_tokens: Number(cache.read || 0),
+    cache_creation_input_tokens: Number(cache.write || 0),
+    reasoning_tokens: Number(tokens.reasoning || 0),
+  };
+  if (part && part.cost != null && Number.isFinite(Number(part.cost))) {
+    usage.total_cost_usd = Number(part.cost);
+  }
+  return usage;
+}
+
+function collectErrorText(value, parts, depth) {
+  if (value == null || depth > 5) {
+    return;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    const text = String(value).trim();
+    if (text) {
+      parts.push(text);
+    }
+    return;
+  }
+  if (typeof value !== "object") {
+    return;
+  }
+  for (const key of ["message", "name", "code", "status", "statusCode", "type", "responseBody"]) {
+    if (value[key] != null && value[key] !== value) {
+      collectErrorText(value[key], parts, depth + 1);
+    }
+  }
+  if (value.data && value.data !== value) {
+    collectErrorText(value.data, parts, depth + 1);
+  }
+  if (value.error && value.error !== value) {
+    collectErrorText(value.error, parts, depth + 1);
+  }
+  if (value.cause && value.cause !== value) {
+    collectErrorText(value.cause, parts, depth + 1);
+  }
+}
+
+function errorTextFromEvent(event) {
+  const parts = [];
+  collectErrorText(event, parts, 0);
+  return [...new Set(parts)].join(" ");
+}
+
+function resultTextFrom(lastEvent, formatter) {
+  if (formatter && typeof formatter.lastText === "function") {
+    const text = formatter.lastText();
+    if (text) {
+      return text;
+    }
+  }
+  const part = lastEvent && lastEvent.part;
+  if (part && typeof part.text === "string") {
+    return part.text;
+  }
+  return "";
+}
+
+function accumulateLLMUsage(payload) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) {
+    return;
+  }
+  const script = path.join(taskDir, "llm_usage.js");
+  if (!fs.existsSync(script)) {
+    return;
+  }
+  require(script).accumulate(taskDir, payload);
+}
+
+function loadTurnTelemetry() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const candidates = [];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "turn_telemetry.js"));
+  }
+  candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file).createTurnTelemetry();
+    }
+  }
+  return require("../turn_telemetry").createTurnTelemetry();
+}
+
+function promptSeriesName(promptFile) {
+  const base = path.basename(promptFile || "", path.extname(promptFile || ""));
+  const words = base.replace(/^\d+-/, "").split("-").filter(Boolean);
+  if (words.length === 0) {
+    return "";
+  }
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+function writeStdout(chunk) {
+  fs.writeSync(1, chunk);
+}
+
+function writeLiveLogRecord(rec) {
+  writeStdout(`${JSON.stringify(rec)}\n`);
+}
+
+function printLiveLogLine(text) {
+  const line = String(text || "");
+  if (!line) {
+    return;
+  }
+  println(line);
+}
+
+function printRetryOutcome(errorText, extraLine) {
+  if (errorText) {
+    printLiveLogLine(truncateText(errorText));
+  }
+  if (extraLine) {
+    printLiveLogLine(extraLine);
+  }
+}
+
+function println(text = "") {
+  writeStdout(`${text}\n`);
+}
+
+function createOpenCodeFormatter(telemetry, onSession) {
+  const tracker = telemetry || loadTurnTelemetry();
+  const tools = createToolTracker(tracker);
+  let sessionID = "";
+  let resultFailed = false;
+  let errorText = "";
+  let lastText = "";
+  let lastEvent = {};
+  let usage = emptyUsage();
+  let cost = 0;
+  let roundOpen = false;
+  let announcedStart = false;
+
+  function rememberSession(event) {
+    const id = String((event && event.sessionID) || (event && event.part && event.part.sessionID) || "").trim();
+    if (!id) {
+      return;
+    }
+    sessionID = id;
+    if (onSession) {
+      onSession(id);
+    }
+  }
+
+  function beginRound(eventUsage, extra) {
+    tracker.beginTurn(eventUsage, extra);
+    roundOpen = true;
+  }
+
+  return {
+    beginSpawn() {
+      resultFailed = false;
+      errorText = "";
+      announcedStart = false;
+      lastText = "";
+      usage = emptyUsage();
+      cost = 0;
+      roundOpen = false;
+      sessionID = "";
+    },
+    handleLine(raw) {
+      const line = String(raw || "").trim();
+      if (!line) {
+        return;
+      }
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        println(line);
+        return;
+      }
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return;
+      }
+      this.handleEvent(event);
+    },
+    handleEvent(event) {
+      rememberSession(event);
+      lastEvent = event;
+      const type = String(event.type || "");
+      const part = event.part && typeof event.part === "object" ? event.part : {};
+      switch (type) {
+        case "step_start":
+          if (!announcedStart) {
+            announcedStart = true;
+            println("OpenCode started");
+          }
+          beginRound(undefined, {});
+          break;
+        case "text": {
+          const text = typeof part.text === "string" ? part.text : "";
+          if (text.trim()) {
+            lastText = text.replace(/\s+$/, "");
+            if (!roundOpen) {
+              beginRound(undefined, { message: lastText });
+            }
+            println(lastText);
+          }
+          break;
+        }
+        case "reasoning": {
+          const thinking = typeof part.text === "string" ? part.text : "";
+          if (thinking.trim()) {
+            println("Thinking");
+            println(truncateText(thinking.trim()));
+            println();
+          }
+          break;
+        }
+        case "tool_use":
+          if (!roundOpen) {
+            beginRound(undefined, { hasTools: true });
+          }
+          formatToolUse(part, tools);
+          break;
+        case "step_finish":
+        case "step-finish": {
+          const stepUsage = usageFromStepFinish(part);
+          usage = mergeUsage(usage, stepUsage);
+          if (part.cost != null && Number.isFinite(Number(part.cost))) {
+            cost = Number(cost || 0) + Number(part.cost);
+          }
+          if (!roundOpen) {
+            beginRound(stepUsage, { message: lastText });
+          } else {
+            tracker.mergeCurrentUsage(stepUsage);
+          }
+          roundOpen = false;
+          break;
+        }
+        case "error": {
+          const text = errorTextFromEvent(event);
+          errorText = text;
+          if (classifyOpenRouterError(text) === "hard") {
+            resultFailed = true;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    flush(failed) {
+      tools.flush(Boolean(failed));
+    },
+    snapshot() {
+      return {
+        sessionID,
+        resultFailed,
+        errorText,
+        usage,
+        cost,
+        lastEvent,
+        roundOpen,
+      };
+    },
+    lastText() {
+      return lastText;
+    },
+    resultFailed() {
+      return resultFailed;
+    },
+  };
+}
+
+function createToolTracker(telemetry) {
+  const openTools = new Map();
+  const fifo = [];
+  let anonSeq = 0;
+
+  function resolveKey(id, creating) {
+    const key = id != null && String(id).trim() ? String(id).trim() : "";
+    if (key) {
+      return key;
+    }
+    if (creating) {
+      const generated = `anon-${anonSeq}`;
+      anonSeq += 1;
+      fifo.push(generated);
+      return generated;
+    }
+    return fifo.shift() || "";
+  }
+
+  return {
+    start(kind, text, id) {
+      const key = resolveKey(id, true);
+      const startedAt = Date.now();
+      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+      return key;
+    },
+    emitStart(id) {
+      let key = id != null && String(id).trim() ? String(id).trim() : "";
+      if (!key || !openTools.has(key)) {
+        key = fifo[0] || key;
+      }
+      const tool = openTools.get(key);
+      if (!tool || tool.emitted) {
+        return key;
+      }
+      tool.emitted = true;
+      writeLiveLogRecord(
+        telemetry.stampToolStart({
+          type: "tool_start",
+          id: key,
+          kind: tool.kind,
+          text: tool.text,
+          started_at: tool.startedAt,
+        }),
+      );
+      return key;
+    },
+    end(failed, id) {
+      this.emitStart(id);
+      let key = resolveKey(id, false);
+      if (!openTools.has(key)) {
+        key = fifo.shift() || key;
+      }
+      const tool = openTools.get(key);
+      if (!tool) {
+        return;
+      }
+      openTools.delete(key);
+      const fifoIndex = fifo.indexOf(key);
+      if (fifoIndex >= 0) {
+        fifo.splice(fifoIndex, 1);
+      }
+      writeLiveLogRecord(
+        telemetry.stampToolEnd({
+          type: "tool_end",
+          id: key,
+          kind: tool.kind,
+          status: failed ? "failed" : "passed",
+          duration_ms: Math.max(0, Date.now() - tool.startedAt),
+        }),
+      );
+    },
+    flush(failed) {
+      for (const key of [...openTools.keys()]) {
+        this.end(failed, key);
+      }
+    },
+  };
+}
+
+function formatToolUse(part, tools) {
+  const name = String(part.tool || part.name || "tool");
+  const kind = name.toLowerCase();
+  const state = part.state && typeof part.state === "object" ? part.state : {};
+  const id = part.callID || part.id || "";
+  const started = tools.start(kind, toolInputDetail(name, state.input) || kind, id);
+  tools.emitStart(started);
+  const output = typeof state.output === "string" ? state.output : "";
+  if (output.trim()) {
+    println(truncateText(output.replace(/\s+$/, "")));
+  } else if (state.error) {
+    const errText = typeof state.error === "string" ? state.error : JSON.stringify(state.error);
+    if (errText.trim()) {
+      println(truncateText(errText));
+    }
+  }
+  const failed = state.status === "error" || Boolean(state.error);
+  tools.end(failed, started);
+}
+
+function toolInputDetail(name, rawInput) {
+  if (rawInput == null || typeof rawInput !== "object" || Array.isArray(rawInput)) {
+    if (rawInput == null) {
+      return "";
+    }
+    return truncateText(String(rawInput));
+  }
+  const lowered = name.toLowerCase();
+  if (lowered === "bash") {
+    const command = rawInput.command;
+    if (typeof command === "string" && command.trim()) {
+      return command.trim().split(/\r?\n/).join(" ");
+    }
+  }
+  if (["read", "write", "edit", "notebookedit"].includes(lowered)) {
+    for (const key of ["file_path", "path", "notebook_path"]) {
+      const value = rawInput[key];
+      if (typeof value === "string" && value.trim()) {
+        let detail = value.trim();
+        if ((lowered === "write" || lowered === "edit") && typeof rawInput.content === "string") {
+          detail += ` (${rawInput.content.length} chars)`;
+        }
+        return detail;
+      }
+    }
+  }
+  if (lowered === "grep") {
+    const parts = [];
+    if (rawInput.pattern) {
+      parts.push(`pattern: ${rawInput.pattern}`);
+    }
+    if (rawInput.path) {
+      parts.push(`path: ${rawInput.path}`);
+    }
+    if (parts.length) {
+      return parts.join(" · ");
+    }
+  }
+  if (lowered === "glob" && rawInput.pattern) {
+    return String(rawInput.pattern);
+  }
+  try {
+    return truncateText(JSON.stringify(rawInput));
+  } catch {
+    return truncateText(String(rawInput));
+  }
+}
+
+function truncateText(text) {
+  let lines = String(text || "").split(/\r?\n/);
+  if (lines.length > TOOL_RESULT_MAX_LINES) {
+    const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);
+    const omitted = lines.length - TOOL_RESULT_MAX_LINES;
+    text = `${kept.join("\n")}\n… (${omitted} more lines)`;
+    lines = text.split(/\r?\n/);
+  }
+  if (text.length > TOOL_RESULT_MAX_CHARS) {
+    text = `${text.slice(0, TOOL_RESULT_MAX_CHARS - 1).replace(/\s+$/, "")}…`;
+  }
+  return text;
 }
 
 function formatTurnResult(event) {
@@ -298,254 +1443,31 @@ function formatTurnResult(event) {
   process.stdout.write(`${parts.join(" · ")}\n`);
 }
 
-function writeResult(resultFile, model, usage, costMicros, lastText) {
-  const payload = {
-    type: "result",
-    result: lastText,
-    model,
-    usage,
-  };
-  if (costMicros > 0) {
-    payload.total_cost_usd = costMicros / 1000000;
+function formatOpenCodeJsonLines(rawLines) {
+  const formatter = createOpenCodeFormatter(loadTurnTelemetry());
+  for (const line of rawLines) {
+    formatter.handleLine(line);
   }
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
-}
-
-function resolveMaxTurns(maxTurns) {
-  const n = Number(maxTurns);
-  if (!(n > 0)) {
-    return DEFAULT_MAX_TURNS;
-  }
-  return Math.min(Math.floor(n), MAX_TURNS_LIMIT);
-}
-
-function extractToolCalls(message) {
-  if (!message) {
-    return [];
-  }
-  if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
-    return message.tool_calls;
-  }
-  if (message.function_call && message.function_call.name) {
-    return [
-      {
-        id: String(message.function_call.name) + "-legacy",
-        type: "function",
-        function: message.function_call,
-      },
-    ];
-  }
-  if (!Array.isArray(message.content)) {
-    return [];
-  }
-  const calls = [];
-  for (const part of message.content) {
-    const fn = (part && (part.functionCall || part.function_call)) || null;
-    if (!fn || !fn.name) {
-      continue;
-    }
-    const rawArgs = fn.arguments || fn.args || {};
-    calls.push({
-      id: String(fn.id || fn.name),
-      type: "function",
-      function: {
-        name: fn.name,
-        arguments: typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs),
-      },
-    });
-  }
-  return calls;
-}
-
-function assistantText(message) {
-  if (!message || !message.content) {
-    return "";
-  }
-  if (Array.isArray(message.content)) {
-    return message.content.map((part) => part.text || "").join("");
-  }
-  return String(message.content);
-}
-
-async function requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit) {
-  process.stderr.write(
-    `OpenRouter agent reached ${turnLimit} turns; requesting a final response without tools\n`,
-  );
-  messages.push({ role: "user", content: WRAP_UP_PROMPT });
-  const response = await chat(baseURL, apiKey, model, messages, false);
-  addUsage(usage, response.usage);
-  const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
-  const text = assistantText(message);
-  if (text) {
-    process.stdout.write(`${text}\n`);
-  }
-  return {
-    text: text || lastText,
-    costMicros: usageCostMicros(response.usage),
-  };
-}
-
-async function chat(baseURL, apiKey, model, messages, withTools, tools = TOOLS) {
-  const payload = {
-    model,
-    messages,
-    usage: { include: true },
-  };
-  if (withTools) {
-    payload.tools = tools;
-    payload.tool_choice = "auto";
-    payload.provider = { require_parameters: true };
-  }
-  const response = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.error && body.error.message ? body.error.message : `OpenRouter HTTP ${response.status}`);
-  }
-  return body;
-}
-
-function addUsage(total, usage) {
-  if (!usage) {
-    return;
-  }
-  total.input_tokens += Number(usage.prompt_tokens || usage.input_tokens || 0);
-  total.output_tokens += Number(usage.completion_tokens || usage.output_tokens || 0);
-  const details = usage.prompt_tokens_details || {};
-  total.cache_read_input_tokens += Number(details.cached_tokens || usage.cache_read_input_tokens || 0);
-  const completionDetails = usage.completion_tokens_details || {};
-  total.reasoning_tokens += Number(completionDetails.reasoning_tokens || usage.reasoning_tokens || 0);
-}
-
-function usageCostMicros(usage) {
-  if (!usage || usage.cost == null) {
-    return 0;
-  }
-  return Math.round(Number(usage.cost) * 1000000);
-}
-
-function parseArgs(raw) {
-  if (!raw) {
-    return {};
-  }
-  if (typeof raw === "object") {
-    return raw;
-  }
-  try {
-    return JSON.parse(raw);
-  } catch (_err) {
-    return {};
-  }
-}
-
-// dispatchTool routes bash/read/write/edit through the synchronous local
-// tool runner and propose_draft/survey through the async planning helpers
-// (network calls to SuperPlane). Planning sessions never see write/edit in
-// their tool list, but reject them here too in case a model hallucinates a
-// call to a tool it was not offered.
-async function dispatchTool(name, args, ctx) {
-  if (ctx.planning) {
-    if (name === "propose_draft" || name === "survey") {
-      return runPlanningTool(name, args, ctx.planningHelpers);
-    }
-    if (name === "write" || name === "edit") {
-      return { output: `${name} is not available in a planning session`, failed: true };
-    }
-  }
-  return runTool(name, args);
-}
-
-async function runPlanningTool(name, args, helpers) {
-  if (!helpers) {
-    return { output: "planning tools are not available in this run", failed: true };
-  }
-  try {
-    const result = name === "propose_draft" ? await helpers.proposeDraft(args) : await helpers.proposeSurvey(args);
-    return { output: JSON.stringify(result), failed: false };
-  } catch (err) {
-    return { output: err && err.message ? err.message : String(err), failed: true };
-  }
-}
-
-function runTool(name, args) {
-  try {
-    if (name === "bash") {
-      const result = spawnSync("bash", ["-lc", String(args.command || "")], {
-        encoding: "utf8",
-        cwd: process.cwd(),
-        env: process.env,
-        timeout: 120000,
-        maxBuffer: 2 * 1024 * 1024,
-      });
-      const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-      if (result.status !== 0) {
-        return { output: output || `command failed with exit ${result.status}`, failed: true };
-      }
-      return { output: output || "(no output)", failed: false };
-    }
-    if (name === "read") {
-      return { output: fs.readFileSync(args.path, "utf8"), failed: false };
-    }
-    if (name === "write") {
-      fs.mkdirSync(path.dirname(args.path), { recursive: true });
-      fs.writeFileSync(args.path, args.content ?? "", "utf8");
-      return { output: `wrote ${args.path}`, failed: false };
-    }
-    if (name === "edit") {
-      const current = fs.readFileSync(args.path, "utf8");
-      if (!current.includes(args.old_text)) {
-        return { output: "old_text not found", failed: true };
-      }
-      fs.writeFileSync(args.path, current.replace(args.old_text, args.new_text), "utf8");
-      return { output: `edited ${args.path}`, failed: false };
-    }
-    return { output: `unknown tool: ${name}`, failed: true };
-  } catch (err) {
-    return { output: err && err.message ? err.message : String(err), failed: true };
-  }
-}
-
-function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
-}
-
-function toolPreview(kind, args) {
-  if (!args || typeof args !== "object") {
-    return kind;
-  }
-  if (kind === "bash" && typeof args.command === "string" && args.command.trim()) {
-    return args.command.trim();
-  }
-  if (kind === "propose_draft" && typeof args.title === "string" && args.title.trim()) {
-    return args.title.trim();
-  }
-  if (typeof args.path === "string" && args.path.trim()) {
-    return args.path.trim();
-  }
-  return kind;
-}
-
-function accumulateLLMUsage(payload) {
-  const taskDir = process.env.SUPERPLANE_TASK_DIR;
-  if (!taskDir) {
-    return;
-  }
-  const script = path.join(taskDir, "llm_usage.js");
-  if (!fs.existsSync(script)) {
-    return;
-  }
-  require(script).accumulate(taskDir, payload);
+  const failed = formatter.resultFailed();
+  formatter.flush(failed);
+  return { failed };
 }
 
 if (require.main === module) {
   main();
 }
 
-module.exports = { runPrompt, formatTurnResult, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT, planningEnabled };
+module.exports = {
+  runPrompt,
+  formatOpenCodeJsonLines,
+  formatTurnResult,
+  opencodeRunArgs,
+  planningEnabled,
+  classifyOpenRouterError,
+  openRouterModelId,
+  buildOpenCodeConfig,
+  retryWaitMs,
+  waitDeadlineMs,
+  openCodeProcessEnv,
+  readSessionUsage,
+};

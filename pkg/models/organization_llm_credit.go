@@ -14,12 +14,15 @@ import (
 const (
 	LLMCreditGrantKindWelcome     = "welcome"
 	LLMCreditGrantKindAdmin       = "admin"
-	LLMCreditGrantKindPolar       = "polar"
-	LLMCreditGrantKindPolarRefund = "polar_refund"
+	LLMCreditGrantKindIncluded    = "included"
+	LLMCreditGrantKindTopup       = "topup"
+	LLMCreditGrantKindTopupRefund = "topup_refund"
+
+	canceledIncludedGrantPrefix = "canceled:"
 )
 
 var (
-	ErrHostedCreditEmpty        = errors.New("hosted LLM credit is empty")
+	ErrHostedCreditEmpty        = errors.New("hosted credit is empty")
 	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
 	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
 	ErrPolarOrderIDRequired     = errors.New("polar order id is required")
@@ -37,6 +40,11 @@ type OrganizationLLMCreditGrant struct {
 	PolarOrderID   *string
 	PolarRefundID  *string
 	CreatedAt      time.Time
+	ExpiresAt      *time.Time
+}
+
+func (g OrganizationLLMCreditGrant) IsExpired(now time.Time) bool {
+	return g.ExpiresAt != nil && !g.ExpiresAt.After(now)
 }
 
 func (OrganizationLLMCreditGrant) TableName() string {
@@ -57,16 +65,36 @@ func (OrganizationLLMSettings) TableName() string {
 
 // OrganizationLLMCreditSummary is remaining hosted credit for an org.
 type OrganizationLLMCreditSummary struct {
-	GrantMicros           int64
-	SuperPlaneGrantMicros int64
-	PurchasedCreditMicros int64
-	BilledMicros          int64
-	RemainingMicros       int64
-	MarkupBPS             int
-	Warning               bool
+	GrantMicros              int64
+	SuperPlaneGrantMicros    int64
+	PurchasedCreditMicros    int64
+	BilledMicros             int64
+	RemainingMicros          int64
+	IncludedRemainingMicros  int64
+	PurchasedRemainingMicros int64
+	WelcomeRemainingMicros   int64
+	AdminRemainingMicros     int64
+	MarkupBPS                int
+	Warning                  bool
+	WelcomeCreditExpiresAt   *time.Time
 }
 
-func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
+func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
+	if accountID == uuid.Nil {
+		return errors.New("account is required for welcome credit")
+	}
+
+	var account Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", accountID).
+		First(&account).Error
+	if err != nil {
+		return err
+	}
+	if account.HasReceivedWelcomeCredit() {
+		return nil
+	}
+
 	settings, err := GetInstallationLLMSettings(tx)
 	if err != nil {
 		return err
@@ -76,30 +104,45 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
 		return nil
 	}
 
+	now := time.Now()
 	var existing OrganizationLLMCreditGrant
 	err = tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
 		First(&existing).Error
 	if err == nil {
-		return nil
+		return stampWelcomeCreditGrantedAt(tx, accountID, existing.CreatedAt)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
+	if _, err := EnsureOrganizationBillingPlan(tx, orgID); err != nil {
+		return err
+	}
+
+	expiresAt := now.Add(DefaultWelcomeGrantTTL)
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
 		Kind:           LLMCreditGrantKindWelcome,
 		AmountMicros:   amount,
-		CreatedAt:      time.Now(),
+		ActorAccountID: &accountID,
+		CreatedAt:      now,
+		ExpiresAt:      &expiresAt,
 	}
 	if err := tx.Create(&grant).Error; err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil
+			return stampWelcomeCreditGrantedAt(tx, accountID, now)
 		}
 		return err
 	}
-	return nil
+
+	return stampWelcomeCreditGrantedAt(tx, accountID, now)
+}
+
+func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt time.Time) error {
+	return tx.Model(&Account{}).
+		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
+		Update("welcome_credit_granted_at", grantedAt).Error
 }
 
 func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, note string, actorAccountID *uuid.UUID) (*OrganizationLLMCreditGrant, error) {
@@ -123,6 +166,10 @@ func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, no
 }
 
 func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
+	return AddTopupLLMCreditGrant(tx, orgID, amountMicros, polarOrderID)
+}
+
+func AddTopupLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
 	if amountMicros <= 0 {
 		return nil, ErrCreditGrantNotPositive
 	}
@@ -131,22 +178,24 @@ func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 		return nil, ErrPolarOrderIDRequired
 	}
 
-	var existing OrganizationLLMCreditGrant
-	err := tx.Where("polar_order_id = ? AND kind = ?", orderID, LLMCreditGrantKindPolar).First(&existing).Error
+	existing, err := FindLLMCreditGrantByPolarOrderID(tx, orderID)
 	if err == nil {
-		return &existing, nil
+		return existing, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 
+	now := time.Now()
+	expiresAt := now.AddDate(0, DefaultTopupGrantMonths, 0)
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
-		Kind:           LLMCreditGrantKindPolar,
+		Kind:           LLMCreditGrantKindTopup,
 		AmountMicros:   amountMicros,
 		PolarOrderID:   &orderID,
-		CreatedAt:      time.Now(),
+		CreatedAt:      now,
+		ExpiresAt:      &expiresAt,
 	}
 	if err := tx.Create(&grant).Error; err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
@@ -159,7 +208,10 @@ func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 
 func FindLLMCreditGrantByPolarOrderID(tx *gorm.DB, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
 	var grant OrganizationLLMCreditGrant
-	err := tx.Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindPolar).First(&grant).Error
+	err := tx.Where("polar_order_id = ? AND kind IN ?", polarOrderID, []string{
+		LLMCreditGrantKindTopup,
+		LLMCreditGrantKindIncluded,
+	}).First(&grant).Error
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +243,7 @@ func AddPolarLLMCreditRefund(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, p
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
-		Kind:           LLMCreditGrantKindPolarRefund,
+		Kind:           LLMCreditGrantKindTopupRefund,
 		AmountMicros:   -amountMicros,
 		PolarOrderID:   &orderID,
 		PolarRefundID:  &refundID,
@@ -219,7 +271,7 @@ func PolarRefundMicrosForOrder(tx *gorm.DB, polarOrderID string) (int64, error) 
 	var refundedMicros int64
 	err := tx.Model(&OrganizationLLMCreditGrant{}).
 		Select("COALESCE(SUM(-amount_micros), 0) AS refunded_micros").
-		Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindPolarRefund).
+		Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindTopupRefund).
 		Scan(&refundedMicros).Error
 	if err != nil {
 		return 0, err
@@ -322,43 +374,81 @@ func ResolveOrganizationMarkupBPS(tx *gorm.DB, orgID uuid.UUID) (int, error) {
 	return installation.MarkupBPS, nil
 }
 
-func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLLMCreditSummary, error) {
-	var kindTotals []struct {
-		Kind  string
-		Total int64
-	}
-	err := tx.Model(&OrganizationLLMCreditGrant{}).
-		Select("kind, COALESCE(SUM(amount_micros), 0) as total").
-		Where("organization_id = ?", orgID).
-		Group("kind").
-		Scan(&kindTotals).Error
+func ListOrganizationLLMCreditGrants(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationLLMCreditGrant, error) {
+	var grants []OrganizationLLMCreditGrant
+	err := tx.Where("organization_id = ?", orgID).
+		Order("created_at DESC").
+		Find(&grants).Error
 	if err != nil {
-		return OrganizationLLMCreditSummary{}, err
+		return nil, err
+	}
+	return grants, nil
+}
+
+func CreditGrantActorNames(tx *gorm.DB, grants []OrganizationLLMCreditGrant) (map[uuid.UUID]string, error) {
+	ids := uniqueCreditGrantActorIDs(grants)
+	if len(ids) == 0 {
+		return map[uuid.UUID]string{}, nil
 	}
 
-	var grantMicros, superplaneGrantMicros, purchasedCreditMicros int64
-	for _, row := range kindTotals {
-		grantMicros += row.Total
-		switch row.Kind {
-		case LLMCreditGrantKindWelcome, LLMCreditGrantKindAdmin:
-			superplaneGrantMicros += row.Total
-		case LLMCreditGrantKindPolar, LLMCreditGrantKindPolarRefund:
-			purchasedCreditMicros += row.Total
+	var accounts []Account
+	err := tx.Select("id", "name", "email").Where("id IN ?", ids).Find(&accounts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	names := make(map[uuid.UUID]string, len(accounts))
+	for _, account := range accounts {
+		names[account.ID] = creditGrantActorDisplayName(account)
+	}
+	return names, nil
+}
+
+func uniqueCreditGrantActorIDs(grants []OrganizationLLMCreditGrant) []uuid.UUID {
+	seen := make(map[uuid.UUID]struct{})
+	ids := make([]uuid.UUID, 0)
+	for _, grant := range grants {
+		if grant.ActorAccountID == nil || *grant.ActorAccountID == uuid.Nil {
+			continue
 		}
+		if _, ok := seen[*grant.ActorAccountID]; ok {
+			continue
+		}
+		seen[*grant.ActorAccountID] = struct{}{}
+		ids = append(ids, *grant.ActorAccountID)
 	}
+	return ids
+}
 
-	var billedMicros int64
-	err = tx.Model(&WorkspaceUsageEvent{}).
-		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", orgID, UsageFundingSourceHosted, UsageKindModel).
-		Scan(&billedMicros).Error
+func creditGrantActorDisplayName(account Account) string {
+	if name := strings.TrimSpace(account.Name); name != "" {
+		return name
+	}
+	return strings.TrimSpace(account.Email)
+}
+
+func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLLMCreditSummary, error) {
+	grants, err := ListOrganizationLLMCreditGrants(tx, orgID)
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err
 	}
 
-	remaining := grantMicros - billedMicros
-	if remaining < 0 {
-		remaining = 0
+	now := time.Now()
+	billedMicros, err := sumHostedBilledMicros(tx, orgID, nil)
+	if err != nil {
+		return OrganizationLLMCreditSummary{}, err
+	}
+
+	billedAtOrBefore, err := billedMicrosAtExpiredGrants(tx, orgID, grants, now)
+	if err != nil {
+		return OrganizationLLMCreditSummary{}, err
+	}
+
+	spend := allocateHostedCreditSpend(grants, billedMicros, billedAtOrBefore, now)
+
+	var grantMicros int64
+	for _, grant := range grants {
+		grantMicros += grant.AmountMicros
 	}
 
 	markupBPS, err := ResolveOrganizationMarkupBPS(tx, orgID)
@@ -374,18 +464,59 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	warning := false
 	if grantMicros > 0 {
 		threshold := grantMicros * int64(installation.WarningThresholdBPS) / int64(MarkupBaseBPS)
-		warning = remaining <= threshold
+		warning = spend.RemainingMicros <= threshold
 	}
 
 	return OrganizationLLMCreditSummary{
-		GrantMicros:           grantMicros,
-		SuperPlaneGrantMicros: superplaneGrantMicros,
-		PurchasedCreditMicros: purchasedCreditMicros,
-		BilledMicros:          billedMicros,
-		RemainingMicros:       remaining,
-		MarkupBPS:             markupBPS,
-		Warning:               warning,
+		GrantMicros:              grantMicros,
+		SuperPlaneGrantMicros:    spend.SuperPlaneGrantMicros,
+		PurchasedCreditMicros:    spend.PurchasedCreditMicros,
+		BilledMicros:             billedMicros,
+		RemainingMicros:          spend.RemainingMicros,
+		IncludedRemainingMicros:  spend.IncludedRemainingMicros,
+		PurchasedRemainingMicros: spend.PurchasedRemainingMicros,
+		WelcomeRemainingMicros:   spend.WelcomeRemainingMicros,
+		AdminRemainingMicros:     spend.AdminRemainingMicros,
+		MarkupBPS:                markupBPS,
+		Warning:                  warning,
+		WelcomeCreditExpiresAt:   spend.WelcomeCreditExpiresAt,
 	}, nil
+}
+
+func sumHostedBilledMicros(tx *gorm.DB, orgID uuid.UUID, atOrBefore *time.Time) (int64, error) {
+	query := tx.Model(&WorkspaceUsageEvent{}).
+		Select("COALESCE(SUM(cost_micros), 0)").
+		Where("organization_id = ? AND funding_source = ?", orgID, UsageFundingSourceHosted)
+	if atOrBefore != nil {
+		query = query.Where("occurred_at <= ?", *atOrBefore)
+	}
+
+	var billedMicros int64
+	err := query.Scan(&billedMicros).Error
+	if err != nil {
+		return 0, err
+	}
+	return billedMicros, nil
+}
+
+func billedMicrosAtExpiredGrants(tx *gorm.DB, orgID uuid.UUID, grants []OrganizationLLMCreditGrant, now time.Time) (map[int64]int64, error) {
+	billedAtOrBefore := map[int64]int64{}
+	for _, grant := range grants {
+		if !grant.IsExpired(now) || grant.ExpiresAt == nil {
+			continue
+		}
+		key := grant.ExpiresAt.UTC().UnixNano()
+		if _, ok := billedAtOrBefore[key]; ok {
+			continue
+		}
+		at := grant.ExpiresAt.UTC()
+		billed, err := sumHostedBilledMicros(tx, orgID, &at)
+		if err != nil {
+			return nil, err
+		}
+		billedAtOrBefore[key] = billed
+	}
+	return billedAtOrBefore, nil
 }
 
 func AssertHostedCreditAvailable(tx *gorm.DB, orgID uuid.UUID) error {
@@ -416,12 +547,22 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 	return nil
 }
 
-// AssertHostedRunAllowed rejects a new hosted start when org remaining credit
-// is empty or the factory hosted budget is exhausted. Pass a committed
-// connection so remaining credit includes billed spend from other runs.
+// AssertHostedRunAllowed rejects a new hosted start when the organization has
+// no open trial or active Business plan, remaining credit is empty, or the
+// factory hosted budget is exhausted. Pass a committed connection so remaining
+// credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
+	}
+	if HostedPlanGatesEnabled() {
+		plan, err := ResolveOrganizationBillingPlan(tx, orgID)
+		if err != nil {
+			return err
+		}
+		if !plan.AllowsHostedExecution(time.Now()) {
+			return ErrHostedSubscriptionRequired
+		}
 	}
 	if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
 		return err
@@ -434,4 +575,114 @@ func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) 
 		return err
 	}
 	return AssertFactoryHostedBudgetAvailable(tx, factory)
+}
+
+type IncludedUsageSync struct {
+	OrganizationID   uuid.UUID
+	SubscriptionID   string
+	PeriodEnd        *time.Time
+	GrantIncluded    bool
+	IsActiveBusiness bool
+}
+
+// SyncIncludedLLMCreditGrant grants or expires Business included usage the same
+// way Polar subscription webhooks do.
+func SyncIncludedLLMCreditGrant(tx *gorm.DB, sync IncludedUsageSync) error {
+	if sync.GrantIncluded {
+		if sync.PeriodEnd == nil {
+			return nil
+		}
+		_, err := AddIncludedLLMCreditGrant(
+			tx,
+			sync.OrganizationID,
+			CentsToMicros(DefaultIncludedGrantCents),
+			IncludedGrantKey(sync.SubscriptionID, *sync.PeriodEnd),
+			*sync.PeriodEnd,
+		)
+		return err
+	}
+	if !sync.IsActiveBusiness {
+		return ExpireOpenIncludedGrants(tx, sync.OrganizationID)
+	}
+	return nil
+}
+
+func AddIncludedLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string, expiresAt time.Time) (*OrganizationLLMCreditGrant, error) {
+	if amountMicros <= 0 {
+		return nil, ErrCreditGrantNotPositive
+	}
+	orderID := strings.TrimSpace(polarOrderID)
+	if orderID == "" {
+		return nil, ErrPolarOrderIDRequired
+	}
+
+	existing, err := FindLLMCreditGrantByPolarOrderID(tx, orderID)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	end := expiresAt
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Kind:           LLMCreditGrantKindIncluded,
+		AmountMicros:   amountMicros,
+		PolarOrderID:   &orderID,
+		CreatedAt:      time.Now(),
+		ExpiresAt:      &end,
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return FindLLMCreditGrantByPolarOrderID(tx, orderID)
+		}
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func IncludedGrantKey(subscriptionID string, periodEnd time.Time) string {
+	return "included:" + strings.TrimSpace(subscriptionID) + ":" + periodEnd.UTC().Format(time.RFC3339)
+}
+
+// ExpireOpenIncludedGrants stops leftover Business included dollars from remaining
+// spendable after Polar cancels or refunds the subscription. It rewrites the Polar
+// order key so a later subscribe can grant a new included allowance.
+func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
+	now := time.Now()
+	var grants []OrganizationLLMCreditGrant
+	err := tx.Where(
+		"organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)",
+		orgID,
+		LLMCreditGrantKindIncluded,
+		now,
+	).Find(&grants).Error
+	if err != nil {
+		return err
+	}
+	for _, grant := range grants {
+		updates := map[string]any{"expires_at": now}
+		if grant.PolarOrderID != nil {
+			if canceled := canceledIncludedOrderID(*grant.PolarOrderID, grant.ID); canceled != "" {
+				updates["polar_order_id"] = canceled
+			}
+		}
+		if err := tx.Model(&OrganizationLLMCreditGrant{}).Where("id = ?", grant.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func canceledIncludedOrderID(polarOrderID string, grantID uuid.UUID) string {
+	trimmed := strings.TrimSpace(polarOrderID)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, canceledIncludedGrantPrefix) {
+		return trimmed
+	}
+	return canceledIncludedGrantPrefix + trimmed + ":" + grantID.String()
 }

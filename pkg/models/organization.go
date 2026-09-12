@@ -211,8 +211,8 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		if inviteErr != nil {
 			return nil, inviteErr
 		}
-		if grantErr := GrantWelcomeCredit(tx, organization.ID); grantErr != nil {
-			return nil, grantErr
+		if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
+			return nil, planErr
 		}
 
 		return &organization, nil

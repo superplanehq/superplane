@@ -1,12 +1,12 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,8 +27,6 @@ const (
 
 	UsageIdempotencyKeyRunner = "runner"
 )
-
-var ErrHostedUsageUnpriced = errors.New("hosted LLM usage has no price for this model")
 
 // WorkspaceUsageEvent is one append-only spend row (model tokens or VM
 // seconds). It is the source of truth for reports. Factory execution
@@ -131,7 +129,10 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 		version = pricebook.Version + "+provider"
 	} else {
 		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Model) {
-			return fmt.Errorf("%w: %s %s", ErrHostedUsageUnpriced, in.Provider, in.Model)
+			log.WithFields(log.Fields{
+				"provider": in.Provider,
+				"model":    in.Model,
+			}).Warn("hosted LLM usage has no price for this model; recording tokens at zero cost")
 		}
 		providerCostMicros = pricebook.EstimateMicros(
 			in.Provider,
@@ -193,8 +194,10 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 }
 
 // RecordComputeUsage inserts one factory-linked runner-fleet row. Cost comes
-// from the compute price book (zero until rates are published). Hosted
-// markup and wallet debit do not apply. Org canvases are skipped.
+// from the compute price book (zero until rates are published) at the raw
+// provider rate; hosted markup does not apply. The stored cost_micros still
+// draws down org hosted credit and factory hosted budgets, same as model
+// usage. Org canvases are skipped.
 func RecordComputeUsage(tx *gorm.DB, in ComputeUsageEventInput) error {
 	machineType := strings.TrimSpace(in.MachineType)
 	if machineType == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
@@ -265,6 +268,15 @@ func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
 
+// ParseUsageFundingSource accepts hosted or byok. Empty input is an error.
+func ParseUsageFundingSource(source string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(source))
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+		return normalized, nil
+	}
+	return "", fmt.Errorf("unsupported usage funding source: %s", source)
+}
+
 func usageIdempotencyKey(key string) string {
 	if trimmed := strings.TrimSpace(key); trimmed != "" {
 		return trimmed
@@ -284,6 +296,39 @@ type UsageReportFilter struct {
 	Model          string
 	MachineType    string
 	TaskOwnerID    *uuid.UUID
+	FundingSource  string
+}
+
+// WorkOrderRunUsage is one task-run spend row grouped from the ledger.
+type WorkOrderRunUsage struct {
+	WorkOrderExecutionID uuid.UUID
+	WorkOrderID          uuid.UUID
+	WorkOrderNumber      int64
+	Title                string
+	LastOccurredAt       time.Time
+	UserID               *uuid.UUID
+	UserName             string
+	UserEmail            string
+	TotalTokens          int64
+	DurationSeconds      int64
+	CostMicros           int64
+	HostedCostMicros     int64
+	BYOKCostMicros       int64
+	Models               []string
+	BYOKModels           []string
+	MachineTypes         []string
+}
+
+func (r WorkOrderRunUsage) CostCents() int64 {
+	return pricebook.MicrosToCents(r.CostMicros)
+}
+
+func (r WorkOrderRunUsage) HostedCostCents() int64 {
+	return pricebook.MicrosToCents(r.HostedCostMicros)
+}
+
+func (r WorkOrderRunUsage) BYOKCostCents() int64 {
+	return pricebook.MicrosToCents(r.BYOKCostMicros)
 }
 
 // UsageTotals is a token, duration, and cost sum.
@@ -308,6 +353,14 @@ type UsageByMachineType struct {
 	CostMicros      int64
 }
 
+// UsageSplit is the ledger of one subject, divided by what the spend paid for.
+type UsageSplit struct {
+	// Model is spend on model tokens.
+	Model UsageTotals
+	// Compute is spend on runner machine time.
+	Compute UsageTotals
+}
+
 func (t UsageTotals) CostCents() int64 {
 	return pricebook.MicrosToCents(t.CostMicros)
 }
@@ -329,8 +382,21 @@ func (r UsageByMachineType) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
 }
 
+// Total is the whole ledger of the subject, both bands together.
+func (s UsageSplit) Total() UsageTotals {
+	return s.Model.Add(s.Compute)
+}
+
 type usageSumRow struct {
 	ID              uuid.UUID
+	TotalTokens     int64
+	DurationSeconds int64
+	CostMicros      int64
+}
+
+type usageKindSumRow struct {
+	ID              uuid.UUID
+	UsageKind       string
 	TotalTokens     int64
 	DurationSeconds int64
 	CostMicros      int64
@@ -367,6 +433,45 @@ func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID
 		return nil, err
 	}
 	return scanUsageSums(rows), nil
+}
+
+// SumUsageForWorkOrdersByKind returns ledger totals keyed by work order, with
+// model spend and compute spend reported apart. Missing IDs are absent from
+// the map (zero value).
+//
+// Anything that is not compute counts as model spend, so the two bands always
+// add up to what the work order cost.
+func SumUsageForWorkOrdersByKind(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]UsageSplit, error) {
+	if len(workOrderIDs) == 0 {
+		return map[uuid.UUID]UsageSplit{}, nil
+	}
+
+	var rows []usageKindSumRow
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("work_order_id AS id, usage_kind, "+usageSumSelect).
+		Where("work_order_id IN ?", workOrderIDs).
+		Group("work_order_id, usage_kind").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]UsageSplit, len(rows))
+	for _, row := range rows {
+		totals := UsageTotals{
+			TotalTokens:     row.TotalTokens,
+			DurationSeconds: row.DurationSeconds,
+			CostMicros:      row.CostMicros,
+		}
+		split := result[row.ID]
+		if row.UsageKind == UsageKindCompute {
+			split.Compute = split.Compute.Add(totals)
+		} else {
+			split.Model = split.Model.Add(totals)
+		}
+		result[row.ID] = split
+	}
+	return result, nil
 }
 
 // SumUsageForRunTrees returns ledger totals for each root run, including
@@ -469,6 +574,13 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 	if filter.MachineType != "" {
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
 	}
+	if filter.FundingSource != "" {
+		if filter.FundingSource == UsageFundingSourceHosted {
+			query = query.Where("workspace_usage_events.funding_source = ?", UsageFundingSourceHosted)
+		} else {
+			query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ?", UsageFundingSourceHosted)
+		}
+	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)
 	}
@@ -539,6 +651,155 @@ func SummarizeComputeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, 
 	return totals, byMachine, nil
 }
 
+const workOrderRunUsageGroupKey = `COALESCE(workspace_usage_events.work_order_execution_id, workspace_usage_events.canvas_run_id)`
+
+const workOrderRunUsageSelect = `
+	workspace_usage_events.work_order_execution_id,
+	factory_work_orders.id AS work_order_id,
+	factory_work_orders.number AS work_order_number,
+	factory_work_orders.title AS title,
+	MAX(workspace_usage_events.occurred_at) AS last_occurred_at,
+	first_assignee.user_id AS user_id,
+	COALESCE(users.name, '') AS user_name,
+	COALESCE(users.email, '') AS user_email,
+	COALESCE(SUM(workspace_usage_events.total_tokens), 0) AS total_tokens,
+	COALESCE(SUM(workspace_usage_events.duration_seconds), 0) AS duration_seconds,
+	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
+	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
+	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS byok_models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
+
+type workOrderRunUsageScanRow struct {
+	WorkOrderExecutionID uuid.UUID
+	WorkOrderID          uuid.UUID
+	WorkOrderNumber      int64
+	Title                string
+	LastOccurredAt       time.Time
+	UserID               *uuid.UUID
+	UserName             string
+	UserEmail            string
+	TotalTokens          int64
+	DurationSeconds      int64
+	CostMicros           int64
+	HostedCostMicros     int64
+	BYOKCostMicros       int64
+	Models               string
+	BYOKModels           string
+	MachineTypes         string
+}
+
+// First assignee by assignment time, then user id. Usage names the owner,
+// not the creator. Analysis rows with no assignee stay empty.
+const firstWorkOrderAssigneeJoin = `LEFT JOIN LATERAL (
+	SELECT user_id
+	FROM factory_work_order_assignees
+	WHERE work_order_id = factory_work_orders.id
+	ORDER BY created_at ASC, user_id ASC
+	LIMIT 1
+) first_assignee ON TRUE`
+
+func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
+	return spendingScopedQuery(tx, filter, true).
+		Joins(firstWorkOrderAssigneeJoin).
+		Joins("LEFT JOIN users ON users.id = first_assignee.user_id").
+		Where("workspace_usage_events.work_order_id IS NOT NULL")
+}
+
+const workOrderRunUsageGroupBy = workOrderRunUsageGroupKey + `, workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, first_assignee.user_id, users.name, users.email`
+
+// ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
+// It does not write usage or change remaining hosted credit.
+func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset int) ([]WorkOrderRunUsage, int64, error) {
+	var totalRow struct {
+		Count int64
+	}
+	err := workOrderRunUsageQuery(tx, filter).
+		Select("COUNT(DISTINCT " + workOrderRunUsageGroupKey + ") AS count").
+		Scan(&totalRow).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	total := totalRow.Count
+
+	var rows []workOrderRunUsageScanRow
+	err = workOrderRunUsageQuery(tx, filter).
+		Select(workOrderRunUsageSelect).
+		Group(workOrderRunUsageGroupBy).
+		Order("MAX(workspace_usage_events.occurred_at) DESC").
+		Order("workspace_usage_events.work_order_execution_id DESC").
+		Limit(limit).
+		Offset(offset).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return workOrderRunUsageRowsFromScan(rows), total, nil
+}
+
+// ListAllWorkOrderRunUsage returns every task-run spend row in the ledger for
+// the filter's scope, with no date window and no pagination. It backs the
+// full-history CSV export; the paginated ListWorkOrderRunUsage stays bound to
+// a reporting period and page size for the table.
+func ListAllWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter) ([]WorkOrderRunUsage, error) {
+	filter.Since = time.Time{}
+	filter.Until = time.Time{}
+
+	var rows []workOrderRunUsageScanRow
+	err := workOrderRunUsageQuery(tx, filter).
+		Select(workOrderRunUsageSelect).
+		Group(workOrderRunUsageGroupBy).
+		Order("MAX(workspace_usage_events.occurred_at) DESC").
+		Order("workspace_usage_events.work_order_execution_id DESC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return workOrderRunUsageRowsFromScan(rows), nil
+}
+
+func workOrderRunUsageRowsFromScan(rows []workOrderRunUsageScanRow) []WorkOrderRunUsage {
+	result := make([]WorkOrderRunUsage, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, WorkOrderRunUsage{
+			WorkOrderExecutionID: row.WorkOrderExecutionID,
+			WorkOrderID:          row.WorkOrderID,
+			WorkOrderNumber:      row.WorkOrderNumber,
+			Title:                row.Title,
+			LastOccurredAt:       row.LastOccurredAt,
+			UserID:               row.UserID,
+			UserName:             row.UserName,
+			UserEmail:            row.UserEmail,
+			TotalTokens:          row.TotalTokens,
+			DurationSeconds:      row.DurationSeconds,
+			CostMicros:           row.CostMicros,
+			HostedCostMicros:     row.HostedCostMicros,
+			BYOKCostMicros:       row.BYOKCostMicros,
+			Models:               splitUsageAgg(row.Models),
+			BYOKModels:           splitUsageAgg(row.BYOKModels),
+			MachineTypes:         splitUsageAgg(row.MachineTypes),
+		})
+	}
+	return result
+}
+
+func splitUsageAgg(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, "\n")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
 // RollupUsage copies ledger totals into the cached execution columns.
 // It locks the step row so concurrent RecordUsage calls cannot write a
 // stale sum over a newer one.
@@ -574,4 +835,37 @@ func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
 			"updated_at":       now,
 		}).Error
 	})
+}
+
+func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRunID uuid.UUID) error {
+	runIDs, err := canvasRunIDsInTree(tx, sourceRunID)
+	if err != nil || len(runIDs) == 0 {
+		return err
+	}
+	return tx.Model(&WorkspaceUsageEvent{}).
+		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
+		Update("work_order_id", workOrderID).Error
+}
+
+func canvasRunIDsInTree(tx *gorm.DB, rootID uuid.UUID) ([]uuid.UUID, error) {
+	ids := []uuid.UUID{rootID}
+	seen := map[uuid.UUID]struct{}{rootID: {}}
+	frontier := []uuid.UUID{rootID}
+	for len(frontier) > 0 {
+		var children []CanvasRun
+		err := tx.Select("id").Where("parent_run_id IN ?", frontier).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+		frontier = frontier[:0]
+		for _, child := range children {
+			if _, exists := seen[child.ID]; exists {
+				continue
+			}
+			seen[child.ID] = struct{}{}
+			ids = append(ids, child.ID)
+			frontier = append(frontier, child.ID)
+		}
+	}
+	return ids, nil
 }

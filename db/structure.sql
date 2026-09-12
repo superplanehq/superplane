@@ -120,7 +120,8 @@ CREATE TABLE public.accounts (
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
     blocked_at timestamp with time zone,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    welcome_credit_granted_at timestamp with time zone
 );
 
 
@@ -394,7 +395,11 @@ CREATE TABLE public.factory_intakes (
     canvas_id uuid NOT NULL,
     source character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
+    initial_import_item_count integer,
+    CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
+    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
 
@@ -480,7 +485,8 @@ CREATE TABLE public.factory_planning_sessions (
     heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
     ended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    selectable_model_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -792,6 +798,32 @@ CREATE TABLE public.factory_work_orders (
 
 
 --
+-- Name: files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    installation_id text NOT NULL,
+    scope character varying(32) NOT NULL,
+    organization_id uuid,
+    factory_id uuid,
+    work_order_id uuid,
+    filename text NOT NULL,
+    content_type text NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    checksum text,
+    storage_key text NOT NULL,
+    state character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    created_by_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
+    CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
+    CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -820,6 +852,7 @@ CREATE TABLE public.hosted_llm_providers (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    management_key bytea,
     CONSTRAINT hosted_llm_providers_known CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
 );
 
@@ -835,6 +868,9 @@ CREATE TABLE public.installation_llm_settings (
     warning_threshold_bps integer DEFAULT 2000 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    default_hosted_provider text,
+    default_hosted_model text,
+    CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
     CONSTRAINT installation_llm_settings_warning_range CHECK (((warning_threshold_bps >= 0) AND (warning_threshold_bps <= 10000))),
@@ -854,6 +890,26 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
+-- Name: organization_billing_plans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_plans (
+    organization_id uuid NOT NULL,
+    plan text NOT NULL,
+    plan_source text DEFAULT ''::text NOT NULL,
+    polar_subscription_id text,
+    polar_subscription_status text DEFAULT ''::text NOT NULL,
+    current_period_start timestamp with time zone,
+    current_period_end timestamp with time zone,
+    trial_started_at timestamp with time zone,
+    trial_ends_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
+    CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
 
@@ -914,8 +970,9 @@ CREATE TABLE public.organization_llm_credit_grants (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_order_id text,
     polar_refund_id text,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
+    expires_at timestamp with time zone,
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'topup_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text])))
 );
 
 
@@ -1086,6 +1143,19 @@ CREATE TABLE public.user_canvas_preferences (
 
 
 --
+-- Name: user_last_locations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_last_locations (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    path text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: user_notification_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1119,7 +1189,8 @@ CREATE TABLE public.users (
     description text,
     created_by uuid,
     api_key_expires_at timestamp without time zone,
-    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_owner boolean DEFAULT false NOT NULL
 );
 
 
@@ -1807,6 +1878,22 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
+-- Name: files files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: files files_storage_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_storage_key_key UNIQUE (storage_key);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1852,6 +1939,14 @@ ALTER TABLE ONLY public.installation_llm_settings
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_plans
+    ADD CONSTRAINT organization_billing_plans_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -2036,6 +2131,14 @@ ALTER TABLE ONLY public.user_api_tokens
 
 ALTER TABLE ONLY public.user_canvas_preferences
     ADD CONSTRAINT user_canvas_preferences_pkey PRIMARY KEY (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: user_last_locations user_last_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_pkey PRIMARY KEY (organization_id, user_id);
 
 
 --
@@ -2742,6 +2845,34 @@ CREATE INDEX idx_factory_work_orders_source_run_id ON public.factory_work_orders
 
 
 --
+-- Name: idx_files_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_factory_id ON public.files USING btree (factory_id);
+
+
+--
+-- Name: idx_files_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_organization_id ON public.files USING btree (organization_id);
+
+
+--
+-- Name: idx_files_stale_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_stale_pending ON public.files USING btree (updated_at) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'failed'::character varying])::text[]));
+
+
+--
+-- Name: idx_files_work_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2766,7 +2897,7 @@ CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_gra
 -- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = ANY (ARRAY['topup'::text, 'included'::text])));
 
 
 --
@@ -3743,6 +3874,38 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
+-- Name: files files_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_created_by_id_fkey FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3884,6 +4047,22 @@ ALTER TABLE ONLY public.user_canvas_preferences
 
 ALTER TABLE ONLY public.user_canvas_preferences
     ADD CONSTRAINT user_canvas_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_last_locations user_last_locations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_last_locations user_last_locations_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -4230,7 +4409,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260904123329	f
+20260911070308	f
 \.
 
 
@@ -4266,7 +4445,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260709012138	f
+20260907234118	f
 \.
 
 

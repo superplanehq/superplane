@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  DRAFT_WORK_ORDER,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
@@ -34,6 +36,15 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
 
 const REFUND_INTAKE_SEARCH = {
   data: [
@@ -59,6 +70,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
@@ -127,6 +139,7 @@ describe("LinesPage backlog create", () => {
     useFactoryIntakes.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
   });
 
   afterEach(() => {
@@ -189,6 +202,7 @@ describe("LinesPage backlog create", () => {
   });
 
   it("opens the agent session from the backlog plus menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     Element.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal(
       "fetch",
@@ -214,7 +228,82 @@ describe("LinesPage backlog create", () => {
     });
   });
 
+  it("hides Create with an Agent when the feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+
+    expect(screen.queryByRole("button", { name: "Create with an Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create task manually" })).toBeInTheDocument();
+  });
+
+  it("opens the agent session from Refine on a backlog draft", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
+    Element.prototype.scrollIntoView = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: {
+          id: "session-1",
+          repository: "acme/payments",
+          canvasRunId: "run-1",
+          messages: [],
+          draft: {
+            title: DRAFT_WORK_ORDER.title,
+            description: DRAFT_WORK_ORDER.description,
+            workOrderId: DRAFT_WORK_ORDER.id,
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+      ...REFUND_FACTORY,
+      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "acme/payments" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/105`,
+    );
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([url, init]) => {
+          return (
+            String(url).includes("/planning-sessions") &&
+            !String(url).includes("/messages") &&
+            init?.method === "POST" &&
+            String(init?.body).includes(`"work_order_id":"${DRAFT_WORK_ORDER.id}"`)
+          );
+        }),
+      ).toBe(true);
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/messages"))).toBe(false);
+    expect(screen.getByRole("heading", { name: "Refine this task" })).toBeInTheDocument();
+  });
+
+  it("hides Refine when the feature is off", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("starts the session with the workspace repository, not the demo repo", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     Element.prototype.scrollIntoView = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
@@ -415,7 +416,55 @@ func (m *mockAuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) 
 	return m.AuthService.SetupOrganization(tx, orgID, ownerID)
 }
 
+// configureHostedGitHubApp sets the SuperPlane GitHub App credentials that
+// createInitialWorkspace requires before it provisions anything.
+func configureHostedGitHubApp(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "1234")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "webhook-secret")
+}
+
+func Test__CreateInitialWorkspaceRequiresHostedGitHubApp(t *testing.T) {
+	// The development container may carry real app credentials in its
+	// environment, so the test clears them to exercise the blocked path.
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	r := support.Setup(t)
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	body, err := json.Marshal(initialWorkspaceRequest{Owner: "GitHub Owner", AttemptID: uuid.NewString()})
+	require.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(body))
+	request = request.WithContext(accountContext(r.Account))
+	response := httptest.NewRecorder()
+	server.createInitialWorkspace(response, request)
+
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	assert.Contains(t, response.Body.String(), "SUPERPLANE_GITHUB_APP_")
+}
+
 func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
+	configureHostedGitHubApp(t)
 	r := support.Setup(t)
 	require.NoError(t, models.SaveAccountLinkedAccount(
 		database.DB(t.Context()),
@@ -501,6 +550,63 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 	assert.Equal(t, first, retryResult)
 }
 
+func Test__CreateInitialWorkspaceReusesPendingOrganization(t *testing.T) {
+	configureHostedGitHubApp(t)
+	r := support.Setup(t)
+	account, err := models.CreateAccount("Reuse Pending", "reuse-onboarding@superplane.local")
+	require.NoError(t, err)
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	postOnboarding := func(attemptID uuid.UUID) initialWorkspaceResponse {
+		body, marshalErr := json.Marshal(initialWorkspaceRequest{Owner: "Reuse Pending", AttemptID: attemptID.String()})
+		require.NoError(t, marshalErr)
+		request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(body))
+		request = request.WithContext(accountContext(account))
+		response := httptest.NewRecorder()
+		server.createInitialWorkspace(response, request)
+		require.Equal(t, http.StatusOK, response.Code)
+		var result initialWorkspaceResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		return result
+	}
+
+	first := postOnboarding(uuid.New())
+	second := postOnboarding(uuid.New())
+	assert.Equal(t, first, second)
+
+	organizations, err := models.ListOrganizationsCreatedByAccount(database.DB(t.Context()), account.ID)
+	require.NoError(t, err)
+	require.Len(t, organizations, 1)
+
+	workspaces, err := models.ListFactories(database.DB(t.Context()), organizations[0].ID)
+	require.NoError(t, err)
+	require.Len(t, workspaces, 1)
+	require.NoError(t, database.DB(t.Context()).Model(&workspaces[0]).Update("onboarding_completed_at", time.Now()).Error)
+
+	third := postOnboarding(uuid.New())
+	assert.NotEqual(t, first.OrganizationSlug, third.OrganizationSlug)
+
+	organizations, err = models.ListOrganizationsCreatedByAccount(database.DB(t.Context()), account.ID)
+	require.NoError(t, err)
+	assert.Len(t, organizations, 2)
+}
+
 func Test__InitialOrganizationNameUsesEmailWhenAccountNameEmpty(t *testing.T) {
 	account := &models.Account{Name: "  ", Email: "dev@superplane.local"}
 	assert.Equal(t, "dev", initialOrganizationName(account, ""))
@@ -509,6 +615,7 @@ func Test__InitialOrganizationNameUsesEmailWhenAccountNameEmpty(t *testing.T) {
 }
 
 func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
+	configureHostedGitHubApp(t)
 	r := support.Setup(t)
 	account, err := models.CreateAccount("Ada Lovelace", "ada-onboarding@superplane.local")
 	require.NoError(t, err)
@@ -548,6 +655,7 @@ func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 }
 
 func Test__OrganizationCreationSerializesLimitChecks(t *testing.T) {
+	configureHostedGitHubApp(t)
 	r := support.Setup(t)
 	require.NoError(t, models.SaveAccountLinkedAccount(
 		database.DB(t.Context()),
@@ -750,6 +858,14 @@ func Test__CreateOrganization(t *testing.T) {
 		roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
+
+		credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+
+		reloaded, err := models.FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.True(t, reloaded.HasReceivedWelcomeCredit())
 	})
 
 	t.Run("organizations with a duplicate name are both created and get distinct slugs", func(t *testing.T) {
@@ -815,6 +931,14 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.Equal(t, "Duplicate Organization", secondOrg.Name)
 		assert.NotEqual(t, firstOrg.ID, secondOrg.ID)
 		assert.NotEqual(t, firstOrg.Slug, secondOrg.Slug)
+
+		firstCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), firstCredit.GrantMicros)
+
+		secondCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), secondCredit.GrantMicros)
 	})
 
 	t.Run("organization creation returns 429 when account limit is reached", func(t *testing.T) {

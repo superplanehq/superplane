@@ -39,10 +39,6 @@ func UpdateFactoryRepository(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
-	factoryID, err := parseFactoryID(req.GetId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory repository")
-	}
 	repository := strings.TrimSpace(req.GetRepository())
 	defaultBranch := strings.TrimSpace(req.GetDefaultBranch())
 	if repository == "" {
@@ -62,9 +58,12 @@ func UpdateFactoryRepository(
 	}
 
 	db := database.DB(ctx)
-	var factory *models.Factory
+	factory, err := findFactory(db, orgID, req.GetId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory repository")
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		loaded, err := models.FindFactory(tx, orgID, factoryID)
+		loaded, err := models.FindFactory(tx, orgID, factory.ID)
 		if err != nil {
 			return err
 		}
@@ -213,7 +212,7 @@ func reconcileFactoryRepository(
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
 			switch template.id {
-			case "line-planning", "line-implementation":
+			case "line-implementation":
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{
 					{from: previousAppRepository, to: orderRepositoryExpression},
 					{from: previousDefaultBranch, to: orderDefaultBranchExpression},

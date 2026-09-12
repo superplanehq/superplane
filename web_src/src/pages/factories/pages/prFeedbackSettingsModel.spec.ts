@@ -12,7 +12,12 @@ import {
   fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
+  toggleUniqueString,
+  availablePRFeedbackSources,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSettingsTab,
+  prFeedbackHandlerForSource,
+  prFeedbackSettingsTabs,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
   oldestActivePRFeedbackRun,
@@ -43,6 +48,17 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
   };
 }
 
+describe("PR feedback settings tabs", () => {
+  it("accepts General, Agent, and Automation", () => {
+    expect(isPRFeedbackSettingsTab("general")).toBe(true);
+    expect(isPRFeedbackSettingsTab("agent")).toBe(true);
+    expect(isPRFeedbackSettingsTab("automation")).toBe(true);
+    expect(isPRFeedbackSettingsTab("runs")).toBe(false);
+    expect(prFeedbackSettingsTabs(false)).toEqual(["general", "automation"]);
+    expect(prFeedbackSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
+  });
+});
+
 describe("oldestActivePRFeedbackRun", () => {
   it("returns the oldest pending or started run", () => {
     const selected = oldestActivePRFeedbackRun([
@@ -71,6 +87,35 @@ describe("activePRFeedbackWorkOrderIds", () => {
         { runs: [{ run: { id: "r4", state: "STATE_PENDING" } }] },
       ]),
     ).toEqual(new Set(["wo-1", "wo-3"]));
+  });
+
+  it("does not treat a cancelling or cancelled check wait as waiting", () => {
+    expect(
+      waitingOnChecksWorkOrderIds([
+        {
+          workOrderId: "wo-cancelling",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelling", state: "STATE_CANCELLING" }),
+            },
+          ],
+        },
+        {
+          workOrderId: "wo-cancelled",
+          activities: [
+            {
+              access: "concurrent",
+              state: "active",
+              description: "Waiting for checks on a82fd91",
+              run: run({ id: "r-cancelled", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }),
+            },
+          ],
+        },
+      ]),
+    ).toEqual(new Set());
   });
 
   it("does not treat a concurrent check wait as addressing feedback", () => {
@@ -271,8 +316,29 @@ describe("takenPRFeedbackSourceIds", () => {
         { source: "SOURCE_PULL_REQUEST_CHECKS" },
       ]),
     ).toEqual(["discussion", "checks"]);
+  });
+});
+
+describe("availablePRFeedbackSources", () => {
+  it("offers discussion and status-check setup", () => {
+    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion", "checks"]);
+    expect(hasAvailablePRFeedbackSource([])).toBe(true);
     expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
     expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
+  });
+});
+
+describe("prFeedbackHandlerForSource", () => {
+  it("returns the handler for a source when it has an id", () => {
+    expect(
+      prFeedbackHandlerForSource(
+        [
+          { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" },
+          { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS" },
+        ],
+        "discussion",
+      ),
+    ).toEqual({ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" });
   });
 });
 
@@ -284,9 +350,11 @@ describe("prFeedbackListenTitle", () => {
 });
 
 describe("prFeedbackDraftIsValid", () => {
-  it("requires a name, repository, and mention", () => {
+  it("requires a name and repository", () => {
     expect(prFeedbackDraftIsValid(discussionDraft())).toBe(true);
     expect(prFeedbackDraftIsValid(discussionDraft({ name: "" }))).toBe(false);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "" }))).toBe(true);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "superplaneagent" }))).toBe(false);
   });
 
   it("does not require an allowed bots list", () => {
@@ -300,6 +368,7 @@ describe("prFeedbackDraftIsValid", () => {
           source: "checks",
           name: "Fix pull request checks",
           mention: "",
+          checkNames: ["lint"],
           maximumAttempts: 3,
         }),
       ),
@@ -310,7 +379,29 @@ describe("prFeedbackDraftIsValid", () => {
           source: "checks",
           name: "Fix pull request checks",
           mention: "",
+          checkNames: [],
+          maximumAttempts: 3,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
           maximumAttempts: 0,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
+          checkNames: ["lint"],
+          maximumAttempts: 5.5,
         }),
       ),
     ).toBe(false);
@@ -329,6 +420,15 @@ describe("prFeedbackDraftFromHandler", () => {
 
     expect(prFeedbackDraftFromHandler(handler).allowedBots).toEqual(["coderabbitai", "bugbot"]);
     expect(prFeedbackDraftFromHandler(handler).source).toBe("discussion");
+  });
+
+  it("keeps an empty mention", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Address PR feedback",
+      settings: { subject: { repository: "acme/app" }, discussion: { mention: "" } },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).mention).toBe("");
   });
 
   it("defaults to an empty allowed bots list", () => {
@@ -364,6 +464,13 @@ describe("appendUniqueTrimmedString", () => {
     expect(appendUniqueTrimmedString(["lint"], " lint, typecheck ")).toEqual(["lint", "lint, typecheck"]);
     expect(appendUniqueTrimmedString(["lint"], "lint")).toEqual(["lint"]);
     expect(appendUniqueTrimmedString(["lint"], "   ")).toEqual(["lint"]);
+  });
+});
+
+describe("toggleUniqueString", () => {
+  it("adds a missing name and removes a matching name without case", () => {
+    expect(toggleUniqueString(["lint"], "e2e")).toEqual(["lint", "e2e"]);
+    expect(toggleUniqueString(["lint", "e2e"], "LINT")).toEqual(["e2e"]);
   });
 });
 

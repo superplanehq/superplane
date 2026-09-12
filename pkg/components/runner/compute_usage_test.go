@@ -15,7 +15,8 @@ type kvState struct {
 	kv map[string]string
 }
 
-func (s *kvState) IsFinished() bool { return false }
+func (s *kvState) IsFinished() bool   { return false }
+func (s *kvState) IsCancelling() bool { return false }
 func (s *kvState) SetKV(key, value string) error {
 	if s.kv == nil {
 		s.kv = map[string]string{}

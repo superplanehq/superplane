@@ -414,8 +414,10 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
-			WithWorkOrderUpdated(onFactoryWorkOrderUpdated),
-		Usage: contexts.NewUsageContext(workflow.OrganizationID, execution),
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithRemoteImageIngest(w.encryptor, w.registry),
+		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
+		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
 	}
 
 	if node.AppInstallationID != nil {

@@ -3,13 +3,16 @@ package public
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -19,29 +22,35 @@ import (
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents   int64                       `json:"welcome_grant_cents"`
-	MarkupBPS           int                         `json:"markup_bps"`
-	WarningThresholdBPS int                         `json:"warning_threshold_bps"`
-	Providers           []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
+	MarkupBPS             int                         `json:"markup_bps"`
+	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
+	DefaultHostedProvider string                      `json:"default_hosted_provider"`
+	DefaultHostedModel    string                      `json:"default_hosted_model"`
+	Providers             []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
-	Provider         string   `json:"provider"`
-	Enabled          bool     `json:"enabled"`
-	APIKeyConfigured bool     `json:"api_key_configured"`
-	BaseURL          string   `json:"base_url"`
-	AllowedModels    []string `json:"allowed_models"`
+	Provider                string   `json:"provider"`
+	Enabled                 bool     `json:"enabled"`
+	APIKeyConfigured        bool     `json:"api_key_configured"`
+	ManagementKeyConfigured bool     `json:"management_key_configured"`
+	BaseURL                 string   `json:"base_url"`
+	AllowedModels           []string `json:"allowed_models"`
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents   *int64 `json:"welcome_grant_cents"`
-	MarkupBPS           *int   `json:"markup_bps"`
-	WarningThresholdBPS *int   `json:"warning_threshold_bps"`
+	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
+	MarkupBPS             *int    `json:"markup_bps"`
+	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
+	DefaultHostedProvider *string `json:"default_hosted_provider"`
+	DefaultHostedModel    *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
 	Enabled       *bool    `json:"enabled"`
 	APIKey        *string  `json:"api_key"`
+	ManagementKey *string  `json:"management_key"`
 	BaseURL       *string  `json:"base_url"`
 	AllowedModels []string `json:"allowed_models"`
 }
@@ -80,6 +89,18 @@ type organizationLLMMarkupRequest struct {
 	MarkupBPS *int `json:"markup_bps"`
 }
 
+type organizationBillingPlanResponse struct {
+	Plan                    string  `json:"plan"`
+	PlanSource              string  `json:"plan_source"`
+	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
+	TrialEndsAt             *string `json:"trial_ends_at"`
+	CurrentPeriodEnd        *string `json:"current_period_end"`
+}
+
+type organizationBillingPlanRequest struct {
+	Plan string `json:"plan"`
+}
+
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
 	response, err := s.buildInstallationLLMSettingsResponse()
 	if err != nil {
@@ -112,11 +133,22 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		if req.WarningThresholdBPS != nil {
 			next.WarningThresholdBPS = *req.WarningThresholdBPS
 		}
+		if req.DefaultHostedProvider != nil {
+			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
+		}
+		if req.DefaultHostedModel != nil {
+			next.DefaultHostedModel = optionalTrimmedStringPointer(*req.DefaultHostedModel)
+		}
 		_, err = models.UpdateInstallationLLMSettings(tx, next)
 		return err
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status := http.StatusBadRequest
+		if !isClientLLMSettingsError(err) {
+			log.Errorf("admin: failed to update hosted LLM settings: %v", err)
+			status = http.StatusInternalServerError
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 
@@ -176,14 +208,37 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 				next.APIKey = encrypted
 			}
 		}
+		if req.ManagementKey != nil {
+			key := strings.TrimSpace(*req.ManagementKey)
+			if key == "" {
+				next.ManagementKey = nil
+			} else {
+				if provider == models.UsageProviderOpenRouter {
+					client := openrouter.NewManagementClient(s.registry.HTTPContext(), key)
+					if verifyErr := client.VerifyManagement(); verifyErr != nil {
+						return fmt.Errorf("provisioning API key is invalid: %w", verifyErr)
+					}
+				}
+				encrypted, encryptErr := llm.EncryptManagementKey(r.Context(), s.encryptor, provider, key)
+				if encryptErr != nil {
+					return encryptErr
+				}
+				next.ManagementKey = encrypted
+			}
+		}
 		if next.Enabled && !next.HasAPIKey() {
 			return errors.New("API key is required when the provider is enabled")
+		}
+		if next.Enabled && provider == models.UsageProviderOpenRouter && !next.HasManagementKey() {
+			return errors.New("provisioning API key is required when OpenRouter is enabled")
 		}
 		if next.Enabled && len(next.AllowedModels) == 0 {
 			return errors.New("select at least one model when the provider is enabled")
 		}
-		_, err = models.UpsertHostedLLMProvider(tx, next)
-		return err
+		if _, err = models.UpsertHostedLLMProvider(tx, next); err != nil {
+			return err
+		}
+		return models.SyncDefaultHostedLLMModelAfterProviderChange(tx)
 	})
 	if err != nil {
 		status := http.StatusBadRequest
@@ -338,6 +393,69 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization billing plan: %v", err)
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, response)
+}
+
+func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+
+	var req organizationBillingPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization billing plan: %v", err)
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, response)
+}
+
+func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organizationBillingPlanResponse, error) {
+	plan, err := models.ResolveOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return organizationBillingPlanResponse{}, err
+	}
+	return organizationBillingPlanResponse{
+		Plan:                    plan.Plan,
+		PlanSource:              plan.PlanSource,
+		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
+		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
+		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
+	}, nil
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil || value.IsZero() {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
+}
+
 func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettingsResponse, error) {
 	tx := database.Conn()
 	settings, err := models.GetInstallationLLMSettings(tx)
@@ -358,20 +476,32 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 	for _, name := range models.KnownHostedLLMProviders() {
 		row := byProvider[name]
 		providers = append(providers, hostedLLMProviderResponse{
-			Provider:         name,
-			Enabled:          row.Enabled,
-			APIKeyConfigured: row.HasAPIKey(),
-			BaseURL:          row.BaseURL,
-			AllowedModels:    append([]string{}, row.AllowedModels...),
+			Provider:                name,
+			Enabled:                 row.Enabled,
+			APIKeyConfigured:        row.HasAPIKey(),
+			ManagementKeyConfigured: row.HasManagementKey(),
+			BaseURL:                 row.BaseURL,
+			AllowedModels:           append([]string{}, row.AllowedModels...),
 		})
 	}
 
+	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:   settings.WelcomeGrantCents,
-		MarkupBPS:           settings.MarkupBPS,
-		WarningThresholdBPS: settings.WarningThresholdBPS,
-		Providers:           providers,
+		WelcomeGrantCents:     settings.WelcomeGrantCents,
+		MarkupBPS:             settings.MarkupBPS,
+		WarningThresholdBPS:   settings.WarningThresholdBPS,
+		DefaultHostedProvider: defaultModel.Provider,
+		DefaultHostedModel:    defaultModel.Model,
+		Providers:             providers,
 	}, nil
+}
+
+func optionalTrimmedStringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func describeOrganizationLLMCreditJSON(tx *gorm.DB, orgID uuid.UUID) (organizationLLMCreditResponse, error) {
@@ -424,7 +554,10 @@ func isClientLLMSettingsError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if errors.Is(err, models.ErrHostedLLMProviderNotFound) {
+	if errors.Is(err, models.ErrHostedLLMProviderNotFound) ||
+		errors.Is(err, models.ErrDefaultHostedModelIncomplete) ||
+		errors.Is(err, models.ErrDefaultHostedModelNotOnAllowlist) ||
+		errors.Is(err, models.ErrDefaultHostedModelMustBeReplaced) {
 		return true
 	}
 	msg := strings.ToLower(err.Error())
@@ -436,5 +569,7 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
-		strings.Contains(msg, "llm base url")
+		strings.Contains(msg, "provisioning api key") ||
+		strings.Contains(msg, "llm base url") ||
+		strings.Contains(msg, "superplane agent model")
 }

@@ -54,20 +54,29 @@ export function resolveFactoryByKey(
 }
 
 /**
- * True when the route segment does not already match the canonical
- * `factory.key` exactly — a legacy id, a lowercase/mixed-case key, or any
- * other non-canonical spelling. Callers `<Navigate replace>` to the
- * canonical URL in this case instead of rendering the page.
+ * True when the route segment does not already match the canonical URL
+ * form of `factory.key` exactly — a legacy id, an uppercase/mixed-case key,
+ * or any other non-canonical spelling. The stored `factory.key` is uppercase,
+ * but the canonical *URL* is lowercase, so a lowercase route segment that
+ * matches `factory.key` case-insensitively does **not** need a redirect
+ * (avoids a redirect loop). Callers `<Navigate replace>` to the canonical
+ * URL in this case instead of rendering the page.
  */
 export function factoryRouteNeedsCanonicalRedirect(resolution: FactoryResolution, routeKey: string): boolean {
-  return resolution.status === "found" && Boolean(resolution.factory?.key) && resolution.factory!.key !== routeKey;
+  return (
+    resolution.status === "found" &&
+    Boolean(resolution.factory?.key) &&
+    resolution.factory!.key!.toLowerCase() !== routeKey
+  );
 }
 
 /**
  * Swaps a stale `:factoryKey` route segment (a legacy id or a non-canonical
  * spelling of the key) for the canonical key, leaving the rest of the path
  * untouched so deep links under the workspace (tasks, lines, apps...)
- * keep working after the redirect.
+ * keep working after the redirect. The canonical URL form is lowercase, even
+ * though `factory.key` itself (and everywhere else it's displayed) stays
+ * uppercase.
  */
 export function replaceFactoryKeySegment(
   pathname: string,
@@ -75,9 +84,10 @@ export function replaceFactoryKeySegment(
   routeKey: string,
   canonicalKey: string,
 ): string {
+  const lowerCanonicalKey = canonicalKey.toLowerCase();
   const prefix = `/${organizationId}/workspaces/${routeKey}`;
   if (!pathname.startsWith(prefix)) {
-    return `/${organizationId}/workspaces/${canonicalKey}`;
+    return `/${organizationId}/workspaces/${lowerCanonicalKey}`;
   }
-  return `/${organizationId}/workspaces/${canonicalKey}${pathname.slice(prefix.length)}`;
+  return `/${organizationId}/workspaces/${lowerCanonicalKey}${pathname.slice(prefix.length)}`;
 }

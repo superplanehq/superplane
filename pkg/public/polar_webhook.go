@@ -18,7 +18,7 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event, err := polar.VerifyAndParseOrderEvent(r.Header, body, polar.WebhookSecret())
+	event, err := polar.VerifyAndParseWebhook(r.Header, body, polar.WebhookSecret())
 	if errors.Is(err, polar.ErrWebhookSecretMissing) || errors.Is(err, polar.ErrInvalidWebhookSignature) {
 		http.Error(w, "invalid webhook signature", http.StatusForbidden)
 		return
@@ -38,17 +38,37 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if event.Subscription != nil {
+		if err := polar.ApplySubscriptionEvent(r.Context(), database.DB(r.Context()), event.Subscription); err != nil {
+			if polar.IsPermanentApplyError(err) {
+				polar.LogPermanentApply(nil, err)
+				acceptPolarWebhook(w)
+				return
+			}
+			log.WithError(err).Error("failed to apply polar subscription")
+			http.Error(w, "unable to apply subscription", http.StatusInternalServerError)
+			return
+		}
+		acceptPolarWebhook(w)
+		return
+	}
+
 	var lookup polar.CreditPackLookup
 	if polar.Configured() {
 		lookup = polar.NewClientFromEnv()
 	}
-	if err := polar.ApplyOrderEvent(r.Context(), database.DB(r.Context()), event, lookup); err != nil {
+	if event.Order == nil {
+		log.Error("ignored polar webhook with no order payload")
+		acceptPolarWebhook(w)
+		return
+	}
+	if err := polar.ApplyOrderEvent(r.Context(), database.DB(r.Context()), event.Order, lookup); err != nil {
 		if polar.IsPermanentApplyError(err) {
-			polar.LogPermanentApply(event, err)
+			polar.LogPermanentApply(event.Order, err)
 			acceptPolarWebhook(w)
 			return
 		}
-		log.WithError(err).WithField("polar_order_id", event.Data.ID).Error("failed to apply polar order")
+		log.WithError(err).WithField("polar_order_id", event.Order.Data.ID).Error("failed to apply polar order")
 		http.Error(w, "unable to apply order", http.StatusInternalServerError)
 		return
 	}

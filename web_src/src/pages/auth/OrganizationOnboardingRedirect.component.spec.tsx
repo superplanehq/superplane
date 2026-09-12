@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccountContextType } from "@/contexts/accountContextState";
+import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import { integrationKeys } from "@/hooks/useIntegrations";
+import { meKeys } from "@/hooks/useMe";
 
 import { OrganizationOnboardingRedirect } from "./OrganizationOnboardingRedirect";
 
@@ -134,7 +137,7 @@ describe("OrganizationOnboardingRedirect", () => {
       json: () => Promise.resolve({ organizationSlug: "dev-user-x1y2z3", workspaceKey: "NEWWO" }),
     });
 
-    await reresolve();
+    await act(reresolve);
 
     await waitFor(() => expect(screen.getByTestId("internal-workspace-slug")).toHaveTextContent("dev-user-x1y2z3"));
     expect(location.replace).not.toHaveBeenCalled();
@@ -165,9 +168,49 @@ describe("OrganizationOnboardingRedirect", () => {
     // Cache written by the wizard itself after the workspace was adopted.
     queryClient.setQueryData(["factories", "dev-user"], [{ id: "current-factory" }]);
 
-    await reresolve();
+    await act(reresolve);
 
     expect(queryClient.getQueryData(["factories", "dev-user"])).toBeDefined();
+  });
+
+  it("keeps seeded workspace queries when a re-resolve adopts a new slug", async () => {
+    const queryClient = new QueryClient();
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ organizationSlug: "dev-user", workspaceKey: "NEWWO" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { reresolve } = renderOnboardingWithReresolve(queryClient);
+
+    await screen.findByText("dev-user");
+
+    const seededFactory = { id: "current-factory", key: "NEWWO" };
+    const currentUser = { id: "account-1", permissions: [{ resource: "factories", action: "update" }] };
+    const integrationId = "github-1";
+    const connected = [{ metadata: { id: integrationId, integrationName: "github" } }];
+    const repositories = [{ id: "acme/api", name: "acme/api" }];
+    queryClient.setQueryData(factoryQueryKeys.list("github-owner"), [seededFactory]);
+    queryClient.setQueryData(factoryQueryKeys.detail("github-owner", seededFactory.id), seededFactory);
+    queryClient.setQueryData(meKeys.me("dev-user"), currentUser);
+    queryClient.setQueryData(integrationKeys.connected("dev-user"), connected);
+    queryClient.setQueryData(integrationKeys.resources("dev-user", integrationId, "repository"), repositories);
+    queryClient.setQueryData(meKeys.me("github-owner"), { id: "stale-user", permissions: [] });
+    queryClient.setQueryData(["integrations", "connected", "github-owner"], [{ id: "stale-integration" }]);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ organizationSlug: "github-owner", workspaceKey: "NEWWO" }),
+    });
+
+    await act(reresolve);
+
+    await waitFor(() => expect(screen.getByTestId("internal-workspace-slug")).toHaveTextContent("github-owner"));
+    expect(queryClient.getQueryData(factoryQueryKeys.list("github-owner"))).toEqual([seededFactory]);
+    expect(queryClient.getQueryData(factoryQueryKeys.detail("github-owner", seededFactory.id))).toEqual(seededFactory);
+    expect(queryClient.getQueryData(meKeys.me("github-owner"))).toEqual(currentUser);
+    expect(queryClient.getQueryData(integrationKeys.connected("github-owner"))).toEqual(connected);
+    expect(queryClient.getQueryData(integrationKeys.resources("github-owner", integrationId, "repository"))).toEqual(
+      repositories,
+    );
   });
 
   it("starts workspace setup without GitHub authorization", async () => {

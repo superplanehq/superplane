@@ -9,6 +9,20 @@ global_job_config:
   env_vars:
     - name: DOCKER_BUILDKIT
       value: "1"
+    # Dummy public GitHub App so factory E2E can open workspace setup.
+    # Local development without these values still blocks onboarding.
+    - name: SUPERPLANE_GITHUB_APP_ID
+      value: "1"
+    - name: SUPERPLANE_GITHUB_APP_SLUG
+      value: "superplane-e2e"
+    - name: SUPERPLANE_GITHUB_APP_PRIVATE_KEY
+      value: "-----BEGIN RSA PRIVATE KEY-----\\ne2e\\n-----END RSA PRIVATE KEY-----"
+    - name: SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET
+      value: "e2e-webhook-secret"
+    - name: SUPERPLANE_GITHUB_APP_CLIENT_ID
+      value: "e2e-client-id"
+    - name: SUPERPLANE_GITHUB_APP_CLIENT_SECRET
+      value: "e2e-client-secret"
   prologue:
     commands:
       - checkout
@@ -66,6 +80,32 @@ blocks:
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - bash scripts/ci_cache_store_go.sh
 
+  - name: "Security"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      jobs:
+        - name: Tool configs
+          commands:
+            - make check.tool.configs
+
+        - name: IoC markers
+          commands:
+            - bash ./scripts/check_ioc_markers.sh
+
+        - name: Install hooks
+          commands:
+            - bash ./scripts/check_install_hooks.sh
+
+        - name: Secrets
+          commands:
+            - bash ./scripts/check_committed_secrets.sh
+
+        - name: npm audit
+          commands:
+            - make check.npm.audit.critical
+
   - name: "Frontend Tests"
     dependencies: []
     run:
@@ -74,27 +114,33 @@ blocks:
       jobs:
         - name: Check Build
           commands:
+            - make check.tool.configs
             - make check.build.ui
 
         - name: Storybook Build
           commands:
+            - make check.tool.configs
             - make check.build.storybook
 
         - name: Unit Tests
           parallelism: 4
           commands:
+            - make check.tool.configs
             - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:
+            - make check.tool.configs
             - make check.format.js
 
         - name: EsLint
           commands:
+            - make check.tool.configs
             - make check.lint.ui
 
         - name: Knip (dead files check)
           commands:
+            - make check.tool.configs
             - make check.lint.ui.knip
 
 after_pipeline:
@@ -103,3 +149,10 @@ after_pipeline:
       - name: Submit Reports
         commands:
           - test-results gen-pipeline-report
+
+promotions:
+  - name: Deploy to Production
+    pipeline_file: deploy-to-production.yml
+    deployment_target: production
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"

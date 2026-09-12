@@ -29,18 +29,13 @@ func ListFactoryIntakeRuns(
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
-	}
-
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
@@ -332,6 +327,8 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		return nestedString(payload, "data", "issue", "title")
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return nestedString(payload, "incident", "title")
+	case models.FactoryIntakeSourceProductiveTasks:
+		return nestedString(payload, "data", "attributes", "title")
 	default:
 		return ""
 	}

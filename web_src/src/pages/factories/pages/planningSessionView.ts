@@ -1,3 +1,4 @@
+import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 
@@ -16,8 +17,9 @@ export type PlanningSessionPayload = {
   canvasRunId?: string;
   waitState?: string;
   executionId?: string;
+  selectableModelKey?: string;
   messages?: PlanningSessionMessagePayload[];
-  draft?: { title?: string; description?: string } | null;
+  draft?: { title?: string; description?: string; workOrderId?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
   survey?: PlanningSessionSurveyPayload | null;
 };
@@ -39,24 +41,6 @@ export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
   extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
 ): CreateWithAgentView {
-  const created: CreateWithAgentCreatedOrder[] = (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
-      Boolean(order.id && order.key && order.title),
-    )
-    .map((order) => ({
-      id: order.id,
-      key: order.key,
-      title: order.title,
-      description: order.description ?? "",
-    }));
-
-  const draftTitle = session.draft?.title?.trim() ?? "";
-  const right = draftTitle
-    ? { kind: "draft" as const, draft: { title: draftTitle, description: session.draft?.description ?? "" } }
-    : extras.right.kind === "preview"
-      ? extras.right
-      : { kind: "empty" as const };
-
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
@@ -66,10 +50,39 @@ export function createWithAgentViewFromSession(
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
-    created,
-    right,
+    created: createdOrdersFromSession(session),
+    right: planningSessionRightPane(session, extras.right),
     endConfirmOpen: extras.endConfirmOpen,
+    selectableModelKey: session.selectableModelKey ?? "",
+    refining: Boolean(session.draft?.workOrderId?.trim()),
   };
+}
+
+function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAgentCreatedOrder[] {
+  return (session.created ?? [])
+    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
+      Boolean(order.id && order.key && order.title),
+    )
+    .map((order) => ({
+      id: order.id,
+      key: order.key,
+      title: order.title,
+      description: order.description ?? "",
+    }));
+}
+
+function planningSessionRightPane(
+  session: PlanningSessionPayload,
+  right: CreateWithAgentView["right"],
+): CreateWithAgentView["right"] {
+  const draftTitle = session.draft?.title?.trim() ?? "";
+  if (draftTitle) {
+    return { kind: "draft", draft: { title: draftTitle, description: session.draft?.description ?? "" } };
+  }
+  if (right.kind === "preview") {
+    return right;
+  }
+  return { kind: "empty" };
 }
 
 function planningSessionSurveyFromPayload(
@@ -97,10 +110,16 @@ export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
   run: { result?: string } | null | undefined,
 ): CreateWithAgentView {
-  if (view.machineStatus === "failed" || !isFailedPlanningCanvasRun(run)) {
+  if (view.machineStatus === "failed") {
     return view;
   }
-  return { ...view, machineStatus: "failed" };
+  if (isFailedPlanningCanvasRun(run)) {
+    return { ...view, machineStatus: "failed" };
+  }
+  if (run?.result === "RESULT_PASSED" && view.machineStatus !== "waiting") {
+    return { ...view, machineStatus: "failed" };
+  }
+  return view;
 }
 
 function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
@@ -117,6 +136,9 @@ function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWi
 }
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
+    return [];
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
     const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
     return [

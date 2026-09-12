@@ -7,6 +7,7 @@ import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "canvases.proto";
+import "files.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
 
@@ -56,7 +57,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory";
-      description: "Returns a factory by its ID";
+      description: "Returns a factory by ID or workspace key. Workspace names are not accepted: they are not unique and can contain spaces.";
       tags: "Factory";
     };
   }
@@ -394,7 +395,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory work order";
-      description: "Returns a work order by its ID";
+      description: "Returns a work order by ID, number, or key";
       tags: "Factory";
     };
   }
@@ -550,6 +551,28 @@ service Factories {
     };
   }
 
+  rpc ListFactoryWorkOrderRunUsage(ListFactoryWorkOrderRunUsageRequest) returns (ListFactoryWorkOrderRunUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage-history"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work-order run usage";
+      description: "Returns paginated task-run spend for a workspace from the usage ledger";
+      tags: "Factory";
+    };
+  }
+
+  rpc ExportFactoryWorkOrderRunUsage(ExportFactoryWorkOrderRunUsageRequest) returns (ExportFactoryWorkOrderRunUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage-history.csv"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Export factory work-order run usage";
+      description: "Returns the full task-run spend ledger for a workspace as CSV, with no date window";
+      tags: "Factory";
+    };
+  }
+
   rpc ListFactoryLLMModels(ListFactoryLLMModelsRequest) returns (ListFactoryLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/llm-models"
@@ -655,6 +678,18 @@ service Factories {
     };
   }
 
+  rpc ReloadPlanningSessionAgent(ReloadPlanningSessionAgentRequest) returns (ReloadPlanningSessionAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reload planning session agent";
+      description: "Keeps the Create with an Agent session and starts a new machine with the selected model";
+      tags: "Factory";
+    };
+  }
+
   rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
@@ -690,6 +725,8 @@ message CreateFactoryResponse {
 }
 
 message DescribeFactoryRequest {
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string id = 1;
 }
 
@@ -772,6 +809,7 @@ message FactoryOnboarding {
     AGENT_HARNESS_CLAUDE_CODE = 1;
     AGENT_HARNESS_CURSOR = 2;
     AGENT_HARNESS_CODEX = 3;
+    AGENT_HARNESS_SUPERPLANE = 4;
   }
 
   // Set when workspace setup finished. Null while onboarding is open.
@@ -917,6 +955,15 @@ message FactoryIntake {
     SOURCE_GITHUB_ISSUES = 1;
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
+    SOURCE_PRODUCTIVE_TASKS = 4;
+  }
+
+  enum InitialImportStatus {
+    INITIAL_IMPORT_STATUS_UNSPECIFIED = 0;
+    INITIAL_IMPORT_STATUS_PENDING = 1;
+    INITIAL_IMPORT_STATUS_COMPLETED = 2;
+    INITIAL_IMPORT_STATUS_FAILED = 3;
+    INITIAL_IMPORT_STATUS_SKIPPED = 4;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
@@ -948,6 +995,13 @@ message FactoryIntake {
     // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
     // GitHub issue intakes only. Off by default.
     bool authors_with_access = 5;
+    // Listen for opened GitHub issues.
+    optional bool new_issues = 6;
+    // Listen for open GitHub issues when somebody adds the "superplane"
+    // label to them.
+    optional bool superplane_label_added = 7;
+    // Listen for reopened GitHub issues.
+    optional bool reopened_issues = 8;
   }
 
   string id = 1;
@@ -963,6 +1017,10 @@ message FactoryIntake {
   bool healthy = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Result of the one-time import that runs when the intake is created.
+  InitialImportStatus initial_import_status = 11;
+  // Set when the initial import completed, including when it found zero items.
+  optional int32 initial_import_item_count = 12;
 }
 
 message FactoryIntakeRun {
@@ -1005,6 +1063,9 @@ message CreateFactoryIntakeRequest {
   // Defaults to a name derived from the source when empty.
   string name = 3;
   optional int32 confidence_pct = 4;
+  // Optional integration and source resource selected during guided setup.
+  string integration_id = 5;
+  string resource_id = 6;
 }
 
 message CreateFactoryIntakeResponse {
@@ -1365,6 +1426,12 @@ message WorkOrder {
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
   int64 total_duration_seconds = 17;
+  // Ready files for this task. Present on DescribeWorkOrder only.
+  // The stored description uses sp-file:// refs, not download URLs.
+  repeated Superplane.Files.File files = 18;
+  // Canvas run that created this task, when Create Task produced it.
+  // Empty for tasks opened in the UI or imported without a source run.
+  string source_run_id = 19;
 }
 
 message WorkOrderOrigin {
@@ -1517,7 +1584,10 @@ message WorkOrderExecutionStep {
 }
 
 message DescribeWorkOrderRequest {
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string factory_id = 1;
+  // Work order UUID, sequence number, or display key (for example `SP-42`).
   string order_id = 2;
 }
 
@@ -1844,13 +1914,24 @@ message DescribeFactoryVelocityDay {
   int32 waste = 5;
   // Merged SuperPlane pull requests grouped by intake source.
   repeated DescribeFactoryVelocityIntakeCount intake = 6;
-  // Tracked model spend of the work orders that closed on this day. A work
-  // order counts on the day its pull request merged, or on the day its last
-  // pull request closed when none merged.
+  // Tracked spend of the work orders that closed on this day. A work order
+  // counts on the day its pull request merged, or on the day its last pull
+  // request closed when none merged.
   int64 cost_cents = 7;
   int64 tokens = 8;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 9;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 10;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 11;
+  // Median model spend of one work order reported on this day. Medians of the
+  // two bands do not add up to the median of the total, so these two describe
+  // one typical work order per band rather than one typical total.
+  int64 median_task_model_cost_cents = 12;
+  // Median runner compute spend of one work order reported on this day.
+  int64 median_task_compute_cost_cents = 13;
 }
 
 // DescribeFactoryVelocityIntakeSource names one intake series and its total.
@@ -1921,7 +2002,7 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
-  // Tracked model spend of the work orders that closed in the window.
+  // Tracked spend of the work orders that closed in the window.
   int64 cost_cents = 6;
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
@@ -1932,6 +2013,11 @@ message DescribeFactoryVelocityTotals {
   int32 tasks_closed = 9;
   // Part of `tasks_closed` whose pull requests all closed without a merge.
   int32 tasks_waste = 10;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 11;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 12;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
@@ -1982,6 +2068,48 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+}
+
+message ListFactoryWorkOrderRunUsageRequest {
+  string factory_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  uint32 limit = 4;
+  uint32 offset = 5;
+}
+
+message WorkOrderRunUsageRow {
+  string work_order_execution_id = 1;
+  string work_order_id = 2;
+  int64 work_order_number = 3;
+  string work_order_key = 4;
+  string title = 5;
+  google.protobuf.Timestamp last_occurred_at = 6;
+  string user_id = 7;
+  string user_name = 8;
+  string user_email = 9;
+  int64 total_tokens = 10;
+  int64 duration_seconds = 11;
+  int64 cost_cents = 12;
+  int64 hosted_cost_cents = 13;
+  int64 byok_cost_cents = 14;
+  repeated string models = 15;
+  repeated string byok_models = 16;
+  repeated string machine_types = 17;
+}
+
+message ListFactoryWorkOrderRunUsageResponse {
+  repeated WorkOrderRunUsageRow rows = 1;
+  uint32 total_count = 2;
+}
+
+message ExportFactoryWorkOrderRunUsageRequest {
+  string factory_id = 1;
+}
+
+message ExportFactoryWorkOrderRunUsageResponse {
+  string csv = 1;
+  string filename = 2;
 }
 
 message ListFactoryLineRunnerModelsRequest {
@@ -2038,6 +2166,7 @@ message UsageByMachineType {
 message PlanningSessionDraft {
   string title = 1;
   string description = 2;
+  string work_order_id = 3;
 }
 
 message PlanningSessionCreatedOrder {
@@ -2077,11 +2206,13 @@ message PlanningSession {
   string wait_state = 10;
   string execution_id = 11;
   PlanningSessionSurvey survey = 12;
+  string selectable_model_key = 13;
 }
 
 message StartPlanningSessionRequest {
   string factory_id = 1;
   string repository = 2;
+  string work_order_id = 3;
 }
 
 message StartPlanningSessionResponse {
@@ -2142,5 +2273,15 @@ message SkipPlanningSessionDraftRequest {
 }
 
 message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message ReloadPlanningSessionAgentRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string selectable_model_key = 3;
+}
+
+message ReloadPlanningSessionAgentResponse {
   PlanningSession session = 1;
 }

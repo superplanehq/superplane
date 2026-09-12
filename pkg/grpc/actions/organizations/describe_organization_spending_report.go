@@ -88,11 +88,13 @@ func DescribeOrganizationSpendingReport(
 		normalizedGroupBy = models.SpendingGroupByModel
 	case models.SpendingGroupByMachine:
 		normalizedGroupBy = models.SpendingGroupByMachine
+	case models.SpendingGroupByFundingSource:
+		normalizedGroupBy = models.SpendingGroupByFundingSource
 	}
 
 	return &pb.DescribeOrganizationSpendingReportResponse{
 		KpiTotals:      serializeSpendingReportTotals(kpi),
-		ExplorerTotals: serializeUsageTotals(explorer.Totals),
+		ExplorerTotals: serializeSpendingReportTotals(explorer.Totals),
 		Series:         serializeSpendingSeries(explorer.Series),
 		SeriesKeys:     serializeSpendingSeriesKeys(explorer.SeriesKeys, catalogs, normalizedGroupBy),
 		Breakdown:      serializeSpendingBreakdown(explorer.Breakdown, catalogs, normalizedGroupBy),
@@ -149,6 +151,14 @@ func applySpendingReportFilters(filter *models.UsageReportFilter, req *pb.Descri
 		filter.TaskOwnerID = &parsed
 	}
 
+	if source := strings.TrimSpace(req.GetFundingSource()); source != "" {
+		normalized, err := models.ParseUsageFundingSource(source)
+		if err != nil {
+			return err
+		}
+		filter.FundingSource = normalized
+	}
+
 	return nil
 }
 
@@ -166,14 +176,6 @@ func serializeSpendingReportTotals(totals models.SpendingKPITotals) *pb.Spending
 		DurationSeconds: totals.DurationSeconds,
 		HostedCostCents: totals.HostedCostCents(),
 		ByokCostCents:   totals.BYOKCostCents(),
-	}
-}
-
-func serializeUsageTotals(totals models.UsageTotals) *pb.SpendingReportTotals {
-	return &pb.SpendingReportTotals{
-		CostCents:       totals.CostCents(),
-		TotalTokens:     totals.TotalTokens,
-		DurationSeconds: totals.DurationSeconds,
 	}
 }
 
@@ -264,6 +266,7 @@ func serializeSpendingCreditSnapshot(
 		RemainingCreditWarning: credit.Warning,
 		BillingEnabled:         billingEnabled,
 		HasBillingCustomer:     hasCustomer,
+		WelcomeCreditExpiresAt: protoTimestamp(credit.WelcomeCreditExpiresAt),
 	}
 }
 

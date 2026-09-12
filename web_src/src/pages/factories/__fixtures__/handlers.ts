@@ -2,6 +2,7 @@ import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
+import { factoryPRFeedbackRoutes } from "./factoryPRFeedbackHandlers";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
@@ -26,10 +27,12 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderRunUsageRow,
 } from "@/api-client";
+import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
-import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
@@ -167,6 +170,105 @@ function factoryWithLineMetrics(factory: FactoriesFactory): FactoriesFactory {
   };
 }
 
+const USAGE_HISTORY_CSV_HEADER = [
+  "Date",
+  "User",
+  "Task",
+  "Model",
+  "Tokens",
+  "Token price",
+  "VM type",
+  "Time",
+  "VM price",
+];
+
+/**
+ * Mirrors the real ExportFactoryWorkOrderRunUsage CSV shape closely enough
+ * for tests: UTF-8 BOM, same header and column order, and empty (not "0" or
+ * "—") cells for a band with nothing in it.
+ */
+function usageHistoryCsvBody(rows: FactoriesWorkOrderRunUsageRow[]): string {
+  const lines = [USAGE_HISTORY_CSV_HEADER, ...rows.map(usageHistoryCsvRow)];
+  return "﻿" + lines.map((line) => line.map(csvEscape).join(",")).join("\r\n") + "\r\n";
+}
+
+function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
+  const totalTokens = Number(row.totalTokens ?? 0);
+  const durationSeconds = Number(row.durationSeconds ?? 0);
+  const hostedCostCents = Number(row.hostedCostCents ?? 0);
+  const byokCostCents = Number(row.byokCostCents ?? 0);
+  const tokenPriceCents = hostedCostCents + byokCostCents;
+  const vmPriceCents = Math.max(0, Number(row.costCents ?? 0) - tokenPriceCents);
+
+  return [
+    row.lastOccurredAt ? new Date(row.lastOccurredAt).toISOString() : "",
+    row.userName || row.userEmail || "",
+    row.workOrderKey ?? "",
+    usageHistoryCsvModels(row.models, row.byokModels),
+    totalTokens > 0 ? String(totalTokens) : "",
+    tokenPriceCents > 0 ? (tokenPriceCents / 100).toFixed(2) : "",
+    (row.machineTypes ?? []).join(" · "),
+    durationSeconds > 0 ? String(durationSeconds) : "",
+    vmPriceCents > 0 ? (vmPriceCents / 100).toFixed(2) : "",
+  ];
+}
+
+function usageHistoryCsvModels(models: string[] = [], byokModels: string[] = []): string {
+  const hosted = models.join(" · ");
+  if (byokModels.length === 0) {
+    return hosted;
+  }
+  const byok = `${byokModels.join(" · ")} (your keys)`;
+  return hosted ? `${hosted} · ${byok}` : byok;
+}
+
+function csvEscape(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * The paginated table endpoint and its unbounded CSV export sibling, both
+ * reading `usageHistoryByFactoryId`. Neither route filters by date; the real
+ * export ignores its date window entirely, and the real table route's date
+ * window is not worth reproducing in a fixture.
+ */
+function usageHistoryRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      // Anchored before the plain "/usage-history" route below; only matters
+      // if both would match, and the trailing ".csv" makes them mutually
+      // exclusive.
+      pattern: re("/api/v1/factories/([^/]+)/usage-history\\.csv"),
+      resolve: (match) => {
+        const rows = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
+        const factory = fixture.factories.find((entry) => entry.id === match[1]);
+        return {
+          json: {
+            csv: usageHistoryCsvBody(rows),
+            filename: `${factory?.key ?? match[1]}-usage.csv`,
+          },
+        };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/usage-history"),
+      resolve: (match, _method, _body, url) => {
+        const all = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
+        const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, requestedLimit) : 50;
+        const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+        const offset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
+        return {
+          json: {
+            rows: all.slice(offset, offset + limit),
+            totalCount: all.length,
+          },
+        };
+      },
+    },
+  ];
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -211,6 +313,8 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
     ...factoryIntakeRoutes(fixture),
+    ...factoryPRFeedbackRoutes(fixture),
+    ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
@@ -637,6 +741,13 @@ function organizationSpendingReportRoute(fixture: FactoriesFixture): FactoriesRo
   };
 }
 
+function organizationCreditGrantsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/credit-grants"),
+    resolve: () => ({ json: { grants: fixture.organizationCreditGrants ?? [] } }),
+  };
+}
+
 function hostedLlmModelsRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
@@ -644,24 +755,59 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
-function byokModelsRoute(): FactoriesRoute {
+function byokSelectedModelIds(fixture: FactoriesFixture, provider: string): string[] {
+  const catalogIds =
+    fixture.byokCandidatesByProvider?.[provider] ?? storybookHostedLlmModels(provider).models.map((model) => model.id);
+  const connected = fixture.byokConnectedProviders
+    ? fixture.byokConnectedProviders.includes(provider)
+    : catalogIds.length > 0;
+  if (!connected) {
+    return fixture.byokSelectedByProvider?.[provider] ?? [];
+  }
+  return fixture.byokSelectedByProvider?.[provider] ?? catalogIds;
+}
+
+function selectableLlmModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/selectable-llm-models"),
+    resolve: () => {
+      const byokByProvider: Record<string, string[]> = {};
+      for (const provider of HOSTED_LLM_PROVIDERS) {
+        byokByProvider[provider] = byokSelectedModelIds(fixture, provider);
+      }
+      return { json: { models: storybookSelectableLlmModels(byokByProvider) } };
+    },
+  };
+}
+
+function byokModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/byok-models"),
     resolve: (_match, method, body, url) => {
       const request = (body ?? {}) as { provider?: string; allowedModels?: unknown };
       const provider =
         url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
-      const models = storybookHostedLlmModels(provider).models;
+      const catalogIds =
+        fixture.byokCandidatesByProvider?.[provider] ??
+        storybookHostedLlmModels(provider).models.map((model) => model.id);
+      const connected = fixture.byokConnectedProviders
+        ? fixture.byokConnectedProviders.includes(provider)
+        : catalogIds.length > 0;
       if (method === "PUT") {
         const allowed = stringArrayOrEmpty(request.allowedModels);
+        fixture.byokSelectedByProvider = {
+          ...fixture.byokSelectedByProvider,
+          [provider]: allowed,
+        };
         return { json: { selected: allowed.map((id) => ({ id, name: id })) } };
       }
+      const selectedIds = byokSelectedModelIds(fixture, provider);
       return {
         json: {
-          connected: models.length > 0,
-          integrationId: models.length > 0 ? "int-byok" : "",
-          selected: models,
-          candidates: models,
+          connected,
+          integrationId: connected ? `int-byok-${provider}` : "",
+          selected: selectedIds.map((id) => ({ id, name: id })),
+          candidates: connected ? catalogIds.map((id) => ({ id, name: id })) : [],
         },
       };
     },
@@ -677,6 +823,53 @@ function hostedCreditProductsRoute(fixture: FactoriesFixture): FactoriesRoute {
         products: fixture.hostedCreditProducts ?? [],
       },
     }),
+  };
+}
+
+function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/sync"),
+    resolve: () => {
+      fixture.billingSyncCalls = (fixture.billingSyncCalls ?? 0) + 1;
+      if (fixture.billingAfterSync) {
+        fixture.organizationBilling = fixture.billingAfterSync;
+      }
+      return {
+        json: fixture.organizationBilling ?? {
+          plan: "trial",
+          planSource: "system",
+          trialEndsAt: "2026-09-22T12:00:00.000Z",
+          billingEnabled: true,
+          subscriptionCheckoutEnabled: true,
+          creditPurchaseAllowed: false,
+          hasBillingCustomer: false,
+        },
+      };
+    },
+  };
+}
+
+function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing"),
+    resolve: () => ({
+      json: fixture.organizationBilling ?? {
+        plan: "trial",
+        planSource: "system",
+        trialEndsAt: "2026-09-22T12:00:00.000Z",
+        billingEnabled: true,
+        subscriptionCheckoutEnabled: true,
+        creditPurchaseAllowed: false,
+        hasBillingCustomer: false,
+      },
+    }),
+  };
+}
+
+function businessCheckoutRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/business-checkout"),
+    resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_business" } }),
   };
 }
 
@@ -748,10 +941,15 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),
+    organizationCreditGrantsRoute(fixture),
     hostedLlmModelsRoute(),
-    byokModelsRoute(),
+    selectableLlmModelsRoute(fixture),
+    byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    organizationBillingSyncRoute(fixture),
+    organizationBillingRoute(fixture),
+    businessCheckoutRoute(),
     billingPortalSessionRoute(),
   ];
 }

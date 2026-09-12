@@ -91,9 +91,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · Automations
-  entry("workspace", "automations", "Automations", undefined, ["new automation", "triggers", "lines", "canvas"]),
-
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
     "llm",
@@ -106,6 +103,17 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "use your keys",
   ]),
 
+  // Workspace · Usage
+  entry("workspace", "usage", "Usage", undefined, [
+    "tokens",
+    "vm time",
+    "cost",
+    "task spend",
+    "your keys",
+    "model",
+    "machine",
+  ]),
+
   // Organization · General
   entry("organization", "general", "General", undefined, ["name", "organization slug", "slug", "workspace url"]),
 
@@ -115,10 +123,44 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   // Organization · Integrations (page-level; providers are added dynamically)
   entry("organization", "integrations", "Integrations", undefined, ["connect", "filter integrations", "integration"]),
 
-  // Organization · API keys / Secrets / Spending
+  // Organization · LLM Models
+  entry("organization", "models", "LLM Models", undefined, [
+    "llm",
+    "byok",
+    "openrouter",
+    "claude",
+    "openai",
+    "your keys",
+    "select models",
+  ]),
+
+  // Organization · API keys / Secrets / Billing / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
-  entry("organization", "spending", "Spending", undefined, ["billing", "usage", "credit", "hosted credit", "byok"]),
+  entry("organization", "billing", "Billing", undefined, [
+    "credit",
+    "hosted credit",
+    "invoices",
+    "trial credit",
+    "included usage",
+    "top-up credit",
+    "remaining hosted credit",
+  ]),
+  entry("organization", "billing", "Hosted credit", "billing-credit-balance", [
+    "buy more",
+    "trial credit",
+    "included usage",
+    "top-up credit",
+    "remaining hosted credit",
+  ]),
+  entry("organization", "billing", "Invoices", "billing-polar-invoices", ["receipt", "paid", "manage invoices"]),
+  entry("organization", "spending", "Spending", undefined, [
+    "usage",
+    "credit",
+    "hosted credit",
+    "your keys",
+    "superplane-hosted",
+  ]),
 ];
 
 function entry(

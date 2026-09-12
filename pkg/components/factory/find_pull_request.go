@@ -49,7 +49,7 @@ Supply at least one complete identity:
 - Provider, repository, and number
 - URL
 
-On a match, emits ` + "`pullRequest.found`" + ` with the pull request and its work order on the ` + "`found`" + ` channel. When nothing matches, emits ` + "`pullRequest.notFound`" + ` on the ` + "`notFound`" + ` channel instead of failing the run. This component can only be used in factory-owned apps.
+On a match, emits ` + "`pullRequest.found`" + ` with the pull request and its task on the ` + "`found`" + ` channel. When nothing matches, emits ` + "`pullRequest.notFound`" + ` on the ` + "`notFound`" + ` channel instead of failing the run. This component can only be used in factory-owned apps.
 
 ## Output Channels
 
@@ -79,6 +79,10 @@ func (c *FindPullRequest) ExampleOutput() map[string]any {
 				"id":     "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
 				"number": 123,
 				"key":    "SP-123",
+				"origin": map[string]any{
+					"url":   "https://github.com/acme/app/issues/42",
+					"label": "acme/app#42",
+				},
 			},
 		},
 	}

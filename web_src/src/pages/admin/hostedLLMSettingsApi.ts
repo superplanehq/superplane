@@ -2,6 +2,7 @@ export type HostedLLMProvider = {
   provider: string;
   enabled: boolean;
   api_key_configured: boolean;
+  management_key_configured: boolean;
   base_url: string;
   allowed_models: string[];
 };
@@ -10,12 +11,15 @@ export type InstallationLLMSettings = {
   welcome_grant_cents: number;
   markup_bps: number;
   warning_threshold_bps: number;
+  default_hosted_provider?: string;
+  default_hosted_model?: string;
   providers: HostedLLMProvider[];
 };
 
 export type ProviderForm = {
   enabled: boolean;
   apiKey: string;
+  managementKey: string;
   baseURL: string;
   allowedModels: string[];
   listedModels: string[];
@@ -26,6 +30,7 @@ const SETTINGS_PATH = "/admin/api/installation/llm-settings";
 export const emptyProviderForm = (provider?: HostedLLMProvider): ProviderForm => ({
   enabled: provider?.enabled ?? false,
   apiKey: "",
+  managementKey: "",
   baseURL: provider?.base_url ?? "",
   allowedModels: provider?.allowed_models ?? [],
   listedModels: provider?.allowed_models ?? [],
@@ -53,9 +58,11 @@ export const fetchInstallationLLMSettings = async (): Promise<InstallationLLMSet
 };
 
 export const patchInstallationLLMPolicy = async (body: {
-  welcome_grant_cents: number;
-  markup_bps: number;
-  warning_threshold_bps: number;
+  welcome_grant_cents?: number;
+  markup_bps?: number;
+  warning_threshold_bps?: number;
+  default_hosted_provider?: string;
+  default_hosted_model?: string;
 }): Promise<InstallationLLMSettings> => {
   const response = await fetch(SETTINGS_PATH, {
     method: "PATCH",

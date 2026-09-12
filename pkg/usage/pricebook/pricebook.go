@@ -15,11 +15,16 @@ const (
 	localFleetID     = "local"
 )
 
-// Catalog VM rates: tiny ≈ $0.50/hour, large ≈ $2.00/hour.
-// micros_per_second = cents_per_hour * 10_000 / 3600, rounded.
+// Catalog VM rates from https://superplane.com/pricing/.
+// Tiny per-minute prices do not divide into integer micros per second.
+// 3 micros/s bills ~10% under $0.0002/min; 2 micros/s bills ~20% over $0.0001/min.
 const (
-	MicrosPerSecondE1Tiny  int64 = 139
-	MicrosPerSecondE1Large int64 = 556
+	MicrosPerSecondE1TinyAMD64  int64 = 3
+	MicrosPerSecondE1TinyARM64  int64 = 2
+	MicrosPerSecondE1LargeAMD64 int64 = 70
+	MicrosPerSecondE1LargeARM64 int64 = 50
+	MicrosPerSecondE1Tiny       int64 = MicrosPerSecondE1TinyAMD64
+	MicrosPerSecondE1Large      int64 = MicrosPerSecondE1LargeAMD64
 )
 
 // Rate is USD cents per million tokens for one token class.
@@ -83,6 +88,31 @@ func defaultPrefixRates() []entry {
 		{prefix: "o3-mini", rate: openAIRate(110, 440)},
 		{prefix: "o3", rate: openAIRate(2000, 8000)},
 		{prefix: "o4-mini", rate: openAIRate(110, 440)},
+		{prefix: "gemini-2.5-pro", rate: openAIRate(125, 1000)},
+		{prefix: "gemini-2.5-flash", rate: openAIRate(15, 60)},
+		{prefix: "gemini-2.0-flash", rate: openAIRate(10, 40)},
+		{prefix: "gemini-1.5-pro", rate: openAIRate(125, 500)},
+		{prefix: "gemini-1.5-flash", rate: openAIRate(8, 30)},
+		{prefix: "gemini-flash", rate: openAIRate(15, 60)},
+		{prefix: "gemini-pro", rate: openAIRate(125, 1000)},
+		{prefix: "gemini", rate: openAIRate(15, 60)},
+		{prefix: "grok-3-mini", rate: openAIRate(30, 50)},
+		{prefix: "grok-3", rate: openAIRate(300, 1500)},
+		{prefix: "grok-2", rate: openAIRate(200, 1000)},
+		{prefix: "grok", rate: openAIRate(300, 1500)},
+		{prefix: "deepseek-reasoner", rate: openAIRate(55, 219)},
+		{prefix: "deepseek-r1", rate: openAIRate(55, 219)},
+		{prefix: "deepseek-chat", rate: openAIRate(27, 110)},
+		{prefix: "deepseek-v3", rate: openAIRate(27, 110)},
+		{prefix: "deepseek", rate: openAIRate(27, 110)},
+		{prefix: "qwen-max", rate: openAIRate(160, 640)},
+		{prefix: "qwen-plus", rate: openAIRate(40, 120)},
+		{prefix: "qwen-turbo", rate: openAIRate(5, 20)},
+		{prefix: "qwen3", rate: openAIRate(30, 90)},
+		{prefix: "qwen", rate: openAIRate(40, 120)},
+		{prefix: "kimi-k2", rate: openAIRate(60, 250)},
+		{prefix: "moonshot", rate: openAIRate(120, 120)},
+		{prefix: "kimi", rate: openAIRate(60, 250)},
 	}
 }
 
@@ -96,10 +126,10 @@ func defaultFamilyRates() []familyEntry {
 
 func defaultComputeRates() map[string]int64 {
 	return map[string]int64{
-		"e1-large-amd64": MicrosPerSecondE1Large,
-		"e1-large-arm64": MicrosPerSecondE1Large,
-		"e1-tiny-amd64":  MicrosPerSecondE1Tiny,
-		"e1-tiny-arm64":  MicrosPerSecondE1Tiny,
+		"e1-large-amd64": MicrosPerSecondE1LargeAMD64,
+		"e1-large-arm64": MicrosPerSecondE1LargeARM64,
+		"e1-tiny-amd64":  MicrosPerSecondE1TinyAMD64,
+		"e1-tiny-arm64":  MicrosPerSecondE1TinyARM64,
 		"local":          0,
 	}
 }
@@ -255,6 +285,7 @@ func lookup(model string) (Rate, bool) {
 
 func normalizeModelID(model string) string {
 	normalized := strings.ToLower(strings.TrimSpace(model))
+	normalized = strings.TrimPrefix(normalized, "openrouter/")
 	provider, rest, found := strings.Cut(normalized, "/")
 	if found && provider != "" && rest != "" && !strings.Contains(rest, "/") {
 		return rest

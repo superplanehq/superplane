@@ -56,6 +56,12 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "GitHub issues", intake.GetName())
 		assert.True(t, intake.GetHealthy())
 		assert.Equal(t, int32(DefaultIntakeConfidencePct), intake.GetSettings().GetConfidencePct())
+		assert.True(t, intake.GetSettings().GetNewIssues())
+		assert.True(t, intake.GetSettings().GetReopenedIssues())
+		assert.True(t, intake.GetSettings().GetSuperplaneLabelAdded())
+		assert.False(t, intake.GetSettings().GetAuthorsWithAccess())
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
 
 		// The graph has to be live, not staged: a staged graph never receives
 		// events.
@@ -68,6 +74,57 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 3)
 		assert.Len(t, liveVersion.Edges, 2)
+	})
+
+	t.Run("creating a Productive.io intake builds a healthy trigger to createWorkOrder canvas", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
+
+		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
+		assert.Equal(t, "Productive.io tasks", intake.GetName())
+		assert.True(t, intake.GetHealthy())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		assert.Len(t, liveVersion.Nodes, 2)
+		assert.Len(t, liveVersion.Edges, 1)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "productive.onTask", trigger.ComponentName())
+	})
+
+	t.Run("a Productive.io intake listens to the selected project", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "productive")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS,
+			IntegrationId: integrationID,
+			ResourceId:    "project-42",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "project-42", trigger.Configuration["project"])
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("a Productive.io intake rejects an integration of another type", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS,
+			IntegrationId: integrationID,
+			ResourceId:    "project-42",
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
@@ -268,12 +325,18 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			}
 		}
 		assert.NotContains(t, expression, ">=")
-		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
-		assert.Contains(t, expression, "size(root().data.issue.assignees) == 0")
+		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
+		assert.Contains(t, expression, "len(root().data.issue.assignees) == 0")
 	})
 
-	t.Run("the authors filter reaches the filter expression when on", func(t *testing.T) {
+	t.Run("the authors filter adds a repository permission gate when on", func(t *testing.T) {
 		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		backlogRepository := "acme/backlog"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSIntegrationID:  &integrationID,
+			BacklogRepository: &backlogRepository,
+		}))
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
 		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
@@ -293,13 +356,52 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 
-		expression := ""
+		var permissionNode, authorFilterNode *models.Node
 		for _, node := range liveVersion.Nodes {
-			if node.ID == intakeFilterNodeID {
-				expression, _ = node.Configuration["expression"].(string)
+			switch node.ID {
+			case intakeAuthorPermissionNodeID:
+				node := node
+				permissionNode = &node
+			case intakeAuthorFilterNodeID:
+				node := node
+				authorFilterNode = &node
 			}
 		}
-		assert.Contains(t, expression, `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`)
+		require.NotNil(t, permissionNode)
+		assert.Equal(t, intakeAuthorPermissionComponent, permissionNode.ComponentName())
+		assert.Equal(t, backlogRepository, permissionNode.Configuration["repository"])
+		assert.Equal(t, "{{ root().data.issue.user.login }}", permissionNode.Configuration["username"])
+		require.NotNil(t, authorFilterNode)
+		assert.Equal(t, `root().data.permission != "none"`, authorFilterNode.Configuration["expression"])
+		assert.Contains(t, liveVersion.Edges, models.Edge{
+			Channel:  "true",
+			SourceID: intakeAuthorFilterNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				AuthorsWithAccess: false,
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetSettings().GetAuthorsWithAccess())
+
+		canvas, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err = models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		for _, node := range liveVersion.Nodes {
+			assert.NotEqual(t, intakeAuthorPermissionNodeID, node.ID)
+			assert.NotEqual(t, intakeAuthorFilterNodeID, node.ID)
+		}
+		assert.Contains(t, liveVersion.Edges, models.Edge{
+			Channel:  "true",
+			SourceID: intakeFilterNodeID,
+			TargetID: intakeCreateNodeID,
+		})
 	})
 
 	t.Run("the authors filter stays off by default", func(t *testing.T) {
@@ -330,6 +432,75 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			}
 		}
 		assert.NotContains(t, expression, "author_association")
+	})
+
+	t.Run("issue event settings reach the trigger and filter", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		newIssues := false
+		reopenedIssues := false
+		superplaneLabelAdded := true
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues:            &newIssues,
+				ReopenedIssues:       &reopenedIssues,
+				SuperplaneLabelAdded: &superplaneLabelAdded,
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.False(t, settings.GetNewIssues())
+		assert.False(t, settings.GetReopenedIssues())
+		assert.True(t, settings.GetSuperplaneLabelAdded())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		for _, node := range liveVersion.Nodes {
+			switch node.ID {
+			case intakeTriggerNodeID:
+				assert.Equal(t, []any{"labeled"}, node.Configuration["actions"])
+			case intakeFilterNodeID:
+				assert.Contains(t, node.Configuration["expression"], intakeSuperplaneLabelCondition)
+			}
+		}
+	})
+
+	t.Run("the new and re-opened toggles reach the trigger on their own", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		reopenedIssues := false
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				ReopenedIssues: &reopenedIssues,
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.True(t, settings.GetNewIssues())
+		assert.False(t, settings.GetReopenedIssues())
+		assert.True(t, settings.GetSuperplaneLabelAdded())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeTriggerNodeID {
+				assert.Equal(t, []any{"opened", "labeled"}, node.Configuration["actions"])
+			}
+		}
 	})
 
 	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
@@ -414,6 +585,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, response.GetRuns())
 	})
+}
+
+func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
+	itemCount := 0
+	intake := &models.FactoryIntake{
+		ID:                     uuid.New(),
+		FactoryID:              uuid.New(),
+		CanvasID:               uuid.New(),
+		Source:                 models.FactoryIntakeSourceGitHubIssues,
+		InitialImportStatus:    models.FactoryIntakeInitialImportStatusCompleted,
+		InitialImportItemCount: &itemCount,
+	}
+
+	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+
+	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
+	require.NotNil(t, serialized.InitialImportItemCount)
+	assert.Zero(t, serialized.GetInitialImportItemCount())
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {

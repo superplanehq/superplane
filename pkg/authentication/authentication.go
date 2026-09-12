@@ -42,7 +42,7 @@ const (
 	authSignupStatePrefix      = "signup:"
 	authSignupResultParam      = "auth_signup_result"
 	authErrorParam             = "auth_error"
-	authErrorSignupRequired    = "signup_required"
+	authErrorSignupDisabled    = "signup_disabled"
 	authProviderParam          = "provider"
 	jsonContentType            = "application/json"
 )
@@ -278,7 +278,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
+	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
@@ -300,8 +300,8 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if errors.Is(err, errSignupRequired) {
-		http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+	if errors.Is(err, errSignupDisabled) {
+		http.Redirect(w, r, getSignupDisabledRedirectURL(r), http.StatusSeeOther)
 		return
 	}
 
@@ -561,6 +561,19 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if err := a.checkSignupPolicy(email, r); err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			successResponse()
+			return
+		}
+		if errors.Is(err, errSignupDisabled) {
+			writeAuthErrorJSON(w, authErrorSignupDisabled)
+			return
+		}
+		successResponse()
+		return
+	}
+
 	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
 	if err != nil {
 		log.Errorf("Failed to count recent magic codes for %s: %v", email, err)
@@ -640,6 +653,10 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	// 2. Check signup policy without creating any records. Only reachable
 	//    with a valid code, so a 403 does not leak account existence.
 	if err := a.checkSignupPolicy(email, r); err != nil {
+		if errors.Is(err, errSignupDisabled) {
+			writeAuthErrorJSON(w, authErrorSignupDisabled)
+			return
+		}
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
 	}
@@ -735,7 +752,6 @@ func errorStatusForCodeError(err error) int {
 }
 
 var errSignupDisabled = fmt.Errorf(SignupDisabledError)
-var errSignupRequired = fmt.Errorf("signup must be started from the signup page")
 var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
 
@@ -756,10 +772,6 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 
 	if allowSignupFromInvite(r) {
 		return nil
-	}
-
-	if !isSignupIntentFromRequest(r) {
-		return errSignupRequired
 	}
 
 	if !a.SignupsEnabled() {
@@ -801,7 +813,7 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 
 func errorStatusForAccountError(err error) int {
 	switch err {
-	case errSignupDisabled, errSignupRequired, errInviteLinkInvalid, models.ErrAccountBlocked:
+	case errSignupDisabled, errInviteLinkInvalid, models.ErrAccountBlocked:
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
@@ -861,10 +873,11 @@ func (a *Handler) getPostAuthRedirectURL(r *http.Request, wasCreated bool) strin
 	}
 
 	if redirectURL == "/" {
-		return "/welcome"
+		return addAuthSignupResult("/welcome", "created")
 	}
 
-	return fmt.Sprintf("/welcome?redirect=%s", url.QueryEscape(redirectURL))
+	welcomeURL := fmt.Sprintf("/welcome?redirect=%s", url.QueryEscape(redirectURL))
+	return addAuthSignupResult(welcomeURL, "created")
 }
 
 func addAuthSignupResult(redirectURL string, result string) string {
@@ -879,9 +892,9 @@ func addAuthSignupResult(redirectURL string, result string) string {
 	return parsedURL.String()
 }
 
-func getSignupRequiredRedirectURL(r *http.Request) string {
+func getSignupDisabledRedirectURL(r *http.Request) string {
 	params := url.Values{}
-	params.Set(authErrorParam, authErrorSignupRequired)
+	params.Set(authErrorParam, authErrorSignupDisabled)
 
 	provider := mux.Vars(r)["provider"]
 	if provider != "" {
@@ -1014,7 +1027,7 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 	if !allowSignup {
 		log.Warnf("Signup blocked for email: %s", gothUser.Email)
-		return nil, false, errSignupRequired
+		return nil, false, errSignupDisabled
 	}
 
 	account, err = models.CreateAccount(gothUser.Name, gothUser.Email)
@@ -1025,12 +1038,12 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 	return account, true, nil
 }
 
-func (a *Handler) allowSignupFromRequest(r *http.Request) bool {
+func (a *Handler) canCreateAccountFromRequest(r *http.Request) bool {
 	if allowSignupFromInvite(r) {
 		return true
 	}
 
-	return a.SignupsEnabled() && isSignupIntentFromRequest(r)
+	return a.SignupsEnabled()
 }
 
 func (a *Handler) SignupsEnabled() bool {
@@ -1055,8 +1068,25 @@ func (a *Handler) SignupsBlockedByEnvironment() bool {
 	return a.blockSignup
 }
 
+func writeAuthErrorJSON(w http.ResponseWriter, authError string) {
+	w.Header().Set("Content-Type", jsonContentType)
+	w.WriteHeader(http.StatusForbidden)
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": authError}); err != nil {
+		log.Errorf("Error encoding authentication error response: %v", err)
+	}
+}
+
+func inviteRedirectPath(r *http.Request) string {
+	formRedirect := strings.TrimSpace(r.FormValue("redirect"))
+	if isValidRedirectURL(formRedirect) {
+		return formRedirect
+	}
+
+	return getRedirectURL(r)
+}
+
 func allowSignupFromInvite(r *http.Request) bool {
-	redirectURL := getRedirectURL(r)
+	redirectURL := inviteRedirectPath(r)
 	if !strings.HasPrefix(redirectURL, "/invite/") {
 		return false
 	}

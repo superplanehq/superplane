@@ -741,6 +741,15 @@
     text-decoration-color: var(--foreground);
   }
 
+  .workspace-markdown img,
+  .workspace-markdown .work-order-file-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-block: 0.75rem;
+    border-radius: 0.5rem;
+  }
+
   .workspace-markdown h1,
   .workspace-markdown h2,
   .workspace-markdown h3,
@@ -976,5 +985,87 @@
   }
   50% {
     opacity: 0.25;
+  }
+}
+
+.workspace-next-steps-progress {
+  view-transition-name: workspace-next-steps-progress;
+}
+
+.workspace-next-steps-title {
+  view-transition-name: workspace-next-steps-title;
+}
+
+.workspace-next-steps-banner {
+  view-transition-name: workspace-next-steps-banner;
+}
+
+.workspace-next-steps-reveal {
+  animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-group(workspace-next-steps-progress) {
+  z-index: 20;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(workspace-next-steps-progress),
+::view-transition-new(workspace-next-steps-progress) {
+  height: 100%;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-group(workspace-next-steps-title) {
+  z-index: 19;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(workspace-next-steps-title),
+::view-transition-new(workspace-next-steps-title) {
+  height: auto;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(workspace-next-steps-banner) {
+  animation: workspace-next-steps-banner-out 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-new(workspace-next-steps-banner) {
+  animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: ease;
+}
+
+@keyframes workspace-next-steps-banner-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+
+@keyframes workspace-next-steps-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-next-steps-progress,
+  .workspace-next-steps-title,
+  .workspace-next-steps-banner {
+    view-transition-name: none;
+  }
+
+  .workspace-next-steps-reveal {
+    animation: none;
   }
 }

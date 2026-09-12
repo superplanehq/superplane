@@ -17,6 +17,19 @@ import {
   noIntakeFactoriesFixture,
   severalIntakeFactoriesFixture,
 } from "../__fixtures__/backlogIntakeItemFixtures";
+import {
+  BUSINESS_ORGANIZATION_BILLING,
+  LAPSED_ORGANIZATION_BILLING,
+  LAPSED_TOPUP_USAGE_REPORT,
+  LOW_CREDIT_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+} from "../__fixtures__/usageReportFixtures";
+import {
+  columnAutomationsEmptyPhaseFixture,
+  columnAutomationsFixture,
+  columnAutomationsNeedsRepairFixture,
+  columnAutomationsSeveralIntakesFixture,
+} from "../__fixtures__/columnAutomationsFixture";
 import { LinesPage } from "./LinesPage";
 
 /**
@@ -95,27 +108,13 @@ export const LineBoardIntakeAutomation: Story = {
   },
 };
 
-export const LineBoardIntakeRuns: Story = {
-  name: "Line board — intake runs",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=runs`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
-      />
-    );
-  },
-};
-
 export const LineBoardGithubAndSentry: Story = {
   name: "Line board — GitHub and Sentry listeners",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
       />
     );
@@ -128,7 +127,7 @@ export const LineBoardSeveralIntakes: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={severalIntakeFactoriesFixture}
       />
     );
@@ -141,8 +140,127 @@ export const LineBoardNoIntakes: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={noIntakeFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardIntakeBannersLegacy: Story = {
+  name: "Line board — intake banners (legacy)",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+        previewFlags={{ addIntakeControl: true, columnAutomations: false }}
+      />
+    );
+  },
+};
+
+export const LineBoardColumnAutomations: Story = {
+  name: "Line board — column automations",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={columnAutomationsFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardBacklogAutomationsOpen: Story = {
+  name: "Line board — Backlog automations open",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
+        factoriesFixture={columnAutomationsFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardVerifyAutomationsOpen: Story = {
+  name: "Line board — Verify automations open",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=verify`}
+        factoriesFixture={columnAutomationsFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardDoneAutomationsOpen: Story = {
+  name: "Line board — Done automations open",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=done`}
+        factoriesFixture={columnAutomationsFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardAutomationView: Story = {
+  name: "Line board — automation view popup",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automationView=app-refund-implementer`}
+        factoriesFixture={columnAutomationsFixture}
+        appFixture={refundLineCanvasFixture()}
+      />
+    );
+  },
+};
+
+export const LineBoardSeveralBacklogAutomations: Story = {
+  name: "Line board — several backlog automations",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
+        factoriesFixture={columnAutomationsSeveralIntakesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardAutomationsNeedsRepair: Story = {
+  name: "Line board — needs repair",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
+        factoriesFixture={columnAutomationsNeedsRepairFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardEmptyPhaseAutomations: Story = {
+  name: "Line board — empty phase automations",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=phase-3`}
+        factoriesFixture={columnAutomationsEmptyPhaseFixture}
       />
     );
   },
@@ -156,6 +274,56 @@ export const LineDetailFivePhases: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={fiveStepLineFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Welcome credit is empty. The board shows the trial chip next to the title. */
+export const LineBoardHostedCreditEmpty: Story = {
+  name: "Line board — hosted credit empty",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT }}
+      />
+    );
+  },
+};
+
+/** Purchased hosted credit remains at or below $20. The board shows a low-credit warning. */
+export const LineBoardHostedCreditLow: Story = {
+  name: "Line board — hosted credit low",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{
+          ...lineMetricsFactoriesFixture,
+          organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT,
+          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
+        }}
+      />
+    );
+  },
+};
+
+/** The organization has no plan. The amber chip sits next to the line title. */
+export const LineBoardNoPlan: Story = {
+  name: "Line board — no plan",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{
+          ...lineMetricsFactoriesFixture,
+          organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
+          organizationBilling: LAPSED_ORGANIZATION_BILLING,
+        }}
       />
     );
   },

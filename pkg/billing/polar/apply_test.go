@@ -23,7 +23,7 @@ func Test__ApplyOrderPaidGrantsFaceValueOnce(t *testing.T) {
 
 	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
 	require.NoError(t, err)
-	assert.Equal(t, models.LLMCreditGrantKindPolar, grant.Kind)
+	assert.Equal(t, models.LLMCreditGrantKindTopup, grant.Kind)
 	assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 
 	settings, err := models.FindOrganizationLLMSettings(db, r.Organization.ID)
@@ -95,6 +95,46 @@ func Test__ApplyOrderPaidIgnoresSubscriptionCycle(t *testing.T) {
 	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
+}
+
+func Test__ApplyOrderPaidUsesExternalCustomerID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidPackEvent(r.Organization.ID, orderID, 10000)
+	event.Data.Customer.ExternalID = ""
+	event.Data.ExternalCustomerID = r.Organization.ID.String()
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
+}
+
+func Test__ApplyOrderPaidUsesItemPackMetadata(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidPackEvent(r.Organization.ID, orderID, 10000)
+	event.Data.Product = OrderProduct{ID: "prod_100"}
+	event.Data.ProductPrice = priceJSON{}
+	event.Data.Items = []orderItemJSON{{
+		Amount:       10000,
+		ProductPrice: priceJSON{AmountType: "fixed", PriceAmount: 10000},
+		Product: OrderProduct{
+			ID: "prod_100",
+			Metadata: map[string]any{
+				"superplane_credit_pack": true,
+			},
+		},
+	}}
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
 }
 
 func Test__ApplyOrderPaidLooksUpMissingPackMetadata(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 )
 
 func TestResolveHostedListModelsBaseURL(t *testing.T) {
@@ -40,6 +41,7 @@ func TestAdminLLMSettings(t *testing.T) {
 			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 		})
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
 	})
 
 	t.Run("non-admin gets 404", func(t *testing.T) {
@@ -69,6 +71,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Empty(t, settings.DefaultHostedProvider)
+		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
@@ -115,7 +119,73 @@ func TestAdminLLMSettings(t *testing.T) {
 		}
 		assert.True(t, anthropic.Enabled)
 		assert.True(t, anthropic.APIKeyConfigured)
+		assert.False(t, anthropic.ManagementKeyConfigured)
 		assert.Equal(t, []string{"claude-sonnet-4-6"}, anthropic.AllowedModels)
+
+		body, err = json.Marshal(map[string]any{
+			"default_hosted_provider": "anthropic",
+			"default_hosted_model":    "claude-sonnet-4-6",
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, "anthropic", settings.DefaultHostedProvider)
+		assert.Equal(t, "claude-sonnet-4-6", settings.DefaultHostedModel)
+	})
+
+	t.Run("admin cannot enable OpenRouter without a provisioning key", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"enabled":        true,
+			"api_key":        "sk-or-inference",
+			"allowed_models": []string{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-providers/openrouter",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "provisioning API key is required")
+	})
+
+	t.Run("admin GET reports when a provisioning key is stored", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      models.UsageProviderOpenRouter,
+			Enabled:       false,
+			APIKey:        []byte("encrypted-inference"),
+			ManagementKey: []byte("encrypted-mgmt"),
+			AllowedModels: datatypes.JSONSlice[string]{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/llm-settings",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var settings installationLLMSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		var openrouterProvider hostedLLMProviderResponse
+		for _, provider := range settings.Providers {
+			if provider.Provider == "openrouter" {
+				openrouterProvider = provider
+			}
+		}
+		assert.True(t, openrouterProvider.APIKeyConfigured)
+		assert.True(t, openrouterProvider.ManagementKeyConfigured)
+		assert.NotContains(t, response.Body.String(), "encrypted-mgmt")
 	})
 
 	t.Run("admin can grant credit and set markup override", func(t *testing.T) {

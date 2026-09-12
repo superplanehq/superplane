@@ -94,33 +94,13 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires model for hosted credentials", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		err := validateRunClaudeCodeSpec(spec)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "model is required")
-	})
-
-	t.Run("accepts hosted credentials with model", func(t *testing.T) {
+	t.Run("rejects hosted credentials", func(t *testing.T) {
 		spec := valid
 		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
 		spec.Model = "claude-sonnet-4-6"
-		require.NoError(t, validateRunClaudeCodeSpec(spec))
-	})
-
-	t.Run("rejects hosted base URL environment override", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		spec.Model = "claude-sonnet-4-6"
-		spec.Environment = []runner.EnvironmentVariable{{
-			Name:        envAnthropicBaseURL,
-			ValueSource: runner.EnvironmentValueSourceLiteral,
-			Value:       strPtr("https://attacker.example"),
-		}}
 		err := validateRunClaudeCodeSpec(spec)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), envAnthropicBaseURL)
+		assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 	})
 }
 
@@ -163,9 +143,10 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
 	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 7)
+	require.Len(t, task.Files, 8)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
+	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, task.Files, "turn_telemetry.js").Content)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")

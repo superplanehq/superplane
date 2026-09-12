@@ -7,10 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
-const (
-	DefaultMaxTurns = 128
-	MaxTurnsLimit   = 256
-)
+const opencodeMissingMessage = "opencode CLI not found on PATH; install OpenCode on the runner"
 
 type RunOpenRouterSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
@@ -21,7 +18,9 @@ type RunOpenRouterSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
-	MaxTurns                int                           `mapstructure:"maxTurns"`
+	// MaxTurns is kept so old node JSON still decodes. OpenCode does not
+	// take a turn cap; the wrapper ignores this value.
+	MaxTurns int `mapstructure:"maxTurns"`
 }
 
 func decodeRunOpenRouterSpec(raw any) (RunOpenRouterSpec, error) {
@@ -36,7 +35,6 @@ func decodeRunOpenRouterSpec(raw any) (RunOpenRouterSpec, error) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
-	spec.MaxTurns = effectiveMaxTurns(spec.MaxTurns)
 	return spec, nil
 }
 
@@ -45,6 +43,9 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 		return fmt.Errorf("machine type is required")
 	}
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
+		return err
+	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
 		return err
 	}
 	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
@@ -59,20 +60,12 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenRouterAPIKey); err != nil {
 		return err
 	}
-	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenRouterBaseURL); err != nil {
-		return err
-	}
 	if strings.TrimSpace(spec.Model) == "" {
 		return fmt.Errorf("model is required")
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
-		}
-	}
-	if spec.MaxTurns != 0 {
-		if spec.MaxTurns < 1 || spec.MaxTurns > MaxTurnsLimit {
-			return fmt.Errorf("max turns must be between 1 and %d, or 0 to use the default (%d)", MaxTurnsLimit, DefaultMaxTurns)
 		}
 	}
 	return nil
@@ -85,10 +78,9 @@ type OpenRouterBrokerTask struct {
 }
 
 func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
-	maxTurns := effectiveMaxTurns(spec.MaxTurns)
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare OpenRouter agent",
-		PrepareScript:    runner.NodePrepareScript("", "", spec.WorkingDirectory),
+		PrepareScript:    runner.NodePrepareScript("opencode", opencodeMissingMessage, spec.WorkingDirectory),
 		RunScriptName:    "run.js",
 		RunScript:        runScript,
 		WorkingDirectory: spec.WorkingDirectory,
@@ -98,14 +90,29 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 		Model:            strings.TrimSpace(spec.Model),
 		PromptCommand: func(promptName, model string) string {
 			return fmt.Sprintf(
-				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s %d`,
+				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
 				promptName,
 				runner.ShellSingleQuote(model),
-				maxTurns,
 			)
 		},
 	})
 	return OpenRouterBrokerTask{Commands: commands, Files: files}
+}
+
+func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
+	return buildOpenRouterBrokerTask(spec, usage, setups)
+}
+
+func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
+	return applyPlanningFollowUp(task, environment, spec)
+}
+
+func attachPlanningSessionFiles(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable) OpenRouterBrokerTask {
+	if !runner.HasPlanningSessionToken(environment) {
+		return task
+	}
+	task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+	return task
 }
 
 // applyPlanningFollowUp keeps the machine on after canvas steps when this run
@@ -123,17 +130,12 @@ func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.Broke
 func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
 	workdir := planningFollowUpWorkingDirectory(spec)
 	model := strings.TrimSpace(spec.Model)
-	maxTurns := effectiveMaxTurns(spec.MaxTurns)
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapCommandInWorkingDirectory(
 				workdir,
-				fmt.Sprintf(
-					`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s %d`,
-					runner.ShellSingleQuote(model),
-					maxTurns,
-				),
+				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,
@@ -148,11 +150,4 @@ func planningFollowUpWorkingDirectory(spec RunOpenRouterSpec) string {
 		}
 	}
 	return strings.TrimSpace(spec.WorkingDirectory)
-}
-
-func effectiveMaxTurns(maxTurns int) int {
-	if maxTurns <= 0 {
-		return DefaultMaxTurns
-	}
-	return maxTurns
 }

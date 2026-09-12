@@ -105,6 +105,19 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Equal(t, prFeedbackActivityDescriptionExpression(), activity.Configuration["description"])
 	})
 
+	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    "",
+			IgnoreBots: true,
+		})
+
+		for _, nodeID := range []string{prFeedbackCommentTriggerNodeID, prFeedbackReviewTriggerNodeID, prFeedbackReplyTriggerNodeID} {
+			node := findSpecNode(t, canvas, nodeID)
+			assert.Equal(t, "", node.Configuration["contentFilter"])
+		}
+	})
+
 	t.Run("the allowed bots list is applied to every trigger", func(t *testing.T) {
 		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
 			Repository:  "acme/app",

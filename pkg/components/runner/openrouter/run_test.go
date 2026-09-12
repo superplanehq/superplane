@@ -1,91 +1,894 @@
 package openrouter
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunPromptReturnsZeroWhenModelStops(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{maxTurns: 2})
-	assert.Equal(t, 0, result.exitCode)
-	require.Len(t, result.requests, 2)
-	assertToolRouting(t, result.requests[0], true)
-	assertToolRouting(t, result.requests[1], true)
-	require.GreaterOrEqual(t, len(result.requests[1]["messages"].([]any)), 3)
-	assert.Equal(t, "working", resultText(t, result.resultFile))
-	assert.Regexp(t, `✓ done · \d+ turns · \$\d+\.\d{4} · \d+\.\d+s`, result.output)
+func TestOpenRouterModelIdPrefixesCatalogIds(t *testing.T) {
+	assert.Equal(t, "openrouter/anthropic/claude-sonnet-4-6", jsString(t, "openRouterModelId", "anthropic/claude-sonnet-4-6"))
+	assert.Equal(t, "openrouter/anthropic/claude-sonnet-4-6", jsString(t, "openRouterModelId", "openrouter/anthropic/claude-sonnet-4-6"))
 }
 
-func TestRunPromptRequiresToolCapableProviders(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{maxTurns: 1})
-	assert.Equal(t, 0, result.exitCode)
-	require.NotEmpty(t, result.requests)
-	assertToolRouting(t, result.requests[0], true)
+func TestClassifyOpenRouterErrorDetectsRateLimitsAndHardFailures(t *testing.T) {
+	rpm := "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Rate limit reached: new accounts are limited to 20 requests per minute for this model. Please retry shortly."
+	assert.Equal(t, "rate_limit", jsClassify(t, rpm))
+	assert.Equal(t, "rate_limit", jsClassify(t, "HTTP 429 Too Many Requests"))
+	assert.Equal(t, "hard", jsClassify(t, "Invalid API key"))
+	assert.Equal(t, "hard", jsClassify(t, "Insufficient credits"))
+	assert.Equal(t, "hard", jsClassify(t, "unknown model: nope"))
+	assert.Equal(t, "retryable", jsClassify(t, "HTTP 503 Service Unavailable"))
+	assert.Equal(t, "retryable", jsClassify(t, "Provider returned error"))
+	assert.Equal(t, "retryable", jsClassify(t, "The model is currently overloaded"))
+	assert.Equal(t, "other", jsClassify(t, "opencode crashed"))
 }
 
-func TestRunPromptWrapsUpWithoutToolsWhenTurnLimitHits(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 2})
-	assert.Equal(t, 0, result.exitCode)
-	require.Len(t, result.requests, 3)
-	assertToolRouting(t, result.requests[0], true)
-	assertToolRouting(t, result.requests[1], true)
-	assertToolRouting(t, result.requests[2], false)
-	assert.Contains(t, result.output, "requesting a final response without tools")
-	assert.Equal(t, "final summary", resultText(t, result.resultFile))
+func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":   "x-ai/grok-4.6",
+		"prompt":  "do the work",
+		"cwd":     "/tmp/repo",
+		"session": "",
+	})
+	assert.Equal(t, []string{
+		"--pure", "run", "--format", "json", "--auto",
+		"-m", "openrouter/x-ai/grok-4.6",
+		"--dir", "/tmp/repo",
+		"do the work",
+	}, args)
+	assert.NotContains(t, args, "--print-logs")
+	assert.NotContains(t, args, "--agent")
 }
 
-func TestRunPromptRunsLegacyFunctionCall(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{legacyFunctionCall: true, maxTurns: 2})
-	assert.Equal(t, 0, result.exitCode)
-	require.GreaterOrEqual(t, len(result.requests), 2)
-	assert.Contains(t, result.output, `"type":"tool_start"`)
-	assert.Contains(t, result.output, `"kind":"bash"`)
-	assert.NotContains(t, result.output, "[bash]")
+func TestOpencodeRunArgsContinuesSession(t *testing.T) {
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":     "anthropic/claude-sonnet-4-6",
+		"prompt":    "next",
+		"cwd":       "/tmp/repo",
+		"sessionID": "ses_abc",
+	})
+	assert.Contains(t, args, "--session")
+	assert.Contains(t, args, "ses_abc")
+	assert.Contains(t, args, "-m")
+	assert.Contains(t, args, "openrouter/anthropic/claude-sonnet-4-6")
 }
 
-func TestRunPromptMarksFilesystemToolErrorsFailed(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{missingRead: true, maxTurns: 2})
-	assert.Equal(t, 0, result.exitCode)
-	assert.Contains(t, result.output, `"type":"tool_end"`)
-	assert.Contains(t, result.output, `"status":"failed"`)
-	assert.Contains(t, result.output, `"kind":"read"`)
+func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"OPENROUTER_API_KEY":             "sk-or",
+		"OPENROUTER_BASE_URL":            "https://proxy.example/openrouter",
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	})
+	provider, _ := config["provider"].(map[string]any)
+	openrouter, _ := provider["openrouter"].(map[string]any)
+	options, _ := openrouter["options"].(map[string]any)
+	assert.Equal(t, "sk-or", options["apiKey"])
+	assert.Equal(t, "https://proxy.example/openrouter", options["baseURL"])
+	permission, _ := config["permission"].(map[string]any)
+	assert.Equal(t, "deny", permission["edit"])
+	assert.Equal(t, "deny", permission["question"])
+	assert.Equal(t, "allow", permission["*"])
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	assert.Equal(t, "local", superplane["type"])
+	command, _ := superplane["command"].([]any)
+	require.Equal(t, 2, len(command))
+	assert.Equal(t, "node", command[0])
+	assert.Equal(t, "/task/planning_session_mcp.js", command[1])
 }
 
-func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
-	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 4, failOnRequest: 2})
+func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{})
+	permission, _ := config["permission"].(map[string]any)
+	assert.Equal(t, "allow", permission["*"])
+	assert.Nil(t, permission["edit"])
+	assert.Nil(t, config["mcp"])
+}
+
+func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{
+		"taskDir": "/task",
+		"env":     map[string]string{"OPENROUTER_API_KEY": "sk-or"},
+		"models":  []string{"x-ai/grok-4.6"},
+	})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(out, &config))
+	provider, _ := config["provider"].(map[string]any)
+	openrouter, _ := provider["openrouter"].(map[string]any)
+	models, _ := openrouter["models"].(map[string]any)
+	require.Contains(t, models, "x-ai/grok-4.6")
+	assert.Len(t, models, 1)
+	grok, _ := models["x-ai/grok-4.6"].(map[string]any)
+	options, _ := grok["options"].(map[string]any)
+	routing, _ := options["provider"].(map[string]any)
+	assert.Equal(t, false, routing["allow_fallbacks"])
+	assert.Equal(t, "throughput", routing["sort"])
+}
+
+func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
+	output := runOpenCodeFormatter(t, []string{
+		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
+	})
+	assert.Contains(t, output, "OpenCode started")
+}
+
+func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
+	output := runOpenCodeFormatter(t, []string{
+		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
+		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"I will check git status."}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"id":"t1","callID":"call_1","tool":"bash","state":{"status":"completed","input":{"command":"git status"},"output":"On branch main"}}}`,
+		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","reason":"stop","cost":0.002,"tokens":{"input":100,"output":20,"reasoning":0,"cache":{"read":0,"write":0}}}}`,
+	})
+	assert.Contains(t, output, "I will check git status.")
+	assert.Contains(t, output, "On branch main")
+	records := liveLogRecords(t, output)
+	require.GreaterOrEqual(t, len(records), 2)
+	assert.Equal(t, "tool_start", records[0]["type"])
+	assert.Equal(t, "bash", records[0]["kind"])
+	assert.Equal(t, "git status", records[0]["text"])
+	assert.Equal(t, float64(1), records[0]["turn"])
+	end := records[len(records)-1]
+	assert.Equal(t, "tool_end", end["type"])
+	assert.Equal(t, "passed", end["status"])
+	assert.Contains(t, output, `"type":"turn"`)
+}
+
+func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
+	output := runOpenCodeFormatter(t, []string{
+		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
+		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"First reply"}}`,
+		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":100,"output":20,"reasoning":3,"cache":{"read":40,"write":5}}}}`,
+		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
+		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"Second reply"}}`,
+		`{"type":"step-finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":80,"output":10,"reasoning":2,"cache":{"read":30,"write":4}}}}`,
+	})
+
+	turns := latestTurnRecords(t, output)
+	require.Len(t, turns, 2)
+	assertTurnRecordUsage(t, turns[1], 100, 20, 40, 5, 3)
+	assertTurnRecordUsage(t, turns[2], 80, 10, 30, 4, 2)
+}
+
+func TestFormatOpenCodeJsonLinesMarksFailedTools(t *testing.T) {
+	output := runOpenCodeFormatter(t, []string{
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call_read","tool":"read","state":{"status":"error","input":{"path":"missing.txt"},"error":"ENOENT"}}}`,
+	})
+	records := liveLogRecords(t, output)
+	require.GreaterOrEqual(t, len(records), 2)
+	assert.Equal(t, "read", records[0]["kind"])
+	assert.Equal(t, "failed", records[len(records)-1]["status"])
+	assert.Contains(t, output, "ENOENT")
+}
+
+func TestFormatOpenCodeJsonLinesTreatsNonRateLimitErrorAsFailed(t *testing.T) {
+	failed := formatOpenCodeJSONLinesFailed(t, []string{
+		`{"type":"error","error":{"name":"APIError","data":{"message":"Invalid API key"}}}`,
+	})
+	assert.True(t, failed)
+}
+
+func TestFormatOpenCodeJsonLinesDoesNotFailRateLimitError(t *testing.T) {
+	failed := formatOpenCodeJSONLinesFailed(t, []string{
+		`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly."}}}`,
+	})
+	assert.False(t, failed)
+}
+
+func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
+	output := runTurnResult(t, map[string]any{
+		"is_error":       false,
+		"num_turns":      1,
+		"duration_ms":    1600,
+		"total_cost_usd": 0.0022,
+	})
+	assert.Equal(t, "✓ done · 1 turns · $0.0022 · 1.6s\n", output)
+}
+
+func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly."),
+			successSpawn("working"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.NotContains(t, result.spawns[1], "anthropic/")
+	assert.Equal(t, []float64{30000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Starting OpenCode · openrouter/x-ai/grok-4.6")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireStdoutLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
+	requireNoTypedLiveLogLine(t, result.output, "Starting OpenCode")
+	requireNoTypedLiveLogLine(t, result.output, "Calling OpenCode")
+	requireNoTypedLiveLogLine(t, result.output, "Waiting 30 seconds")
+	assert.NotContains(t, result.spawns[1], "--session")
+	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "working", payload["result"])
+}
+
+func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "HTTP 503 Service Unavailable",
+				Stdout: []string{
+					`{"type":"error","sessionID":"ses_fail","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+				},
+			},
+			successSpawn("recovered"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.Contains(t, result.spawns[0], "openrouter/x-ai/grok-4.6")
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_fail")
+	assert.Equal(t, []float64{30000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Temporary error on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
+}
+
+func TestRunPromptContinuesSessionWhenRetryableFailureMadeProgress(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_work","part":{"type":"step-start"}}`,
+					`{"type":"tool_use","sessionID":"ses_work","part":{"callID":"call_1","tool":"bash","state":{"status":"completed","input":{"command":"git status"},"output":"On branch main"}}}`,
+					`{"type":"error","sessionID":"ses_work","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.NotContains(t, result.spawns[0], "--session")
+	assert.Contains(t, result.spawns[1], "--session")
+	assert.Contains(t, result.spawns[1], "ses_work")
+}
+
+func TestRunPromptRetriesNestedRateLimitOnSelectedModel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stdout: []string{
+					`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":429,"responseBody":"{\"error\":{\"code\":429,\"message\":\"Rate limit exceeded\"}}"}}}`,
+				},
+			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.Contains(t, result.spawns[1], "openrouter/x-ai/grok-4.6")
+	assert.Equal(t, []float64{30000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 30 seconds, then retrying (attempt 2 of 4).")
+}
+
+func TestRunPromptUsesProgressiveWaitWithoutRetryAfter(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			{
+				ExitCode: 1,
+				Stderr:   "HTTP 503 Service Unavailable",
+				Stdout: []string{
+					`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+				},
+			},
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 4)
+	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Waiting 30 seconds, then retrying (attempt 2 of 4).")
+	requireStdoutLine(t, result.output, "Waiting 45 seconds, then retrying (attempt 3 of 4).")
+	requireStdoutLine(t, result.output, "Waiting 60 seconds, then retrying (attempt 4 of 4).")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireNoTypedLiveLogLine(t, result.output, "Waiting 45 seconds")
+}
+
+func TestRunPromptHonorsRetryAfterOverProgressiveWait(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly. Retry-After: 90"),
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 2)
+	assert.Equal(t, []float64{90000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Rate limit on x-ai/grok-4.6. Waiting 90 seconds, then retrying (attempt 2 of 4).")
+	assert.NotContains(t, result.output, "Waiting 30 seconds")
+}
+
+func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
 	assert.Equal(t, 1, result.exitCode)
-	assert.Contains(t, result.output, "provider exploded")
-	assert.Regexp(t, `✗ failed · \d+ turns · \$0\.0020 · \d+\.\d+s`, result.output)
+	require.Len(t, result.spawns, 4)
+	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireStdoutLine(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	requireNoTypedLiveLogLine(t, result.output, "Stopped after 4 attempts")
+	assert.NotContains(t, result.output, "attempt 5")
+	assert.Regexp(t, `✗ failed`, result.output)
+}
 
+func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "Hello! How can I help you today?", payload["result"])
+	assert.Regexp(t, `✓ done`, result.output)
+}
+
+func TestRunPromptKeepsBilledUsageWhenRetrySucceedsWithoutStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_bill","part":{"type":"step-start"}}`,
+					`{"type":"text","sessionID":"ses_bill","part":{"type":"text","text":"partial"}}`,
+					`{"type":"step_finish","sessionID":"ses_bill","part":{"type":"step-finish","cost":0.012,"tokens":{"input":10,"output":8}}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	assertResultUsage(t, resultPayload(t, result.resultFile), 10, 8, 0.012)
+}
+
+func TestRunPromptAddsUsageAcrossBilledRetries(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.01,"tokens":{"input":10,"output":8}}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_2","part":{"type":"text","text":"done"}}`,
+					`{"type":"step_finish","sessionID":"ses_2","part":{"type":"step-finish","cost":0.005,"tokens":{"input":5,"output":3}}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 15, 11, 0.015)
+	assertTurnUsageSum(t, payload, 15, 11)
+}
+
+func TestRunPromptUsesSessionStoreWhenJsonlMissesStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		sessionUsage: []map[string]any{
+			{
+				"input_tokens":   100,
+				"output_tokens":  20,
+				"total_cost_usd": 0.1,
+			},
+			{
+				"input_tokens":   140,
+				"output_tokens":  32,
+				"total_cost_usd": 0.12,
+			},
+		},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	assertTurnUsageSum(t, payload, 40, 12)
+}
+
+func TestRunPromptReadsSessionJsonWhenJsonlMissesStepFinish(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+			},
+			SessionParts: []string{
+				`{"type":"step-finish","cost":0.02,"tokens":{"input":40,"output":12}}`,
+				`{"type":"step-finish","cost":0.01,"tokens":{"input":20,"output":6}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 60, 18, 0.03)
+	turns := resultTurnRecords(t, payload)
+	require.Len(t, turns, 2)
+	assertTurnRecordUsage(t, turns[0], 40, 12, 0, 0, 0)
+	assertTurnRecordUsage(t, turns[1], 20, 6, 0, 0, 0)
+	assertTurnUsageSum(t, payload, 60, 18)
+	liveTurns := latestTurnRecords(t, result.output)
+	assertTurnRecordUsage(t, liveTurns[1], 40, 12, 0, 0, 0)
+	assertTurnRecordUsage(t, liveTurns[2], 20, 6, 0, 0, 0)
+}
+
+func TestRunPromptDoesNotCopyRetryUsageOntoFailedAttemptTurn(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_fail","part":{"type":"step-start"}}`,
+					`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				},
+			},
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"step_start","sessionID":"ses_ok","part":{"type":"step-start"}}`,
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"done"}}`,
+					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":40,"output":12}}}`,
+				},
+				SessionParts: []string{
+					`{"type":"step-finish","cost":0.02,"tokens":{"input":40,"output":12}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assertResultUsage(t, payload, 40, 12, 0.02)
+	turns := resultTurnRecords(t, payload)
+	require.Len(t, turns, 2)
+	assertTurnRecordUsage(t, turns[0], 0, 0, 0, 0, 0)
+	assertTurnRecordUsage(t, turns[1], 40, 12, 0, 0, 0)
+	assertTurnUsageSum(t, payload, 40, 12)
+}
+
+func TestReadSessionUsageSumsStepFinishJsonParts(t *testing.T) {
+	dir := t.TempDir()
+	partDir := filepath.Join(dir, "xdg", "data", "opencode", "storage", "part", "msg_1")
+	require.NoError(t, os.MkdirAll(partDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_1.json"), []byte(`{"type":"step-finish","cost":0.01,"tokens":{"input":10,"output":8,"reasoning":1,"cache":{"read":4,"write":2}}}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_text.json"), []byte(`{"type":"text","text":"hi"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(partDir, "prt_2.json"), []byte(`{"part":{"type":"step-finish","cost":0.005,"tokens":{"input":5,"output":3,"cache":{"read":1,"write":0}}}}`), 0o644))
+	usage := jsReadSessionUsage(t, dir)
+	assert.Equal(t, float64(15), usage["input_tokens"])
+	assert.Equal(t, float64(11), usage["output_tokens"])
+	assert.Equal(t, float64(5), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
+	assert.InDelta(t, 0.015, usage["total_cost_usd"], 1e-9)
+}
+
+func TestReadSessionUsageSumsStepFinishSqliteParts(t *testing.T) {
+	dir := t.TempDir()
+	dbDir := filepath.Join(dir, "xdg", "data", "opencode")
+	require.NoError(t, os.MkdirAll(dbDir, 0o755))
+	dbPath := filepath.Join(dbDir, "opencode.db")
+	cmd := exec.Command("node", "-e", `
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = require("node:sqlite"));
+} catch {
+  process.exit(2);
+}
+const db = new DatabaseSync(process.env.OPENCODE_DB);
+db.exec("CREATE TABLE part (id TEXT PRIMARY KEY, time_created INTEGER NOT NULL, data TEXT NOT NULL)");
+const insert = db.prepare("INSERT INTO part (id, time_created, data) VALUES (?, ?, ?)");
+insert.run("prt_1", 1, JSON.stringify({
+  type: "step-finish",
+  cost: 0.01,
+  tokens: { input: 10, output: 8, reasoning: 1, cache: { read: 4, write: 2 } },
+}));
+insert.run("prt_2", 2, JSON.stringify({ type: "text", text: "hi" }));
+db.close();
+`)
+	cmd.Env = append(os.Environ(), "OPENCODE_DB="+dbPath, "NODE_NO_WARNINGS=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if ok && exitErr.ExitCode() == 2 {
+			t.Skip("node:sqlite is not available")
+		}
+		require.NoError(t, err, string(out))
+	}
+	usage := jsReadSessionUsage(t, dir)
+	assert.Equal(t, float64(10), usage["input_tokens"])
+	assert.Equal(t, float64(8), usage["output_tokens"])
+	assert.Equal(t, float64(4), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
+	assert.InDelta(t, 0.01, usage["total_cost_usd"], 1e-9)
+}
+
+func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"I opened the repository."}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":5,"output":3}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "I opened the repository.", payload["result"])
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(15), usage["input_tokens"])
+	assert.Equal(t, float64(11), usage["output_tokens"])
+	turns := resultTurnRecords(t, payload)
+	require.Len(t, turns, 2)
+	assertTurnRecordUsage(t, turns[0], 10, 8, 0, 0, 0)
+	assertTurnRecordUsage(t, turns[1], 5, 3, 0, 0, 0)
+	assertTurnUsageSum(t, payload, 15, 11)
+	assert.Regexp(t, `✓ done`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help you today?"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"I found a few files to inspect"}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	usage, ok := payload["usage"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(11), usage["input_tokens"])
-	assert.Equal(t, float64(3), usage["output_tokens"])
-	assert.InDelta(t, 0.002, payload["total_cost_usd"], 1e-9)
-	assert.Equal(t, "openai/gpt-4.1", payload["model"])
+	assert.Equal(t, float64(10), usage["input_tokens"])
+	assert.Equal(t, float64(8), usage["output_tokens"])
+}
 
-	sidecar := resultPayload(t, filepath.Join(result.taskDir, "llm_usage.json"))
-	sidecarUsage, ok := sidecar["usage"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, float64(11), sidecarUsage["input_tokens"])
-	assert.Equal(t, float64(3), sidecarUsage["output_tokens"])
-	assert.InDelta(t, 0.002, sidecar["total_cost_usd"], 1e-9)
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"text","sessionID":"ses_hello","part":{"type":"text","text":"Hello! How can I help"}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithUsageOnly(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stdout: []string{
+				`{"type":"step_start","sessionID":"ses_hello","part":{"type":"step-start"}}`,
+				`{"type":"step_finish","sessionID":"ses_hello","part":{"type":"step-finish","tokens":{"input":10,"output":8}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithoutReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "google/gemma-4-31b-it",
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stderr:   "opencode crashed",
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "anthropic/claude-sonnet-4-6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Invalid API key",
+				Stdout:   []string{`{"type":"error","error":{"data":{"message":"Invalid API key"}}}`},
+			},
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.NotContains(t, result.output, "Waiting")
+	assert.NotContains(t, result.output, "Retrying")
+	requireStdoutLine(t, result.output, "Invalid API key")
+	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
+	dir := t.TempDir()
+	writeTaskHelpers(t, dir)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("first"), 0o644))
+
+	first := runPromptInDir(t, dir, "prompt.txt", "anthropic/claude-sonnet-4-6", []spawnScript{{
+		ExitCode: 0,
+		Stdout: []string{
+			`{"type":"step_start","sessionID":"ses_keep","part":{"type":"step-start"}}`,
+			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
+			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+		},
+	}}, nil, nil, nil)
+	assert.Equal(t, 0, first.exitCode)
+	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
+	require.NoError(t, err)
+	assert.Equal(t, "ses_keep\n", string(session))
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt2.txt"), []byte("second"), 0o644))
+	second := runPromptInDir(t, dir, "prompt2.txt", "anthropic/claude-sonnet-4-6", []spawnScript{{
+		ExitCode: 0,
+		Stdout: []string{
+			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
+			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+		},
+	}}, nil, nil, nil)
+	assert.Equal(t, 0, second.exitCode)
+	require.NotEmpty(t, second.spawns)
+	assert.Contains(t, second.spawns[0], "--session")
+	assert.Contains(t, second.spawns[0], "ses_keep")
+	requireStdoutLine(t, second.output, "Continuing OpenCode session on openrouter/anthropic/claude-sonnet-4-6")
+	requireStdoutLine(t, second.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoTypedLiveLogLine(t, second.output, "Continuing OpenCode session")
+}
+
+func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "anthropic/claude-sonnet-4-6",
+		env: map[string]string{
+			"OPENROUTER_BASE_URL": "https://hosted.example/openrouter",
+		},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stdout: []string{
+				`{"type":"text","sessionID":"ses_cfg","part":{"type":"text","text":"ok"}}`,
+				`{"type":"step_finish","sessionID":"ses_cfg","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	raw, err := os.ReadFile(filepath.Join(result.taskDir, "opencode.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "https://hosted.example/openrouter")
+	assert.Contains(t, result.spawns[0], "--format")
+	assert.Contains(t, result.spawns[0], "json")
+	assert.Contains(t, result.spawns[0], "--auto")
+	assert.Equal(t, "--pure", result.spawns[0][0])
+	assert.Equal(t, "run", result.spawns[0][1])
+	requireStdoutLine(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
+	requireNoTypedLiveLogLine(t, result.output, "Starting OpenCode")
+}
+
+func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stderr:   "HTTP 429 Too Many Requests",
+			Stdout: []string{
+				`{"type":"error","sessionID":"ses_ok","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"recovered"}}`,
+				`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.NotContains(t, result.output, "Waiting")
+	assert.NotContains(t, result.output, "Retrying")
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "recovered", payload["result"])
+}
+
+func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
+		},
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	requireStdoutLine(t, result.output, "Rate limit wait exceeded the execution timeout")
+	requireNoTypedLiveLogLine(t, result.output, "wait exceeded the execution timeout")
+}
+
+func TestRunPromptTimeoutLineUsesTemporaryErrorLabel(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
+		},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stderr:   "HTTP 503 Service Unavailable",
+			Stdout: []string{
+				`{"type":"error","error":{"name":"APIError","message":"Provider returned error","data":{"statusCode":503}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	requireStdoutLine(t, result.output, "Temporary error wait exceeded the execution timeout")
+	assert.NotContains(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestRunPromptDoesNotWaitWhenRetryExceedsRemainingTimeout(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "10",
+		},
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	requireStdoutLine(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestWaitDeadlineMsUsesExecutionTimeoutSeconds(t *testing.T) {
+	deadline := jsWaitDeadline(t, map[string]string{"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "30"}, 1000)
+	assert.Equal(t, float64(31000), deadline)
+}
+
+func TestOpenCodeProcessEnvSetsPureAndIsolatesHomes(t *testing.T) {
+	env := jsOpenCodeProcessEnv(t, "/task")
+	assert.Equal(t, "1", env["OPENCODE_PURE"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_AUTOUPDATE"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_MODELS_FETCH"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_LSP_DOWNLOAD"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_CLAUDE_CODE"])
+	assert.Equal(t, "/task/opencode.json", env["OPENCODE_CONFIG"])
+	assert.Equal(t, "/task/xdg/data", env["XDG_DATA_HOME"])
+}
+
+type spawnScript struct {
+	ExitCode     int      `json:"exitCode"`
+	Stdout       []string `json:"stdout"`
+	Stderr       string   `json:"stderr"`
+	SessionParts []string `json:"sessionParts"`
 }
 
 type promptHarness struct {
-	alwaysTools        bool
-	legacyFunctionCall bool
-	missingRead        bool
-	maxTurns           int
-	failOnRequest      int
+	model        string
+	spawns       []spawnScript
+	env          map[string]string
+	nowValues    []int64
+	sessionUsage []map[string]any
 }
 
 type openRouterPromptResult struct {
@@ -93,338 +896,417 @@ type openRouterPromptResult struct {
 	output     string
 	resultFile string
 	taskDir    string
-	requests   []map[string]any
+	spawns     [][]string
+	sleeps     []float64
 }
 
 func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptResult {
 	t.Helper()
-
 	dir := t.TempDir()
-	resultFile := filepath.Join(dir, "result.json")
-	promptFile := filepath.Join(dir, "prompt.txt")
-	harnessFile := filepath.Join(dir, "harness.js")
-	requestsFile := filepath.Join(dir, "requests.json")
-	require.NoError(t, os.WriteFile(promptFile, []byte("do the work"), 0o644))
+	writeTaskHelpers(t, dir)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
+	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage)
+}
 
+func rateLimitSpawn(message string) spawnScript {
+	return spawnScript{
+		ExitCode: 1,
+		Stderr:   message,
+		Stdout:   []string{fmt.Sprintf(`{"type":"error","error":{"data":{"message":%q}}}`, message)},
+	}
+}
+
+func successSpawn(text string) spawnScript {
+	return spawnScript{
+		ExitCode: 0,
+		Stdout: []string{
+			fmt.Sprintf(`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":%q}}`, text),
+			`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+		},
+	}
+}
+
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any) openRouterPromptResult {
+	t.Helper()
+	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	usageScript, err := filepath.Abs("../llm_usage.js")
+	spawnsJSON, err := json.Marshal(spawns)
 	require.NoError(t, err)
-	usageBody, err := os.ReadFile(usageScript)
+	if nowValues == nil {
+		nowValues = []int64{}
+	}
+	nowJSON, err := json.Marshal(nowValues)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "llm_usage.js"), usageBody, 0o644))
-
+	sessionJSON, err := json.Marshal(sessionUsage)
+	require.NoError(t, err)
+	harnessFile := filepath.Join(dir, "harness.js")
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
+const { PassThrough } = require("stream");
 const { runPrompt } = require(%q);
-const requests = [];
-const alwaysTools = %t;
-const legacyFunctionCall = %t;
-const missingRead = %t;
-const failOnRequest = %d;
-let toolTurns = 0;
-let requestCount = 0;
-global.fetch = async (_url, init) => {
-  const body = JSON.parse(init.body);
-  requests.push(body);
-  requestCount += 1;
-  if (failOnRequest > 0 && requestCount === failOnRequest) {
-    return {
-      ok: false,
-      status: 502,
-      json: async () => ({ error: { message: "provider exploded" } }),
-    };
-  }
-  const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
-  let message = { content: hasTools ? "working" : "final summary" };
-  if (alwaysTools && hasTools) {
-    message = {
-      content: "working",
-      tool_calls: [{
-        id: "call_1",
-        type: "function",
-        function: { name: "bash", arguments: JSON.stringify({ command: "true" }) },
-      }],
-    };
-  } else if (legacyFunctionCall && hasTools && toolTurns === 0) {
-    toolTurns += 1;
-    message = {
-      content: "working",
-      function_call: { name: "bash", arguments: JSON.stringify({ command: "true" }) },
-    };
-  } else if (missingRead && hasTools && toolTurns === 0) {
-    toolTurns += 1;
-    message = {
-      content: "working",
-      tool_calls: [{
-        id: "call_read",
-        type: "function",
-        function: { name: "read", arguments: JSON.stringify({ path: "/definitely/missing/file.txt" }) },
-      }],
-    };
-  }
-  return {
-    ok: true,
-    json: async () => ({
-      usage: { prompt_tokens: 11, completion_tokens: 3, cost: 0.002 },
-      choices: [{ message }],
-    }),
+const spawns = %s;
+const nowValues = %s;
+const sessionReads = %s;
+const calls = [];
+const sleeps = [];
+let index = 0;
+let nowIndex = 0;
+let sessionReadIndex = 0;
+function mockChild(spec) {
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const listeners = {};
+  const child = {
+    stdout,
+    stderr,
+    on(event, cb) {
+      listeners[event] = cb;
+      return child;
+    },
   };
+  setImmediate(() => {
+    for (const line of spec.stdout || []) {
+      stdout.write(line + "\n");
+    }
+    stdout.end();
+    if (spec.stderr) {
+      stderr.write(spec.stderr);
+    }
+    stderr.end();
+    if (listeners.close) {
+      listeners.close(spec.exitCode == null ? 0 : spec.exitCode);
+    }
+  });
+  return child;
+}
+const helpers = {
+  spawnOpenCode(args) {
+    const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
+    index += 1;
+    calls.push(args);
+    if (Array.isArray(spec.sessionParts) && spec.sessionParts.length) {
+      const partDir = require("path").join(process.env.SUPERPLANE_TASK_DIR, "xdg", "data", "opencode", "storage", "part", "msg_live");
+      fs.mkdirSync(partDir, { recursive: true });
+      spec.sessionParts.forEach((body, i) => {
+        fs.writeFileSync(require("path").join(partDir, "prt_" + i + ".json"), body);
+      });
+    }
+    return mockChild(spec);
+  },
+  sleep(ms) {
+    sleeps.push(ms);
+    return Promise.resolve();
+  },
+  now: nowValues.length
+    ? () => nowValues[Math.min(nowIndex++, nowValues.length - 1)]
+    : undefined,
+  cwd: %q,
 };
-runPrompt(%q, "openai/gpt-4.1", %d)
+if (Array.isArray(sessionReads)) {
+  helpers.readSessionUsage = () => {
+    const row = sessionReadIndex < sessionReads.length ? sessionReads[sessionReadIndex] : {};
+    sessionReadIndex += 1;
+    return row;
+  };
+}
+runPrompt(%q, %q, helpers)
   .then((code) => {
-    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify(requests));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
     process.exit(code);
   })
   .catch((err) => {
-    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify(requests));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, harness.alwaysTools, harness.legacyFunctionCall, harness.missingRead, harness.failOnRequest, promptFile, harness.maxTurns)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, dir, filepath.Join(dir, promptName), model)), 0o644))
 
+	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		"SUPERPLANE_RESULT_FILE="+resultFile,
 		"SUPERPLANE_TASK_DIR="+dir,
 		"OPENROUTER_API_KEY=test",
-		"REQUESTS_FILE="+requestsFile,
+		"SPAWNS_FILE="+spawnsFile,
 	)
-	out, err := cmd.CombinedOutput()
+	if extraEnv != nil {
+		for key, value := range extraEnv {
+			env = append(env, key+"="+value)
+		}
+	}
+	cmd.Env = env
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	exitCode := 0
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)
-		require.Truef(t, ok, "node harness failed: %v\n%s", err, out)
+		require.Truef(t, ok, "node harness failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 		exitCode = exitErr.ExitCode()
 	}
-
-	raw, readErr := os.ReadFile(requestsFile)
+	recorded := struct {
+		Calls  [][]string `json:"calls"`
+		Sleeps []float64  `json:"sleeps"`
+	}{}
+	raw, readErr := os.ReadFile(spawnsFile)
 	require.NoError(t, readErr)
-	var requests []map[string]any
-	require.NoError(t, json.Unmarshal(raw, &requests))
-
+	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
 		exitCode:   exitCode,
-		output:     string(out),
+		output:     stdout.String(),
 		resultFile: resultFile,
 		taskDir:    dir,
-		requests:   requests,
+		spawns:     recorded.Calls,
+		sleeps:     recorded.Sleeps,
 	}
 }
 
-func TestRunPromptPlanningAdvertisesPlanningToolsNotWriteEdit(t *testing.T) {
-	result := runOpenRouterPlanningPrompt(t, "none")
-	assert.Equal(t, 0, result.exitCode)
-	require.NotEmpty(t, result.chatRequests)
-	names := toolNames(t, result.chatRequests[0])
-	assert.Contains(t, names, "propose_draft")
-	assert.Contains(t, names, "survey")
-	assert.Contains(t, names, "bash")
-	assert.Contains(t, names, "read")
-	assert.NotContains(t, names, "write")
-	assert.NotContains(t, names, "edit")
-	assert.Empty(t, result.planningRequests)
-}
-
-func TestRunPromptPlanningProposeDraftPostsToDraftsEndpoint(t *testing.T) {
-	result := runOpenRouterPlanningPrompt(t, "propose_draft")
-	assert.Equal(t, 0, result.exitCode)
-	require.Len(t, result.planningRequests, 1)
-	req := result.planningRequests[0]
-	assert.Contains(t, req["url"], "/api/v1/runner/planning-sessions/drafts")
-	assert.Equal(t, "POST", req["method"])
-	headers, ok := req["headers"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "Bearer test-run-token", headers["Authorization"])
-	body, ok := req["body"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "Add dark mode", body["title"])
-	assert.Equal(t, "Add a dark color scheme", body["description"])
-}
-
-func TestRunPromptPlanningSurveyPostsToSurveysEndpoint(t *testing.T) {
-	result := runOpenRouterPlanningPrompt(t, "survey")
-	assert.Equal(t, 0, result.exitCode)
-	require.Len(t, result.planningRequests, 1)
-	req := result.planningRequests[0]
-	assert.Contains(t, req["url"], "/api/v1/runner/planning-sessions/surveys")
-	body, ok := req["body"].(map[string]any)
-	require.True(t, ok)
-	questions, ok := body["questions"].([]any)
-	require.True(t, ok)
-	require.Len(t, questions, 1)
-	question := questions[0].(map[string]any)
-	assert.Equal(t, "Which theme?", question["prompt"])
-}
-
-type openRouterPlanningResult struct {
-	exitCode         int
-	output           string
-	resultFile       string
-	chatRequests     []map[string]any
-	planningRequests []map[string]any
-}
-
-// toolMode selects which tool call (if any) the fake model returns on its
-// first tool-enabled turn: "propose_draft", "survey", or "none".
-func runOpenRouterPlanningPrompt(t *testing.T, toolMode string) openRouterPlanningResult {
+func writeTaskHelpers(t *testing.T, dir string) {
 	t.Helper()
+	copyScript(t, dir, "../llm_usage.js", "llm_usage.js")
+	copyScript(t, dir, "../turn_telemetry.js", "turn_telemetry.js")
+}
 
-	dir := t.TempDir()
-	resultFile := filepath.Join(dir, "result.json")
-	promptFile := filepath.Join(dir, "prompt.txt")
-	harnessFile := filepath.Join(dir, "harness.js")
-	requestsFile := filepath.Join(dir, "requests.json")
-	require.NoError(t, os.WriteFile(promptFile, []byte("what should we build next?"), 0o644))
+func copyScript(t *testing.T, dir, src, dest string) {
+	t.Helper()
+	path, err := filepath.Abs(src)
+	require.NoError(t, err)
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, dest), body, 0o644))
+}
 
+func jsWaitDeadline(t *testing.T, env map[string]string, nowMs int64) float64 {
+	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	planningScript, err := filepath.Abs("../planning_session_mcp.js")
+	payload, err := json.Marshal(map[string]any{"env": env, "now": nowMs})
 	require.NoError(t, err)
-	planningBody, err := os.ReadFile(planningScript)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "planning_session_mcp.js"), planningBody, 0o644))
-
-	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
-const fs = require("fs");
-const { runPrompt } = require(%q);
-const chatRequests = [];
-const planningRequests = [];
-const toolMode = %q;
-let toolTurn = 0;
-global.fetch = async (url, init) => {
-  const target = String(url);
-  if (target.endsWith("/chat/completions")) {
-    const body = JSON.parse(init.body);
-    chatRequests.push(body);
-    const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
-    let message = { content: hasTools ? "" : "Thanks, noted." };
-    if (hasTools && toolTurn === 0 && toolMode === "propose_draft") {
-      toolTurn += 1;
-      message = {
-        content: "",
-        tool_calls: [{
-          id: "call_1",
-          type: "function",
-          function: {
-            name: "propose_draft",
-            arguments: JSON.stringify({ title: "Add dark mode", description: "Add a dark color scheme" }),
-          },
-        }],
-      };
-    } else if (hasTools && toolTurn === 0 && toolMode === "survey") {
-      toolTurn += 1;
-      message = {
-        content: "",
-        tool_calls: [{
-          id: "call_1",
-          type: "function",
-          function: {
-            name: "survey",
-            arguments: JSON.stringify({ questions: [{ prompt: "Which theme?", options: ["Dark", "Light"] }] }),
-          },
-        }],
-      };
-    }
-    return { ok: true, json: async () => ({ usage: { prompt_tokens: 5, completion_tokens: 2 }, choices: [{ message }] }) };
-  }
-  const body = init.body ? JSON.parse(init.body) : undefined;
-  planningRequests.push({ url: target, method: init.method, headers: init.headers, body });
-  if (target.endsWith("/drafts")) {
-    return { ok: true, text: async () => JSON.stringify({ status: "created", work_order_key: "WO-1" }) };
-  }
-  if (target.endsWith("/surveys")) {
-    return { ok: true, text: async () => JSON.stringify({ status: "ok" }) };
-  }
-  return { ok: false, status: 404, text: async () => "not found" };
-};
-runPrompt(%q, "openai/gpt-4.1", 4)
-  .then((code) => {
-    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify({ chatRequests, planningRequests }));
-    process.exit(code);
-  })
-  .catch((err) => {
-    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify({ chatRequests, planningRequests }));
-    console.error(err && err.message ? err.message : err);
-    process.exit(1);
-  });
-`, script, toolMode, promptFile)), 0o644))
-
-	cmd := exec.Command("node", harnessFile)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"SUPERPLANE_RESULT_FILE="+resultFile,
-		"SUPERPLANE_TASK_DIR="+dir,
-		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
-		"SUPERPLANE_BASE_URL=https://superplane.example",
-		"SUPERPLANE_RUN_TOKEN=test-run-token",
-		"OPENROUTER_API_KEY=test",
-		"REQUESTS_FILE="+requestsFile,
-	)
+	cmd := exec.Command("node", "-e", `const { waitDeadlineMs } = require(process.argv[1]); const input = JSON.parse(process.argv[2]); process.stdout.write(String(waitDeadlineMs(input.env, () => input.now)));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
-	exitCode := 0
-	if err != nil {
-		exitErr, ok := err.(*exec.ExitError)
-		require.Truef(t, ok, "node harness failed: %v\n%s", err, out)
-		exitCode = exitErr.ExitCode()
-	}
-
-	raw, readErr := os.ReadFile(requestsFile)
-	require.NoError(t, readErr)
-	var parsed struct {
-		ChatRequests     []map[string]any `json:"chatRequests"`
-		PlanningRequests []map[string]any `json:"planningRequests"`
-	}
-	require.NoError(t, json.Unmarshal(raw, &parsed))
-
-	return openRouterPlanningResult{
-		exitCode:         exitCode,
-		output:           string(out),
-		resultFile:       resultFile,
-		chatRequests:     parsed.ChatRequests,
-		planningRequests: parsed.PlanningRequests,
-	}
+	require.NoError(t, err, string(out))
+	var deadline float64
+	_, err = fmt.Sscan(string(out), &deadline)
+	require.NoError(t, err)
+	return deadline
 }
 
-func toolNames(t *testing.T, request map[string]any) []string {
+func jsOpenCodeProcessEnv(t *testing.T, taskDir string) map[string]string {
 	t.Helper()
-	tools, ok := request["tools"].([]any)
-	require.True(t, ok)
-	names := make([]string, 0, len(tools))
-	for _, raw := range tools {
-		tool, ok := raw.(map[string]any)
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { openCodeProcessEnv } = require(process.argv[1]); process.stdout.write(JSON.stringify(openCodeProcessEnv(process.argv[2], {})));`, script, taskDir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var env map[string]string
+	require.NoError(t, json.Unmarshal(out, &env))
+	return env
+}
+
+func jsString(t *testing.T, fn, arg string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const m = require(process.argv[1]); process.stdout.write(m[process.argv[2]](process.argv[3]));`, script, fn, arg)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func jsClassify(t *testing.T, text string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { classifyOpenRouterError } = require(process.argv[1]); process.stdout.write(classifyOpenRouterError(process.argv[2]));`, script, text)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func jsOpencodeArgs(t *testing.T, input map[string]any) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(input)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { opencodeRunArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(opencodeRunArgs(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
+func jsBuildConfig(t *testing.T, taskDir string, env map[string]string) map[string]any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{"taskDir": taskDir, "env": env, "planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != ""})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(out, &config))
+	return config
+}
+
+func runOpenCodeFormatter(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatOpenCodeJsonLines } = require(process.argv[1]); formatOpenCodeJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func formatOpenCodeJSONLinesFailed(t *testing.T, lines []string) bool {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatOpenCodeJsonLines } = require(process.argv[1]); process.stdout.write(JSON.stringify(formatOpenCodeJsonLines(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var result struct {
+		Failed bool `json:"failed"`
+	}
+	require.NoError(t, json.Unmarshal(out, &result), string(out))
+	return result.Failed
+}
+
+func runTurnResult(t *testing.T, event map[string]any) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatTurnResult } = require(process.argv[1]); formatTurnResult(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func liveLogRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+func typedLiveLogRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		if strings.TrimSpace(fmt.Sprint(rec["type"])) == "" {
+			continue
+		}
+		records = append(records, rec)
+	}
+	return records
+}
+
+func latestTurnRecords(t *testing.T, output string) map[int]map[string]any {
+	t.Helper()
+	turns := map[int]map[string]any{}
+	for _, record := range typedLiveLogRecords(t, output) {
+		if record["type"] != "turn" {
+			continue
+		}
+		turn, ok := record["turn"].(float64)
 		require.True(t, ok)
-		fn, ok := tool["function"].(map[string]any)
-		require.True(t, ok)
-		name, _ := fn["name"].(string)
-		names = append(names, name)
+		turns[int(turn)] = record
 	}
-	return names
+	return turns
 }
 
-func assertToolRouting(t *testing.T, request map[string]any, wantTools bool) {
+func assertTurnRecordUsage(
+	t *testing.T,
+	record map[string]any,
+	input, output, cacheRead, cacheCreation, reasoning float64,
+) {
 	t.Helper()
-	_, hasTools := request["tools"]
-	if !wantTools {
-		assert.False(t, hasTools)
-		_, hasChoice := request["tool_choice"]
-		assert.False(t, hasChoice)
-		_, hasProvider := request["provider"]
-		assert.False(t, hasProvider)
-		return
-	}
-	assert.NotEmpty(t, request["tools"])
-	assert.Equal(t, "auto", request["tool_choice"])
-	provider, ok := request["provider"].(map[string]any)
+	usage, ok := record["usage"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, true, provider["require_parameters"])
+	assert.Equal(t, input, usage["input_tokens"])
+	assert.Equal(t, output, usage["output_tokens"])
+	assert.Equal(t, cacheRead, usage["cache_read_input_tokens"])
+	assert.Equal(t, cacheCreation, usage["cache_creation_input_tokens"])
+	assert.Equal(t, reasoning, usage["reasoning_tokens"])
 }
 
-func resultText(t *testing.T, resultFile string) string {
+func resultTurnRecords(t *testing.T, payload map[string]any) []map[string]any {
 	t.Helper()
-	text, _ := resultPayload(t, resultFile)["result"].(string)
-	return text
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok, "result payload must include telemetry")
+	rawTurns, ok := telemetry["turns"].([]any)
+	require.True(t, ok, "telemetry must include turns")
+	turns := make([]map[string]any, 0, len(rawTurns))
+	for _, raw := range rawTurns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		turns = append(turns, turn)
+	}
+	return turns
+}
+
+func liveLogLineTexts(t *testing.T, output string) []string {
+	t.Helper()
+	var texts []string
+	for _, rec := range typedLiveLogRecords(t, output) {
+		if rec["type"] != "line" {
+			continue
+		}
+		text, ok := rec["text"].(string)
+		if !ok || text == "" {
+			continue
+		}
+		texts = append(texts, text)
+	}
+	return texts
+}
+
+func requireStdoutLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "{") {
+			continue
+		}
+		if strings.Contains(trimmed, needle) {
+			return
+		}
+	}
+	require.Failf(t, "missing stdout line", "wanted %q in plain stdout; got %q", needle, output)
+}
+
+func requireNoTypedLiveLogLine(t *testing.T, output, needle string) {
+	t.Helper()
+	for _, text := range liveLogLineTexts(t, output) {
+		if strings.Contains(text, needle) {
+			require.Failf(t, "found typed live-log line", "wanted %q as plain stdout, not a type=line record; got %q", needle, liveLogLineTexts(t, output))
+		}
+	}
 }
 
 func resultPayload(t *testing.T, path string) map[string]any {
@@ -434,4 +1316,63 @@ func resultPayload(t *testing.T, path string) map[string]any {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(raw, &payload))
 	return payload
+}
+
+func assertResultUsage(t *testing.T, payload map[string]any, input, output, cost float64) {
+	t.Helper()
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok, "result payload must include usage")
+	assert.Equal(t, input, usage["input_tokens"])
+	assert.Equal(t, output, usage["output_tokens"])
+	require.Contains(t, payload, "total_cost_usd")
+	assert.InDelta(t, cost, payload["total_cost_usd"], 1e-9)
+}
+
+func assertTurnUsageSum(t *testing.T, payload map[string]any, input, output float64) {
+	t.Helper()
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok, "result payload must include telemetry")
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok, "telemetry must include turns")
+	var inputSum, outputSum float64
+	for _, raw := range turns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		usage, ok := turn["usage"].(map[string]any)
+		require.True(t, ok)
+		inputSum += usageNumber(usage["input_tokens"])
+		outputSum += usageNumber(usage["output_tokens"])
+	}
+	assert.Equal(t, input, inputSum)
+	assert.Equal(t, output, outputSum)
+}
+
+func usageNumber(value any) float64 {
+	switch n := value.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	default:
+		return 0
+	}
+}
+
+func jsReadSessionUsage(t *testing.T, taskDir string) map[string]any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { readSessionUsage } = require(process.argv[1]); process.stdout.write(JSON.stringify(readSessionUsage(process.argv[2])));`, script, taskDir)
+	cmd.Env = append(os.Environ(), "NODE_NO_WARNINGS=1")
+	out, err := cmd.Output()
+	if err != nil {
+		stderr := ""
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			stderr = string(exitErr.Stderr)
+		}
+		require.NoError(t, err, stderr)
+	}
+	var usage map[string]any
+	require.NoError(t, json.Unmarshal(out, &usage), string(out))
+	return usage
 }

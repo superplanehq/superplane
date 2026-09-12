@@ -66,7 +66,7 @@ export const EmptyWorkspace: Story = {
   render: () => <FactoriesHarness pathSuffix={emptyWorkspacePath} factoriesFixture={defaultFactoriesFixture} />,
 };
 
-/** Remaining hosted credit is empty. A banner sits above the task board. */
+/** Remaining trial credit is empty. The trial chip sits next to the title. */
 export const HostedCreditEmpty: Story = {
   name: "Hosted credit empty",
   render: () => {

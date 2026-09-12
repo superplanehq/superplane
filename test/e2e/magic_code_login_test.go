@@ -86,6 +86,29 @@ func TestMagicCodeLogin(t *testing.T) {
 		steps.clickMagicCodeToggle()
 		steps.assertMagicCodeFormVisible()
 	})
+
+	t.Run("new user on login receives a code and creates an account", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
+		steps.start()
+		steps.visitLoginPage()
+		email := support.RandomName("magic") + "@superplane.local"
+		steps.enterEmailAndRequestCode(email)
+		steps.assertCodeStepVisible()
+		steps.assertMagicCodeCount(email, 1)
+		steps.insertKnownMagicCode(email, "222222")
+		steps.enterCodeAndSubmit("222222")
+		steps.assertAccountCreated(email)
+	})
+
+	t.Run("new user on signup receives a code", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
+		steps.start()
+		steps.visitSignupPage()
+		email := support.RandomName("magic") + "@superplane.local"
+		steps.enterEmailAndRequestCode(email)
+		steps.assertCodeStepVisible()
+		steps.assertMagicCodeCount(email, 1)
+	})
 }
 
 type magicCodeSteps struct {
@@ -100,6 +123,11 @@ func (s *magicCodeSteps) start() {
 
 func (s *magicCodeSteps) visitLoginPage() {
 	s.session.Visit("/login")
+	s.session.Sleep(500)
+}
+
+func (s *magicCodeSteps) visitSignupPage() {
+	s.session.Visit("/signup")
 	s.session.Sleep(500)
 }
 
@@ -143,10 +171,16 @@ func (s *magicCodeSteps) enterCodeAndSubmit(code string) {
 	s.session.Sleep(1500)
 }
 
+func (s *magicCodeSteps) assertMagicCodeCount(email string, expected int64) {
+	count, err := models.CountRecentMagicCodes(strings.ToLower(strings.TrimSpace(email)), time.Now().Add(-time.Hour))
+	require.NoError(s.t, err)
+	assert.Equal(s.t, expected, count)
+}
+
 func (s *magicCodeSteps) assertRedirectedToOrganization() {
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.session.OrgSlug,
-		"expected redirect to organization home, got %s", currentURL)
+	// The app lands on "/" first and then resolves the organization redirect
+	// after several async requests, so poll instead of checking once.
+	s.session.WaitUntilURLContains("/" + s.session.OrgSlug)
 }
 
 func (s *magicCodeSteps) assertAccountCreated(email string) {

@@ -174,6 +174,10 @@ describe("getExecutionDetails", () => {
         isCollapsed: false,
         configuration: {
           machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
         },
         metadata: {},
       },
@@ -192,6 +196,79 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.customField).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerSuperPlane mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerSuperPlane");
+    const props = mapper.props({
+      node: {
+        id: "node-superplane-1",
+        name: "Run SuperPlane Agent",
+        componentName: "runnerSuperPlane",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerSuperPlane",
+        label: "Run SuperPlane Agent",
+        description: "Runs a SuperPlane-hosted coding agent on a fleet runner",
+        icon: "code",
+        color: "#1D4ED8",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
+    expect(getStateMap("runnerSuperPlane")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerOpenRouter mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerOpenRouter");
+    const props = mapper.props({
+      node: {
+        id: "node-openrouter-1",
+        name: "Run OpenRouter Agent",
+        componentName: "runnerOpenRouter",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerOpenRouter",
+        label: "Run OpenRouter Agent",
+        description: "Runs an OpenRouter-backed coding agent on a fleet runner",
+        icon: "code",
+        color: "#6366F1",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
+    expect(getStateMap("runnerOpenRouter")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 });

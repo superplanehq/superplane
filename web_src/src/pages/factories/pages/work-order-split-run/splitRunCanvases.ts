@@ -5,6 +5,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { parseCanvasYamlMetadata, parseCanvasYamlToSpec } from "@/pages/app/lib/canvas-yaml-staging";
+import { AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import {
@@ -13,7 +14,6 @@ import {
 } from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
 import issueIntakeYaml from "@factory-templates/issue-intake.canvas.yaml?raw";
-import planningYaml from "@factory-templates/line-planning.canvas.yaml?raw";
 import implementationYaml from "@factory-templates/line-implementation.canvas.yaml?raw";
 import prClosureYaml from "@factory-templates/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -25,18 +25,16 @@ import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
 import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
 import implementationClaudeLog from "./implementation-claude-log.txt?raw";
-import planningClaudeLog from "./planning-claude-log.txt?raw";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
-export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
+export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "implementation" | "risk" | "closure";
 
-const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "planning", "implementation", "risk", "closure"];
+const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
   { needles: ["sentry"], key: "sentry" },
   { needles: ["slack"], key: "slack" },
   { needles: ["ingest", "intake", "backlog"], key: "intake" },
-  { needles: ["plan"], key: "planning" },
   { needles: ["implement"], key: "implementation" },
   { needles: ["verify", "verifier", "risk", "ci"], key: "risk" },
   { needles: ["closure", "done"], key: "closure" },
@@ -65,7 +63,6 @@ const LINE_AUTOMATION_LABEL: Record<SplitRunCanvasKey, { name: string; component
   intake: { name: "Backlog", componentName: "Ingest" },
   sentry: { name: "Backlog", componentName: "Sentry" },
   slack: { name: "Backlog", componentName: "Slack" },
-  planning: { name: "Plan", componentName: "Planning" },
   implementation: { name: "Implement", componentName: "Implementation" },
   risk: { name: "Verify", componentName: "Risk Assessment" },
   closure: { name: "Done", componentName: "PR Closure" },
@@ -97,7 +94,6 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
   intake: issueIntakeYaml,
   sentry: sentryIntakeYaml,
   slack: slackIntakeYaml,
-  planning: planningYaml,
   implementation: implementationYaml,
   risk: riskAssessmentYaml,
   closure: prClosureYaml,
@@ -178,7 +174,7 @@ function takenNodeIds(
         continue;
       }
       const source = nodes.find((node) => node.id === id);
-      if (edge.channel === "passed" && status === "running" && source?.component === "runnerClaudeCode") {
+      if (edge.channel === "passed" && status === "running" && isAgentHarnessNode(source)) {
         continue;
       }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
@@ -294,7 +290,10 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
 const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; iconSrc?: string }> = {
   onRun: { title: "On Run", iconSlug: "play" },
   runnerBash: { title: "Run Bash", iconSlug: "code" },
+  runnerSuperPlane: { title: "Run SuperPlane Agent", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
+  runnerCodex: { title: "Run Codex", iconSlug: "code" },
+  runnerOpenRouter: { title: "Run OpenRouter Agent", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
   if: { title: "If", iconSlug: "split" },
   filter: { title: "Filter", iconSlug: "funnel" },
@@ -469,6 +468,10 @@ function appendRichStreamNode({
   return tick;
 }
 
+function isAgentHarnessNode(node: ComponentsNode | undefined): boolean {
+  return Boolean(node?.component && AGENT_HARNESS_COMPONENTS.has(node.component));
+}
+
 export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
   if (node.type === "TYPE_TRIGGER") {
     return "trigger";
@@ -480,7 +483,7 @@ export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
   if (component === "if") {
     return "if";
   }
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {
@@ -518,7 +521,7 @@ function hidesProducedOutputs(kind: "agent" | "check" | "artifact" | "simple", n
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {
   const component = node.component ?? "";
   const name = `${node.name ?? ""} ${componentPresentation(component).title}`.toLowerCase();
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {
@@ -550,7 +553,6 @@ export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; typ
 }
 
 const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
-  planning: planningClaudeLog,
   implementation: implementationClaudeLog,
 };
 
@@ -568,9 +570,6 @@ function claudeCodeChildren(
 }
 
 function agentNotes(nodeId: string): string[] {
-  if (nodeId.startsWith("planner-agent")) {
-    return ["Clone Repo", "Write Implementation Plan", "Use plan as output"];
-  }
   if (nodeId.startsWith("implementation-agent")) {
     return ["Reading plan.md.", "Opening the refund reconciliation worker.", "Adding the timeout-then-retry test."];
   }

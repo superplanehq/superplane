@@ -5,7 +5,12 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_KEY,
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 
 describe("FactorySettingsLayout sidebar", () => {
   beforeAll(() => {
@@ -23,11 +28,16 @@ describe("FactorySettingsLayout sidebar", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(screen.getByTestId("factory-settings-main").className).toMatch(/overflow-y-auto/);
-    expect(within(sidebar).getByTestId("factory-settings-back")).toHaveTextContent("Back to workspace");
+    expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
+    expect(screen.queryByTestId("factories-workspace-settings-link")).not.toBeInTheDocument();
+    expect(within(sidebar).queryByTestId("factory-settings-back")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-account-nav")).toHaveTextContent("Account");
     expect(within(sidebar).getByTestId("factory-settings-find")).toBeInTheDocument();
-    expect(within(sidebar).getByTestId("factory-settings-workspace-switcher")).toBeInTheDocument();
-    expect(within(sidebar).getByTestId("factory-settings-organization-switcher")).toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Semaphore");
+    expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Workspace · RF");
+    expect(within(sidebar).getByTestId("factory-settings-organization-heading")).toHaveTextContent("Organization");
+    expect(within(sidebar).queryByRole("button", { name: /Switch workspace/ })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: /Switch organization/ })).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-workspace-nav")).toHaveTextContent("Workspace");
     expect(within(sidebar).getByTestId("factory-settings-organization-nav")).toHaveTextContent("Organization");
     expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
@@ -137,6 +147,30 @@ describe("FactorySettingsLayout sidebar", () => {
     expect(screen.getByText("Selected workspaces")).toBeInTheDocument();
   }, 10000);
 
+  it("redirects the removed workspace Automations settings URL to the factory Automations tab", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/automations`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("redirects the older /settings/automations bookmark to the factory Automations tab", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/automations`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+  }, 10000);
+
   it("redirects unknown legacy paths to Workspace General", async () => {
     render(
       <FactoriesHarness
@@ -157,21 +191,40 @@ describe("FactorySettingsLayout sidebar", () => {
   it.each([
     ["API keys", "api-keys", "factory-settings-api-keys"],
     ["Secrets", "secrets", "factory-settings-secrets"],
-  ])("renders the Organization %s page in the factory settings shell", async (_title, path, pageTestId) => {
+    ["LLM Models", "models", "factory-settings-llm-models"],
+    ["Billing", "billing", "billing-credit-balance"],
+  ])(
+    "renders the Organization %s page in the factory settings shell",
+    async (_title, path, pageTestId) => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${path}`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).getByTestId(`factory-settings-nav-organization-${path}`)).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
+    },
+    10000,
+  );
+
+  it("renders the Workspace Usage page in the factory settings shell", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${path}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId(`factory-settings-nav-organization-${path}`)).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(await screen.findByTestId(pageTestId)).toBeInTheDocument();
-  });
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 
   describe("Find settings", () => {
     it("shows section results for Security and hides the grouped nav", async () => {
@@ -191,7 +244,7 @@ describe("FactorySettingsLayout sidebar", () => {
       expect(within(sidebar).queryByTestId("factory-settings-account-nav")).not.toBeInTheDocument();
     }, 10000);
 
-    it("shows Spending results when the query matches billing", async () => {
+    it("shows Billing results when the query matches billing", async () => {
       const user = userEvent.setup();
       render(
         <FactoriesHarness
@@ -203,7 +256,8 @@ describe("FactorySettingsLayout sidebar", () => {
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       await user.type(within(sidebar).getByTestId("factory-settings-find"), "billing");
       const results = within(sidebar).getByTestId("factory-settings-search-results");
-      expect(within(results).getAllByText("Spending")).toHaveLength(1);
+      expect(within(results).getAllByText("Billing")).toHaveLength(1);
+      expect(within(results).queryByText("Spending")).not.toBeInTheDocument();
       expect(within(sidebar).queryByTestId("factory-settings-workspace-nav")).not.toBeInTheDocument();
     }, 10000);
 
@@ -308,6 +362,7 @@ describe("FactorySettingsLayout sidebar", () => {
 
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
     }, 10000);
 
     it("shows the Models nav item when the feature is on", async () => {
@@ -351,8 +406,8 @@ describe("FactorySettingsLayout sidebar", () => {
     }, 10000);
   });
 
-  describe("organization switcher", () => {
-    it("marks the current organization and stays in settings when it is chosen", async () => {
+  describe("icon rail workspace switcher", () => {
+    it("keeps the current settings page when another workspace is chosen", async () => {
       const user = userEvent.setup();
       render(
         <FactoriesHarness
@@ -361,24 +416,28 @@ describe("FactorySettingsLayout sidebar", () => {
         />,
       );
 
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      await user.click(within(sidebar).getByTestId("factory-settings-organization-switcher"));
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.click(screen.getByTestId("factories-workspace-switch"));
+      await user.click(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY_ID}`));
 
-      const current = await screen.findByTestId("factory-settings-organization-switcher-option-superplane");
-      expect(current).toHaveAttribute("aria-checked", "true");
-      expect(current).toHaveTextContent("SuperPlane");
-
-      await user.click(current);
-
-      expect(await screen.findByTestId("factory-settings-sidebar")).toBeInTheDocument();
-      expect(screen.queryByTestId("home-factories-link")).not.toBeInTheDocument();
-      expect(
-        within(screen.getByTestId("factory-settings-sidebar")).getByTestId("factory-settings-nav-organization-general"),
-      ).toHaveAttribute("aria-current", "page");
+      const sidebar = await screen.findByTestId("factory-settings-sidebar");
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
+        "href",
+        expect.stringContaining(
+          `/workspaces/${ACME_ONBOARDING_FACTORY_KEY.toLowerCase()}/settings/organization/general`,
+        ),
+      );
+      expect(screen.queryByTestId("lines-detail-page")).not.toBeInTheDocument();
+      expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();
     }, 10000);
+  });
 
-    it("does not open the apps home when switching to another organization", async () => {
-      const user = userEvent.setup();
+  describe("settings group headings", () => {
+    it("shows the workspace and organization names without a switcher", async () => {
       render(
         <FactoriesHarness
           pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/general`}
@@ -387,16 +446,17 @@ describe("FactorySettingsLayout sidebar", () => {
       );
 
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      await user.click(within(sidebar).getByTestId("factory-settings-organization-switcher"));
-      await user.click(await screen.findByTestId("factory-settings-organization-switcher-option-acme"));
-
-      await waitFor(
-        () => {
-          expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();
-        },
-        { timeout: 8000 },
-      );
-      expect(screen.queryByTestId("home-factories-link")).not.toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Semaphore");
+      expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Workspace · RF");
+      expect(within(sidebar).queryByTestId("factory-settings-workspace-heading-avatar")).not.toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-organization-heading")).toHaveTextContent("SuperPlane");
+      expect(within(sidebar).getByTestId("factory-settings-organization-heading")).toHaveTextContent("Organization");
+      expect(within(sidebar).queryByTestId("factory-settings-organization-heading-avatar")).not.toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-account-heading-avatar")).not.toBeInTheDocument();
+      expect(within(sidebar).queryByRole("button", { name: /Switch workspace/ })).not.toBeInTheDocument();
+      expect(within(sidebar).queryByRole("button", { name: /Switch organization/ })).not.toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-workspace-switcher")).not.toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-organization-switcher")).not.toBeInTheDocument();
     }, 10000);
   });
 });

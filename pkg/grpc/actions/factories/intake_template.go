@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,9 @@ const (
 	intakeFilterNodeID  = "filter"
 	intakeCreateNodeID  = "create-work-order"
 
+	intakeAuthorPermissionNodeID = "get-author-permission"
+	intakeAuthorFilterNodeID     = "author-has-repository-access"
+
 	// Legacy node identifiers. A graph generated before intake became
 	// create-only still resolves so settings and health keep working.
 	intakeAnalysisNodeID         = "analyze"
@@ -30,6 +34,7 @@ const (
 	intakeCreateNodeName   = "Create Task"
 
 	intakeFilterComponent           = "if"
+	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
 	intakeReportConfidenceComponent = "reportWorkOrderCheck"
@@ -47,6 +52,18 @@ const (
 	intakeConfidenceCriticalAt = 2
 
 	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
+	intakeIntentOutputFile   = "/tmp/intent.md"
+
+	intakeIntentArtifactNodeID   = "attach-intent"
+	intakeIntentArtifactNodeName = "Add intent"
+	intakeIntentArtifactTitle    = "intent.md"
+
+	intakeAddRunErrorNodeID    = "add-run-error"
+	intakeAddRunErrorNodeName  = "Record Analysis Failure"
+	intakeAddRunErrorComponent = "addRunError"
+	intakeAddRunErrorMessage   = "The analysis agent failed. Open the agent logs to find the cause."
+
+	intakeAnalysisTimeoutSeconds = 1800
 
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
@@ -68,7 +85,8 @@ const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 var intakeAnalysisComponents = intakeAgentComponents()
 
 func intakeAgentComponents() []string {
-	components := make([]string, 0, len(intakeAgentSpecs))
+	components := make([]string, 0, len(intakeAgentSpecs)+1)
+	components = append(components, models.SuperPlaneRunnerComponent)
 	for _, spec := range intakeAgentSpecs {
 		components = append(components, spec.component)
 	}
@@ -93,7 +111,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a GitHub issue is opened.",
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
-		triggerConfiguration: map[string]any{"actions": []any{"opened"}},
+		triggerConfiguration: map[string]any{"actions": intakeTriggerActionsFor(defaultIntakeSettings())},
 		analysisSubject:      "GitHub issue",
 		createTitle:          "{{ root().data.issue.title }}",
 		createDescription:    "{{ root().data.issue.body }}",
@@ -120,6 +138,16 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		analysisSubject:   "PagerDuty incident",
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
+	},
+	models.FactoryIntakeSourceProductiveTasks: {
+		name:                 "Productive.io tasks",
+		description:          "Create a work order when a Productive.io task is created.",
+		triggerComponent:     "productive.onTask",
+		triggerName:          "On Task",
+		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		analysisSubject:      "Productive.io task",
+		createTitle:          "{{ root().data.data.attributes.title }}",
+		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
 }
 
@@ -225,6 +253,116 @@ func intakeConcurrency() *yaml.ConcurrencySpec {
 	return &yaml.ConcurrencySpec{Max: &max}
 }
 
+func configureIntakeAuthorAccess(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+	enabled bool,
+) ([]models.Node, []models.Edge, error) {
+	if !enabled {
+		nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
+			return node.ID == graph.AuthorPermissionNodeID || node.ID == graph.AuthorFilterNodeID
+		})
+		edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+			return edge.SourceID == graph.AuthorPermissionNodeID ||
+				edge.TargetID == graph.AuthorPermissionNodeID ||
+				edge.SourceID == graph.AuthorFilterNodeID ||
+				edge.TargetID == graph.AuthorFilterNodeID
+		})
+		return nodes, ensureIntakeEdge(edges, models.Edge{
+			Channel:  "true",
+			SourceID: graph.FilterNodeID,
+			TargetID: graph.CreateNodeID,
+		}), nil
+	}
+
+	trigger := findIntakeNode(nodes, graph.TriggerNodeID)
+	if trigger == nil {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub trigger")
+	}
+	repository, _ := trigger.Configuration["repository"].(string)
+	if strings.TrimSpace(repository) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub repository")
+	}
+	if trigger.IntegrationID == nil || strings.TrimSpace(*trigger.IntegrationID) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub integration")
+	}
+
+	permissionNode := models.Node{
+		ID:   intakeAuthorPermissionNodeID,
+		Name: "Get Author Repository Permission",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeAuthorPermissionComponent},
+		},
+		Configuration: map[string]any{
+			"repository": repository,
+			"username":   "{{ root().data.issue.user.login }}",
+		},
+		Position:      models.Position{X: 160, Y: 440},
+		Concurrency:   intakeModelConcurrency(),
+		IntegrationID: trigger.IntegrationID,
+	}
+	authorFilterNode := models.Node{
+		ID:   intakeAuthorFilterNodeID,
+		Name: "Author Has Repository Access?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": `root().data.permission != "none"`,
+		},
+		Position:    models.Position{X: 160, Y: 620},
+		Concurrency: intakeModelConcurrency(),
+	}
+	nodes = upsertIntakeNode(nodes, permissionNode)
+	nodes = upsertIntakeNode(nodes, authorFilterNode)
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.FilterNodeID &&
+			(edge.TargetID == graph.CreateNodeID || edge.TargetID == intakeAuthorPermissionNodeID)
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: graph.FilterNodeID,
+		TargetID: intakeAuthorPermissionNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: intakeAuthorPermissionNodeID,
+		TargetID: intakeAuthorFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeAuthorFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, nil
+}
+
+func intakeModelConcurrency() *models.ConcurrencySpec {
+	max := intakeConcurrencyMax
+	return &models.ConcurrencySpec{Max: &max}
+}
+
+func upsertIntakeNode(nodes []models.Node, updated models.Node) []models.Node {
+	for i := range nodes {
+		if nodes[i].ID == updated.ID {
+			nodes[i] = updated
+			return nodes
+		}
+	}
+	return append(nodes, updated)
+}
+
+func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
+	if slices.Contains(edges, expected) {
+		return edges
+	}
+	return append(edges, expected)
+}
+
 // intakeTriggerConfiguration lays the binding over the template so the trigger
 // listens on a concrete resource. The template map is shared between intakes,
 // so it is copied rather than written to.
@@ -240,18 +378,47 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration configures the runner that scores a work order.
-// The runner components reject a node without a machine type or credentials, so
-// the generated node names the machine and the credentials of the workspace
-// agent.
-func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
+// intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK
+// agents also receive credentials and a model.
+func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName string) map[string]any {
+	if strings.TrimSpace(githubName) == "" {
+		githubName = intakeGitHubAppName
+	}
+
 	configuration := map[string]any{
-		"machineType": intakeAnalysisMachineType,
+		"machineType":             intakeAnalysisMachineType,
+		"executionTimeoutSeconds": intakeAnalysisTimeoutSeconds,
+		"environmentFrom": []any{
+			map[string]any{
+				"source": "integration",
+				"integration": map[string]any{
+					"name": githubName,
+				},
+			},
+		},
+		"environment": []any{
+			map[string]any{
+				"name":        "REPO_URL",
+				"value":       "{{ root().data.workOrder.repository_url }}",
+				"valueSource": "literal",
+			},
+			map[string]any{
+				"name":        "BASE",
+				"value":       "{{ root().data.workOrder.default_branch }}",
+				"valueSource": "literal",
+			},
+		},
 		"steps": []any{
 			map[string]any{
-				"name":   "Analyze and score",
-				"type":   "prompt",
-				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
+				"name":    "Clone repository",
+				"type":    runner.AgentStepBash,
+				"command": intakeAnalysisCloneCommand(),
+			},
+			map[string]any{
+				"name":             "Analyze and score",
+				"type":             "prompt",
+				"workingDirectory": "repo",
+				"prompt":           intakeAnalysisPrompt(spec.analysisSubject),
 			},
 			map[string]any{
 				"name":    "Use analysis as output",
@@ -271,38 +438,102 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string
 	return configuration
 }
 
+func intakeAnalysisCloneCommand() string {
+	return strings.Join([]string{
+		"set -euo pipefail",
+		`if [ -z "${REPO_URL:-}" ]; then`,
+		`  echo "This workspace has no repository to analyze." >&2`,
+		"  exit 1",
+		"fi",
+		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
+		"rm -rf repo",
+		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+	}, "\n")
+}
+
 func intakeAnalysisPrompt(subject string) string {
 	return strings.Join([]string{
-		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
-		"Consider impact, clarity, feasibility, and whether an agent on this factory line can take a concrete action.",
-		fmt.Sprintf("Write one JSON object to %s. Do not write the result to another file.", intakeAnalysisOutputFile),
+		fmt.Sprintf("Analyze this %s against the repository checked out in the working directory.", subject),
+		"Read the ticket and the code. Score how well an agent on this factory line can complete the work.",
+		"Do not score from the title and description alone.",
+		"",
+		fmt.Sprintf("Write one JSON object to %s.", intakeAnalysisOutputFile),
 		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
 		"Keys:",
 		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
 		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
 		`- "reasons": exactly three short sentences that explain the score.`,
-		"Write three reasons: what the item names, what already exists, and whether an agent can do the work.",
+		"Write three reasons: what the item names, what already exists in this repository, and whether an agent can do the work.",
 		"",
-		"Event:",
-		"{{ root().data }}",
+		fmt.Sprintf("Also write %s. Write it like you are explaining the work to a teammate, not like a spec.", intakeIntentOutputFile),
+		"Keep it under 40 lines. Use short sentences and plain words.",
+		"Do not write implementation details, file lists, APIs, or a detailed spec.",
+		"Do not use words like proposed outcome, stakeholders, systems, or proto-spec.",
+		"Do not start with a title such as Intent:.",
+		"Use a mermaid fence only when a simple diagram clarifies the idea.",
+		"Do not add an Open questions section.",
+		"Map your 0-100 score to a 0-5 confidence with round(score / 20). Pick one intent format from that 0-5 value.",
+		"",
+		"If confidence is 4 or 5, use these markdown headings:",
+		"## How I understand this",
+		"## What's going on",
+		"## What done looks like",
+		"## What to watch",
+		"Write How I understand this in first person. Answer: How do you understand what needs to be done here?",
+		"What's going on: what is missing or broken, in everyday words.",
+		"What done looks like: what a person will notice when the work is finished.",
+		"What to watch: hard limits only, such as keep the change small.",
+		"",
+		"If confidence is 2 or 3, use the same headings, then add:",
+		"## Honest take",
+		"Say what is uncertain and why. Do not pretend the work is clear.",
+		"",
+		"If confidence is 0 or 1, do not write What done looks like or What to watch.",
+		"Use these markdown headings:",
+		"## How I understand this",
+		"## Why I would not start this",
+		"## What would make this clear",
+		"How I understand this: say that you do not know what should be done, and why.",
+		"Why I would not start this: tell the reader not to start implementation until they refine the task.",
+		"What would make this clear: the top 3 changes that would make the task clear enough to start. Use a numbered list.",
+		"",
+		"Task:",
+		"{{ root().data.workOrder }}",
 	}, "\n")
 }
 
-// intakeAnalysisOutputCommand promotes the file the agent wrote to the node's
+// intakeAnalysisOutputCommand promotes the files the agent wrote to the node's
 // result, so the rest of the graph reads fields instead of parsing text. The
 // prompt asks for an exact shape, but this step accepts what an agent really
 // produces: a quoted number, a missing summary, or a different number of
-// reasons. Only the score is required, because the report check cannot run
-// without it.
+// reasons. Only the score and intent body are required.
 func intakeAnalysisOutputCommand() string {
-	return fmt.Sprintf(`if ! jq -ce '{
+	return fmt.Sprintf(`if [ ! -s %s ]; then
+  echo "The analysis wrote no intent.md" >&2
+  exit 1
+fi
+if ! jq -ce --rawfile intent %s '{
   score: (.score | tonumber | floor),
   summary: ((.summary // "") | tostring),
-  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring]
+  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring],
+  intent: ($intent | tostring)
 }' %s > "$SUPERPLANE_RESULT_FILE"; then
   echo "The analysis at %s has no readable score" >&2
   exit 1
-fi`, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
+fi`, intakeIntentOutputFile, intakeIntentOutputFile, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
+}
+
+func intakeIntentBodyExpression() string {
+	return fmt.Sprintf(`{{ $[%q].data.result.intent }}`, intakeAnalysisNodeName)
+}
+
+func intakeIntentArtifactConfiguration() map[string]any {
+	return map[string]any{
+		"orderId":      intakeWorkOrderIDFromRootExpression(),
+		"artifactType": "markdown",
+		"title":        intakeIntentArtifactTitle,
+		"body":         intakeIntentBodyExpression(),
+	}
 }
 
 func intakeAnalysisScorePath() string {

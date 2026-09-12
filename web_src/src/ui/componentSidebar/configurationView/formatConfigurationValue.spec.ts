@@ -116,4 +116,20 @@ describe("formatConfigurationValue", () => {
       displayText: "https://api.example.com/hook",
     });
   });
+
+  it("shows SuperPlane model keys as provider/model", () => {
+    const field: ConfigurationField = {
+      name: "model",
+      label: "Model",
+      type: "hosted-model",
+      typeOptions: { hostedModel: { provider: "all" } },
+    };
+    expect(formatConfigurationValue(field, "openrouter::moonshotai/kimi-k2.6").displayText).toBe(
+      "moonshotai/kimi-k2.6",
+    );
+    expect(formatConfigurationValue(field, "hosted::openrouter::moonshotai/kimi-k2.6").displayText).toBe(
+      "moonshotai/kimi-k2.6",
+    );
+    expect(formatConfigurationValue(field, "").displayText).toBe("Instance SuperPlane agent model");
+  });
 });

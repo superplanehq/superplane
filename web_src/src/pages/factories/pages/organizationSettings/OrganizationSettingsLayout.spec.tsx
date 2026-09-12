@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -46,6 +46,42 @@ describe("legacy factory organization settings routes", () => {
     expect(
       await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
     ).toBeInTheDocument();
+  }, 10000);
+
+  it("opens Workspace Usage directly, no redirect", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
+  }, 10000);
+
+  it("redirects the old Organization Usage URL into Workspace Usage", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
   }, 10000);
 
   it("redirects the old LLM spend URL into Organization Spending", async () => {

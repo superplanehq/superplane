@@ -17,7 +17,7 @@ const (
 	backlogDefaultName        = "Backlog"
 	backlogDefaultDescription = "Score new work orders for how well an agent can complete them."
 	backlogTriggerNodeID      = "trigger"
-	backlogTriggerName        = "On Work Order"
+	backlogTriggerName        = "On Task"
 	backlogAnalysisSubject    = "work order"
 )
 
@@ -97,8 +97,9 @@ func createBacklogCanvas(
 	}
 
 	canvasDoc := buildBacklogCanvas(backlogCanvasRequest{
-		Name:  name,
-		Agent: resolveIntakeAgent(db, factoryModel),
+		Name:       name,
+		Agent:      resolveIntakeAgent(db, factoryModel),
+		GitHubName: resolveGitHubInstallationName(db, factoryModel),
 	})
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factoryModel.OrganizationID.String())
@@ -135,8 +136,9 @@ func createBacklogCanvas(
 }
 
 type backlogCanvasRequest struct {
-	Name  string
-	Agent *intakeAgent
+	Name       string
+	Agent      *intakeAgent
+	GitHubName string
 }
 
 func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
@@ -158,6 +160,8 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 			Edges: []yaml.Edge{
 				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
 				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeIntentArtifactNodeID},
+				{Channel: "failed", SourceID: intakeAnalysisNodeID, TargetID: intakeAddRunErrorNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -172,7 +176,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:          intakeAnalysisNodeName,
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
-					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
+					Configuration: intakeAnalysisConfiguration(spec, request.Agent, request.GitHubName),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 260},
 				},
@@ -184,6 +188,25 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Configuration: intakeConfidenceReportConfiguration(backlogAnalysisSubject),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
+				},
+				{
+					ID:            intakeIntentArtifactNodeID,
+					Name:          intakeIntentArtifactNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     factory.AddWorkOrderArtifactComponentName,
+					Configuration: intakeIntentArtifactConfiguration(),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 400, Y: 440},
+				},
+				{
+					ID:        intakeAddRunErrorNodeID,
+					Name:      intakeAddRunErrorNodeName,
+					Type:      yaml.NodeTypeAction,
+					Component: intakeAddRunErrorComponent,
+					Configuration: map[string]any{
+						"message": intakeAddRunErrorMessage,
+					},
+					Position: yaml.Position{X: 400, Y: 260},
 				},
 			},
 		},

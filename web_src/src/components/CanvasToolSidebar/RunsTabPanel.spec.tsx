@@ -82,6 +82,14 @@ describe("RunsTabPanel", () => {
     expect(onSelectLiveCanvas).toHaveBeenCalledTimes(1);
   });
 
+  it("hides the Live Canvas row when no live-canvas handler is given", () => {
+    const { onSelectLiveCanvas: _onSelectLiveCanvas, ...props } = baseProps;
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...props} />, { wrapper: routerWrapper });
+
+    expect(screen.queryByTestId("runs-sidebar-live-canvas")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Live Canvas" })).not.toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no runs", () => {
     render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />, { wrapper: routerWrapper });
 

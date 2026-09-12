@@ -112,6 +112,7 @@ type CanvasMemoryRecord struct {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
+	IsCancelling() bool
 	SetKV(key, value string) error
 	GetKV(key string) (string, error)
 

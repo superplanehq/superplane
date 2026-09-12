@@ -55,6 +55,11 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import {
+  componentMappers as productiveComponentMappers,
+  triggerRenderers as productiveTriggerRenderers,
+  eventStateRegistry as productiveEventStateRegistry,
+} from "./productive/index";
+import {
   componentMappers as dash0ComponentMappers,
   triggerRenderers as dash0TriggerRenderers,
   eventStateRegistry as dash0EventStateRegistry,
@@ -270,7 +275,7 @@ import {
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { forEachMapper, FOR_EACH_STATE_REGISTRY } from "./forEach";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { claudeCodeMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
+import { agentHarnessMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
@@ -313,9 +318,10 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runnerJS: runnerMapper,
   runnerBash: runnerMapper,
   runnerPython: runnerMapper,
-  runnerClaudeCode: claudeCodeMapper,
-  runnerCodex: runnerMapper,
-  runnerOpenRouter: runnerMapper,
+  runnerSuperPlane: agentHarnessMapper,
+  runnerClaudeCode: agentHarnessMapper,
+  runnerCodex: agentHarnessMapper,
+  runnerOpenRouter: agentHarnessMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   forEach: forEachMapper,
@@ -337,6 +343,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   linear: linearComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  productive: productiveComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
@@ -387,6 +394,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jira: jiraTriggerRenderers,
   linear: linearTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  productive: productiveTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
@@ -434,6 +442,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  productive: productiveEventStateRegistry,
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,
@@ -485,6 +494,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   runnerJS: RUNNER_STATE_REGISTRY,
   runnerBash: RUNNER_STATE_REGISTRY,
   runnerPython: RUNNER_STATE_REGISTRY,
+  runnerSuperPlane: RUNNER_STATE_REGISTRY,
   runnerClaudeCode: RUNNER_STATE_REGISTRY,
   runnerCodex: RUNNER_STATE_REGISTRY,
   runnerOpenRouter: RUNNER_STATE_REGISTRY,

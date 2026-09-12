@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
-  GITHUB_INTAKE_RUNS,
   isIntakeSettingsTab,
-  intakePlacementActivity,
-  intakePlacementLabel,
-  intakeRelativeTime,
+  intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
   normalizeIntakeSourceSettings,
@@ -19,37 +17,29 @@ describe("intakeSourceSettingsModel", () => {
     expect(toggleIntakeLabel(["bug", "enhancement"], "bug")).toEqual(["enhancement"]);
   });
 
-  it("keeps a default name when the draft name is empty", () => {
+  it("adds a typed label once and ignores blank input", () => {
+    expect(addIntakeLabel(["bug"], "  needs-triage  ")).toEqual(["bug", "needs-triage"]);
+    expect(addIntakeLabel(["bug"], "bug")).toEqual(["bug"]);
+    expect(addIntakeLabel(["bug"], "   ")).toEqual(["bug"]);
+  });
+
+  it("clamps the confidence score", () => {
     const next = normalizeIntakeSourceSettings({
       ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-      name: "   ",
       confidencePct: 140.6,
     });
 
-    expect(next.name).toBe("GitHub issues");
     expect(next.confidencePct).toBe(100);
   });
 
-  it("labels ticket placement for backlog, rejected, and in-progress work", () => {
-    const implement = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-1")!;
-    const backlog = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-3")!;
-    const rejected = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-4")!;
-    const held = GITHUB_INTAKE_RUNS.find((run) => run.id === "gh-issue-6")!;
-
-    expect(intakePlacementLabel(implement)).toBe("Implement");
-    expect(intakePlacementActivity(implement)).toBe("Writing the retry handler.");
-    expect(intakePlacementLabel(backlog)).toBe("In Backlog");
-    expect(intakePlacementActivity(backlog)).toBe("Waiting for review.");
-    expect(intakePlacementLabel(rejected)).toBe("Rejected");
-    expect(intakePlacementLabel(held)).toBe("Not moved to Backlog");
-    expect(intakeRelativeTime(180)).toBe("3h ago");
-  });
-
-  it("accepts only the three settings tabs", () => {
+  it("accepts the intake settings tabs", () => {
     expect(isIntakeSettingsTab("automation")).toBe(true);
-    expect(isIntakeSettingsTab("runs")).toBe(true);
+    expect(isIntakeSettingsTab("runs")).toBe(false);
+    expect(isIntakeSettingsTab("agent")).toBe(true);
     expect(isIntakeSettingsTab("general")).toBe(true);
     expect(isIntakeSettingsTab("listen")).toBe(false);
+    expect(intakeSettingsTabs(false)).toEqual(["general", "automation"]);
+    expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });
 
   it("defaults the authors filter to off", () => {
@@ -65,5 +55,40 @@ describe("intakeSourceSettingsModel", () => {
     const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
     expect(off.authorsWithAccess).toBe(false);
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
+  });
+
+  it("round-trips GitHub issue events through the API shape", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: false,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
+    });
+
+    expect(settings.newIssues).toBe(false);
+    expect(settings.reopenedIssues).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(true);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      newIssues: false,
+      reopenedIssues: true,
+      superplaneLabelAdded: true,
+    });
+  });
+
+  it("keeps the new and re-opened toggles apart", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {
+      newIssues: true,
+      reopenedIssues: false,
+    });
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(false);
+  });
+
+  it("defaults the GitHub issue event toggles on when the API omits them", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", {});
+
+    expect(settings.newIssues).toBe(true);
+    expect(settings.reopenedIssues).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(true);
   });
 });

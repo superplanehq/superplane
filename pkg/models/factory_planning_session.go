@@ -74,32 +74,34 @@ type StartPlanningSessionParams struct {
 	Repository      string
 	CanvasID        uuid.UUID
 	Entrypoint      string
+	WorkOrderID     uuid.UUID
 }
 
 type FactoryPlanningSession struct {
-	ID               uuid.UUID
-	OrganizationID   uuid.UUID
-	FactoryID        uuid.UUID
-	CreatedByUserID  uuid.UUID
-	Repository       string
-	State            string
-	CanvasID         *uuid.UUID
-	CanvasRunID      *uuid.UUID
-	DraftTitle       string
-	DraftDescription string
-	DraftWorkOrderID *uuid.UUID
-	WaitState        string
-	WaitKind         string
-	WaitText         string
-	WaitWorkOrderID  *uuid.UUID
-	WaitWorkOrderKey string
-	SurveyID         *uuid.UUID
-	Survey           datatypes.JSONType[PlanningSessionSurvey]
-	HeartbeatAt      time.Time
-	EndedAt          *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Messages         []PlanningSessionMessage `gorm:"-"`
+	ID                 uuid.UUID
+	OrganizationID     uuid.UUID
+	FactoryID          uuid.UUID
+	CreatedByUserID    uuid.UUID
+	Repository         string
+	State              string
+	CanvasID           *uuid.UUID
+	CanvasRunID        *uuid.UUID
+	DraftTitle         string
+	DraftDescription   string
+	DraftWorkOrderID   *uuid.UUID
+	WaitState          string
+	WaitKind           string
+	WaitText           string
+	WaitWorkOrderID    *uuid.UUID
+	WaitWorkOrderKey   string
+	SurveyID           *uuid.UUID
+	Survey             datatypes.JSONType[PlanningSessionSurvey]
+	SelectableModelKey string
+	HeartbeatAt        time.Time
+	EndedAt            *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Messages           []PlanningSessionMessage `gorm:"-"`
 }
 
 func (FactoryPlanningSession) TableName() string {
@@ -153,30 +155,18 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		return nil, fmt.Errorf("%w: entrypoint must be onRun", ErrFactoryPlanningSessionInvalid)
 	}
 
+	refine, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, params.CanvasID)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
-	run := &CanvasRun{
-		ID:         uuid.New(),
-		WorkflowID: params.CanvasID,
-		NodeID:     params.Entrypoint,
-		VersionID:  liveVersion.ID,
-		Callbacks: datatypes.JSONSlice[core.RunCallback]{
-			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
-		},
-		Input: NewJSONValue(map[string]any{
-			"planning_session": map[string]any{
-				"factory_id": f.ID.String(),
-				"repository": repository,
-			},
-		}),
-		State:     CanvasRunStatePending,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-	}
+	run := NewPlanningSessionRun(params.CanvasID, liveVersion.ID, params.Entrypoint, f, repository, "", refine)
 	if err := tx.Create(run).Error; err != nil {
 		return nil, err
 	}
@@ -198,7 +188,105 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 	if err := tx.Create(session).Error; err != nil {
 		return nil, err
 	}
+	if refine != nil {
+		if err := session.attachRefineDraft(tx, refine); err != nil {
+			return nil, err
+		}
+	}
 	return session, nil
+}
+
+func NewPlanningSessionRun(
+	canvasID, versionID uuid.UUID,
+	entrypoint string,
+	factoryModel *Factory,
+	repository, modelKey string,
+	refine *FactoryWorkOrder,
+) *CanvasRun {
+	now := time.Now()
+	return &CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvasID,
+		NodeID:     entrypoint,
+		VersionID:  versionID,
+		Callbacks: datatypes.JSONSlice[core.RunCallback]{
+			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
+		},
+		Input:     NewJSONValue(planningSessionRunInput(factoryModel, repository, modelKey, refine)),
+		State:     CanvasRunStatePending,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+}
+
+func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, modelKey string) error {
+	if err := s.guardOpen(); err != nil {
+		return err
+	}
+	s.CanvasRunID = &runID
+	s.SelectableModelKey = strings.TrimSpace(modelKey)
+	s.clearWait()
+	s.clearSurvey()
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id":        s.CanvasRunID,
+		"selectable_model_key": s.SelectableModelKey,
+		"wait_state":           s.WaitState,
+		"wait_kind":            s.WaitKind,
+		"wait_text":            s.WaitText,
+		"wait_work_order_id":   s.WaitWorkOrderID,
+		"wait_work_order_key":  s.WaitWorkOrderKey,
+		"survey_id":            s.SurveyID,
+		"survey":               s.Survey,
+		"updated_at":           s.UpdatedAt,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) RefineWorkOrder(tx *gorm.DB, factoryModel *Factory) (*FactoryWorkOrder, error) {
+	if s.DraftWorkOrderID == nil {
+		return nil, nil
+	}
+	order, err := factoryModel.FindWorkOrder(tx, *s.DraftWorkOrderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return order, nil
+}
+
+func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryWorkOrder, error) {
+	if workOrderID == uuid.Nil {
+		return nil, nil
+	}
+	order, err := f.FindWorkOrder(tx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return nil, fmt.Errorf("%w: work order is not a draft", ErrFactoryPlanningSessionInvalid)
+	}
+	return order, nil
+}
+
+func planningSessionRunInput(factoryModel *Factory, repository, modelKey string, refine *FactoryWorkOrder) map[string]any {
+	planning := map[string]any{
+		"factory_id":         factoryModel.ID.String(),
+		"repository":         repository,
+		"refine_key":         "",
+		"refine_title":       "",
+		"refine_description": "",
+	}
+	if refine != nil {
+		planning["refine_key"] = factoryModel.WorkOrderKey(refine.Number)
+		planning["refine_title"] = refine.Title
+		planning["refine_description"] = refine.Description
+	}
+	if key := strings.TrimSpace(modelKey); key != "" {
+		planning["selectable_model_key"] = key
+	}
+	return map[string]any{"planning_session": planning}
 }
 
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
@@ -236,10 +324,11 @@ func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlann
 	return &session, nil
 }
 
-func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, result string) error {
-	if result != CanvasRunResultFailed && result != CanvasRunResultCancelled {
-		return nil
-	}
+// EndPlanningSessionForFinishedRun closes the planning session when the canvas
+// run is finished. Follow-up keeps a healthy session's run in progress. A
+// finished run means the agent process is gone, including a passed greet that
+// never entered wait.
+func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, _ string) error {
 	session, err := FindPlanningSessionByRun(tx, canvasRunID)
 	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
 		return nil
@@ -309,6 +398,10 @@ func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, e
 
 func (s *FactoryPlanningSession) reload(tx *gorm.DB) error {
 	return tx.Where("id = ?", s.ID).First(s).Error
+}
+
+func (s *FactoryPlanningSession) LockForUpdate(tx *gorm.DB) error {
+	return s.lockAndReload(tx)
 }
 
 func (s *FactoryPlanningSession) lockAndReload(tx *gorm.DB) error {

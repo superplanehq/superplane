@@ -21,7 +21,7 @@ import {
 import { Separator } from "@/ui/separator";
 
 import { pickVelocityAxisTicks } from "../../../lib/velocityAxisTicks";
-import { formatUsdCents } from "../../../lib/workOrderUsage";
+import { formatCompactTokens, formatUsdCents } from "../../../lib/workOrderUsage";
 import { factoryCardClassName } from "../../factoryPageLayoutStyles";
 import type { SpendingCreditSnapshot } from "./spendingRedesignMocks";
 import {
@@ -29,8 +29,11 @@ import {
   formatFilterTriggerLabel,
   formatShare,
   hasActiveSpendingFilters,
-  MACHINE_BREAKDOWN_OPTIONS,
-  MODEL_BREAKDOWN_OPTIONS,
+  narrowSpendingReport,
+  SPENDING_FUNDING_SOURCE_OPTIONS,
+  spendingBreakdownColumnLabel,
+  spendingBreakdownLabel,
+  spendingUsageCopy,
   type SpendingBreakdown,
   type SpendingCatalogItem,
   type SpendingCatalogs,
@@ -59,9 +62,10 @@ export function SpendingUsageSection({
   onChange: (filters: SpendingFilters) => void;
   onBreakdownChange: (value: SpendingBreakdown) => void;
 }) {
-  const copy = usageCopy(kind);
+  const copy = spendingUsageCopy(kind);
   const prefix = copy.testIdPrefix;
-  const empty = report.totals.costCents === 0;
+  const visibleReport = narrowSpendingReport(report, filters, breakdown);
+  const empty = visibleReport.totals.costCents === 0;
 
   return (
     <section className="flex flex-col gap-5" data-testid={`${prefix}-usage`}>
@@ -86,14 +90,15 @@ export function SpendingUsageSection({
         breakdownOptions={copy.breakdownOptions}
         empty={empty}
         emptyMessage={copy.emptyMessage}
-        report={report}
+        report={visibleReport}
         testId={`${prefix}-chart`}
       />
       <SpendingBreakdownCard
         breakdown={breakdown}
         empty={empty}
         emptyMessage={copy.emptyMessage}
-        report={report}
+        report={visibleReport}
+        showTokens={kind === "model"}
         testId={`${prefix}-breakdown`}
       />
     </section>
@@ -138,13 +143,22 @@ function SpendingFilterBar({
         onSelect={(workspaceId) => onChange({ ...filters, workspaceId })}
       />
       {kind === "model" ? (
-        <SpendingFilterMenu
-          allLabel="All models"
-          items={catalogs.models}
-          selected={filters.model}
-          testId={`${testIdPrefix}-filter-models`}
-          onSelect={(model) => onChange({ ...filters, model })}
-        />
+        <>
+          <SpendingFilterMenu
+            allLabel="All sources"
+            items={SPENDING_FUNDING_SOURCE_OPTIONS}
+            selected={filters.fundingSource}
+            testId={`${testIdPrefix}-filter-sources`}
+            onSelect={(fundingSource) => onChange({ ...filters, fundingSource })}
+          />
+          <SpendingFilterMenu
+            allLabel="All models"
+            items={catalogs.models}
+            selected={filters.model}
+            testId={`${testIdPrefix}-filter-models`}
+            onSelect={(model) => onChange({ ...filters, model })}
+          />
+        </>
       ) : (
         <SpendingFilterMenu
           allLabel="All machine types"
@@ -194,7 +208,7 @@ function SpendingGroupBy({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" aria-label="Group by" data-testid={testId}>
-          Group by {breakdownLabel(breakdown, breakdownOptions)}
+          Group by {spendingBreakdownLabel(breakdown, breakdownOptions)}
           <ChevronDown className="size-3.5" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
@@ -270,12 +284,17 @@ export function SpendingKpiRow({
 }) {
   return (
     <div className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${factoryCardClassName} p-4`}>
-      <SpendingKpi label="Estimated spend" value={metrics.spend} hint={rangeCaption} testId="spending-kpi-spend" />
       <SpendingKpi
-        label="Tokens"
-        value={metrics.tokens}
-        hint={`Hosted ${metrics.hosted} · Your keys ${metrics.byok}`}
-        testId="spending-kpi-tokens"
+        label="SuperPlane-hosted spend"
+        value={metrics.hosted}
+        hint={`SuperPlane-hosted models and VM time · ${rangeCaption}`}
+        testId="spending-kpi-hosted"
+      />
+      <SpendingKpi
+        label="Your keys spend"
+        value={metrics.byok}
+        hint="Estimated. SuperPlane does not bill this."
+        testId="spending-kpi-byok"
       />
       <SpendingKpi label="VM time" value={metrics.duration} hint="SuperPlane runner fleets" testId="spending-kpi-vm" />
       <SpendingKpi
@@ -318,7 +337,7 @@ function SpendingChartCard({
       <div className="px-4 pt-4">
         <h3 className="workspace-section-title">Spend over time</h3>
         <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Stacked by {breakdownLabel(breakdown, breakdownOptions).toLowerCase()}.
+          Stacked by {spendingBreakdownLabel(breakdown, breakdownOptions).toLowerCase()}.
         </p>
       </div>
       {empty ? (
@@ -337,12 +356,14 @@ function SpendingBreakdownCard({
   empty,
   emptyMessage,
   report,
+  showTokens,
   testId,
 }: {
   breakdown: SpendingBreakdown;
   empty: boolean;
   emptyMessage: string;
   report: SpendingReport;
+  showTokens: boolean;
   testId: string;
 }) {
   return (
@@ -352,7 +373,7 @@ function SpendingBreakdownCard({
         <p className="mt-0.5 text-[12px] text-muted-foreground">
           {breakdown === "user"
             ? "Spend is grouped by the task owner."
-            : `One row per ${breakdownColumnLabel(breakdown).toLowerCase()} in this range.`}
+            : `One row per ${spendingBreakdownColumnLabel(breakdown).toLowerCase()} in this range.`}
         </p>
       </div>
       {empty ? (
@@ -361,8 +382,9 @@ function SpendingBreakdownCard({
         <table className="mt-2 w-full text-left text-[13px]">
           <thead>
             <tr className="border-b border-border text-muted-foreground">
-              <th className="px-4 py-2 font-medium">{breakdownColumnLabel(breakdown)}</th>
+              <th className="px-4 py-2 font-medium">{spendingBreakdownColumnLabel(breakdown)}</th>
               <th className="px-4 py-2 font-medium">Spend</th>
+              {showTokens ? <th className="px-4 py-2 font-medium">Tokens</th> : null}
               <th className="px-4 py-2 font-medium">Share</th>
             </tr>
           </thead>
@@ -371,6 +393,7 @@ function SpendingBreakdownCard({
               <tr key={row.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-2">{row.label}</td>
                 <td className="px-4 py-2">{formatUsdCents(row.costCents)}</td>
+                {showTokens ? <td className="px-4 py-2">{formatCompactTokens(row.tokens)}</td> : null}
                 <td className="px-4 py-2 text-muted-foreground">{formatShare(row.share)}</td>
               </tr>
             ))}
@@ -405,7 +428,11 @@ function SpendingBarChart({ report }: { report: SpendingReport }) {
         className="aspect-auto h-[240px] w-full"
         initialDimension={{ width: 760, height: 240 }}
       >
-        <BarChart data={rows} margin={{ top: 8, right: 4, left: 8, bottom: 0 }}>
+        <BarChart
+          key={report.seriesKeys.map((item) => item.id).join("-")}
+          data={rows}
+          margin={{ top: 8, right: 4, left: 8, bottom: 0 }}
+        >
           <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             dataKey="label"
@@ -468,49 +495,4 @@ function SpendingEmptyState({ message }: { message: string }) {
       </p>
     </div>
   );
-}
-
-function usageCopy(kind: SpendingUsageKind): {
-  title: string;
-  description: string;
-  emptyMessage: string;
-  testIdPrefix: string;
-  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
-} {
-  if (kind === "model") {
-    return {
-      title: "Model usage",
-      description: "Estimated spend in dollars for SuperPlane-hosted models and your keys.",
-      emptyMessage: "No model usage is recorded for this period.",
-      testIdPrefix: "spending-model",
-      breakdownOptions: MODEL_BREAKDOWN_OPTIONS,
-    };
-  }
-  return {
-    title: "VM usage",
-    description: "Estimated spend in dollars for SuperPlane runner machines.",
-    emptyMessage: "No VM usage is recorded for this period.",
-    testIdPrefix: "spending-vm",
-    breakdownOptions: MACHINE_BREAKDOWN_OPTIONS,
-  };
-}
-
-function breakdownLabel(
-  breakdown: SpendingBreakdown,
-  options: Array<{ value: SpendingBreakdown; label: string }>,
-): string {
-  return options.find((option) => option.value === breakdown)?.label ?? "Workspaces";
-}
-
-function breakdownColumnLabel(breakdown: SpendingBreakdown): string {
-  if (breakdown === "workspace") {
-    return "Workspace";
-  }
-  if (breakdown === "user") {
-    return "User";
-  }
-  if (breakdown === "model") {
-    return "Model";
-  }
-  return "Machine type";
 }

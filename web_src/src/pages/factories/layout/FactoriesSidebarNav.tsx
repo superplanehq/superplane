@@ -1,17 +1,14 @@
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { Gauge, Kanban, Settings } from "lucide-react";
+import { ChartLine, Home } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
+import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, isBoardPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
-  canOpenSettings: boolean;
-  permissionsLoading: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -46,55 +43,30 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: the line board, the Velocity link,
- * then settings. Intakes and PR feedback open from their listener rows on
- * the board, so they do not need a rail icon.
+ * Icon rail under the workspace switcher: the line board and Velocity.
+ * Workspace settings open from the workspace switcher.
  */
-export function FactoriesSidebarNav({
-  organizationId,
-  factoryKey,
-  lineId,
-  canOpenSettings,
-  permissionsLoading,
-}: FactoriesSidebarNavProps) {
+export function FactoriesSidebarNav({ organizationId, factoryKey, lineId }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
-  const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, factoryKey);
-  const boardCurrent = isBoardPath(pathname);
-  const velocityCurrent = isVelocityPath(pathname);
-  const settingsCurrent = isSettingsPath(pathname);
 
   return (
     <nav className="flex flex-col items-center gap-1 px-1.5" aria-label="Workspace" data-testid="factories-sidebar-nav">
-      <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
+      <RailNavLink
+        to={boardHref}
+        label="Board"
+        Icon={Home}
+        testId="factories-nav-board"
+        isCurrent={isBoardPath(pathname)}
+      />
       <RailNavLink
         to={velocityHref}
         label="Velocity"
-        Icon={Gauge}
+        Icon={ChartLine}
         testId="factories-nav-velocity"
-        isCurrent={velocityCurrent}
+        isCurrent={isVelocityPath(pathname)}
       />
-      <PermissionTooltip
-        allowed={canOpenSettings || permissionsLoading}
-        message="You don't have permission to open workspace settings."
-      >
-        <Link
-          to={canOpenSettings ? settingsHref : "#"}
-          onClick={(event) => {
-            if (!canOpenSettings) {
-              event.preventDefault();
-            }
-          }}
-          aria-label="Workspace settings"
-          title="Workspace settings"
-          aria-current={settingsCurrent ? "page" : undefined}
-          data-testid="factories-workspace-settings-link"
-          className={cn(railLinkClassName(settingsCurrent), !canOpenSettings && "pointer-events-none opacity-60")}
-        >
-          <Settings className="size-3.5" aria-hidden />
-        </Link>
-      </PermissionTooltip>
     </nav>
   );
 }

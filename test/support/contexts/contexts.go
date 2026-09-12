@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -256,6 +257,7 @@ func (s *SubscriptionContext) SendMessage(message any) error {
 
 type ExecutionStateContext struct {
 	Finished       bool
+	Cancelling     bool
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
@@ -267,6 +269,10 @@ type ExecutionStateContext struct {
 
 func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
+}
+
+func (c *ExecutionStateContext) IsCancelling() bool {
+	return c.Cancelling
 }
 
 func (c *ExecutionStateContext) Pass() error {
@@ -420,9 +426,16 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 type HTTPContext struct {
 	Requests  []*http.Request
 	Responses []*http.Response
+
+	// mu guards Requests and Responses so components that issue concurrent
+	// requests (e.g. metric fan-out) can safely share a single mock context.
+	mu sync.Mutex
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Requests = append(c.Requests, request)
 
 	if len(c.Responses) == 0 {
@@ -489,6 +502,8 @@ type HostedLLMContext struct {
 	CreditErr     error
 	ResolveErr    error
 	SelectableErr error
+	Default       core.DefaultHostedLLMModel
+	DefaultErr    error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -504,6 +519,13 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
 	return c.SelectableErr
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	if c.DefaultErr != nil {
+		return core.DefaultHostedLLMModel{}, c.DefaultErr
+	}
+	return c.Default, nil
 }
 
 type ExpressionContext struct {

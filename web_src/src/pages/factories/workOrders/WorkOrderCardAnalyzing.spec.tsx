@@ -64,4 +64,10 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
   });
+
+  it("uses the same gray-blue hover fill as the factory run list", () => {
+    renderCard({});
+
+    expect(screen.getByTestId("work-order-card-wo-1").className).toContain("hover:bg-slate-100");
+  });
 });

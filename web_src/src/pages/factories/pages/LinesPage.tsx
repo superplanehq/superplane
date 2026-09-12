@@ -1,4 +1,10 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
+  FactoriesWorkOrder,
+} from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import {
@@ -7,10 +13,12 @@ import {
   useFactoryWorkOrders,
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
-import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -18,20 +26,44 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CREATE_WITH_AGENT,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Clock, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
+import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
+import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
+import {
+  isWorkspaceNextStepDeferred,
+  runWorkspaceNextStepAction,
+  shouldForgetDeferredWorkspaceNextStep,
+  isWorkspaceNextStepsQueryReady,
+  workspaceNextStepBanner,
+  workspaceNextSteps,
+  workspaceNextStepsProgressCopy,
+} from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
+import { LineBoardViewMenu } from "./LineBoardViewMenu";
+import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
+import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
+import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
+import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
 import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
+import { workspacePlanningRepository } from "./planningSessionView";
+import { useCreateWithAgentSession } from "./useCreateWithAgentSession";
+import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -84,12 +116,13 @@ import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-spl
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
-  editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppRunPath,
   factoryHomePath,
   factoryIntakePath,
   factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
+  columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
@@ -99,6 +132,7 @@ import {
   isPRFeedbackSearchOpen,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
+  prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -106,11 +140,18 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import {
+  applyColumnAutomationsOverlay,
+  buildColumnAutomations,
+  columnAutomationOpenPath,
+  type ColumnAutomation,
+  type ColumnKey,
+} from "../lib/columnAutomations";
+import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { PlanningReviewPopup } from "./PlanningReviewPopup";
-import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
+import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
   ADD_INTAKE_TEMPLATES,
   apiIntakeSource,
@@ -120,17 +161,20 @@ import {
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
+import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  apiPRFeedbackSource,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
+  type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
+import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
@@ -166,15 +210,32 @@ function applyVisibleWorkOrders(
   });
 }
 
+function prFeedbackSetupHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  sourceId: PRFeedbackSourceId,
+): string | undefined {
+  if (!lineId) {
+    return undefined;
+  }
+  return factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(sourceId));
+}
+
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
+  const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
+  const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
+  const { view: columnAutomationView, setView: setColumnAutomationView } = useColumnAutomationViewPreference();
+  const showAutomationRows = canChooseAutomationView && columnAutomationView === "names";
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
+  const automationViewCanvasId = columnAutomationViewCanvasIdFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
@@ -182,20 +243,41 @@ export function LinesPage() {
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
-  const { data: prFeedbackHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
-  const canAddSentryIntake = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_SENTRY_INTAKE);
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const canCreateWithAgent = hasExperimentalFeature(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
+  const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
   const addIntakeTemplates = useMemo(() => {
-    const allowedIds = new Set(canAddSentryIntake ? ["github-issues", "sentry-exceptions"] : ["github-issues"]);
+    const allowedIds = new Set(["github-issues"]);
+    if (canAddSentryIntake) {
+      allowedIds.add("sentry-exceptions");
+    }
+    if (canAddProductiveIntake) {
+      allowedIds.add("productive-tasks");
+    }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddSentryIntake]);
+  }, [canAddSentryIntake, canAddProductiveIntake]);
+  // The menu entry only pays off once a source beyond the default GitHub issues is available.
+  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
+  const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
+  const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const catalogParameters = appRepository ? { repository: appRepository } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+  });
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+  });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const {
@@ -206,6 +288,10 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
 
+  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
+    organizationId,
+    factoryKey,
+  );
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -256,16 +342,33 @@ export function LinesPage() {
 
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
 
-  const intakePanel: BacklogIntakePanel = {
-    sources: configuredIntakes,
-    showAddIntake: showAddIntakeControl,
-    onOpenSettings: (intake) =>
-      navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
-    onAddIntake: () => setAddIntakeOpen(true),
-  };
+  const intakePanel: BacklogIntakePanel | undefined = showColumnAutomations
+    ? undefined
+    : {
+        sources: configuredIntakes,
+        showAddIntake: showAddIntakeControl,
+        onOpenSettings: (intake) =>
+          navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
+        onAddIntake: () => setAddIntakeOpen(true),
+      };
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const nextSteps = workspaceNextSteps({
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    takenPRFeedbackSources,
+    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+  });
+  const nextStepBanner = workspaceNextStepBanner(nextSteps);
+  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
+  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
+
+  useEffect(() => {
+    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
+      nextStepDeferral.forget();
+    }
+  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
@@ -288,25 +391,23 @@ export function LinesPage() {
   });
 
   const createPRFeedbackFromSource = (source: PRFeedbackSource) => {
-    if (takenPRFeedbackSources.includes(source.id)) {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
+      return;
+    }
+    const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, source.id);
+    if (!href) {
       return;
     }
     setAddPRFeedbackOpen(false);
-    createPRFeedbackHandler
-      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
-      .then((handler) => {
-        if (!handler.id) {
-          return;
-        }
-        navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id));
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-      });
+    navigate(href);
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (template.id === "productive-tasks") {
+      setProductiveIntakeSetupOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -356,18 +457,9 @@ export function LinesPage() {
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           intake={settingsIntake}
+          repository={factory?.onboarding?.backlogRepository}
+          vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onOpenRun={(run) => {
-            if (!run.appId || !run.runId) {
-              return;
-            }
-            navigate(
-              factoryAppRunPath(organizationId, factoryKey, run.appId, run.runId, {
-                from: "lines",
-                lineId: selectedLine.id,
-              }),
-            );
-          }}
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
@@ -377,26 +469,39 @@ export function LinesPage() {
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
       />
+      <ProductiveIntakeSetupDialog
+        open={productiveIntakeSetupOpen}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        onClose={() => setProductiveIntakeSetupOpen(false)}
+      />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
         onClose={() => setAddPRFeedbackOpen(false)}
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
       />
+      {automationViewCanvasId ? (
+        <ColumnAutomationViewHost
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          lineId={selectedLine.id}
+          canvasId={automationViewCanvasId}
+          title={factoryApps.find((app) => app.id === automationViewCanvasId)?.name?.trim() || "Automation"}
+          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+        />
+      ) : null}
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          githubIntegrationId={githubIntegrationId}
+          repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onCreated={(handlerId) =>
-            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId), {
-              replace: true,
-            })
-          }
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
@@ -405,12 +510,43 @@ export function LinesPage() {
           <LineDetailHeader
             organizationId={organizationId}
             factoryId={factoryId}
-            factoryKey={factoryKey}
             line={selectedLine}
             workOrders={workOrders}
             factory={factory}
             state={listState}
             canUpdate={canUpdate}
+            hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+            nextStepsRestore={
+              nextStepsCollapsed && nextStepBanner ? (
+                <WorkspaceNextStepsHeaderBadge
+                  progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
+                  title={nextStepBanner.badgeLabel}
+                  onOpen={nextStepDeferral.restore}
+                />
+              ) : undefined
+            }
+            hostedCreditEmptyBanner={hostedCreditEmptyBanner}
+            automationView={canChooseAutomationView ? columnAutomationView : undefined}
+            onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
+          />
+          <NextStepsPanel
+            steps={nextSteps}
+            collapsed={nextStepsCollapsed}
+            onContinue={(step) =>
+              runWorkspaceNextStepAction(step.action, {
+                openPRFeedbackSetup: (sourceId) => {
+                  const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
+                  if (href) {
+                    navigate(href);
+                  }
+                },
+              })
+            }
+            onDefer={() => {
+              if (nextStepBanner) {
+                nextStepDeferral.defer(nextStepBanner.activeStep.id);
+              }
+            }}
           />
         </div>
         <div className={factoryWorkOrdersBodyClassName}>
@@ -422,12 +558,21 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+            canCreateWithAgent={canCreateWithAgent}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
-            onAddIntake={canAddSentryIntake ? () => setAddIntakeOpen(true) : undefined}
-            verifyListeners={verifyListeners}
-            onAddPRFeedback={canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined}
+            onAddIntake={
+              showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
+            }
+            verifyListeners={showColumnAutomations ? [] : verifyListeners}
+            onAddPRFeedback={
+              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
+            }
+            factoryIntakes={factoryIntakes}
+            prFeedbackHandlers={prFeedbackHandlers}
+            showColumnAutomations={showColumnAutomations}
+            showAutomationRows={showAutomationRows}
             workOrderCardContext={{
               organizationId,
               factoryId,
@@ -441,6 +586,7 @@ export function LinesPage() {
               waitingOnChecksOrderIds,
               checksPassedOrderIds,
               fixesPausedOrderIds,
+              pullRequests,
               ...cardActions,
             }}
             peekOrder={peekOrder ?? undefined}
@@ -456,28 +602,35 @@ export function LinesPage() {
 function LineDetailHeader({
   organizationId,
   factoryId,
-  factoryKey,
   line,
   workOrders,
   factory,
   state,
   canUpdate,
+  hostedCreditHeaderKicker,
+  nextStepsRestore,
+  hostedCreditEmptyBanner,
+  automationView,
+  onAutomationViewChange,
 }: {
   organizationId: string;
   factoryId: string;
-  factoryKey: string;
   line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
   factory: FactoriesFactory | null;
   state: WorkOrderListState;
   canUpdate: boolean;
+  hostedCreditHeaderKicker?: ReactNode;
+  nextStepsRestore?: ReactNode;
+  hostedCreditEmptyBanner?: ReactNode;
+  automationView?: ColumnAutomationView;
+  onAutomationViewChange?: (view: ColumnAutomationView) => void;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
   const title = humanizeLineName(line.name);
-  const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -506,6 +659,14 @@ function LineDetailHeader({
         />
       }
       leading={
+        nextStepsRestore || hostedCreditHeaderKicker ? (
+          <>
+            {hostedCreditHeaderKicker}
+            {nextStepsRestore}
+          </>
+        ) : undefined
+      }
+      actions={
         <>
           <ScopePills
             value={state.scope}
@@ -514,10 +675,6 @@ function LineDetailHeader({
             testIdPrefix="work-orders-scope"
           />
           <FilterMenu state={state} assigneeOptions={assigneeOptions} />
-        </>
-      }
-      actions={
-        <>
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -526,10 +683,19 @@ function LineDetailHeader({
             onChange={state.setSearch}
             onClose={state.closeSearch}
           />
-          {canUpdate && line.id ? <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" /> : null}
+          {automationView && onAutomationViewChange ? (
+            <LineBoardViewMenu view={automationView} onViewChange={onAutomationViewChange} />
+          ) : null}
         </>
       }
-      belowRow={<FilterChips state={state} assigneeOptions={assigneeOptions} />}
+      belowRow={
+        hostedCreditEmptyBanner || state.filterCount > 0 ? (
+          <>
+            {hostedCreditEmptyBanner}
+            {state.filterCount > 0 ? <FilterChips state={state} assigneeOptions={assigneeOptions} /> : null}
+          </>
+        ) : undefined
+      }
     />
   );
 }
@@ -542,12 +708,17 @@ function LineDetail({
   apps,
   workOrders,
   canCreateWorkOrder,
+  canCreateWithAgent,
   canUpdate,
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
   verifyListeners,
   onAddPRFeedback,
+  factoryIntakes,
+  prFeedbackHandlers,
+  showColumnAutomations,
+  showAutomationRows,
   workOrderCardContext,
   peekOrder,
   onOpenWorkOrder,
@@ -560,12 +731,17 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
+  canCreateWithAgent: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
-  intakePanel: BacklogIntakePanel;
+  intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
+  factoryIntakes: FactoriesFactoryIntake[];
+  prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
+  showColumnAutomations: boolean;
+  showAutomationRows: boolean;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
@@ -582,6 +758,52 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const { factory } = useFactoriesLayout();
+  const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
+  const navigate = useNavigate();
+  const [overlay, setOverlay] = useState<{
+    disabledIds: string[];
+    removedIds: string[];
+  }>({ disabledIds: [], removedIds: [] });
+
+  const automationsFor = useCallback(
+    (key: ColumnKey, columnTitle: string) => {
+      const base = buildColumnAutomations(key, {
+        columnTitle,
+        columns: board,
+        intakes: factoryIntakes,
+        prFeedbackHandlers,
+        apps,
+        workOrders,
+      });
+      return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
+    },
+    [apps, board, factoryIntakes, overlay, prFeedbackHandlers, workOrders],
+  );
+
+  const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
+    if (action === "settings") {
+      const href = columnAutomationOpenPath(automation, { organizationId, factoryKey, lineId: line.id });
+      if (href) {
+        navigate(href);
+      }
+      return;
+    }
+    if (action === "disable") {
+      setOverlay((current) => ({ ...current, disabledIds: [...current.disabledIds, automation.id] }));
+      return;
+    }
+    if (action === "enable") {
+      setOverlay((current) => ({
+        ...current,
+        disabledIds: current.disabledIds.filter((id) => id !== automation.id),
+      }));
+      return;
+    }
+    if (action === "remove") {
+      setOverlay((current) => ({ ...current, removedIds: [...current.removedIds, automation.id] }));
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -593,7 +815,6 @@ function LineDetail({
           factoryId={factoryId}
           factoryKey={factoryKey}
           line={line}
-          apps={apps}
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
@@ -601,6 +822,7 @@ function LineDetail({
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
+          onCreateWithAgent={canCreateWithAgent ? agentSession.start : undefined}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           verifyListeners={verifyListeners}
@@ -608,6 +830,10 @@ function LineDetail({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
+          showColumnAutomations={showColumnAutomations}
+          showAutomationRows={showAutomationRows}
+          automationsFor={automationsFor}
+          onAutomationRowAction={handleRowAction}
         />
       )}
       {peekOrderId && peekOrder ? (
@@ -624,10 +850,67 @@ function LineDetail({
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
+          isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
+          canRefine={canCreateWithAgent}
           onClose={onClosePeek}
+          onRefine={() => {
+            const id = peekOrder.id?.trim();
+            const title = peekOrder.title?.trim();
+            if (!id || !title) {
+              return;
+            }
+            agentSession.start({
+              id,
+              title,
+              description: peekOrder.description ?? "",
+            });
+          }}
+        />
+      ) : null}
+      {canCreateWithAgent ? (
+        <LineCreateWithAgentDialog
+          factoryKey={factoryKey}
+          factoryId={factoryId}
+          organizationId={organizationId}
+          session={agentSession}
         />
       ) : null}
     </div>
+  );
+}
+
+function LineCreateWithAgentDialog({
+  factoryKey,
+  factoryId,
+  organizationId,
+  session,
+}: {
+  factoryKey: string;
+  factoryId: string;
+  organizationId: string;
+  session: ReturnType<typeof useCreateWithAgentSession>;
+}) {
+  const view = usePlanningSessionLiveRun(organizationId, session.view);
+  return (
+    <CreateWithAgentDialog
+      open={session.open}
+      workspaceName={factoryKey}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      view={view}
+      onComposerChange={session.onComposerChange}
+      onSend={session.onSend}
+      onSubmitSurvey={session.onSubmitSurvey}
+      onDraftTitleChange={session.onDraftTitleChange}
+      onCreateDraft={session.onCreateDraft}
+      onSkipDraft={session.onSkipDraft}
+      onSelectCreated={session.onSelectCreated}
+      onRefineCreated={session.onRefineCreated}
+      onRequestClose={session.onRequestClose}
+      onCancelEnd={session.onCancelEnd}
+      onConfirmEnd={session.onConfirmEnd}
+      onSelectModel={session.onSelectModel}
+    />
   );
 }
 
@@ -644,7 +927,10 @@ function LineBoardSplitRunPopup({
   isDispatching,
   onDispatch,
   analysisRuns,
+  isAnalyzing,
+  canRefine,
   onClose,
+  onRefine,
 }: {
   organizationId: string;
   factoryId: string;
@@ -658,7 +944,10 @@ function LineBoardSplitRunPopup({
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
+  isAnalyzing: boolean;
+  canRefine: boolean;
   onClose: () => void;
+  onRefine: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
@@ -667,6 +956,7 @@ function LineBoardSplitRunPopup({
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
   const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
+  const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -684,16 +974,20 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        isAnalyzing,
         stoppedBy: closer.actor,
         closer,
+        resolveUser,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
+      canRefine={canRefine}
       isDispatching={isDispatching}
       onDispatch={
         resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
       }
       onClose={onClose}
+      onRefine={onRefine}
       fixed
     />
   );
@@ -709,7 +1003,6 @@ function canvasAppIdsForLine(
     intake: backlog?.id,
     sentry: appIdNamed(apps, "Sentry"),
     slack: appIdNamed(apps, "Slack"),
-    planning: undefined,
     implementation: undefined,
     risk: undefined,
     closure: closure?.id,
@@ -724,7 +1017,7 @@ function canvasAppIdsForLine(
       id: appId,
       name: app?.name,
     });
-    if (key === "planning" || key === "implementation" || key === "risk" || key === "closure") {
+    if (key === "implementation" || key === "risk" || key === "closure") {
       ids[key] = appId;
     }
   }
@@ -807,7 +1100,6 @@ function PhaseBoard({
   factoryId,
   factoryKey,
   line,
-  apps,
   backlogOrders,
   verifyOrders,
   doneOrders,
@@ -815,6 +1107,7 @@ function PhaseBoard({
   canCreateWorkOrder,
   canRename,
   onCreateWorkOrder,
+  onCreateWithAgent,
   intakePanel,
   onAddIntake,
   verifyListeners,
@@ -822,12 +1115,15 @@ function PhaseBoard({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  showColumnAutomations,
+  showAutomationRows,
+  automationsFor,
+  onAutomationRowAction,
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string }>;
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
@@ -835,13 +1131,18 @@ function PhaseBoard({
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onCreateWorkOrder: () => void;
-  intakePanel: BacklogIntakePanel;
+  onCreateWithAgent?: () => void;
+  intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
+  showColumnAutomations: boolean;
+  showAutomationRows: boolean;
+  automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
+  onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
@@ -853,14 +1154,6 @@ function PhaseBoard({
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
-  const backlogAutomationApp = findBacklogAutomationApp(apps);
-  const backlogAutomationHref =
-    backlogAutomationApp && lineId
-      ? factoryAppConfigurePath(organizationId, factoryKey, backlogAutomationApp.id, {
-          from: "lines",
-          lineId,
-        })
-      : undefined;
 
   // The line query is the source of truth for persisted colors. Resync when
   // it changes, but skip while a color save is in flight so a stale refetch
@@ -911,6 +1204,22 @@ function PhaseBoard({
     setColumnTitles((current) => ({ ...current, [columnKey]: title }));
   }, []);
 
+  const backlogTitle = columnTitles.backlog ?? "Backlog";
+  const verifyTitle = columnTitles.verify ?? "Verify";
+  const doneTitle = columnTitles.done ?? "Done";
+  const phaseTitle = (column: LinePhaseColumn) => columnTitles[`phase-${column.stepIndex}`] ?? column.stepName;
+  const backlogAutomations = showColumnAutomations ? automationsFor("backlog", backlogTitle) : undefined;
+  const phaseAutomations = columns.map((column) =>
+    showColumnAutomations ? automationsFor(`phase-${column.stepIndex}`, phaseTitle(column)) : undefined,
+  );
+  const verifyAutomations = showColumnAutomations ? automationsFor("verify", verifyTitle) : undefined;
+  const doneAutomations = showColumnAutomations ? automationsFor("done", doneTitle) : undefined;
+  const automationRowCount = showAutomationRows
+    ? columnAutomationHeaderRowCount(
+        [backlogAutomations, ...phaseAutomations, verifyAutomations, doneAutomations].map((list) => list ?? []),
+      )
+    : undefined;
+
   const saveParallelism = useCallback(
     async (stepIndex: number, value: number) => {
       setParallelismByStep((current) => ({ ...current, [stepIndex]: value }));
@@ -942,7 +1251,7 @@ function PhaseBoard({
           factoryId={factoryId}
           factoryKey={factoryKey}
           orders={backlogOrders}
-          title={columnTitles.backlog ?? "Backlog"}
+          title={backlogTitle}
           size={backlogSize}
           settingsOpen={backlogSettingsOpen}
           onOpenSettings={() => setBacklogSettingsOpen(true)}
@@ -958,16 +1267,19 @@ function PhaseBoard({
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
           onCreateWorkOrder={onCreateWorkOrder}
+          onCreateWithAgent={onCreateWithAgent}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
-          automationHref={backlogAutomationHref}
+          automations={backlogAutomations}
+          automationRowCount={automationRowCount}
+          onAutomationRowAction={onAutomationRowAction}
         />
       </div>
       {columns.map((column, index) => {
-        const columnKey = `phase-${column.stepIndex}`;
+        const columnKey: ColumnKey = `phase-${column.stepIndex}`;
         return (
           <div
             key={`${column.stepIndex}-${column.stepName}`}
@@ -981,7 +1293,7 @@ function PhaseBoard({
               factoryKey={factoryKey}
               lineId={lineId}
               column={column}
-              title={columnTitles[columnKey] ?? column.stepName}
+              title={phaseTitle(column)}
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
@@ -990,6 +1302,9 @@ function PhaseBoard({
               onRename={(title) => setColumnTitle(columnKey, title)}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
+              automations={phaseAutomations[index]}
+              automationRowCount={automationRowCount}
+              onAutomationRowAction={onAutomationRowAction}
             />
           </div>
         );
@@ -998,7 +1313,7 @@ function PhaseBoard({
         <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <VerifyColumn
           orders={verifyOrders}
-          title={columnTitles.verify ?? "Verify"}
+          title={verifyTitle}
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
@@ -1007,19 +1322,25 @@ function PhaseBoard({
           onRename={(title) => setColumnTitle("verify", title)}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
+          automations={verifyAutomations}
+          automationRowCount={automationRowCount}
+          onAutomationRowAction={onAutomationRowAction}
         />
       </div>
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <DoneColumn
           orders={doneOrders}
-          title={columnTitles.done ?? "Done"}
+          title={doneTitle}
           colorId={columnColors.done ?? null}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
+          automations={doneAutomations}
+          automationRowCount={automationRowCount}
+          onAutomationRowAction={onAutomationRowAction}
         />
       </div>
     </WorkOrderKanbanBoard>
@@ -1037,6 +1358,9 @@ function VerifyColumn({
   onRename,
   workOrderCardContext,
   onOpenWorkOrder,
+  automations,
+  automationRowCount,
+  onAutomationRowAction,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1048,6 +1372,9 @@ function VerifyColumn({
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  automations?: ColumnAutomation[];
+  automationRowCount?: number;
+  onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1065,6 +1392,14 @@ function VerifyColumn({
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {automationRowCount ? null : (
+            <ColumnAutomationsHeaderSlot
+              title={title}
+              automations={automations}
+              onRowAction={onAutomationRowAction}
+              testId="lines-verify-automations"
+            />
+          )}
           {onAdd ? (
             <button
               type="button"
@@ -1080,6 +1415,13 @@ function VerifyColumn({
           <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
         </div>
       }
+      subheader={columnAutomationRowsSubheader({
+        title,
+        automations,
+        rowCount: automationRowCount,
+        onRowAction: onAutomationRowAction,
+        testId: "lines-verify-automation-rows",
+      })}
       banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
       testId="lines-verify-column"
     >
@@ -1107,6 +1449,9 @@ function DoneColumn({
   onRename,
   workOrderCardContext,
   onOpenWorkOrder,
+  automations,
+  automationRowCount,
+  onAutomationRowAction,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1116,6 +1461,9 @@ function DoneColumn({
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  automations?: ColumnAutomation[];
+  automationRowCount?: number;
+  onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1132,8 +1480,25 @@ function DoneColumn({
       emptyDescription="No tasks in Done."
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
-        <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          {automationRowCount ? null : (
+            <ColumnAutomationsHeaderSlot
+              title={title}
+              automations={automations}
+              onRowAction={onAutomationRowAction}
+              testId="lines-done-automations"
+            />
+          )}
+          <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
+        </div>
       }
+      subheader={columnAutomationRowsSubheader({
+        title,
+        automations,
+        rowCount: automationRowCount,
+        onRowAction: onAutomationRowAction,
+        testId: "lines-done-automation-rows",
+      })}
       testId="lines-done-column"
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-done-column-scroll">
@@ -1148,31 +1513,6 @@ function DoneColumn({
         ))}
       </ul>
     </WorkOrderBoardLane>
-  );
-}
-
-function ColumnConfigureMenu({ title, href, testId }: { title: string; href: string; testId: string }) {
-  const navigate = useNavigate();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={`${title} menu`}
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          data-testid={testId}
-        >
-          <MoreHorizontal className="size-3.5" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem onClick={() => navigate(href)} data-testid={`${testId}-edit`}>
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-          Edit
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -1201,6 +1541,9 @@ function PhaseColumn({
   onRename,
   workOrderCardContext,
   onOpenWorkOrder,
+  automations,
+  automationRowCount,
+  onAutomationRowAction,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -1215,11 +1558,13 @@ function PhaseColumn({
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  automations?: ColumnAutomation[];
+  automationRowCount?: number;
+  onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
-  const agentEditor = useColumnCanvasAgentEditor(organizationId, column.appId);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -1259,18 +1604,32 @@ function PhaseColumn({
         onRename={onRename}
         titleTestId={`lines-column-title-phase-${column.stepIndex}`}
         testId={`lines-phase-column-${column.stepIndex}`}
+        subheader={columnAutomationRowsSubheader({
+          title,
+          automations,
+          rowCount: automationRowCount,
+          onRowAction: onAutomationRowAction,
+          testId: `lines-phase-${column.stepIndex}-automation-rows`,
+        })}
         actions={
-          <ColumnLaneMenu
-            title={title}
-            testId={`lines-phase-menu-${column.stepIndex}`}
-            editHref={configureHref}
-            editLabel={configureHref ? "Edit Automation" : undefined}
-            onEditAgent={agentEditor.openEditor}
-            onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
-            parallelism={parallelism}
-            colorId={colorId}
-            onColorChange={onColorChange}
-          />
+          <div className="flex shrink-0 items-center gap-0.5">
+            {automationRowCount ? null : (
+              <ColumnAutomationsHeaderSlot
+                title={title}
+                automations={automations}
+                onRowAction={onAutomationRowAction}
+                testId={`lines-phase-${column.stepIndex}-automations`}
+              />
+            )}
+            <ColumnLaneMenu
+              title={title}
+              testId={`lines-phase-menu-${column.stepIndex}`}
+              onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
+              parallelism={parallelism}
+              colorId={colorId}
+              onColorChange={onColorChange}
+            />
+          </div>
         }
       >
         <ul
@@ -1295,17 +1654,6 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
-      {agentEditor.editorOpen ? (
-        <PlanningReviewPopup
-          key={agentEditor.agentNode?.id ?? "agent"}
-          onClose={agentEditor.closeEditor}
-          organizationId={organizationId}
-          automationHref={configureHref ?? undefined}
-          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
-          isLoading={agentEditor.isLoading || !agentEditor.draft}
-          onSave={agentEditor.save}
-        />
-      ) : null}
     </>
   );
 }

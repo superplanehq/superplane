@@ -25,10 +25,75 @@ func Test__FactoryIntake(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, canvas.ID, intake.CanvasID)
 		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, intake.Source)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusPending, intake.InitialImportStatus)
+		assert.Nil(t, intake.InitialImportItemCount)
 
 		found, err := factory.FindIntake(db, intake.ID)
 		require.NoError(t, err)
 		assert.Equal(t, canvas.Name, found.Name())
+	})
+
+	t.Run("records a completed initial import", func(t *testing.T) {
+		for _, itemCount := range []int{0, 3} {
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, support.RandomName("canvas"))
+			intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+			require.NoError(t, err)
+
+			require.NoError(t, intake.CompleteInitialImport(db, itemCount))
+
+			stored, err := factory.FindIntake(db, intake.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryIntakeInitialImportStatusCompleted, stored.InitialImportStatus)
+			require.NotNil(t, stored.InitialImportItemCount)
+			assert.Equal(t, itemCount, *stored.InitialImportItemCount)
+		}
+	})
+
+	t.Run("records failed and skipped initial imports without a count", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, support.RandomName("canvas"))
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		require.NoError(t, intake.FailInitialImport(db))
+		stored, err := factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusFailed, stored.InitialImportStatus)
+		assert.Nil(t, stored.InitialImportItemCount)
+
+		require.NoError(t, intake.SkipInitialImport(db))
+		stored, err = factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusSkipped, stored.InitialImportStatus)
+		assert.Nil(t, stored.InitialImportItemCount)
+	})
+
+	t.Run("every known source round-trips through create and find", func(t *testing.T) {
+		for _, source := range []string{
+			models.FactoryIntakeSourceGitHubIssues,
+			models.FactoryIntakeSourceSentryExceptions,
+			models.FactoryIntakeSourcePagerDutyIncidents,
+			models.FactoryIntakeSourceProductiveTasks,
+		} {
+			assert.True(t, models.ValidFactoryIntakeSource(source))
+
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
+
+			intake, err := factory.CreateIntake(db, canvas.ID, source)
+			require.NoError(t, err)
+			assert.Equal(t, source, intake.Source)
+
+			found, err := factory.FindIntake(db, intake.ID)
+			require.NoError(t, err)
+			assert.Equal(t, source, found.Source)
+		}
+
+		assert.False(t, models.ValidFactoryIntakeSource("linear-issues"))
 	})
 
 	t.Run("source must be one we know how to run", func(t *testing.T) {

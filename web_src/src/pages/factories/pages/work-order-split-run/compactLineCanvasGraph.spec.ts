@@ -14,7 +14,7 @@ type RoutedEdge = Edge & {
 
 function messyIfCanvas(): SplitRunCanvasModel {
   return {
-    key: "planning",
+    key: "implementation",
     title: "Create Implementation Plan",
     nodes: [
       { id: "on-run", name: "On Run", component: "triggerOnRun", position: { x: 12, y: 0 } },

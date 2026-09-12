@@ -59,14 +59,19 @@ describe("resolveFactoryByKey", () => {
 });
 
 describe("factoryRouteNeedsCanonicalRedirect", () => {
-  it("is false for an exact key match", () => {
-    const resolution = resolveFactoryByKey(FACTORIES, "SP", false);
-    expect(factoryRouteNeedsCanonicalRedirect(resolution, "SP")).toBe(false);
+  it("is false for a lowercase key match — the canonical URL form", () => {
+    const resolution = resolveFactoryByKey(FACTORIES, "sp", false);
+    expect(factoryRouteNeedsCanonicalRedirect(resolution, "sp")).toBe(false);
   });
 
-  it("is true for a case mismatch", () => {
-    const resolution = resolveFactoryByKey(FACTORIES, "sp", false);
-    expect(factoryRouteNeedsCanonicalRedirect(resolution, "sp")).toBe(true);
+  it("is true for an uppercase route segment, even though it matches `factory.key` exactly", () => {
+    const resolution = resolveFactoryByKey(FACTORIES, "SP", false);
+    expect(factoryRouteNeedsCanonicalRedirect(resolution, "SP")).toBe(true);
+  });
+
+  it("is true for a mixed-case route segment", () => {
+    const resolution = resolveFactoryByKey(FACTORIES, "Sp", false);
+    expect(factoryRouteNeedsCanonicalRedirect(resolution, "Sp")).toBe(true);
   });
 
   it("is true for a legacy id match", () => {
@@ -81,13 +86,17 @@ describe("factoryRouteNeedsCanonicalRedirect", () => {
 });
 
 describe("replaceFactoryKeySegment", () => {
-  it("swaps the factory key segment and keeps the rest of the path", () => {
+  it("swaps the factory key segment and keeps the rest of the path, lowercased", () => {
     expect(
       replaceFactoryKeySegment("/org-1/workspaces/factory-2/work-orders/order-1", "org-1", "factory-2", "RF"),
-    ).toBe("/org-1/workspaces/RF/work-orders/order-1");
+    ).toBe("/org-1/workspaces/rf/work-orders/order-1");
   });
 
   it("keeps the workspace root when there is no trailing path", () => {
-    expect(replaceFactoryKeySegment("/org-1/workspaces/sp", "org-1", "sp", "SP")).toBe("/org-1/workspaces/SP");
+    expect(replaceFactoryKeySegment("/org-1/workspaces/SP", "org-1", "SP", "SP")).toBe("/org-1/workspaces/sp");
+  });
+
+  it("lowercases the canonical key even when the route segment did not match the prefix", () => {
+    expect(replaceFactoryKeySegment("/org-1/other", "org-1", "SP", "SP")).toBe("/org-1/workspaces/sp");
   });
 });

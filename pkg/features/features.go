@@ -28,6 +28,11 @@ const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 // in the Backlog column menu until the flow is generally available.
 const FeatureFactorySentryIntake = "factory_sentry_intake"
 
+// FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
+// Productive.io in the Backlog column menu until the flow is generally
+// available.
+const FeatureFactoryProductiveIntake = "factory_productive_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -35,6 +40,10 @@ const FeatureWorkspaceModels = "workspace_models"
 // FeatureFactoryDraftStartModel gates the model selector next to Start on
 // a draft task until the flow is generally available.
 const FeatureFactoryDraftStartModel = "factory_draft_start_model"
+
+// FeatureFactoryCreateWithAgent gates agent-assisted task creation and
+// refinement until the flow is generally available.
+const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
 
 func released() *bool {
 	v := true
@@ -46,8 +55,10 @@ var registry = []Feature{
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
+	{ID: FeatureFactoryCreateWithAgent, Label: "Create with an Agent", Description: "Create and refine factory tasks with an agent"},
 }
 
 func All() []Feature {

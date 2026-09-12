@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/e2e/queries"
 )
 
@@ -56,6 +57,7 @@ func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeo
 func (s *TestSession) Start() {
 	s.resetDatabase()
 	s.setupUserAndOrganization()
+	middleware.MarkOwnerSetupCompleted()
 }
 
 // StartWithoutUser resets the database but does not seed any user or
@@ -136,7 +138,7 @@ func (s *TestSession) resetDatabase() {
             SELECT tablename
             FROM pg_tables
             WHERE schemaname = 'public'
-              AND tablename NOT IN ('schema_migrations')
+              AND tablename NOT IN ('schema_migrations', 'usage_price_books', 'usage_price_book_rates')
         ) LOOP
             EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP;
@@ -401,6 +403,21 @@ func (s *TestSession) WaitUntilURLDoesNotContain(part string) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	s.t.Fatalf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL())
+}
+
+// WaitUntilURLContains polls until the current URL contains part. Use this
+// for redirects that a single-page app resolves after several async requests
+// (for example, the post-login redirect into an organization), where a fixed
+// sleep is not enough.
+func (s *TestSession) WaitUntilURLContains(part string) {
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for URL to contain %q, last URL was %q", part, s.page.URL())
 }
 
 func (s *TestSession) AssertURLContains(part string) {

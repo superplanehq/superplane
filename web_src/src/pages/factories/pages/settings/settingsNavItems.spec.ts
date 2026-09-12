@@ -4,6 +4,7 @@ import {
   FACTORY_SETTINGS_NAV_GROUPS,
   factorySettingsRouteFromPathname,
   filterFactorySettingsNavGroups,
+  filterFactorySettingsNavGroupsByPermission,
 } from "./settingsNavItems";
 
 describe("factorySettingsRouteFromPathname", () => {
@@ -12,11 +13,11 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/notifications")?.id).toBe(
       "account-notifications",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")?.id).toBe(
-      "workspace-automations",
-    );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
+    );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
+      "organization-models",
     );
   });
 
@@ -25,6 +26,10 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/overview")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/linked-accounts")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/security")).toBeUndefined();
+  });
+
+  it("no longer resolves the removed workspace Automations settings page", () => {
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")).toBeUndefined();
   });
 });
 
@@ -36,13 +41,15 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
-      "Automations",
       "Models",
+      "Usage",
       "General",
       "Members",
       "Integrations",
+      "LLM Models",
       "API keys",
       "Secrets",
+      "Billing",
       "Spending",
     ]);
   });
@@ -72,14 +79,14 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
-      "workspace-automations",
       "workspace-models",
+      "workspace-usage",
     ]);
   });
 
   it("matches keyword aliases such as billing", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "billing");
-    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-spending"]);
+    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-billing"]);
   });
 
   it("drops groups that have no matching items", () => {
@@ -101,5 +108,30 @@ describe("filterFactorySettingsNavGroups", () => {
   it("matches in-page phrases when query words appear in any order", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "key workspace");
     expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toContain("workspace-general");
+  });
+});
+
+describe("filterFactorySettingsNavGroupsByPermission", () => {
+  it("keeps every item while permissions are loading", () => {
+    const filtered = filterFactorySettingsNavGroupsByPermission(FACTORY_SETTINGS_NAV_GROUPS, () => false, true);
+    expect(filtered).toEqual(FACTORY_SETTINGS_NAV_GROUPS);
+  });
+
+  it("shows only Usage in the workspace group without factories.update", () => {
+    const filtered = filterFactorySettingsNavGroupsByPermission(
+      FACTORY_SETTINGS_NAV_GROUPS,
+      (resource, action) => resource === "org" && action === "read",
+      false,
+    );
+    expect(filtered.map((group) => group.id)).toEqual(["account", "workspace", "organization"]);
+    expect(filtered.find((group) => group.id === "workspace")?.items.map((item) => item.id)).toEqual([
+      "workspace-usage",
+    ]);
+    expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
+      "organization-general",
+      "organization-models",
+      "organization-billing",
+      "organization-spending",
+    ]);
   });
 });

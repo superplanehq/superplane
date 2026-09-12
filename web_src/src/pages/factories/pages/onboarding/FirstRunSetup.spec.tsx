@@ -42,21 +42,23 @@ vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
   useRecheckGitHubInstallRequest: vi.fn(),
 }));
 
+const bindMutate = vi.fn();
+
 vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+  useBindGitHubInstallation: () => ({
+    mutateAsync: (variables: unknown) =>
+      new Promise<void>((resolve, reject) => {
+        bindMutate(variables, { onSuccess: resolve, onError: reject });
+      }),
+  }),
 }));
 
-const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
 const navigateSpy = vi.fn();
-
-vi.mock("@/hooks/useFactoryData", () => ({
-  useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
-}));
 
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
-  useAccountOrganizations: () => ({ data: accountOrganizations }),
+  useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
 }));
 
 vi.mock("react-router", async () => {
@@ -81,13 +83,16 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
+    refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
+    githubConnectionsLoading: false,
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
     createVcsConnection: vi.fn(),
-    selectVcsConnection: vi.fn(),
+    selectVcsConnection: vi.fn().mockResolvedValue(true),
     githubConnections: { name: "github", allInstances: [], readyInstances: [] },
     selectedVcsConnectionId: "github-1",
     requestConfigure: vi.fn(),
@@ -101,12 +106,14 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
+    provisionedDestination: null,
+    githubOwner: undefined,
     ...overrides,
   };
 }
 
 function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
-  render(
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
@@ -115,25 +122,50 @@ function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/s
 
 describe("FirstRunSetup", () => {
   beforeEach(() => {
-    factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
+    factory = { id: "factory-1", key: "PAY", name: "New workspace", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
-    deleteFactoryMutateAsync.mockClear();
     navigateSpy.mockClear();
+    bindMutate.mockReset();
   });
 
-  it("finishes setup from the ticket screen when hosted credentials cover the agent", async () => {
-    const user = userEvent.setup();
-    const model = pageModel({ hostedAgentReady: true });
+  it.each([
+    {
+      scenario: "a new user, organization, and workspace",
+      currentFactory: { onboarding: { initial: true, vcsIntegrationId: "github-1" } },
+      otherFactories: [],
+      otherOrganizations: [],
+    },
+    {
+      scenario: "an existing user and organization with a new workspace",
+      currentFactory: { onboarding: { vcsIntegrationId: "github-1" } },
+      otherFactories: [{ id: "factory-2", key: "CORE", name: "Core" }],
+      otherOrganizations: [],
+    },
+    {
+      scenario: "an existing user with a new organization and workspace",
+      currentFactory: { onboarding: { vcsIntegrationId: "github-1" } },
+      otherFactories: [],
+      otherOrganizations: [{ id: "org-2", name: "Existing organization" }],
+    },
+  ])(
+    "finishes setup without the agent screen for $scenario",
+    async ({ currentFactory, otherFactories, otherOrganizations }) => {
+      factory = { id: "factory-1", key: "PAY", name: "New workspace", ...currentFactory };
+      factories = [factory, ...otherFactories];
+      accountOrganizations = [{ id: "org-1", name: "Acme" }, ...otherOrganizations];
+      const user = userEvent.setup();
+      const model = pageModel({ hostedAgentReady: true });
 
-    renderSetup(model);
+      renderSetup(model);
 
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+      await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
-  });
+      expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+    },
+  );
 
   // Regression: the click that sets the issues choice and the call that
   // provisions the workspace happen in the same handler. `finish` used to
@@ -155,28 +187,26 @@ describe("FirstRunSetup", () => {
     expect(model.finish).toHaveBeenCalledWith("vcs");
   });
 
-  it("shows the GitHub account picker on the connect screen", () => {
+  it("asks to connect GitHub when the workspace has not saved a connection", () => {
+    factory = { id: "factory-1", onboarding: {} };
+
     renderSetup(
       pageModel({
         openSection: "vcs",
+        setup: { ...setupState(), vcsReady: true },
+        selectedVcsConnectionId: "github-1",
         githubConnections: {
           name: "github",
-          readyInstances: [],
+          readyInstances: [
+            {
+              metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+              status: { state: "ready", metadata: { owner: "acme" } },
+            },
+          ],
           allInstances: [
             {
-              metadata: { id: "int-1", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "user-1",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [
-                    { id: "11", accountLogin: "acme" },
-                    { id: "22", accountLogin: "octo" },
-                  ],
-                },
-              },
+              metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+              status: { state: "ready", metadata: { owner: "acme" } },
             },
           ],
         },
@@ -184,71 +214,233 @@ describe("FirstRunSetup", () => {
       "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
 
-  it("does not show another member's GitHub account picker", () => {
+  // A connection bound before picker data was kept has nothing to pick from,
+  // so the screen offers a new connect instead of a dead connected state.
+  it("asks to connect GitHub again when the saved connection kept no picker data", () => {
     renderSetup(
       pageModel({
         openSection: "vcs",
-        githubConnections: {
-          name: "github",
-          readyInstances: [],
-          allInstances: [
-            {
-              metadata: { id: "int-1", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "some-other-user",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [
-                    { id: "11", accountLogin: "acme" },
-                    { id: "22", accountLogin: "octo" },
-                  ],
-                },
-              },
-            },
-          ],
-        },
+        setup: { ...setupState(), vcsReady: true },
+        selectedVcsConnectionId: "github-1",
       }),
       "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
+
+  // A resumed pending organization or workspace opens without a step in the
+  // URL. Setup then always starts on the welcome screen, even when earlier
+  // answers exist.
+  it("starts on the welcome screen when the URL carries no step", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup: { ...setupState(), vcsReady: true },
+        selectedVcsConnectionId: "github-1",
+      }),
+      "/org-1/workspaces/PAY/setup",
+    );
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
+  /** The workspace's bound connection, with the picker data a bind keeps. */
+  function boundConnectionModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
+    const boundInstance = {
+      metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+      status: {
+        state: "ready",
+        metadata: {
+          owner: "acme",
+          startedByUserID: "user-1",
+          startedByGitHubLogin: "forestileao",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [
+            { id: "11", accountLogin: "acme" },
+            { id: "22", accountLogin: "octo" },
+          ],
+        },
+      },
+    };
+    return pageModel({
+      openSection: "vcs",
+      setup: { ...setupState(), vcsReady: true },
+      selectedVcsConnectionId: "github-1",
+      selectVcsConnection,
+      githubConnections: {
+        name: "github",
+        readyInstances: [boundInstance],
+        allInstances: [boundInstance],
+      },
+    });
+  }
+
+  it("reopens the account picker for the workspace's bound connection", () => {
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
+
+  // Get started always opens the Connect GitHub page, even when picker data
+  // exists. The user picks the GitHub account on every forward pass, because
+  // many people stay signed in to two GitHub accounts.
+  it("opens the Connect GitHub page from Get started even when picker data exists", async () => {
+    const user = userEvent.setup();
+
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup");
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-get-started"));
+
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
-  it("opens Connect when GitHub returned an install request without a step", () => {
-    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
+  // Back walks the exact pages in reverse order: account picker, Connect
+  // GitHub page, welcome.
+  it("walks back from the picker to the Connect GitHub page and then to welcome", async () => {
+    const user = userEvent.setup();
 
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+  });
+
+  it("reopens the account picker when the user goes back from the repository screen", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+  });
+
+  it("moves the bound connection to another account through the picker", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+
+    expect(bindMutate).toHaveBeenCalledWith(
+      { state: "csrf", installationId: "22" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("github-1"));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+  });
+
+  function bindablePageModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
+    const pendingInstance = {
+      metadata: { id: "int-new", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+        },
+      },
+    };
+    // The static test model shows the post-bind refetch already applied: the
+    // bound connection reports ready.
+    const readyInstance = {
+      metadata: { id: "int-new", name: "github-acme", integrationName: "github" },
+      status: { state: "ready", metadata: { owner: "acme" } },
+    };
+    return pageModel({
+      openSection: "vcs",
+      selectVcsConnection,
+      githubConnections: {
+        name: "github",
+        readyInstances: [readyInstance],
+        allInstances: [pendingInstance],
+      },
+    });
+  }
+
+  it("saves the bound GitHub connection for a workspace of an existing organization", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    factory = { id: "factory-1", onboarding: {} };
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+  });
+
+  it("saves the bound GitHub connection for the initial organization", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    factory = { id: "factory-1", onboarding: { initial: true } };
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+  });
+
+  // Regression: the repository screen opened before the bound connection was
+  // saved, so a fast repository pick stored the repository on the prior
+  // connection. The screen must stay on connect when the save fails.
+  it("keeps the connect screen when the bound connection does not save", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(false);
+    factory = { id: "factory-1", onboarding: {} };
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
     expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
-  });
-
-  it("shows a waiting chip when GitHub returned an install request", () => {
-    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request");
-
-    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.installRequested,
-    );
-    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
-  });
-
-  it("names the GitHub organization from the return query", () => {
-    renderSetup(
-      pageModel({ openSection: "vcs" }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
-    );
-
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
@@ -265,7 +457,7 @@ describe("FirstRunSetup", () => {
     expect(finish).toBeDisabled();
   });
 
-  it("opens the agent screen when the agent needs a connected provider", async () => {
+  it("opens the agent screen when local setup has no hosted agent", async () => {
     const user = userEvent.setup();
     const model = pageModel({ hostedAgentReady: false });
 
@@ -282,76 +474,38 @@ describe("FirstRunSetup", () => {
   // returns to the screen that carries the action, not to a screen with no
   // question left to answer.
   it("resumes on the ticket screen when hosted credentials cover the agent", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
   it("resumes on the agent screen when the agent still needs a connected provider", () => {
-    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 
-  it("shows the close control instead of Log out when another workspace exists", () => {
-    factories = [factory, { id: "factory-2" }];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
-  });
-
-  it("deletes the placeholder workspace and returns to the workspace index on cancel", async () => {
-    factories = [factory, { id: "factory-2" }];
+  it("goes back through every screen to the welcome screen", async () => {
     const user = userEvent.setup();
+    const model = pageModel({
+      setup: (() => {
+        const setup = setupState();
+        setup.selectRepo("acme/payments-service");
+        return setup;
+      })(),
+    });
 
-    renderSetup(pageModel());
+    renderSetup(model);
 
-    await user.click(screen.getByTestId("first-run-cancel"));
-
-    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
-  });
-
-  it("shows the close control when another organization exists, even with no other workspace here", () => {
-    factories = [factory];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co" },
-    ];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
-  });
-
-  it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
-    factories = [factory];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co", slug: "other-co" },
-    ];
-    const user = userEvent.setup();
-
-    renderSetup(pageModel());
-
-    await user.click(screen.getByTestId("first-run-cancel"));
-
-    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/other-co"));
-    expect(navigateSpy).not.toHaveBeenCalledWith("/org-1/workspaces");
-  });
-
-  it("keeps Log out and hides the close control with a single org and single (placeholder) workspace", () => {
-    factories = [factory];
-    accountOrganizations = [{ id: "org-1", name: "Acme" }];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    // The welcome screen is the first screen, so it offers no Back.
+    expect(screen.queryByTestId("first-run-back")).not.toBeInTheDocument();
   });
 });

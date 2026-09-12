@@ -57,3 +57,37 @@ export const Open: Story = {
     defaultOpen: true,
   },
 };
+
+export const Trial: Story = {
+  args: {
+    ...defaultArgs,
+    planLabel: "Trial",
+  },
+};
+
+export const TrialOpen: Story = {
+  name: "Trial (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "Trial",
+    defaultOpen: true,
+  },
+};
+
+export const BusinessOpen: Story = {
+  name: "Business (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "Business",
+    defaultOpen: true,
+  },
+};
+
+export const NoPlanOpen: Story = {
+  name: "No plan (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "No plan",
+    defaultOpen: true,
+  },
+};

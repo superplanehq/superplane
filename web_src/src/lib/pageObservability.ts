@@ -47,6 +47,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
       return { pageKey: "adminSettings", attributes: {} };
     }
 
+    if (second === "price-books") {
+      return { pageKey: "adminPriceBooks", attributes: {} };
+    }
+
     if (second === "runner-tasks") {
       return { pageKey: "adminRunnerTasks", attributes: {} };
     }
@@ -199,6 +203,14 @@ function resolveOrganizationSettingsPageObservability(
 
   if (section === "workspace-usage" || section === "llm-spend" || section === "spending") {
     return { pageKey: "organizationSettingsWorkspaceUsage", attributes: organizationAttributes };
+  }
+
+  if (section === "billing") {
+    return { pageKey: "organizationSettingsBilling", attributes: organizationAttributes };
+  }
+
+  if (section === "usage") {
+    return { pageKey: "organizationSettingsUsage", attributes: organizationAttributes };
   }
 
   if (section === "integrations") {

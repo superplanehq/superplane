@@ -1,11 +1,16 @@
 package contexts
 
 import (
+	"context"
+	"strings"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -46,7 +51,7 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return err
 	}
 
-	payload := workOrderCreatedPayload(order)
+	payload := workOrderCreatedPayload(tx, order)
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
@@ -81,13 +86,40 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 	return nil
 }
 
-func workOrderCreatedPayload(order *models.FactoryWorkOrder) map[string]any {
+func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
+	description := order.Description
+	filePayloads := []any{}
+	markdown, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
+	} else {
+		description = markdown
+		for _, file := range files {
+			filePayloads = append(filePayloads, file.Map())
+		}
+	}
+
 	workOrder := map[string]any{
 		"id":          order.ID.String(),
 		"title":       order.Title,
-		"description": order.Description,
+		"description": description,
 		"number":      order.Number,
 		"state":       order.State,
+		"files":       filePayloads,
+	}
+	if repository, repositoryURL, defaultBranch := workOrderCreatedRepository(tx, order); repository != "" {
+		workOrder["repository"] = repository
+		workOrder["repository_url"] = repositoryURL
+		workOrder["default_branch"] = defaultBranch
 	}
 	if order.OriginURL != nil && *order.OriginURL != "" {
 		origin := map[string]any{"url": *order.OriginURL}
@@ -98,6 +130,30 @@ func workOrderCreatedPayload(order *models.FactoryWorkOrder) map[string]any {
 	}
 
 	return map[string]any{"workOrder": workOrder}
+}
+
+func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
+	repository := strings.TrimSpace(stringValue(order.Repository))
+	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
+	if repository == "" || defaultBranch == "" {
+		factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+		if err == nil {
+			config := factoryModel.OnboardingConfigValue()
+			if repository == "" {
+				repository = strings.TrimSpace(config.AppRepository)
+			}
+			if defaultBranch == "" {
+				defaultBranch = strings.TrimSpace(config.DefaultBranch)
+			}
+		}
+	}
+	if repository == "" {
+		return "", "", ""
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	return repository, githubRepositoryURL(repository), defaultBranch
 }
 
 func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {
