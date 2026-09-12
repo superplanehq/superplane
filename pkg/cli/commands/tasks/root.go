@@ -26,7 +26,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "List tasks in a workspace",
 		Long: `List tasks in a workspace.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used.
 
 --assignees accepts user UUIDs or emails (comma-separated or repeated).
@@ -38,7 +38,7 @@ By default, only open tasks are shown. Pass --state all to see
 draft, open, and closed tasks.
 
 Examples:
-  superplane tasks list --workspace shipping --state open
+  superplane tasks list --workspace super --state open
   superplane tasks list --assignees alice@example.com --result failed
   superplane tasks list --unassigned
   superplane tasks list --state all`,
@@ -68,12 +68,12 @@ Examples:
 		Long: `Show a task's title, assignees, description, comments, and
 timeline of events.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123).
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
 
 Example:
-  superplane tasks describe --workspace shipping --task "$TID"`,
+  superplane tasks describe --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
 	workspaces.BindNameFlag(taskDescribeCmd, &taskDescribeWorkspace)
@@ -96,7 +96,7 @@ Example:
 		Short: "Create a task",
 		Long: `Create a task in draft state.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used. --title is required.
 --description sets the description inline; -f/--file reads it from a
 file (or - for stdin) instead; the two are mutually exclusive.
@@ -138,14 +138,14 @@ Examples:
 		Short: "Dispatch a task to a workspace line",
 		Long: `Dispatch a task to a workspace line, starting its execution.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123). --line is the target workspace line's name.
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823). --line is the target workspace line's name.
 
 A draft task moves to the open state on its first dispatch.
 
 Example:
-  superplane tasks dispatch --task "$TID" --line build`,
+  superplane tasks dispatch --workspace super --task 1823 --line build`,
 		Args: cobra.NoArgs,
 	}
 	workspaces.BindNameFlag(taskDispatchCmd, &taskDispatchWorkspace)
@@ -168,16 +168,16 @@ Example:
 		Short: "Set a task's assignees",
 		Long: `Set a task's assignees.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug
-(e.g. prefix-123).
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
 
 --assignee accepts a user UUID or email and is repeatable; at least one is
 required. This command replaces the entire assignee list with the ones
 given — it does not add to the existing list.
 
 Example:
-  superplane tasks assign --task "$TID" --assignee alice@example.com --assignee bob@example.com`,
+  superplane tasks assign --workspace super --task 1823 --assignee alice@example.com --assignee bob@example.com`,
 		Args: cobra.NoArgs,
 	}
 	workspaces.BindNameFlag(taskAssignCmd, &taskAssignWorkspace)
@@ -211,34 +211,34 @@ Example:
 		Short: "Attach an artifact to a task",
 		Long: `Attach a typed artifact to a task.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
-from "superplane workspace active" is used. --task is the task UUID or slug.
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID.
 --type is one of: markdown, branch, link.
 
 Examples:
-  superplane tasks artifacts list --workspace shipping --task "$TID"
+  superplane tasks artifacts list --workspace super --task 1823
 
   # Uses the active workspace
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type markdown \
     --title "PLAN.md" \
     -f ./PLAN.md
 
   superplane tasks artifacts add \
-    --workspace shipping \
-    --task "$TID" \
+    --workspace super \
+    --task 1823 \
     --type markdown \
     --title "PLAN.md" \
     -f ./PLAN.md
 
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type branch \
     --name feature/login
 
   superplane tasks artifacts add \
-    --task "$TID" \
+    --task 1823 \
     --type link \
     --url https://preview.example.com/pr-42 \
     --title Preview`,
@@ -273,11 +273,11 @@ Examples:
 		Short: "List artifacts on a task",
 		Long: `List artifacts on a task.
 
---workspace is a workspace name or UUID. When omitted, the active workspace
+--workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used.
 
 Example:
-  superplane tasks artifacts list --workspace shipping --task "$TID"`,
+  superplane tasks artifacts list --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
 	workspaces.BindNameFlag(artifactListCmd, &artifactListWorkspace)
@@ -301,8 +301,8 @@ Example:
 }
 
 func bindTaskIDFlag(cmd *cobra.Command, dest *string) {
-	cmd.Flags().StringVar(dest, "task", "", "task UUID or slug (e.g. prefix-123)")
-	cmd.Flags().StringVar(dest, "order", "", "task UUID or slug (e.g. prefix-123)")
+	cmd.Flags().StringVar(dest, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
+	cmd.Flags().StringVar(dest, "order", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
 	_ = cmd.Flags().MarkDeprecated("order", "use --task")
 	_ = cmd.Flags().MarkHidden("order")
 }

@@ -60,7 +60,9 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	artifactListCmd, _, err := root.Find([]string{"artifacts", "list"})
 	require.NoError(t, err)
 	require.NotNil(t, artifactListCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, artifactListCmd.Flags().Lookup("factory"))
 	require.NotNil(t, artifactListCmd.Flags().Lookup("task"))
+	require.NotNil(t, artifactListCmd.Flags().Lookup("order"))
 }
 
 func TestNewCommand_Aliases(t *testing.T) {

@@ -25,4 +25,9 @@ func TestDeprecatedFactoryCommandsRemainRegistered(t *testing.T) {
 	activeCmd, _, err := RootCmd.Find([]string{"factories", "active"})
 	require.NoError(t, err)
 	require.NotNil(t, activeCmd)
+
+	describeWorkspaceCmd, _, err := RootCmd.Find([]string{"factory", "describe"})
+	require.NoError(t, err)
+	require.NotNil(t, describeWorkspaceCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, describeWorkspaceCmd.Flags().Lookup("factory"))
 }

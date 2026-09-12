@@ -201,7 +201,7 @@ func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {
 	assert.Contains(t, runScript, "OPENCODE_DISABLE_MODELS_FETCH")
 	assert.Contains(t, runScript, "OPENROUTER_BASE_URL")
 	assert.NotContains(t, runScript, "/chat/completions")
-	assert.Contains(t, runScript, "Retrying OpenCode")
+	assert.Contains(t, runScript, "Calling OpenCode")
 	assert.Contains(t, runScript, "Stopped after")
 	assert.NotContains(t, runScript, "OpenRouter model rotation:")
 	assert.NotContains(t, runScript, "Switching to")
