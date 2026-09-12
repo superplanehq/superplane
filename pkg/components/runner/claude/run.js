@@ -14,14 +14,12 @@ const { spawn, spawnSync } = require("child_process");
 
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
+const SESSION_FILE = "claude_session";
 
 const SYSTEM_PROMPT =
   "Write all assistant messages as plain terminal text. " +
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
   "Prefer plain paths, shell commands, and simple indentation.";
-
-const PLANNING_SYSTEM_PROMPT =
-  " This is a SuperPlane planning session. Call mcp__superplane__propose_draft only when the user asked for a task in this turn. Call mcp__superplane__survey to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain text.";
 
 function loadAnalysisProtocolModule() {
   const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
@@ -56,7 +54,6 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // MCP tools. Edit/Write are intentionally excluded so the agent cannot make
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
-const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__survey"];
 const ANALYSIS_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
   "mcp__superplane__propose_confidence",
@@ -68,22 +65,16 @@ function envFlag(env, name) {
 }
 
 function planningAnalysisEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
 function planningSystemPrompt(env = process.env) {
-  if (planningAnalysisEnabled(env)) {
-    return ` ${loadAnalysisProtocol()}`;
-  }
-  return PLANNING_SYSTEM_PROMPT;
+  return planningAnalysisEnabled(env) ? ` ${loadAnalysisProtocol()}` : "";
 }
 
 function allowedClaudeTools(env = process.env) {
-  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
+  if (mcpToolsEnabled(env)) {
     return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...ANALYSIS_ALLOWED_TOOLS].join(",");
-  }
-  if (envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
-    return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
   }
   return BASE_ALLOWED_TOOLS;
 }
@@ -93,9 +84,8 @@ function claudePermissionMode(env = process.env) {
     // Planning sessions stay read-only by restricting allowedClaudeTools to
     // Read/Bash plus the planning MCP tools. We intentionally do NOT use
     // "plan" mode here: Claude Code blocks every non-read-only tool call in
-    // plan mode, including our MCP tools, which fails propose_draft/survey with
-    // "Cannot call mcp__superplane__propose_draft while in plan mode." In
-    // headless ("-p") mode "default" treats allowedTools as the allowlist, so
+    // plan mode, including our MCP publishing tools. In headless ("-p") mode,
+    // "default" treats allowedTools as the allowlist, so
     // Edit/Write are still denied (there is no interactive prompt to grant
     // them) while the planning MCP tools remain callable.
     return "default";
@@ -104,7 +94,37 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function readSessionID(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (!fs.existsSync(file)) {
+    return "";
+  }
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function writeSessionID(taskDir, sessionID) {
+  const id = String(sessionID || "").trim();
+  if (id) {
+    fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
+  }
+}
+
+function claudeContinuationArgs(promptCount, sessionID) {
+  if (Number(promptCount) < 1) {
+    return [];
+  }
+  const id = String(sessionID || "").trim();
+  if (!id) {
+    throw new Error("Claude session ID is missing for a follow-up prompt");
+  }
+  return ["--resume", id];
+}
+
+function claudeSessionIDFromEvent(event) {
+  return String((event && event.session_id) || "").trim();
 }
 
 function main() {
@@ -134,6 +154,8 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
   const prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  const sessionID = readSessionID(sp);
+  const planningToolsEnabled = mcpToolsEnabled();
 
   const claudeArgs = [
     "--bare",
@@ -149,7 +171,7 @@ async function runPrompt(promptFile, model) {
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
-  if (mcpToolsEnabled()) {
+  if (planningToolsEnabled) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
     claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt();
@@ -174,9 +196,7 @@ async function runPrompt(promptFile, model) {
   if (model) {
     claudeArgs.push("--model", model);
   }
-  if (promptCount > 0) {
-    claudeArgs.push("--continue");
-  }
+  claudeArgs.push(...claudeContinuationArgs(promptCount, sessionID));
   claudeArgs.push("--", prompt);
 
   let command = "claude";
@@ -186,7 +206,7 @@ async function runPrompt(promptFile, model) {
     args = ["-oL", "-eL", "claude", ...claudeArgs];
   }
 
-  const formatter = createFormatter(promptFile);
+  const formatter = createFormatter(promptFile, (id) => writeSessionID(sp, id));
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -214,6 +234,10 @@ async function runPrompt(promptFile, model) {
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planningToolsEnabled) {
+    const result = JSON.parse(resultJSON);
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(result.result);
+  }
   if (failed) {
     return exitCode !== 0 ? exitCode : 1;
   }
@@ -271,7 +295,7 @@ function promptSeriesName(promptFile) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
-function createFormatter(promptFile) {
+function createFormatter(promptFile, onSession) {
   let streamedText = false;
   let inText = false;
   let textBuf = "";
@@ -299,6 +323,10 @@ function createFormatter(promptFile) {
       }
       if (!event || typeof event !== "object" || Array.isArray(event)) {
         return;
+      }
+      const sessionID = claudeSessionIDFromEvent(event);
+      if (onSession && sessionID) {
+        onSession(sessionID);
       }
 
       switch (event.type) {
@@ -792,4 +820,11 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { allowedClaudeTools, claudePermissionMode, formatStreamJsonLines, planningSystemPrompt };
+module.exports = {
+  allowedClaudeTools,
+  claudeContinuationArgs,
+  claudePermissionMode,
+  claudeSessionIDFromEvent,
+  formatStreamJsonLines,
+  planningSystemPrompt,
+};

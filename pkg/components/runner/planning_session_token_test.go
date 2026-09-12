@@ -72,13 +72,10 @@ func TestRunnerSuperplaneBaseURLUsesPublicURLForRemoteBroker(t *testing.T) {
 	assert.Equal(t, "https://hooks.example", RunnerSuperplaneBaseURL("https://app.example"))
 }
 
-func TestIsAnalysisPlanningSession(t *testing.T) {
+func TestPlanningSessionKindDeterminesAnalysisMode(t *testing.T) {
 	t.Parallel()
 
-	orderID := uuid.New()
-	analysis := &models.FactoryPlanningSession{DraftWorkOrderID: &orderID}
-	assert.True(t, IsAnalysisPlanningSession(analysis, "Backlog"))
-	assert.False(t, IsAnalysisPlanningSession(analysis, models.PlanningCanvasName))
-	assert.False(t, IsAnalysisPlanningSession(&models.FactoryPlanningSession{}, "Backlog"))
-	assert.False(t, IsAnalysisPlanningSession(nil, "Backlog"))
+	analysis := &models.FactoryPlanningSession{Kind: models.PlanningSessionKindWorkOrderAnalysis}
+	assert.True(t, analysis.IsAnalysisSession())
+	assert.False(t, (&models.FactoryPlanningSession{Kind: models.PlanningSessionKindTaskCreation}).IsAnalysisSession())
 }

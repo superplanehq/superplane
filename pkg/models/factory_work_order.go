@@ -371,6 +371,12 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			return err
 		}
 
+		if fromState == FactoryWorkOrderStateDraft {
+			if err := o.endAnalysisSession(tx, update.Actor); err != nil {
+				return err
+			}
+		}
+
 		// A closing order abandons any traversal still waiting in a step's
 		// queue; a queued dispatch has no run to finish it later.
 		if toState == FactoryWorkOrderStateClosed {
@@ -417,6 +423,36 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, err
 	}
 	return true, nil
+}
+
+func (o *FactoryWorkOrder) endAnalysisSession(tx *gorm.DB, actor *uuid.UUID) error {
+	var session FactoryPlanningSession
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND draft_work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID).
+		Where("kind = ?", PlanningSessionKindWorkOrderAnalysis).
+		First(&session).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := session.End(tx); err != nil {
+		return err
+	}
+	if session.CanvasRunID == nil {
+		return nil
+	}
+	run, err := FindUnscopedCanvasRun(tx, *session.CanvasRunID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = run.RequestCancellation(tx, actor)
+	return err
 }
 
 // loadSourceRunRefs resolves the originating canvas run + app for an order

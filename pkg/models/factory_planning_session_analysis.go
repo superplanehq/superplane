@@ -10,9 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-const workOrderCreatedPayloadType = "workOrder.created"
+const (
+	workOrderCreatedPayloadType              = "workOrder.created"
+	WorkOrderCreatedRefinementEnabledDataKey = "taskRefinementEnabled"
+)
 
 const (
 	PlanningSpecArtifactKey   = "spec"
@@ -22,8 +26,17 @@ const (
 	PlanningConfidenceCheckName = "Confidence score"
 	PlanningConfidenceScoreMax  = 5
 
-	analysisContinuationMessageLimit = 20
+	// Rewinds keep a contiguous recent suffix. When history exceeds the hard
+	// limit, retain 80 percent so the next turn has room for new output.
+	analysisRewindMessageCharacterLimit = 24_000
+	analysisRewindRetentionPercent      = 80
+	analysisRewindTruncationMarker      = "\n… middle omitted from this rewind …\n"
 )
+
+type analysisMessageWindow struct {
+	Messages []PlanningSessionMessage
+	Omitted  int
+}
 
 type AttachAnalysisSessionParams struct {
 	CreatedByUserID uuid.UUID
@@ -37,9 +50,19 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 	if params.CanvasID == uuid.Nil || params.CanvasRunID == uuid.Nil || params.WorkOrderID == uuid.Nil {
 		return nil, ErrFactoryPlanningSessionInvalid
 	}
+	order, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
 
 	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
 	if err == nil {
+		if !analysisSessionMatchesWorkOrder(existing, params.WorkOrderID) {
+			return nil, ErrFactoryPlanningSessionInvalid
+		}
 		return existing, nil
 	}
 	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
@@ -48,10 +71,14 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 
 	existing, err = FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
 	if err == nil {
-		if existing.State == PlanningSessionStateEnded {
-			if err := existing.Reopen(tx); err != nil {
-				return nil, err
-			}
+		if err := existing.LockForUpdate(tx); err != nil {
+			return nil, err
+		}
+		if existing.State != PlanningSessionStateEnded && existing.hasActiveAnalysisRun(tx) {
+			return existing, nil
+		}
+		if err := existing.Reopen(tx); err != nil {
+			return nil, err
 		}
 		if err := existing.AttachAgentRun(tx, params.CanvasRunID, existing.SelectableModelKey); err != nil {
 			return nil, err
@@ -62,37 +89,40 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return nil, err
 	}
 
-	order, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
-	if err != nil {
-		return nil, err
-	}
-	if order == nil {
-		return nil, ErrFactoryPlanningSessionInvalid
-	}
-
 	now := time.Now()
 	canvasID := params.CanvasID
 	runID := params.CanvasRunID
+	workOrderID := order.ID
 	session := &FactoryPlanningSession{
-		ID:              uuid.New(),
-		OrganizationID:  f.OrganizationID,
-		FactoryID:       f.ID,
-		CreatedByUserID: params.CreatedByUserID,
-		Repository:      strings.TrimSpace(params.Repository),
-		State:           PlanningSessionStateRunning,
-		CanvasID:        &canvasID,
-		CanvasRunID:     &runID,
-		HeartbeatAt:     now,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:               uuid.New(),
+		OrganizationID:   f.OrganizationID,
+		FactoryID:        f.ID,
+		CreatedByUserID:  params.CreatedByUserID,
+		Repository:       strings.TrimSpace(params.Repository),
+		Kind:             PlanningSessionKindWorkOrderAnalysis,
+		State:            PlanningSessionStateRunning,
+		CanvasID:         &canvasID,
+		CanvasRunID:      &runID,
+		DraftWorkOrderID: &workOrderID,
+		HeartbeatAt:      now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
-	if err := tx.Create(session).Error; err != nil {
-		return nil, err
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(session)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
 	}
 	if err := session.attachRefineDraft(tx, order); err != nil {
 		return nil, err
 	}
 	return session, nil
+}
+
+func analysisSessionMatchesWorkOrder(session *FactoryPlanningSession, workOrderID uuid.UUID) bool {
+	return session.IsAnalysisSession() && session.DraftWorkOrderID != nil && *session.DraftWorkOrderID == workOrderID
 }
 
 func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
@@ -158,75 +188,23 @@ func planningSpecArtifactKey(orderID uuid.UUID) string {
 }
 
 func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body string) error {
+	key := planningSpecArtifactKey(order.ID)
 	data := map[string]any{
 		"name":  PlanningSpecArtifactTitle,
 		"title": PlanningSpecArtifactTitle,
 		"body":  body,
 	}
-	artifacts, err := order.ListArtifacts(tx)
-	if err != nil {
+	if _, err := order.UpdateArtifactData(tx, key, data); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
 		return err
 	}
-	updated := false
-	for i := range artifacts {
-		if !isPlanningSpecArtifact(artifacts[i]) {
-			continue
-		}
-		if err := writePlanningSpecArtifact(tx, order, &artifacts[i], data); err != nil {
-			return err
-		}
-		updated = true
-	}
-	if updated {
-		return nil
-	}
-	_, err = order.CreateArtifact(tx, FactoryWorkOrderArtifactParams{
+	_, err := order.CreateArtifact(tx, FactoryWorkOrderArtifactParams{
 		Type: FactoryWorkOrderArtifactTypeMarkdown,
-		Key:  planningSpecArtifactKey(order.ID),
+		Key:  key,
 		Data: data,
 	})
 	return err
-}
-
-func isPlanningSpecArtifact(artifact FactoryWorkOrderArtifact) bool {
-	var data map[string]any
-	if json.Unmarshal(artifact.Data, &data) != nil {
-		return false
-	}
-	name := extractArtifactString(data, "name")
-	title := extractArtifactString(data, "title")
-	return name == PlanningSpecArtifactTitle || title == PlanningSpecArtifactTitle
-}
-
-func writePlanningSpecArtifact(
-	tx *gorm.DB,
-	order *FactoryWorkOrder,
-	artifact *FactoryWorkOrderArtifact,
-	data map[string]any,
-) error {
-	if artifact.Key != nil && strings.TrimSpace(*artifact.Key) != "" {
-		_, err := order.UpdateArtifactData(tx, *artifact.Key, data)
-		return err
-	}
-	if err := validateArtifactData(artifact.Type, data); err != nil {
-		return err
-	}
-	dataJSON, err := encodeArtifactData(data)
-	if err != nil {
-		return err
-	}
-	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
-		return fmt.Errorf(
-			"%w: artifact data exceeds %d bytes",
-			ErrFactoryWorkOrderArtifactInvalid,
-			MaxFactoryWorkOrderArtifactDataBytes,
-		)
-	}
-	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
-		return err
-	}
-	artifact.Data = dataJSON
-	return nil
 }
 
 func planningConfidenceLevel(score float64) string {
@@ -258,9 +236,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if spec == "" && score == "" && len(messages) == 0 {
 		return "", nil
 	}
-	if len(messages) > analysisContinuationMessageLimit {
-		messages = messages[len(messages)-analysisContinuationMessageLimit:]
-	}
+	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the current specification and the score when the new context changes them.\n")
@@ -278,9 +254,16 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 		}
 		b.WriteString("\n")
 	}
-	if len(messages) > 0 {
-		b.WriteString("\nPrior messages:\n")
-		for _, message := range messages {
+	if len(window.Messages) > 0 {
+		b.WriteString("\nRecent messages retained for this rewind:\n")
+		if window.Omitted > 0 {
+			fmt.Fprintf(
+				&b,
+				"\n%d older messages are not in this rewind. The current specification and confidence above contain the durable task state.\n",
+				window.Omitted,
+			)
+		}
+		for _, message := range window.Messages {
 			role := "User"
 			if message.Role == PlanningSessionMessageRoleAgent {
 				role = "Agent"
@@ -290,6 +273,78 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	}
 	b.WriteString("\nApply the latest user message. Do not rewrite the specification from scratch unless the new context requires it.\n")
 	return b.String(), nil
+}
+
+func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
+	if len(messages) == 0 || hardLimit <= 0 {
+		return analysisMessageWindow{Omitted: len(messages)}
+	}
+	if analysisMessagesContextCharacters(messages) <= hardLimit {
+		return analysisMessageWindow{Messages: messages}
+	}
+
+	target := max(1, hardLimit*analysisRewindRetentionPercent/100)
+	selected := make([]PlanningSessionMessage, 0, len(messages))
+	used := 0
+	for index := len(messages) - 1; index >= 0; index-- {
+		message := messages[index]
+		cost := analysisMessageContextCharacters(message)
+		if used+cost <= target {
+			selected = append(selected, message)
+			used += cost
+			continue
+		}
+		if len(selected) == 0 {
+			message.Text = truncateAnalysisMessageForRewind(message.Text, target-analysisMessageEnvelopeCharacters(message))
+			selected = append(selected, message)
+			index--
+		}
+		reversePlanningMessages(selected)
+		return analysisMessageWindow{Messages: selected, Omitted: index + 1}
+	}
+	reversePlanningMessages(selected)
+	return analysisMessageWindow{Messages: selected}
+}
+
+func analysisMessagesContextCharacters(messages []PlanningSessionMessage) int {
+	total := 0
+	for _, message := range messages {
+		total += analysisMessageContextCharacters(message)
+	}
+	return total
+}
+
+func analysisMessageContextCharacters(message PlanningSessionMessage) int {
+	return analysisMessageEnvelopeCharacters(message) + len([]rune(strings.TrimSpace(message.Text)))
+}
+
+func analysisMessageEnvelopeCharacters(message PlanningSessionMessage) int {
+	role := "User"
+	if message.Role == PlanningSessionMessageRoleAgent {
+		role = "Agent"
+	}
+	return len([]rune(role)) + len(": \n")
+}
+
+func truncateAnalysisMessageForRewind(text string, limit int) string {
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	marker := []rune(analysisRewindTruncationMarker)
+	if limit <= len(marker) {
+		return string(runes[:max(0, limit)])
+	}
+	contentLimit := limit - len(marker)
+	headLength := contentLimit / 2
+	tailLength := contentLimit - headLength
+	return string(runes[:headLength]) + analysisRewindTruncationMarker + string(runes[len(runes)-tailLength:])
+}
+
+func reversePlanningMessages(messages []PlanningSessionMessage) {
+	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
+		messages[left], messages[right] = messages[right], messages[left]
+	}
 }
 
 func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession) (string, string, string, error) {
@@ -319,8 +374,9 @@ func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	key := planningSpecArtifactKey(order.ID)
 	for i := range artifacts {
-		if !isPlanningSpecArtifact(artifacts[i]) {
+		if artifacts[i].Key == nil || *artifacts[i].Key != key {
 			continue
 		}
 		var data map[string]any
@@ -361,15 +417,14 @@ func FindPlanningSessionByDraftWorkOrder(
 	}
 	var session FactoryPlanningSession
 	err := tx.
-		Joins("LEFT JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
 		Where(
-			"factory_planning_sessions.organization_id = ? AND factory_planning_sessions.factory_id = ? AND factory_planning_sessions.draft_work_order_id = ?",
+			"organization_id = ? AND factory_id = ? AND draft_work_order_id = ? AND kind = ?",
 			organizationID,
 			factoryID,
 			workOrderID,
+			PlanningSessionKindWorkOrderAnalysis,
 		).
-		Where("workflows.name IS NULL OR workflows.name <> ?", PlanningCanvasName).
-		Order("factory_planning_sessions.created_at DESC").
+		Order("created_at DESC").
 		First(&session).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrFactoryPlanningSessionNotFound
@@ -387,15 +442,28 @@ func MaybeAttachAnalysisSession(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	if canvas == nil || event == nil || run == nil || canvas.FactoryID == nil {
 		return nil
 	}
-	workOrderID, repository, ok := parseWorkOrderCreatedEvent(event)
-	if !ok {
+	if event.WorkflowID != canvas.ID || run.WorkflowID != canvas.ID || event.NodeID != FactoryAppBacklogTriggerID || run.NodeID != FactoryAppBacklogTriggerID {
+		return nil
+	}
+	if event.RunID != uuid.Nil && event.RunID != run.ID {
+		return nil
+	}
+	version, err := FindCanvasVersionInTransaction(tx, canvas.ID, run.VersionID)
+	if err != nil {
+		return err
+	}
+	if !IsBacklogFactoryApp(version.Nodes, version.Edges) {
+		return nil
+	}
+	created, ok := parseAnalysisWorkOrderCreatedEvent(event)
+	if !ok || !created.RefinementEnabled {
 		return nil
 	}
 	factoryModel, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
 		return err
 	}
-	order, err := factoryModel.FindWorkOrder(tx, workOrderID)
+	order, err := factoryModel.FindWorkOrder(tx, created.WorkOrderID)
 	if err != nil {
 		return err
 	}
@@ -405,6 +473,7 @@ func MaybeAttachAnalysisSession(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	if order.CreatedByID == nil || *order.CreatedByID == uuid.Nil {
 		return nil
 	}
+	repository := created.Repository
 	if repository == "" && order.Repository != nil {
 		repository = strings.TrimSpace(*order.Repository)
 	}
@@ -421,29 +490,40 @@ func MaybeAttachAnalysisSession(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	return err
 }
 
-func parseWorkOrderCreatedEvent(event *CanvasEvent) (uuid.UUID, string, bool) {
+type analysisWorkOrderCreatedPayload struct {
+	WorkOrderID       uuid.UUID
+	Repository        string
+	RefinementEnabled bool
+}
+
+func parseAnalysisWorkOrderCreatedEvent(event *CanvasEvent) (analysisWorkOrderCreatedPayload, bool) {
 	raw, err := json.Marshal(event.Data.Data())
 	if err != nil {
-		return uuid.Nil, "", false
+		return analysisWorkOrderCreatedPayload{}, false
 	}
 	var envelope struct {
 		Type string `json:"type"`
 		Data struct {
-			WorkOrder struct {
+			RefinementEnabled bool `json:"taskRefinementEnabled"`
+			WorkOrder         struct {
 				ID         string `json:"id"`
 				Repository string `json:"repository"`
 			} `json:"workOrder"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return uuid.Nil, "", false
+		return analysisWorkOrderCreatedPayload{}, false
 	}
 	if envelope.Type != workOrderCreatedPayloadType {
-		return uuid.Nil, "", false
+		return analysisWorkOrderCreatedPayload{}, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(envelope.Data.WorkOrder.ID))
 	if err != nil {
-		return uuid.Nil, "", false
+		return analysisWorkOrderCreatedPayload{}, false
 	}
-	return id, strings.TrimSpace(envelope.Data.WorkOrder.Repository), true
+	return analysisWorkOrderCreatedPayload{
+		WorkOrderID:       id,
+		Repository:        strings.TrimSpace(envelope.Data.WorkOrder.Repository),
+		RefinementEnabled: envelope.Data.RefinementEnabled,
+	}, true
 }

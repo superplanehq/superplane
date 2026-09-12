@@ -12,10 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-// Planning sessions run every code runner (Claude, Codex, OpenCode/OpenRouter)
-// in a read-only "explore, then propose a draft" mode. These assets are shared
-// by every runner so the wait loop and the MCP tool contract behave identically
-// regardless of which agent CLI is executing the turn.
+// Analysis sessions run every code runner (Claude, Codex, OpenCode/OpenRouter)
+// in a read-only task-refinement mode. These assets keep the wait loop and MCP
+// contract identical for every supported agent CLI.
 
 //go:embed planning_session_mcp.js
 var planningSessionMCPScript string
@@ -29,8 +28,8 @@ var planningSessionMCPConfig string
 //go:embed follow_up_loop.js
 var followUpLoopScript string
 
-// PlanningSessionMCPScript is the stdio MCP server exposing propose_draft and
-// survey. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
+// PlanningSessionMCPScript is the stdio MCP server exposing task-refinement
+// tools. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
 // SUPERPLANE_TASK_DIR as planning_session_mcp.js.
 func PlanningSessionMCPScript() string { return planningSessionMCPScript }
 
@@ -84,7 +83,7 @@ func PlanningSessionContinuationFile(ctx core.ExecutionContext) *BrokerTaskFile 
 	}
 	db := database.DB(context.Background())
 	session, err := models.FindPlanningSessionByRun(db, ctx.RunID)
-	if err != nil {
+	if err != nil || !session.IsAnalysisSession() {
 		return nil
 	}
 	text, err := models.AnalysisContinuationText(db, session)

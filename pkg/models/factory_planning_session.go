@@ -20,6 +20,9 @@ const (
 	PlanningSessionStateRunning = "running"
 	PlanningSessionStateEnded   = "ended"
 
+	PlanningSessionKindTaskCreation      = "task_creation"
+	PlanningSessionKindWorkOrderAnalysis = "work_order_analysis"
+
 	PlanningSessionMessageRoleUser  = "user"
 	PlanningSessionMessageRoleAgent = "agent"
 
@@ -83,6 +86,7 @@ type FactoryPlanningSession struct {
 	FactoryID          uuid.UUID
 	CreatedByUserID    uuid.UUID
 	Repository         string
+	Kind               string
 	State              string
 	CanvasID           *uuid.UUID
 	CanvasRunID        *uuid.UUID
@@ -178,6 +182,7 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		FactoryID:       f.ID,
 		CreatedByUserID: params.CreatedByUserID,
 		Repository:      repository,
+		Kind:            PlanningSessionKindTaskCreation,
 		State:           PlanningSessionStateRunning,
 		CanvasID:        &canvasID,
 		CanvasRunID:     &run.ID,
@@ -292,13 +297,12 @@ func planningSessionRunInput(factoryModel *Factory, repository, modelKey string,
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Model(&FactoryPlanningSession{}).
-		Joins("INNER JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
 		Where(
-			"factory_planning_sessions.organization_id = ? AND factory_planning_sessions.factory_id = ? AND factory_planning_sessions.state <> ? AND workflows.name = ?",
+			"organization_id = ? AND factory_id = ? AND state <> ? AND kind = ?",
 			organizationID,
 			factoryID,
 			PlanningSessionStateEnded,
-			PlanningCanvasName,
+			PlanningSessionKindTaskCreation,
 		).
 		Count(&count).Error
 	return count, err
@@ -353,10 +357,9 @@ func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]Fac
 	var sessions []FactoryPlanningSession
 	cutoff := now.Add(-PlanningSessionHeartbeatStale)
 	err := tx.
-		Joins("LEFT JOIN workflows ON workflows.id = factory_planning_sessions.canvas_id AND workflows.deleted_at IS NULL").
-		Where("factory_planning_sessions.state <> ? AND factory_planning_sessions.heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
-		Where("workflows.name = ? OR workflows.id IS NULL", PlanningCanvasName).
-		Order("factory_planning_sessions.heartbeat_at ASC").
+		Where("state <> ? AND heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
+		Where("kind = ?", PlanningSessionKindTaskCreation).
+		Order("heartbeat_at ASC").
 		Limit(limit).
 		Find(&sessions).Error
 	return sessions, err
@@ -421,12 +424,12 @@ func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
 	).Updates(s).Error
 }
 
-func (s *FactoryPlanningSession) IsAnalysisSession(tx *gorm.DB) bool {
-	return s.usesAnalysisFollowUp(tx)
+func (s *FactoryPlanningSession) IsAnalysisSession() bool {
+	return s.Kind == PlanningSessionKindWorkOrderAnalysis
 }
 
 func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
-	if !s.IsAnalysisSession(tx) {
+	if !s.IsAnalysisSession() {
 		return false
 	}
 	if s.State == PlanningSessionStateEnded {

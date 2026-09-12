@@ -288,11 +288,6 @@ func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.Upd
 	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)
 }
 
-func (s *FactoryService) StartPlanningSession(ctx context.Context, req *pb.StartPlanningSessionRequest) (*pb.StartPlanningSessionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.StartPlanningSession(ctx, organizationID, req)
-}
-
 func (s *FactoryService) DescribePlanningSession(ctx context.Context, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribePlanningSession(ctx, organizationID, req)
@@ -313,22 +308,7 @@ func (s *FactoryService) SendPlanningSessionMessage(ctx context.Context, req *pb
 	return actions.SendPlanningSessionMessage(ctx, organizationID, req)
 }
 
-func (s *FactoryService) UpdatePlanningSessionDraft(ctx context.Context, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {
+func (s *FactoryService) AnswerPlanningSessionSurvey(ctx context.Context, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdatePlanningSessionDraft(ctx, organizationID, req)
-}
-
-func (s *FactoryService) CreatePlanningSessionWorkOrder(ctx context.Context, req *pb.CreatePlanningSessionWorkOrderRequest) (*pb.CreatePlanningSessionWorkOrderResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreatePlanningSessionWorkOrder(ctx, organizationID, req)
-}
-
-func (s *FactoryService) SkipPlanningSessionDraft(ctx context.Context, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.SkipPlanningSessionDraft(ctx, organizationID, req)
-}
-
-func (s *FactoryService) ReloadPlanningSessionAgent(ctx context.Context, req *pb.ReloadPlanningSessionAgentRequest) (*pb.ReloadPlanningSessionAgentResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ReloadPlanningSessionAgent(ctx, organizationID, req)
+	return actions.AnswerPlanningSessionSurvey(ctx, organizationID, req)
 }

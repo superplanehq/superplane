@@ -1,4 +1,4 @@
-import type { CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
+import type { CreateWithAgentView } from "./createWithAgentTypes";
 import type { SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
 export const PLANNING_SESSION_PHASE_ID = "planning";
@@ -16,7 +16,7 @@ export function planningSessionPhase(
     duration: "",
     componentName: PLANNING_AGENT_NAME,
     artifacts: [],
-    stream: [planningAgentStreamLine(view), ...planningSessionTalkLines(view.messages)],
+    stream: [planningAgentStreamLine(view)],
     canvasSteps: [],
     appId: view.canvasId || undefined,
   };
@@ -35,9 +35,7 @@ function planningSessionPhaseStatus(machineStatus: CreateWithAgentView["machineS
   return "running";
 }
 
-function planningAgentLineStatus(
-  machineStatus: CreateWithAgentView["machineStatus"],
-): SplitRunStreamLine["status"] {
+function planningAgentLineStatus(machineStatus: CreateWithAgentView["machineStatus"]): SplitRunStreamLine["status"] {
   if (machineStatus === "failed") {
     return "failed";
   }
@@ -60,30 +58,4 @@ function planningAgentStreamLine(view: Pick<CreateWithAgentView, "executionId" |
     // live log stream and the full log flickers back as collapsed tool calls.
     status: planningAgentLineStatus(view.machineStatus),
   };
-}
-
-export function planningSessionTalkLines(messages: CreateWithAgentMessage[]): SplitRunStreamLine[] {
-  return messages.flatMap((message) => {
-    if (message.kind !== "text") {
-      return [];
-    }
-    const text = message.text.trim();
-    if (!text) {
-      return [];
-    }
-    return [
-      {
-        id: message.id,
-        nodeId: PLANNING_SESSION_AGENT_LINE_ID,
-        at: "",
-        note: true,
-        componentName: text,
-        componentType: message.role === "user" ? "prompt" : "note",
-        status: "passed" as const,
-        detail: message.role === "user" ? text : undefined,
-        ...(message.role === "user" ? { userTalk: message.origin === "survey" ? "survey" : "message" } : {}),
-        ...(message.createdAtMs === undefined ? {} : { orderKey: message.createdAtMs }),
-      },
-    ];
-  });
 }

@@ -4,7 +4,7 @@
 const fs = require("fs");
 
 /**
- * Stdio MCP server for Create with an Agent.
+ * Stdio MCP server for task refinement.
  * Talks to SuperPlane with SUPERPLANE_BASE_URL + SUPERPLANE_RUN_TOKEN.
  */
 
@@ -45,21 +45,6 @@ async function requestJSON(method, path, body) {
     throw error;
   }
   return parsed;
-}
-
-async function proposeDraft(input) {
-  const title = String((input && input.title) || "").trim();
-  const description = String((input && input.description) || "").trim();
-  if (!title) {
-    throw new Error("title is required");
-  }
-  if (!description) {
-    throw new Error("description is required");
-  }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/drafts", {
-    title,
-    description,
-  });
 }
 
 function surveyQuestions(input) {
@@ -137,6 +122,14 @@ async function proposeConfidence(input) {
   return result;
 }
 
+async function recordAgentMessage(text) {
+  const body = String(text || "").trim();
+  if (!body) {
+    return { status: "ignored" };
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/agent-messages", { text: body });
+}
+
 const TOOLS = [
   {
     name: "propose_spec",
@@ -167,18 +160,6 @@ const TOOLS = [
         },
       },
       required: ["score", "summary"],
-    },
-  },
-  {
-    name: "propose_draft",
-    description: "Show a draft task on the right only when the user asked for a task in this turn. Title and description are required. Description must include the user's request and constraints. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-      },
-      required: ["title", "description"],
     },
   },
   {
@@ -252,9 +233,7 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "propose_draft") {
-        result = await proposeDraft(args);
-      } else if (name === "propose_spec") {
+      if (name === "propose_spec") {
         result = await proposeSpec(args);
       } else if (name === "propose_confidence") {
         result = await proposeConfidence(args);
@@ -386,10 +365,10 @@ if (require.main === module) {
 }
 
 module.exports = {
-  proposeDraft,
   proposeSpec,
   proposeConfidence,
   proposeSurvey,
+  recordAgentMessage,
   surveyQuestions,
   TOOLS,
   writeAnalysisOutputs,

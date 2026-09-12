@@ -21,11 +21,6 @@ const (
 	maxPlanningHoldSeconds = 60
 )
 
-type planningDraftRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-}
-
 type planningSurveyRequest struct {
 	Questions []models.PlanningSessionSurveyQuestion `json:"questions"`
 }
@@ -37,6 +32,10 @@ type planningSpecRequest struct {
 type planningConfidenceRequest struct {
 	Score   float64 `json:"score"`
 	Summary string  `json:"summary"`
+}
+
+type planningAgentMessageRequest struct {
+	Text string `json:"text"`
 }
 
 func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *http.Request) (*runneraction.PlanningSessionScope, bool) {
@@ -65,6 +64,17 @@ func (s *Server) loadPlanningSessionForRunner(r *http.Request, scope *runneracti
 	return session, nil
 }
 
+func (s *Server) loadAnalysisPlanningSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
+	session, err := s.loadPlanningSessionForRunner(r, scope)
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsAnalysisSession() {
+		return nil, models.ErrFactoryPlanningSessionInvalid
+	}
+	return session, nil
+}
+
 func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
@@ -80,7 +90,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		}
-		session, err := s.loadPlanningSessionForRunner(r, scope)
+		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 		if err != nil {
 			writeRunnerPlanningError(w, err)
 			return
@@ -129,31 +139,6 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *Server) handleRunnerPlanningDraft(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
-	if !ok {
-		return
-	}
-	var req planningDraftRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-	session, err := s.loadPlanningSessionForRunner(r, scope)
-	if err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	if err := session.ProposeDraft(database.DB(r.Context()), models.PlanningSessionDraft{
-		Title:       req.Title,
-		Description: req.Description,
-	}); err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
-}
-
 func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
@@ -164,7 +149,7 @@ func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadPlanningSessionForRunner(r, scope)
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, err)
 		return
@@ -186,7 +171,7 @@ func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.R
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadPlanningSessionForRunner(r, scope)
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, err)
 		return
@@ -208,7 +193,7 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadPlanningSessionForRunner(r, scope)
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, err)
 		return
@@ -216,6 +201,28 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 	if err := session.ProposeSurvey(database.DB(r.Context()), models.PlanningSessionSurvey{
 		Questions: req.Questions,
 	}); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningAgentMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.RecordAgentMessage(database.DB(r.Context()), req.Text); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}

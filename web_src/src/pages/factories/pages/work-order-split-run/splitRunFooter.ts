@@ -192,6 +192,25 @@ export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
   text: "Review the summary and the plan. Then click Start to send it to the line.",
 };
 
+export const SPLIT_RUN_CLASSIC_DRAFT_NOTE: SplitRunFooterNote = {
+  headline: "This task is ready to start",
+  text: "Review the details. Change anything you need. Then click Start to send it to the line.",
+};
+
+/** Restore the established draft controls outside live refinement mode. */
+export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
+  if (footer.kind !== "draft") {
+    return footer;
+  }
+  return {
+    ...footer,
+    sentence: "This task is a draft.",
+    note: { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
+    confidenceScore: undefined,
+    actions: [ARCHIVE, START],
+  };
+}
+
 export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
   headline: "SuperPlane is currently analyzing this task",
   text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",

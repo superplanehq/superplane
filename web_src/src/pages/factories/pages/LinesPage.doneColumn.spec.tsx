@@ -74,6 +74,12 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({

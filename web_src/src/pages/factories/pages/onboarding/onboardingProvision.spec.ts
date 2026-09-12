@@ -82,7 +82,7 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs PR closure and Create with an Agent for the workspace", async () => {
+  it("installs PR closure for the workspace", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -99,7 +99,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
         factoryId: "pr-closure",
@@ -130,8 +130,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
-    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "create-with-agent" }));
+    expect(installFactory).not.toHaveBeenCalled();
   });
 
   it("does not install PR closure when it was renamed to PR Closure (2)", async () => {
@@ -151,16 +150,12 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
-    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "create-with-agent" }));
+    expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("installs neither event app when the workspace already has both", async () => {
+  it("does not install PR closure when the workspace already has it", async () => {
     const installFactory = vi.fn();
-    const listApps = vi.fn().mockResolvedValue([
-      { id: "app-1", name: "PR Closure" },
-      { id: "app-2", name: "Create with an Agent" },
-    ]);
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure" }]);
 
     await provisionEventApps({
       factoryId: "factory-1",
@@ -175,7 +170,7 @@ describe("provisionEventApps", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("installs PR closure and Create with an Agent next to an app with an unrelated name", async () => {
+  it("installs PR closure next to an app with an unrelated name", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -192,7 +187,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
   });
 });
 

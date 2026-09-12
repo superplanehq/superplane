@@ -12,14 +12,7 @@ const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
 
-const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
-  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
-  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
-  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
-  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
-  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
-  "edit or write any files.";
+const SESSION_FILE = "codex_session";
 
 function loadAnalysisProtocolModule() {
   const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
@@ -54,32 +47,30 @@ function envFlag(env, name) {
 }
 
 function planningEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
 }
 
 function planningAnalysisEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_ANALYSIS");
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
 function planningSystemPrompt(env = process.env) {
-  if (planningAnalysisEnabled(env)) {
-    return loadAnalysisProtocol();
-  }
-  return PLANNING_SYSTEM_PROMPT;
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
 }
 
-// Codex `exec` has no --ask-for-approval flag; approval_policy is set via a
-// `-c` config override instead. `--sandbox read-only` still allows Bash/Read
-// style exploration (shell commands, file reads) but rejects file writes, so
-// planning sessions stay read-only without disabling tool use entirely.
-function codexExecArgs(env = process.env, model, mcpScriptPath) {
-  const args = ["exec", "--json", "--skip-git-repo-check"];
+// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
+// --sandbox flag. Config overrides keep both new and resumed analysis turns
+// read-only without disabling shell commands and file reads.
+function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
+  const args = ["exec"];
+  if (sessionID) {
+    args.push("resume", sessionID);
+  }
+  args.push("--json", "--skip-git-repo-check");
   if (planningEnabled(env)) {
-    args.push("--sandbox", "read-only", "-c", "approval_policy=\"never\"");
+    args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
     args.push(...mcpConfigOverrides(mcpScriptPath));
-    if (planningAnalysisEnabled(env)) {
-      args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
-    }
+    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
   }
@@ -87,6 +78,36 @@ function codexExecArgs(env = process.env, model, mcpScriptPath) {
     args.push("-m", model);
   }
   return args;
+}
+
+function readSessionID(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (!fs.existsSync(file)) {
+    return "";
+  }
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function writeSessionID(taskDir, sessionID) {
+  const id = String(sessionID || "").trim();
+  if (id) {
+    fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
+  }
+}
+
+function codexSessionForPrompt(promptCount, sessionID) {
+  if (Number(promptCount) < 1) {
+    return "";
+  }
+  const id = String(sessionID || "").trim();
+  if (!id) {
+    throw new Error("Codex session ID is missing for a follow-up prompt");
+  }
+  return id;
+}
+
+function codexSessionIDFromEvent(event) {
+  return String((event && (event.thread_id || (event.thread && event.thread.id))) || "").trim();
 }
 
 function mcpConfigOverrides(mcpScriptPath) {
@@ -137,16 +158,14 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
   let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
   const planning = planningEnabled();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"));
+  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write("sandbox: read-only\n");
-    if (!planningAnalysisEnabled()) {
-      prompt = `${prompt}\n\n${planningSystemPrompt()}`;
-    }
   }
   if (promptCount > 0) {
     process.stdout.write("Continuing Codex session in the current directory\n");
@@ -168,6 +187,10 @@ async function runPrompt(promptFile, model) {
     try {
       const event = JSON.parse(line);
       if (event && typeof event === "object") {
+        const nextSessionID = codexSessionIDFromEvent(event);
+        if (nextSessionID) {
+          writeSessionID(sp, nextSessionID);
+        }
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
         }
@@ -199,7 +222,7 @@ async function runPrompt(promptFile, model) {
   }
   const payload = {
     type: "result",
-    result: lastResult.result || lastResult.text || "",
+    result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: lastResult.model || model,
     usage,
   };
@@ -207,6 +230,9 @@ async function runPrompt(promptFile, model) {
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(payload.result);
+  }
   formatTurnResult({
     is_error: exitCode !== 0,
     num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
@@ -274,6 +300,7 @@ function createCodexFormatter(telemetry) {
   const anonQueue = [];
   let anonSeq = 0;
   let roundOpen = false;
+  let lastText = "";
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -368,7 +395,8 @@ function createCodexFormatter(telemetry) {
           }
           roundOpen = false;
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
-            process.stdout.write(`${text.replace(/\s+$/, "")}\n`);
+            lastText = text.replace(/\s+$/, "");
+            process.stdout.write(`${lastText}\n`);
           }
         }
         return;
@@ -410,6 +438,9 @@ function createCodexFormatter(telemetry) {
         );
         open.delete(id);
       }
+    },
+    lastText() {
+      return lastText;
     },
   };
 }
@@ -535,6 +566,8 @@ module.exports = {
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,
+  codexSessionForPrompt,
+  codexSessionIDFromEvent,
   planningEnabled,
   planningSystemPrompt,
   planningAnalysisEnabled,

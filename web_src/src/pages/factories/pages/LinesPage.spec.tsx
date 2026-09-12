@@ -11,6 +11,7 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
@@ -218,6 +219,12 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("./ProductiveIntakeSetupDialog", () => ({
@@ -355,6 +362,7 @@ describe("LinesPage board", () => {
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const analyzingOrder = { ...REVIEW_CANDIDATE_WORK_ORDERS[0], id: "wo-fresh-analyzing" };
     useFactoryWorkOrders.mockReturnValue({ data: [analyzingOrder] });
     const analyzingOrderId = analyzingOrder.id;

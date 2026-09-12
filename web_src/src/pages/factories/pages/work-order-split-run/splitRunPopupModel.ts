@@ -20,6 +20,10 @@ import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
+/** Classic Description uses a 3/2 reading-to-side split. */
+export const SPLIT_RUN_PANE_GRID_CLASSNAME =
+  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
+
 /** Task popup size. Wider than the default overlay so Summary and Plan have room. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
   "max-h-[min(62rem,calc(100vh-3rem))] h-[min(56rem,calc(100vh-3rem))] w-[min(90rem,calc(100vw-3rem))]";
@@ -214,6 +218,18 @@ export function splitRunLinkedArtifacts(
       }
       return !isOriginTicketArtifact(artifact, source);
     })
+    .sort(compareArtifactsByCreatedAt);
+}
+
+/** Classic mode keeps the analysis document in the artifact list. */
+export function classicSplitRunLinkedArtifacts(
+  artifacts: FactoriesWorkOrderArtifact[],
+  source?: SplitRunSource,
+): FactoriesWorkOrderArtifact[] {
+  return artifacts
+    .filter(
+      (artifact) => !DESCRIPTION_NAMES.includes(artifactName(artifact)) && !isOriginTicketArtifact(artifact, source),
+    )
     .sort(compareArtifactsByCreatedAt);
 }
 

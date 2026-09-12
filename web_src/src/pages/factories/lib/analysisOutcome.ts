@@ -9,9 +9,7 @@ import {
 
 const CONFIDENCE_CHECK_KEY = "confidence";
 
-export function hasAnalysisScore(
-  checks?: Array<{ name?: string; key?: string; score?: number | null }>,
-): boolean {
+export function hasAnalysisScore(checks?: Array<{ name?: string; key?: string; score?: number | null }>): boolean {
   return (checks ?? []).some((check) => {
     const named = check.name === CONFIDENCE_CHECK_NAME || check.key === CONFIDENCE_CHECK_KEY;
     return named && check.score != null;

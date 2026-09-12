@@ -24,6 +24,13 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
+function configuredRefetchInterval(queryClient: QueryClient) {
+  const query = queryClient
+    .getQueryCache()
+    .find({ queryKey: factoryQueryKeys.workOrderChecks("org-1", "factory-1", "wo-1") });
+  return (query?.options as { refetchInterval?: number | false } | undefined)?.refetchInterval;
+}
+
 describe("useWorkOrderChecks", () => {
   beforeEach(() => {
     factoriesListWorkOrderChecks.mockReset();
@@ -38,10 +45,7 @@ describe("useWorkOrderChecks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const query = queryClient
-      .getQueryCache()
-      .find({ queryKey: factoryQueryKeys.workOrderChecks("org-1", "factory-1", "wo-1") });
-    expect(query?.options.refetchInterval).toBeUndefined();
+    expect(configuredRefetchInterval(queryClient)).toBeUndefined();
   });
 
   it("polls while analysis is in flight", async () => {
@@ -53,9 +57,6 @@ describe("useWorkOrderChecks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const query = queryClient
-      .getQueryCache()
-      .find({ queryKey: factoryQueryKeys.workOrderChecks("org-1", "factory-1", "wo-1") });
-    expect(query?.options.refetchInterval).toBe(ANALYZING_WORK_ORDER_CHECKS_POLL_MS);
+    expect(configuredRefetchInterval(queryClient)).toBe(ANALYZING_WORK_ORDER_CHECKS_POLL_MS);
   });
 });

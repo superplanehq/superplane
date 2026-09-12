@@ -14,15 +14,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/gorm"
 )
 
 const (
-	PlanningSessionTokenPurpose   = "planning_session"
-	EnvSuperplanePlanningID       = "SUPERPLANE_PLANNING_SESSION_ID"
-	EnvSuperplanePlanningAnalysis = "SUPERPLANE_PLANNING_ANALYSIS"
-	EnvSuperplaneBaseURL          = "SUPERPLANE_BASE_URL"
-	EnvSuperplaneRunToken         = "SUPERPLANE_RUN_TOKEN"
+	PlanningSessionTokenPurpose      = "planning_session"
+	EnvSuperplanePlanningID          = "SUPERPLANE_PLANNING_SESSION_ID"
+	EnvSuperplanePlanningSessionKind = "SUPERPLANE_PLANNING_SESSION_KIND"
+	EnvSuperplaneAnalysisSpecFile    = "SUPERPLANE_ANALYSIS_SPEC_FILE"
+	EnvSuperplaneAnalysisScoreFile   = "SUPERPLANE_ANALYSIS_SCORE_FILE"
+	EnvSuperplaneBaseURL             = "SUPERPLANE_BASE_URL"
+	EnvSuperplaneRunToken            = "SUPERPLANE_RUN_TOKEN"
 )
 
 type PlanningSessionScope struct {
@@ -103,6 +104,9 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		}
 		return environment
 	}
+	if !session.IsAnalysisSession() {
+		return environment
+	}
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
@@ -144,33 +148,17 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,
 		Value: session.ID.String(),
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplanePlanningSessionKind,
+		Value: session.Kind,
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplaneAnalysisSpecFile,
+		Value: "/tmp/intent.md",
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplaneAnalysisScoreFile,
+		Value: "/tmp/intake-analysis.json",
 	})
-	if IsAnalysisPlanningSession(session, planningSessionCanvasName(database.DB(context.Background()), session)) {
-		environment = append(environment, BrokerEnvironmentVariable{
-			Name:  EnvSuperplanePlanningAnalysis,
-			Value: "1",
-		})
-	}
 	return environment
-}
-
-func IsAnalysisPlanningSession(session *models.FactoryPlanningSession, canvasName string) bool {
-	if session == nil || session.DraftWorkOrderID == nil || *session.DraftWorkOrderID == uuid.Nil {
-		return false
-	}
-	name := strings.TrimSpace(canvasName)
-	return name != "" && name != models.PlanningCanvasName
-}
-
-func planningSessionCanvasName(tx *gorm.DB, session *models.FactoryPlanningSession) string {
-	if session == nil || session.CanvasID == nil {
-		return ""
-	}
-	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, *session.CanvasID)
-	if err != nil {
-		return ""
-	}
-	return canvas.Name
 }
 
 func planningSessionEnvVars(baseURL, token string) []BrokerEnvironmentVariable {

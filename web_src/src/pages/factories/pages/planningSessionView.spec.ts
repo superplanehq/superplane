@@ -4,18 +4,39 @@ import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   applyPlanningSessionLiveRun,
   createWithAgentViewFromSession,
+  mergePlanningSessionHistory,
   planningSessionHasPendingSurvey,
-  workspacePlanningRepository,
 } from "./planningSessionView";
 
-describe("workspacePlanningRepository", () => {
-  it("uses the workspace app repository", () => {
-    expect(workspacePlanningRepository({ onboarding: { appRepository: " semaphore/web " } })).toBe("semaphore/web");
+describe("mergePlanningSessionHistory", () => {
+  it("keeps the full transcript when a new run returns only its latest message", () => {
+    const previous = {
+      id: "session-1",
+      state: "ended",
+      canvasRunId: "run-1",
+      messages: [
+        { id: "user-1", role: "user", text: "Use the current form.", createdAt: "2026-09-03T10:00:00Z" },
+        { id: "agent-1", role: "agent", text: "I updated the plan.", createdAt: "2026-09-03T10:01:00Z" },
+      ],
+    };
+    const restarted = {
+      id: "session-1",
+      state: "running",
+      canvasRunId: "run-2",
+      messages: [{ id: "user-2", role: "user", text: "Also cover errors.", createdAt: "2026-09-03T10:02:00Z" }],
+    };
+
+    expect(mergePlanningSessionHistory(previous, restarted)).toEqual({
+      ...restarted,
+      messages: [...previous.messages, ...restarted.messages],
+    });
   });
 
-  it("returns empty when the workspace has no app repository", () => {
-    expect(workspacePlanningRepository({ onboarding: {} })).toBe("");
-    expect(workspacePlanningRepository(null)).toBe("");
+  it("does not merge messages from a different planning session", () => {
+    const previous = { id: "session-1", messages: [{ id: "old", role: "user", text: "Old task" }] };
+    const next = { id: "session-2", messages: [{ id: "new", role: "user", text: "New task" }] };
+
+    expect(mergePlanningSessionHistory(previous, next)).toEqual(next);
   });
 });
 

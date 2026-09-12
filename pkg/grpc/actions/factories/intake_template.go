@@ -52,18 +52,18 @@ const (
 	intakeConfidenceCriticalAt = 2
 
 	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
-	intakeIntentOutputFile   = "/tmp/spec.md"
+	intakeIntentOutputFile   = "/tmp/intent.md"
 
 	intakeIntentArtifactNodeID   = "attach-intent"
-	intakeIntentArtifactNodeName = "Add spec"
-	intakeIntentArtifactTitle    = "spec.md"
+	intakeIntentArtifactNodeName = "Add intent"
+	intakeIntentArtifactTitle    = "intent.md"
 
 	intakeAddRunErrorNodeID    = "add-run-error"
 	intakeAddRunErrorNodeName  = "Record Analysis Failure"
 	intakeAddRunErrorComponent = "addRunError"
 	intakeAddRunErrorMessage   = "The analysis agent failed. Open the agent logs to find the cause."
 
-	intakeAnalysisTimeoutSeconds = 3600
+	intakeAnalysisTimeoutSeconds = 1800
 
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
@@ -457,88 +457,45 @@ func intakeAnalysisPrompt(subject string) string {
 		"Read the ticket and the code. Score how well an agent on this factory line can complete the work.",
 		"Do not score from the title and description alone.",
 		"",
-		"Score from 0 through 5. A higher value means greater confidence.",
-		"0 or 1: do not start. The task is not clear.",
-		"2 or 3: start only after you name the uncertainty.",
-		"4 or 5: an agent can follow the plan.",
-		"When the score is 0 through 3, or two valid readings exist, ask the person a multiple-choice question. Do not guess the missing decision.",
-		"Write one sentence that explains the score. Say how suitable the work is for an agent on this factory line.",
-		"Do not write a test or an acceptance check in that sentence.",
-		"Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+		fmt.Sprintf("Write one JSON object to %s.", intakeAnalysisOutputFile),
+		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
+		"Keys:",
+		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
+		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
+		`- "reasons": exactly three short sentences that explain the score.`,
+		"Write three reasons: what the item names, what already exists in this repository, and whether an agent can do the work.",
 		"",
-		"Write a specification, not a chat note. Use short sentences and plain words. Use American English. Do not use contractions.",
-		"Ground every claim in this repository. Name files, types, and functions that exist.",
-		"Do not invent files or APIs. Do not start with a line such as Intent:.",
+		fmt.Sprintf("Also write %s. Write it like you are explaining the work to a teammate, not like a spec.", intakeIntentOutputFile),
+		"Keep it under 40 lines. Use short sentences and plain words.",
+		"Do not write implementation details, file lists, APIs, or a detailed spec.",
+		"Do not use words like proposed outcome, stakeholders, systems, or proto-spec.",
+		"Do not start with a title such as Intent:.",
+		"Use a mermaid fence only when a simple diagram clarifies the idea.",
 		"Do not add an Open questions section.",
+		"Map your 0-100 score to a 0-5 confidence with round(score / 20). Pick one intent format from that 0-5 value.",
 		"",
-		"Always start with this shape:",
-		"# <outcome in 8 words or fewer>",
-		"## Executive summary",
-		"Copy this markdown shape. Omit Diagram when a picture is not needed.",
-		"### Goal",
-		"<one or two sentences that name the outcome a person should get>",
-		"<one sentence that says how the agent must read the request. Name what this is not.>",
-		"### Done when",
-		"- <acceptance check>",
-		"- <second check>",
-		"### Out of scope",
-		"- <what will not change>",
-		"### Key architecture decisions",
-		"- <high-level seam or model choice>",
-		"- <second decision>",
-		"### Diagram",
-		"<one mermaid fence, only when a UI flow or architecture must be seen>",
-		"Example:",
-		"### Goal",
-		"A person can set a puppy breed and see it on the list and the puppy page.",
-		"The agent reads the request as a field addition on the current puppy record. It does not read it as a new animal type or a catalog redesign.",
-		"### Done when",
-		"- Create and edit accept a breed value.",
-		"- List and show display that value.",
-		"- Existing name create, edit, and show still pass.",
-		"### Out of scope",
-		"- Other animal types",
-		"- Name storage and validation",
-		"- Page layout beyond the breed field",
-		"### Key architecture decisions",
-		"- Add breed to the existing puppy record. Do not add a new table or service.",
-		"- Reuse the current create, edit, list, and show pages.",
-		"- Treat breed as optional text so current records stay valid.",
-		"Rules for this section:",
-		"Goal: 2 or 3 short sentences. First name the outcome. Then say how the agent must read the request.",
-		"Done when: 2 to 4 bullets. Write checks a person can verify after Start.",
-		"Out of scope: 1 to 3 bullets. Name what will not change.",
-		"Key architecture decisions: 2 to 4 bullets. Name seams and model choices only.",
-		"Omit ### Diagram when a picture is not needed. When you include it, use one mermaid fence. Choose a UI flow or an architecture picture, not both.",
-		"Do not explain what the app is, what stack it uses, or how the repository is organized.",
-		"Do not name files or APIs here. Put those in the Plan.",
-		"Do not write why the change matters for the product or for later work.",
-		"Do not write first person. Do not use ## headings inside this section.",
+		"If confidence is 4 or 5, use these markdown headings:",
+		"## How I understand this",
+		"## What's going on",
+		"## What done looks like",
+		"## What to watch",
+		"Write How I understand this in first person. Answer: How do you understand what needs to be done here?",
+		"What's going on: what is missing or broken, in everyday words.",
+		"What done looks like: what a person will notice when the work is finished.",
+		"What to watch: hard limits only, such as keep the change small.",
 		"",
-		"If the score is 2 through 5, write 80 to 150 lines after the title. Add these markdown headings after the executive summary, in this order:",
-		"## Problem",
-		"What is missing or broken. Name the current types, functions, and files. Quote current behavior when it helps.",
-		"## Scope",
-		"In scope: what this change must do. Out of scope: what this change must not do. Use two short bullet lists.",
-		"## Outcome",
-		"What done looks like for a user and for the code. Be concrete. Cover create, edit, list, and show when those surfaces exist.",
-		"## Approach",
-		"Numbered steps an agent can follow. Write at least 5 steps. Each step names the file or seam to change and what to change there.",
-		"## Files and seams",
-		"A bullet list of existing paths to change, and new paths only when you must add a file. One reason per path. Include tests.",
-		"## Acceptance",
-		"A numbered list of checks. Include tests to add or run, and the command when you know it.",
-		"## Risks",
-		"Hard limits and likely failure points. Name what must stay the same. Do not write only keep the change small.",
+		"If confidence is 2 or 3, use the same headings, then add:",
+		"## Honest take",
+		"Say what is uncertain and why. Do not pretend the work is clear.",
 		"",
-		"If the score is 2 or 3, the Risks section must also say what is uncertain and why. Do not pretend the work is clear.",
-		"",
-		"If the score is 0 or 1, do not write Problem, Scope, Outcome, Approach, Files and seams, or Acceptance.",
-		"After the executive summary, use only these headings:",
-		"## Why not start",
-		"Tell the reader not to start implementation until they refine the task. Say what is missing.",
+		"If confidence is 0 or 1, do not write What done looks like or What to watch.",
+		"Use these markdown headings:",
+		"## How I understand this",
+		"## Why I would not start this",
 		"## What would make this clear",
-		"The top 3 changes that would make the task clear enough to start. Use a numbered list.",
+		"How I understand this: say that you do not know what should be done, and why.",
+		"Why I would not start this: tell the reader not to start implementation until they refine the task.",
+		"What would make this clear: the top 3 changes that would make the task clear enough to start. Use a numbered list.",
 		"",
 		"Task:",
 		"{{ root().data.workOrder }}",
@@ -552,7 +509,7 @@ func intakeAnalysisPrompt(subject string) string {
 // reasons. Only the score and intent body are required.
 func intakeAnalysisOutputCommand() string {
 	return fmt.Sprintf(`if [ ! -s %s ]; then
-  echo "The analysis wrote no spec.md" >&2
+  echo "The analysis wrote no intent.md" >&2
   exit 1
 fi
 if ! jq -ce --rawfile intent %s '{

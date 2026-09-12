@@ -28,24 +28,6 @@ async function planningSessionRequest(
   return body.session;
 }
 
-export function startPlanningSession(organizationId: string, factoryId: string, repository = "", workOrderId = "") {
-  const trimmed = repository.trim();
-  const refineId = workOrderId.trim();
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions`, {
-    method: "POST",
-    body: JSON.stringify({
-      ...(trimmed ? { repository: trimmed } : {}),
-      ...(refineId ? { work_order_id: refineId } : {}),
-    }),
-  });
-}
-
-export function describePlanningSession(organizationId: string, factoryId: string, sessionId: string) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}`, {
-    method: "GET",
-  });
-}
-
 export async function findPlanningSessionByWorkOrder(
   organizationId: string,
   factoryId: string,
@@ -70,19 +52,6 @@ export async function findPlanningSessionByWorkOrder(
   return body.session ?? null;
 }
 
-export function endPlanningSession(
-  organizationId: string,
-  factoryId: string,
-  sessionId: string,
-  options?: { keepalive?: boolean },
-) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/end`, {
-    method: "POST",
-    body: "{}",
-    keepalive: options?.keepalive,
-  });
-}
-
 export function sendPlanningSessionMessage(organizationId: string, factoryId: string, sessionId: string, text: string) {
   return planningSessionRequest(
     organizationId,
@@ -94,48 +63,18 @@ export function sendPlanningSessionMessage(organizationId: string, factoryId: st
   );
 }
 
-export function updatePlanningSessionDraft(
+export function answerPlanningSessionSurvey(
   organizationId: string,
   factoryId: string,
   sessionId: string,
-  draft: { title: string; description: string },
-) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/draft`, {
-    method: "PATCH",
-    body: JSON.stringify(draft),
-  });
-}
-
-export function createPlanningSessionWorkOrder(organizationId: string, factoryId: string, sessionId: string) {
-  return planningSessionRequest(
-    organizationId,
-    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/create`,
-    {
-      method: "POST",
-      body: "{}",
-    },
-  );
-}
-
-export function skipPlanningSessionDraft(organizationId: string, factoryId: string, sessionId: string) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/skip`, {
-    method: "POST",
-    body: "{}",
-  });
-}
-
-export function reloadPlanningSessionAgent(
-  organizationId: string,
-  factoryId: string,
-  sessionId: string,
-  selectableModelKey: string,
+  text: string,
 ) {
   return planningSessionRequest(
     organizationId,
-    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/reload-agent`,
+    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/survey-answer`,
     {
       method: "POST",
-      body: JSON.stringify({ selectableModelKey }),
+      body: JSON.stringify({ text }),
     },
   );
 }

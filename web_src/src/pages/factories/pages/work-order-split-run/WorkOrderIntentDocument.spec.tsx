@@ -221,7 +221,7 @@ describe("WorkOrderIntentDocument", () => {
           organizationId: "org-1",
           view: {
             repository: "acme/payments",
-            machineStatus: "waiting",
+            machineStatus: "starting",
             canvasId: "",
             canvasRunId: "",
             executionId: "",
@@ -251,6 +251,56 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByText("The agent is writing the plan.")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+  });
+
+  it("keeps the stored transcript outside the current run activity", () => {
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        analysis={{
+          organizationId: "org-1",
+          view: {
+            repository: "acme/payments",
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [
+              { id: "user-1", kind: "text", role: "user", text: "Use the current empty-state component." },
+              { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan with that constraint." },
+              {
+                id: "survey-1",
+                kind: "text",
+                role: "user",
+                origin: "survey",
+                text: "What is the priority? High",
+              },
+            ],
+            composer: "",
+            created: [],
+            right: { kind: "empty" },
+            endConfirmOpen: false,
+            selectableModelKey: "",
+            refining: false,
+          },
+          composer: "",
+          canSend: true,
+          onComposerChange: vi.fn(),
+          onSend: vi.fn(),
+          onSubmitSurvey: vi.fn(),
+        }}
+      />,
+    );
+
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    expect(within(transcript).getByText("Use the current empty-state component.")).toBeInTheDocument();
+    expect(within(transcript).getByText("I updated the plan with that constraint.")).toBeInTheDocument();
+    expect(within(transcript).getByText(CREATE_WITH_AGENT_COPY.youSurvey)).toBeInTheDocument();
+    expect(screen.getAllByText("Use the current empty-state component.")).toHaveLength(1);
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
   });
 
   it("does not send a multi-question survey when Next is clicked", async () => {

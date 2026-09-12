@@ -486,7 +486,9 @@ CREATE TABLE public.factory_planning_sessions (
     ended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    selectable_model_key text DEFAULT ''::text NOT NULL
+    selectable_model_key text DEFAULT ''::text NOT NULL,
+    kind text NOT NULL,
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text])))
 );
 
 
@@ -2551,6 +2553,13 @@ CREATE INDEX idx_factory_planning_session_messages_session ON public.factory_pla
 
 
 --
+-- Name: idx_factory_planning_sessions_analysis_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_sessions_analysis_work_order ON public.factory_planning_sessions USING btree (organization_id, factory_id, draft_work_order_id) WHERE ((kind = 'work_order_analysis'::text) AND (draft_work_order_id IS NOT NULL));
+
+
+--
 -- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4409,7 +4418,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260911070308	f
+20260911164433	f
 \.
 
 

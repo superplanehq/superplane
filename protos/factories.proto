@@ -607,18 +607,6 @@ service Factories {
     };
   }
 
-  rpc StartPlanningSession(StartPlanningSessionRequest) returns (StartPlanningSessionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/planning-sessions"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Start planning session";
-      description: "Starts a new Create with an Agent planning session";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -654,50 +642,14 @@ service Factories {
     };
   }
 
-  rpc UpdatePlanningSessionDraft(UpdatePlanningSessionDraftRequest) returns (UpdatePlanningSessionDraftResponse) {
+  rpc AnswerPlanningSessionSurvey(AnswerPlanningSessionSurveyRequest) returns (AnswerPlanningSessionSurveyResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey-answer"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update planning session draft";
-      description: "Edits the pending draft on a planning session";
-      tags: "Factory";
-    };
-  }
-
-  rpc CreatePlanningSessionWorkOrder(CreatePlanningSessionWorkOrderRequest) returns (CreatePlanningSessionWorkOrderResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create planning session work order";
-      description: "Creates a draft work order from the planning session draft";
-      tags: "Factory";
-    };
-  }
-
-  rpc ReloadPlanningSessionAgent(ReloadPlanningSessionAgentRequest) returns (ReloadPlanningSessionAgentResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Reload planning session agent";
-      description: "Keeps the Create with an Agent session and starts a new machine with the selected model";
-      tags: "Factory";
-    };
-  }
-
-  rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Skip planning session draft";
-      description: "Throws away the pending planning session draft";
+      summary: "Answer planning session survey";
+      description: "Sends the user's survey answer to an analysis planning session";
       tags: "Factory";
     };
   }
@@ -2213,16 +2165,13 @@ message PlanningSession {
   string execution_id = 11;
   PlanningSessionSurvey survey = 12;
   string selectable_model_key = 13;
+  PlanningSessionKind kind = 14;
 }
 
-message StartPlanningSessionRequest {
-  string factory_id = 1;
-  string repository = 2;
-  string work_order_id = 3;
-}
-
-message StartPlanningSessionResponse {
-  PlanningSession session = 1;
+enum PlanningSessionKind {
+  PLANNING_SESSION_KIND_UNSPECIFIED = 0;
+  PLANNING_SESSION_KIND_TASK_CREATION = 1;
+  PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS = 2;
 }
 
 message DescribePlanningSessionRequest {
@@ -2253,42 +2202,13 @@ message SendPlanningSessionMessageResponse {
   PlanningSession session = 1;
 }
 
-message UpdatePlanningSessionDraftRequest {
+message AnswerPlanningSessionSurveyRequest {
   string factory_id = 1;
   string session_id = 2;
-  string title = 3;
-  string description = 4;
+  string text = 3;
 }
 
-message UpdatePlanningSessionDraftResponse {
-  PlanningSession session = 1;
-}
-
-message CreatePlanningSessionWorkOrderRequest {
-  string factory_id = 1;
-  string session_id = 2;
-}
-
-message CreatePlanningSessionWorkOrderResponse {
-  PlanningSession session = 1;
-}
-
-message SkipPlanningSessionDraftRequest {
-  string factory_id = 1;
-  string session_id = 2;
-}
-
-message SkipPlanningSessionDraftResponse {
-  PlanningSession session = 1;
-}
-
-message ReloadPlanningSessionAgentRequest {
-  string factory_id = 1;
-  string session_id = 2;
-  string selectable_model_key = 3;
-}
-
-message ReloadPlanningSessionAgentResponse {
+message AnswerPlanningSessionSurveyResponse {
   PlanningSession session = 1;
 }
 

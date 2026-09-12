@@ -239,8 +239,8 @@ describe("Line board job popup", () => {
     );
 
     const dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).queryByTestId("split-run-source")).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
       "Let a user add emoji reactions on a task itself (not only on comments).",
     );
@@ -311,9 +311,8 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByTestId("popup-work-order-title")).toHaveTextContent(
       "Add retry handling to webhook delivery",
     );
-    expect(within(dialog).getByTestId("split-run-intent-session")).toHaveTextContent(
-      "Add retry handling to webhook delivery",
-    );
+    expect(within(dialog).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");

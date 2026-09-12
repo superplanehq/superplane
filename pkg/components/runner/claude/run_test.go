@@ -3,6 +3,8 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -12,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
+func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 		"SUPERPLANE_RUN_TOKEN":           "token",
@@ -21,13 +23,11 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 
 	assert.Contains(t, tools, "Read")
 	assert.Contains(t, tools, "Bash")
-	assert.Contains(t, tools, "mcp__superplane")
-	assert.Contains(t, tools, "mcp__superplane__propose_draft")
-	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "mcp__superplane")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
-	assert.NotContains(t, tools, "Edit")
-	assert.NotContains(t, tools, "Write")
+	assert.Contains(t, tools, "Edit")
+	assert.Contains(t, tools, "Write")
 	assert.NotContains(t, tools, "mcp__superplane__say")
 	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, tools, "mcp__superplane__ask")
@@ -35,10 +35,10 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 
 func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
-		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
-		"SUPERPLANE_RUN_TOKEN":           "token",
-		"SUPERPLANE_BASE_URL":            "http://localhost:8000",
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
 	})
 
 	assert.Contains(t, tools, "Read")
@@ -54,21 +54,20 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 
 func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	analysis := planningSystemPromptFromScript(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
-		"SUPERPLANE_PLANNING_ANALYSIS":   "1",
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	assert.Contains(t, analysis, "propose_spec")
 	assert.Contains(t, analysis, "propose_confidence")
 	assert.Contains(t, analysis, "how suitable the work is for an agent")
 	assert.NotContains(t, analysis, "check copy")
-	assert.Contains(t, analysis, "Do not call propose_draft")
+	assert.Contains(t, analysis, "Use only the analysis tools")
 	assert.Contains(t, analysis, "call survey with 2 to 4 options")
 
-	planning := planningSystemPromptFromScript(t, map[string]string{
+	unknown := planningSystemPromptFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	})
-	assert.Contains(t, planning, "propose_draft")
-	assert.NotContains(t, planning, "propose_spec")
+	assert.Empty(t, unknown)
 }
 
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
@@ -76,11 +75,15 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
-func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *testing.T) {
+func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {
 	// Planning sessions must use "default" (not "plan"): plan mode blocks the
-	// planning MCP tools, breaking propose_draft/survey. Read-only is enforced
+	// planning MCP tools. Read-only is enforced
 	// by allowedClaudeTools dropping Edit/Write instead.
 	assert.Equal(t, "default", claudePermissionModeFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}))
+	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
@@ -88,6 +91,115 @@ func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *tes
 		"SUPERPLANE_BASE_URL":  "http://localhost:8000",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{}))
+}
+
+func TestClaudeContinuationUsesExactSession(t *testing.T) {
+	assert.Empty(t, claudeContinuationArgsFromScript(t, 0, ""))
+	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 1, "session-123"))
+	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 4, "session-123"))
+}
+
+func TestClaudeContinuationRejectsMissingSession(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `require(process.argv[1]).claudeContinuationArgs(1, "")`, script)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Claude session ID is missing")
+}
+
+func TestClaudeSessionIDFromInitEvent(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeSessionIDFromEvent } = require(process.argv[1]); process.stdout.write(claudeSessionIDFromEvent({type:"system", subtype:"init", session_id:"session-123"}));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "session-123", string(out))
+}
+
+func TestClaudeAnalysisRunRecordsTheAgentMessage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	recorded := filepath.Join(taskDir, "recorded-agent-message")
+	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "planning_session_mcp.js"),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		0o600,
+	))
+	fakeClaude := filepath.Join(taskDir, "claude")
+	require.NoError(t, os.WriteFile(
+		fakeClaude,
+		[]byte("#!/bin/sh\nprintf '%s\\n' '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"The plan is ready.\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+		"RECORDED_AGENT_MESSAGE="+recorded,
+	)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	message, err := os.ReadFile(recorded)
+	require.NoError(t, err)
+	assert.Equal(t, "The plan is ready.", string(message))
+	_, err = os.Stat(result)
+	require.NoError(t, err)
+}
+
+func TestClaudeAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	recorded := filepath.Join(taskDir, "recorded-agent-message")
+	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "planning_session_mcp.js"),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		0o600,
+	))
+	fakeClaude := filepath.Join(taskDir, "claude")
+	require.NoError(t, os.WriteFile(
+		fakeClaude,
+		[]byte("#!/bin/sh\nprintf '%s\\n' '{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"I found useful context before the tool failed.\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+		"RECORDED_AGENT_MESSAGE="+recorded,
+	)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, string(output))
+
+	message, err := os.ReadFile(recorded)
+	require.NoError(t, err)
+	assert.Equal(t, "I found useful context before the tool failed.", string(message))
+	_, err = os.Stat(result)
+	require.NoError(t, err)
 }
 
 func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {
@@ -287,6 +399,25 @@ func claudePermissionModeFromScript(t *testing.T, env map[string]string) string 
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func claudeContinuationArgsFromScript(t *testing.T, promptCount int, sessionID string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(Number(process.argv[2]), process.argv[3])));`,
+		script,
+		fmt.Sprint(promptCount),
+		sessionID,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
 }
 
 func planningSystemPromptFromScript(t *testing.T, env map[string]string) string {

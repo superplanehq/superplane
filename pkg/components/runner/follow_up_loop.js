@@ -29,20 +29,6 @@ function nextAction(result) {
     }
     return { type: "wait" };
   }
-  if (status === "created") {
-    const key = String((result && result.work_order_key) || (result && result.work_order_id) || "").trim();
-    const label = key ? ` (${key})` : "";
-    return {
-      type: "prompt",
-      text: `The user created the draft task${label}. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.`,
-    };
-  }
-  if (status === "skipped") {
-    return {
-      type: "prompt",
-      text: "The user skipped that draft. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.",
-    };
-  }
   return { type: "wait" };
 }
 

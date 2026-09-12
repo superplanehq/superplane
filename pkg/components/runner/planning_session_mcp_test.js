@@ -8,7 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { analysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
-const { writeAnalysisOutputs } = require("./planning_session_mcp");
+const { recordAgentMessage, writeAnalysisOutputs } = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
@@ -16,7 +16,7 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /propose_confidence/);
   assert.match(pack, /how suitable the work is for an agent/);
   assert.match(pack, /Do not write a test or an acceptance check/);
-  assert.match(pack, /Do not call propose_draft/);
+  assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the specification/);
   assert.match(pack, /call survey with 2 to 4 options/);
   assert.match(pack, /If the score is 0 through 3/);
@@ -52,6 +52,35 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
   });
 });
 
+test("recordAgentMessage publishes the final reply outside the MCP tool list", async () => {
+  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
+  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousFetch = global.fetch;
+  const calls = [];
+  process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
+  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => '{"status":"shown"}' };
+  };
+
+  try {
+    const result = await recordAgentMessage("  I found the retry seam.  ");
+    assert.deepEqual(result, { status: "shown" });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/agent-messages");
+    assert.equal(calls[0].options.method, "POST");
+    assert.equal(calls[0].options.headers.Authorization, "Bearer runner-token");
+    assert.deepEqual(JSON.parse(calls[0].options.body), { text: "I found the retry seam." });
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
+    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
+    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
+    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+  }
+});
+
 test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const replies = await exchangeMCP("ndjson", [
     {
@@ -66,14 +95,13 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.equal(replies[0].result.serverInfo.name, "superplane");
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "propose_draft", "survey"],
+    ["propose_spec", "propose_confidence", "survey"],
   );
   assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["body"]);
   assert.match(replies[1].result.tools[1].description, /how suitable the work is for an agent/);
-  assert.match(replies[1].result.tools[3].description, /two valid readings exist/);
+  assert.match(replies[1].result.tools[2].description, /two valid readings exist/);
   assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /explains the score/);
   assert.doesNotMatch(replies[1].result.tools[1].description, /check copy/);
-  assert.deepEqual(replies[1].result.tools[2].inputSchema.required, ["title", "description"]);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -83,7 +111,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "propose_draft", "survey"],
+    ["propose_spec", "propose_confidence", "survey"],
   );
 });
 

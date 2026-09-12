@@ -1,16 +1,21 @@
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { emptyCreateWithAgentView } from "../createWithAgentDemo";
 import {
-  endPlanningSession,
+  answerPlanningSessionSurvey,
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
-import { createWithAgentViewFromSession, type PlanningSessionPayload } from "../planningSessionView";
+import {
+  createWithAgentViewFromSession,
+  mergePlanningSessionHistory,
+  type PlanningSessionPayload,
+} from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
+import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 
 const POLL_MS = 1500;
 
@@ -19,162 +24,203 @@ export const ANALYSIS_PLANNING_COPY = {
   send: "Send",
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
+  failedLoad: "The analysis session did not load. Try again.",
   writing: "The agent is writing the plan.",
 };
 
-export function useAnalysisPlanningSession(args: {
+type AnalysisPlanningSessionArgs = {
   organizationId?: string;
   factoryId?: string;
   workOrderId?: string;
   enabled: boolean;
+  pollForSession?: boolean;
   canUpdate: boolean;
   analysisDelivered?: boolean;
+};
+
+export function analysisSessionPollInterval(
+  pollForSession: boolean,
+  session: PlanningSessionPayload | null | undefined,
+) {
+  if (session && session.state !== "ended") {
+    return POLL_MS;
+  }
+  return pollForSession && !session ? POLL_MS : false;
+}
+
+function usePlanningSessionLookup(
+  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled" | "pollForSession">> & {
+    organizationId: string;
+    factoryId: string;
+    workOrderId: string;
+  },
+) {
+  const { organizationId, factoryId, workOrderId, enabled, pollForSession } = args;
+  return useQuery<PlanningSessionPayload | null>({
+    queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
+    queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
+    enabled: enabled && Boolean(organizationId && factoryId && workOrderId),
+    structuralSharing: (previous, next) =>
+      mergePlanningSessionHistory(
+        previous as PlanningSessionPayload | null | undefined,
+        next as PlanningSessionPayload | null,
+      ),
+    refetchInterval: (current) =>
+      analysisSessionPollInterval(pollForSession, current.state.data as PlanningSessionPayload | null | undefined),
+  });
+}
+
+async function refreshAnalysisWorkOrder(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  workOrderId: string,
+) {
+  if (!organizationId || !factoryId || !workOrderId) {
+    return;
+  }
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, workOrderId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, workOrderId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
+    }),
+  ]);
+}
+
+function useRefreshAnalysisWorkOrder(args: {
+  queryClient: QueryClient;
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  session: PlanningSessionPayload | null;
+  sessionUpdatedAt: number;
 }) {
+  const { queryClient, organizationId, factoryId, workOrderId, session, sessionUpdatedAt } = args;
+  useEffect(() => {
+    if (!session?.id || !sessionUpdatedAt) {
+      return;
+    }
+    void refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
+  }, [factoryId, organizationId, queryClient, session?.id, sessionUpdatedAt, workOrderId]);
+}
+
+function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
+  if (!session) {
+    return emptyCreateWithAgentView();
+  }
+  return createWithAgentViewFromSession(session, {
+    composer,
+    right: emptyCreateWithAgentView().right,
+    endConfirmOpen: false,
+    analysisDelivered,
+  });
+}
+
+function analysisSendState(
+  session: PlanningSessionPayload | null,
+  machineStatus: string,
+  canUpdate: boolean,
+  sendPending: boolean,
+) {
+  const stopped = machineStatus === "failed" || machineStatus === "passed";
+  const isLive = Boolean(session?.id && session.state !== "ended" && !stopped);
+  const canRestart = Boolean(session?.id && (session.state === "ended" || stopped));
+  return { isLive, canSend: canUpdate && !sendPending && (isLive || canRestart) };
+}
+
+export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
   const {
     organizationId = "",
     factoryId = "",
     workOrderId = "",
     enabled,
+    pollForSession = false,
     canUpdate,
     analysisDelivered = false,
   } = args;
   const queryClient = useQueryClient();
-  const [session, setSession] = useState<PlanningSessionPayload | null>(null);
   const [composer, setComposer] = useState("");
   const [composerError, setComposerError] = useState("");
-  const [sendBusy, setSendBusy] = useState(false);
-  const sessionIdRef = useRef("");
-  sessionIdRef.current = session?.id ?? "";
+  const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId);
+  const query = usePlanningSessionLookup({
+    organizationId,
+    factoryId,
+    workOrderId,
+    enabled,
+    pollForSession,
+  });
+  const session = query.data ?? null;
+  useRefreshAnalysisWorkOrder({
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    session,
+    sessionUpdatedAt: query.dataUpdatedAt,
+  });
 
-  const applySession = useCallback(
-    (next: PlanningSessionPayload | null) => {
-      setSession(next);
-      if (!next || !organizationId || !factoryId || !workOrderId) {
-        return;
-      }
-      void queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, workOrderId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, workOrderId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
-      });
-    },
-    [factoryId, organizationId, queryClient, workOrderId],
-  );
+  const onMutationSuccess = async (next: PlanningSessionPayload) => {
+    queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
+      mergePlanningSessionHistory(previous, next),
+    );
+    setComposer("");
+    setComposerError("");
+    await refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
+  };
+  const onMutationError = (error: Error) => {
+    setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
+  };
 
-  useEffect(() => {
-    if (!enabled || !organizationId || !factoryId || !workOrderId) {
-      setSession(null);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const next = await findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId);
-        if (!cancelled) {
-          applySession(next);
-        }
-      } catch {
-        if (!cancelled) {
-          applySession(null);
-        }
-      }
-    };
-    void load();
-    const timer = window.setInterval(() => {
-      void load();
-    }, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [applySession, enabled, factoryId, organizationId, workOrderId]);
+  const sendMessage = useMutation({
+    mutationFn: (text: string) => sendPlanningSessionMessage(organizationId, factoryId, session?.id ?? "", text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+  const answerSurvey = useMutation({
+    mutationFn: (text: string) => answerPlanningSessionSurvey(organizationId, factoryId, session?.id ?? "", text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
 
   const view = usePlanningSessionLiveRun(
     organizationId,
-    session
-      ? createWithAgentViewFromSession(session, {
-          composer,
-          right: emptyCreateWithAgentView().right,
-          endConfirmOpen: false,
-          analysisDelivered,
-        })
-      : emptyCreateWithAgentView(),
+    analysisView(session, composer, analysisDelivered),
     analysisDelivered,
   );
-
-  const sessionId = session?.id ?? "";
-  const isLive = Boolean(
-    sessionId &&
-      session?.state !== "ended" &&
-      view.machineStatus !== "failed" &&
-      view.machineStatus !== "passed",
+  const { isLive, canSend } = analysisSendState(
+    session,
+    view.machineStatus,
+    canUpdate,
+    sendMessage.isPending || answerSurvey.isPending,
   );
-  const canRestart = Boolean(
-    sessionId &&
-      (session?.state === "ended" || view.machineStatus === "failed" || view.machineStatus === "passed"),
-  );
-  const canSend = canUpdate && !sendBusy && (isLive || canRestart);
-
-  const onSend = useCallback(async () => {
-    const text = composer.trim();
-    if (!text || !canSend || !organizationId || !factoryId || !sessionId) {
+  const submit = (text: string, send: (body: string) => void) => {
+    const trimmed = text.trim();
+    if (!trimmed || !canSend) {
       return;
     }
-    setSendBusy(true);
     setComposerError("");
-    try {
-      const next = await sendPlanningSessionMessage(organizationId, factoryId, sessionId, text);
-      setComposer("");
-      applySession(next);
-    } catch (error) {
-      setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
-    } finally {
-      setSendBusy(false);
-    }
-  }, [applySession, canSend, composer, factoryId, organizationId, sessionId]);
-
-  const onSubmitSurvey = useCallback(
-    async (text: string) => {
-      if (!canSend || !organizationId || !factoryId || !sessionId) {
-        return;
-      }
-      setSendBusy(true);
-      setComposerError("");
-      try {
-        applySession(await sendPlanningSessionMessage(organizationId, factoryId, sessionId, text));
-      } catch (error) {
-        setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
-      } finally {
-        setSendBusy(false);
-      }
-    },
-    [applySession, canSend, factoryId, organizationId, sessionId],
-  );
-
-  const endSession = useCallback(async () => {
-    const id = sessionIdRef.current;
-    if (!id || !organizationId || !factoryId) {
-      return;
-    }
-    await endPlanningSession(organizationId, factoryId, id).catch(() => undefined);
-  }, [factoryId, organizationId]);
+    send(trimmed);
+  };
 
   return {
     organizationId,
-    sessionId,
+    session,
+    sessionId: session?.id ?? "",
+    queryError: query.error,
+    isLoading: query.isLoading,
     view,
     composer,
     composerError,
     canSend,
     isLive,
-    showChat: Boolean(sessionId),
+    showChat: Boolean(session?.id),
     onComposerChange: setComposer,
-    onSend,
-    onSubmitSurvey,
-    endSession,
+    onSend: () => submit(composer, sendMessage.mutate),
+    onSubmitSurvey: (text: string) => submit(text, answerSurvey.mutate),
   };
 }

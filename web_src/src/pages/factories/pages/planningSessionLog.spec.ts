@@ -138,31 +138,6 @@ describe("groupPlanningSessionLog", () => {
     );
   });
 
-  it("hides the Analyze and score prompt header", () => {
-    const groups = groupPlanningSessionLog([
-      note({
-        id: "agent-step-2",
-        componentType: "prompt",
-        componentName: "Analyze and score",
-      }),
-      note({
-        id: "talk",
-        noteParentId: "agent-step-2",
-        componentType: "note",
-        componentName: "I will read the ticket and the repository.",
-      }),
-    ]);
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0]?.line.componentName).toBe("");
-    expect(groups[0]?.events[0]).toEqual(
-      expect.objectContaining({
-        kind: "note",
-        line: expect.objectContaining({ id: "talk" }),
-      }),
-    );
-  });
-
   it("hides prompt headers and collapses say or draft JSON", () => {
     const groups = groupPlanningSessionLog([
       note({

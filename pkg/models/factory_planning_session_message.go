@@ -25,18 +25,11 @@ func (PlanningSessionMessage) TableName() string {
 }
 
 func sessionWaitText(tx *gorm.DB, session *FactoryPlanningSession, text string, refined bool) string {
-	return planningWaitTextForKind(text, refined, session.Draft(), session.usesAnalysisFollowUp(tx))
+	return planningWaitTextForKind(text, refined, session.Draft(), session.IsAnalysisSession())
 }
 
-func (s *FactoryPlanningSession) usesAnalysisFollowUp(tx *gorm.DB) bool {
-	if s.CanvasID == nil || s.DraftWorkOrderID == nil {
-		return false
-	}
-	var name string
-	if err := tx.Model(&Canvas{}).Select("name").Where("id = ?", *s.CanvasID).Scan(&name).Error; err != nil || name == "" {
-		return false
-	}
-	return name != PlanningCanvasName
+func (s *FactoryPlanningSession) usesAnalysisFollowUp(_ *gorm.DB) bool {
+	return s.IsAnalysisSession()
 }
 
 func ListPlanningSessionMessages(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionMessage, error) {
@@ -93,6 +86,30 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 			return err
 		}
 		if err := s.saveSessionMutation(inner); err != nil {
+			return err
+		}
+		return s.reloadMessages(inner)
+	})
+}
+
+func (s *FactoryPlanningSession) RecordAgentMessage(tx *gorm.DB, text string) error {
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		body := strings.TrimSpace(text)
+		if body == "" {
+			return fmt.Errorf("%w: message is required", ErrFactoryPlanningSessionInvalid)
+		}
+		message := PlanningSessionMessage{
+			ID:        uuid.New(),
+			SessionID: s.ID,
+			Role:      PlanningSessionMessageRoleAgent,
+			Text:      body,
+			Delivered: true,
+			CreatedAt: time.Now(),
+		}
+		if err := inner.Create(&message).Error; err != nil {
 			return err
 		}
 		return s.reloadMessages(inner)
