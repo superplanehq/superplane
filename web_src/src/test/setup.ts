@@ -1,8 +1,23 @@
+import { notifyManager } from "@tanstack/react-query";
+import { act } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import type * as Recharts from "recharts";
 import { vi } from "vitest";
 
 import "@testing-library/jest-dom/vitest";
+
+// Query notifications and rAF finish after the test act() scope.
+notifyManager.setNotifyFunction((callback) => {
+  act(callback);
+});
+
+const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+window.requestAnimationFrame = (callback) =>
+  nativeRequestAnimationFrame((time) => {
+    act(() => {
+      callback(time);
+    });
+  });
 
 // jsdom has no CSS layout. Recharts ResponsiveContainer then reads
 // getBoundingClientRect after mount, overwrites initialDimension with 0x0,

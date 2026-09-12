@@ -13,6 +13,16 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    reporters: [
+      "dot",
+      [
+        "junit",
+        {
+          outputFile: path.resolve(import.meta.dirname, "../junit-report.xml"),
+          suiteName: "UI unit tests",
+        },
+      ],
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text-summary"],
