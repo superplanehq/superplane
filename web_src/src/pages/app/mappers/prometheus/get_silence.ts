@@ -4,7 +4,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

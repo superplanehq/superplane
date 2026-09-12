@@ -124,6 +124,9 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
+- UI unit tests: `make check.test.ui` (Bun + Happy DOM).
+  Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
+  Paths in `FILES` are relative to `web_src/`.
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
   Do not run `go build ./...` — `scripts/` has more than one `main` package.
   Use `make check.build.app`.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { getKnowledgeBaseMapper } from "./get_knowledge_base";
