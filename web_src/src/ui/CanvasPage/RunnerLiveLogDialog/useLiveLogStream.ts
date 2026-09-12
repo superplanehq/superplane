@@ -160,9 +160,13 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
     },
     onCmdEnd: (index, status, durationMs) =>
       setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs))),
-    onToolStart: (kind, text, id, turn) => {
+    onToolStart: (kind, text, id, turn, startedAtMs) => {
       setState((prev) =>
-        startReplayedTool(prev, { kind, text, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
+        startReplayedTool(
+          prev,
+          { kind, text, sourceId: id, commandIndex: commandCursor.index, startedAtMs },
+          reconnecting,
+        ),
       );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_start", kind, text, id, turn }));
     },
@@ -210,13 +214,19 @@ function rememberOrStartCommand(
 
 function startReplayedTool(
   state: LogState,
-  tool: { kind: string; text: string; sourceId?: string; commandIndex?: number },
+  tool: { kind: string; text: string; sourceId?: string; commandIndex?: number; startedAtMs?: number | null },
   reconnecting: boolean,
 ): LogState {
   if (shouldSkipUnindexedLiveLogReplay(reconnecting, tool.commandIndex, hasFinishedCommandSection(state))) {
     return state;
   }
-  return withClearedError(startToolOnLatestSection(state, tool.kind, tool.text, tool.sourceId, tool.commandIndex));
+  return withClearedError(
+    startToolOnLatestSection(state, tool.kind, tool.text, {
+      sourceId: tool.sourceId,
+      commandIndex: tool.commandIndex,
+      startedAtMs: tool.startedAtMs,
+    }),
+  );
 }
 
 function endReplayedTool(

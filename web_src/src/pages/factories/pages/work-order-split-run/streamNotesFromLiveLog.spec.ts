@@ -40,6 +40,7 @@ function promptSection(): CommandSection {
             lines: ["package workers"],
             status: "passed",
             duration_ms: 80,
+            started_at: 4_500,
           },
         ],
       },
@@ -88,16 +89,16 @@ describe("notesFromLiveLogSections", () => {
     expect(notes[1]?.componentName).toBe("You are implementing a fix.\n\nRead the ticket first.");
   });
 
-  it("tags the section, its notes, and its tools with the section start time", () => {
+  it("tags the section and its notes with the section start time", () => {
     const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: 5_000 }]);
 
-    expect(notes.map((note) => note.orderKey)).toEqual([5_000, 5_000, 5_000]);
+    expect(notes.map((note) => note.orderKey)).toEqual([5_000, 5_000, 4_500]);
   });
 
-  it("leaves orderKey undefined when the section has no start time", () => {
+  it("keeps prompt lines untimed when the section has no start time", () => {
     const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: null }]);
 
-    expect(notes.every((note) => note.orderKey === undefined)).toBe(true);
+    expect(notes.map((note) => note.orderKey)).toEqual([undefined, undefined, 4_500]);
   });
 
   it("falls back to parseClaudeCodeLog for old -> [Tool] lines", () => {

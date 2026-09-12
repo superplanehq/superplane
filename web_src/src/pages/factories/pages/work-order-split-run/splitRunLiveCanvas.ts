@@ -291,7 +291,13 @@ function streamLineForNode(
     iconSrc: presentation.iconSrc,
     component: node.component,
     executionId: execution?.id,
+    orderKey: timestampMs(execution?.createdAt),
   };
+}
+
+function timestampMs(value: string | undefined): number | undefined {
+  const parsed = Date.parse(value ?? "");
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function splitRunCanvasFromLive(input: {

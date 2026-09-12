@@ -101,9 +101,9 @@ export function startToolOnLatestSection(
   state: LogState,
   kind: string,
   text: string,
-  sourceId?: string,
-  commandIndex?: number,
+  options?: { sourceId?: string; commandIndex?: number; startedAtMs?: number | null },
 ): LogState {
+  const { sourceId, commandIndex, startedAtMs } = options ?? {};
   const sectionPos = commandSectionPosition(state, commandIndex);
   if (sectionPos < 0) {
     return state;
@@ -116,7 +116,7 @@ export function startToolOnLatestSection(
     return state;
   }
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = startToolOnSection(section, kind, text, sourceId);
+  nextSections[sectionPos] = startToolOnSection(section, kind, text, sourceId, startedAtMs);
   return { ...state, sections: nextSections };
 }
 
@@ -187,7 +187,13 @@ function appendLineToSection(section: CommandSection, text: string): CommandSect
   };
 }
 
-function startToolOnSection(section: CommandSection, kind: string, text: string, sourceId?: string): CommandSection {
+function startToolOnSection(
+  section: CommandSection,
+  kind: string,
+  text: string,
+  sourceId?: string,
+  startedAtMs?: number | null,
+): CommandSection {
   const tool: CommandTool = {
     id: sourceId?.trim() || `${section.index}-tool-${toolCount(section)}`,
     sourceId: sourceId?.trim() || undefined,
@@ -196,6 +202,7 @@ function startToolOnSection(section: CommandSection, kind: string, text: string,
     lines: [],
     status: "running",
     duration_ms: null,
+    started_at: startedAtMs ?? section.started_at,
   };
   const last = section.events.at(-1);
   if (last?.kind === "tools") {
