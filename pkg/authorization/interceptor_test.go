@@ -297,16 +297,13 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 
 func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
-	requiredFeatures := []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}
+	requiredFeatures := []string{features.FeatureFactories}
 	routes := []HTTPRoute{
-		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"},
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"},
-		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"},
-		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"},
-		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"},
-		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey-answer"},
 	}
 
 	for _, route := range routes {
@@ -315,19 +312,9 @@ func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 		assert.Equal(t, requiredFeatures, rule.RequiredExperimentalFeatures)
 	}
 
-	start, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}]
-	require.True(t, ok)
-	assert.Equal(t, "work_orders", start.Resource)
-	assert.Equal(t, "create", start.Action)
-
 	describe, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}]
 	require.True(t, ok)
 	assert.Equal(t, "read", describe.Action)
-
-	reload, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"}]
-	require.True(t, ok)
-	assert.Equal(t, "work_orders", reload.Resource)
-	assert.Equal(t, "update", reload.Action)
 }
 
 func TestSetUserOwnerRouteUsesMembersUpdate(t *testing.T) {

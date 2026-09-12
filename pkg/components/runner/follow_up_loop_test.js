@@ -40,20 +40,6 @@ test("ignores an empty user message", () => {
   assert.deepEqual(nextAction({ status: "message", text: "   " }), { type: "wait" });
 });
 
-test("asks Claude to acknowledge create or skip, not to draft the next task", () => {
-  const created = nextAction({ status: "created", work_order_key: "NEWWO-12" });
-  assert.equal(created.type, "prompt");
-  assert.match(created.text, /NEWWO-12/);
-  assert.match(created.text, /Acknowledge/i);
-  assert.match(created.text, /Do not call propose_draft/);
-  assert.doesNotMatch(created.text, /Propose the next/);
-  const skipped = nextAction({ status: "skipped" });
-  assert.equal(skipped.type, "prompt");
-  assert.match(skipped.text, /skipped/i);
-  assert.match(skipped.text, /Acknowledge/i);
-  assert.match(skipped.text, /Do not call propose_draft/);
-});
-
 test("runLoop runs the user prompt then exits on ended", async () => {
   const prompts = [];
   const results = [{ status: "pending" }, { status: "message", text: "Add color" }, { status: "ended" }];
@@ -68,27 +54,6 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
-});
-
-test("runLoop prompts after create or skip", async () => {
-  const prompts = [];
-  const results = [
-    { status: "created", work_order_key: "NEWWO-12" },
-    { status: "skipped" },
-    { status: "ended" },
-  ];
-  const code = await runLoop({
-    waitOnce: async () => results.shift(),
-    runPrompt: async (text) => {
-      prompts.push(text);
-      return 0;
-    },
-    writeLiveLogRecord: () => {},
-  });
-  assert.equal(code, 0);
-  assert.equal(prompts.length, 2);
-  assert.match(prompts[0], /NEWWO-12/);
-  assert.match(prompts[1], /skipped/i);
 });
 
 test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {
@@ -226,20 +191,48 @@ test("runLoop backs off silently on idle pending and empty-message waits", async
   assert.deepEqual(logs, []);
 });
 
-test("safeWaitRequest treats a fetch throw as pending", async () => {
+test("safeWaitRequest treats a fetch throw as unreachable pending", async () => {
   const got = await safeWaitRequest(async () => {
     throw new TypeError("fetch failed");
   });
-  assert.deepEqual(got, { status: "pending" });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
 });
 
-test("safeWaitRequest treats an abort as pending", async () => {
+test("runLoop exits after consecutive unreachable waits", async () => {
+  const logs = [];
+  const sleeps = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      if (waits > 10) {
+        throw new Error("loop did not exit after unreachable waits");
+      }
+      return { status: "pending", unreachable: true };
+    },
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+    maxUnreachableWaits: 3,
+  });
+  assert.equal(code, 1);
+  assert.equal(waits, 3);
+  assert.equal(sleeps.length, 2);
+  assert.match(logs.join(""), /unreachable|failed/i);
+});
+
+test("safeWaitRequest treats an abort as unreachable pending", async () => {
   const got = await safeWaitRequest(async () => {
     const err = new Error("This operation was aborted");
     err.name = "AbortError";
     throw err;
   });
-  assert.deepEqual(got, { status: "pending" });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
 });
 
 test("safeWaitRequest keeps a delivered user message", async () => {
@@ -319,7 +312,7 @@ test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () 
   const nowValues = [5_000, 5_250, 6_000, 6_400];
   const results = [
     { status: "message", text: "Add color" },
-    { status: "created", work_order_key: "NEWWO-12" },
+    { status: "message", text: "Use the existing form" },
     { status: "ended" },
   ];
   const code = await runLoop({
@@ -347,9 +340,9 @@ test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () 
     {
       type: "cmd_start",
       index: FOLLOW_UP_CMD_INDEX_BASE + 1,
-      text: nextAction({ status: "created", work_order_key: "NEWWO-12" }).text,
+      text: "Use the existing form",
       kind: "prompt",
-      preview: nextAction({ status: "created", work_order_key: "NEWWO-12" }).text,
+      preview: "Use the existing form",
       started_at: 6_000,
     },
     {

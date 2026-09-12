@@ -4,17 +4,39 @@ import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   applyPlanningSessionLiveRun,
   createWithAgentViewFromSession,
-  workspacePlanningRepository,
+  mergePlanningSessionHistory,
+  planningSessionHasPendingSurvey,
 } from "./planningSessionView";
 
-describe("workspacePlanningRepository", () => {
-  it("uses the workspace app repository", () => {
-    expect(workspacePlanningRepository({ onboarding: { appRepository: " semaphore/web " } })).toBe("semaphore/web");
+describe("mergePlanningSessionHistory", () => {
+  it("keeps the full transcript when a new run returns only its latest message", () => {
+    const previous = {
+      id: "session-1",
+      state: "ended",
+      canvasRunId: "run-1",
+      messages: [
+        { id: "user-1", role: "user", text: "Use the current form.", createdAt: "2026-09-03T10:00:00Z" },
+        { id: "agent-1", role: "agent", text: "I updated the plan.", createdAt: "2026-09-03T10:01:00Z" },
+      ],
+    };
+    const restarted = {
+      id: "session-1",
+      state: "running",
+      canvasRunId: "run-2",
+      messages: [{ id: "user-2", role: "user", text: "Also cover errors.", createdAt: "2026-09-03T10:02:00Z" }],
+    };
+
+    expect(mergePlanningSessionHistory(previous, restarted)).toEqual({
+      ...restarted,
+      messages: [...previous.messages, ...restarted.messages],
+    });
   });
 
-  it("returns empty when the workspace has no app repository", () => {
-    expect(workspacePlanningRepository({ onboarding: {} })).toBe("");
-    expect(workspacePlanningRepository(null)).toBe("");
+  it("does not merge messages from a different planning session", () => {
+    const previous = { id: "session-1", messages: [{ id: "old", role: "user", text: "Old task" }] };
+    const next = { id: "session-2", messages: [{ id: "new", role: "user", text: "New task" }] };
+
+    expect(mergePlanningSessionHistory(previous, next)).toEqual(next);
   });
 });
 
@@ -72,6 +94,21 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.canvasRunId).toBe("run-1");
   });
 
+  it("marks the machine passed when the session ended after a score and plan", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, analysisDelivered: true },
+    );
+
+    expect(view.machineStatus).toBe("passed");
+  });
+
   it("marks the machine failed before starting when the live run failed", () => {
     const view = applyPlanningSessionLiveRun(
       createWithAgentViewFromSession(
@@ -103,6 +140,24 @@ describe("createWithAgentViewFromSession", () => {
     );
 
     expect(view.machineStatus).toBe("failed");
+  });
+
+  it("marks a cancelled live run passed when a score and plan already exist", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_CANCELLED" },
+      true,
+    );
+
+    expect(view.machineStatus).toBe("passed");
   });
 
   it("keeps waiting when the live run is still open", () => {
@@ -157,6 +212,12 @@ describe("createWithAgentViewFromSession", () => {
       id: "pending-survey",
       questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
     });
+    expect(
+      planningSessionHasPendingSurvey({
+        survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
+      }),
+    ).toBe(true);
+    expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
     expect(view.messages).toEqual([
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);

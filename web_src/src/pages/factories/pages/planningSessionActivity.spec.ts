@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   PLANNING_SESSION_AGENT_LINE_ID,
   PLANNING_SESSION_PHASE_ID,
   planningSessionPhase,
-  planningSessionTalkLines,
 } from "./planningSessionActivity";
 
 describe("planningSessionPhase", () => {
@@ -18,7 +16,7 @@ describe("planningSessionPhase", () => {
     });
 
     expect(phase.id).toBe(PLANNING_SESSION_PHASE_ID);
-    expect(phase.name).toBe(CREATE_WITH_AGENT_COPY.menu);
+    expect(phase.name).toBe("Planning session");
     expect(phase.status).toBe("running");
     expect(phase.appId).toBeUndefined();
     expect(phase.stream).toEqual([
@@ -48,6 +46,18 @@ describe("planningSessionPhase", () => {
     expect(phase.stream[0]?.status).toBe("running");
   });
 
+  it("marks the agent line passed when the first analysis result already exists", () => {
+    const phase = planningSessionPhase({
+      canvasId: "canvas-1",
+      executionId: "execution-1",
+      messages: [],
+      machineStatus: "passed",
+    });
+
+    expect(phase.status).toBe("passed");
+    expect(phase.stream[0]?.status).toBe("passed");
+  });
+
   it("marks the agent line failed when the machine stopped", () => {
     const phase = planningSessionPhase({
       canvasId: "canvas-1",
@@ -73,7 +83,7 @@ describe("planningSessionPhase", () => {
     expect(phase.stream[0]?.executionId).toBe("execution-1");
   });
 
-  it("nests user and agent text under the agent so the live log can mix them in order", () => {
+  it("keeps stored messages out of the transient run stream", () => {
     const phase = planningSessionPhase({
       canvasId: "canvas-1",
       executionId: "execution-1",
@@ -84,58 +94,7 @@ describe("planningSessionPhase", () => {
       ],
     });
 
+    expect(phase.stream).toHaveLength(1);
     expect(phase.stream[0]?.id).toBe(PLANNING_SESSION_AGENT_LINE_ID);
-    expect(phase.stream.slice(1)).toEqual(
-      planningSessionTalkLines([
-        { id: "agent-1", kind: "text", role: "agent", text: "Ready when you are." },
-        { id: "user-1", kind: "text", role: "user", text: "Add a Size field" },
-      ]),
-    );
-    expect(phase.stream[1]).toMatchObject({
-      id: "agent-1",
-      nodeId: PLANNING_SESSION_AGENT_LINE_ID,
-      note: true,
-      componentType: "note",
-      componentName: "Ready when you are.",
-    });
-    expect(phase.stream[2]).toMatchObject({
-      id: "user-1",
-      nodeId: PLANNING_SESSION_AGENT_LINE_ID,
-      note: true,
-      componentType: "prompt",
-      componentName: "Add a Size field",
-    });
-  });
-
-  it("marks survey replies so the log can label them", () => {
-    expect(
-      planningSessionTalkLines([
-        { id: "user-1", kind: "text", role: "user", text: "Add a Size field" },
-        {
-          id: "user-survey",
-          kind: "text",
-          role: "user",
-          text: "What is the priority? High",
-          origin: "survey",
-        },
-      ]),
-    ).toEqual([
-      expect.objectContaining({ id: "user-1", userTalk: "message" }),
-      expect.objectContaining({ id: "user-survey", userTalk: "survey" }),
-    ]);
-  });
-
-  it("carries the message createdAtMs through as the talk line orderKey", () => {
-    const lines = planningSessionTalkLines([
-      { id: "user-1", kind: "text", role: "user", text: "Add a Size field", createdAtMs: 1000 },
-    ]);
-
-    expect(lines[0]?.orderKey).toBe(1000);
-  });
-
-  it("leaves orderKey undefined when the message has no createdAtMs", () => {
-    const lines = planningSessionTalkLines([{ id: "user-1", kind: "text", role: "user", text: "Add a Size field" }]);
-
-    expect(lines[0]?.orderKey).toBeUndefined();
   });
 });

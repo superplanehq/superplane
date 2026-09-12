@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -113,7 +112,18 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -201,63 +211,7 @@ describe("LinesPage backlog create", () => {
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the agent session from the backlog plus menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    Element.prototype.scrollIntoView = vi.fn();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          session: {
-            id: "session-1",
-            repository: "acme/payments",
-            canvasRunId: "run-1",
-            messages: [],
-          },
-        }),
-      }),
-    );
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByRole("button", { name: "Create with an Agent" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
-    });
-  });
-
-  it("hides Create with an Agent when the feature is off", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-create"));
-
-    expect(screen.queryByRole("button", { name: "Create with an Agent" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create task manually" })).toBeInTheDocument();
-  });
-
-  it("opens the agent session from Refine on a backlog draft", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    Element.prototype.scrollIntoView = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        session: {
-          id: "session-1",
-          repository: "acme/payments",
-          canvasRunId: "run-1",
-          messages: [],
-          draft: {
-            title: DRAFT_WORK_ORDER.title,
-            description: DRAFT_WORK_ORDER.description,
-            workOrderId: DRAFT_WORK_ORDER.id,
-          },
-        },
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+  it("does not refine a backlog draft from the task popup", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
@@ -266,74 +220,11 @@ describe("LinesPage backlog create", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
-    });
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/105`,
-    );
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([url, init]) => {
-          return (
-            String(url).includes("/planning-sessions") &&
-            !String(url).includes("/messages") &&
-            init?.method === "POST" &&
-            String(init?.body).includes(`"work_order_id":"${DRAFT_WORK_ORDER.id}"`)
-          );
-        }),
-      ).toBe(true);
-    });
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/messages"))).toBe(false);
-    expect(screen.getByRole("heading", { name: "Refine this task" })).toBeInTheDocument();
-  });
-
-  it("hides Refine when the feature is off", async () => {
-    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
 
     expect(
       within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
     ).not.toBeInTheDocument();
-  });
-
-  it("starts the session with the workspace repository, not the demo repo", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    Element.prototype.scrollIntoView = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        session: {
-          id: "session-1",
-          repository: "semaphore/web",
-          canvasRunId: "run-1",
-          messages: [],
-        },
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
-      ...REFUND_FACTORY,
-      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "semaphore/web" },
-    });
-
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByRole("button", { name: "Create with an Agent" }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalled();
-    });
-    const startCall = fetchMock.mock.calls.find(([url, init]) => {
-      return String(url).includes("/planning-sessions") && init?.method === "POST" && !String(url).includes("/end");
-    });
-    expect(startCall).toBeDefined();
-    expect(JSON.parse(String(startCall?.[1]?.body))).toEqual({ repository: "semaphore/web" });
+    expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
   it("imports an intake item and opens the task popup", async () => {

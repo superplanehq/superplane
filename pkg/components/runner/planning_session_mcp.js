@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
+const fs = require("fs");
+
 /**
- * Stdio MCP server for Create with an Agent.
+ * Stdio MCP server for task refinement.
  * Talks to SuperPlane with SUPERPLANE_BASE_URL + SUPERPLANE_RUN_TOKEN.
  */
 
@@ -45,21 +47,6 @@ async function requestJSON(method, path, body) {
   return parsed;
 }
 
-async function proposeDraft(input) {
-  const title = String((input && input.title) || "").trim();
-  const description = String((input && input.description) || "").trim();
-  if (!title) {
-    throw new Error("title is required");
-  }
-  if (!description) {
-    throw new Error("description is required");
-  }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/drafts", {
-    title,
-    description,
-  });
-}
-
 function surveyQuestions(input) {
   const raw = input && Array.isArray(input.questions) ? input.questions : [];
   return raw.map((question) => ({
@@ -76,22 +63,109 @@ async function proposeSurvey(input) {
   });
 }
 
+function analysisOutputPaths(env = process.env) {
+  return {
+    spec: String(env.SUPERPLANE_ANALYSIS_SPEC_FILE || "/tmp/spec.md"),
+    score: String(env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json"),
+  };
+}
+
+function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
+  const paths = analysisOutputPaths(env);
+  try {
+    if (spec != null) {
+      fs.writeFileSync(paths.spec, spec);
+    }
+    if (score != null && Number.isFinite(Number(score))) {
+      let existing = {};
+      try {
+        existing = JSON.parse(fs.readFileSync(paths.score, "utf8"));
+      } catch (_err) {
+        existing = {};
+      }
+      const reasons = Array.isArray(existing.reasons) ? existing.reasons : [];
+      fs.writeFileSync(
+        paths.score,
+        `${JSON.stringify({
+          score: Math.round(Number(score) * 20),
+          summary: summary != null ? String(summary) : String(existing.summary || ""),
+          reasons,
+        })}\n`,
+      );
+    }
+  } catch (_err) {
+    // Publish already succeeded. The exit graph reads these files when it can.
+  }
+}
+
+async function proposeSpec(input) {
+  const body = String((input && input.body) || "").trim();
+  if (!body) {
+    throw new Error("body is required");
+  }
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+  writeAnalysisOutputs({ spec: body });
+  return result;
+}
+
+async function proposeConfidence(input) {
+  const score = Number(input && input.score);
+  if (!Number.isFinite(score)) {
+    throw new Error("score is required");
+  }
+  const summary = String((input && input.summary) || "").trim();
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
+    score,
+    summary,
+  });
+  writeAnalysisOutputs({ score, summary });
+  return result;
+}
+
+async function recordAgentMessage(text) {
+  const body = String(text || "").trim();
+  if (!body) {
+    return { status: "ignored" };
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/agent-messages", { text: body });
+}
+
 const TOOLS = [
   {
-    name: "propose_draft",
-    description: "Show a draft task on the right only when the user asked for a task in this turn. Title and description are required. Description must include the user's request and constraints. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
+    name: "propose_spec",
+    description: "Publish the full spec.md markdown for the open task. Include the title, Executive summary, and plan. Do not change the original request. Call this after you write the specification.",
     inputSchema: {
       type: "object",
       properties: {
-        title: { type: "string" },
-        description: { type: "string" },
+        body: { type: "string" },
       },
-      required: ["title", "description"],
+      required: ["body"],
+    },
+  },
+  {
+    name: "propose_confidence",
+    description:
+      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        score: {
+          type: "number",
+          description: "Confidence from 0 through 5.",
+        },
+        summary: {
+          type: "string",
+          description:
+            "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+        },
+      },
+      required: ["score", "summary"],
     },
   },
   {
     name: "survey",
-    description: "Show one or more multiple-choice questions above the chat. The user picks one option or writes an answer. Then stop.",
+    description:
+      "Ask the person a multiple-choice question when the task is unclear or two valid readings exist. Use 2 to 4 options. Then stop. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
@@ -159,8 +233,10 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "propose_draft") {
-        result = await proposeDraft(args);
+      if (name === "propose_spec") {
+        result = await proposeSpec(args);
+      } else if (name === "propose_confidence") {
+        result = await proposeConfidence(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
       } else {
@@ -288,4 +364,13 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { proposeDraft, proposeSurvey, surveyQuestions, TOOLS };
+module.exports = {
+  proposeSpec,
+  proposeConfidence,
+  proposeSurvey,
+  recordAgentMessage,
+  surveyQuestions,
+  TOOLS,
+  writeAnalysisOutputs,
+  analysisOutputPaths,
+};

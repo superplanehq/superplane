@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	factoryTemplateMetadataKey = "factoryTemplate"
+	factoryTemplateMetadataKey = models.FactoryAppTemplateMetadataKey
 	factoryTemplateVersion     = 1
 	factoryCanvasIDPlaceholder = "__FACTORY_CANVAS_ID__"
 )
@@ -65,12 +65,6 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.onIssue": "github",
 		},
-	},
-	"create-with-agent": {
-		id:               "create-with-agent",
-		entrypointNodeID: "onrun-create-with-agent",
-		canvasFile:       "templates/create-with-agent.canvas.yaml",
-		consoleFile:      "templates/create-with-agent.console.yaml",
 	},
 }
 
@@ -257,10 +251,7 @@ func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
 		if node.Metadata == nil {
 			node.Metadata = map[string]any{}
 		}
-		node.Metadata[factoryTemplateMetadataKey] = map[string]any{
-			"id":      template.id,
-			"version": factoryTemplateVersion,
-		}
+		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadata(template.id, factoryTemplateVersion))
 		return
 	}
 }
@@ -552,12 +543,7 @@ func materializeIntakeDefaults(
 			node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 		}
 		if node.ID == intakeTriggerNodeID {
-			node.Metadata = map[string]any{
-				factoryTemplateMetadataKey: map[string]any{
-					"id":      "intake:" + intake.Source,
-					"version": factoryTemplateVersion,
-				},
-			}
+			node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
 		}
 	}
 	defaults.Metadata.ID = canvas.ID.String()
@@ -588,19 +574,14 @@ func materializeBacklogDefaults(
 		if node.ID != backlogTriggerNodeID {
 			continue
 		}
-		node.Metadata = map[string]any{
-			factoryTemplateMetadataKey: map[string]any{
-				"id":      "backlog",
-				"version": factoryTemplateVersion,
-			},
-		}
+		node.Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, factoryTemplateVersion)
 	}
 	encoded, err := goyaml.Marshal(defaults)
 	if err != nil {
 		return nil, fmt.Errorf("encode Backlog defaults: %w", err)
 	}
 	return &materializedFactoryTemplate{
-		templateID: "backlog",
+		templateID: models.FactoryAppTemplateBacklogID,
 		canvasYAML: string(encoded),
 	}, nil
 }
@@ -687,10 +668,7 @@ func stampFactoryTemplateMetadata(canvas *yaml.Canvas, nodeID, templateID string
 		if node.Metadata == nil {
 			node.Metadata = map[string]any{}
 		}
-		node.Metadata[factoryTemplateMetadataKey] = map[string]any{
-			"id":      templateID,
-			"version": factoryTemplateVersion,
-		}
+		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadata(templateID, factoryTemplateVersion))
 		return
 	}
 }

@@ -20,6 +20,9 @@ const (
 	PlanningSessionStateRunning = "running"
 	PlanningSessionStateEnded   = "ended"
 
+	PlanningSessionKindTaskCreation      = "task_creation"
+	PlanningSessionKindWorkOrderAnalysis = "work_order_analysis"
+
 	PlanningSessionMessageRoleUser  = "user"
 	PlanningSessionMessageRoleAgent = "agent"
 
@@ -83,6 +86,7 @@ type FactoryPlanningSession struct {
 	FactoryID          uuid.UUID
 	CreatedByUserID    uuid.UUID
 	Repository         string
+	Kind               string
 	State              string
 	CanvasID           *uuid.UUID
 	CanvasRunID        *uuid.UUID
@@ -178,6 +182,7 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		FactoryID:       f.ID,
 		CreatedByUserID: params.CreatedByUserID,
 		Repository:      repository,
+		Kind:            PlanningSessionKindTaskCreation,
 		State:           PlanningSessionStateRunning,
 		CanvasID:        &canvasID,
 		CanvasRunID:     &run.ID,
@@ -292,7 +297,13 @@ func planningSessionRunInput(factoryModel *Factory, repository, modelKey string,
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Model(&FactoryPlanningSession{}).
-		Where("organization_id = ? AND factory_id = ? AND state <> ?", organizationID, factoryID, PlanningSessionStateEnded).
+		Where(
+			"organization_id = ? AND factory_id = ? AND state <> ? AND kind = ?",
+			organizationID,
+			factoryID,
+			PlanningSessionStateEnded,
+			PlanningSessionKindTaskCreation,
+		).
 		Count(&count).Error
 	return count, err
 }
@@ -347,6 +358,7 @@ func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]Fac
 	cutoff := now.Add(-PlanningSessionHeartbeatStale)
 	err := tx.
 		Where("state <> ? AND heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
+		Where("kind = ?", PlanningSessionKindTaskCreation).
 		Order("heartbeat_at ASC").
 		Limit(limit).
 		Find(&sessions).Error
@@ -384,6 +396,66 @@ func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
 		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindEnded})
 	}
 	return s.saveEndedState(tx)
+}
+
+func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
+	if s.State != PlanningSessionStateEnded {
+		return nil
+	}
+	now := time.Now()
+	s.State = PlanningSessionStateRunning
+	s.EndedAt = nil
+	s.HeartbeatAt = now
+	s.UpdatedAt = now
+	s.clearWait()
+	s.clearSurvey()
+	return tx.Model(s).Select(
+		"State",
+		"EndedAt",
+		"HeartbeatAt",
+		"UpdatedAt",
+		"WaitState",
+		"WaitKind",
+		"WaitText",
+		"WaitWorkOrderID",
+		"WaitWorkOrderKey",
+		"SurveyID",
+		"Survey",
+	).Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) IsAnalysisSession() bool {
+	return s.Kind == PlanningSessionKindWorkOrderAnalysis
+}
+
+func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
+	if !s.IsAnalysisSession() {
+		return false
+	}
+	if s.State == PlanningSessionStateEnded {
+		return true
+	}
+	return !s.hasActiveAnalysisRun(tx)
+}
+
+func (s *FactoryPlanningSession) hasActiveAnalysisRun(tx *gorm.DB) bool {
+	if s.CanvasID == nil || s.CanvasRunID == nil {
+		return false
+	}
+	run, err := FindCanvasRunInTransaction(tx, *s.CanvasID, *s.CanvasRunID)
+	if err != nil {
+		return false
+	}
+	return run.State == CanvasRunStatePending || run.State == CanvasRunStateStarted
+}
+
+func (s *FactoryPlanningSession) DetachAgentRun(tx *gorm.DB) error {
+	s.CanvasRunID = nil
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id": nil,
+		"updated_at":    s.UpdatedAt,
+	}).Error
 }
 
 func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, error) {

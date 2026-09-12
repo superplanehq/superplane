@@ -1,24 +1,44 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
-import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
+import {
+  composeIntentDocument,
+  INTENT_ARTIFACT_NAME,
+  SPEC_ARTIFACT_NAME,
+  type IntentDocument,
+  parseIntentDocument,
+} from "../../lib/intentDocument";
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactName,
+  extractArtifactTitle,
+  toArtifactDataRecord,
+} from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import type { SplitRunFixture, SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
-/** Description uses a 3/2 reading-to-side split. */
+/** Classic Description uses a 3/2 reading-to-side split. */
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
+/** Task popup size. Wider than the default overlay so Summary and Plan have room. */
+export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
+  "max-h-[min(62rem,calc(100vh-3rem))] h-[min(56rem,calc(100vh-3rem))] w-[min(90rem,calc(100vw-3rem))]";
+
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
+const PLAN_NAMES = ["plan.md"];
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
+  if (fixture.footer.kind === "draft" || fixture.footer.kind === "done") {
+    return "description";
+  }
   if (fixture.openPhaseId) {
     return "log";
   }
-  return fixture.footer.kind === "draft" || fixture.footer.kind === "done" ? "description" : "log";
+  return "log";
 }
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {
@@ -150,14 +170,22 @@ export function collectSplitRunPullRequests(fixture: SplitRunFixture): Factories
 }
 
 export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
-  for (const name of DESCRIPTION_NAMES) {
-    const artifact = artifacts.find((entry) => artifactName(entry) === name);
-    const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact?.data))?.trim();
-    if (body) {
-      return body;
-    }
+  return firstArtifactMarkdown(artifacts, DESCRIPTION_NAMES);
+}
+
+export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
+  return firstArtifactMarkdown(artifacts, [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME]);
+}
+
+export function splitRunIntentDocument(args: {
+  artifacts: FactoriesWorkOrderArtifact[];
+  description: string;
+}): IntentDocument {
+  const intent = splitRunIntentMarkdown(args.artifacts);
+  if (intent) {
+    return parseIntentDocument(intent);
   }
-  return "";
+  return composeIntentDocument(args.description, firstArtifactMarkdown(args.artifacts, PLAN_NAMES));
 }
 
 /** Live saves win. Storybook still prefers artifact markdown. */
@@ -181,11 +209,27 @@ export function splitRunLinkedArtifacts(
 ): FactoriesWorkOrderArtifact[] {
   return artifacts
     .filter((artifact) => {
-      if (DESCRIPTION_NAMES.includes(artifactName(artifact))) {
+      if (
+        DESCRIPTION_NAMES.includes(artifactName(artifact)) ||
+        artifactName(artifact) === INTENT_ARTIFACT_NAME ||
+        artifactName(artifact) === SPEC_ARTIFACT_NAME
+      ) {
         return false;
       }
       return !isOriginTicketArtifact(artifact, source);
     })
+    .sort(compareArtifactsByCreatedAt);
+}
+
+/** Classic mode keeps the analysis document in the artifact list. */
+export function classicSplitRunLinkedArtifacts(
+  artifacts: FactoriesWorkOrderArtifact[],
+  source?: SplitRunSource,
+): FactoriesWorkOrderArtifact[] {
+  return artifacts
+    .filter(
+      (artifact) => !DESCRIPTION_NAMES.includes(artifactName(artifact)) && !isOriginTicketArtifact(artifact, source),
+    )
     .sort(compareArtifactsByCreatedAt);
 }
 
@@ -198,13 +242,18 @@ function artifactCreatedAtMs(artifact: FactoriesWorkOrderArtifact): number {
   return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
-function artifactName(artifact: FactoriesWorkOrderArtifact): string {
-  const data = toArtifactDataRecord(artifact.data);
-  if (typeof data?.name === "string" && data.name.trim()) {
-    return data.name.trim();
-  }
-  if (typeof data?.title === "string" && data.title.trim()) {
-    return data.title.trim();
+function firstArtifactMarkdown(artifacts: FactoriesWorkOrderArtifact[], names: readonly string[]): string {
+  for (const name of names) {
+    const artifact = artifacts.find((entry) => artifactName(entry) === name);
+    const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact?.data))?.trim();
+    if (body) {
+      return body;
+    }
   }
   return "";
+}
+
+function artifactName(artifact: FactoriesWorkOrderArtifact): string {
+  const data = toArtifactDataRecord(artifact.data);
+  return extractArtifactName(data)?.trim() || extractArtifactTitle(data)?.trim() || "";
 }

@@ -47,12 +47,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show a model selector next to Start on a draft task", f.Description)
 	})
 
-	t.Run("known id returns create with agent feature", func(t *testing.T) {
+	t.Run("known id returns task refinement feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryCreateWithAgent)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
-		assert.Equal(t, "Create with an Agent", f.Label)
-		assert.Equal(t, "Create and refine factory tasks with an agent", f.Description)
+		assert.Equal(t, "Task Refinement", f.Label)
+		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
@@ -87,6 +88,19 @@ func TestWorkOrderCreatedPayloadIncludesRepository(t *testing.T) {
 	assert.Equal(t, "acme/widgets", workOrder["repository"])
 	assert.Equal(t, "https://github.com/acme/widgets.git", workOrder["repository_url"])
 	assert.Equal(t, "develop", workOrder["default_branch"])
+}
+
+func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+	assert.Equal(t, true, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
 }
 
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {

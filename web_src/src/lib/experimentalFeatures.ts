@@ -19,5 +19,5 @@ export const FEATURE_WORKSPACE_MODELS = "workspace_models";
 /** Organization experimental feature: model selector next to Start on a draft task. */
 export const FEATURE_FACTORY_DRAFT_START_MODEL = "factory_draft_start_model";
 
-/** Organization experimental feature: agent-assisted factory task creation and refinement. */
+/** Organization experimental feature: live agent refinement for draft work orders. */
 export const FEATURE_FACTORY_CREATE_WITH_AGENT = "factory_create_with_agent";
