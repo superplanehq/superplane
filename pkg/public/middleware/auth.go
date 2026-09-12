@@ -57,10 +57,9 @@ func IsOwnerSetupRequired() bool {
 	}
 
 	ownerSetupMu.RLock()
-	if ownerSetupNeededCache != nil {
-		val := *ownerSetupNeededCache
+	if ownerSetupNeededCache != nil && !*ownerSetupNeededCache {
 		ownerSetupMu.RUnlock()
-		return val
+		return false
 	}
 	ownerSetupMu.RUnlock()
 
@@ -73,12 +72,16 @@ func IsOwnerSetupRequired() bool {
 		Error
 
 	needed := err == nil && count == 0
+	if needed {
+		return true
+	}
 
 	ownerSetupMu.Lock()
-	ownerSetupNeededCache = &needed
+	completed := false
+	ownerSetupNeededCache = &completed
 	ownerSetupMu.Unlock()
 
-	return needed
+	return false
 }
 
 func MarkOwnerSetupCompleted() {

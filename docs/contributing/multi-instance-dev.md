@@ -41,3 +41,10 @@ These are the ports you can override per repo:
 | pprof | `PPROF_PORT` | `6060` | `6061` |
 | Base URL | `BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |
 | Webhooks base URL | `WEBHOOKS_BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |
+
+## Local database snapshot
+
+`make db.snapshot` and `make db.restore` use this worktree's Compose stack.
+Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
+
+Run those commands in the worktree that serves the UI you use.

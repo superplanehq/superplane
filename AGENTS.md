@@ -111,7 +111,21 @@ Agent. SuperPlane does not download OpenCode in the prompt prepare step.
 
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
-(`BLOCK_SIGNUP=yes`).
+(`BLOCK_SIGNUP=yes`). After you finish owner, organization, GitHub, and workspace
+setup, save a local dump:
+
+`make db.snapshot` and `make db.restore` use this worktree's Compose stack.
+Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
+
+1. Run `make db.snapshot`. SuperPlane writes `.local/superplane_dev.dump`.
+2. Later, run `make db.restore`. SuperPlane loads the dump and applies pending
+   migrations. This replaces `superplane_dev` only. It does not change
+   `superplane_test`.
+3. Run `make db.snapshot` again to keep the dump current.
+4. Do not commit `.local/`. The dump is local only.
+
+The dump stores Postgres rows. It does not restore SuperGit canvas git data or
+blob files. GitHub App credentials stay in `.env`.
 
 If `go mod download` / `go build` fail with missing or corrupt files in the Go
 module cache (the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`, often
@@ -145,10 +159,12 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - **NEVER DROP LOCAL DATABASES WITHOUT ASKING.** Do not run `make db.delete`,
   `make db.recreate.all.dangerous`, `make dev.setup.no.cache`,
   `make dev.pr.clean.checkout`, `dropdb`, or `DROP DATABASE` unless the user
-  explicitly asked. `make db.migrate.all` applies pending migrations and
-  rewrites `db/structure.sql`. It does not drop data. Do not pair it with
-  `db.delete`. If migrate fails (for example `no migration found for version`),
-  stop and ask. Do not recreate `superplane_dev` as a workaround.
+  explicitly asked. `make db.restore` replaces `superplane_dev` from
+  `.local/superplane_dev.dump`. Run it only when the user asked to restore that
+  local dump. `make db.migrate.all` applies pending migrations and rewrites
+  `db/structure.sql`. It does not drop data. Do not pair it with `db.delete`.
+  If migrate fails (for example `no migration found for version`), stop and
+  ask. Do not recreate `superplane_dev` as a workaround.
 
 Cross-cutting rules when extending the backend:
 

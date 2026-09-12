@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -311,6 +311,18 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+
+# Local only. Writes this worktree's superplane_dev to
+# .local/superplane_dev.dump. PUBLIC_API_PORT in .env is the UI port.
+# Postgres in this stack is db:5432. The dump is gitignored.
+db.snapshot:
+	./scripts/db_exec_on_ui_instance.sh ./scripts/db_snapshot.sh superplane_dev
+
+# Local only. Replaces this worktree's superplane_dev from
+# .local/superplane_dev.dump, then applies pending migrations. It does not
+# touch superplane_test. Run make db.snapshot again after migrate.
+db.restore:
+	./scripts/db_exec_on_ui_instance.sh ./scripts/db_restore.sh superplane_dev
 
 # Local only. Puts every org on a 14-day trial, clears Polar ids, and
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
