@@ -1,4 +1,5 @@
 import { createElement, type ReactNode } from "react";
+import type * as Recharts from "recharts";
 import { vi } from "vitest";
 
 import "@testing-library/jest-dom/vitest";
@@ -8,11 +9,11 @@ import "@testing-library/jest-dom/vitest";
 // and warns that the chart width and height must be greater than 0.
 // A numeric size skips that measure so every chart test stays quiet.
 vi.mock("recharts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("recharts")>();
+  const actual = await importOriginal<typeof Recharts>();
   return {
     ...actual,
     ResponsiveContainer: ({ children }: { children: ReactNode }) =>
-      createElement(actual.ResponsiveContainer, { width: 760, height: 240 }, children),
+      createElement(actual.ResponsiveContainer, { width: 760, height: 240, children }),
   };
 });
 
