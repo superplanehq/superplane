@@ -19,7 +19,7 @@ import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 import { stringOrDash } from "./utils";
 
 // Custom state map for HTTP component with error state

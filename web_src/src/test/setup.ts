@@ -90,6 +90,57 @@ if (typeof window.matchMedia === "undefined") {
   });
 }
 
+// Happy DOM's WebSocket connects for real. A failed handshake emits an
+// unhandled ErrorEvent that Bun treats as a test failure, often on the
+// next case in the file. Tests never need a live socket.
+class SilentWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  readonly CONNECTING = SilentWebSocket.CONNECTING;
+  readonly OPEN = SilentWebSocket.OPEN;
+  readonly CLOSING = SilentWebSocket.CLOSING;
+  readonly CLOSED = SilentWebSocket.CLOSED;
+  readonly url: string;
+  readyState = SilentWebSocket.CONNECTING;
+  protocol = "";
+  extensions = "";
+  bufferedAmount = 0;
+  binaryType: BinaryType = "blob";
+  onopen: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+
+  constructor(url: string | URL) {
+    this.url = String(url);
+  }
+
+  close() {
+    this.readyState = SilentWebSocket.CLOSED;
+  }
+
+  send() {}
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() {
+    return false;
+  }
+}
+
+Object.defineProperty(globalThis, "WebSocket", {
+  configurable: true,
+  writable: true,
+  value: SilentWebSocket,
+});
+Object.defineProperty(window, "WebSocket", {
+  configurable: true,
+  writable: true,
+  value: SilentWebSocket,
+});
+
 Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   configurable: true,
   writable: true,

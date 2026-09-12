@@ -1,5 +1,5 @@
 import type { EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type { ExecutionInfo, NodeInfo } from "../types";
 import type { StatuspageIncident } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";

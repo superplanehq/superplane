@@ -12,7 +12,7 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/lib/colors";
 import type React from "react";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 const SSH_STATE_MAP: EventStateMap = {

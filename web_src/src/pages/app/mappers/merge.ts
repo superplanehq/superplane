@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 import { truncate } from "./safeMappers";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";

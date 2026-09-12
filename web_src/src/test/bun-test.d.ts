@@ -1,5 +1,6 @@
-import type * as Vitest from "vitest";
-
+// Keep this file a script (no top-level import/export). A top-level import
+// turns `declare module` into an augmentation of a missing package, and
+// `tsc -b` then reports TS2307 for every `from "bun:test"` spec.
 declare module "bun:test" {
   export {
     afterAll,
@@ -16,7 +17,9 @@ declare module "bun:test" {
     type MockInstance,
   } from "vitest";
 
-  export const mock: Vitest.vi["fn"];
-  export const spyOn: Vitest.vi["spyOn"];
-  export const setSystemTime: Vitest.vi["setSystemTime"];
+  type VitestVi = (typeof import("vitest"))["vi"];
+
+  export const mock: VitestVi["fn"];
+  export const spyOn: VitestVi["spyOn"];
+  export const setSystemTime: VitestVi["setSystemTime"];
 }

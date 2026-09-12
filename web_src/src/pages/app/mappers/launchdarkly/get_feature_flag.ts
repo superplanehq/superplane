@@ -11,7 +11,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import { buildSubtitle } from "../utils";
 import { renderTimeAgo } from "@/components/TimeAgo";

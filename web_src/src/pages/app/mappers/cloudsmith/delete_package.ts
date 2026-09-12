@@ -4,7 +4,7 @@ import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import { getTriggerRenderer, getState, getStateMap } from "./mapperLookup";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";

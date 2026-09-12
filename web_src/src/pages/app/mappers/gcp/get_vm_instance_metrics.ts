@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

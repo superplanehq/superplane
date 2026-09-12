@@ -14,7 +14,7 @@ import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getTriggerRenderer } from "../..";
+import { getTriggerRenderer } from "../../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 import { defaultStateFunction } from "../../stateRegistry";
