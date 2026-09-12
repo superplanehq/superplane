@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { useCanvasVersionsSidebarState } from "./useCanvasVersionsSidebarState";
 
 describe("useCanvasVersionsSidebarState", () => {

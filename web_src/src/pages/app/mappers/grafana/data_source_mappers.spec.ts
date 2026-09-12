@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { queryDataSourceMapper } from "./query_data_source";
 import { queryLogsMapper } from "./query_logs";

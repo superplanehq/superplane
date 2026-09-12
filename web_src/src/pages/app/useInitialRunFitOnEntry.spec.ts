@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { useRef } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { useInitialRunFitOnEntry } from "./useInitialRunFitOnEntry";
 
 const runId = "550e8400-e29b-41d4-a716-446655440000";

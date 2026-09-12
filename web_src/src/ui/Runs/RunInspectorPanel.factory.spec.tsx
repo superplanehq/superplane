@@ -1,5 +1,5 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { executions, renderInspector } from "./RunInspectorPanel.spec.fixtures";

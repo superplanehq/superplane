@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 
 describe("api-interceptor", () => {
@@ -8,40 +8,37 @@ describe("api-interceptor", () => {
   let search = "?tab=overview";
 
   beforeEach(() => {
-    vi.resetModules();
     originalFetch = globalThis.fetch;
     locationHref = "http://localhost/dashboard?tab=overview";
     pathname = "/dashboard";
     search = "?tab=overview";
 
-    vi.stubGlobal(
-      "window",
-      Object.assign(globalThis.window, {
-        location: {
-          get pathname() {
-            return pathname;
-          },
-          get search() {
-            return search;
-          },
-          get href() {
-            return locationHref;
-          },
-          set href(value: string) {
-            locationHref = value;
-          },
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      enumerable: true,
+      value: {
+        get pathname() {
+          return pathname;
         },
-      }),
-    );
+        get search() {
+          return search;
+        },
+        get href() {
+          return locationHref;
+        },
+        set href(value: string) {
+          locationHref = value;
+        },
+      },
+    });
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.unstubAllGlobals();
   });
 
   it("redirects unauthorized api requests on non-auth routes", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -51,7 +48,7 @@ describe("api-interceptor", () => {
   });
 
   it("redirects blocked api requests to the login message", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response(ACCOUNT_BLOCKED_MESSAGE, { status: 403 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response(ACCOUNT_BLOCKED_MESSAGE, { status: 403 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -61,7 +58,7 @@ describe("api-interceptor", () => {
   });
 
   it("redirects blocked account-session requests", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response(ACCOUNT_BLOCKED_MESSAGE, { status: 403 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response(ACCOUNT_BLOCKED_MESSAGE, { status: 403 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -83,7 +80,7 @@ describe("api-interceptor", () => {
   });
 
   it("leaves unrelated forbidden responses unchanged", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("Forbidden", { status: 403 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response("Forbidden", { status: 403 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -94,7 +91,7 @@ describe("api-interceptor", () => {
   });
 
   it("does not redirect non-api requests", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -105,7 +102,7 @@ describe("api-interceptor", () => {
   });
 
   it("does not hard-redirect the account session probe on 401", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -118,7 +115,7 @@ describe("api-interceptor", () => {
   it("does not redirect auth routes", async () => {
     pathname = "/login";
     search = "";
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
@@ -128,7 +125,7 @@ describe("api-interceptor", () => {
   });
 
   it("wraps fetch only once", async () => {
-    const baseFetch = vi.fn().mockResolvedValue(new Response("", { status: 200 }));
+    const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
     globalThis.fetch = baseFetch;
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 

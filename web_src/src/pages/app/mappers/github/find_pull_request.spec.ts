@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 import { FIND_PULL_REQUEST_STATE_REGISTRY, findPullRequestMapper } from "./find_pull_request";

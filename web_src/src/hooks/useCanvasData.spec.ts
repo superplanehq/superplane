@@ -2,7 +2,7 @@ import type { CanvasesCanvasSummary } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const {
   canvasFoldersUpdateCanvasFolder,
@@ -26,10 +26,7 @@ const {
   canvasesGetCanvasStaging: vi.fn(),
 }));
 
-vi.mock("../api-client/sdk.gen", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...(actual as Record<string, unknown>),
+vi.mock("../api-client/sdk.gen", () => ({
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
     canvasesDescribeRun,
@@ -39,8 +36,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     canvasesDescribeCanvasVersion,
     canvasesListCanvasVersions,
     canvasesGetCanvasStaging,
-  };
-});
+}));
 
 import {
   canvasKeys,

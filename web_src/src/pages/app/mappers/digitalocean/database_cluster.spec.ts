@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createDatabaseClusterMapper } from "./create_database_cluster";
 import { getDatabaseClusterMapper } from "./get_database_cluster";

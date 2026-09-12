@@ -708,7 +708,7 @@ Now check for a spec/test file for notificationSettings.ts and FactorySettingsNo
 -> [Bash] grep -rln "NOTIFICATION_SETTINGS_TYPES\|NOTIFICATION_TYPE_OPTIONS\|TYPE_WORK_ORDER_MENTIONED" /home/ubuntu/superplane/web_src/src --include="*.test.*" --include="*.spec.*"
      /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts
 -> [Bash] cat /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts
-     import { describe, expect, it } from "vitest";
+     import { describe, expect, it } from "bun:test";
      import {
        defaultNotificationSettings,
        defaultNotificationTypeToggles,

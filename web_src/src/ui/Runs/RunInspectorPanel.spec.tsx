@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "bun:test";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
 import {

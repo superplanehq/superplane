@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import type { NavigateFunction } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 

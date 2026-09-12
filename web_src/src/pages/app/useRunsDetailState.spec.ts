@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { isRunDetailDismissed, runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
 
 function makeSearchParams(params: Record<string, string> = {}) {

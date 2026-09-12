@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { stagingCommitSuccessToast, stagingResetSuccessToast } from "./staging-action-copy";
 
 describe("staging-action-copy", () => {
