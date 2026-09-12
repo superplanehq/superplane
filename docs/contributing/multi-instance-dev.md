@@ -44,7 +44,10 @@ These are the ports you can override per repo:
 
 ## Local database snapshot
 
+Restore a dump to skip owner setup and GitHub connection in a second instance.
+
 `make db.snapshot` and `make db.restore` use this worktree's Compose stack.
 Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
 
 Run those commands in the worktree that serves the UI you use.
+See [Local database snapshot](local-database-snapshot.md).

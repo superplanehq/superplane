@@ -313,15 +313,17 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 # Local only. Writes this worktree's superplane_dev to
-# .local/superplane_dev.dump. Postgres in this stack is db:5432.
+# .local/superplane_dev.dump so a later restore can skip owner setup
+# and GitHub connection. Postgres in this stack is db:5432.
 # The dump is gitignored.
 db.snapshot:
 	@$(COMPOSE) exec app ./scripts/db_snapshot.sh superplane_dev
 
 # Local only. Replaces this worktree's superplane_dev from
-# .local/superplane_dev.dump, then applies pending migrations. It does not
-# touch superplane_test. Restart make dev.server after restore if it is
-# already running. Run make db.snapshot again after migrate.
+# .local/superplane_dev.dump, then applies pending migrations. Use this
+# to create a new local environment without owner setup or GitHub
+# connection. It does not touch superplane_test. Restart make
+# dev.server after restore if it is already running.
 db.restore:
 	@$(COMPOSE) exec app ./scripts/db_restore.sh superplane_dev
 

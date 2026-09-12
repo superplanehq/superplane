@@ -63,23 +63,10 @@ After the first setup, run `make dev.up` when the stack is not running, then `ma
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-Complete owner, organization, GitHub, and workspace setup once in the UI.
-Then save a local dump. Later restores keep that workspace and GitHub
-connection, so you do not connect GitHub again.
-
-`make db.snapshot` and `make db.restore` use this worktree's Compose stack.
-Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
-
-1. Run `make db.snapshot`. SuperPlane writes `.local/superplane_dev.dump`.
-2. Later, run `make db.restore`. SuperPlane loads the dump and applies pending
-   migrations. This replaces `superplane_dev` only. It does not change
-   `superplane_test`. If `make dev.server` is already running, restart it
-   after restore.
-3. Run `make db.snapshot` again to keep the dump current.
-4. Do not commit `.local/`. The dump is local only.
-
-The dump stores Postgres rows. It does not restore SuperGit canvas git data or
-blob files. GitHub App credentials stay in `.env`.
+A local dump lets you create a new environment without owner setup or GitHub
+connection. This is the intended path when a script or agent creates local
+environments.
+See [Local database snapshot](docs/contributing/local-database-snapshot.md).
 
 To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
@@ -108,6 +95,7 @@ OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
 - **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
+- **[Local database snapshot](docs/contributing/local-database-snapshot.md)** - Restore a dump to skip owner setup in a new local environment
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
