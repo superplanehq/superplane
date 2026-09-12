@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { CanvasToolSidebar } from ".";
 import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";

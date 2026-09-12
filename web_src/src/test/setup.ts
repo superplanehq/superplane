@@ -1,21 +1,15 @@
-import { createElement, type ReactNode } from "react";
-import type * as Recharts from "recharts";
-import { vi } from "vitest";
-
 import "@testing-library/jest-dom/vitest";
 
-// jsdom has no CSS layout. Recharts ResponsiveContainer then reads
+// Happy DOM has no CSS layout. Recharts ResponsiveContainer then reads
 // getBoundingClientRect after mount, overwrites initialDimension with 0x0,
 // and warns that the chart width and height must be greater than 0.
-// A numeric size skips that measure so every chart test stays quiet.
-vi.mock("recharts", async (importOriginal) => {
-  const actual = await importOriginal<typeof Recharts>();
+const elementBox = { width: 760, height: 240, top: 0, left: 0, bottom: 240, right: 760, x: 0, y: 0 };
+HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
   return {
-    ...actual,
-    ResponsiveContainer: ({ children }: { children: ReactNode }) =>
-      createElement(actual.ResponsiveContainer, { width: 760, height: 240, children }),
+    ...elementBox,
+    toJSON: () => elementBox,
   };
-});
+};
 
 // jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
 // Provide a no-op so every test file gets it for free instead of having to
@@ -94,6 +88,57 @@ if (typeof window.matchMedia === "undefined") {
     }),
   });
 }
+
+// Happy DOM's WebSocket connects for real. A failed handshake emits an
+// unhandled ErrorEvent that Bun treats as a test failure, often on the
+// next case in the file. Tests never need a live socket.
+class SilentWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  readonly CONNECTING = SilentWebSocket.CONNECTING;
+  readonly OPEN = SilentWebSocket.OPEN;
+  readonly CLOSING = SilentWebSocket.CLOSING;
+  readonly CLOSED = SilentWebSocket.CLOSED;
+  readonly url: string;
+  readyState = SilentWebSocket.CONNECTING;
+  protocol = "";
+  extensions = "";
+  bufferedAmount = 0;
+  binaryType: BinaryType = "blob";
+  onopen: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+
+  constructor(url: string | URL) {
+    this.url = String(url);
+  }
+
+  close() {
+    this.readyState = SilentWebSocket.CLOSED;
+  }
+
+  send() {}
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() {
+    return false;
+  }
+}
+
+Object.defineProperty(globalThis, "WebSocket", {
+  configurable: true,
+  writable: true,
+  value: SilentWebSocket,
+});
+Object.defineProperty(window, "WebSocket", {
+  configurable: true,
+  writable: true,
+  value: SilentWebSocket,
+});
 
 Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   configurable: true,

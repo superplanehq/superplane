@@ -10,7 +10,7 @@ import type {
 import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";

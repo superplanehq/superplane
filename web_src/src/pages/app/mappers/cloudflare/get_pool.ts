@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";

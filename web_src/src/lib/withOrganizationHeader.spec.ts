@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 describe("withOrganizationHeader", () => {

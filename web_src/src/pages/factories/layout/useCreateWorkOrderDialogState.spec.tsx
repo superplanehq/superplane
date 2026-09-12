@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createWorkOrderPath, factoryHomePath, linesPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";

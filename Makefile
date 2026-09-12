@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -129,6 +129,7 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
+	@$(MAKE) ensure.bun
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
@@ -219,10 +220,13 @@ check.build.ui:
 check.build.storybook:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
 
-check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+ensure.bun:
+	$(COMPOSE) exec app bash -lc 'command -v bun >/dev/null || bash /app/scripts/docker/install-bun.sh'
 
-check.test.ui.shard:
+check.test.ui: ensure.bun
+	$(COMPOSE) exec app bash -lc "cd /app/web_src && bun test --isolate $(FILES)"
+
+check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:

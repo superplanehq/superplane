@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { EMPTY_SPENDING_FILTERS } from "@/pages/factories/pages/organizationSettings/spending-redesign/spendingRedesignLib";
 
@@ -9,13 +9,9 @@ const { organizationsDescribeOrganizationSpendingReport } = vi.hoisted(() => ({
   organizationsDescribeOrganizationSpendingReport: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    organizationsDescribeOrganizationSpendingReport,
-  };
-});
+vi.mock("@/api-client", () => ({
+  organizationsDescribeOrganizationSpendingReport,
+}));
 
 import { useOrganizationSpendingReport, type OrganizationSpendingReportQuery } from "./useOrganizationSpendingReport";
 
