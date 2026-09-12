@@ -1,0 +1,11 @@
+[test]
+root = "./src"
+preload = ["./src/test/bun-preload.ts"]
+timeout = 15000
+
+[define]
+"import.meta.env" = "globalThis.__IMPORT_META_ENV"
+
+[loader]
+".svg" = "file"
+".yaml" = "text"

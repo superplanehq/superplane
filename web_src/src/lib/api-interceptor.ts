@@ -2,14 +2,16 @@ import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 
 const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations", "/apps/install/preview", "/apps/install"]);
 
-let interceptorSetup = false;
+let interceptorFetch: typeof globalThis.fetch | undefined;
 
 export const setupApiInterceptor = (): void => {
-  if (interceptorSetup) return;
+  if (globalThis.fetch === interceptorFetch) {
+    return;
+  }
 
   const originalFetch = globalThis.fetch;
 
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const nextFetch: typeof globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const response = await originalFetch(input, init);
 
     if (!isAuthenticatedRequest(input)) {
@@ -33,7 +35,8 @@ export const setupApiInterceptor = (): void => {
     return response;
   };
 
-  interceptorSetup = true;
+  globalThis.fetch = nextFetch;
+  interceptorFetch = nextFetch;
 };
 
 function requestPath(input: RequestInfo | URL): string {

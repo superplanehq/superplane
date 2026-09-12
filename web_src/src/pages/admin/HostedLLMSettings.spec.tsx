@@ -1,6 +1,6 @@
 import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { HostedLLMSettings } from "./HostedLLMSettings";
 import type { InstallationLLMSettings } from "./hostedLLMSettingsApi";

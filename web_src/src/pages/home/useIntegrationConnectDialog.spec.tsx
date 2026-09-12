@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { OrganizationsCreateIntegrationResponse } from "@/api-client";
 import type * as StartDirectGitHubConnectModule from "@/lib/startDirectGitHubConnect";

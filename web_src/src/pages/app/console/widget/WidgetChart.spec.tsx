@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { isValidElement } from "react";
 import type * as Recharts from "recharts";
 import { render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { SettingsAutomationRunsSidebar } from "./SettingsAutomationRunsSidebar";
 

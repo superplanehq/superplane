@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement } from "react";
 import type { ReactNode } from "react";
 import type { CanvasesCanvasRun } from "@/api-client";
@@ -17,8 +17,8 @@ const { useWebSocketMock, nodeExecutionStoreMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("react-use-websocket", () => ({
-  default: useWebSocketMock,
+vi.mock("@/lib/reactUseWebsocket", () => ({
+  useWebSocket: useWebSocketMock,
 }));
 
 vi.mock("@/stores/nodeExecutionStore", () => ({

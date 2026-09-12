@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 
@@ -274,9 +274,8 @@ describe("WorkOrderDescriptionEditor", () => {
 
     const input = await screen.findByTestId("work-order-description-input");
     await user.click(input);
-    fireEvent.paste(input, {
-      clipboardData: { getData: () => "" },
-    });
+    await user.paste("");
+    await user.click(input);
     await user.keyboard("{Control>}a{/Control}");
     await user.click(await screen.findByRole("button", { name: "Bold" }));
 

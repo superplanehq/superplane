@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { MultiFileDiffProps } from "@pierre/diffs/react";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { CanvasYamlDiffModal } from "./CanvasYamlDiffModal";

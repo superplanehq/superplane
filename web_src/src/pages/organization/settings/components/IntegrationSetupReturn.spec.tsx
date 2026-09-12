@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useSearchParams } from "react-router";
 
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
