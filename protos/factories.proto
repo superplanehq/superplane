@@ -2096,6 +2096,11 @@ message WorkOrderRunUsageRow {
   repeated string models = 15;
   repeated string byok_models = 16;
   repeated string machine_types = 17;
+  // Ledger totals in millionths of a dollar. Whole-cent fields above truncate
+  // these, so a short VM run can be $0.00 in cents and still have micros.
+  int64 cost_micros = 18;
+  int64 hosted_cost_micros = 19;
+  int64 byok_cost_micros = 20;
 }
 
 message ListFactoryWorkOrderRunUsageResponse {

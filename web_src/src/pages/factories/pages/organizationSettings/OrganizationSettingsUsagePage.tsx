@@ -18,12 +18,13 @@ import {
   formatUsageMachineTypes,
   formatUsageModels,
   formatUsageOccurredAt,
-  formatUsageSpend,
+  formatUsageSpendMicros,
   formatUsageTaskKey,
   formatUsageTokenCount,
   parseWorkOrderMetric,
-  usageTokenSpendCents,
-  usageVmSpendCents,
+  usageSpendMicros,
+  usageTokenSpendMicros,
+  usageVmSpendMicros,
 } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { useFactorySettingsLayout } from "../settings/factorySettingsLayoutContext";
@@ -278,9 +279,9 @@ function UsageHistoryRow({
 }) {
   const taskKey = formatUsageTaskKey(row.workOrderKey);
   const href = workOrderDetailPath(organizationId, factoryKey, row.workOrderNumber ?? "");
-  const hostedCostCents = parseWorkOrderMetric(row.hostedCostCents);
-  const byokCostCents = parseWorkOrderMetric(row.byokCostCents);
-  const totalCostCents = parseWorkOrderMetric(row.costCents);
+  const hostedCostMicros = usageSpendMicros(row.hostedCostMicros, row.hostedCostCents);
+  const byokCostMicros = usageSpendMicros(row.byokCostMicros, row.byokCostCents);
+  const totalCostMicros = usageSpendMicros(row.costMicros, row.costCents);
 
   return (
     <tr className="border-b border-border last:border-0" data-testid="organization-usage-row">
@@ -298,14 +299,14 @@ function UsageHistoryRow({
         {formatUsageTokenCount(parseWorkOrderMetric(row.totalTokens))}
       </td>
       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-        {formatUsageSpend(usageTokenSpendCents(hostedCostCents, byokCostCents))}
+        {formatUsageSpendMicros(usageTokenSpendMicros(hostedCostMicros, byokCostMicros))}
       </td>
       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">{formatUsageMachineTypes(row.machineTypes)}</td>
       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
         {formatUsageDuration(parseWorkOrderMetric(row.durationSeconds))}
       </td>
       <td className="py-2 whitespace-nowrap">
-        {formatUsageSpend(usageVmSpendCents(totalCostCents, hostedCostCents, byokCostCents))}
+        {formatUsageSpendMicros(usageVmSpendMicros(totalCostMicros, hostedCostMicros, byokCostMicros))}
       </td>
     </tr>
   );

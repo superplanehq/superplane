@@ -331,6 +331,18 @@ func (r WorkOrderRunUsage) BYOKCostCents() int64 {
 	return pricebook.MicrosToCents(r.BYOKCostMicros)
 }
 
+func (r WorkOrderRunUsage) TokenCostMicros() int64 {
+	return r.HostedCostMicros + r.BYOKCostMicros
+}
+
+func (r WorkOrderRunUsage) ComputeCostMicros() int64 {
+	remainder := r.CostMicros - r.TokenCostMicros()
+	if remainder < 0 {
+		return 0
+	}
+	return remainder
+}
+
 // UsageTotals is a token, duration, and cost sum.
 type UsageTotals struct {
 	TotalTokens     int64

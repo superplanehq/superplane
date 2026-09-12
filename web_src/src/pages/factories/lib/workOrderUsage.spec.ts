@@ -3,16 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   firstPositiveWorkOrderMetric,
   formatDurationSeconds,
+  formatUsageCsvDollarsFromMicros,
   formatUsageMachineTypes,
   formatUsageModels,
   formatUsageOccurredAt,
   formatUsageSpend,
+  formatUsageSpendMicros,
   formatUsageTaskKey,
   formatUsageTaskName,
   formatUsageTokensAndTime,
+  formatUsdMicros,
   formatWorkOrderExecutionUsage,
+  usageSpendMicros,
   usageTokenSpendCents,
+  usageTokenSpendMicros,
   usageVmSpendCents,
+  usageVmSpendMicros,
 } from "./workOrderUsage";
 
 describe("firstPositiveWorkOrderMetric", () => {
@@ -157,6 +163,54 @@ describe("usageVmSpendCents", () => {
 
   it("returns zero when model spend covers the total", () => {
     expect(usageVmSpendCents(123, 120, 3)).toBe(0);
+  });
+});
+
+describe("usageSpendMicros", () => {
+  it("prefers ledger micros when the field is present", () => {
+    expect(usageSpendMicros("3150", "18")).toBe(3150);
+    expect(usageSpendMicros(0, "18")).toBe(0);
+  });
+
+  it("falls back to whole cents when micros are omitted", () => {
+    expect(usageSpendMicros(undefined, "18")).toBe(180_000);
+  });
+});
+
+describe("formatUsageSpendMicros", () => {
+  it("keeps two decimals at one cent and above", () => {
+    expect(formatUsageSpendMicros(1_230_000)).toBe("$1.23");
+    expect(formatUsageSpendMicros(20_000)).toBe("$0.02");
+  });
+
+  it("shows sub-cent VM spend instead of an em dash", () => {
+    expect(formatUsageSpendMicros(3_150)).toBe("$0.00315");
+    expect(formatUsageSpendMicros(90)).toBe("$0.00009");
+  });
+
+  it("returns an em dash when there is no spend", () => {
+    expect(formatUsageSpendMicros(0)).toBe("—");
+  });
+});
+
+describe("usageVmSpendMicros", () => {
+  it("keeps a remainder that is smaller than one cent", () => {
+    expect(usageVmSpendMicros(183_150, 180_000, 0)).toBe(3_150);
+    expect(usageTokenSpendMicros(180_000, 0)).toBe(180_000);
+  });
+});
+
+describe("formatUsageCsvDollarsFromMicros", () => {
+  it("matches the table's sub-cent precision without a dollar sign", () => {
+    expect(formatUsageCsvDollarsFromMicros(1_230_000)).toBe("1.23");
+    expect(formatUsageCsvDollarsFromMicros(3_150)).toBe("0.00315");
+    expect(formatUsageCsvDollarsFromMicros(0)).toBe("");
+  });
+});
+
+describe("formatUsdMicros", () => {
+  it("formats a whole-cent amount with two decimals", () => {
+    expect(formatUsdMicros(50_000)).toBe("$0.05");
   });
 });
 

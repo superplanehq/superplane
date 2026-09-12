@@ -98,10 +98,10 @@ func workOrderRunUsageCSVRecord(item *pb.WorkOrderRunUsageRow) []string {
 		user = item.GetUserEmail()
 	}
 
-	tokenPriceCents := item.GetHostedCostCents() + item.GetByokCostCents()
-	vmPriceCents := item.GetCostCents() - tokenPriceCents
-	if vmPriceCents < 0 {
-		vmPriceCents = 0
+	tokenPriceMicros := item.GetHostedCostMicros() + item.GetByokCostMicros()
+	vmPriceMicros := item.GetCostMicros() - tokenPriceMicros
+	if vmPriceMicros < 0 {
+		vmPriceMicros = 0
 	}
 
 	return []string{
@@ -110,10 +110,10 @@ func workOrderRunUsageCSVRecord(item *pb.WorkOrderRunUsageRow) []string {
 		sanitizeUsageCSVCell(item.GetWorkOrderKey()),
 		sanitizeUsageCSVCell(formatUsageCSVModels(item.GetModels(), item.GetByokModels())),
 		formatUsageCSVInt(item.GetTotalTokens()),
-		formatUsageCSVCents(tokenPriceCents),
+		formatUsageCSVDollarsFromMicros(tokenPriceMicros),
 		sanitizeUsageCSVCell(formatUsageCSVMachineTypes(item.GetMachineTypes())),
 		formatUsageCSVInt(item.GetDurationSeconds()),
-		formatUsageCSVCents(vmPriceCents),
+		formatUsageCSVDollarsFromMicros(vmPriceMicros),
 	}
 }
 
@@ -167,12 +167,28 @@ func formatUsageCSVInt(value int64) string {
 	return strconv.FormatInt(value, 10)
 }
 
-// formatUsageCSVCents renders cents as a plain decimal dollar amount, with no
-// "$" prefix, so Excel treats it as a number. Zero stays empty for the same
-// reason as formatUsageCSVInt.
-func formatUsageCSVCents(cents int64) string {
-	if cents <= 0 {
+const (
+	usageCSVMicrosPerDollar = 1_000_000
+	usageCSVMinDollar       = 0.01
+)
+
+// formatUsageCSVDollarsFromMicros renders ledger micros as a plain decimal
+// dollar amount, with no "$" prefix, so Excel treats it as a number. Zero
+// stays empty for the same reason as formatUsageCSVInt. Amounts under one
+// cent keep enough fraction digits that a short VM run is still visible.
+func formatUsageCSVDollarsFromMicros(micros int64) string {
+	if micros <= 0 {
 		return ""
 	}
-	return strconv.FormatFloat(float64(cents)/100, 'f', 2, 64)
+	dollars := float64(micros) / usageCSVMicrosPerDollar
+	if dollars >= usageCSVMinDollar {
+		return strconv.FormatFloat(dollars, 'f', 2, 64)
+	}
+	formatted := strconv.FormatFloat(dollars, 'f', 6, 64)
+	formatted = strings.TrimRight(formatted, "0")
+	formatted = strings.TrimRight(formatted, ".")
+	if !strings.Contains(formatted, ".") {
+		return strconv.FormatFloat(dollars, 'f', 2, 64)
+	}
+	return formatted
 }
