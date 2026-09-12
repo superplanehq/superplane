@@ -152,6 +152,21 @@ func (s *gitHubIntakeItemSource) Search(ctx context.Context, query string, limit
 	return gitHubIssueItems(result.Issues, limit), nil
 }
 
+func (s *gitHubIntakeItemSource) Repository() string {
+	return s.repository
+}
+
+func (s *gitHubIntakeItemSource) IsIssueClosed(ctx context.Context, number int) (bool, error) {
+	issue, _, err := s.github.GetIssue(ctx, s.repository, number)
+	if err != nil {
+		return false, err
+	}
+	if issue == nil || issue.IsPullRequest() {
+		return false, errIntakeItemNotFound
+	}
+	return strings.EqualFold(issue.GetState(), "closed"), nil
+}
+
 func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
 	number, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(id), "#"))
 	if err != nil || number <= 0 {

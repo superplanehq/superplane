@@ -364,6 +364,18 @@ service Factories {
     };
   }
 
+  rpc SyncClosedGitHubBacklog(SyncClosedGitHubBacklogRequest) returns (SyncClosedGitHubBacklogResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/backlog/sync-closed-github-issues"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync closed GitHub issues";
+      description: "Closes backlog work orders whose linked GitHub issues are closed";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -1339,6 +1351,15 @@ message ImportFactoryIntakeItemRequest {
 
 message ImportFactoryIntakeItemResponse {
   WorkOrder order = 1;
+}
+
+message SyncClosedGitHubBacklogRequest {
+  string factory_id = 1;
+}
+
+message SyncClosedGitHubBacklogResponse {
+  int32 closed_count = 1;
+  int32 failed_count = 2;
 }
 
 // Work orders

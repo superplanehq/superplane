@@ -295,6 +295,18 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestSyncClosedGitHubBacklogUsesWorkOrderUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	rule, ok := rules[HTTPRoute{
+		Method:  http.MethodPost,
+		Pattern: "/api/v1/factories/{factory_id}/backlog/sync-closed-github-issues",
+	}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
 func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	requiredFeatures := []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}
