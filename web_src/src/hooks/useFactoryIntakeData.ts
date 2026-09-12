@@ -4,6 +4,7 @@ import {
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
   factoriesSearchFactoryIntakeItems,
+  factoriesSyncClosedGitHubBacklog,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
 import type {
@@ -233,4 +234,27 @@ function upsertImportedWorkOrder(
     return current.map((existing) => (existing.id === order.id ? order : existing));
   }
   return [order, ...current];
+}
+
+export function useSyncClosedGitHubBacklog(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<{ closedCount: number; failedCount: number }> => {
+      const response = await factoriesSyncClosedGitHubBacklog(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {},
+        }),
+      );
+      return {
+        closedCount: response.data?.closedCount ?? 0,
+        failedCount: response.data?.failedCount ?? 0,
+      };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+    },
+  });
 }

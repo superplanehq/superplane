@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWorkOrderRequest) (*pb.CloseWorkOrderResponse, error) {
@@ -41,48 +42,14 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	logger := logging.ForFactory(*factory)
 	order, err := findWorkOrder(db, factory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
-	orderID := order.ID
 
-	logger = logging.WithWorkOrder(logger, *order)
-	fromState := order.State
-	wasClosed := order.IsClosed()
-	order, err = order.Close(db, result, &closedBy)
+	order, err = closeWorkOrderAsUser(db, orgID, factory, order, result, closedBy)
 	if err != nil {
-		logger.WithError(err).Error("close work order failed")
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
-
-	if err := messages.PublishFactoryWorkOrderUpdated(
-		factory.ID.String(),
-		order.ID.String(),
-		factoryevents.EventTypeOrderStatusUpdated,
-	); err != nil {
-		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-	}
-
-	if !wasClosed {
-		notification := messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID: orgID.String(),
-			FactoryID:      factory.ID.String(),
-			OrderID:        order.ID.String(),
-			EventType:      factoryevents.EventTypeOrderStatusUpdated,
-			ActorUserID:    closedBy.String(),
-			FromState:      fromState,
-			ToState:        models.FactoryWorkOrderStateClosed,
-			Result:         result,
-		}
-		if err := notification.Publish(); err != nil {
-			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
-		}
-	}
-
-	order, err = factory.FindWorkOrder(db, orderID)
-	if err != nil {
+		logging.WithWorkOrder(logging.ForFactory(*factory), *order).WithError(err).Error("close work order failed")
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
@@ -94,4 +61,60 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	return &pb.CloseWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func closeWorkOrderAsUser(
+	db *gorm.DB,
+	orgID uuid.UUID,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	result string,
+	closedBy uuid.UUID,
+) (*models.FactoryWorkOrder, error) {
+	fromState := order.State
+	wasClosed := order.IsClosed()
+	closed, err := order.Close(db, result, &closedBy)
+	if err != nil {
+		return nil, err
+	}
+
+	publishWorkOrderClosed(orgID, factory, closed, closedBy, fromState, result, wasClosed)
+	return closed, nil
+}
+
+func publishWorkOrderClosed(
+	orgID uuid.UUID,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	closedBy uuid.UUID,
+	fromState string,
+	result string,
+	wasClosed bool,
+) {
+	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderStatusUpdated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if wasClosed {
+		return
+	}
+
+	notification := messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: orgID.String(),
+		FactoryID:      factory.ID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factoryevents.EventTypeOrderStatusUpdated,
+		ActorUserID:    closedBy.String(),
+		FromState:      fromState,
+		ToState:        models.FactoryWorkOrderStateClosed,
+		Result:         result,
+	}
+	if err := notification.Publish(); err != nil {
+		logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+	}
 }
