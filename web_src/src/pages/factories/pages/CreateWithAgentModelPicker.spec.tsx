@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import { CREATE_WITH_AGENT_DEMO_MODELS } from "./createWithAgentDemo";

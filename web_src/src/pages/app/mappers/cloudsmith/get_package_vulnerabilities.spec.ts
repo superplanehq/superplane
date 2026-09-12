@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getPackageVulnerabilitiesMapper } from "./get_package_vulnerabilities";
 import { buildDetailsCtx, buildPackageOutput } from "./test_helpers";
 import type { VulnerabilityScanResult } from "./types";

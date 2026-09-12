@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { manageElasticIPMapper, MANAGE_ELASTIC_IP_STATE_REGISTRY } from "./manage_elastic_ip";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";

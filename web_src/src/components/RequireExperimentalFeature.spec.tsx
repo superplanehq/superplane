@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { OrganizationsOrganization } from "@/api-client";
 import { experimentalFeaturesKeys, type ExperimentalFeaturesRegistry } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";

@@ -1,5 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "./ThemeProvider";
 import { useTheme } from "./useTheme";
 import { THEME_PREFERENCE_STORAGE_KEY } from "@/lib/themePreference";

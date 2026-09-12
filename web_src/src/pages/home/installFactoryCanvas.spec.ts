@@ -2,7 +2,7 @@ import type { FactoryApp } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { getFactoryDefinition } from "./factories";
 import { ensureFactoryCanvas, type CreateFactoryCanvasFn } from "./installFactoryCanvas";

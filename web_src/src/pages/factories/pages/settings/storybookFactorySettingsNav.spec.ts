@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { ORG_SPENDING_ONLY_NAV_GROUPS } from "./storybookFactorySettingsNav";
 

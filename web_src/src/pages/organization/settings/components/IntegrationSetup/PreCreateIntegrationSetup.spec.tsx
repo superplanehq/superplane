@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import type * as SdkGen from "@/api-client/sdk.gen";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { IntegrationSetup } from ".";
 
 const { integrationsListIntegrations, organizationsDescribeIntegration, organizationsListIntegrations } = vi.hoisted(

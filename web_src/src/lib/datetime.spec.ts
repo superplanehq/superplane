@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { formatAbsolute, formatDate, formatISO, formatRelative, formatUTC, toDate } from "@/lib/datetime";
 
 describe("datetime", () => {

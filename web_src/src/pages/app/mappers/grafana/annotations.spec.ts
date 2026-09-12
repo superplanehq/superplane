@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createAnnotationMapper } from "./create_annotation";
 import { deleteAnnotationMapper } from "./delete_annotation";

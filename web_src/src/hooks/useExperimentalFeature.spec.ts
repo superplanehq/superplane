@@ -2,7 +2,7 @@ import type { OrganizationsOrganization } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { useOrganizationIdMock } = vi.hoisted(() => ({
   useOrganizationIdMock: vi.fn(),

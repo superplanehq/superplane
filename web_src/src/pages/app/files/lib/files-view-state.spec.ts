@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 import type { AppFile } from "../types";

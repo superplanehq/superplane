@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 import { publishCommitStatusMapper } from "./publish_commit_status";
