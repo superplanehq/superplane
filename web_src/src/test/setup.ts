@@ -95,6 +95,23 @@ Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   }),
 });
 
+// happy-dom follows <a href> clicks as navigations, including download links.
+// That replaces location.href (often with a blob: URL) and breaks later
+// `new URL("/account", location.href)` fixture matching.
+window.addEventListener(
+  "click",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    if (target.closest("a[download]")) {
+      event.preventDefault();
+    }
+  },
+  true,
+);
+
 // happy-dom hardcodes Node.prototype.nodeName to "" and shadows it on Element.
 // DOMPurify reads the base getter to resist clobbering, so every tag looks
 // empty and the allow-list misfires. Delegate to the instance getter.

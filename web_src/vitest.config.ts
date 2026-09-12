@@ -21,6 +21,11 @@ export default defineConfig({
         },
       },
     },
+    // happy-dom rejects with an Event whose target is SCRIPT when a
+    // <script src> cannot load. Canvas pages inject those tags.
+    onUnhandledError(error) {
+      return !isHappyDomScriptLoadError(error);
+    },
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
       provider: "v8",
@@ -34,3 +39,14 @@ export default defineConfig({
     },
   },
 });
+
+function isHappyDomScriptLoadError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const target = (error as { target?: unknown }).target;
+  if (typeof HTMLScriptElement !== "undefined" && target instanceof HTMLScriptElement) {
+    return true;
+  }
+  return target === "SCRIPT";
+}
