@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";

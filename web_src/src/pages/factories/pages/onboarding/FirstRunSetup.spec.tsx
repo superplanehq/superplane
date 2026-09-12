@@ -1,8 +1,7 @@
 import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory } from "@/api-client";
 
@@ -53,21 +52,11 @@ vi.mock("@/hooks/useBindGitHubInstallation", () => ({
   }),
 }));
 
-const navigateSpy = vi.fn();
-
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
 }));
-
-vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
-  return {
-    ...actual,
-    useNavigate: () => navigateSpy,
-  };
-});
 
 // The agent step reports organization spend, which this flow test does not use.
 vi.mock("./AgentStep", () => ({
@@ -125,7 +114,6 @@ describe("FirstRunSetup", () => {
     factory = { id: "factory-1", key: "PAY", name: "New workspace", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
-    navigateSpy.mockClear();
     bindMutate.mockReset();
   });
 

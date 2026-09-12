@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
 import { createOrgUserDisplayLookup } from "@/lib/orgUserDisplay";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   APPROVAL_WORK_ORDER,

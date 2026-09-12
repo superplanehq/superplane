@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { groupPlanningSessionLog, mergePlanningSessionNotes } from "./planningSessionLog";
 import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";

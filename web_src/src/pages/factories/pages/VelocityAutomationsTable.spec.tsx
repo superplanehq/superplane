@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { VelocityAutomation } from "../lib/factoryVelocityReport";
 import { VelocityAutomationsTable } from "./VelocityAutomationsTable";

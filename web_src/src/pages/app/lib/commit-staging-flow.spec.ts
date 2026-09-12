@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { canvasKeys } from "@/hooks/useCanvasData";
 

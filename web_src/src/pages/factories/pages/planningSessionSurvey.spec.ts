@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import { formatPlanningSurveyReply, isPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
