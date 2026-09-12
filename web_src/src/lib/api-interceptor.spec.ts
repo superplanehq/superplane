@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
+import { resetApiInterceptor } from "@/lib/api-interceptor";
 
 describe("api-interceptor", () => {
   let originalFetch: typeof globalThis.fetch;
+  const originalLocation = window.location;
   let locationHref: string;
   let pathname = "/dashboard";
   let search = "?tab=overview";
@@ -14,29 +16,32 @@ describe("api-interceptor", () => {
     pathname = "/dashboard";
     search = "?tab=overview";
 
-    vi.stubGlobal(
-      "window",
-      Object.assign(globalThis.window, {
-        location: {
-          get pathname() {
-            return pathname;
-          },
-          get search() {
-            return search;
-          },
-          get href() {
-            return locationHref;
-          },
-          set href(value: string) {
-            locationHref = value;
-          },
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        get pathname() {
+          return pathname;
         },
-      }),
-    );
+        get search() {
+          return search;
+        },
+        get href() {
+          return locationHref;
+        },
+        set href(value: string) {
+          locationHref = value;
+        },
+      },
+    });
   });
 
   afterEach(() => {
+    resetApiInterceptor();
     globalThis.fetch = originalFetch;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
     vi.unstubAllGlobals();
   });
 

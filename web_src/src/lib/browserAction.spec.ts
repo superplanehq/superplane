@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { followBrowserAction } from "./browserAction";
 
+const originalFormSubmit = HTMLFormElement.prototype.submit;
+
 describe("followBrowserAction", () => {
   afterEach(() => {
+    HTMLFormElement.prototype.submit = originalFormSubmit;
     document.body.innerHTML = "";
   });
 

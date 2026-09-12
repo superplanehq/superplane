@@ -21,6 +21,7 @@ import {
   startPlanningSession,
   updatePlanningSessionDraft,
 } from "./planningSessionClient";
+import { cancelScheduledPlanningSessionEnd, schedulePlanningSessionEnd } from "./planningSessionUnmountEnds";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./planningSessionView";
 
@@ -32,31 +33,9 @@ export type PlanningRefineTarget = {
 
 const POLL_MS = 1500;
 const DRAFT_SAVE_MS = 400;
-const UNMOUNT_END_MS = 100;
-const pendingUnmountEnds = new Map<string, number>();
 
 function planningSessionHookKey(organizationId: string, factoryId: string) {
   return `${organizationId}:${factoryId}`;
-}
-
-function cancelScheduledPlanningSessionEnd(key: string) {
-  const timer = pendingUnmountEnds.get(key);
-  if (timer === undefined) {
-    return;
-  }
-  window.clearTimeout(timer);
-  pendingUnmountEnds.delete(key);
-}
-
-function schedulePlanningSessionEnd(key: string, end: () => void) {
-  cancelScheduledPlanningSessionEnd(key);
-  pendingUnmountEnds.set(
-    key,
-    window.setTimeout(() => {
-      pendingUnmountEnds.delete(key);
-      end();
-    }, UNMOUNT_END_MS),
-  );
 }
 
 function clearDraftSaveTimer(timer: { current: number | undefined }) {

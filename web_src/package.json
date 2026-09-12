@@ -20,6 +20,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:lib-shared": "vitest run --config vitest.lib-shared.config.ts src/lib",
+    "test:factories-shared": "vitest run --config vitest.lib-shared.config.ts --maxWorkers=2 src/pages/factories",
     "test:coverage": "vitest run --coverage",
     "storybook": "storybook dev --no-open -p 6006",
     "build-storybook": "storybook build",

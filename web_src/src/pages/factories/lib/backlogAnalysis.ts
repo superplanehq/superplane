@@ -121,6 +121,16 @@ export function markBacklogAnalysisPending(workOrderId: string | undefined | nul
   notifyPendingAnalysisListeners();
 }
 
+/** Drop every pending analysis entry. Used by the shared-env test harness. */
+export function resetBacklogAnalysisPending(): void {
+  if (pendingAnalysis.size === 0 && pendingAnalysisListeners.size === 0) {
+    return;
+  }
+  pendingAnalysis.clear();
+  pendingAnalysisListeners.clear();
+  pendingAnalysisSnapshot = new Set();
+}
+
 /** Clear a work order once its real run (or result) is known. */
 export function clearBacklogAnalysisPending(workOrderId: string | undefined | null): void {
   if (!workOrderId || !pendingAnalysis.delete(workOrderId)) {

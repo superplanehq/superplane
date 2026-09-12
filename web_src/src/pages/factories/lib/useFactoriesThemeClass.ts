@@ -14,6 +14,11 @@ const THEME_CLASS = "theme-factories";
  */
 let mountCount = 0;
 
+export function resetFactoriesThemeClass() {
+  mountCount = 0;
+  document.body.classList.remove(THEME_CLASS);
+}
+
 export function useFactoriesThemeClass() {
   useEffect(() => {
     mountCount += 1;
