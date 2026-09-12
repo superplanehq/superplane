@@ -145,6 +145,7 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("X-Pplx-Integration", "superplane")
 
 	res, err := c.http.Do(req)
 	if err != nil {
