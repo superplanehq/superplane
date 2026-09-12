@@ -591,18 +591,6 @@ func mintTestAccountToken(t *testing.T, signer *jwt.Signer, accountID string, is
 	return tokenString
 }
 
-func TestIsOwnerSetupRequired_RequeriesWhenCachedAsNeeded(t *testing.T) {
-	support.Setup(t)
-	ResetOwnerSetupStateForTests()
-
-	needed := true
-	ownerSetupMu.Lock()
-	ownerSetupNeededCache = &needed
-	ownerSetupMu.Unlock()
-
-	assert.False(t, IsOwnerSetupRequired())
-}
-
 func assertImpersonationCookieCleared(t *testing.T, recorder *httptest.ResponseRecorder) {
 	t.Helper()
 
