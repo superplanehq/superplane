@@ -20,6 +20,28 @@ type HTTPPolicy struct {
 	PrivateIPRanges []string
 }
 
+type HTTPPolicyError struct {
+	err error
+}
+
+func (e *HTTPPolicyError) Error() string {
+	return e.err.Error()
+}
+
+func (e *HTTPPolicyError) Unwrap() error {
+	return e.err
+}
+
+type HTTPResponseTooLargeError struct {
+	message string
+}
+
+type sensitiveHeadersContextKey struct{}
+
+func (e *HTTPResponseTooLargeError) Error() string {
+	return e.message
+}
+
 const (
 	// defaultRequestTimeout bounds every outbound request that does not ask
 	// for more time via a context deadline on the request.
@@ -59,6 +81,28 @@ type compiledHTTPPolicy struct {
 type HTTPContextInTransaction struct {
 	httpCtx *HTTPContext
 	tx      *gorm.DB
+}
+
+func WithSensitiveHeaders(request *http.Request, headers ...string) *http.Request {
+	canonicalHeaders := make([]string, 0, len(headers))
+	seen := map[string]struct{}{}
+	for _, header := range headers {
+		header = http.CanonicalHeaderKey(strings.TrimSpace(header))
+		if header == "" {
+			continue
+		}
+		if _, ok := seen[header]; ok {
+			continue
+		}
+		seen[header] = struct{}{}
+		canonicalHeaders = append(canonicalHeaders, header)
+	}
+	if len(canonicalHeaders) == 0 {
+		return request
+	}
+
+	ctx := context.WithValue(request.Context(), sensitiveHeadersContextKey{}, canonicalHeaders)
+	return request.WithContext(ctx)
 }
 
 func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
@@ -144,16 +188,34 @@ func (c *HTTPContext) checkRedirect(req *http.Request, via []*http.Request, tx *
 		return fmt.Errorf("stopped after 10 redirects")
 	}
 
+	if len(via) > 0 && !sameOrigin(via[0].URL, req.URL) {
+		for _, header := range sensitiveHeaders(req) {
+			req.Header.Del(header)
+		}
+	}
+
 	policy, err := c.activePolicy(tx)
 	if err != nil {
 		return err
 	}
 
 	if err := c.validateURLWithPolicy(policy, req.URL); err != nil {
-		return fmt.Errorf("redirect blocked: %w", err)
+		return fmt.Errorf("redirect blocked: %w", &HTTPPolicyError{err: err})
 	}
 
 	return nil
+}
+
+func sensitiveHeaders(request *http.Request) []string {
+	headers, _ := request.Context().Value(sensitiveHeadersContextKey{}).([]string)
+	return headers
+}
+
+func sameOrigin(left, right *url.URL) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	return strings.EqualFold(left.Scheme, right.Scheme) && strings.EqualFold(left.Host, right.Host)
 }
 
 func (c *HTTPContext) dialer(tx *gorm.DB) *net.Dialer {
@@ -177,7 +239,7 @@ func (c *HTTPContext) dialer(tx *gorm.DB) *net.Dialer {
 			}
 
 			if err := c.validateIPWithPolicy(policy, ip); err != nil {
-				return fmt.Errorf("connection blocked: %w", err)
+				return fmt.Errorf("connection blocked: %w", &HTTPPolicyError{err: err})
 			}
 
 			return nil
@@ -221,7 +283,7 @@ func (c *HTTPContext) doWithTransaction(request *http.Request, tx *gorm.DB) (*ht
 	}
 
 	if err := c.validateURLWithPolicy(policy, request.URL); err != nil {
-		return nil, err
+		return nil, &HTTPPolicyError{err: err}
 	}
 
 	return c.do(request, tx)
@@ -255,7 +317,13 @@ func (c *HTTPContext) do(request *http.Request, tx *gorm.DB) (*http.Response, er
 	//
 	if resp.ContentLength > c.maxResponseBytes {
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("response too large: %d bytes exceeds maximum size of %d bytes", resp.ContentLength, c.maxResponseBytes)
+		return nil, &HTTPResponseTooLargeError{
+			message: fmt.Sprintf(
+				"response too large: %d bytes exceeds maximum size of %d bytes",
+				resp.ContentLength,
+				c.maxResponseBytes,
+			),
+		}
 	}
 
 	//
@@ -282,7 +350,9 @@ func (r *LimitedReadCloser) Read(p []byte) (int, error) {
 		var buf [1]byte
 		n, err := r.reader.Read(buf[:])
 		if n > 0 {
-			return 0, fmt.Errorf("response too large: exceeds maximum size of %d bytes", r.maxResponseSize)
+			return 0, &HTTPResponseTooLargeError{
+				message: fmt.Sprintf("response too large: exceeds maximum size of %d bytes", r.maxResponseSize),
+			}
 		}
 		return 0, err
 	}
