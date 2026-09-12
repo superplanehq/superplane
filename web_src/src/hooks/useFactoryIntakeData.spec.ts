@@ -3,8 +3,9 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { factoriesCreateFactoryIntake } = vi.hoisted(() => ({
+const { factoriesCreateFactoryIntake, factoriesSyncClosedGitHubBacklog } = vi.hoisted(() => ({
   factoriesCreateFactoryIntake: vi.fn(),
+  factoriesSyncClosedGitHubBacklog: vi.fn(),
 }));
 
 vi.mock("@/api-client", async (importOriginal) => {
@@ -12,11 +13,12 @@ vi.mock("@/api-client", async (importOriginal) => {
   return {
     ...actual,
     factoriesCreateFactoryIntake,
+    factoriesSyncClosedGitHubBacklog,
   };
 });
 
 import { factoryQueryKeys } from "./useFactoryData";
-import { useCreateFactoryIntake } from "./useFactoryIntakeData";
+import { useCreateFactoryIntake, useSyncClosedGitHubBacklog } from "./useFactoryIntakeData";
 
 const ORGANIZATION_ID = "org-1";
 const FACTORY_ID = "factory-1";
@@ -27,12 +29,13 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
-describe("useCreateFactoryIntake", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    factoriesCreateFactoryIntake.mockResolvedValue({ data: { intake: { id: "intake-1" } } });
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  factoriesCreateFactoryIntake.mockResolvedValue({ data: { intake: { id: "intake-1" } } });
+  factoriesSyncClosedGitHubBacklog.mockResolvedValue({ data: { closedCount: 2, failedCount: 0 } });
+});
 
+describe("useCreateFactoryIntake", () => {
   // A new intake seeds the newest items of its source, so the tasks exist
   // before any card mutation runs. Without this the Backlog kept serving its
   // cached list and the seeded tasks looked lost.
@@ -44,6 +47,24 @@ describe("useCreateFactoryIntake", () => {
     });
 
     await result.current.mutateAsync({ source: "SOURCE_PRODUCTIVE_TASKS" });
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: factoryQueryKeys.workOrders(ORGANIZATION_ID, FACTORY_ID),
+      });
+    });
+  });
+});
+
+describe("useSyncClosedGitHubBacklog", () => {
+  it("refetches backlog tasks after GitHub issues close", async () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useSyncClosedGitHubBacklog(ORGANIZATION_ID, FACTORY_ID), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await expect(result.current.mutateAsync()).resolves.toEqual({ closedCount: 2, failedCount: 0 });
 
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({
