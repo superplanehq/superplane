@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "bun:test";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 

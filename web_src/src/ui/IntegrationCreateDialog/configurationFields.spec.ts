@@ -1,5 +1,5 @@
 import type { ConfigurationField } from "@/api-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   areRequiredCreateFieldsFilled,

@@ -2,9 +2,10 @@ import { render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory } from "@/api-client";
+import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -52,8 +53,8 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
 }));
 
-vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
+vi.mock("react-router", () => {
+  const actual = unmockedPackage<typeof ReactRouterDom>("react-router/dist/development/index.js");
   return {
     ...actual,
     useNavigate: () => navigateSpy,

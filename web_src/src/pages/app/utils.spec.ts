@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { makeComponentsNode } from "@/test/factories";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
