@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createAlertRuleMapper } from "./create_alert_rule";
 import { deleteAlertRuleMapper } from "./delete_alert_rule";

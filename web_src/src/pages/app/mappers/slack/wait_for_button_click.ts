@@ -18,7 +18,7 @@ import type {
 } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";

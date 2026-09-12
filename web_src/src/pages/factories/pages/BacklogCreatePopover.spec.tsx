@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import {
@@ -53,7 +53,7 @@ describe("BacklogCreatePopover", () => {
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-create-menu")).toHaveAttribute("data-side", "right");
+    expect(screen.getByTestId("lines-backlog-create-menu").getAttribute("data-side")).toBe("right");
     expect(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually })).toBeInTheDocument();
     expect(screen.getByText(BACKLOG_CREATE_COPY.createManuallyHint)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();

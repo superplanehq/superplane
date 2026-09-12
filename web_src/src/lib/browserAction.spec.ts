@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 
 import { followBrowserAction } from "./browserAction";
 
@@ -13,8 +13,9 @@ describe("followBrowserAction", () => {
   });
 
   it("assigns the location for a GET action", () => {
-    const assign = vi.fn();
-    vi.stubGlobal("location", { assign });
+    const assign = mock();
+    const previousAssign = window.location.assign.bind(window.location);
+    window.location.assign = assign;
 
     expect(
       followBrowserAction({
@@ -24,11 +25,12 @@ describe("followBrowserAction", () => {
     ).toBe(true);
     expect(assign).toHaveBeenCalledWith("https://github.com/apps/superplane/installations/new?state=abc");
 
-    vi.unstubAllGlobals();
+    window.location.assign = previousAssign;
   });
 
   it("submits a form for a POST action", () => {
-    const submit = vi.fn();
+    const submit = mock();
+    const previousSubmit = HTMLFormElement.prototype.submit;
     HTMLFormElement.prototype.submit = submit;
 
     expect(
@@ -40,8 +42,10 @@ describe("followBrowserAction", () => {
     ).toBe(true);
 
     const form = document.querySelector("form");
-    expect(form?.method).toMatch(/post/i);
+    expect(form?.getAttribute("method")).toMatch(/post/i);
     expect(form?.action).toContain("https://github.com/settings/apps/new");
     expect(submit).toHaveBeenCalled();
+
+    HTMLFormElement.prototype.submit = previousSubmit;
   });
 });

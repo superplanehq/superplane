@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
@@ -9,8 +9,8 @@ const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
 }));
 
-vi.mock("react-use-websocket", () => ({
-  default: useWebSocketMock,
+vi.mock("@/lib/reactUseWebsocket", () => ({
+  useWebSocket: useWebSocketMock,
 }));
 
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";

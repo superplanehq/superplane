@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ActionsAction, SuperplaneComponentsNode } from "@/api-client";
 import { makeCanvas, makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
