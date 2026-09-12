@@ -288,7 +288,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 	next := *existing
 	next.PlanSource = BillingPlanSourcePolar
 	next.UpdatedAt = now
-	next.PolarModifiedAt = polarSnapshotModifiedAt(sub.ModifiedAt, now)
+	next.PolarModifiedAt = polarSnapshotModifiedAt(existing.PolarModifiedAt, sub.ModifiedAt)
 	if strings.TrimSpace(sub.ID) != "" {
 		id := strings.TrimSpace(sub.ID)
 		next.PolarSubscriptionID = &id
@@ -422,13 +422,12 @@ func polarSnapshotIsStale(existing *OrganizationBillingPlan, incoming *time.Time
 	return incoming.Before(*existing.PolarModifiedAt)
 }
 
-func polarSnapshotModifiedAt(incoming *time.Time, now time.Time) *time.Time {
+func polarSnapshotModifiedAt(existing, incoming *time.Time) *time.Time {
 	if incoming != nil {
 		at := incoming.UTC()
 		return &at
 	}
-	at := now.UTC()
-	return &at
+	return existing
 }
 
 func (p *OrganizationBillingPlan) shouldLapseEndedPolarBusiness(now time.Time) bool {

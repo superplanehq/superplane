@@ -517,6 +517,61 @@ func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 	assert.True(t, after.PolarModifiedAt.Equal(newer))
 }
 
+func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	provider := now.Add(-30 * time.Second)
+	laterWebhook := now.Add(-10 * time.Second)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_order",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &provider,
+		},
+	)
+	require.NoError(t, err)
+
+	canceled, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_order",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, canceled.CancelAtPeriodEnd)
+	require.NotNil(t, canceled.PolarModifiedAt)
+	assert.True(t, canceled.PolarModifiedAt.Equal(provider))
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_order",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &laterWebhook,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.False(t, after.CancelAtPeriodEnd)
+	require.NotNil(t, after.PolarModifiedAt)
+	assert.True(t, after.PolarModifiedAt.Equal(laterWebhook))
+}
+
 func Test__ResolveOrganizationBillingPlanLapsesEndedCancelAtPeriodEnd(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
