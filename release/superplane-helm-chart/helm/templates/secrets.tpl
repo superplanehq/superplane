@@ -86,3 +86,7 @@
 {{- .Values.email.secretName }}
 {{- end }}
 {{- end }}
+
+{{- define "secrets.feedback.name" }}
+{{- printf "%s-feedback" .Release.Name }}
+{{- end }}
