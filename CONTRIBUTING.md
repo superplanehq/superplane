@@ -63,7 +63,9 @@ After the first setup, run `make dev.up` when the stack is not running, then `ma
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-After you finish owner, organization, GitHub, and workspace setup, save a local dump:
+Complete owner, organization, GitHub, and workspace setup once in the UI.
+Then save a local dump. Later restores keep that workspace and GitHub
+connection, so you do not connect GitHub again.
 
 `make db.snapshot` and `make db.restore` use this worktree's Compose stack.
 Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
@@ -71,7 +73,8 @@ Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
 1. Run `make db.snapshot`. SuperPlane writes `.local/superplane_dev.dump`.
 2. Later, run `make db.restore`. SuperPlane loads the dump and applies pending
    migrations. This replaces `superplane_dev` only. It does not change
-   `superplane_test`.
+   `superplane_test`. If `make dev.server` is already running, restart it
+   after restore.
 3. Run `make db.snapshot` again to keep the dump current.
 4. Do not commit `.local/`. The dump is local only.
 
