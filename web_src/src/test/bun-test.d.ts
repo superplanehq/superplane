@@ -21,3 +21,10 @@ declare module "bun:test" {
   export function spyOn<T extends object, K extends keyof T>(object: T, method: K): Mock;
   export function setSystemTime(now?: number | Date): void;
 }
+
+declare module "jsdom" {
+  export class JSDOM {
+    constructor(html?: string, options?: { url?: string });
+    readonly window: Window;
+  }
+}
