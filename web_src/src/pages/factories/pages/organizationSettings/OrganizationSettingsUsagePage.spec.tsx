@@ -11,7 +11,11 @@ import {
   PRIMARY_FACTORY_KEY,
   defaultFactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
-import { DEFAULT_USAGE_HISTORY_ROWS, SUB_CENT_VM_USAGE_HISTORY_ROW, usageHistoryRows } from "../../__fixtures__/usageHistoryFixtures";
+import {
+  DEFAULT_USAGE_HISTORY_ROWS,
+  SUB_CENT_VM_USAGE_HISTORY_ROW,
+  usageHistoryRows,
+} from "../../__fixtures__/usageHistoryFixtures";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 describe("OrganizationSettingsUsagePage", () => {

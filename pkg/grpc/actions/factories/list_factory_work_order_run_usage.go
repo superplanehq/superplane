@@ -94,14 +94,14 @@ func serializeWorkOrderRunUsageRows(factory *models.Factory, rows []models.WorkO
 
 func serializeWorkOrderRunUsageRow(factory *models.Factory, row models.WorkOrderRunUsage) *pb.WorkOrderRunUsageRow {
 	item := &pb.WorkOrderRunUsageRow{
-		WorkOrderId:     row.WorkOrderID.String(),
-		WorkOrderNumber: row.WorkOrderNumber,
-		WorkOrderKey:    factory.WorkOrderKey(row.WorkOrderNumber),
-		Title:           row.Title,
-		LastOccurredAt:  timestamppb.New(row.LastOccurredAt),
-		UserName:        row.UserName,
-		UserEmail:       row.UserEmail,
-		TotalTokens:     row.TotalTokens,
+		WorkOrderId:      row.WorkOrderID.String(),
+		WorkOrderNumber:  row.WorkOrderNumber,
+		WorkOrderKey:     factory.WorkOrderKey(row.WorkOrderNumber),
+		Title:            row.Title,
+		LastOccurredAt:   timestamppb.New(row.LastOccurredAt),
+		UserName:         row.UserName,
+		UserEmail:        row.UserEmail,
+		TotalTokens:      row.TotalTokens,
 		DurationSeconds:  row.DurationSeconds,
 		CostCents:        row.CostCents(),
 		HostedCostCents:  row.HostedCostCents(),
@@ -110,8 +110,8 @@ func serializeWorkOrderRunUsageRow(factory *models.Factory, row models.WorkOrder
 		HostedCostMicros: row.HostedCostMicros,
 		ByokCostMicros:   row.BYOKCostMicros,
 		Models:           row.Models,
-		ByokModels:      row.BYOKModels,
-		MachineTypes:    row.MachineTypes,
+		ByokModels:       row.BYOKModels,
+		MachineTypes:     row.MachineTypes,
 	}
 	if row.WorkOrderExecutionID != uuid.Nil {
 		item.WorkOrderExecutionId = row.WorkOrderExecutionID.String()
