@@ -1,4 +1,20 @@
+import { createElement, type ReactNode } from "react";
+import { vi } from "vitest";
+
 import "@testing-library/jest-dom/vitest";
+
+// jsdom has no CSS layout. Recharts ResponsiveContainer then reads
+// getBoundingClientRect after mount, overwrites initialDimension with 0x0,
+// and warns that the chart width and height must be greater than 0.
+// A numeric size skips that measure so every chart test stays quiet.
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("recharts")>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: ReactNode }) =>
+      createElement(actual.ResponsiveContainer, { width: 760, height: 240 }, children),
+  };
+});
 
 // jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
 // Provide a no-op so every test file gets it for free instead of having to
