@@ -63,10 +63,7 @@ export function usageVmSpendMicros(totalCostMicros: number, hostedCostMicros: nu
  * Prefers ledger micros. Rows that predate those fields still format from
  * whole cents, including MSW fixtures that omit micros.
  */
-export function usageSpendMicros(
-  micros: string | number | undefined,
-  cents: string | number | undefined,
-): number {
+export function usageSpendMicros(micros: string | number | undefined, cents: string | number | undefined): number {
   if (micros !== undefined && micros !== "") {
     return parseWorkOrderMetric(micros);
   }
