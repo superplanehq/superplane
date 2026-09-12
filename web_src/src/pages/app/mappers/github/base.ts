@@ -1,7 +1,7 @@
 import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { MetadataItem } from "@/ui/metadataList";
 import type {

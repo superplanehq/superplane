@@ -11,7 +11,7 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import { stringOrDash } from "../../utils";
 import prometheusIcon from "@/assets/icons/integrations/aws.prometheus.svg";
 

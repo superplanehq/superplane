@@ -288,6 +288,7 @@ import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { onRunTriggerRenderer } from "./messages/on_run";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
+import { registerMapperLookups } from "./mapperLookup";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -699,3 +700,9 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
     },
   };
 }
+
+registerMapperLookups({
+  getState,
+  getStateMap,
+  getTriggerRenderer,
+});

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { onComputeInstanceCreatedTriggerRenderer } from "./on_compute_instance_created";
 import type { NodeInfo, TriggerEventContext, TriggerRendererContext } from "../types";

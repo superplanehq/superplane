@@ -5,7 +5,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatDuration } from "@/lib/duration";
 import { appRunPath } from "@/lib/appPaths";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getState, getStateMap, getTriggerRenderer } from ".";
+import { getState, getStateMap, getTriggerRenderer } from "./mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

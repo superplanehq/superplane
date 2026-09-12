@@ -19,7 +19,7 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";

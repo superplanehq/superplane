@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   aggregateFactoryVelocityFlow,

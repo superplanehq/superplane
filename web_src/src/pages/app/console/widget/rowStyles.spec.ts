@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { makeRowStyleResolver, ROW_STYLE_CLASS } from "./rowStyles";
 import type { WidgetRowStyle } from "./types";

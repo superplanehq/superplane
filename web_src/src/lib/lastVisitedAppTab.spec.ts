@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 
 import { LAST_VISITED_APP_TAB_STORAGE_KEY, readLastVisitedAppTab, recordLastVisitedAppTab } from "./lastVisitedAppTab";
 

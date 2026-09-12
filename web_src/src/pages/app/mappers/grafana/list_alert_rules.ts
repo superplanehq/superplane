@@ -2,7 +2,7 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
   ComponentBaseContext,

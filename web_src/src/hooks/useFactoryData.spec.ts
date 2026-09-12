@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
@@ -9,13 +9,9 @@ const { factoriesCreateWorkOrder } = vi.hoisted(() => ({
   factoriesCreateWorkOrder: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    factoriesCreateWorkOrder,
-  };
-});
+vi.mock("@/api-client", () => ({
+  factoriesCreateWorkOrder,
+}));
 
 import { useCreateWorkOrder } from "./useFactoryData";
 

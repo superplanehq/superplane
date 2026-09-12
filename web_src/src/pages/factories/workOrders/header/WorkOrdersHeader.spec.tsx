@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { WorkOrdersHeader } from "./WorkOrdersHeader";

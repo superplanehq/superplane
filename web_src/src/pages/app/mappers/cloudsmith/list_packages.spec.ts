@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { listPackagesMapper } from "./list_packages";
 import { buildDetailsCtx } from "./test_helpers";
 import type { TrimmedPackageData } from "./types";

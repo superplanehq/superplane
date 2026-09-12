@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { interpolateLayoutNodes } from "./nodePositionAnimation";
 
 describe("interpolateLayoutNodes", () => {

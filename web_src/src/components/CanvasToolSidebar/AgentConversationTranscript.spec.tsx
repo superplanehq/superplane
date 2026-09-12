@@ -1,6 +1,6 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import type { MessageGroup } from "./agentMessageGroups";

@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 

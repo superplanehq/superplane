@@ -1,17 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as SdkGen from "@/api-client/sdk.gen";
-
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 const { organizationsListIntegrationResources } = vi.hoisted(() => ({
   organizationsListIntegrationResources: vi.fn(),
 }));
 
-vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
-  const actual = await importOriginal<typeof SdkGen>();
-  return {
-    ...actual,
-    organizationsListIntegrationResources,
-  };
-});
+vi.mock("@/api-client/sdk.gen", () => ({
+  organizationsListIntegrationResources,
+}));
 
 import { resolveGithubDefaultBranch } from "./useIntegrations";
 

@@ -22,7 +22,7 @@ import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,

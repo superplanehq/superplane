@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasVersion, ConfigurationField } from "@/api-client";
 import { executions, run as baseRun, renderInspector, workflowNodes } from "./RunInspectorPanel.spec.fixtures";
 

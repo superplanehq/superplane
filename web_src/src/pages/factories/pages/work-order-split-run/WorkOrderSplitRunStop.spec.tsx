@@ -3,7 +3,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { handleStopMock, handleRejectMock, handleArchiveMock, handleBackToDraftMock, enabledExperimentalFeatures } =
   vi.hoisted(() => ({

@@ -7,7 +7,7 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 
 import type {
   ComponentBaseContext,

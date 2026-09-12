@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, PHASE } from "./PhaseLogCard.testHelpers";

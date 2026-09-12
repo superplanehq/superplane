@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 import { CanvasRunsSidebar } from ".";
 

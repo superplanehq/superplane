@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { addIncidentActivityMapper } from "./add_incident_activity";
 import { declareDrillMapper, declareIncidentMapper } from "./declare_incident";

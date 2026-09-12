@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 
 import { INITIAL_EAGER_ROWS, LOAD_MORE_STEP } from "./widgetPagination";
 import { useDisplayWindow } from "./useWidgetData";

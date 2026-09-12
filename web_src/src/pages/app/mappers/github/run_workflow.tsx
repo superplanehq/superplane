@@ -19,7 +19,7 @@ import type {
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
 
