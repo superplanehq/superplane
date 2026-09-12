@@ -77,11 +77,26 @@ function isOfflineSafeFetchUrl(url: string): boolean {
 
 await import("./setup");
 
-const { cleanup } = await import("@testing-library/react");
+const { act, cleanup } = await import("@testing-library/react");
+const nativeSetTimeout = globalThis.setTimeout.bind(globalThis);
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await flushDeferredReactUpdates();
 });
+
+async function flushDeferredReactUpdates() {
+  await act(async () => {
+    try {
+      vi.runOnlyPendingTimers();
+    } catch {
+      // Real timers, or Bun rejects when the clock is not faked.
+    }
+    await new Promise<void>((resolve) => {
+      nativeSetTimeout(resolve, 0);
+    });
+  });
+}
 
 function patchVitestCompat(viRecord: Record<string, unknown>) {
   const globalDescriptors = new Map<string, PropertyDescriptor | undefined>();

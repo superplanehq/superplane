@@ -1,5 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 
+silenceReactActWarnings();
+disableCssAnimations();
+
 // Happy DOM has no CSS layout. Recharts ResponsiveContainer then reads
 // getBoundingClientRect after mount, overwrites initialDimension with 0x0,
 // and warns that the chart width and height must be greater than 0.
@@ -168,3 +171,32 @@ Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     measureText: (text: string) => ({ width: text.length * 7 }),
   }),
 });
+
+function silenceReactActWarnings() {
+  const originalError = console.error.bind(console);
+  const originalWarn = console.warn.bind(console);
+  console.error = (...args: unknown[]) => {
+    if (isReactActWarning(args)) {
+      return;
+    }
+    originalError(...args);
+  };
+  console.warn = (...args: unknown[]) => {
+    if (isReactActWarning(args)) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
+
+function isReactActWarning(args: unknown[]): boolean {
+  return args.some((arg) => typeof arg === "string" && arg.includes("not wrapped in act("));
+}
+
+function disableCssAnimations() {
+  const style = document.createElement("style");
+  style.setAttribute("data-superplane-test-disable-animations", "");
+  style.textContent =
+    "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;}";
+  document.head.appendChild(style);
+}
