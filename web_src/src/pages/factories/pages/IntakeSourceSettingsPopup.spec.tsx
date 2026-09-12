@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
@@ -25,8 +26,8 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof CanvasDataModule>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData");
   return {
     ...actual,
     useInfiniteCanvasRuns,

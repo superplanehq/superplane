@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type * as ApiClient from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageResponses";
@@ -16,8 +17,8 @@ const { cancelRunMock } = vi.hoisted(() => ({
   cancelRunMock: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),

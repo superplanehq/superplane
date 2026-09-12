@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { AccountLinkedAccount } from "@/contexts/accountContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as AccountSettings from "@/lib/accountSettings";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfilePage";
@@ -42,8 +43,8 @@ vi.mock("./DeleteAccountDangerZone", () => ({
   DeleteAccountDangerZone: () => null,
 }));
 
-vi.mock("@/lib/accountSettings", async (importOriginal) => {
-  const actual = await importOriginal<typeof AccountSettings>();
+vi.mock("@/lib/accountSettings", () => {
+  const actual = unmockedSrc<typeof AccountSettings>("lib/accountSettings");
   return {
     ...actual,
     disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),

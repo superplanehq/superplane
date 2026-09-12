@@ -1,16 +1,15 @@
-import { createElement, type ReactNode } from "react";
-import { vi } from "bun:test";
-
 import "@testing-library/jest-dom/vitest";
 
 // Happy DOM has no CSS layout. Recharts ResponsiveContainer then reads
 // getBoundingClientRect after mount, overwrites initialDimension with 0x0,
 // and warns that the chart width and height must be greater than 0.
-// A numeric size skips that measure so every chart test stays quiet.
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: ReactNode }) =>
-    createElement("div", { style: { width: 760, height: 240 } }, children),
-}));
+const elementBox = { width: 760, height: 240, top: 0, left: 0, bottom: 240, right: 760, x: 0, y: 0 };
+HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+  return {
+    ...elementBox,
+    toJSON: () => elementBox,
+  };
+};
 
 // jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
 // Provide a no-op so every test file gets it for free instead of having to

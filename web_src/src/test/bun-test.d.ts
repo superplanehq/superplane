@@ -17,9 +17,7 @@ declare module "bun:test" {
     type MockInstance,
   } from "vitest";
 
-  type VitestVi = (typeof import("vitest"))["vi"];
-
-  export const mock: VitestVi["fn"];
-  export const spyOn: VitestVi["spyOn"];
-  export const setSystemTime: VitestVi["setSystemTime"];
+  export function mock<T extends (...args: never[]) => unknown>(implementation?: T): Mock;
+  export function spyOn<T extends object, K extends keyof T>(object: T, method: K): Mock;
+  export function setSystemTime(now?: number | Date): void;
 }

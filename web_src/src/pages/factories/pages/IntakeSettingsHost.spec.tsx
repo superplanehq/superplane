@@ -9,6 +9,7 @@ import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
@@ -35,8 +36,8 @@ const {
   useEventExecutions: vi.fn(),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
-  ...(await importOriginal<typeof CanvasDataModule>()),
+vi.mock("@/hooks/useCanvasData", () => ({
+  ...unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData"),
   useCanvas,
   useTriggers,
   useInfiniteCanvasRuns,
@@ -44,18 +45,18 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
   useEventExecutions,
 }));
 
-vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
-  ...(await importOriginal<typeof ComponentDataModule>()),
+vi.mock("@/hooks/useComponentData", () => ({
+  ...unmockedSrc<typeof ComponentDataModule>("hooks/useComponentData"),
   useComponents,
 }));
 
-vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
-  ...(await importOriginal<typeof IntegrationsModule>()),
+vi.mock("@/hooks/useIntegrations", () => ({
+  ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useAvailableIntegrations,
 }));
 
-vi.mock("@/hooks/useFactoryIntakeData", async (importOriginal) => ({
-  ...(await importOriginal<typeof FactoryIntakeDataModule>()),
+vi.mock("@/hooks/useFactoryIntakeData", () => ({
+  ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
 }));
 

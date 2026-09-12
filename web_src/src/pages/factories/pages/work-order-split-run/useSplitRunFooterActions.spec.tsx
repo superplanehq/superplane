@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type * as ApiClient from "@/api-client";
 import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 
 const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
@@ -13,16 +14,16 @@ const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock 
   cancelRunMock: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
   };
 });
 
-vi.mock("@/hooks/useFactoryData", async (importOriginal) => {
-  const actual = await importOriginal<typeof FactoryData>();
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
   return {
     ...actual,
     useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),

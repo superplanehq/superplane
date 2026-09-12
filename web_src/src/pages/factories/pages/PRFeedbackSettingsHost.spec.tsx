@@ -8,6 +8,7 @@ import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryPRFeedbackDataModule from "@/hooks/useFactoryPRFeedbackData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PR_DISCUSSION_HANDLER } from "../__fixtures__/columnAutomationsFixture";
@@ -26,26 +27,26 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
-  ...(await importOriginal<typeof CanvasDataModule>()),
+vi.mock("@/hooks/useCanvasData", () => ({
+  ...unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData"),
   useCanvas,
   useTriggers,
   useInfiniteCanvasRuns,
 }));
 
-vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
-  ...(await importOriginal<typeof ComponentDataModule>()),
+vi.mock("@/hooks/useComponentData", () => ({
+  ...unmockedSrc<typeof ComponentDataModule>("hooks/useComponentData"),
   useComponents,
 }));
 
-vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
-  ...(await importOriginal<typeof IntegrationsModule>()),
+vi.mock("@/hooks/useIntegrations", () => ({
+  ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useConnectedIntegrations: () => ({ data: [], isLoading: false, error: null }),
   useAvailableIntegrations: () => ({ data: [], isLoading: false }),
 }));
 
-vi.mock("@/hooks/useFactoryPRFeedbackData", async (importOriginal) => ({
-  ...(await importOriginal<typeof FactoryPRFeedbackDataModule>()),
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  ...unmockedSrc<typeof FactoryPRFeedbackDataModule>("hooks/useFactoryPRFeedbackData"),
   useFactoryPRFeedbackHandlers: () => ({
     data: [PR_DISCUSSION_HANDLER],
     isPending: false,

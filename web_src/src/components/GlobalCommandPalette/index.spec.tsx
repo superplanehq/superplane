@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { unmockedPackage } from "@/test/unmockedModule";
+
 import { GlobalCommandPalette } from ".";
 import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { openGlobalCommandPalette } from "./controller";
@@ -55,8 +57,8 @@ const {
   };
 });
 
-vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
+vi.mock("react-router", () => {
+  const actual = unmockedPackage<typeof ReactRouterDom>("react-router/dist/development/index.js");
   return {
     ...actual,
     useNavigate: () => navigateMock,

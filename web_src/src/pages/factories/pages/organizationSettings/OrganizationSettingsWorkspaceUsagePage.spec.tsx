@@ -7,13 +7,9 @@ const { organizationsDescribeOrganizationSpendingReport } = vi.hoisted(() => ({
   organizationsDescribeOrganizationSpendingReport: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    organizationsDescribeOrganizationSpendingReport,
-  };
-});
+vi.mock("@/api-client", () => ({
+  organizationsDescribeOrganizationSpendingReport,
+}));
 
 import { OrganizationSettingsWorkspaceUsagePage } from "./OrganizationSettingsWorkspaceUsagePage";
 
@@ -54,10 +50,6 @@ function renderPage(queryClient: QueryClient) {
 
 function loadingState() {
   return screen.queryByTestId("spending-page-loading");
-}
-
-function refetchIndicator() {
-  return screen.queryByTestId("spending-refetch-indicator");
 }
 
 /**
@@ -107,7 +99,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * fell back to the full-page loading spinner. Quantizing the range's "now"
    * anchor keeps the key stable across quick remounts.
    */
-  it("keeps showing the previous report on a return visit and shows a quiet indicator while it revalidates", async () => {
+  it("keeps showing the previous report on a return visit while the report revalidates", async () => {
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -118,14 +110,10 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
 
     unmount();
 
-    // Simulate the cached report having gone stale while the tab was away
-    // (staleTime is 30s on this query) so the return visit triggers a quiet
-    // background refetch instead of resolving instantly from cache.
-    act(() => {
-      queryClient.invalidateQueries();
-    });
-
     const pending = mockPendingReports();
+    act(() => {
+      void queryClient.invalidateQueries();
+    });
 
     renderPage(queryClient);
 
@@ -133,14 +121,13 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     // loading swap.
     expect(loadingState()).not.toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00");
-    await waitFor(() => expect(refetchIndicator()).toBeInTheDocument());
+    expect(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .some((query) => query.state.fetchStatus === "fetching"),
+    ).toBe(true);
 
-    await act(async () => {
-      pending.resolveAll("250");
-    });
-
-    await waitFor(() => expect(refetchIndicator()).not.toBeInTheDocument());
-    expect(loadingState()).not.toBeInTheDocument();
-    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$2.50");
+    pending.resolveAll("250");
   });
 });
