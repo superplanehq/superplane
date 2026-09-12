@@ -75,14 +75,14 @@ run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
 - Go `1.26.2` (pinned in `go.mod`; provided by the dev container).
-- Node.js + npm (provided by the dev container; used by Vite/frontend).
+- Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
 Run these three steps once, in order:
 
 1. `make dev.up` — builds the dev-base image and starts containers (app, db,
    rabbitmq). The first run builds the image (~3-5 min); later runs reuse it.
-2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
+2. `make dev.setup` — installs JS deps with bun, downloads Go modules, runs protobuf
    codegen, and creates + migrates the databases. Re-run when protos, Go
    modules, or frontend deps change. By default only `superplane_dev` is
    migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also

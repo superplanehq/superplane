@@ -1,5 +1,7 @@
 junit-report.xml
 junit-e2e.xml
+bun.lock
+bun.lockb
 pkg/web/assets/dist
 tmp
 build/

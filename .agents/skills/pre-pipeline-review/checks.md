@@ -30,7 +30,7 @@ targets across rows. Skip a row when nothing in that column changed.
 - **Protos**: after `pb.gen`, generated trees stay gitignored; a clean
   `git status` for those paths is expected. Do not commit them.
 - **Fast security**: `make check.fast.security` is a static scan of tool
-  configs, known dropper markers, and npm install hooks. Run it before
+  configs, known dropper markers, and package install hooks. Run it before
   jobs that load Vite, Vitest, Storybook, or ESLint. It does not load
   `eslint.config.js`. Semaphore runs the same scans in the Security block.
 - **ESLint**: `make check.lint.ui` fails when the budget grows. Fix violations;

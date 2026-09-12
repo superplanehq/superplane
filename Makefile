@@ -13,10 +13,18 @@ DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
 
+# Quiet BuildKit and Compose progress in CI. Use DEBUG=1 for full logs.
+COMPOSE_PROGRESS := auto
+COMPOSE_UP_EXTRA :=
 ifeq ($(DEBUG),1)
 export BUILDKIT_PROGRESS := plain
+COMPOSE_PROGRESS := plain
 else
 export BUILDKIT_PROGRESS := quiet
+ifneq ($(strip $(CI)),)
+COMPOSE_PROGRESS := quiet
+COMPOSE_UP_EXTRA := --quiet-build
+endif
 endif
 
 PKG_TEST_PACKAGES := ./pkg/...
@@ -116,7 +124,9 @@ dev.test.is.running:
 
 dev.up:
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
-	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
+	@echo "Starting development containers..."
+	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
+	@echo "Development containers are ready."
 
 dev.setup:
 	@$(MAKE) dev.test.is.running
@@ -130,7 +140,7 @@ dev.setup:
 
 dev.setup.npm:
 	@$(MAKE) ensure.bun
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && bun install"
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
@@ -224,10 +234,10 @@ ensure.bun:
 	$(COMPOSE) exec app bash -lc 'command -v bun >/dev/null || bash /app/scripts/docker/install-bun.sh'
 
 check.test.ui: ensure.bun
-	$(COMPOSE) exec app bash -lc "cd /app/web_src && bun test --isolate $(FILES)"
+	$(COMPOSE) exec -e FILES="$(FILES)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.test.ui.shard: ensure.bun
-	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
+	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
@@ -283,8 +293,8 @@ profile.goroutines:
 	$(COMPOSE) exec app curl -s "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/goroutine?debug=2"
 
 
-storybook:
-	$(COMPOSE) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
+storybook: ensure.bun
+	$(COMPOSE) exec app bash -lc "cd /app/web_src && bun install && npm run storybook"
 
 ui.setup:
 	npm install
