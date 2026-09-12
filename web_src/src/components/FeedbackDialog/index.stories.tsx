@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Bug, MessageSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { Toaster } from "sonner";
 import { userEvent, within } from "storybook/test";
@@ -44,31 +44,73 @@ type Story = StoryObj<typeof meta>;
 
 type SubmitMode = "success" | "error" | "pending";
 
-function useFeedbackSubmit(mode: SubmitMode) {
+const FEEDBACK_FETCH_KEY = "__feedbackDialogStoryFetch";
+
+interface FeedbackFetchState {
+  original: typeof fetch;
+  modes: Map<string, SubmitMode>;
+}
+
+function organizationIdFromHeaders(headers: HeadersInit | undefined): string {
+  if (!headers) {
+    return "";
+  }
+  if (headers instanceof Headers) {
+    return headers.get("x-organization-id") ?? "";
+  }
+  if (Array.isArray(headers)) {
+    const match = headers.find(([key]) => key.toLowerCase() === "x-organization-id");
+    return match?.[1] ?? "";
+  }
+  return headers["x-organization-id"] ?? "";
+}
+
+function feedbackResponse(mode: SubmitMode): Promise<Response> {
+  if (mode === "pending") {
+    return new Promise(() => undefined);
+  }
+  if (mode === "error") {
+    return Promise.resolve(
+      new Response(JSON.stringify({ message: "SuperPlane could not send your feedback. Try again." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }
+  return Promise.resolve(new Response(null, { status: 204 }));
+}
+
+function feedbackFetchState(): FeedbackFetchState {
+  const holder = window as unknown as Record<string, FeedbackFetchState | undefined>;
+  let state = holder[FEEDBACK_FETCH_KEY];
+  if (state) {
+    return state;
+  }
+
+  const created: FeedbackFetchState = {
+    original: window.fetch.bind(window),
+    modes: new Map(),
+  };
+  holder[FEEDBACK_FETCH_KEY] = created;
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (!url.includes("/api/v1/me/feedback")) {
+      return created.original(input, init);
+    }
+    const organizationId = organizationIdFromHeaders(init?.headers);
+    return feedbackResponse(created.modes.get(organizationId) ?? "success");
+  }) as typeof fetch;
+  return created;
+}
+
+function useFeedbackSubmit(organizationId: string, mode: SubmitMode) {
   useEffect(() => {
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (!url.includes("/api/v1/me/feedback")) {
-        return originalFetch(input, init);
-      }
-      if (mode === "pending") {
-        return new Promise(() => undefined);
-      }
-      if (mode === "error") {
-        return Promise.resolve(
-          new Response(JSON.stringify({ message: "SuperPlane could not send your feedback. Try again." }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-      return Promise.resolve(new Response(null, { status: 204 }));
-    };
+    const state = feedbackFetchState();
+    state.modes.set(organizationId, mode);
     return () => {
-      window.fetch = originalFetch;
+      state.modes.delete(organizationId);
     };
-  }, [mode]);
+  }, [organizationId, mode]);
 }
 
 function FeedbackDialogPlayground({
@@ -80,9 +122,10 @@ function FeedbackDialogPlayground({
   initialOpen?: boolean;
   submitMode?: SubmitMode;
 }) {
+  const organizationId = useId();
   const [open, setOpen] = useState(initialOpen);
   const [category, setCategory] = useState(initialCategory);
-  useFeedbackSubmit(submitMode);
+  useFeedbackSubmit(organizationId, submitMode);
 
   const openWith = (nextCategory: FeedbackCategory) => {
     setCategory(nextCategory);
@@ -101,7 +144,7 @@ function FeedbackDialogPlayground({
           Send feedback
         </Button>
       </div>
-      <FeedbackDialog open={open} onOpenChange={setOpen} organizationId="org-storybook" initialCategory={category} />
+      <FeedbackDialog open={open} onOpenChange={setOpen} organizationId={organizationId} initialCategory={category} />
     </>
   );
 }
