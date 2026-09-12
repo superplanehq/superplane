@@ -2,6 +2,8 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -11,11 +13,23 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type gitHubIssueStateSource interface {
 	Repository() string
 	IsIssueClosed(ctx context.Context, number int) (bool, error)
+}
+
+type gitHubIssueSourceIndex struct {
+	byRepository map[string]gitHubIssueStateSource
+	failedRepos  map[string]struct{}
+	connectFails int
+}
+
+type gitHubIssueClosedLookup struct {
+	closed bool
+	err    error
 }
 
 func SyncClosedGitHubBacklog(
@@ -56,10 +70,11 @@ func SyncClosedGitHubBacklog(
 		return nil, factoryErrorToStatus(err, "failed to sync closed GitHub issues")
 	}
 
+	lookups := map[string]gitHubIssueClosedLookup{}
 	closedCount := int32(0)
-	failedCount := int32(0)
+	failedCount := int32(sources.connectFails)
 	for i := range orders {
-		closed, failed := syncDraftOrderFromGitHub(ctx, db, orgID, factory, &orders[i], sources, closedBy)
+		closed, failed := syncDraftOrderFromGitHub(ctx, db, orgID, factory, &orders[i], sources, lookups, closedBy)
 		if closed {
 			closedCount++
 		}
@@ -79,13 +94,16 @@ func connectedGitHubIssueSources(
 	deps IntakeDependencies,
 	db *gorm.DB,
 	factory *models.Factory,
-) (map[string]gitHubIssueStateSource, error) {
+) (gitHubIssueSourceIndex, error) {
 	intakes, err := factory.ListIntakes(db)
 	if err != nil {
-		return nil, err
+		return gitHubIssueSourceIndex{}, err
 	}
 
-	sources := map[string]gitHubIssueStateSource{}
+	index := gitHubIssueSourceIndex{
+		byRepository: map[string]gitHubIssueStateSource{},
+		failedRepos:  map[string]struct{}{},
+	}
 	var connectErr error
 	for i := range intakes {
 		intake := &intakes[i]
@@ -95,26 +113,56 @@ func connectedGitHubIssueSources(
 		source, err := deps.itemSource(ctx, db, intake)
 		if err != nil {
 			connectErr = err
+			recordFailedGitHubIntake(db, intake, &index)
 			continue
 		}
 		githubSource, ok := source.(gitHubIssueStateSource)
 		if !ok {
 			continue
 		}
-		repository := strings.ToLower(strings.TrimSpace(githubSource.Repository()))
+		repository := normalizeGitHubRepository(githubSource.Repository())
 		if repository == "" {
 			continue
 		}
-		sources[repository] = githubSource
+		if _, exists := index.byRepository[repository]; exists {
+			continue
+		}
+		index.byRepository[repository] = githubSource
+		delete(index.failedRepos, repository)
 	}
 
-	if len(sources) > 0 {
-		return sources, nil
+	if len(index.byRepository) > 0 {
+		return index, nil
 	}
 	if connectErr != nil {
-		return nil, connectErr
+		return gitHubIssueSourceIndex{}, connectErr
 	}
-	return nil, errIntakeNotConnected
+	return gitHubIssueSourceIndex{}, errIntakeNotConnected
+}
+
+func recordFailedGitHubIntake(db *gorm.DB, intake *models.FactoryIntake, index *gitHubIssueSourceIndex) {
+	repository := gitHubIntakeRepository(db, intake)
+	if repository == "" {
+		index.connectFails++
+		return
+	}
+	if _, exists := index.byRepository[repository]; exists {
+		return
+	}
+	index.failedRepos[repository] = struct{}{}
+}
+
+func gitHubIntakeRepository(db *gorm.DB, intake *models.FactoryIntake) string {
+	trigger, _, err := resolveLiveIntakeTrigger(db, intake)
+	if err != nil || trigger == nil {
+		return ""
+	}
+	repository, _ := trigger.Configuration["repository"].(string)
+	return normalizeGitHubRepository(repository)
+}
+
+func normalizeGitHubRepository(repository string) string {
+	return strings.ToLower(strings.TrimSpace(repository))
 }
 
 func syncDraftOrderFromGitHub(
@@ -123,7 +171,8 @@ func syncDraftOrderFromGitHub(
 	orgID uuid.UUID,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	sources map[string]gitHubIssueStateSource,
+	sources gitHubIssueSourceIndex,
+	lookups map[string]gitHubIssueClosedLookup,
 	closedBy uuid.UUID,
 ) (closed bool, failed bool) {
 	origin := order.Origin()
@@ -136,12 +185,16 @@ func syncDraftOrderFromGitHub(
 		return false, false
 	}
 
-	source := sources[strings.ToLower(ref.Repository)]
+	repository := normalizeGitHubRepository(ref.Repository)
+	source := sources.byRepository[repository]
 	if source == nil {
+		if _, failedRepo := sources.failedRepos[repository]; failedRepo {
+			return false, true
+		}
 		return false, false
 	}
 
-	issueClosed, err := source.IsIssueClosed(ctx, ref.Number)
+	issueClosed, err := issueClosedFromSource(ctx, source, repository, ref.Number, lookups)
 	if err != nil {
 		return false, true
 	}
@@ -149,8 +202,53 @@ func syncDraftOrderFromGitHub(
 		return false, false
 	}
 
-	if _, err := closeWorkOrderAsUser(db, orgID, factory, order, models.FactoryWorkOrderResultRejected, closedBy); err != nil {
+	return closeDraftWorkOrderIfCurrent(db, orgID, factory, order.ID, closedBy)
+}
+
+func issueClosedFromSource(
+	ctx context.Context,
+	source gitHubIssueStateSource,
+	repository string,
+	number int,
+	lookups map[string]gitHubIssueClosedLookup,
+) (bool, error) {
+	key := repository + "#" + strconv.Itoa(number)
+	if lookup, ok := lookups[key]; ok {
+		return lookup.closed, lookup.err
+	}
+
+	closed, err := source.IsIssueClosed(ctx, number)
+	lookups[key] = gitHubIssueClosedLookup{closed: closed, err: err}
+	return closed, err
+}
+
+func closeDraftWorkOrderIfCurrent(
+	db *gorm.DB,
+	orgID uuid.UUID,
+	factory *models.Factory,
+	orderID uuid.UUID,
+	closedBy uuid.UUID,
+) (closed bool, failed bool) {
+	var closedOK bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		current, err := factory.FindWorkOrder(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orderID)
+		if err != nil {
+			return err
+		}
+		if current.State != models.FactoryWorkOrderStateDraft {
+			return nil
+		}
+		if _, err := closeWorkOrderAsUser(tx, orgID, factory, current, models.FactoryWorkOrderResultRejected, closedBy); err != nil {
+			if errors.Is(err, models.ErrFactoryWorkOrderInvalidState) {
+				return nil
+			}
+			return err
+		}
+		closedOK = true
+		return nil
+	})
+	if err != nil {
 		return false, true
 	}
-	return true, false
+	return closedOK, false
 }

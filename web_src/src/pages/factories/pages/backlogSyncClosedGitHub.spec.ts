@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { BACKLOG_SYNC_GITHUB_COPY, hasGitHubIssuesIntake, syncClosedGitHubToast } from "./backlogSyncClosedGitHub";
+import {
+  BACKLOG_SYNC_GITHUB_COPY,
+  canSyncClosedGitHubIssues,
+  hasGitHubIssuesIntake,
+  syncClosedGitHubToast,
+} from "./backlogSyncClosedGitHub";
 
 describe("hasGitHubIssuesIntake", () => {
   it("is true when a GitHub issues intake exists", () => {
@@ -11,6 +16,16 @@ describe("hasGitHubIssuesIntake", () => {
     expect(hasGitHubIssuesIntake([{ source: "SOURCE_SENTRY_EXCEPTIONS" }])).toBe(false);
     expect(hasGitHubIssuesIntake([])).toBe(false);
     expect(hasGitHubIssuesIntake(undefined)).toBe(false);
+  });
+});
+
+describe("canSyncClosedGitHubIssues", () => {
+  it("is true when a GitHub issues intake exists and the user can update work orders", () => {
+    expect(canSyncClosedGitHubIssues([{ source: "SOURCE_GITHUB_ISSUES" }], true)).toBe(true);
+  });
+
+  it("is false when the user cannot update work orders", () => {
+    expect(canSyncClosedGitHubIssues([{ source: "SOURCE_GITHUB_ISSUES" }], false)).toBe(false);
   });
 });
 

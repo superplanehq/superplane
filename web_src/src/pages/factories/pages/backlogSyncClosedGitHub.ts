@@ -26,6 +26,13 @@ export function hasGitHubIssuesIntake(intakes: FactoriesFactoryIntake[] | undefi
   return Boolean(intakes?.some((intake) => intake.source === "SOURCE_GITHUB_ISSUES"));
 }
 
+export function canSyncClosedGitHubIssues(
+  intakes: FactoriesFactoryIntake[] | undefined,
+  canUpdateWorkOrders: boolean,
+): boolean {
+  return canUpdateWorkOrders && hasGitHubIssuesIntake(intakes);
+}
+
 export type SyncClosedGitHubBacklogResult = {
   closedCount: number;
   failedCount: number;

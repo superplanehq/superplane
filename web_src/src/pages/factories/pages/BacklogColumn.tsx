@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryIntakes, useSyncClosedGitHubBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
@@ -18,7 +19,7 @@ import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lin
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
-import { BACKLOG_SYNC_GITHUB_COPY, hasGitHubIssuesIntake, syncClosedGitHubToast } from "./backlogSyncClosedGitHub";
+import { BACKLOG_SYNC_GITHUB_COPY, canSyncClosedGitHubIssues, syncClosedGitHubToast } from "./backlogSyncClosedGitHub";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -92,6 +93,8 @@ export function BacklogColumn({
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const { canAct } = usePermissions();
+  const canUpdateWorkOrders = canAct("work_orders", "update");
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const syncClosedGitHub = useSyncClosedGitHubBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
@@ -127,7 +130,7 @@ export function BacklogColumn({
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
             onSyncClosedGitHubIssues={
-              hasGitHubIssuesIntake(intakesQuery.data)
+              canSyncClosedGitHubIssues(intakesQuery.data, canUpdateWorkOrders)
                 ? () => {
                     void syncClosedGitHubIssues(syncClosedGitHub.mutateAsync);
                   }

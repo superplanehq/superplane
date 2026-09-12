@@ -103,5 +103,5 @@ func closeWorkOrderAsUser(
 		}
 	}
 
-	return factory.FindWorkOrder(db, closed.ID)
+	return closed, nil
 }

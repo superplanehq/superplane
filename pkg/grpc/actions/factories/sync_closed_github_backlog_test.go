@@ -22,13 +22,19 @@ type stubGitHubIssueStateSource struct {
 	repository string
 	closed     map[int]bool
 	err        error
+	checks     int
+	onCheck    func(number int)
 }
 
-func (s stubGitHubIssueStateSource) Repository() string {
+func (s *stubGitHubIssueStateSource) Repository() string {
 	return s.repository
 }
 
-func (s stubGitHubIssueStateSource) IsIssueClosed(_ context.Context, number int) (bool, error) {
+func (s *stubGitHubIssueStateSource) IsIssueClosed(_ context.Context, number int) (bool, error) {
+	s.checks++
+	if s.onCheck != nil {
+		s.onCheck(number)
+	}
 	if s.err != nil {
 		return false, s.err
 	}
@@ -75,7 +81,7 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 		return order
 	}
 
-	githubDeps := func(source stubGitHubIssueStateSource) IntakeDependencies {
+	githubDeps := func(source *stubGitHubIssueStateSource) IntakeDependencies {
 		return IntakeDependencies{
 			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
 				return source, nil
@@ -96,7 +102,7 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 			Label: "91",
 		})
 
-		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(stubGitHubIssueStateSource{
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(&stubGitHubIssueStateSource{
 			repository: "acme/payments",
 			closed:     map[int]bool{12: true, 13: false},
 		}), orgID, &pb.SyncClosedGitHubBacklogRequest{FactoryId: factory.ID.String()})
@@ -115,7 +121,7 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 		createGitHubIntake(t, factory)
 		createDraft(t, factory, "Fails lookup", githubOrigin)
 
-		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(stubGitHubIssueStateSource{
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(&stubGitHubIssueStateSource{
 			repository: "acme/payments",
 			err:        errors.New("github unavailable"),
 		}), orgID, &pb.SyncClosedGitHubBacklogRequest{FactoryId: factory.ID.String()})
@@ -161,7 +167,7 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 			Label: "other/repo#4",
 		})
 
-		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(stubGitHubIssueStateSource{
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(&stubGitHubIssueStateSource{
 			repository: "acme/payments",
 			closed:     map[int]bool{4: true},
 		}), orgID, &pb.SyncClosedGitHubBacklogRequest{FactoryId: factory.ID.String()})
@@ -171,5 +177,99 @@ func Test__SyncClosedGitHubBacklog(t *testing.T) {
 		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), other.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	})
+
+	t.Run("counts a failed GitHub intake when another intake connects", func(t *testing.T) {
+		factory := newFactory(t)
+		createGitHubIntake(t, factory)
+		createGitHubIntake(t, factory)
+		createDraft(t, factory, "Still open", models.WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/13",
+			Label: "acme/payments#13",
+		})
+
+		calls := 0
+		response, err := SyncClosedGitHubBacklog(ctx, IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				calls++
+				if calls > 1 {
+					return nil, errors.New("github unavailable")
+				}
+				return &stubGitHubIssueStateSource{
+					repository: "acme/payments",
+					closed:     map[int]bool{13: false},
+				}, nil
+			},
+		}, orgID, &pb.SyncClosedGitHubBacklogRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), response.GetClosedCount())
+		assert.Equal(t, int32(1), response.GetFailedCount())
+	})
+
+	t.Run("keeps the first connected source for a repository", func(t *testing.T) {
+		factory := newFactory(t)
+		createGitHubIntake(t, factory)
+		createGitHubIntake(t, factory)
+		order := createDraft(t, factory, "Handle duplicate refunds", githubOrigin)
+
+		calls := 0
+		response, err := SyncClosedGitHubBacklog(ctx, IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				calls++
+				closed := map[int]bool{12: calls > 1}
+				return &stubGitHubIssueStateSource{
+					repository: "acme/payments",
+					closed:     closed,
+				}, nil
+			},
+		}, orgID, &pb.SyncClosedGitHubBacklogRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), response.GetClosedCount())
+
+		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	})
+
+	t.Run("reuses GitHub issue lookups for duplicate origins", func(t *testing.T) {
+		factory := newFactory(t)
+		createGitHubIntake(t, factory)
+		createDraft(t, factory, "First copy", githubOrigin)
+		createDraft(t, factory, "Second copy", githubOrigin)
+		source := &stubGitHubIssueStateSource{
+			repository: "acme/payments",
+			closed:     map[int]bool{12: false},
+		}
+
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(source), orgID, &pb.SyncClosedGitHubBacklogRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), response.GetClosedCount())
+		assert.Equal(t, 1, source.checks)
+	})
+
+	t.Run("does not close a draft that was dispatched during the GitHub check", func(t *testing.T) {
+		factory := newFactory(t)
+		createGitHubIntake(t, factory)
+		order := createDraft(t, factory, "Handle duplicate refunds", githubOrigin)
+		source := &stubGitHubIssueStateSource{
+			repository: "acme/payments",
+			closed:     map[int]bool{12: true},
+			onCheck: func(int) {
+				require.NoError(t, order.TransitionOnDispatch(database.DB(t.Context()), &r.User))
+			},
+		}
+
+		response, err := SyncClosedGitHubBacklog(ctx, githubDeps(source), orgID, &pb.SyncClosedGitHubBacklogRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), response.GetClosedCount())
+		assert.Equal(t, int32(0), response.GetFailedCount())
+
+		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 	})
 }
