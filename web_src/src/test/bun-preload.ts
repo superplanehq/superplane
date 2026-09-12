@@ -1,4 +1,5 @@
 import { afterEach, setSystemTime, vi } from "bun:test";
+import { setTimeout as nodeSetTimeout } from "node:timers/promises";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 type ImportMetaEnv = Record<string, string | boolean | undefined>;
@@ -78,7 +79,6 @@ function isOfflineSafeFetchUrl(url: string): boolean {
 await import("./setup");
 
 const { act, cleanup } = await import("@testing-library/react");
-const nativeSetTimeout = globalThis.setTimeout.bind(globalThis);
 
 afterEach(async () => {
   cleanup();
@@ -86,16 +86,15 @@ afterEach(async () => {
 });
 
 async function flushDeferredReactUpdates() {
-  await act(async () => {
-    try {
-      vi.runOnlyPendingTimers();
-    } catch {
-      // Real timers, or Bun rejects when the clock is not faked.
-    }
-    await new Promise<void>((resolve) => {
-      nativeSetTimeout(resolve, 0);
+  try {
+    await act(() => {
+      vi.advanceTimersByTime(0);
     });
-  });
+  } catch {
+    // Real timers, or Bun rejects when the clock is not faked.
+  }
+  // Use Node timers so fake clocks cannot stall this hook.
+  await nodeSetTimeout(0);
 }
 
 function patchVitestCompat(viRecord: Record<string, unknown>) {
