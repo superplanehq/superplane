@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import {
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
+import { BACKLOG_SYNC_GITHUB_COPY } from "./backlogSyncClosedGitHub";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
 interface ColumnLaneMenuProps {
@@ -31,6 +32,9 @@ interface ColumnLaneMenuProps {
   onAddIntake?: () => void;
   /** Opens the Add automation picker. */
   onAddAutomation?: () => void;
+  /** Closes backlog tasks whose GitHub issues are closed. Hidden when unset. */
+  onSyncClosedGitHubIssues?: () => void;
+  syncClosedGitHubIssuesPending?: boolean;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -48,12 +52,14 @@ export function ColumnLaneMenu({
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   onAddIntake,
   onAddAutomation,
+  onSyncClosedGitHubIssues,
+  syncClosedGitHubIssuesPending = false,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation);
+  const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation || onSyncClosedGitHubIssues);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -89,6 +95,8 @@ export function ColumnLaneMenu({
               parallelism={parallelism}
               onAddIntake={onAddIntake}
               onAddAutomation={onAddAutomation}
+              onSyncClosedGitHubIssues={onSyncClosedGitHubIssues}
+              syncClosedGitHubIssuesPending={syncClosedGitHubIssuesPending}
             />
             <DropdownMenuSeparator className="my-0" />
           </>
@@ -108,6 +116,8 @@ function ColumnLaneMenuActions({
   parallelism,
   onAddIntake,
   onAddAutomation,
+  onSyncClosedGitHubIssues,
+  syncClosedGitHubIssuesPending,
 }: {
   testId: string;
   editLabel: string;
@@ -117,6 +127,8 @@ function ColumnLaneMenuActions({
   parallelism: number;
   onAddIntake?: () => void;
   onAddAutomation?: () => void;
+  onSyncClosedGitHubIssues?: () => void;
+  syncClosedGitHubIssuesPending: boolean;
 }) {
   return (
     <div className="p-1">
@@ -142,6 +154,16 @@ function ColumnLaneMenuActions({
         <DropdownMenuItem onSelect={onSetParallelism} data-testid={`${testId}-parallelism`}>
           <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
           {setParallelismLabel(parallelism)}
+        </DropdownMenuItem>
+      ) : null}
+      {onSyncClosedGitHubIssues ? (
+        <DropdownMenuItem
+          onSelect={onSyncClosedGitHubIssues}
+          disabled={syncClosedGitHubIssuesPending}
+          data-testid={`${testId}-sync-closed-github-issues`}
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+          {BACKLOG_SYNC_GITHUB_COPY.menu}
         </DropdownMenuItem>
       ) : null}
     </div>
