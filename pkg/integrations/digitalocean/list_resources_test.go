@@ -58,6 +58,11 @@ func Test__ListResources__Droplets(t *testing.T) {
 		assert.Equal(t, "12345678", resources[0].ID)
 		assert.Equal(t, "db-server-01", resources[1].Name)
 		assert.Equal(t, "87654321", resources[1].ID)
+
+		// The API defaults to 20 items per page; without an explicit per_page,
+		// accounts with more than 20 droplets get a silently truncated list.
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "per_page=200")
 	})
 
 	t.Run("API error -> returns error", func(t *testing.T) {
