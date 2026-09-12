@@ -3,6 +3,7 @@ package models
 import (
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,12 @@ var preferredIntakeOriginURLKeys = []string{"html_url", "permalink", "web_url", 
 type WorkOrderOrigin struct {
 	URL   string
 	Label string
+}
+
+// GitHubIssueOrigin identifies the GitHub issue a work order was imported from.
+type GitHubIssueOrigin struct {
+	Repository string
+	Number     int
 }
 
 func OriginFromIntakePayload(payload map[string]any) *WorkOrderOrigin {
@@ -50,6 +57,33 @@ func OriginLabelFromURL(rawURL string) string {
 	}
 
 	return lastPathSegment(parsed)
+}
+
+// ParseGitHubIssueOrigin reads owner/repo and the issue number from an origin
+// URL. It reports ok=false for pull request URLs, non-GitHub origins, and
+// malformed URLs.
+func ParseGitHubIssueOrigin(rawURL string) (GitHubIssueOrigin, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Hostname() != "github.com" {
+		return GitHubIssueOrigin{}, false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 {
+		return GitHubIssueOrigin{}, false
+	}
+
+	owner, repo, kind, numberText := parts[0], parts[1], parts[2], parts[3]
+	if owner == "" || repo == "" || kind != "issues" {
+		return GitHubIssueOrigin{}, false
+	}
+
+	number, err := strconv.Atoi(numberText)
+	if err != nil || number <= 0 {
+		return GitHubIssueOrigin{}, false
+	}
+
+	return GitHubIssueOrigin{Repository: owner + "/" + repo, Number: number}, true
 }
 
 func applyWorkOrderOrigin(order *FactoryWorkOrder, origin *WorkOrderOrigin) {

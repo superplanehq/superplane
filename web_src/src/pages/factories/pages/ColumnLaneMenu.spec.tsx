@@ -215,4 +215,47 @@ describe("ColumnLaneMenu", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
+
+  it("offers Sync closed GitHub issues when supplied", async () => {
+    const onSyncClosedGitHubIssues = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          onSyncClosedGitHubIssues={onSyncClosedGitHubIssues}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const sync = screen.getByTestId("lines-backlog-menu-sync-closed-github-issues");
+    expect(sync).toHaveTextContent("Sync closed GitHub issues");
+    await user.click(sync);
+    expect(onSyncClosedGitHubIssues).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Sync closed GitHub issues when it is not supplied", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-sync-closed-github-issues")).not.toBeInTheDocument();
+  });
 });
