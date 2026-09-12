@@ -106,3 +106,101 @@ func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanNone, stored.Plan)
 }
+
+func Test__CancelOrganizationSubscription(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID:          "sub_grpc_cancel",
+		Status:      models.PolarSubscriptionStatusActive,
+		PeriodStart: &periodStart,
+		PeriodEnd:   &periodEnd,
+	})
+	require.NoError(t, err)
+
+	t.Run("invalid organization id", func(t *testing.T) {
+		_, err := CancelOrganizationSubscription(context.Background(), "bad", &pb.CancelOrganizationSubscriptionRequest{})
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("rejects trial", func(t *testing.T) {
+		other, err := models.CreateOrganization(support.RandomName("billing-cancel"), "")
+		require.NoError(t, err)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+		_, err = CancelOrganizationSubscription(context.Background(), other.ID.String(), &pb.CancelOrganizationSubscriptionRequest{})
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	})
+
+	t.Run("cancels at period end", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, http.MethodPatch, req.Method)
+			assert.Equal(t, "/subscriptions/sub_grpc_cancel", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":                   "sub_grpc_cancel",
+				"status":               "active",
+				"cancel_at_period_end": true,
+				"current_period_start": periodStart.Format(time.RFC3339),
+				"current_period_end":   periodEnd.Format(time.RFC3339),
+				"external_customer_id": r.Organization.ID.String(),
+				"customer": map[string]any{
+					"id":          "cust_polar_1",
+					"external_id": r.Organization.ID.String(),
+				},
+			}))
+		})
+		usePolarTestServer(t, server)
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+		resp, err := CancelOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.CancelOrganizationSubscriptionRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
+		assert.True(t, resp.CreditPurchaseAllowed)
+		assert.True(t, resp.CancelAtPeriodEnd)
+	})
+}
+
+func Test__ResumeOrganizationSubscription(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID:                "sub_grpc_resume",
+		Status:            models.PolarSubscriptionStatusActive,
+		PeriodStart:       &periodStart,
+		PeriodEnd:         &periodEnd,
+		CancelAtPeriodEnd: true,
+	})
+	require.NoError(t, err)
+
+	t.Run("keeps Business", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, http.MethodPatch, req.Method)
+			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":                   "sub_grpc_resume",
+				"status":               "active",
+				"cancel_at_period_end": false,
+				"current_period_start": periodStart.Format(time.RFC3339),
+				"current_period_end":   periodEnd.Format(time.RFC3339),
+				"external_customer_id": r.Organization.ID.String(),
+				"customer": map[string]any{
+					"id":          "cust_polar_1",
+					"external_id": r.Organization.ID.String(),
+				},
+			}))
+		})
+		usePolarTestServer(t, server)
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+		resp, err := ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
+		assert.True(t, resp.CreditPurchaseAllowed)
+		assert.False(t, resp.CancelAtPeriodEnd)
+	})
+}

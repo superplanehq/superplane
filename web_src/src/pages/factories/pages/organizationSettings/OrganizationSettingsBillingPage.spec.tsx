@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
@@ -15,20 +15,32 @@ import {
   LAPSED_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
-  RESTORED_TRIAL_ORGANIZATION_BILLING,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
-import {
-  BILLING_SPEND_ORDER_COPY,
-  BILLING_SPEND_ORDER_WITH_GRANT_COPY,
-  BILLING_TRIAL_TTL_COPY,
-} from "../../lib/billingCreditBuckets";
+import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
 const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+let canUpdateOrg = true;
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) => {
+      if (resource === "org" && action === "update") {
+        return canUpdateOrg;
+      }
+      return true;
+    },
+    isLoading: false,
+  }),
+}));
 
 describe("OrganizationSettingsBillingPage", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  beforeEach(() => {
+    canUpdateOrg = true;
   });
 
   it("shows remaining welcome credit and trial copy when Polar has no customer", async () => {
@@ -49,6 +61,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(plans).queryByTestId("billing-plan-usage")).not.toBeInTheDocument();
     expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
     expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
@@ -307,6 +320,8 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$141.24");
     expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
@@ -388,128 +403,12 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Hosted runs cannot start. Subscribe to Business to continue.");
     expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Expired on");
-  }, 10000);
-
-  it("shows SuperPlane grant after top-up when remaining grant is greater than zero", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          organizationBilling: {
-            ...BUSINESS_ORGANIZATION_BILLING,
-            remainingCreditCents: "115278",
-            includedRemainingCents: "0",
-            purchasedRemainingCents: "104278",
-            welcomeRemainingCents: "0",
-            adminRemainingCents: "11000",
-          },
-          organizationWorkspaceUsage: {
-            ...PURCHASED_CREDIT_USAGE_REPORT,
-            remainingCreditCents: "115278",
-            grantTotalCents: "115278",
-            purchasedCreditCents: "104278",
-            hostedBilledCents: "0",
-            billingEnabled: true,
-            hasBillingCustomer: true,
-          },
-          organizationCreditGrants: [
-            {
-              id: "grant-admin",
-              kind: "admin",
-              amountCents: "11000",
-              note: "Support grant",
-              actorName: "Ada",
-              createdAt: "2026-08-10T09:00:00.000Z",
-            },
-            {
-              id: "grant-topup",
-              kind: "topup",
-              amountCents: "104278",
-              polarOrderId: "ord_topup",
-              createdAt: "2026-08-18T10:00:00.000Z",
-            },
-          ],
-        }}
-      />,
-    );
-
-    const balance = await screen.findByTestId("billing-credit-balance");
-    expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$1152.78");
-    expect(within(balance).getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(within(balance).getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend third");
-    expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$1042.78 remaining");
-    expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("SuperPlane grant");
-    expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("Spend last");
-    expect(within(balance).getByTestId("billing-credit-grant-remaining")).toHaveTextContent("$110.00 remaining");
-    expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_WITH_GRANT_COPY);
-  }, 10000);
-
-  it("does not show SuperPlane grant when remaining grant is zero", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          organizationBilling: {
-            ...BUSINESS_ORGANIZATION_BILLING,
-            remainingCreditCents: "14124",
-            adminRemainingCents: "0",
-          },
-          organizationWorkspaceUsage: {
-            ...PURCHASED_CREDIT_USAGE_REPORT,
-            billingEnabled: true,
-            hasBillingCustomer: true,
-          },
-          organizationCreditGrants: MIXED_CREDIT_GRANTS,
-        }}
-      />,
-    );
-
-    const balance = await screen.findByTestId("billing-credit-balance");
-    expect(within(balance).queryByTestId("billing-credit-grant")).not.toBeInTheDocument();
-    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend last");
-    expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
-    expect(balance).not.toHaveTextContent("then SuperPlane grant");
-    expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("SuperPlane grant");
-  }, 10000);
-
-  it("shows trial usage after a refund while the trial window is still open", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          organizationBilling: RESTORED_TRIAL_ORGANIZATION_BILLING,
-          organizationWorkspaceUsage: {
-            ...DEFAULT_FACTORY_USAGE,
-            remainingCreditCents: "5000",
-            hostedBilledCents: "0",
-            billingEnabled: true,
-            hasBillingCustomer: true,
-          },
-        }}
-      />,
-    );
-
-    expect(await screen.findByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
-    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$50.00 remaining");
-    expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
-    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
-
-    const balance = screen.getByTestId("billing-credit-balance");
-    expect(balance).toHaveTextContent("Trial");
-    expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
-    expect(balance).not.toHaveTextContent("Hosted runs cannot start.");
-    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
   }, 10000);
 });

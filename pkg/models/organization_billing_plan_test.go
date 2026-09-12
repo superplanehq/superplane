@@ -41,10 +41,12 @@ func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
 	after, grantIncluded, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_admin",
-		models.PolarSubscriptionStatusCanceled,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_admin",
+			Status:      models.PolarSubscriptionStatusCanceled,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
@@ -149,20 +151,24 @@ func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 	_, _, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_restore",
-		models.PolarSubscriptionStatusActive,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_restore",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 
 	after, grantIncluded, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_restore",
-		models.PolarSubscriptionStatusCanceled,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_restore",
+			Status:      models.PolarSubscriptionStatusCanceled,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
@@ -180,10 +186,12 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 	_, _, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_lapsed",
-		models.PolarSubscriptionStatusActive,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_lapsed",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 
@@ -195,10 +203,12 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 	after, grantIncluded, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_lapsed",
-		models.PolarSubscriptionStatusCanceled,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_lapsed",
+			Status:      models.PolarSubscriptionStatusCanceled,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
@@ -216,10 +226,12 @@ func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 	after, grantIncluded, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
-		"sub_incomplete",
-		models.PolarSubscriptionStatusIncomplete,
-		&now,
-		&end,
+		models.PolarSubscriptionApply{
+			ID:          "sub_incomplete",
+			Status:      models.PolarSubscriptionStatusIncomplete,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
@@ -349,6 +361,251 @@ func Test__AssertHostedRunAllowedRejectsExpiredTrialWithTopup(t *testing.T) {
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Greater(t, summary.PurchasedRemainingMicros, int64(0))
+}
+
+func Test__ApplyPolarSubscriptionCancelAtPeriodEndKeepsBusiness(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_ending",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	assert.True(t, after.CancelAtPeriodEnd)
+	assert.True(t, after.IsActiveBusiness())
+	assert.True(t, after.AllowsCreditPurchase())
+}
+
+func Test__ApplyPolarSubscriptionCanceledKeepsBusinessUntilPeriodEnd(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_cancel_flag",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
+	)
+	require.NoError(t, err)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_cancel_flag",
+			Status:            models.PolarSubscriptionStatusCanceled,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	assert.True(t, after.CancelAtPeriodEnd)
+	assert.True(t, after.IsActiveBusiness())
+}
+
+func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_keep",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_keep",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	assert.False(t, after.CancelAtPeriodEnd)
+	assert.True(t, after.IsActiveBusiness())
+}
+
+func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	older := now.Add(-time.Minute)
+	newer := now
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_stale",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &older,
+		},
+	)
+	require.NoError(t, err)
+
+	resumed, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_stale",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &newer,
+		},
+	)
+	require.NoError(t, err)
+	require.False(t, resumed.CancelAtPeriodEnd)
+	require.NotNil(t, resumed.PolarModifiedAt)
+	assert.True(t, resumed.PolarModifiedAt.Equal(newer))
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_stale",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+			ModifiedAt:        &older,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.False(t, after.CancelAtPeriodEnd)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	require.NotNil(t, after.PolarModifiedAt)
+	assert.True(t, after.PolarModifiedAt.Equal(newer))
+}
+
+func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	provider := now.Add(-30 * time.Second)
+	laterWebhook := now.Add(-10 * time.Second)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_order",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &provider,
+		},
+	)
+	require.NoError(t, err)
+
+	canceled, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_order",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, canceled.CancelAtPeriodEnd)
+	require.NotNil(t, canceled.PolarModifiedAt)
+	assert.True(t, canceled.PolarModifiedAt.Equal(provider))
+
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_order",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+			ModifiedAt:  &laterWebhook,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, grantIncluded)
+	assert.False(t, after.CancelAtPeriodEnd)
+	require.NotNil(t, after.PolarModifiedAt)
+	assert.True(t, after.PolarModifiedAt.Equal(laterWebhook))
+}
+
+func Test__ResolveOrganizationBillingPlanLapsesEndedCancelAtPeriodEnd(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+
+	_, _, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:                "sub_ended",
+			Status:            models.PolarSubscriptionStatusActive,
+			PeriodStart:       &now,
+			PeriodEnd:         &end,
+			CancelAtPeriodEnd: true,
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{
+			"current_period_end": now.Add(-time.Hour),
+			"trial_ends_at":      now.Add(-2 * time.Hour),
+		}).Error)
+
+	plan, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanNone, plan.Plan)
+	assert.False(t, plan.IsActiveBusiness())
+	assert.False(t, plan.AllowsCreditPurchase())
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
 }
 
 func expireOrganizationTrial(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
