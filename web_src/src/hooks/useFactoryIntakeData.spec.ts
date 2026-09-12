@@ -1,21 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { factoriesCreateFactoryIntake, factoriesSyncClosedGitHubBacklog } = vi.hoisted(() => ({
   factoriesCreateFactoryIntake: vi.fn(),
   factoriesSyncClosedGitHubBacklog: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    factoriesCreateFactoryIntake,
-    factoriesSyncClosedGitHubBacklog,
-  };
-});
+vi.mock("@/api-client", () => ({
+  factoriesCreateFactoryIntake,
+  factoriesSyncClosedGitHubBacklog,
+}));
 
 import { factoryQueryKeys } from "./useFactoryData";
 import { useCreateFactoryIntake, useSyncClosedGitHubBacklog } from "./useFactoryIntakeData";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { computeTrend, formatTrendLabel, formatTrendTooltip, TREND_PERCENT_CAP } from "./widgetTrend";
 

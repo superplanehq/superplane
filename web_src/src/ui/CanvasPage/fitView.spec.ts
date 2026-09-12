@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { resolveFitViewVersionId, shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 
 describe("resolveFitViewVersionId", () => {

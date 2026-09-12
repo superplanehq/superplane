@@ -2,13 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
@@ -35,8 +36,15 @@ const {
   useEventExecutions: vi.fn(),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
-  ...(await importOriginal<typeof CanvasDataModule>()),
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  ...unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData"),
   useCanvas,
   useTriggers,
   useInfiniteCanvasRuns,
@@ -44,18 +52,18 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
   useEventExecutions,
 }));
 
-vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
-  ...(await importOriginal<typeof ComponentDataModule>()),
+vi.mock("@/hooks/useComponentData", () => ({
+  ...unmockedSrc<typeof ComponentDataModule>("hooks/useComponentData"),
   useComponents,
 }));
 
-vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
-  ...(await importOriginal<typeof IntegrationsModule>()),
+vi.mock("@/hooks/useIntegrations", () => ({
+  ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useAvailableIntegrations,
 }));
 
-vi.mock("@/hooks/useFactoryIntakeData", async (importOriginal) => ({
-  ...(await importOriginal<typeof FactoryIntakeDataModule>()),
+vi.mock("@/hooks/useFactoryIntakeData", () => ({
+  ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
 }));
 

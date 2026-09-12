@@ -1,7 +1,8 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type * as LiveLogStreamModule from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { renderInspector, runnerExecution, runnerNode, workflowNodes } from "./RunInspectorPanel.spec.fixtures";
 
 let mockedExecutions: CanvasesCanvasNodeExecution[] = [runnerExecution];
@@ -22,8 +23,8 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: null }),
 }));
 
-vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", async (importOriginal) => ({
-  ...(await importOriginal<typeof LiveLogStreamModule>()),
+vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
+  ...unmockedSrc<typeof LiveLogStreamModule>("ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream"),
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
 

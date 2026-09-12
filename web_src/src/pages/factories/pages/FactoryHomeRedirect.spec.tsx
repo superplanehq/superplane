@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FactoryHomeRedirect } from "./FactoryHomeRedirect";

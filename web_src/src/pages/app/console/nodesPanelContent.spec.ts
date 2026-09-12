@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { NODES_PANEL_FORM_MODES, nodesPanelContentFromLegacyNode, validateNodesContent } from "./nodesPanelContent";
 
