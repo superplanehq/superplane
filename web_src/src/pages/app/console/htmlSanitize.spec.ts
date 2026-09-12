@@ -1,11 +1,14 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 
 import { sanitizeHtml } from "./htmlSanitize";
 
 /**
- * The sanitizer runs in jsdom under vitest. Each test exercises one specific
- * threat or allow-list rule documented in `htmlSanitize.ts`. Failures here
- * indicate a regression in the widget's security policy.
+ * The sanitizer runs in jsdom. happy-dom's NodeIterator skips siblings after a
+ * removal, so mixed forbidden-tag payloads are not a reliable check there.
+ * Each test exercises one specific threat or allow-list rule documented in
+ * `htmlSanitize.ts`. Failures here indicate a regression in the widget's
+ * security policy.
  */
 const ROOT_ID = "html-root";
 

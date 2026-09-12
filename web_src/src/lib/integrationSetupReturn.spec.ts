@@ -13,10 +13,12 @@ import {
 
 function setupReturnCookie(): string | undefined {
   const prefix = `${INTEGRATION_SETUP_RETURN_COOKIE}=`;
-  return document.cookie
+  const value = document.cookie
     .split("; ")
     .find((part) => part.startsWith(prefix))
     ?.slice(prefix.length);
+  // happy-dom keeps Max-Age=0 cookies as an empty value instead of dropping them.
+  return value === "" ? undefined : value;
 }
 
 describe("integration setup return", () => {

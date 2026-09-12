@@ -277,6 +277,9 @@ describe("WorkOrderDescriptionEditor", () => {
     fireEvent.paste(input, {
       clipboardData: { getData: () => "" },
     });
+    // Paste collapses the TipTap selection in happy-dom. Click again so the
+    // format bubble menu can attach before Ctrl+A.
+    await user.click(input);
     await user.keyboard("{Control>}a{/Control}");
     await user.click(await screen.findByRole("button", { name: "Bold" }));
 

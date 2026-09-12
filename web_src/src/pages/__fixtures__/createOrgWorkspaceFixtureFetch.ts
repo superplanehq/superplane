@@ -38,6 +38,14 @@ function requestUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
+/** Download clicks in happy-dom can leave location on a blob: URL. */
+export function fixtureFetchBaseHref(href = globalThis.location?.href): string {
+  if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+    return href;
+  }
+  return "http://localhost";
+}
+
 /**
  * Serves both homepage and canvas-app fixtures from one `fetch` override so
  * Storybook can navigate between HomePage and AppPage without hitting the network.
@@ -66,7 +74,7 @@ export function createOrgWorkspaceFixtureFetch(
   const accountState = createStorybookAccountState(homeFixture.organizationId);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
+    const url = new URL(requestUrl(input), fixtureFetchBaseHref());
     const method = requestMethod(input, init);
     const body = await readRequestJson(input, init);
     const agentRoute = matchStorybookAgentMessageRoute({

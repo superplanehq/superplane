@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
+import { createOrgWorkspaceFixtureFetch, fixtureFetchBaseHref } from "./createOrgWorkspaceFixtureFetch";
 
 describe("createOrgWorkspaceFixtureFetch", () => {
   it("prefers canvas-app integration definitions when appFixture is supplied", async () => {
@@ -49,6 +49,11 @@ describe("createOrgWorkspaceFixtureFetch", () => {
       "openai",
       "openrouter",
     ]);
+  });
+
+  it("uses localhost when location is a blob download URL", () => {
+    expect(fixtureFetchBaseHref("blob:mock-usage-csv")).toBe("http://localhost");
+    expect(fixtureFetchBaseHref("http://localhost:3000/org-1")).toBe("http://localhost:3000/org-1");
   });
 
   it("starts with the organization connections the story seeds", async () => {
