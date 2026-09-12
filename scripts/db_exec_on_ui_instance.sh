@@ -3,8 +3,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Run a command in the Compose `app` container that publishes PUBLIC_API_PORT.
-# That port is the UI, not Postgres. Inside the container, Postgres is db:5432.
+# Run a command in this worktree's Compose `app` container.
+# PUBLIC_API_PORT is the UI port. Postgres in this stack is db:5432.
 
 if [[ -f .env ]]; then
   set -a
@@ -20,28 +20,24 @@ if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-ids="$(docker ps -q \
-  --filter "label=com.docker.compose.service=app" \
-  --filter "publish=${PORT}")"
-
-if [[ -z "$ids" ]]; then
-  echo "No SuperPlane app container is publishing port ${PORT}." >&2
-  echo "Set PUBLIC_API_PORT in .env to the UI port of the running instance." >&2
-  echo "Then run make dev.up in that worktree." >&2
+if [[ "$#" -lt 1 ]]; then
+  echo "Usage: $0 <command> [args...]" >&2
   exit 1
 fi
 
-# Host bash 3.2: split on IFS, not mapfile.
-# shellcheck disable=SC2086
-set -- $ids
-if [[ "$#" -gt 1 ]]; then
-  echo "More than one app container publishes port ${PORT}." >&2
+app_id="$(docker compose -f docker-compose.dev.yml ps -q app)"
+if [[ -z "$app_id" ]]; then
+  echo "The app container is not running in this worktree." >&2
+  echo "Run make dev.up first." >&2
   exit 1
 fi
 
-cid="$1"
-project="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid")"
+project="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$app_id")"
 
-echo "Using the database for http://localhost:${PORT} (Compose project ${project})."
+echo "Using Postgres in Compose project ${project} (db:5432)."
+echo "This stack's UI is http://localhost:${PORT}."
 
-exec docker exec -e PUBLIC_API_PORT="$PORT" "$cid" "$@"
+exec docker compose -f docker-compose.dev.yml exec \
+  -e PUBLIC_API_PORT="$PORT" \
+  app \
+  "$@"

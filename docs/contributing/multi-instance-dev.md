@@ -44,8 +44,7 @@ These are the ports you can override per repo:
 
 ## Local database snapshot
 
-`make db.snapshot` and `make db.restore` read `PUBLIC_API_PORT` from `.env`.
-They target the Compose stack that serves that UI port.
-Postgres in that stack is `db:5432`. It is not the UI port.
+`make db.snapshot` and `make db.restore` use this worktree's Compose stack.
+Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
 
-Run those commands in the worktree whose `.env` has the UI port you use.
+Run those commands in the worktree that serves the UI you use.

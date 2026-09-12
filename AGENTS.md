@@ -114,9 +114,8 @@ prompted to create an admin account. Open registration is disabled by default
 (`BLOCK_SIGNUP=yes`). After you finish owner, organization, GitHub, and workspace
 setup, save a local dump:
 
-`make db.snapshot` and `make db.restore` read `PUBLIC_API_PORT` from `.env`.
-They target the Compose stack that serves that UI port.
-Postgres in that stack is `db:5432`. It is not the UI port.
+`make db.snapshot` and `make db.restore` use this worktree's Compose stack.
+Postgres in that stack is `db:5432`. `PUBLIC_API_PORT` in `.env` is the UI port.
 
 1. Run `make db.snapshot`. SuperPlane writes `.local/superplane_dev.dump`.
 2. Later, run `make db.restore`. SuperPlane loads the dump and applies pending
