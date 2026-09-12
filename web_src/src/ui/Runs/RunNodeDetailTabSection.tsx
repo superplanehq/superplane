@@ -1,9 +1,7 @@
-import JsonView from "@uiw/react-json-view";
 import React from "react";
-import { useTheme } from "@/contexts/useTheme";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
 import { cn, resolveIcon } from "@/lib/utils";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import type { RunNodeDetailTabData, RunNodeDetailTabKey } from "./types";
@@ -29,9 +27,6 @@ export function RunNodeDetailTabSection({
   createdAt,
   onSelectTab,
 }: RunNodeDetailTabSectionProps) {
-  const { resolvedTheme } = useTheme();
-  const jsonViewStyle = getJsonViewStyle(resolvedTheme);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
@@ -74,25 +69,9 @@ export function RunNodeDetailTabSection({
             relativeTime={createdAt}
           />
         ) : null}
-        {activeTab === "payload" && hasPayload ? (
-          <JsonView
-            value={tabData?.payload as object}
-            collapsed={2}
-            style={jsonViewStyle}
-            className={jsonViewClassName}
-            displayObjectSize={false}
-            enableClipboard={false}
-          />
-        ) : null}
+        {activeTab === "payload" && hasPayload ? <JsonPayload value={tabData?.payload} collapsed={2} /> : null}
         {activeTab === "configuration" && hasConfig ? (
-          <JsonView
-            value={tabData?.configuration as object}
-            collapsed={2}
-            style={jsonViewStyle}
-            className={jsonViewClassName}
-            displayObjectSize={false}
-            enableClipboard={false}
-          />
+          <JsonPayload value={tabData?.configuration} collapsed={2} />
         ) : null}
       </div>
     </div>

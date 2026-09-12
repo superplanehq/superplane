@@ -1,8 +1,6 @@
-import JsonView from "@uiw/react-json-view";
 import { Copy, Check, Maximize2 } from "lucide-react";
 import { useState } from "react";
-import { useTheme } from "@/contexts/useTheme";
-import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { PayloadDialog } from "./PayloadDialog";
 
 interface PayloadPreviewProps {
@@ -25,12 +23,10 @@ export function PayloadPreview({
   labelSize = "sm",
   onExpand,
 }: PayloadPreviewProps) {
-  const { resolvedTheme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const payloadString = JSON.stringify(value, null, 2);
   const managesOwnDialog = !onExpand;
-  const jsonViewStyle = getJsonViewStyle(resolvedTheme);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(payloadString);
@@ -74,13 +70,7 @@ export function PayloadPreview({
         </div>
       </div>
       <div className={`${maxHeight} overflow-auto rounded`}>
-        <JsonView
-          value={value}
-          style={{ ...jsonViewStyle, padding: "8px" }}
-          className={jsonViewClassName}
-          displayObjectSize={false}
-          enableClipboard={false}
-        />
+        <JsonPayload value={value} jsonViewStyle={{ padding: "8px" }} />
       </div>
 
       {managesOwnDialog && (

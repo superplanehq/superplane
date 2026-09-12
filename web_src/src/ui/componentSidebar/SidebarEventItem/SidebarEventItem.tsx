@@ -4,7 +4,7 @@ import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
-import JsonView from "@uiw/react-json-view";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { SimpleTooltip } from "../SimpleTooltip";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
@@ -337,19 +337,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 </div>
               </div>
               <div className="h-50 overflow-auto rounded -mt-2">
-                <JsonView
+                <JsonPayload
                   value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
-                  style={{
-                    fontSize: "12px",
-                    fontFamily:
-                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                    backgroundColor: "#ffffff",
-                    color: "#24292e",
-                    padding: "8px",
-                  }}
-                  className="json-viewer-hide-types"
-                  displayObjectSize={false}
-                  enableClipboard={false}
+                  jsonViewStyle={{ padding: "8px" }}
                 />
               </div>
             </div>
@@ -426,19 +416,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             </div>
             <div className="flex-1 overflow-auto bg-white rounded-b-lg dark:bg-gray-900">
               <div className="p-4">
-                <JsonView
-                  value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
-                  style={{
-                    fontSize: "14px",
-                    fontFamily:
-                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                    backgroundColor: "#ffffff",
-                    color: "#24292e",
-                  }}
-                  className="json-viewer-hide-types"
-                  displayObjectSize={false}
-                  enableClipboard={false}
-                />
+                <JsonPayload value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload} />
               </div>
             </div>
           </div>
