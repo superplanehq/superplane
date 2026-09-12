@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding seed
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -135,27 +135,6 @@ dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
 
-seed:
-	@$(MAKE) dev.test.is.running
-	$(COMPOSE) exec \
-		-e SEED_EMAIL \
-		-e SEED_PASSWORD \
-		-e SEED_NAME \
-		-e SEED_ORG \
-		-e SEED_WORKSPACE \
-		-e SUPERPLANE_SEED_GITHUB_INSTALLATION_ID \
-		-e SUPERPLANE_SEED_GITHUB_REPO \
-		-e SUPERPLANE_SEED_GITHUB_BACKLOG_REPO \
-		-e SUPERPLANE_SEED_GITHUB_DEFAULT_BRANCH \
-		-e ANTHROPIC_API_KEY \
-		-e SUPERPLANE_GITHUB_APP_ID \
-		-e SUPERPLANE_GITHUB_APP_SLUG \
-		-e SUPERPLANE_GITHUB_APP_PRIVATE_KEY \
-		-e SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET \
-		-e SUPERPLANE_GITHUB_APP_CLIENT_ID \
-		-e SUPERPLANE_GITHUB_APP_CLIENT_SECRET \
-		app go run ./cmd/seed
-
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
 	$(COMPOSE) exec app go clean -modcache -cache
@@ -271,7 +250,6 @@ check.lint.ui.baseline.update:
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
-	$(COMPOSE) exec app go build cmd/seed/main.go
 
 check.generated.artifacts:
 	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
@@ -333,6 +311,19 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+
+# Local only. Writes superplane_dev to .local/superplane_dev.dump.
+# Uses PUBLIC_API_PORT from .env to select the Compose stack that serves
+# that UI. Postgres inside that stack is db:5432. The dump is gitignored.
+db.snapshot:
+	./scripts/db_exec_on_ui_instance.sh ./scripts/db_snapshot.sh superplane_dev
+
+# Local only. Replaces superplane_dev from .local/superplane_dev.dump, then
+# applies pending migrations. Uses PUBLIC_API_PORT from .env to select the
+# Compose stack that serves that UI. It does not touch superplane_test.
+# Run make db.snapshot again to refresh the dump after migrate.
+db.restore:
+	./scripts/db_exec_on_ui_instance.sh ./scripts/db_restore.sh superplane_dev
 
 # Local only. Puts every org on a 14-day trial, clears Polar ids, and
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
