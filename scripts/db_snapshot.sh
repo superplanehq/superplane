@@ -4,7 +4,8 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Local-only. Writes a full dump of superplane_dev to
-# .local/superplane_dev.dump. Do not commit that file.
+# .local/superplane_dev.dump so a later restore can skip owner setup
+# and GitHub connection. Do not commit that file.
 
 DUMP_PATH="${DUMP_PATH:-.local/superplane_dev.dump}"
 DB_NAME="${1:-superplane_dev}"

@@ -4,8 +4,9 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Local-only. Replaces superplane_dev from .local/superplane_dev.dump, then
-# applies pending migrations. It does not touch superplane_test. It does not
-# wipe Docker volumes.
+# applies pending migrations. Use this to create a new local environment
+# without owner setup or GitHub connection. It does not touch
+# superplane_test. It does not wipe Docker volumes.
 
 DUMP_PATH="${DUMP_PATH:-.local/superplane_dev.dump}"
 DB_NAME="${1:-superplane_dev}"
