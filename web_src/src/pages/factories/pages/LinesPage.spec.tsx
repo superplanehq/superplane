@@ -12,6 +12,13 @@ import type {
 import type * as canvasData from "@/hooks/useCanvasData";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,

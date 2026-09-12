@@ -20,6 +20,8 @@ Object.defineProperty(globalThis, "__IMPORT_META_ENV", {
 
 if (!GlobalRegistrator.isRegistered) {
   GlobalRegistrator.register({
+    width: 1280,
+    height: 800,
     settings: {
       disableJavaScriptFileLoading: true,
       disableCSSFileLoading: true,
@@ -51,6 +53,7 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
   const envPrevious = new Map<string, string | undefined>();
   const advanceTimersByTime = (viRecord.advanceTimersByTime as (ms: number) => void).bind(viRecord);
   const runOnlyPendingTimers = (viRecord.runOnlyPendingTimers as () => void).bind(viRecord);
+  const runAllTimers = (viRecord.runAllTimers as () => void).bind(viRecord);
 
   Object.defineProperties(viRecord, {
     hoisted: {
@@ -78,6 +81,7 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
       enumerable: true,
       value: async (ms: number) => {
         advanceTimersByTime(ms);
+        await Promise.resolve();
       },
     },
     runOnlyPendingTimersAsync: {
@@ -85,6 +89,15 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
       enumerable: true,
       value: async () => {
         runOnlyPendingTimers();
+        await Promise.resolve();
+      },
+    },
+    runAllTimersAsync: {
+      configurable: true,
+      enumerable: true,
+      value: async () => {
+        runAllTimers();
+        await Promise.resolve();
       },
     },
     stubEnv: {
@@ -120,6 +133,7 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
       configurable: true,
       enumerable: true,
       value: (name: string, value: unknown) => {
+        const previousHref = name === "location" ? currentWindowHref() : undefined;
         if (!globalDescriptors.has(name)) {
           globalDescriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
         }
@@ -133,7 +147,7 @@ function patchVitestCompat(viRecord: Record<string, unknown>) {
 
         const locationValue = locationStubFromGlobal(name, value);
         if (locationValue !== undefined) {
-          extraRestores.push(replaceWindowLocation(locationValue));
+          extraRestores.push(replaceWindowLocation(locationValue, previousHref));
         }
 
         return vi;
@@ -173,8 +187,7 @@ function locationStubFromGlobal(name: string, value: unknown): object | undefine
   return undefined;
 }
 
-function replaceWindowLocation(locationValue: object): () => void {
-  const previousHref = window.location.href;
+function replaceWindowLocation(locationValue: object, previousHref = currentWindowHref()): () => void {
   const previousDescriptor = Object.getOwnPropertyDescriptor(window, "location");
 
   try {
@@ -275,8 +288,14 @@ function currentWindowHref(): string {
   return typeof href === "string" ? href : "";
 }
 
-function resolveWindowUrl(url: string | URL): string | undefined {
-  const href = url.toString();
+function resolveWindowUrl(url: string | URL | null | undefined): string | undefined {
+  if (url == null) {
+    return undefined;
+  }
+  const href = typeof url === "string" ? url : url.toString?.();
+  if (!href) {
+    return undefined;
+  }
   const currentHref = currentWindowHref();
   const bases =
     currentHref.startsWith("http://") || currentHref.startsWith("https://")

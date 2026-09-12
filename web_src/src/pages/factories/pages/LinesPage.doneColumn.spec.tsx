@@ -7,6 +7,13 @@ import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,

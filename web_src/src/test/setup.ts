@@ -3,12 +3,17 @@ import "@testing-library/jest-dom/vitest";
 // Happy DOM has no CSS layout. Recharts ResponsiveContainer then reads
 // getBoundingClientRect after mount, overwrites initialDimension with 0x0,
 // and warns that the chart width and height must be greater than 0.
-const elementBox = { width: 760, height: 240, top: 0, left: 0, bottom: 240, right: 760, x: 0, y: 0 };
+const chartBox = { width: 760, height: 240, top: 0, left: 0, bottom: 240, right: 760, x: 0, y: 0 };
+const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
-  return {
-    ...elementBox,
-    toJSON: () => elementBox,
-  };
+  const className = typeof this.className === "string" ? this.className : String(this.className ?? "");
+  if (className.includes("recharts")) {
+    return {
+      ...chartBox,
+      toJSON: () => chartBox,
+    };
+  }
+  return originalGetBoundingClientRect.call(this);
 };
 
 // jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
@@ -139,6 +144,21 @@ Object.defineProperty(window, "WebSocket", {
   writable: true,
   value: SilentWebSocket,
 });
+
+document.addEventListener(
+  "click",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const downloadLink = target.closest("a[download]");
+    if (downloadLink) {
+      event.preventDefault();
+    }
+  },
+  true,
+);
 
 Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   configurable: true,
