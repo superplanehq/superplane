@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
-// jsdom doesn't ship ResizeObserver; several UI primitives depend on it.
+// Some test DOMs omit ResizeObserver; several UI primitives depend on it.
 // Provide a no-op so every test file gets it for free instead of having to
 // declare it locally.
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -11,7 +11,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   };
 }
 
-// jsdom does not implement DOMMatrixReadOnly. React Flow reads viewport zoom
+// Some test DOMs omit DOMMatrixReadOnly. React Flow reads viewport zoom
 // with `new DOMMatrixReadOnly(style.transform)` when node internals update.
 if (typeof window.DOMMatrixReadOnly !== "function") {
   class DOMMatrixReadOnlyStub {
@@ -59,7 +59,7 @@ function parseCssMatrix2d(init: string | undefined): number[] | undefined {
   return values;
 }
 
-// jsdom doesn't implement matchMedia; ThemeProvider reads it to resolve
+// Some test DOMs omit matchMedia; ThemeProvider reads it to resolve
 // "system" theme preference. Tests can override this per file when needed.
 if (typeof window.matchMedia === "undefined") {
   Object.defineProperty(window, "matchMedia", {
@@ -78,6 +78,14 @@ if (typeof window.matchMedia === "undefined") {
   });
 }
 
+// happy-dom owns Window.fetch. Tests stub globalThis.fetch; route window.fetch
+// through that binding so `vi.stubGlobal("fetch", ...)` applies to both.
+Object.defineProperty(window, "fetch", {
+  configurable: true,
+  writable: true,
+  value: ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args)) as typeof fetch,
+});
+
 Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   configurable: true,
   writable: true,
@@ -86,3 +94,42 @@ Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     measureText: (text: string) => ({ width: text.length * 7 }),
   }),
 });
+
+// happy-dom hardcodes Node.prototype.nodeName to "" and shadows it on Element.
+// DOMPurify reads the base getter to resist clobbering, so every tag looks
+// empty and the allow-list misfires. Delegate to the instance getter.
+patchHappyDomNodeName();
+
+function patchHappyDomNodeName(): void {
+  const nodeProto = globalThis.Node?.prototype;
+  if (!nodeProto || !document) {
+    return;
+  }
+
+  const baseDesc = Object.getOwnPropertyDescriptor(nodeProto, "nodeName");
+  if (!baseDesc?.get || !baseDesc.configurable) {
+    return;
+  }
+
+  const probe = document.createElement("div");
+  if (baseDesc.get.call(probe) === probe.nodeName) {
+    return;
+  }
+
+  const baseGet = baseDesc.get;
+  Object.defineProperty(nodeProto, "nodeName", {
+    configurable: true,
+    enumerable: baseDesc.enumerable,
+    get(this: Node) {
+      let proto: object | null = Object.getPrototypeOf(this);
+      while (proto && proto !== nodeProto) {
+        const desc = Object.getOwnPropertyDescriptor(proto, "nodeName");
+        if (desc?.get) {
+          return desc.get.call(this);
+        }
+        proto = Object.getPrototypeOf(proto);
+      }
+      return baseGet.call(this);
+    },
+  });
+}

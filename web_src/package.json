@@ -137,6 +137,7 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "eslint-plugin-storybook": "^10.5.7",
     "globals": "^16.0.0",
+    "happy-dom": "^20.14.5",
     "jsdom": "^30.0.1",
     "knip": "^6.35.0",
     "msw": "^2.14.6",

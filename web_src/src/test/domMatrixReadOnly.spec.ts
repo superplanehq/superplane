@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-describe("jsdom DOMMatrixReadOnly", () => {
+describe("DOMMatrixReadOnly polyfill", () => {
   it("exposes a constructor so React Flow can read viewport zoom", () => {
     const matrix = new window.DOMMatrixReadOnly("matrix(0.8, 0, 0, 0.8, 10, 20)");
 

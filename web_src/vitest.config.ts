@@ -11,7 +11,16 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "jsdom",
+    environment: "happy-dom",
+    environmentOptions: {
+      happyDOM: {
+        settings: {
+          disableJavaScriptFileLoading: true,
+          disableCSSFileLoading: true,
+          disableIframePageLoading: true,
+        },
+      },
+    },
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
       provider: "v8",
