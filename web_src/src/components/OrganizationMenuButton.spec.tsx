@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({
@@ -82,5 +84,29 @@ describe("OrganizationMenuButton", () => {
     );
 
     expect(screen.getByRole("link", { name: "Go to canvases" })).toHaveAttribute("href", "/org-123/workspaces");
+  });
+
+  it("opens the shared feedback screen from Report issue and Send feedback", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <OrganizationMenuButton organizationId="org-123" />
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open organization menu" }));
+    await user.click(screen.getByRole("button", { name: "Report issue" }));
+
+    expect(screen.getByRole("heading", { name: "Send feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("feedback-category-bug")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Open organization menu" }));
+    await user.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    expect(screen.getByRole("heading", { name: "Send feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("feedback-category-other")).toHaveAttribute("aria-pressed", "true");
   });
 });
