@@ -3,15 +3,12 @@ import type { FormEvent } from "react";
 import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
-
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { planningSessionPhase } from "../planningSessionActivity";
+import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
-import { PhaseLogCard } from "./PhaseLogCard";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
@@ -95,21 +92,14 @@ function AnalysisRequestChat({
           data-testid="split-run-intent-chat-log"
         >
           <RequestMessage description={description} files={files} asChat />
-          <WorkOrderIntentTranscript messages={analysis.view.messages} />
-          {state.active && analysis.view.canvasId && analysis.view.executionId ? (
-            <PhaseLogCard
-              phase={planningSessionPhase(analysis.view)}
-              expanded
-              collapsible={false}
+          <WorkOrderIntentTranscript messages={analysis.view.messages} streaming={state.active} />
+          {state.active ? (
+            <AnalysisLiveWork
+              machineStatus={analysis.view.machineStatus}
               organizationId={analysis.organizationId}
               canvasId={analysis.view.canvasId}
-              compactSessionLog
+              executionId={analysis.view.executionId}
             />
-          ) : state.active ? (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              <p>{ANALYSIS_PLANNING_COPY.writing}</p>
-            </div>
           ) : null}
         </div>
         {follow.following ? null : (
@@ -147,7 +137,7 @@ function AnalysisRequestChat({
           </Button>
         </div>
         {analysis.composerError ? (
-          <p className="mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
+          <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
             {analysis.composerError}
           </p>
         ) : null}

@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 
 function renderDocument(ui: ReactElement) {
@@ -248,7 +249,8 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
-    expect(within(chat).getByText("The agent is writing the plan.")).toBeInTheDocument();
+    expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_THINKING_STATES[0]);
+    expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
   });
@@ -383,8 +385,9 @@ describe("WorkOrderIntentDocument", () => {
     );
 
     expect(
-      within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-phase-planning"),
+      within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-intent-thinking"),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
   });
 
   it("collapses a long request and expands it on Show more", async () => {

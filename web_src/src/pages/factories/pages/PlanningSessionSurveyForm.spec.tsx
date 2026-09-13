@@ -22,7 +22,9 @@ describe("PlanningSessionSurveyForm", () => {
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 2")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /High/ }));
+    const high = screen.getByRole("button", { name: /High/ });
+    await user.click(high);
+    expect(high).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
     expect(onSubmit).not.toHaveBeenCalled();

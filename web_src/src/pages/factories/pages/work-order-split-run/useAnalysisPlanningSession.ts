@@ -25,7 +25,6 @@ export const ANALYSIS_PLANNING_COPY = {
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
   failedLoad: "The analysis session did not load. Try again.",
-  writing: "The agent is writing the plan.",
 };
 
 type AnalysisPlanningSessionArgs = {

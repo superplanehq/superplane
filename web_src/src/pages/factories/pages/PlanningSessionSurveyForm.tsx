@@ -30,17 +30,22 @@ export function PlanningSessionSurveyForm({
   }
 
   return (
-    <div className="border-b border-border bg-background px-3 py-3" data-testid="create-with-agent-survey">
+    <div
+      className="sp-survey-enter border-b border-border bg-background px-3 py-3"
+      data-testid="create-with-agent-survey"
+    >
       <div className="overflow-hidden rounded-lg border border-border">
         <div className="flex items-start justify-between gap-3 border-b border-border bg-muted/40 px-3 py-2">
-          <p className="text-[12px] font-medium text-foreground">{question.prompt}</p>
+          <p key={question.prompt} className="sp-survey-page text-[12px] font-medium text-foreground">
+            {question.prompt}
+          </p>
           {questionCount > 1 ? (
             <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
               {currentIndex + 1} of {questionCount}
             </span>
           ) : null}
         </div>
-        <div className="flex flex-col gap-1 p-2">
+        <div key={question.prompt} className="sp-survey-page flex flex-col gap-1 p-2">
           {question.options.map((option, optionIndex) => {
             const selected = answers[currentIndex] === option;
             return (
@@ -49,6 +54,7 @@ export function PlanningSessionSurveyForm({
                 type="button"
                 variant="ghost"
                 size="sm"
+                aria-pressed={selected}
                 className={cn(
                   "h-auto justify-start whitespace-normal px-2.5 py-1.5 text-left text-[12px]",
                   selected
@@ -60,7 +66,7 @@ export function PlanningSessionSurveyForm({
                 }}
               >
                 <span className="mr-2 inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-foreground">
-                  {String.fromCharCode(65 + optionIndex)}
+                  {selected ? <SurveyOptionCheck /> : String.fromCharCode(65 + optionIndex)}
                 </span>
                 {option}
               </Button>
@@ -93,6 +99,22 @@ export function PlanningSessionSurveyForm({
         />
       </div>
     </div>
+  );
+}
+
+function SurveyOptionCheck() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
+      <path
+        className="sp-survey-check"
+        d="M3.5 8.5 L6.5 11.5 L12.5 4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
