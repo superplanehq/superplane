@@ -676,17 +676,15 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
-  it("opens a draft on the description tab and keeps the log collapsed", async () => {
-    const user = userEvent.setup();
+  it("opens a draft refine view without Automations", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Description" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-source")).not.toBeInTheDocument();
-    const pendingDot = screen.getByTestId("split-run-log-tab-dot");
-    expect(pendingDot).toHaveAttribute("title", "Pending");
-    expect(pendingDot.className).not.toContain("animate-spin");
+    expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     const start = within(note).getByRole("button", { name: "Start" });
@@ -699,19 +697,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).getByTestId("split-run-attention-note")).toBe(note);
     expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-attention-note")).toBeNull();
-    await openLogTab(user);
-    const logNote = screen.getByTestId("split-run-attention-note");
-    expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
-    expect(within(logNote).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(logNote).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(within(logNote).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    const backlog = screen.getByTestId("split-run-phase-backlog");
-    expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
-    expect(within(backlog).queryByText(/Created manually/)).not.toBeInTheDocument();
-    expect(within(backlog).queryByText("Completed")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
-    expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
-    expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-decision")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
@@ -740,7 +727,8 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Description" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
@@ -880,7 +868,11 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("shows the Ingest log when a GitHub automation created the draft", async () => {
     const user = userEvent.setup();
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER) });
+    renderPopup({
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: INGEST_DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER),
+    });
 
     await openLogTab(user);
     expect(screen.getByTestId("split-run-phase-backlog")).toBeInTheDocument();

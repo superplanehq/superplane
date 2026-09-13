@@ -30,63 +30,74 @@ export function PlanningSessionSurveyForm({
   }
 
   return (
-    <div
-      className="sp-survey-enter border-b border-border bg-background px-3 py-3"
-      data-testid="create-with-agent-survey"
-    >
-      <div className="overflow-hidden rounded-lg border border-border">
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-muted/40 px-3 py-2">
-          <p key={question.prompt} className="sp-survey-page text-[12px] font-medium text-foreground">
-            {question.prompt}
-          </p>
+    <div className="sp-survey-enter mt-3 mb-1" data-testid="create-with-agent-survey">
+      <div className="rounded-2xl border border-border bg-muted/30 px-3 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-medium text-muted-foreground">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
           {questionCount > 1 ? (
-            <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+            <span className="shrink-0 text-[11px] text-muted-foreground">
               {currentIndex + 1} of {questionCount}
             </span>
           ) : null}
         </div>
-        <div key={question.prompt} className="sp-survey-page flex flex-col gap-1 p-2">
-          {question.options.map((option, optionIndex) => {
-            const selected = answers[currentIndex] === option;
-            return (
-              <Button
-                key={option}
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-pressed={selected}
-                className={cn(
-                  "h-auto justify-start whitespace-normal px-2.5 py-1.5 text-left text-[12px]",
-                  selected
-                    ? "bg-muted text-foreground ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => {
-                  setAnswers((current) => replaceAtIndex(current, currentIndex, option));
-                }}
-              >
-                <span className="mr-2 inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-foreground">
-                  {selected ? <SurveyOptionCheck /> : String.fromCharCode(65 + optionIndex)}
-                </span>
-                {option}
-              </Button>
-            );
-          })}
-          <Input
-            type="text"
-            value={customInputs[currentIndex] ?? ""}
-            placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
-            aria-label={`${question.prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
-            className="mt-0.5 h-8 text-[12px]"
-            onChange={(event) => {
-              const value = event.target.value;
-              setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
-              setAnswers((current) => replaceAtIndex(current, currentIndex, value.trim() || null));
-            }}
-            onKeyDown={(event) =>
-              handleSurveyEnter(event, isLast, hasCurrentAnswer, () => setCurrentIndex((index) => index + 1), sendReply)
-            }
-          />
+        <div key={question.prompt} className="sp-survey-page">
+          <p className="mt-2 text-[14px] font-medium leading-5 text-foreground">{question.prompt}</p>
+          <div className="mt-3 flex flex-col gap-1">
+            {question.options.map((option, optionIndex) => {
+              const selected = answers[currentIndex] === option;
+              const keyLabel = String.fromCharCode(65 + optionIndex);
+              return (
+                <Button
+                  key={option}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={selected}
+                  className={cn(
+                    "h-auto justify-start gap-2.5 whitespace-normal rounded-lg px-2 py-2 text-left text-[13px]",
+                    selected ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => {
+                    setAnswers((current) => replaceAtIndex(current, currentIndex, option));
+                  }}
+                >
+                  <span
+                    className={cn(
+                      "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold",
+                      selected
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-background text-muted-foreground",
+                    )}
+                    aria-hidden
+                  >
+                    {selected ? <SurveyOptionCheck /> : keyLabel}
+                  </span>
+                  {option}
+                </Button>
+              );
+            })}
+            <Input
+              type="text"
+              value={customInputs[currentIndex] ?? ""}
+              placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
+              aria-label={`${question.prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
+              className="mt-1 h-9 rounded-lg border-0 bg-background text-[13px] shadow-none"
+              onChange={(event) => {
+                const value = event.target.value;
+                setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
+                setAnswers((current) => replaceAtIndex(current, currentIndex, value.trim() || null));
+              }}
+              onKeyDown={(event) =>
+                handleSurveyEnter(
+                  event,
+                  isLast,
+                  hasCurrentAnswer,
+                  () => setCurrentIndex((index) => index + 1),
+                  sendReply,
+                )
+              }
+            />
+          </div>
         </div>
         <SurveyFormPager
           questionCount={questionCount}
@@ -156,13 +167,13 @@ function SurveyFormPager({
   onSend: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
+    <div className="mt-2 flex items-center justify-between gap-2">
       {questionCount > 1 ? (
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 text-xs text-muted-foreground"
+          className="h-8 text-[13px] text-muted-foreground"
           disabled={isFirst}
           onClick={onPrevious}
         >
@@ -179,7 +190,7 @@ function SurveyFormPager({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 text-xs text-muted-foreground"
+              className="h-8 text-[13px] text-muted-foreground"
               onClick={onSend}
             >
               {CREATE_WITH_AGENT_COPY.skipSurvey}
@@ -188,7 +199,7 @@ function SurveyFormPager({
           <Button
             type="button"
             size="sm"
-            className="h-7 text-xs"
+            className="h-8 text-[13px]"
             disabled={questionCount > 1 && !hasCurrentAnswer}
             onClick={onSend}
           >
@@ -198,7 +209,13 @@ function SurveyFormPager({
           </Button>
         </div>
       ) : (
-        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={onNext}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 text-[13px] text-muted-foreground"
+          onClick={onNext}
+        >
           {CREATE_WITH_AGENT_COPY.nextQuestion}
           <ChevronRight size={12} className="ml-1" />
         </Button>

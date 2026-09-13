@@ -20,6 +20,13 @@ import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
+export function refinePopupShowsAutomations(args: {
+  mode: "classic" | "analysis";
+  footerKind: SplitRunFixture["footer"]["kind"];
+}) {
+  return !(args.mode === "analysis" && args.footerKind === "draft");
+}
+
 /** Classic Description uses a 3/2 reading-to-side split. */
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";

@@ -5,27 +5,46 @@ import { ChevronDown } from "lucide-react";
 
 import type { IntentDocument } from "../../lib/intentDocument";
 
+const PLAN_PLACEHOLDER = "The analysis is writing the plan.";
+const EMPTY_SUMMARY = "The analysis has not written a summary yet.";
+const EMPTY_DOCUMENT = "The analysis has not written a plan yet.";
+
 type WorkOrderIntentPlanProps = {
   document: IntentDocument;
   expanded: boolean;
   onToggle: () => void;
+  isAnalyzing?: boolean;
 };
 
-export function WorkOrderIntentPlan({ document, expanded, onToggle }: WorkOrderIntentPlanProps) {
+export function WorkOrderIntentPlan({
+  document,
+  expanded,
+  onToggle,
+  isAnalyzing = false,
+}: WorkOrderIntentPlanProps) {
   const hasPlan = Boolean(document.plan.trim());
   if (!document.summary.trim() && !hasPlan) {
-    return <p className="text-[13px] text-muted-foreground">The analysis has not written a plan yet.</p>;
+    return (
+      <p
+        className={cn("text-[13px] leading-5 text-muted-foreground", isAnalyzing && "sp-ai-thinking")}
+        data-text={isAnalyzing ? PLAN_PLACEHOLDER : undefined}
+      >
+        {isAnalyzing ? PLAN_PLACEHOLDER : EMPTY_DOCUMENT}
+      </p>
+    );
   }
 
   return (
     <div>
       {document.summary.trim() ? (
-        <MarkdownContent content={document.summary} variant="workspace" data-testid="split-run-intent-summary" />
+        <div key={document.summary} className="sp-text-reveal">
+          <MarkdownContent content={document.summary} variant="workspace" data-testid="split-run-intent-summary" />
+        </div>
       ) : (
-        <p className="text-[13px] text-muted-foreground">The analysis has not written a summary yet.</p>
+        <p className="text-[13px] text-muted-foreground">{EMPTY_SUMMARY}</p>
       )}
       {hasPlan ? (
-        <div className="mt-4">
+        <div className="mt-6">
           <Button
             type="button"
             variant="ghost"
@@ -39,11 +58,7 @@ export function WorkOrderIntentPlan({ document, expanded, onToggle }: WorkOrderI
             {expanded ? "Hide full plan" : "Show full plan"}
           </Button>
           {expanded ? (
-            <div
-              className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3"
-              data-testid="split-run-intent-plan-panel"
-            >
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plan</p>
+            <div key={document.plan} className="sp-stream-text" data-testid="split-run-intent-plan-panel">
               <MarkdownContent content={document.plan} variant="workspace" data-testid="split-run-intent-plan" />
             </div>
           ) : null}

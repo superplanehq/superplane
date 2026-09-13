@@ -16,6 +16,7 @@ import {
   collectSplitRunArtifacts,
   collectSplitRunPullRequests,
   defaultSplitRunPopupTab,
+  refinePopupShowsAutomations,
   resolveSplitRunPopupArtifacts,
   resolveSplitRunPopupPullRequests,
   splitRunAutomationRunHref,
@@ -29,6 +30,12 @@ import {
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
+  it("hides Automations on a draft refine popup", () => {
+    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "draft" })).toBe(false);
+    expect(refinePopupShowsAutomations({ mode: "classic", footerKind: "draft" })).toBe(true);
+    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "running" })).toBe(true);
+  });
+
   it("opens the automation run for the preferred phase, then the latest phase run", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
     const implementHref = getWorkOrderRunHref(

@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -101,19 +102,19 @@ function AnalysisRequestChat({
               executionId={analysis.view.executionId}
             />
           ) : null}
+          {state.showSurvey && analysis.view.survey ? (
+            <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
+          ) : null}
         </div>
         {follow.following ? null : (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         )}
       </div>
-      {state.showSurvey && analysis.view.survey ? (
-        <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
-      ) : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
         </label>
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2">
           <Textarea
             id="split-run-intent-composer"
             data-testid="split-run-intent-composer"
@@ -129,11 +130,18 @@ function AnalysisRequestChat({
                 }
               }
             }}
-            className="min-h-[44px] resize-none text-[13px]"
+            className="min-h-[40px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
             rows={2}
           />
-          <Button type="submit" size="sm" disabled={!analysis.canSend || !analysis.composer.trim()}>
-            {ANALYSIS_PLANNING_COPY.send}
+          <Button
+            type="submit"
+            size="icon"
+            className="size-8 shrink-0 rounded-full"
+            disabled={!analysis.canSend || !analysis.composer.trim()}
+            aria-label={ANALYSIS_PLANNING_COPY.send}
+          >
+            <ArrowUp className="size-4" aria-hidden />
+            <span className="sr-only">{ANALYSIS_PLANNING_COPY.send}</span>
           </Button>
         </div>
         {analysis.composerError ? (
@@ -160,7 +168,7 @@ function RequestMessage({
       description={description}
       files={files}
       previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
-      fadeClassName={asChat ? "from-primary/10 via-primary/10" : "from-muted via-muted/80"}
+      fadeClassName="from-muted via-muted/80"
     />
   ) : (
     <p className="text-[13px] text-muted-foreground">No request yet.</p>
@@ -179,11 +187,10 @@ function RequestMessage({
   }
 
   return (
-    <div className="mb-3 flex w-full items-start" data-testid="split-run-description" aria-label="Request">
-      <span className="inline-flex w-4 shrink-0" aria-hidden />
-      <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
-        <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">
-          {CREATE_WITH_AGENT_COPY.you}
+    <div className="mb-4 flex w-full justify-start" data-testid="split-run-description" aria-label="Request">
+      <div className="max-w-[92%] rounded-2xl bg-muted px-3.5 py-2.5">
+        <span className="mb-1 block font-sans text-[11px] leading-none text-muted-foreground">
+          {CREATE_WITH_AGENT_COPY.request}
         </span>
         {body}
       </div>

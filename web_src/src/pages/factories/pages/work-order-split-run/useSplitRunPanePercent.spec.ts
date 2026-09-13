@@ -7,7 +7,7 @@ describe("useSplitRunPanePercent", () => {
     expect(DEFAULT_LOG_PERCENT).toBe(65);
   });
 
-  it("opens the request pane at one third width", () => {
-    expect(DEFAULT_INTENT_LEFT_PERCENT).toBe(33);
+  it("opens the request pane at two fifths width", () => {
+    expect(DEFAULT_INTENT_LEFT_PERCENT).toBe(40);
   });
 });

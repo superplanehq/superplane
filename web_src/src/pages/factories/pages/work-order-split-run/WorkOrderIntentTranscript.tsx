@@ -4,7 +4,7 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 
 const MESSAGE_MARKDOWN =
-  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
+  "max-w-none font-sans text-[14px] leading-6 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
 
 export function WorkOrderIntentTranscript({
   messages,
@@ -20,7 +20,7 @@ export function WorkOrderIntentTranscript({
   const lastAgentId = [...messages].reverse().find((message) => message.role === "agent")?.id;
 
   return (
-    <div className="mb-3 space-y-2" data-testid="split-run-intent-transcript">
+    <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
       {messages.map((message) => (
         <TranscriptMessage
           key={message.id}
@@ -34,12 +34,15 @@ export function WorkOrderIntentTranscript({
 
 function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMessage; streaming: boolean }) {
   if (message.role === "user") {
-    const label = message.origin === "survey" ? CREATE_WITH_AGENT_COPY.youSurvey : CREATE_WITH_AGENT_COPY.you;
+    const isSurvey = message.origin === "survey";
     return (
-      <div className="sp-text-reveal flex w-full items-start">
-        <span className="inline-flex w-4 shrink-0" aria-hidden />
-        <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
-          <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">{label}</span>
+      <div className="sp-text-reveal flex w-full justify-start">
+        <div className="max-w-[92%] rounded-2xl bg-muted px-3.5 py-2.5">
+          {isSurvey ? (
+            <span className="mb-1 block font-sans text-[11px] leading-none text-muted-foreground">
+              {CREATE_WITH_AGENT_COPY.youSurvey}
+            </span>
+          ) : null}
           <MarkdownContent content={message.text} variant="workspace" className={MESSAGE_MARKDOWN} />
         </div>
       </div>
@@ -48,9 +51,8 @@ function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMes
 
   return (
     <div className="flex w-full items-start">
-      <span className="inline-flex w-4 shrink-0" aria-hidden />
       <div
-        className={`min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground ${streaming ? "sp-stream-text" : "sp-text-reveal"}`}
+        className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${streaming ? "sp-stream-text" : "sp-text-reveal"}`}
       >
         <MarkdownContent content={message.text} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>

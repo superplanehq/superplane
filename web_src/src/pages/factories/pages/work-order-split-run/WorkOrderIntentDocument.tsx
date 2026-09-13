@@ -17,8 +17,8 @@ export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
 
 /**
  * Description-tab reading pane. Drafts keep analysis chat on the left and
- * the plan plus confidence on the right. After Start, the left pane shows
- * source context and confidence. The plan stays on the right.
+ * the summary plus confidence on the right. After Start, the left pane shows
+ * source context and confidence. The summary stays on the right.
  */
 export function WorkOrderIntentDocument({
   title,
@@ -43,6 +43,7 @@ export function WorkOrderIntentDocument({
   analysis?: IntentAnalysisChat;
   contextSidebar?: ReactNode;
 }) {
+  const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
   const split = useSplitRunPanePercent({ defaultPercent: DEFAULT_INTENT_LEFT_PERCENT, minPercent: 28, maxPercent: 68 });
   const document = splitRunIntentDocument({ artifacts, description });
@@ -93,14 +94,24 @@ export function WorkOrderIntentDocument({
             <WorkOrderIntentPlan
               document={document}
               expanded={showPlan}
+              isAnalyzing={isAnalyzing}
               onToggle={() => setShowPlan((current) => !current)}
             />
             {resultAfterBody}
           </div>
-          {contextSidebar ? null : (
-            <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+          {contextSidebar ? (
+            resultFooter
+          ) : refineOpen ? (
+            <div className="shrink-0 border-t border-border" data-testid="split-run-intent-decision">
+              <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />
+              {resultFooter}
+            </div>
+          ) : (
+            <>
+              <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+              {resultFooter}
+            </>
           )}
-          {resultFooter}
         </div>
       </div>
     </article>

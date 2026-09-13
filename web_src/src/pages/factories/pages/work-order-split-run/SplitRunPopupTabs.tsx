@@ -9,7 +9,7 @@ import { ClassicWorkOrderSplitRunOverview } from "./ClassicWorkOrderSplitRunOver
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
-import type { SplitRunPopupTab } from "./splitRunPopupModel";
+import { refinePopupShowsAutomations, type SplitRunPopupTab } from "./splitRunPopupModel";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -107,6 +107,10 @@ export function SplitRunPopupTabs({
         showContextSidebar={fixture.footer.kind !== "draft"}
       />
     );
+  const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind });
+  if (!showAutomations) {
+    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{description}</div>;
+  }
 
   return (
     <Tabs

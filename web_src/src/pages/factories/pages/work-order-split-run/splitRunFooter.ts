@@ -129,6 +129,7 @@ export interface SplitRunFooterAction {
   emphasis: "primary" | "quiet";
   icon?: "undo-2" | "sparkles";
   tooltip?: string;
+  disabled?: boolean;
 }
 
 export interface SplitRunFooterNote {
@@ -159,6 +160,11 @@ const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
+const START_BLOCKED: SplitRunFooterAction = {
+  ...START,
+  disabled: true,
+  tooltip: "Confidence is too low to start.",
+};
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 const BACK_TO_DRAFT: SplitRunFooterAction = {
   id: "back-to-draft",
@@ -365,7 +371,7 @@ function draftReadinessNote(score?: number, isAnalyzing?: boolean): SplitRunFoot
 
 function draftDecisionActions(score?: number): SplitRunFooterAction[] {
   if (score != null && score <= 1) {
-    return [ARCHIVE];
+    return [ARCHIVE, START_BLOCKED];
   }
   return [ARCHIVE, START];
 }

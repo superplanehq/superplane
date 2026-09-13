@@ -18,9 +18,11 @@ describe("PlanningSessionSurveyForm", () => {
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toBeInTheDocument();
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /High/ })).toHaveTextContent("A");
 
     const high = screen.getByRole("button", { name: /High/ });
     await user.click(high);

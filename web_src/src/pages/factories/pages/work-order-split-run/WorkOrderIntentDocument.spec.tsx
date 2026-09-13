@@ -178,7 +178,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-plan-panel")).toBeInTheDocument();
   });
 
-  it("starts the request pane at one third width and lets the reader drag the split", () => {
+  it("starts the request pane at two fifths width and lets the reader drag the split", () => {
     renderDocument(
       <WorkOrderIntentDocument
         title="Show a clearer empty state"
@@ -189,7 +189,7 @@ describe("WorkOrderIntentDocument", () => {
 
     const request = screen.getByTestId("split-run-intent-request");
     const handle = screen.getByTestId("split-run-intent-resize-handle");
-    expect(request.style.getPropertyValue("--intent-left")).toBe("33%");
+    expect(request.style.getPropertyValue("--intent-left")).toBe("40%");
     expect(handle).toHaveAttribute("aria-label", "Resize the request and plan");
 
     const split = request.parentElement;
@@ -245,12 +245,17 @@ describe("WorkOrderIntentDocument", () => {
 
     const chat = within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-intent-chat");
     expect(chat).toBeInTheDocument();
-    expect(within(chat).getByText("You")).toBeInTheDocument();
+    expect(within(chat).getByText(CREATE_WITH_AGENT_COPY.request)).toBeInTheDocument();
+    expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
     expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_THINKING_STATES[0]);
     expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show full plan" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-decision")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
   });
@@ -344,6 +349,10 @@ describe("WorkOrderIntentDocument", () => {
         }}
       />,
     );
+
+    expect(
+      within(screen.getByTestId("split-run-intent-chat-log")).getByTestId("create-with-agent-survey"),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /High/ }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));

@@ -140,7 +140,7 @@ export function SplitRunAttentionNote({
           <Icon className={cn("size-5", visual.icon)} />
         </span>
 
-        <div className="min-w-0 flex-1">
+        <div key={`${note.headline}-${note.text ?? ""}`} className="sp-text-reveal min-w-0 flex-1">
           <h3 className="workspace-section-title">
             <StoppedHeadline note={note} />
           </h3>
@@ -258,7 +258,7 @@ function NoteAction({
 }) {
   const primary = action.emphasis === "primary";
   const busy = action.kind === "start" ? startBusy : actionBusy;
-  const disabled = action.kind === "start" ? startDisabled || startBusy : actionBusy;
+  const disabled = action.kind === "start" ? startDisabled || startBusy || Boolean(action.disabled) : actionBusy;
 
   const button = (
     <Button
@@ -278,7 +278,7 @@ function NoteAction({
   }
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger asChild>{disabled ? <span className="inline-flex">{button}</span> : button}</TooltipTrigger>
       <TooltipContent>{action.tooltip}</TooltipContent>
     </Tooltip>
   );

@@ -1037,6 +1037,10 @@
   animation: sp-error-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
 
+.sp-meter-bar {
+  transition: background-color 280ms ease;
+}
+
 @keyframes sp-text-reveal {
   from {
     opacity: 0;
@@ -1206,5 +1210,9 @@
   .sp-error-shake,
   .sp-ai-thinking::before {
     animation: none;
+  }
+
+  .sp-meter-bar {
+    transition: none;
   }
 }
