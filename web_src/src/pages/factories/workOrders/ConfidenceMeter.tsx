@@ -38,7 +38,10 @@ export function ConfidenceMeter({ score, className, testId }: { score: number; c
             <span
               key={index}
               data-filled={index < value ? "true" : "false"}
-              className={cn("h-2 w-1.5 rounded-[1px]", index < value ? FILLED_TONE[band] : "bg-muted-foreground/25")}
+              className={cn(
+                "sp-meter-bar h-2 w-1.5 rounded-[1px]",
+                index < value ? FILLED_TONE[band] : "bg-muted-foreground/25",
+              )}
             />
           ))}
         </span>
