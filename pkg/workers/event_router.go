@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -293,6 +294,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		return nil, run.ID, nil
+	}
+
+	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
 
 	var queueItems []models.CanvasNodeQueueItem

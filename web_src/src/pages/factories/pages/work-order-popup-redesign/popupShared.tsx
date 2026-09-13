@@ -24,6 +24,7 @@ export function PopupShell({
   wide = false,
   canvas = false,
   fullPage = false,
+  className,
   onDismiss,
 }: {
   testId: string;
@@ -32,6 +33,7 @@ export function PopupShell({
   wide?: boolean;
   canvas?: boolean;
   fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
   return (
@@ -41,6 +43,7 @@ export function PopupShell({
       wide={wide}
       canvas={canvas}
       fullPage={fullPage}
+      className={className}
       onDismiss={onDismiss}
     >
       {children}
@@ -73,6 +76,7 @@ export function PopupHeader({
   children,
   onClose,
   actions,
+  accessory,
   expanded = false,
   onToggleExpanded,
   canEditTitle = false,
@@ -85,6 +89,7 @@ export function PopupHeader({
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
+  accessory?: ReactNode;
   expanded?: boolean;
   onToggleExpanded?: () => void;
   canEditTitle?: boolean;
@@ -117,12 +122,15 @@ export function PopupHeader({
           </div>
           {children}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {actions}
-          {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
-          <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
-            <XIcon className="h-4 w-4" />
-          </button>
+        <div className="flex shrink-0 flex-col items-end justify-between self-stretch gap-2">
+          <div className="flex items-center gap-2">
+            {actions}
+            {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
+            <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+          {accessory}
         </div>
       </div>
     </header>
@@ -166,7 +174,7 @@ export function OwnerTimeCostRow({
 
   return (
     <div
-      className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
+      className={cn("mt-2 flex w-full flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
       data-testid="popup-owner-time-cost"
     >
       {canEditOwner && organizationId && onOwnerSave ? (

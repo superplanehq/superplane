@@ -169,6 +169,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:      backlogTriggerName,
 					Type:      yaml.NodeTypeTrigger,
 					Component: factory.OnWorkOrderTriggerName,
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, factoryTemplateVersion),
 					Position:  yaml.Position{X: 160, Y: 80},
 				},
 				{

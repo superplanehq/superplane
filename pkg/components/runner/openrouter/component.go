@@ -154,6 +154,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups)
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
