@@ -29,9 +29,9 @@ describe("client-side navigation updates document.title", () => {
 
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     const permalinkPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
-    expect(within(permalinkPopup).getByTestId("popup-work-order-title")).toHaveTextContent(
-      "Reconcile duplicate refunds in ledger",
-    );
+    expect(
+      within(permalinkPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+    ).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 
@@ -45,9 +45,9 @@ describe("client-side navigation updates document.title", () => {
     );
 
     const legacyPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
-    expect(within(legacyPopup).getByTestId("popup-work-order-title")).toHaveTextContent(
-      "Reconcile duplicate refunds in ledger",
-    );
+    expect(
+      within(legacyPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+    ).toBeInTheDocument();
   }, 15000);
 
   it("redirects the legacy /work-orders list to /tasks", async () => {
@@ -74,9 +74,9 @@ describe("client-side navigation updates document.title", () => {
 
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     const permalinkPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
-    expect(within(permalinkPopup).getByTestId("popup-work-order-title")).toHaveTextContent(
-      "Reconcile duplicate refunds in ledger",
-    );
+    expect(
+      within(permalinkPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+    ).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 
