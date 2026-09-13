@@ -713,6 +713,17 @@ func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T)
 
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
+	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  "notes:" + order.ID.String(),
+		Data: map[string]any{
+			"name":  models.PlanningSpecArtifactTitle,
+			"title": models.PlanningSpecArtifactTitle,
+			"body":  "# Wrong spec\n\nThis is a later markdown artifact with the same display name.\n",
+		},
+	})
+	require.NoError(t, err)
+
 	spec, err = builder.ResolveExpression(`task().spec`)
 	require.NoError(t, err)
 	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", spec)

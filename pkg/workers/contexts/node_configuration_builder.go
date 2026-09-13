@@ -1227,32 +1227,26 @@ func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrd
 	if !workOrderRefinementEnabled(b.tx, order) {
 		return "", nil
 	}
-	artifacts, err := order.ListArtifacts(b.tx)
+	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return "", nil
+	}
 	if err != nil {
 		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
 	}
-	return planningSpecArtifactBody(artifacts), nil
+	return planningSpecArtifactBody(artifact), nil
 }
 
-func planningSpecArtifactBody(artifacts []models.FactoryWorkOrderArtifact) string {
-	for i := range artifacts {
-		if artifacts[i].Type != models.FactoryWorkOrderArtifactTypeMarkdown {
-			continue
-		}
-		var data map[string]any
-		if err := json.Unmarshal(artifacts[i].Data, &data); err != nil {
-			continue
-		}
-		name, _ := data["name"].(string)
-		title, _ := data["title"].(string)
-		if strings.TrimSpace(name) != models.PlanningSpecArtifactTitle &&
-			strings.TrimSpace(title) != models.PlanningSpecArtifactTitle {
-			continue
-		}
-		body, _ := data["body"].(string)
-		return strings.TrimSpace(body)
+func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact == nil || artifact.Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+		return ""
 	}
-	return ""
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return ""
+	}
+	body, _ := data["body"].(string)
+	return strings.TrimSpace(body)
 }
 
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
