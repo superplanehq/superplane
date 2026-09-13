@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -161,84 +162,8 @@ func (s *Server) adminActivatePriceBook(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
-	var syncResp adminPriceBookSyncResponse
-	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		current, err := models.FindCurrentUsagePriceBook(tx)
-		if err != nil {
-			return err
-		}
-		rows, err := models.ListUsagePriceBookRates(tx, current.Version)
-		if err != nil {
-			return err
-		}
-
-		providers, err := models.ListHostedLLMProviders(tx)
-		if err != nil {
-			return err
-		}
-
-		next := models.CloneUsagePriceBookRates(rows)
-		skipped := make([]string, 0)
-		updated := 0
-		added := 0
-		fetchedPricedProvider := false
-
-		for _, provider := range providers {
-			if !provider.Enabled || !provider.HasAPIKey() {
-				continue
-			}
-			if provider.Provider != models.UsageProviderOpenRouter {
-				skipped = append(skipped, provider.Provider)
-				continue
-			}
-
-			apiKey, decryptErr := llm.DecryptAPIKey(r.Context(), s.encryptor, provider.Provider, provider.APIKey)
-			if decryptErr != nil {
-				return decryptErr
-			}
-			prices, listErr := llm.ListCatalogPrices(
-				r.Context(),
-				s.registry.HTTPContext(),
-				provider.Provider,
-				llm.Credentials{APIKey: apiKey, BaseURL: provider.BaseURL},
-			)
-			if listErr != nil {
-				if errors.Is(listErr, llm.ErrNoCatalogPrices) {
-					skipped = append(skipped, provider.Provider)
-					continue
-				}
-				return listErr
-			}
-
-			fetchedPricedProvider = true
-			filtered := filterCatalogPrices(prices, provider.AllowedModels)
-			var stepUpdated, stepAdded int
-			next, stepUpdated, stepAdded = models.ApplyCatalogPrices(next, filtered)
-			updated += stepUpdated
-			added += stepAdded
-		}
-
-		if !fetchedPricedProvider {
-			return errNoPricedCatalogProvider
-		}
-
-		book, pubErr := models.PublishUsagePriceBook(tx, next)
-		if pubErr != nil {
-			return pubErr
-		}
-
-		payload, status, message := loadAdminPriceBooks(tx, book.Version)
-		if status != http.StatusOK {
-			return errors.New(message)
-		}
-		syncResp = adminPriceBookSyncResponse{
-			adminPriceBooksResponse: payload,
-			UpdatedCount:            updated,
-			AddedCount:              added,
-			SkippedProviders:        skipped,
-		}
-		return nil
-	})
+	ctx := r.Context()
+	sync, err := s.collectCatalogRates(ctx, database.DB(ctx))
 	if err != nil {
 		if errors.Is(err, errNoPricedCatalogProvider) {
 			http.Error(w, "No enabled provider publishes catalog prices", http.StatusBadRequest)
@@ -248,14 +173,108 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Price book not found", http.StatusNotFound)
 			return
 		}
-		log.Errorf("admin: failed to sync price books: %v", err)
+		log.Errorf("admin: failed to read provider catalog prices: %v", err)
 		http.Error(w, "Unable to update model rates from the provider", http.StatusBadGateway)
 		return
 	}
-	respondJSON(w, syncResp)
+
+	var published *models.UsagePriceBook
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		book, pubErr := models.PublishUsagePriceBook(tx, sync.rates)
+		if pubErr != nil {
+			return pubErr
+		}
+		published = book
+		return nil
+	})
+	if err != nil {
+		log.Errorf("admin: failed to publish synced price book: %v", err)
+		http.Error(w, "Failed to save price books", http.StatusInternalServerError)
+		return
+	}
+
+	payload, status, message := loadAdminPriceBooks(database.DB(ctx), published.Version)
+	if status != http.StatusOK {
+		log.Errorf("admin: failed to load synced price book %s: %s", published.Version, message)
+		http.Error(w, "Failed to load price books", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, adminPriceBookSyncResponse{
+		adminPriceBooksResponse: payload,
+		UpdatedCount:            sync.updated,
+		AddedCount:              sync.added,
+		SkippedProviders:        sync.skipped,
+	})
 }
 
 var errNoPricedCatalogProvider = errors.New("no enabled provider publishes catalog prices")
+
+// catalogSync is the price book that provider catalogs produce, before it is published.
+type catalogSync struct {
+	rates   []models.UsagePriceBookRate
+	updated int
+	added   int
+	skipped []string
+}
+
+// collectCatalogRates reads the current rates and merges provider catalog
+// prices into them. It runs outside a transaction because it calls provider
+// HTTP APIs.
+func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB) (catalogSync, error) {
+	current, err := models.FindCurrentUsagePriceBook(tx)
+	if err != nil {
+		return catalogSync{}, err
+	}
+	rows, err := models.ListUsagePriceBookRates(tx, current.Version)
+	if err != nil {
+		return catalogSync{}, err
+	}
+	providers, err := models.ListHostedLLMProviders(tx)
+	if err != nil {
+		return catalogSync{}, err
+	}
+
+	sync := catalogSync{rates: models.CloneUsagePriceBookRates(rows), skipped: make([]string, 0)}
+	fetchedPricedProvider := false
+	for _, provider := range providers {
+		if !provider.Enabled || !provider.HasAPIKey() {
+			continue
+		}
+		if provider.Provider != models.UsageProviderOpenRouter {
+			sync.skipped = append(sync.skipped, provider.Provider)
+			continue
+		}
+
+		apiKey, decryptErr := llm.DecryptAPIKey(ctx, s.encryptor, provider.Provider, provider.APIKey)
+		if decryptErr != nil {
+			return catalogSync{}, decryptErr
+		}
+		prices, listErr := llm.ListCatalogPrices(
+			ctx,
+			s.registry.HTTPContext(),
+			provider.Provider,
+			llm.Credentials{APIKey: apiKey, BaseURL: provider.BaseURL},
+		)
+		if listErr != nil {
+			if errors.Is(listErr, llm.ErrNoCatalogPrices) {
+				sync.skipped = append(sync.skipped, provider.Provider)
+				continue
+			}
+			return catalogSync{}, listErr
+		}
+
+		fetchedPricedProvider = true
+		var updated, added int
+		sync.rates, updated, added = models.ApplyCatalogPrices(sync.rates, filterCatalogPrices(prices, provider.AllowedModels))
+		sync.updated += updated
+		sync.added += added
+	}
+
+	if !fetchedPricedProvider {
+		return catalogSync{}, errNoPricedCatalogProvider
+	}
+	return sync, nil
+}
 
 func filterCatalogPrices(prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
 	provider := models.HostedLLMProvider{AllowedModels: allowlist}
