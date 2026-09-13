@@ -47,7 +47,7 @@ function reviewRunHref(
 }
 
 /**
- * Decision note under Description and Automations. Header stays Close only.
+ * Decision note under the plan on Description, and under Automations.
  */
 export function SplitRunReview({
   footer,
@@ -56,17 +56,16 @@ export function SplitRunReview({
   factoryKey,
   orderNumber,
   canAct = true,
-  canRefine = true,
   onStart,
   onArchive,
   onReject,
-  onRefine,
   onBackToDraft,
   onStop,
   startBusy = false,
   actionBusy = false,
   startDisabled = false,
   modelSelect,
+  compact = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -74,28 +73,26 @@ export function SplitRunReview({
   factoryKey?: string;
   orderNumber?: string;
   canAct?: boolean;
-  canRefine?: boolean;
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
-  onRefine?: () => void;
   onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
   startDisabled?: boolean;
   modelSelect?: ReactNode;
+  compact?: boolean;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
-  const actions = canAct ? footer.actions.filter((action) => canRefine || action.kind !== "refine") : [];
+  const actions = canAct ? footer.actions.filter((action) => action.kind !== "refine") : [];
   const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
     start: onStart,
     archive: onArchive,
     reject: onReject,
-    refine: onRefine,
     "back-to-draft": onBackToDraft,
   };
   const onAction = (action: SplitRunFooterAction) => {
@@ -119,7 +116,7 @@ export function SplitRunReview({
   };
 
   return (
-    <div className={cn("shrink-0", className)} data-testid="split-run-review">
+    <div className={cn(compact ? "min-w-0 flex-1" : "shrink-0", className)} data-testid="split-run-review">
       <SplitRunAttentionNote
         note={footer.note}
         tone={splitRunDecisionTone(footer)}
@@ -129,6 +126,7 @@ export function SplitRunReview({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        compact={compact}
         onAction={onAction}
       />
     </div>

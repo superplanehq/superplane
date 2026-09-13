@@ -17,6 +17,25 @@ export function parsePlanningSurvey(raw: string | undefined): CreateWithAgentSur
   }
 }
 
+export type PlanningSurveyReplyPair = {
+  question: string;
+  answer: string;
+};
+
+export function parsePlanningSurveyReply(text: string): PlanningSurveyReplyPair[] {
+  if (text.trim() === CREATE_WITH_AGENT_COPY.surveySkipped) {
+    return [];
+  }
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const match = /^(.*\?)\s+(\S.*)$/.exec(line);
+      return match ? [{ question: match[1].trim(), answer: match[2].trim() }] : [];
+    });
+}
+
 export function isPlanningSurveyReply(text: string): boolean {
   const name = text.trim();
   if (!name) {

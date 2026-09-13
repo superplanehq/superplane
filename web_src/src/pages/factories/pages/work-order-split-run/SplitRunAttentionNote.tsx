@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   Bug,
   CheckCircle2,
+  CircleAlert,
   CircleX,
   ExternalLink,
   FileText,
@@ -9,6 +10,7 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
 
@@ -29,6 +31,24 @@ const TONE = {
     iconWrap: "bg-[color:var(--status-draft-dot)]/15",
     icon: "text-[color:var(--status-draft-fg)]",
     Icon: FileText,
+  },
+  "draft-blocked": {
+    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
+    iconWrap: "bg-[color:var(--status-failed-dot)]/15",
+    icon: "text-[color:var(--status-failed-fg)]",
+    Icon: CircleAlert,
+  },
+  "draft-caution": {
+    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
+    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
+    icon: "text-[color:var(--status-waiting-fg)]",
+    Icon: TriangleAlert,
+  },
+  "draft-ready": {
+    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
+    iconWrap: "bg-[color:var(--status-completed-dot)]/15",
+    icon: "text-[color:var(--status-completed-fg)]",
+    Icon: CheckCircle2,
   },
   waiting: {
     strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
@@ -82,6 +102,7 @@ export function SplitRunAttentionNote({
   startBusy = false,
   startDisabled = false,
   modelSelect,
+  compact = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -92,6 +113,7 @@ export function SplitRunAttentionNote({
   startBusy?: boolean;
   startDisabled?: boolean;
   modelSelect?: ReactNode;
+  compact?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
@@ -104,6 +126,31 @@ export function SplitRunAttentionNote({
         actionBusy={actionBusy}
         onAction={onAction}
       />
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+        <div
+          key={`${note.headline}-${note.text ?? ""}`}
+          className="sp-stream-text min-w-0 flex-1"
+          data-testid="split-run-intent-decision-tip"
+        >
+          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
+          {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
+        </div>
+        <NoteActionRow
+          note={note}
+          actions={actions}
+          runHref={runHref}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          modelSelect={modelSelect}
+          onAction={onAction}
+        />
+      </div>
     );
   }
 
@@ -120,7 +167,7 @@ export function SplitRunAttentionNote({
           <Icon className={cn("size-5", visual.icon)} />
         </span>
 
-        <div className="min-w-0 flex-1">
+        <div key={`${note.headline}-${note.text ?? ""}`} className="sp-text-reveal min-w-0 flex-1">
           <h3 className="workspace-section-title">
             <StoppedHeadline note={note} />
           </h3>
@@ -238,7 +285,7 @@ function NoteAction({
 }) {
   const primary = action.emphasis === "primary";
   const busy = action.kind === "start" ? startBusy : actionBusy;
-  const disabled = action.kind === "start" ? startDisabled || startBusy : actionBusy;
+  const disabled = action.kind === "start" ? startDisabled || startBusy || Boolean(action.disabled) : actionBusy;
 
   const button = (
     <Button
@@ -258,7 +305,7 @@ function NoteAction({
   }
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger asChild>{disabled ? <span className="inline-flex">{button}</span> : button}</TooltipTrigger>
       <TooltipContent>{action.tooltip}</TooltipContent>
     </Tooltip>
   );
