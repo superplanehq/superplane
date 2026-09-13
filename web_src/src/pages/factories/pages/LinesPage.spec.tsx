@@ -343,9 +343,12 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
+    expect(within(dialog).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("5/5");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-decision-tip")).toHaveTextContent(
+      "This task is ready to start",
+    );
     expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(

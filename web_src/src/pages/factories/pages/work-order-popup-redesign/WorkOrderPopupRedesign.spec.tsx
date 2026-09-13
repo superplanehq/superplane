@@ -315,10 +315,9 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
-    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
-    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("5/5");
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 

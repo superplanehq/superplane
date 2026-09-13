@@ -1,22 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "./useWorkOrderChecks";
 import { factoryQueryKeys } from "./useFactoryData";
 
 const { factoriesListWorkOrderChecks } = vi.hoisted(() => ({
   factoriesListWorkOrderChecks: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    factoriesListWorkOrderChecks,
-  };
-});
+vi.mock("@/api-client", () => ({
+  factoriesListWorkOrderChecks,
+}));
+
+import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "./useWorkOrderChecks";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
