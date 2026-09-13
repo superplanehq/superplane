@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "./HostedCreditEmptyBanner";
 import { HOSTED_CREDIT_RUNS_STOP_HINT, welcomeCreditHeaderLabel } from "./lib/hostedCreditEmpty";

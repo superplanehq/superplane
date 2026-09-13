@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { DOLLAR_REWRITE_IDENTIFIER } from "./widget/celExpr";
 import { interpolateMarkdownTemplate } from "./markdownInterpolation";
