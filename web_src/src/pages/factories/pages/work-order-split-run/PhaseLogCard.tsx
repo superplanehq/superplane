@@ -409,7 +409,7 @@ type PhaseLogCardProps = {
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
-  /** Collapse setup noise and bash in the Create with an Agent session log. */
+  /** Collapse setup noise and bash in the planning session log. */
   compactSessionLog?: boolean;
   /** Live canvas or run details are still loading for this phase. */
   streamLoading?: boolean;
