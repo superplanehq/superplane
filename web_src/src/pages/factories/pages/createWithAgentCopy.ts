@@ -9,7 +9,7 @@ export const CREATE_WITH_AGENT_COPY = {
   keepSession: "Keep session",
   send: "Send",
   you: "You",
-  youSurvey: "You (survey response)",
+  youSurvey: "Answer",
   sendAnswers: "Send answers",
   skipSurvey: "Skip",
   previousQuestion: "Previous",
