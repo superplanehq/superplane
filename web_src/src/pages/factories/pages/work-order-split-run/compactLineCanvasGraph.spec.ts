@@ -1,5 +1,5 @@
 import { Position, type Edge } from "@xyflow/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";

@@ -1,12 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
+
+import { unmockedSrc } from "@/test/unmockedModule";
 
 const canvasesPutCanvasStaging = vi.hoisted(() => vi.fn());
 const canvasesCommitCanvasStaging = vi.hoisted(() => vi.fn());
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<Record<string, unknown>>("api-client");
   return {
-    ...(actual as Record<string, unknown>),
+    ...actual,
     canvasesPutCanvasStaging,
     canvasesCommitCanvasStaging,
   };

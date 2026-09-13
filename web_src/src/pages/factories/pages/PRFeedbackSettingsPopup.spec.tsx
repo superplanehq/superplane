@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -30,16 +31,16 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof CanvasDataModule>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData");
   return {
     ...actual,
     useInfiniteCanvasRuns,
   };
 });
 
-vi.mock("@/hooks/useIntegrations", async (importOriginal) => {
-  const actual = await importOriginal<typeof IntegrationsModule>();
+vi.mock("@/hooks/useIntegrations", () => {
+  const actual = unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations");
   return {
     ...actual,
     useConnectedIntegrations: vi.fn(() => ({ data: [] })),

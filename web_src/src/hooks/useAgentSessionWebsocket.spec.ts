@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
 import { agentChatKeys, type AgentMessagesPage } from "@/hooks/useAgentChats";
 
@@ -8,8 +8,8 @@ const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
 }));
 
-vi.mock("react-use-websocket", () => ({
-  default: useWebSocketMock,
+vi.mock("@/lib/reactUseWebsocket", () => ({
+  useWebSocket: useWebSocketMock,
 }));
 
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";

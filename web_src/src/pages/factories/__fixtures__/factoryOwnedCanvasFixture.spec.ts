@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 import { isValidRunId } from "@/pages/app/workflowPageHelpers";

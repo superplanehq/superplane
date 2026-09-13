@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { CanvasesCanvasRun } from "@/api-client";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
+import { unmockedSrc } from "@/test/unmockedModule";
 
 import { useSettingsAutomationRunCanvas } from "./useSettingsAutomationRunCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
@@ -19,8 +20,8 @@ const { useCanvas, useDescribeRun, useEventExecutions, useTriggers, useComponent
     useAvailableIntegrations: vi.fn(),
   }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof CanvasDataModule>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData");
   return {
     ...actual,
     useCanvas,

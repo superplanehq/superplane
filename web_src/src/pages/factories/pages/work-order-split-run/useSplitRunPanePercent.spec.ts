@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { DEFAULT_INTENT_LEFT_PERCENT, DEFAULT_LOG_PERCENT } from "./useSplitRunPanePercent";
 

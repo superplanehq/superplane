@@ -1,6 +1,6 @@
 import type { CanvasesCanvasVersionMetadata } from "@/api-client";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { VersionsTabPanel } from "./VersionsTabPanel";
 
 function makeVersion(id: string, commitMessage?: string): CanvasesCanvasVersionMetadata {
