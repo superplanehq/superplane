@@ -43,6 +43,13 @@ func ExpressionUsesOrderKey(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "key")
 }
 
+// ExpressionUsesOrderSpec reports whether the expression accesses order().spec
+// or task().spec (dot or bracket). Used to load the refinement spec only when
+// the implement prompt asks for it.
+func ExpressionUsesOrderSpec(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "spec")
+}
+
 // expressionReferencesOrderProperty reports whether the expression accesses
 // order().<property> or task().<property> (dot or bracket), including nested
 // uses such as len(order().<property>) or none(task().<property>, …).
