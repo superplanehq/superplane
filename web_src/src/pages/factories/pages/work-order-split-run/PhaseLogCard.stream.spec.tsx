@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
 
@@ -16,7 +17,7 @@ beforeEach(() => {
 });
 
 describe("PhaseLogCard stream details", () => {
-  it("labels a survey reply as You (survey response)", () => {
+  it("labels a survey reply as Answer", () => {
     render(
       <PhaseLogCard
         phase={PHASE}
@@ -43,7 +44,7 @@ describe("PhaseLogCard stream details", () => {
     );
 
     const userNote = screen.getByTestId("split-run-user-note");
-    expect(userNote).toHaveTextContent("You (survey response)");
+    expect(userNote).toHaveTextContent(CREATE_WITH_AGENT_COPY.youSurvey);
     expect(userNote).toHaveTextContent("What is the priority? High");
   });
 
