@@ -4,7 +4,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
-import { analysisFirstResultDelivered } from "../../lib/analysisOutcome";
+import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
@@ -38,7 +38,7 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const refinementEnabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const isDraft = fixture.footer.kind === "draft";
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
-  const canLookupSession = isDraft && Boolean(organizationId && factoryId && orderId);
+  const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
   const analysis = useAnalysisPlanningSession({
@@ -55,6 +55,7 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   });
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
+    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
     refinementEnabled,
     analysisActive: isAnalyzing,
     hasLookupIdentity,

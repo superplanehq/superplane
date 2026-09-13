@@ -756,6 +756,22 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
   });
 
+  it("keeps source and spec after reopen when the started card has a score", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: OPEN_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Description" }));
+    const request = screen.getByTestId("split-run-intent-request");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-overview-checks")).not.toBeInTheDocument();
+  });
+
   it("hides source, artifacts, and pull requests on the description tab", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
