@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentSurvey } from "./createWithAgentTypes";
@@ -22,25 +22,15 @@ export function PlanningSessionSurveyForm({
   const questionCount = survey.questions.length;
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === questionCount - 1;
-  const hasAnswer = answers.some((answer) => Boolean(answer?.trim()));
+  const hasCurrentAnswer = Boolean(answers[currentIndex]?.trim());
+  const sendReply = () => onSubmit(formatPlanningSurveyReply(survey.questions, answers));
 
   if (!question) {
     return null;
   }
 
   return (
-    <form
-      className="border-b border-border bg-background px-3 py-3"
-      data-testid="create-with-agent-survey"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!isLast) {
-          setCurrentIndex((index) => index + 1);
-          return;
-        }
-        onSubmit(formatPlanningSurveyReply(survey.questions, answers));
-      }}
-    >
+    <div className="border-b border-border bg-background px-3 py-3" data-testid="create-with-agent-survey">
       <div className="overflow-hidden rounded-lg border border-border">
         <div className="flex items-start justify-between gap-3 border-b border-border bg-muted/40 px-3 py-2">
           <p className="text-[12px] font-medium text-foreground">{question.prompt}</p>
@@ -77,6 +67,7 @@ export function PlanningSessionSurveyForm({
             );
           })}
           <Input
+            type="text"
             value={customInputs[currentIndex] ?? ""}
             placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
             aria-label={`${question.prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
@@ -86,43 +77,111 @@ export function PlanningSessionSurveyForm({
               setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
               setAnswers((current) => replaceAtIndex(current, currentIndex, value.trim() || null));
             }}
+            onKeyDown={(event) =>
+              handleSurveyEnter(event, isLast, hasCurrentAnswer, () => setCurrentIndex((index) => index + 1), sendReply)
+            }
           />
         </div>
-        <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
+        <SurveyFormPager
+          questionCount={questionCount}
+          isFirst={isFirst}
+          isLast={isLast}
+          hasCurrentAnswer={hasCurrentAnswer}
+          onPrevious={() => setCurrentIndex((index) => index - 1)}
+          onNext={() => setCurrentIndex((index) => index + 1)}
+          onSend={sendReply}
+        />
+      </div>
+    </div>
+  );
+}
+
+function handleSurveyEnter(
+  event: KeyboardEvent<HTMLInputElement>,
+  isLast: boolean,
+  hasCurrentAnswer: boolean,
+  onNext: () => void,
+  onSend: () => void,
+) {
+  if (event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  if (!isLast) {
+    onNext();
+    return;
+  }
+  if (hasCurrentAnswer) {
+    onSend();
+  }
+}
+
+function SurveyFormPager({
+  questionCount,
+  isFirst,
+  isLast,
+  hasCurrentAnswer,
+  onPrevious,
+  onNext,
+  onSend,
+}: {
+  questionCount: number;
+  isFirst: boolean;
+  isLast: boolean;
+  hasCurrentAnswer: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
+      {questionCount > 1 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-muted-foreground"
+          disabled={isFirst}
+          onClick={onPrevious}
+        >
+          <ChevronLeft size={12} className="mr-1" />
+          {CREATE_WITH_AGENT_COPY.previousQuestion}
+        </Button>
+      ) : (
+        <span />
+      )}
+      {isLast ? (
+        <div className="flex items-center gap-2">
           {questionCount > 1 ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              disabled={isFirst}
-              onClick={() => setCurrentIndex((index) => index - 1)}
+              onClick={onSend}
             >
-              <ChevronLeft size={12} className="mr-1" />
-              {CREATE_WITH_AGENT_COPY.previousQuestion}
+              {CREATE_WITH_AGENT_COPY.skipSurvey}
             </Button>
-          ) : (
-            <span />
-          )}
-          {isLast ? (
-            <Button type="submit" size="sm" className="h-7 text-xs">
-              {hasAnswer ? CREATE_WITH_AGENT_COPY.sendAnswers : CREATE_WITH_AGENT_COPY.skipSurvey}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-muted-foreground"
-              onClick={() => setCurrentIndex((index) => index + 1)}
-            >
-              {CREATE_WITH_AGENT_COPY.nextQuestion}
-              <ChevronRight size={12} className="ml-1" />
-            </Button>
-          )}
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={questionCount > 1 && !hasCurrentAnswer}
+            onClick={onSend}
+          >
+            {hasCurrentAnswer || questionCount > 1
+              ? CREATE_WITH_AGENT_COPY.sendAnswers
+              : CREATE_WITH_AGENT_COPY.skipSurvey}
+          </Button>
         </div>
-      </div>
-    </form>
+      ) : (
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={onNext}>
+          {CREATE_WITH_AGENT_COPY.nextQuestion}
+          <ChevronRight size={12} className="ml-1" />
+        </Button>
+      )}
+    </div>
   );
 }
 

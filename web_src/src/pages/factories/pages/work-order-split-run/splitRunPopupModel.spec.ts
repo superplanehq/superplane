@@ -18,9 +18,9 @@ import {
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
   resolveSplitRunPopupPullRequests,
-  SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
+  splitRunIntentDocument,
   splitRunLinkedArtifacts,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
@@ -29,10 +29,6 @@ import {
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
-  it("uses a 3/2 pane split for Description", () => {
-    expect(SPLIT_RUN_PANE_GRID_CLASSNAME).toContain("minmax(0,3fr)_minmax(0,2fr)");
-  });
-
   it("opens the automation run for the preferred phase, then the latest phase run", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
     const implementHref = getWorkOrderRunHref(
@@ -112,9 +108,28 @@ describe("splitRunPopupModel", () => {
 
   it("opens the description tab for drafts and done cards, and the log for later states", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+          analysisRuns: [
+            {
+              canvasId: "canvas-backlog",
+              workOrderId: DRAFT_WORK_ORDER.id ?? "",
+              run: {
+                id: "run-analysis",
+                canvasId: "canvas-backlog",
+                state: "STATE_STARTED",
+                createdAt: "2026-08-28T12:00:00Z",
+                updatedAt: "2026-08-28T12:00:00Z",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("log");
   });
 
   it("prefers the saved work-order description on a live order", () => {
@@ -145,6 +160,45 @@ describe("splitRunPopupModel", () => {
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(splitRunIntentDocument({ artifacts, description }).summary).toBeTruthy();
+    expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
+  });
+
+  it("prefers spec.md over intent.md", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "# Old intent\n\n## Executive summary\n\nOld summary.\n" },
+      },
+      {
+        id: "art-spec",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "spec.md", body: "# New spec\n\n## Executive summary\n\nNew summary.\n" },
+      },
+    ];
+
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New spec");
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("New summary.");
+    expect(splitRunLinkedArtifacts(artifacts)).toEqual([]);
+  });
+
+  it("keeps intent.md out of the Artifacts list", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "## Executive summary\n\nA retry loop." },
+      },
+      {
+        id: "art-plan",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "plan.md", body: "Add a retry." },
+      },
+    ];
+
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-plan"]);
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("A retry loop.");
   });
 
   it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {
