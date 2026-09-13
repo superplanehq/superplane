@@ -10,8 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 func TestAdminGetPriceBooks(t *testing.T) {
@@ -82,6 +85,86 @@ func TestAdminGetPriceBooks(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
+}
+
+func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	t.Cleanup(func() {
+		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-09.1")
+	})
+
+	getBody := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/admin/api/price-books",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, getBody.Code)
+	var current adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(getBody.Body.Bytes(), &current))
+
+	current.Models[0].InputCentsPerMillion = current.Models[0].InputCentsPerMillion + 1
+	current.VMs = append(current.VMs, adminPriceBookVMRate{
+		MatchKey:        "e1-test-amd64",
+		MatchMode:       "exact",
+		MicrosPerSecond: 9,
+	})
+
+	payload, err := json.Marshal(adminPriceBooksSaveRequest{Models: current.Models, VMs: current.VMs})
+	require.NoError(t, err)
+
+	save := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books",
+		authCookie:  token,
+		body:        payload,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, save.Code)
+
+	var saved adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(save.Body.Bytes(), &saved))
+	assert.NotEqual(t, "2026-09-09.1", saved.CurrentVersion)
+	assert.Equal(t, saved.CurrentVersion, saved.Version)
+	assert.True(t, containsVMRate(saved.VMs, "e1-test-amd64", 9))
+
+	activate := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books/current",
+		authCookie:  token,
+		body:        []byte(`{"version":"2026-09-09.1"}`),
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, activate.Code)
+	var restored adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(activate.Body.Bytes(), &restored))
+	assert.Equal(t, "2026-09-09.1", restored.CurrentVersion)
+	assert.Equal(t, "2026-09-09.1", restored.Version)
+	assert.False(t, containsVMRate(restored.VMs, "e1-test-amd64", 9))
+}
+
+func TestAdminSyncPriceBooks_RequiresPricedProvider(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	response := execRequest(server, requestParams{
+		method:     "POST",
+		path:       "/admin/api/price-books/sync",
+		authCookie: token,
+	})
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), "No enabled provider publishes catalog prices")
+}
+
+func TestFilterCatalogPrices_MatchesAllowlistAndNormalizedIDs(t *testing.T) {
+	prices := []llm.CatalogPrice{
+		{ID: "anthropic/claude-sonnet-4-6", Rate: pricebook.Rate{Input: 400}},
+		{ID: "openai/gpt-4o", Rate: pricebook.Rate{Input: 250}},
+		{ID: "openai/gpt-4o-mini", Rate: pricebook.Rate{Input: 15}},
+	}
+
+	filtered := filterCatalogPrices(prices, []string{"anthropic/claude-sonnet-4-6", "gpt-4o-mini"})
+	require.Len(t, filtered, 2)
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", filtered[0].ModelID)
+	assert.Equal(t, "openai/gpt-4o-mini", filtered[1].ModelID)
 }
 
 func containsModelRate(rates []adminPriceBookModelRate, matchKey string) bool {

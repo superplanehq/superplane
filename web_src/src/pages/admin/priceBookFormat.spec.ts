@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { formatCentsPerMillionUsd, formatMatchMode, formatMicrosPerSecondUsdPerMinute } from "./priceBookFormat";
+import {
+  centsToUsdInput,
+  formatCentsPerMillionUsd,
+  formatMatchMode,
+  formatMicrosPerSecondUsdPerMinute,
+  usdInputToCents,
+} from "./priceBookFormat";
 
 describe("formatCentsPerMillionUsd", () => {
   it("formats cents per million tokens as USD", () => {
@@ -23,5 +29,20 @@ describe("formatMatchMode", () => {
     expect(formatMatchMode("prefix")).toBe("Prefix");
     expect(formatMatchMode("family")).toBe("Family");
     expect(formatMatchMode("exact")).toBe("Exact");
+  });
+});
+
+describe("usdInputToCents", () => {
+  it("converts dollar input to cents per million", () => {
+    expect(usdInputToCents("3.00")).toBe(300);
+    expect(usdInputToCents("0.08")).toBe(8);
+    expect(usdInputToCents("-1")).toBe(0);
+  });
+});
+
+describe("centsToUsdInput", () => {
+  it("formats cents per million as a dollar input", () => {
+    expect(centsToUsdInput(300)).toBe("3.00");
+    expect(centsToUsdInput(8)).toBe("0.08");
   });
 });
