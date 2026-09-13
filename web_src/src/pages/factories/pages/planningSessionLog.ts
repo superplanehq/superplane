@@ -47,6 +47,9 @@ export function isPlanningSessionToolPayload(text: string): boolean {
     if (Array.isArray(record.questions) || record.status === "shown") {
       return true;
     }
+    if (typeof record.body === "string" || typeof record.score === "number") {
+      return true;
+    }
     return ["message", "text", "title", "description"].some((key) => typeof record[key] === "string");
   } catch {
     return false;
@@ -187,6 +190,8 @@ function isCollapsedTool(line: SplitRunStreamLine): boolean {
     COLLAPSED_TOOL_TYPES.has(type) ||
     type.includes("mcp__") ||
     type.endsWith("propose_draft") ||
+    type.endsWith("propose_spec") ||
+    type.endsWith("propose_confidence") ||
     type.endsWith("survey") ||
     type.endsWith("say")
   );
@@ -211,9 +216,13 @@ function isPlanningSessionSystemPrompt(text: string): boolean {
   const name = text.trim();
   return (
     name === "Plan with the user" ||
+    name === "Analyze and score" ||
     name === "Wait for the next user message" ||
+    name.startsWith("Analyze this") ||
     name.startsWith("You are in a SuperPlane planning session") ||
     name.startsWith("This is a SuperPlane planning session") ||
+    name.startsWith("This is a SuperPlane analysis session") ||
+    name.startsWith("The user is adding context") ||
     name.startsWith("Greet the user") ||
     name.startsWith("The user created the draft task") ||
     name.startsWith("The user skipped that draft") ||
