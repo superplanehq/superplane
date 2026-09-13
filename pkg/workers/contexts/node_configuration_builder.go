@@ -1231,22 +1231,19 @@ func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrd
 	if err != nil {
 		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
 	}
-	return planningSpecArtifactBody(artifacts), nil
+	return planningSpecArtifactBody(artifacts, models.PlanningSpecArtifactKey+":"+order.ID.String()), nil
 }
 
-func planningSpecArtifactBody(artifacts []models.FactoryWorkOrderArtifact) string {
+func planningSpecArtifactBody(artifacts []models.FactoryWorkOrderArtifact, key string) string {
 	for i := range artifacts {
 		if artifacts[i].Type != models.FactoryWorkOrderArtifactTypeMarkdown {
 			continue
 		}
-		var data map[string]any
-		if err := json.Unmarshal(artifacts[i].Data, &data); err != nil {
+		if artifacts[i].Key == nil || *artifacts[i].Key != key {
 			continue
 		}
-		name, _ := data["name"].(string)
-		title, _ := data["title"].(string)
-		if strings.TrimSpace(name) != models.PlanningSpecArtifactTitle &&
-			strings.TrimSpace(title) != models.PlanningSpecArtifactTitle {
+		var data map[string]any
+		if err := json.Unmarshal(artifacts[i].Data, &data); err != nil {
 			continue
 		}
 		body, _ := data["body"].(string)

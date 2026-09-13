@@ -107,6 +107,10 @@ func TestExpressionUsesOrderSpec(t *testing.T) {
 		{name: "bracket spec", raw: `order()["spec"]`, want: true},
 		{name: "ternary", raw: `task().spec != "" ? task().spec : ""`, want: true},
 		{name: "task alias", raw: `task().spec`, want: true},
+		{name: "let alias spec", raw: `let taskData = task(); taskData.spec`, want: true},
+		{name: "let alias bracket spec", raw: `let taskData = task(); taskData["spec"]`, want: true},
+		{name: "let alias order spec", raw: `let orderData = order(); orderData.spec`, want: true},
+		{name: "let unrelated spec", raw: `let taskData = root(); taskData.spec`, want: false},
 		{name: "unrelated", raw: `root().data.spec`, want: false},
 	}
 
