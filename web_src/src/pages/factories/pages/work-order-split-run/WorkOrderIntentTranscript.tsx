@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
+import { WorkOrderDescription } from "../../WorkOrderDescription";
+import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
@@ -46,7 +48,11 @@ function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMes
           data-testid="split-run-intent-user-note"
         >
           <p className="sp-user-note-label mb-1.5 text-[11px] font-medium leading-none">{CREATE_WITH_AGENT_COPY.you}</p>
-          <MarkdownContent content={message.text} variant="workspace" className={MESSAGE_MARKDOWN} />
+          <WorkOrderDescription
+            description={message.text}
+            previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
+            fadeClassName="sp-user-note-fade"
+          />
         </div>
       </div>
     );
