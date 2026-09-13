@@ -122,6 +122,7 @@ function AnalysisWorkOrderPopup({
       startBusy={isDispatching}
       actionBusy={footerActions.busy}
       startDisabled={!canDispatch}
+      compact={fixture.footer.kind === "draft"}
       modelSelect={
         fixture.footer.kind === "draft" &&
         canPickDraftStartModel &&

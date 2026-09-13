@@ -317,6 +317,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --stream-gap: 28ms;
+  --stream-fade: 220ms;
+  --stream-blur: 2px;
+  --stream-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dark {
@@ -1001,7 +1005,20 @@
 }
 
 .sp-stream-text {
-  animation: sp-stream-text 420ms ease-out both;
+  animation: sp-stream-text 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-stream-w {
+  opacity: 0;
+  filter: blur(var(--stream-blur));
+  transition:
+    opacity var(--stream-fade) var(--stream-ease),
+    filter var(--stream-fade) var(--stream-ease);
+}
+
+.sp-stream-w.is-in {
+  opacity: 1;
+  filter: blur(0);
 }
 
 .sp-reasoning-stream {
@@ -1041,6 +1058,10 @@
   transition: background-color 280ms ease;
 }
 
+.sp-confidence-why[data-state="open"] {
+  animation: sp-confidence-why-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes sp-text-reveal {
   from {
     opacity: 0;
@@ -1052,10 +1073,21 @@
   }
 }
 
+@keyframes sp-confidence-why-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes sp-stream-text {
   from {
-    opacity: 0.4;
-    filter: blur(3px);
+    opacity: 0;
+    filter: blur(5px);
   }
   to {
     opacity: 1;
@@ -1214,5 +1246,15 @@
 
   .sp-meter-bar {
     transition: none;
+  }
+
+  .sp-stream-w {
+    transition: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+
+  .sp-confidence-why[data-state="open"] {
+    animation: none;
   }
 }

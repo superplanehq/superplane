@@ -35,6 +35,10 @@ export const SPLIT_RUN_PANE_GRID_CLASSNAME =
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
   "max-h-[min(62rem,calc(100vh-3rem))] h-[min(56rem,calc(100vh-3rem))] w-[min(90rem,calc(100vw-3rem))]";
 
+/** Shared height for the chat composer and the spec decision row. */
+export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =
+  "flex shrink-0 items-center border-t border-border bg-background px-5 py-3 min-h-[5.5rem]";
+
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
 const PLAN_NAMES = ["plan.md"];
 

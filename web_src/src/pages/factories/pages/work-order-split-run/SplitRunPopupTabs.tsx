@@ -98,6 +98,7 @@ export function SplitRunPopupTabs({
         isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
         organizationId={organizationId}
         factoryKey={factoryKey}
+        orderId={orderId}
         orderNumber={orderNumber}
         files={liveWorkOrder.data?.files}
         expandFirstCheck={fixture.footer.kind === "draft"}

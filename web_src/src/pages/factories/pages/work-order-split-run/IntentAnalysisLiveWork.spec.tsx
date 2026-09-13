@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "bun:test";
 
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 
 describe("AnalysisLiveWork", () => {
@@ -39,6 +40,37 @@ describe("AnalysisLiveWork", () => {
       "data-text",
       "The empty view only names the page.",
     );
+  });
+
+  it("hides the starting status after the first agent line", () => {
+    render(
+      <AnalysisLiveWork
+        machineStatus="running"
+        waitingForAgent
+        items={[
+          { id: "note", text: "I have enough understanding of the repository. Let me write the analysis files." },
+          { id: "tools", text: "Ran 1 command", details: ["jq empty /tmp/intake-analysis.json"] },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-reasoning")).toHaveTextContent(
+      "I have enough understanding of the repository.",
+    );
+  });
+
+  it("keeps the starting status while commands run before the first agent message", () => {
+    render(
+      <AnalysisLiveWork
+        machineStatus="running"
+        waitingForAgent
+        items={[{ id: "tools", text: "Ran 2 commands", details: ["git clone", "ls"] }]}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineStarting);
+    expect(screen.getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
   });
 
   it("expands a ran-commands summary to the command names", async () => {

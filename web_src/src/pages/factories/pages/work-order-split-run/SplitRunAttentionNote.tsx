@@ -102,6 +102,7 @@ export function SplitRunAttentionNote({
   startBusy = false,
   startDisabled = false,
   modelSelect,
+  compact = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -112,6 +113,7 @@ export function SplitRunAttentionNote({
   startBusy?: boolean;
   startDisabled?: boolean;
   modelSelect?: ReactNode;
+  compact?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
@@ -124,6 +126,31 @@ export function SplitRunAttentionNote({
         actionBusy={actionBusy}
         onAction={onAction}
       />
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+        <div
+          key={`${note.headline}-${note.text ?? ""}`}
+          className="sp-stream-text min-w-0 flex-1"
+          data-testid="split-run-intent-decision-tip"
+        >
+          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
+          {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
+        </div>
+        <NoteActionRow
+          note={note}
+          actions={actions}
+          runHref={runHref}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          modelSelect={modelSelect}
+          onAction={onAction}
+        />
+      </div>
     );
   }
 

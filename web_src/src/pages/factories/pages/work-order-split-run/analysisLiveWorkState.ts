@@ -1,3 +1,4 @@
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { groupPlanningSessionLog, isPlanningSessionNoise, isPlanningSessionToolPayload } from "../planningSessionLog";
 import type { ClaudeStepEvent, ClaudeStepGroup } from "./PhaseLogCard";
@@ -6,7 +7,11 @@ import type { SplitRunStreamLine } from "./splitRunMocks";
 
 export const ANALYSIS_THINKING_INTERVAL_MS = 2400;
 
-export const ANALYSIS_THINKING_STATES = ["Reading the ticket", "Opening the repository", "Writing the plan"] as const;
+export const ANALYSIS_THINKING_STATES = [
+  CREATE_WITH_AGENT_COPY.machineStarting,
+  "Opening the repository",
+  "Reading the ticket",
+] as const;
 
 export type AnalysisLiveWorkKind = "idle" | "thinking" | "reasoning";
 
@@ -30,6 +35,10 @@ export function analysisLiveWorkKind(args: {
     return "reasoning";
   }
   return "thinking";
+}
+
+export function hasAgentReasoning(items: ReasoningItem[]): boolean {
+  return items.some((item) => !item.details?.length);
 }
 
 export function thinkingStatusFor(elapsedMs: number, intervalMs = ANALYSIS_THINKING_INTERVAL_MS): string {

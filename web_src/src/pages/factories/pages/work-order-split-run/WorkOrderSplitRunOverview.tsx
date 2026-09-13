@@ -26,6 +26,7 @@ export function WorkOrderSplitRunOverview({
   isAnalyzing = false,
   organizationId,
   factoryKey,
+  orderId,
   orderNumber,
   expandFirstCheck = false,
   files,
@@ -45,6 +46,7 @@ export function WorkOrderSplitRunOverview({
   isAnalyzing?: boolean;
   organizationId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
   expandFirstCheck?: boolean;
   files?: FilesFile[];
@@ -61,6 +63,8 @@ export function WorkOrderSplitRunOverview({
       <WorkOrderIntentDocument
         title={title}
         description={description}
+        streamKey={orderId ?? orderNumber}
+        streamReady={!artifactsLoading}
         artifacts={artifacts}
         confidence={confidence}
         isAnalyzing={isAnalyzing}

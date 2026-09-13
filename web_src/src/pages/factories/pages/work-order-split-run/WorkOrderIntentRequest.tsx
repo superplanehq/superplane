@@ -4,6 +4,7 @@ import { ArrowUp } from "lucide-react";
 import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
@@ -12,6 +13,7 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
+import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 
@@ -100,6 +102,7 @@ function AnalysisRequestChat({
               organizationId={analysis.organizationId}
               canvasId={analysis.view.canvasId}
               executionId={analysis.view.executionId}
+              waitingForAgent={!analysis.view.messages.some((message) => message.role === "agent")}
             />
           ) : null}
           {state.showSurvey && analysis.view.survey ? (
@@ -110,11 +113,14 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         )}
       </div>
-      <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
+      <form
+        className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "w-full flex-col items-stretch justify-center")}
+        onSubmit={handleSubmit}
+      >
         <label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
         </label>
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2">
+        <div className="flex min-h-[3.5rem] w-full items-center gap-2 rounded-2xl bg-muted">
           <Textarea
             id="split-run-intent-composer"
             data-testid="split-run-intent-composer"
@@ -130,13 +136,13 @@ function AnalysisRequestChat({
                 }
               }
             }}
-            className="min-h-[40px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
+            className="min-h-[3.5rem] flex-1 resize-none rounded-2xl border-0 !bg-muted px-3.5 py-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 dark:!bg-muted"
             rows={2}
           />
           <Button
             type="submit"
             size="icon"
-            className="size-8 shrink-0 rounded-full"
+            className="mr-2 size-8 shrink-0 rounded-full"
             disabled={!analysis.canSend || !analysis.composer.trim()}
             aria-label={ANALYSIS_PLANNING_COPY.send}
           >

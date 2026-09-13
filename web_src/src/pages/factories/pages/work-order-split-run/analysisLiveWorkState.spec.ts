@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   ANALYSIS_THINKING_STATES,
   analysisLiveWorkKind,
+  hasAgentReasoning,
   reasoningLinesFromPlanningNotes,
   thinkingStatusFor,
 } from "./analysisLiveWorkState";
@@ -38,6 +39,16 @@ describe("analysisLiveWorkKind", () => {
     expect(analysisLiveWorkKind({ machineStatus: "running", items: [{ id: "n", text: "Read billing.ts" }] })).toBe(
       "reasoning",
     );
+  });
+});
+
+describe("hasAgentReasoning", () => {
+  it("treats a plain note as the first agent line", () => {
+    expect(hasAgentReasoning([{ id: "note", text: "I have enough understanding of the repository." }])).toBe(true);
+  });
+
+  it("ignores ran-command summaries", () => {
+    expect(hasAgentReasoning([{ id: "tools", text: "Ran 1 command", details: ["git clone"] }])).toBe(false);
   });
 });
 

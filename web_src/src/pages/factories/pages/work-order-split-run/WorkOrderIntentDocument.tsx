@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { splitRunIntentDocument } from "./splitRunPopupModel";
+import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, splitRunIntentDocument } from "./splitRunPopupModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
 import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
@@ -31,6 +31,8 @@ export function WorkOrderIntentDocument({
   resultFooter,
   analysis,
   contextSidebar,
+  streamKey,
+  streamReady = true,
 }: {
   title: string;
   description: string;
@@ -42,6 +44,8 @@ export function WorkOrderIntentDocument({
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
   contextSidebar?: ReactNode;
+  streamKey?: string;
+  streamReady?: boolean;
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
@@ -93,6 +97,8 @@ export function WorkOrderIntentDocument({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5" data-testid="split-run-intent-body">
             <WorkOrderIntentPlan
               document={document}
+              streamKey={streamKey}
+              streamReady={streamReady}
               expanded={showPlan}
               isAnalyzing={isAnalyzing}
               onToggle={() => setShowPlan((current) => !current)}
@@ -102,7 +108,10 @@ export function WorkOrderIntentDocument({
           {contextSidebar ? (
             resultFooter
           ) : refineOpen ? (
-            <div className="shrink-0 border-t border-border" data-testid="split-run-intent-decision">
+            <div
+              className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "justify-between gap-4")}
+              data-testid="split-run-intent-decision"
+            >
               <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />
               {resultFooter}
             </div>

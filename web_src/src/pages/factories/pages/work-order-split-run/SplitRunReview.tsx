@@ -65,6 +65,7 @@ export function SplitRunReview({
   actionBusy = false,
   startDisabled = false,
   modelSelect,
+  compact = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -81,6 +82,7 @@ export function SplitRunReview({
   actionBusy?: boolean;
   startDisabled?: boolean;
   modelSelect?: ReactNode;
+  compact?: boolean;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
@@ -114,7 +116,7 @@ export function SplitRunReview({
   };
 
   return (
-    <div className={cn("shrink-0", className)} data-testid="split-run-review">
+    <div className={cn(compact ? "min-w-0 flex-1" : "shrink-0", className)} data-testid="split-run-review">
       <SplitRunAttentionNote
         note={footer.note}
         tone={splitRunDecisionTone(footer)}
@@ -124,6 +126,7 @@ export function SplitRunReview({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        compact={compact}
         onAction={onAction}
       />
     </div>

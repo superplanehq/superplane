@@ -1,8 +1,25 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
-import { CONFIDENCE_CHECK_NAME, CONFIDENCE_SCORE_MAX } from "../../lib/confidenceScore";
+import { cn } from "@/lib/utils";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
+
+import {
+  CONFIDENCE_CHECK_NAME,
+  CONFIDENCE_SCORE_MAX,
+  confidenceBandForScore,
+  type ConfidenceBand,
+} from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
+
+const CHIP_TONE: Record<ConfidenceBand, string> = {
+  High: "border-emerald-500/30 bg-emerald-500/10",
+  Medium: "border-orange-500/30 bg-orange-500/10",
+  Low: "border-red-500/30 bg-red-500/10",
+};
+
+const FALLBACK_WHY = "The analysis scored how clear this work is.";
+const ANALYZING_WHY = "The analysis is still running.";
 
 type WorkOrderIntentConfidenceFooterProps = {
   confidence?: WorkOrderCheckPresentation;
@@ -18,10 +35,14 @@ export function WorkOrderIntentConfidenceFooter({
   if (isAnalyzing && !confidence) {
     return (
       <ConfidenceFooterShell flush={flush}>
-        <div className="flex items-start gap-2">
-          <ConfidenceAnalyzingIndicator testId="split-run-intent-confidence-meter" />
-          <p className="text-[13px] leading-5 text-muted-foreground">The analysis is still running.</p>
-        </div>
+        <ConfidenceWhyChip key="analyzing" label={`${CONFIDENCE_CHECK_NAME}. Analyzing`} why={ANALYZING_WHY}>
+          <ConfidenceAnalyzingIndicator
+            testId="split-run-intent-confidence-meter"
+            showTooltip={false}
+            decorative
+            className="text-[13px]"
+          />
+        </ConfidenceWhyChip>
       </ConfidenceFooterShell>
     );
   }
@@ -34,30 +55,105 @@ export function WorkOrderIntentConfidenceFooter({
     );
   }
 
+  const maxScore = confidence.maxScore || CONFIDENCE_SCORE_MAX;
+  const scoreLabel = `${confidence.score}/${maxScore}`;
+
   return (
     <ConfidenceFooterShell flush={flush}>
-      <div key={`${confidence.score}-${confidence.summary ?? ""}`} className="sp-text-reveal flex items-start gap-2.5">
-        <div className="flex shrink-0 flex-col items-start gap-1 pt-0.5">
-          <ConfidenceMeter score={confidence.score} testId="split-run-intent-confidence-meter" />
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            {confidence.score}/{confidence.maxScore || CONFIDENCE_SCORE_MAX}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <p className="text-[12px] text-muted-foreground">{CONFIDENCE_CHECK_NAME}</p>
-          <p className="text-[13px] leading-5 text-foreground" data-testid="split-run-intent-confidence-copy">
-            {confidence.summary?.trim() || "The analysis scored how clear this work is."}
-          </p>
-        </div>
-      </div>
+      <ConfidenceWhyChip
+        key={`${confidence.score}-${confidence.summary ?? ""}`}
+        label={`${CONFIDENCE_CHECK_NAME} ${scoreLabel}`}
+        why={confidence.summary?.trim() || FALLBACK_WHY}
+        tone={confidenceBandForScore(confidence.score)}
+      >
+        <span className="flex items-baseline gap-0.5 leading-none">
+          <span className="text-[22px] font-semibold tabular-nums text-foreground">{confidence.score}</span>
+          <span className="text-[12px] text-muted-foreground">/{maxScore}</span>
+        </span>
+        <ConfidenceMeter
+          score={confidence.score}
+          testId="split-run-intent-confidence-meter"
+          showTooltip={false}
+          decorative
+          size="lg"
+        />
+      </ConfidenceWhyChip>
     </ConfidenceFooterShell>
+  );
+}
+
+function ConfidenceWhyChip({
+  label,
+  why,
+  tone,
+  children,
+}: {
+  label: string;
+  why: string;
+  tone?: ConfidenceBand;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+
+  const setPanel = (next: boolean, pin = pinned) => {
+    if (pin && !next) {
+      return;
+    }
+    setOpen(next);
+    if (!next) {
+      setPinned(false);
+    }
+  };
+
+  const togglePinned = () => {
+    setPinned((current) => {
+      const next = !current;
+      setOpen(next);
+      return next;
+    });
+  };
+
+  return (
+    <HoverCard open={open} onOpenChange={(next) => setPanel(next)} openDelay={0} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={label}
+          data-testid="split-run-intent-confidence-chip"
+          className={cn(
+            "sp-stream-text inline-flex min-h-[3.25rem] items-center gap-2.5 rounded-xl border px-3 py-2 text-left",
+            tone ? CHIP_TONE[tone] : "border-border bg-muted/40",
+          )}
+          onClick={(event) => {
+            event.preventDefault();
+            togglePinned();
+          }}
+        >
+          {children}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent
+        side="top"
+        align="start"
+        sideOffset={8}
+        avoidCollisions={false}
+        className="sp-confidence-why z-[80] w-80 p-3"
+      >
+        <p className="text-[12px] text-muted-foreground">{CONFIDENCE_CHECK_NAME}</p>
+        <p className="mt-1 text-[13px] leading-5 text-foreground" data-testid="split-run-intent-confidence-copy">
+          {why}
+        </p>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
 function ConfidenceFooterShell({ children, flush }: { children: ReactNode; flush?: boolean }) {
   return (
     <footer
-      className={flush ? "px-5 pt-3" : "shrink-0 border-t border-border px-5 py-3"}
+      className={flush ? undefined : "shrink-0 border-t border-border px-5 py-3"}
       data-testid="split-run-overview-checks"
       aria-label={CONFIDENCE_CHECK_NAME}
     >

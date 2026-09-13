@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
+import { resetStreamMemoryForTests } from "./StreamingText";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 
 function renderDocument(ui: ReactElement) {
@@ -73,6 +75,7 @@ describe("WorkOrderIntentDocument", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetStreamMemoryForTests();
   });
 
   it("shows the original request and the generated summary", () => {
@@ -100,6 +103,7 @@ describe("WorkOrderIntentDocument", () => {
     );
     expect(screen.getByRole("heading", { name: "Clearer empty state" })).toBeInTheDocument();
     const summary = screen.getByTestId("split-run-intent-summary");
+    expect(summary.parentElement).not.toHaveAttribute("data-streaming");
     expect(summary).toHaveTextContent("A person can add a payment method from the empty billing page.");
     expect(within(summary).getByRole("heading", { name: "Goal" })).toBeInTheDocument();
     expect(within(summary).getByRole("heading", { name: "Done when" })).toBeInTheDocument();
@@ -107,14 +111,38 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(summary).getByRole("heading", { name: "Key architecture decisions" })).toBeInTheDocument();
     expect(within(summary).getAllByRole("listitem")).toHaveLength(4);
     const result = screen.getByTestId("split-run-intent-result");
-    expect(within(result).getByTestId("split-run-overview-checks")).toHaveTextContent(CONFIDENCE_CHECK_NAME);
-    expect(within(result).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
-      "This issue is a good fit for an agent on this factory line.",
-    );
+    const chip = within(result).getByTestId("split-run-intent-confidence-chip");
+    expect(chip).toHaveAccessibleName(`${CONFIDENCE_CHECK_NAME} 4/5`);
+    expect(chip).toHaveTextContent("4/5");
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-overview-checks"),
     ).toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
+  });
+
+  it("reveals the confidence why when the chip is opened", async () => {
+    const user = userEvent.setup();
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        confidence={{
+          id: "check-confidence",
+          name: CONFIDENCE_CHECK_NAME,
+          score: 4,
+          maxScore: 5,
+          level: "positive",
+          summary: confidenceSuitabilitySummary("High"),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByTestId("split-run-intent-confidence-chip"));
+    expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+      "This issue is a good fit for an agent on this factory line.",
+    );
   });
 
   it("puts source context and confidence on the left after Start", () => {
@@ -138,7 +166,9 @@ describe("WorkOrderIntentDocument", () => {
     const request = screen.getByTestId("split-run-intent-request");
     const result = screen.getByTestId("split-run-intent-result");
     expect(within(request).getByTestId("split-run-overview-sidebar")).toHaveTextContent("Source");
-    expect(within(request).getByTestId("split-run-overview-checks")).toHaveTextContent(CONFIDENCE_CHECK_NAME);
+    expect(within(request).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(
+      `${CONFIDENCE_CHECK_NAME} 4/5`,
+    );
     expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
@@ -255,9 +285,96 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show full plan" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-decision")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-decision")).toHaveClass("min-h-[5.5rem]");
+    expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
     expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+  });
+
+  it("streams the summary when the spec updates after open", () => {
+    const view = {
+      title: "Show a clearer empty state",
+      description: "Imported from GitHub: billing empty state is unclear.",
+    };
+    const { rerender } = renderDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument
+          {...view}
+          streamKey="order-stream"
+          artifacts={[{ ...INTENT, data: { ...INTENT.data, body: "# Old title\n\nOld summary only.\n" } }]}
+        />
+      </StrictMode>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument {...view} streamKey="order-stream" artifacts={[INTENT]} />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
+    expect(screen.getByRole("heading", { name: "Goal" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Out of scope" })).not.toBeInTheDocument();
+  });
+
+  it("streams the first spec that arrives while the card is open", () => {
+    const { rerender } = renderDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument
+          title="Show a clearer empty state"
+          description="Imported from GitHub: billing empty state is unclear."
+          streamKey="order-first-spec"
+          artifacts={[]}
+          isAnalyzing
+        />
+      </StrictMode>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument
+            title="Show a clearer empty state"
+            description="Imported from GitHub: billing empty state is unclear."
+            streamKey="order-first-spec"
+            artifacts={[INTENT]}
+            isAnalyzing
+          />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
+    expect(screen.queryByRole("heading", { name: "Out of scope" })).not.toBeInTheDocument();
+  });
+
+  it("does not stream when artifacts load after the card opens", () => {
+    const view = {
+      title: "Show a clearer empty state",
+      description: "Imported from GitHub: billing empty state is unclear.",
+    };
+    const { rerender } = renderDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument {...view} streamKey="order-open" streamReady={false} artifacts={[]} />
+      </StrictMode>,
+    );
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument {...view} streamKey="order-open" streamReady artifacts={[INTENT]} />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+    expect(screen.getByRole("heading", { name: "Out of scope" })).toBeInTheDocument();
   });
 
   it("keeps the stored transcript outside the current run activity", () => {

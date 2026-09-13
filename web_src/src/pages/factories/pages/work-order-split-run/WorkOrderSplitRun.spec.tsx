@@ -693,7 +693,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
-    expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
+    const tip = screen.getByTestId("split-run-intent-decision-tip");
+    expect(tip).toHaveTextContent("This task is ready to start");
+    expect(tip).toHaveTextContent("Review the summary and the plan. Then click Start to send it to the line.");
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-intent-result")).getByTestId("split-run-attention-note")).toBe(note);
     expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-attention-note")).toBeNull();
@@ -729,7 +731,10 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByRole("tab", { name: "Description" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
+    const tip = screen.getByTestId("split-run-intent-decision-tip");
+    expect(tip).toHaveTextContent("SuperPlane is currently analyzing this task");
+    expect(tip).toHaveTextContent("Wait for the analysis to finish. Or click Start to send this task to the line now.");
+    expect(screen.getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName("Confidence score. Analyzing");
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
@@ -769,7 +774,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).queryByRole("heading", { name: "Artifacts" })).not.toBeInTheDocument();
     expect(within(tab).queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
-    expect(within(tab).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
+    expect(within(tab).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
     expect(within(tab).getByTestId("split-run-check-comment-check-code-coverage")).not.toHaveAttribute("open");
@@ -786,9 +791,9 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
 
     const tab = screen.getByTestId("split-run-work-order-tab");
-    const footer = within(tab).getByTestId("split-run-overview-checks");
-    expect(within(footer).getByText("Confidence score")).toBeInTheDocument();
-    expect(within(footer).getByText("This issue is a good fit for an agent on this factory line.")).toBeInTheDocument();
+    const chip = within(tab).getByTestId("split-run-intent-confidence-chip");
+    expect(chip).toHaveAccessibleName(/Confidence score/);
+    expect(within(tab).queryByText("This issue is a good fit for an agent on this factory line.")).toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
   });
 
@@ -860,9 +865,8 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("tab", { name: "Description" }));
     const tab = screen.getByTestId("split-run-work-order-tab");
-    const footer = within(tab).getByTestId("split-run-overview-checks");
-    expect(within(footer).getByText("Confidence score")).toBeInTheDocument();
-    expect(within(footer).getByText(/fit for an agent on this factory line/)).toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
+    expect(within(tab).queryByText(/fit for an agent on this factory line/)).toBeNull();
     expect(within(tab).getByText("Risk score")).toBeInTheDocument();
   });
 

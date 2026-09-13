@@ -21,6 +21,8 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /call survey with 2 to 4 options/);
   assert.match(pack, /If the score is 0 through 3/);
   assert.match(pack, /this is a continuation/);
+  assert.match(pack, /does not publish the specification or the score/);
+  assert.match(pack, /only after those calls/);
   assert.doesNotMatch(pack, /check copy/);
   assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
 });

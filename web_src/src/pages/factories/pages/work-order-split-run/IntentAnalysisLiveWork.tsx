@@ -9,6 +9,7 @@ import { PLANNING_SESSION_AGENT_LINE_ID } from "../planningSessionActivity";
 import {
   ANALYSIS_THINKING_INTERVAL_MS,
   analysisLiveWorkKind,
+  hasAgentReasoning,
   reasoningLinesFromPlanningNotes,
   thinkingStatusFor,
   type ReasoningItem,
@@ -21,12 +22,14 @@ export function AnalysisLiveWork({
   canvasId,
   executionId,
   items,
+  waitingForAgent = false,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
   organizationId?: string;
   canvasId?: string;
   executionId?: string;
   items?: ReasoningItem[];
+  waitingForAgent?: boolean;
 }) {
   const liveItems = useAnalysisReasoningItems({
     organizationId,
@@ -41,10 +44,14 @@ export function AnalysisLiveWork({
   if (kind === "idle") {
     return null;
   }
-  if (kind === "reasoning") {
-    return <ReasoningStream items={reasoningItems} />;
-  }
-  return <ThinkingStatus />;
+  const showThinking =
+    waitingForAgent && !hasAgentReasoning(reasoningItems) && (kind === "thinking" || kind === "reasoning");
+  return (
+    <div data-testid="split-run-intent-live-work">
+      {showThinking ? <ThinkingStatus /> : null}
+      {kind === "reasoning" ? <ReasoningStream items={reasoningItems} /> : null}
+    </div>
+  );
 }
 
 function ThinkingStatus() {
@@ -58,7 +65,7 @@ function ThinkingStatus() {
   const status = thinkingStatusFor(elapsedMs);
 
   return (
-    <div className="px-2 py-1.5" data-testid="split-run-intent-live-work">
+    <div className="px-2 py-1.5">
       <p
         className="sp-ai-thinking text-[13px] leading-5 text-muted-foreground"
         data-testid="split-run-intent-thinking"
