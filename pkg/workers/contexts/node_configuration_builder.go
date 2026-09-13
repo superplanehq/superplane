@@ -1053,9 +1053,10 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments, and
-// assignees are loaded only when the expression AST references those fields
-// on order() or task(). Origin is attached whenever the work order has one.
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and spec are loaded only when the expression AST references
+// those fields on order() or task(). Origin is attached whenever the work
+// order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1207,7 +1208,45 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["assignees"] = assigneePayloads
 	}
 
+	usesSpec, err := expressionvalidation.ExpressionUsesOrderSpec(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesSpec {
+		spec, err := b.resolveOrderSpec(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["spec"] = spec
+	}
+
 	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
+	if !workOrderRefinementEnabled(b.tx, order) {
+		return "", nil
+	}
+	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
+	}
+	return planningSpecArtifactBody(artifact), nil
+}
+
+func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact == nil || artifact.Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+		return ""
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return ""
+	}
+	body, _ := data["body"].(string)
+	return strings.TrimSpace(body)
 }
 
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
