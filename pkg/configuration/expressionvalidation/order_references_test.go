@@ -111,6 +111,8 @@ func TestExpressionUsesOrderSpec(t *testing.T) {
 		{name: "let alias bracket spec", raw: `let taskData = task(); taskData["spec"]`, want: true},
 		{name: "let alias order spec", raw: `let orderData = order(); orderData.spec`, want: true},
 		{name: "let unrelated spec", raw: `let taskData = root(); taskData.spec`, want: false},
+		{name: "let shadowed alias", raw: `let taskData = task(); let taskData = root(); taskData.spec`, want: false},
+		{name: "let rebound alias", raw: `let taskData = root(); let taskData = task(); taskData.spec`, want: true},
 		{name: "unrelated", raw: `root().data.spec`, want: false},
 	}
 

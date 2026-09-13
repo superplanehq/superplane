@@ -59,56 +59,83 @@ func expressionReferencesOrderProperty(expression, property string) (bool, error
 		return false, err
 	}
 
-	aliases := collectOrderAliases(tree.Node)
-	collector := &orderPropertyCollector{property: property, aliases: aliases}
-	ast.Walk(&tree.Node, collector)
-	return collector.found, nil
+	return referencesOrderProperty(tree.Node, property, nil), nil
 }
 
-func collectOrderAliases(node ast.Node) map[string]struct{} {
-	collector := &orderAliasCollector{aliases: map[string]struct{}{}}
-	ast.Walk(&node, collector)
-	return collector.aliases
+func referencesOrderProperty(node ast.Node, property string, aliases map[string]struct{}) bool {
+	if node == nil {
+		return false
+	}
+
+	switch n := node.(type) {
+	case *ast.VariableDeclaratorNode:
+		inner := inheritOrderAliases(aliases)
+		if isOrderCall(n.Value) {
+			inner[n.Name] = struct{}{}
+		} else {
+			delete(inner, n.Name)
+		}
+		return referencesOrderProperty(n.Value, property, aliases) ||
+			referencesOrderProperty(n.Expr, property, inner)
+	case *ast.MemberNode:
+		if name, ok := memberPropertyName(n.Property); ok && name == property && isOrderSource(n.Node, aliases) {
+			return true
+		}
+		return referencesOrderProperty(n.Node, property, aliases) ||
+			referencesOrderProperty(n.Property, property, aliases)
+	case *ast.UnaryNode:
+		return referencesOrderProperty(n.Node, property, aliases)
+	case *ast.BinaryNode:
+		return referencesOrderProperty(n.Left, property, aliases) ||
+			referencesOrderProperty(n.Right, property, aliases)
+	case *ast.ChainNode:
+		return referencesOrderProperty(n.Node, property, aliases)
+	case *ast.SliceNode:
+		return referencesOrderProperty(n.Node, property, aliases) ||
+			referencesOrderProperty(n.From, property, aliases) ||
+			referencesOrderProperty(n.To, property, aliases)
+	case *ast.CallNode:
+		if referencesOrderProperty(n.Callee, property, aliases) {
+			return true
+		}
+		return referencesOrderPropertyList(n.Arguments, property, aliases)
+	case *ast.BuiltinNode:
+		return referencesOrderPropertyList(n.Arguments, property, aliases)
+	case *ast.PredicateNode:
+		return referencesOrderProperty(n.Node, property, aliases)
+	case *ast.SequenceNode:
+		return referencesOrderPropertyList(n.Nodes, property, aliases)
+	case *ast.ConditionalNode:
+		return referencesOrderProperty(n.Cond, property, aliases) ||
+			referencesOrderProperty(n.Exp1, property, aliases) ||
+			referencesOrderProperty(n.Exp2, property, aliases)
+	case *ast.ArrayNode:
+		return referencesOrderPropertyList(n.Nodes, property, aliases)
+	case *ast.MapNode:
+		return referencesOrderPropertyList(n.Pairs, property, aliases)
+	case *ast.PairNode:
+		return referencesOrderProperty(n.Key, property, aliases) ||
+			referencesOrderProperty(n.Value, property, aliases)
+	default:
+		return false
+	}
 }
 
-type orderAliasCollector struct {
-	aliases map[string]struct{}
+func referencesOrderPropertyList(nodes []ast.Node, property string, aliases map[string]struct{}) bool {
+	for _, child := range nodes {
+		if referencesOrderProperty(child, property, aliases) {
+			return true
+		}
+	}
+	return false
 }
 
-func (c *orderAliasCollector) Visit(node *ast.Node) {
-	decl, ok := (*node).(*ast.VariableDeclaratorNode)
-	if !ok {
-		return
+func inheritOrderAliases(aliases map[string]struct{}) map[string]struct{} {
+	inner := make(map[string]struct{}, len(aliases))
+	for name := range aliases {
+		inner[name] = struct{}{}
 	}
-	if isOrderCall(decl.Value) {
-		c.aliases[decl.Name] = struct{}{}
-	}
-}
-
-type orderPropertyCollector struct {
-	property string
-	aliases  map[string]struct{}
-	found    bool
-}
-
-func (c *orderPropertyCollector) Visit(node *ast.Node) {
-	if c.found {
-		return
-	}
-
-	member, ok := (*node).(*ast.MemberNode)
-	if !ok {
-		return
-	}
-
-	name, ok := memberPropertyName(member.Property)
-	if !ok || name != c.property {
-		return
-	}
-
-	if isOrderSource(member.Node, c.aliases) {
-		c.found = true
-	}
+	return inner
 }
 
 func isOrderSource(node ast.Node, aliases map[string]struct{}) bool {
