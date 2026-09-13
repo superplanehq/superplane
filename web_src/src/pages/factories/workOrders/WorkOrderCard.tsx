@@ -1,6 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
@@ -67,6 +68,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   className?: string;
   /** True when this card is the active item in a list. */
   selected?: boolean;
+  /** True when the draft analysis session waits for a multiple-choice answer. */
+  hasAgentQuestion?: boolean;
 }
 
 /**
@@ -101,11 +104,14 @@ export function WorkOrderCard({
   isAnalyzing = false,
   className,
   selected = false,
+  hasAgentQuestion = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const showStart = entry.displayStatus === "draft";
+  const isDraft = entry.displayStatus === "draft";
+  const showStart = isDraft;
+  const showAgentQuestion = hasAgentQuestion && isDraft;
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -138,9 +144,11 @@ export function WorkOrderCard({
         </div>
 
         <WorkOrderCardStatusRow
+          entryId={entry.id}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
+          hasAgentQuestion={showAgentQuestion}
         />
         <WorkOrderCardMetaRow
           entry={entry}
@@ -178,20 +186,25 @@ function WorkOrderCardOpenControl({
 }
 
 function WorkOrderCardStatusRow({
+  entryId,
   reasons,
   feedbackLabel,
   cardPullRequest,
+  hasAgentQuestion,
 }: {
+  entryId: string;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
+  hasAgentQuestion: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest) {
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+      {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
       ) : null}
@@ -207,6 +220,19 @@ function WorkOrderCardStatusRow({
         ),
       )}
     </div>
+  );
+}
+
+function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
+  return (
+    <span
+      className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400"
+      data-testid={`work-order-card-agent-question-${entryId}`}
+      title="Agent question"
+    >
+      <Bot className="size-3 shrink-0" aria-hidden />
+      <span className="truncate">Agent question</span>
+    </span>
   );
 }
 
