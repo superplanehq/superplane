@@ -49,6 +49,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
 	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
+	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
 	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
 
