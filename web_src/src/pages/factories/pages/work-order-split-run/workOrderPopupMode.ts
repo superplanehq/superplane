@@ -13,8 +13,11 @@ export function workOrderPopupMode({
   analysisActive: boolean;
   hasLookupIdentity: boolean;
 }): WorkOrderPopupMode {
-  if (!hasLookupIdentity || hasPlanningSession || hasAnalysisResult) {
+  if (!hasLookupIdentity || hasPlanningSession) {
     return "analysis";
   }
-  return refinementEnabled && analysisActive ? "analysis" : "classic";
+  if (!refinementEnabled) {
+    return "classic";
+  }
+  return hasAnalysisResult || analysisActive ? "analysis" : "classic";
 }

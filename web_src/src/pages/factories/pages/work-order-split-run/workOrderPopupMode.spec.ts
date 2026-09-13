@@ -48,6 +48,18 @@ describe("workOrderPopupMode", () => {
     ).toBe("classic");
   });
 
+  it("uses the classic popup when refinement is disabled even if a score exists", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: true,
+        refinementEnabled: false,
+        analysisActive: false,
+        hasLookupIdentity: true,
+      }),
+    ).toBe("classic");
+  });
+
   it("keeps the analysis popup after Start when a score or spec exists", () => {
     expect(
       workOrderPopupMode({

@@ -3,10 +3,21 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
+
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
 
 import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
@@ -58,6 +69,10 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("WorkOrderSplitRunPopup", () => {
+  beforeEach(() => {
+    enabledExperimentalFeatures.clear();
+  });
+
   it("does not put an expand control on the Log heading", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -777,6 +792,7 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("keeps source and spec after reopen when the started card has a score", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,

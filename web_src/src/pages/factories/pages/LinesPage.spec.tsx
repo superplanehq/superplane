@@ -340,8 +340,8 @@ describe("LinesPage board", () => {
     );
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
