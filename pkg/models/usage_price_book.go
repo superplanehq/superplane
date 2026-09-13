@@ -179,7 +179,9 @@ func ValidateUsagePriceBookRates(rows []UsagePriceBookRate) error {
 	return nil
 }
 
-// PublishUsagePriceBook inserts a new current catalog and reloads memory.
+// PublishUsagePriceBook inserts a new current catalog. It does not touch the
+// in-memory book, because the caller can still roll the transaction back.
+// Call LoadCurrentPriceBook after the commit.
 func PublishUsagePriceBook(tx *gorm.DB, rates []UsagePriceBookRate) (*UsagePriceBook, error) {
 	normalized := make([]UsagePriceBookRate, 0, len(rates))
 	for _, row := range rates {
@@ -219,13 +221,12 @@ func PublishUsagePriceBook(tx *gorm.DB, rates []UsagePriceBookRate) (*UsagePrice
 		}
 	}
 
-	if err := LoadCurrentPriceBook(tx); err != nil {
-		return nil, err
-	}
 	return &book, nil
 }
 
-// ActivateUsagePriceBook marks an existing version current and reloads memory.
+// ActivateUsagePriceBook marks an existing version current. It does not touch
+// the in-memory book, because the caller can still roll the transaction back.
+// Call LoadCurrentPriceBook after the commit.
 func ActivateUsagePriceBook(tx *gorm.DB, version string) error {
 	version = strings.TrimSpace(version)
 	book, err := FindUsagePriceBook(tx, version)
@@ -233,16 +234,13 @@ func ActivateUsagePriceBook(tx *gorm.DB, version string) error {
 		return err
 	}
 	if book.IsCurrent {
-		return LoadCurrentPriceBook(tx)
+		return nil
 	}
 
 	if err := clearCurrentUsagePriceBook(tx); err != nil {
 		return err
 	}
-	if err := tx.Model(&UsagePriceBook{}).Where("version = ?", version).Update("is_current", true).Error; err != nil {
-		return err
-	}
-	return LoadCurrentPriceBook(tx)
+	return tx.Model(&UsagePriceBook{}).Where("version = ?", version).Update("is_current", true).Error
 }
 
 // LoadCurrentPriceBook installs the current database catalog into the

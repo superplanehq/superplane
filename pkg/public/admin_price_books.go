@@ -119,6 +119,7 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	reloadCurrentPriceBook(r.Context())
 
 	payload, status, message := loadAdminPriceBooks(database.DB(r.Context()), published.Version)
 	if status != http.StatusOK {
@@ -152,6 +153,7 @@ func (s *Server) adminActivatePriceBook(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to activate price book", http.StatusInternalServerError)
 		return
 	}
+	reloadCurrentPriceBook(r.Context())
 
 	payload, status, message := loadAdminPriceBooks(database.DB(r.Context()), strings.TrimSpace(req.Version))
 	if status != http.StatusOK {
@@ -192,6 +194,7 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to save price books", http.StatusInternalServerError)
 		return
 	}
+	reloadCurrentPriceBook(ctx)
 
 	payload, status, message := loadAdminPriceBooks(database.DB(ctx), published.Version)
 	if status != http.StatusOK {
@@ -205,6 +208,14 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 		AddedCount:              sync.added,
 		SkippedProviders:        sync.skipped,
 	})
+}
+
+// reloadCurrentPriceBook installs the committed catalog into the in-memory
+// book. The process keeps the previous book when the reload fails.
+func reloadCurrentPriceBook(ctx context.Context) {
+	if err := models.LoadCurrentPriceBook(database.DB(ctx)); err != nil {
+		log.Errorf("admin: failed to reload the current price book: %v", err)
+	}
 }
 
 var errNoPricedCatalogProvider = errors.New("no enabled provider publishes catalog prices")

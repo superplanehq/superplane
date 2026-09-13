@@ -165,6 +165,7 @@ func Test__PublishAndActivateUsagePriceBook(t *testing.T) {
 
 	published, err := models.PublishUsagePriceBook(db, cloned)
 	require.NoError(t, err)
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 	assert.True(t, published.IsCurrent)
 	assert.NotEqual(t, "2026-09-09.1", published.Version)
 
@@ -178,6 +179,7 @@ func Test__PublishAndActivateUsagePriceBook(t *testing.T) {
 	assert.Equal(t, int64(3_500_000), pricebook.EstimateMicros("anthropic", "claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0))
 
 	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-09.1"))
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 	restored, err := models.FindCurrentUsagePriceBook(db)
 	require.NoError(t, err)
 	assert.Equal(t, "2026-09-09.1", restored.Version)

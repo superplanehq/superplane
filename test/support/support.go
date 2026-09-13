@@ -761,4 +761,5 @@ func restoreSeedUsagePriceBooks(t require.TestingT) {
 	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
 	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
 	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-09.1"))
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 }
