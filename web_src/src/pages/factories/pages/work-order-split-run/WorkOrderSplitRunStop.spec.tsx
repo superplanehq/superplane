@@ -156,6 +156,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
+                factoryId="factory-1"
+                orderId={DRAFT_WORK_ORDER.id}
                 fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
                 onDispatch={onDispatch}
                 canDispatch
@@ -292,12 +294,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
     );
     expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
   });
 
   it("keeps Automations open when To Backlog does not succeed", async () => {
@@ -327,6 +330,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),

@@ -149,25 +149,6 @@ function AnalysisWorkOrderPopup({
       className={fullPage ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
       onDismiss={onClose}
     >
-      <PopupHeader
-        title={edits.title}
-        onClose={onClose}
-        canEditTitle={edits.canEdit}
-        titleBusy={edits.titleBusy}
-        onTitleSave={(next) => void edits.saveTitle(next)}
-        expanded={fullPage}
-        onToggleExpanded={() => setFullPage((current) => !current)}
-        actions={
-          <CopyLinkButton
-            url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            iconClassName="h-4 w-4"
-            testId="popup-work-order-copy-link-button"
-          />
-        }
-      >
-        <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
-      </PopupHeader>
       <SplitRunPopupTabs
         fixture={fixture}
         edits={edits}
@@ -184,6 +165,28 @@ function AnalysisWorkOrderPopup({
         footerActions={footerActions}
         resultFooter={tab === "description" ? review : undefined}
         analysis={fixture.footer.kind === "draft" ? analysis : undefined}
+        header={(views) => (
+          <PopupHeader
+            title={edits.title}
+            onClose={onClose}
+            canEditTitle={edits.canEdit}
+            titleBusy={edits.titleBusy}
+            onTitleSave={(next) => void edits.saveTitle(next)}
+            expanded={fullPage}
+            onToggleExpanded={() => setFullPage((current) => !current)}
+            actions={
+              <CopyLinkButton
+                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
+                iconClassName="h-4 w-4"
+                testId="popup-work-order-copy-link-button"
+              />
+            }
+            accessory={views}
+          >
+            <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+          </PopupHeader>
+        )}
       />
       {tab !== "description" ? review : null}
     </PopupShell>

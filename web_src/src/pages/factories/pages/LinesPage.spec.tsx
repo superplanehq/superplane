@@ -340,21 +340,13 @@ describe("LinesPage board", () => {
     );
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
-    expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-log-scroll")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
@@ -391,10 +383,11 @@ describe("LinesPage board", () => {
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
       const dialog = screen.getByTestId("work-order-split-run");
-      expect(
-        within(dialog).getByRole("heading", { name: "SuperPlane is currently analyzing this task" }),
-      ).toBeInTheDocument();
-      expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+      expect(within(dialog).getByTestId("split-run-intent-decision-tip")).toHaveTextContent(
+        "SuperPlane is currently analyzing this task",
+      );
+      expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
       expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();

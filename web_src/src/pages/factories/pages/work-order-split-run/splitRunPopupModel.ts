@@ -43,13 +43,7 @@ const DESCRIPTION_NAMES = ["details.md", "description.md"];
 const PLAN_NAMES = ["plan.md"];
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  if (fixture.footer.kind === "draft" || fixture.footer.kind === "done") {
-    return "description";
-  }
-  if (fixture.openPhaseId) {
-    return "log";
-  }
-  return "log";
+  return fixture.footer.kind === "running" ? "log" : "description";
 }
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {

@@ -69,25 +69,6 @@ export function ClassicWorkOrderPopup({
 
   return (
     <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
-      <PopupHeader
-        title={edits.title}
-        onClose={onClose}
-        canEditTitle={edits.canEdit}
-        titleBusy={edits.titleBusy}
-        onTitleSave={(next) => void edits.saveTitle(next)}
-        expanded={fullPage}
-        onToggleExpanded={() => setFullPage((current) => !current)}
-        actions={
-          <CopyLinkButton
-            url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            iconClassName="h-4 w-4"
-            testId="popup-work-order-copy-link-button"
-          />
-        }
-      >
-        <OwnerTimeCostRow fixture={{ ...classicFixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
-      </PopupHeader>
       <SplitRunPopupTabs
         mode="classic"
         fixture={classicFixture}
@@ -104,6 +85,28 @@ export function ClassicWorkOrderPopup({
         canUpdate={canUpdate}
         footerActions={footerActions}
         sessionLookupError={sessionLookupError?.message}
+        header={(views) => (
+          <PopupHeader
+            title={edits.title}
+            onClose={onClose}
+            canEditTitle={edits.canEdit}
+            titleBusy={edits.titleBusy}
+            onTitleSave={(next) => void edits.saveTitle(next)}
+            expanded={fullPage}
+            onToggleExpanded={() => setFullPage((current) => !current)}
+            actions={
+              <CopyLinkButton
+                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
+                iconClassName="h-4 w-4"
+                testId="popup-work-order-copy-link-button"
+              />
+            }
+            accessory={views}
+          >
+            <OwnerTimeCostRow fixture={{ ...classicFixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+          </PopupHeader>
+        )}
       />
       <SplitRunReview
         footer={classicFixture.footer}

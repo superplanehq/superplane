@@ -256,7 +256,7 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
   });
 
   it("opens the popup from a just-imported order that already has a number", async () => {

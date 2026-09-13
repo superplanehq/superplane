@@ -112,6 +112,24 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
+    expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
+    const close = screen.getByRole("button", { name: "Close" });
+    const views = screen.getByRole("tablist", { name: "Task views" });
+    expect(close.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
+  });
+
+  it("opens the Task tab when no automation is running", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
+
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
+    const views = screen.getByRole("tablist", { name: "Task views" });
+    expect(screen.getByRole("button", { name: "Close" }).compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(views).getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
+    expect(within(views).getByRole("tab", { name: "Task" })).toHaveClass("sp-popup-view-tab");
+    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "inactive");
   });
 
   it("shows tokens and cost on a line-step phase", () => {
@@ -180,7 +198,7 @@ describe("WorkOrderSplitRunPopup", () => {
       expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
     );
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
     expect(runningDot).toHaveAttribute("title", "Running");
     expect(runningDot.className).toContain("animate-spin");
@@ -679,7 +697,7 @@ describe("WorkOrderSplitRunPopup", () => {
   it("opens a draft refine view without Automations", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
-    expect(screen.queryByRole("tab", { name: "Description" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
@@ -729,7 +747,7 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.queryByRole("tab", { name: "Description" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     const tip = screen.getByTestId("split-run-intent-decision-tip");
     expect(tip).toHaveTextContent("SuperPlane is currently analyzing this task");
@@ -765,7 +783,7 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks: OPEN_WORK_ORDER_CHECKS }),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Description" }));
+    await user.click(screen.getByRole("tab", { name: "Task" }));
     const request = screen.getByTestId("split-run-intent-request");
     expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
@@ -866,7 +884,7 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Description" }));
+    await user.click(screen.getByRole("tab", { name: "Task" }));
     expect(screen.getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
@@ -877,7 +895,7 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS }),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Description" }));
+    await user.click(screen.getByRole("tab", { name: "Task" }));
     const tab = screen.getByTestId("split-run-work-order-tab");
     expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(tab).queryByText(/fit for an agent on this factory line/)).toBeNull();
@@ -908,7 +926,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("heading", { name: "This task succeeded" })).toBeInTheDocument();
     expect(within(note).getByText("The work is done. The result met the goal.")).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
 
     const request = screen.getByTestId("split-run-intent-request");
     expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
@@ -947,9 +965,11 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   });
 
-  it("shows a failed implement stream with To Backlog, Reject, and Rerun on the note", () => {
+  it("shows a failed implement stream with To Backlog, Reject, and Rerun on the note", async () => {
+    const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
+    await openLogTab(user);
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();

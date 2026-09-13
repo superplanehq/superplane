@@ -36,6 +36,7 @@ type SplitRunPopupTabsProps = {
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
   sessionLookupError?: string;
+  header: (views: ReactNode) => ReactNode;
 };
 
 export function SplitRunPopupTabs({
@@ -56,6 +57,7 @@ export function SplitRunPopupTabs({
   resultFooter,
   analysis,
   sessionLookupError,
+  header,
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const [streamTick, setStreamTick] = useState("");
@@ -110,7 +112,12 @@ export function SplitRunPopupTabs({
     );
   const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind });
   if (!showAutomations) {
-    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{description}</div>;
+    return (
+      <>
+        {header(null)}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{description}</div>
+      </>
+    );
   }
 
   return (
@@ -123,21 +130,7 @@ export function SplitRunPopupTabs({
       }}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-2">
-        <TabsList aria-label="Task views">
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="log">
-            <WorkOrderStatusIcon
-              status={displayStatusForLineStatus(fixture.lineStatus)}
-              title={splitRunStatusLabel(fixture.lineStatus)}
-              className="size-3"
-              data-testid="split-run-log-tab-dot"
-              aria-hidden
-            />
-            Automations
-          </TabsTrigger>
-        </TabsList>
-      </div>
+      {header(<SplitRunPopupViewTabs lineStatus={fixture.lineStatus} />)}
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         {description}
       </TabsContent>
@@ -157,5 +150,27 @@ export function SplitRunPopupTabs({
         />
       </TabsContent>
     </Tabs>
+  );
+}
+
+const VIEW_TAB_CLASSNAME = "sp-popup-view-tab";
+
+function SplitRunPopupViewTabs({ lineStatus }: { lineStatus: SplitRunFixture["lineStatus"] }) {
+  return (
+    <TabsList aria-label="Task views">
+      <TabsTrigger value="description" className={VIEW_TAB_CLASSNAME}>
+        Task
+      </TabsTrigger>
+      <TabsTrigger value="log" className={VIEW_TAB_CLASSNAME}>
+        <WorkOrderStatusIcon
+          status={displayStatusForLineStatus(lineStatus)}
+          title={splitRunStatusLabel(lineStatus)}
+          className="size-3"
+          data-testid="split-run-log-tab-dot"
+          aria-hidden
+        />
+        Automations
+      </TabsTrigger>
+    </TabsList>
   );
 }

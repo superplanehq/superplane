@@ -27,7 +27,7 @@ import {
   splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
-import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
   it("hides Automations on a draft refine popup", () => {
@@ -113,7 +113,7 @@ describe("splitRunPopupModel", () => {
     expect(splitRunPhaseRunHref({ phase: prCreation! })).toBeUndefined();
   });
 
-  it("opens the description tab for drafts and done cards, and the log for later states", () => {
+  it("opens Automations only while a run is in progress", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
     expect(
       defaultSplitRunPopupTab(
@@ -136,7 +136,8 @@ describe("splitRunPopupModel", () => {
     ).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("description");
+    expect(defaultSplitRunPopupTab(SPLIT_RUN_RUNNING)).toBe("log");
   });
 
   it("prefers the saved work-order description on a live order", () => {

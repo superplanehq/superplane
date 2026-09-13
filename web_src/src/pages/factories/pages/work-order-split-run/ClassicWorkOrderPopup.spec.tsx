@@ -49,7 +49,7 @@ describe("ClassicWorkOrderPopup", () => {
       expect(dialog).not.toHaveClass(className);
     }
 
-    expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "Source" })).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
