@@ -726,6 +726,25 @@ func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T)
 		"Implement and open PR\n\nSpec:\n# Retry refunds\n\n## Executive summary\n\nStop double charges.",
 		prompt["body"],
 	)
+
+	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  "notes:" + order.ID.String(),
+		Data: map[string]any{
+			"name":  models.PlanningSpecArtifactTitle,
+			"title": models.PlanningSpecArtifactTitle,
+			"body":  "# Wrong contract\n",
+		},
+	})
+	require.NoError(t, err)
+
+	spec, err = builder.ResolveExpression(`task().spec`)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", spec)
+
+	aliased, err := builder.ResolveExpression(`let taskData = task(); taskData.spec`)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", aliased)
 }
 
 func Test_NodeConfigurationBuilder_PRClosureSourceIssueOrigin(t *testing.T) {
