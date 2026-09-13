@@ -1053,9 +1053,10 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments, and
-// assignees are loaded only when the expression AST references those fields
-// on order() or task(). Origin is attached whenever the work order has one.
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and spec are loaded only when the expression AST references
+// those fields on order() or task(). Origin is attached whenever the work
+// order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1207,7 +1208,51 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["assignees"] = assigneePayloads
 	}
 
+	usesSpec, err := expressionvalidation.ExpressionUsesOrderSpec(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesSpec {
+		spec, err := b.resolveOrderSpec(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["spec"] = spec
+	}
+
 	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
+	if !workOrderRefinementEnabled(b.tx, order) {
+		return "", nil
+	}
+	artifacts, err := order.ListArtifacts(b.tx)
+	if err != nil {
+		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
+	}
+	return planningSpecArtifactBody(artifacts), nil
+}
+
+func planningSpecArtifactBody(artifacts []models.FactoryWorkOrderArtifact) string {
+	for i := range artifacts {
+		if artifacts[i].Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+			continue
+		}
+		var data map[string]any
+		if err := json.Unmarshal(artifacts[i].Data, &data); err != nil {
+			continue
+		}
+		name, _ := data["name"].(string)
+		title, _ := data["title"].(string)
+		if strings.TrimSpace(name) != models.PlanningSpecArtifactTitle &&
+			strings.TrimSpace(title) != models.PlanningSpecArtifactTitle {
+			continue
+		}
+		body, _ := data["body"].(string)
+		return strings.TrimSpace(body)
+	}
+	return ""
 }
 
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
