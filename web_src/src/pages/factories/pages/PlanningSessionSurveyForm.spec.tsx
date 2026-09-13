@@ -18,6 +18,8 @@ describe("PlanningSessionSurveyForm", () => {
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toHaveClass("sp-survey-accent");
+    expect(screen.getByTestId("create-with-agent-survey-card")).toHaveClass("sp-survey-card");
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toBeInTheDocument();
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();

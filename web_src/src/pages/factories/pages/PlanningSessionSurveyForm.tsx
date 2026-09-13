@@ -31,9 +31,9 @@ export function PlanningSessionSurveyForm({
 
   return (
     <div className="sp-survey-enter mt-3 mb-1" data-testid="create-with-agent-survey">
-      <div className="rounded-2xl border border-border bg-muted/30 px-3 py-3">
+      <div className="sp-survey-card rounded-2xl border px-3 py-3" data-testid="create-with-agent-survey-card">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-medium text-muted-foreground">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
+          <p className="sp-survey-accent text-[11px] font-medium">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
           {questionCount > 1 ? (
             <span className="shrink-0 text-[11px] text-muted-foreground">
               {currentIndex + 1} of {questionCount}
@@ -55,7 +55,9 @@ export function PlanningSessionSurveyForm({
                   aria-pressed={selected}
                   className={cn(
                     "h-auto justify-start gap-2.5 whitespace-normal rounded-lg px-2 py-2 text-left text-[13px]",
-                    selected ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
+                    selected
+                      ? "sp-survey-option-selected text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                   onClick={() => {
                     setAnswers((current) => replaceAtIndex(current, currentIndex, option));
@@ -65,7 +67,7 @@ export function PlanningSessionSurveyForm({
                     className={cn(
                       "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold",
                       selected
-                        ? "border-foreground bg-foreground text-background"
+                        ? "sp-survey-pick"
                         : "border-border bg-background text-muted-foreground",
                     )}
                     aria-hidden
