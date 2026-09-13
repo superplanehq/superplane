@@ -94,6 +94,39 @@ func TestExpressionUsesOrderKey(t *testing.T) {
 	}
 }
 
+func TestExpressionUsesOrderSpec(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "order artifacts", raw: `order().artifacts`, want: false},
+		{name: "dot spec", raw: `order().spec`, want: true},
+		{name: "bracket spec", raw: `order()["spec"]`, want: true},
+		{name: "ternary", raw: `task().spec != "" ? task().spec : ""`, want: true},
+		{name: "task alias", raw: `task().spec`, want: true},
+		{name: "let alias spec", raw: `let taskData = task(); taskData.spec`, want: true},
+		{name: "let alias bracket spec", raw: `let taskData = task(); taskData["spec"]`, want: true},
+		{name: "let alias order spec", raw: `let orderData = order(); orderData.spec`, want: true},
+		{name: "let unrelated spec", raw: `let taskData = root(); taskData.spec`, want: false},
+		{name: "unrelated", raw: `root().data.spec`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderSpec(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpressionUsesOrderAssignees(t *testing.T) {
 	cases := []struct {
 		name string

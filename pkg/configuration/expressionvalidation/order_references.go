@@ -43,6 +43,13 @@ func ExpressionUsesOrderKey(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "key")
 }
 
+// ExpressionUsesOrderSpec reports whether the expression accesses order().spec
+// or task().spec (dot or bracket). Used to load the refinement spec only when
+// the implement prompt asks for it.
+func ExpressionUsesOrderSpec(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "spec")
+}
+
 // expressionReferencesOrderProperty reports whether the expression accesses
 // order().<property> or task().<property> (dot or bracket), including nested
 // uses such as len(order().<property>) or none(task().<property>, …).
@@ -52,13 +59,35 @@ func expressionReferencesOrderProperty(expression, property string) (bool, error
 		return false, err
 	}
 
-	collector := &orderPropertyCollector{property: property}
+	aliases := collectOrderAliases(tree.Node)
+	collector := &orderPropertyCollector{property: property, aliases: aliases}
 	ast.Walk(&tree.Node, collector)
 	return collector.found, nil
 }
 
+func collectOrderAliases(node ast.Node) map[string]struct{} {
+	collector := &orderAliasCollector{aliases: map[string]struct{}{}}
+	ast.Walk(&node, collector)
+	return collector.aliases
+}
+
+type orderAliasCollector struct {
+	aliases map[string]struct{}
+}
+
+func (c *orderAliasCollector) Visit(node *ast.Node) {
+	decl, ok := (*node).(*ast.VariableDeclaratorNode)
+	if !ok {
+		return
+	}
+	if isOrderCall(decl.Value) {
+		c.aliases[decl.Name] = struct{}{}
+	}
+}
+
 type orderPropertyCollector struct {
 	property string
+	aliases  map[string]struct{}
 	found    bool
 }
 
@@ -77,9 +106,21 @@ func (c *orderPropertyCollector) Visit(node *ast.Node) {
 		return
 	}
 
-	if isOrderCall(member.Node) {
+	if isOrderSource(member.Node, c.aliases) {
 		c.found = true
 	}
+}
+
+func isOrderSource(node ast.Node, aliases map[string]struct{}) bool {
+	if isOrderCall(node) {
+		return true
+	}
+	ident, ok := node.(*ast.IdentifierNode)
+	if !ok {
+		return false
+	}
+	_, found := aliases[ident.Value]
+	return found
 }
 
 func memberPropertyName(property ast.Node) (string, bool) {
