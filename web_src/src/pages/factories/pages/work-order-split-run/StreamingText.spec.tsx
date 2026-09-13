@@ -2,11 +2,17 @@ import { StrictMode } from "react";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { resetStreamMemoryForTests, StreamingText } from "./StreamingText";
+import { StreamingText } from "./StreamingText";
+import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 
 function renderStream(content: string, extra: { contentKey?: string; memoryKey?: string; ready?: boolean } = {}) {
   return (
-    <StreamingText content={content} contentKey={extra.contentKey ?? content} memoryKey={extra.memoryKey} ready={extra.ready}>
+    <StreamingText
+      content={content}
+      contentKey={extra.contentKey ?? content}
+      memoryKey={extra.memoryKey}
+      ready={extra.ready}
+    >
       {(visible) => <span data-testid="stream-visible">{visible}</span>}
     </StreamingText>
   );
@@ -58,9 +64,7 @@ describe("StreamingText", () => {
   });
 
   it("does not stream the first value after the pane becomes ready", () => {
-    const { rerender } = render(
-      <StrictMode>{renderStream("old summary", { ready: false })}</StrictMode>,
-    );
+    const { rerender } = render(<StrictMode>{renderStream("old summary", { ready: false })}</StrictMode>);
 
     rerender(<StrictMode>{renderStream("new spec words", { ready: true })}</StrictMode>);
 

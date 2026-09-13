@@ -1,76 +1,28 @@
-import type { ReactElement } from "react";
 import { StrictMode } from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
+import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { ANALYSIS_REPLY_THINKING_STATES, ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
-import { resetStreamMemoryForTests } from "./StreamingText";
+import {
+  analysisChat,
+  HIGH_CONFIDENCE,
+  INTENT,
+  INTENT_DOC,
+  IntentDocumentResizeObserver,
+  notifyIntentResize,
+  renderIntentDocument,
+} from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
-
-function renderDocument(ui: ReactElement) {
-  return render(<TooltipProvider>{ui}</TooltipProvider>);
-}
-
-let notifyResize: () => void;
-
-class MockResizeObserver {
-  constructor(callback: ResizeObserverCallback) {
-    notifyResize = () => callback([], this as unknown as ResizeObserver);
-  }
-
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-
-const INTENT = {
-  id: "art-intent",
-  type: "TYPE_MARKDOWN" as const,
-  data: {
-    name: "intent.md",
-    title: "intent.md",
-    body: `# Clearer empty state
-
-## Executive summary
-
-### Goal
-
-A person can add a payment method from the empty billing page.
-
-The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
-
-### Done when
-
-- The empty view names the next action.
-- The action opens add-payment-method.
-
-### Out of scope
-
-- The page after a card exists.
-
-### Key architecture decisions
-
-- Reuse the current empty view. Do not add a new page.
-
-## Problem
-
-The empty view only shows a title.
-
-## Outcome
-
-The empty state tells the user how to add a payment method.
-`,
-  },
-};
+import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 
 describe("WorkOrderIntentDocument", () => {
   beforeEach(() => {
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
   });
 
   afterEach(() => {
@@ -79,21 +31,7 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("shows the original request and the generated summary", () => {
-    renderDocument(
-      <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
-        artifacts={[INTENT]}
-        confidence={{
-          id: "check-confidence",
-          name: CONFIDENCE_CHECK_NAME,
-          score: 4,
-          maxScore: 5,
-          level: "positive",
-          summary: confidenceSuitabilitySummary("High"),
-        }}
-      />,
-    );
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
 
     expect(screen.getByTestId("split-run-intent-session")).toHaveTextContent("Show a clearer empty state");
     expect(screen.queryByText("Original request")).not.toBeInTheDocument();
@@ -123,21 +61,7 @@ describe("WorkOrderIntentDocument", () => {
 
   it("reveals the confidence why when the chip is opened", async () => {
     const user = userEvent.setup();
-    renderDocument(
-      <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
-        artifacts={[INTENT]}
-        confidence={{
-          id: "check-confidence",
-          name: CONFIDENCE_CHECK_NAME,
-          score: 4,
-          maxScore: 5,
-          level: "positive",
-          summary: confidenceSuitabilitySummary("High"),
-        }}
-      />,
-    );
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
 
     await user.click(screen.getByTestId("split-run-intent-confidence-chip"));
     expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
@@ -146,19 +70,11 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("puts source context on the left after Start and hides confidence", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        confidence={{
-          id: "check-confidence",
-          name: CONFIDENCE_CHECK_NAME,
-          score: 4,
-          maxScore: 5,
-          level: "positive",
-          summary: confidenceSuitabilitySummary("High"),
-        }}
+        confidence={HIGH_CONFIDENCE}
         contextSidebar={<aside data-testid="split-run-overview-sidebar">Source</aside>}
       />,
     );
@@ -174,10 +90,9 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("keeps a decision note on the plan pane", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
         resultFooter={<div data-testid="split-run-review">Ready</div>}
       />,
@@ -191,13 +106,7 @@ describe("WorkOrderIntentDocument", () => {
 
   it("switches to the full plan", async () => {
     const user = userEvent.setup();
-    renderDocument(
-      <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
-        artifacts={[INTENT]}
-      />,
-    );
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
 
     expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Show full plan" }));
@@ -207,13 +116,7 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("starts the request pane at two fifths width and lets the reader drag the split", () => {
-    renderDocument(
-      <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
-        artifacts={[INTENT]}
-      />,
-    );
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
 
     const request = screen.getByTestId("split-run-intent-request");
     const handle = screen.getByTestId("split-run-intent-resize-handle");
@@ -241,33 +144,11 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("shows the request as the first chat message on the left", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={{
-          organizationId: "org-1",
-          view: {
-            repository: "acme/payments",
-            machineStatus: "starting",
-            canvasId: "",
-            canvasRunId: "",
-            executionId: "",
-            messages: [],
-            composer: "",
-            created: [],
-            right: { kind: "empty" },
-            endConfirmOpen: false,
-            selectableModelKey: "",
-            refining: false,
-          },
-          composer: "Need the existing empty-state component.",
-          canSend: true,
-          onComposerChange: vi.fn(),
-          onSend: vi.fn(),
-          onSubmitSurvey: vi.fn(),
-        }}
+        analysis={analysisChat({ composer: "Need the existing empty-state component." })}
       />,
     );
 
@@ -293,14 +174,10 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("streams the summary when the spec updates after open", () => {
-    const view = {
-      title: "Show a clearer empty state",
-      description: "Imported from GitHub: billing empty state is unclear.",
-    };
-    const { rerender } = renderDocument(
+    const { rerender } = renderIntentDocument(
       <StrictMode>
         <WorkOrderIntentDocument
-          {...view}
+          {...INTENT_DOC}
           streamKey="order-stream"
           artifacts={[{ ...INTENT, data: { ...INTENT.data, body: "# Old title\n\nOld summary only.\n" } }]}
         />
@@ -312,7 +189,7 @@ describe("WorkOrderIntentDocument", () => {
     rerender(
       <TooltipProvider>
         <StrictMode>
-          <WorkOrderIntentDocument {...view} streamKey="order-stream" artifacts={[INTENT]} />
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-stream" artifacts={[INTENT]} />
         </StrictMode>
       </TooltipProvider>,
     );
@@ -323,15 +200,9 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("streams the first spec that arrives while the card is open", () => {
-    const { rerender } = renderDocument(
+    const { rerender } = renderIntentDocument(
       <StrictMode>
-        <WorkOrderIntentDocument
-          title="Show a clearer empty state"
-          description="Imported from GitHub: billing empty state is unclear."
-          streamKey="order-first-spec"
-          artifacts={[]}
-          isAnalyzing
-        />
+        <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-first-spec" artifacts={[]} isAnalyzing />
       </StrictMode>,
     );
 
@@ -340,13 +211,7 @@ describe("WorkOrderIntentDocument", () => {
     rerender(
       <TooltipProvider>
         <StrictMode>
-          <WorkOrderIntentDocument
-            title="Show a clearer empty state"
-            description="Imported from GitHub: billing empty state is unclear."
-            streamKey="order-first-spec"
-            artifacts={[INTENT]}
-            isAnalyzing
-          />
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-first-spec" artifacts={[INTENT]} isAnalyzing />
         </StrictMode>
       </TooltipProvider>,
     );
@@ -356,20 +221,16 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("does not stream when artifacts load after the card opens", () => {
-    const view = {
-      title: "Show a clearer empty state",
-      description: "Imported from GitHub: billing empty state is unclear.",
-    };
-    const { rerender } = renderDocument(
+    const { rerender } = renderIntentDocument(
       <StrictMode>
-        <WorkOrderIntentDocument {...view} streamKey="order-open" streamReady={false} artifacts={[]} />
+        <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-open" streamReady={false} artifacts={[]} />
       </StrictMode>,
     );
 
     rerender(
       <TooltipProvider>
         <StrictMode>
-          <WorkOrderIntentDocument {...view} streamKey="order-open" streamReady artifacts={[INTENT]} />
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-open" streamReady artifacts={[INTENT]} />
         </StrictMode>
       </TooltipProvider>,
     );
@@ -379,15 +240,12 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("keeps the stored transcript outside the current run activity", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={{
-          organizationId: "org-1",
+        analysis={analysisChat({
           view: {
-            repository: "acme/payments",
             machineStatus: "waiting",
             canvasId: "canvas-1",
             canvasRunId: "run-1",
@@ -395,27 +253,10 @@ describe("WorkOrderIntentDocument", () => {
             messages: [
               { id: "user-1", kind: "text", role: "user", text: "Use the current empty-state component." },
               { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan with that constraint." },
-              {
-                id: "survey-1",
-                kind: "text",
-                role: "user",
-                origin: "survey",
-                text: "What is the priority? High",
-              },
+              { id: "survey-1", kind: "text", role: "user", origin: "survey", text: "What is the priority? High" },
             ],
-            composer: "",
-            created: [],
-            right: { kind: "empty" },
-            endConfirmOpen: false,
-            selectableModelKey: "",
-            refining: false,
           },
-          composer: "",
-          canSend: true,
-          onComposerChange: vi.fn(),
-          onSend: vi.fn(),
-          onSubmitSurvey: vi.fn(),
-        }}
+        })}
       />,
     );
 
@@ -429,15 +270,13 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("does not restream the last agent line after a survey answer", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={{
-          organizationId: "org-1",
+        analysis={analysisChat({
+          canSend: false,
           view: {
-            repository: "acme/payments",
             machineStatus: "running",
             canvasId: "canvas-1",
             canvasRunId: "run-1",
@@ -457,19 +296,8 @@ describe("WorkOrderIntentDocument", () => {
                 text: "The delete route already returns 404 for a missing puppy. Add a test and close the ticket.",
               },
             ],
-            composer: "",
-            created: [],
-            right: { kind: "empty" },
-            endConfirmOpen: false,
-            selectableModelKey: "",
-            refining: false,
           },
-          composer: "",
-          canSend: false,
-          onComposerChange: vi.fn(),
-          onSend: vi.fn(),
-          onSubmitSurvey: vi.fn(),
-        }}
+        })}
       />,
     );
 
@@ -484,26 +312,14 @@ describe("WorkOrderIntentDocument", () => {
   it("does not send a multi-question survey when Next is clicked", async () => {
     const user = userEvent.setup();
     const onSubmitSurvey = vi.fn();
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={{
-          organizationId: "org-1",
+        analysis={analysisChat({
+          onSubmitSurvey,
           view: {
-            repository: "acme/payments",
             machineStatus: "waiting",
-            canvasId: "",
-            canvasRunId: "",
-            executionId: "",
-            messages: [],
-            composer: "",
-            created: [],
-            right: { kind: "empty" },
-            endConfirmOpen: false,
-            selectableModelKey: "",
-            refining: false,
             survey: {
               id: "survey-1",
               questions: [
@@ -512,12 +328,7 @@ describe("WorkOrderIntentDocument", () => {
               ],
             },
           },
-          composer: "",
-          canSend: true,
-          onComposerChange: vi.fn(),
-          onSend: vi.fn(),
-          onSubmitSurvey,
-        }}
+        })}
       />,
     );
 
@@ -534,33 +345,13 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("streams the analysis agent in the left chat", () => {
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
-        description="Imported from GitHub: billing empty state is unclear."
+        {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={{
-          organizationId: "org-1",
-          view: {
-            repository: "acme/payments",
-            machineStatus: "running",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [],
-            composer: "",
-            created: [],
-            right: { kind: "empty" },
-            endConfirmOpen: false,
-            selectableModelKey: "",
-            refining: false,
-          },
-          composer: "",
-          canSend: true,
-          onComposerChange: vi.fn(),
-          onSend: vi.fn(),
-          onSubmitSurvey: vi.fn(),
-        }}
+        analysis={analysisChat({
+          view: { machineStatus: "running", canvasId: "canvas-1", canvasRunId: "run-1", executionId: "exec-1" },
+        })}
       />,
     );
 
@@ -572,9 +363,9 @@ describe("WorkOrderIntentDocument", () => {
 
   it("collapses a long request and expands it on Show more", async () => {
     const user = userEvent.setup();
-    renderDocument(
+    renderIntentDocument(
       <WorkOrderIntentDocument
-        title="Show a clearer empty state"
+        {...INTENT_DOC}
         description={"Imported from GitHub.\n\n" + "Need a payment method.\n".repeat(40)}
         artifacts={[INTENT]}
       />,
@@ -582,7 +373,7 @@ describe("WorkOrderIntentDocument", () => {
 
     const content = screen.getByTestId("work-order-description-markdown").parentElement;
     Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 640 });
-    act(() => notifyResize());
+    act(() => notifyIntentResize());
 
     expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(content).toHaveStyle({ maxHeight: "220px" });

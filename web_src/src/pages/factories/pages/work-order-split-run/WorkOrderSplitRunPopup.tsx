@@ -36,7 +36,6 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const { organizationId, factoryId, orderId, fixture, canUpdate = true } = props;
   const refinementEnabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
-  const isDraft = fixture.footer.kind === "draft";
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -108,38 +107,23 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
-  const review = (
-    <SplitRunReview
-      footer={fixture.footer}
-      organizationId={organizationId}
-      factoryKey={factoryKey}
-      orderNumber={orderNumber}
-      canAct={canUpdate}
-      onStart={draftStart}
-      onArchive={mutations.onArchive}
-      onReject={mutations.onReject}
-      onBackToDraft={backToDraft}
-      onStop={mutations.onStop}
-      startBusy={isDispatching}
-      actionBusy={footerActions.busy}
-      startDisabled={!canDispatch}
-      compact={fixture.footer.kind === "draft"}
-      modelSelect={
-        fixture.footer.kind === "draft" &&
-        canPickDraftStartModel &&
-        fixture.footer.actions.some((action) => action.kind === "start") ? (
-          <DraftStartModelSelect
-            organizationId={organizationId}
-            factoryId={factoryId}
-            lineName={fixture.lineName}
-            value={draftModel}
-            onChange={setDraftModel}
-            disabled={isDispatching}
-          />
-        ) : undefined
-      }
-    />
-  );
+  const review = analysisPopupReview({
+    fixture,
+    organizationId,
+    factoryId,
+    factoryKey,
+    orderNumber,
+    canUpdate,
+    draftStart,
+    mutations,
+    backToDraft,
+    isDispatching,
+    footerBusy: footerActions.busy,
+    canDispatch,
+    canPickDraftStartModel,
+    draftModel,
+    setDraftModel,
+  });
 
   return (
     <PopupShell
@@ -190,5 +174,79 @@ function AnalysisWorkOrderPopup({
       />
       {tab !== "description" ? review : null}
     </PopupShell>
+  );
+}
+
+function analysisPopupReview(args: {
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  canUpdate: boolean;
+  draftStart: ReturnType<typeof draftStartAction>;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  backToDraft: ReturnType<typeof returnToBacklogAction>;
+  isDispatching: boolean;
+  footerBusy: boolean;
+  canDispatch: boolean;
+  canPickDraftStartModel: boolean;
+  draftModel: string;
+  setDraftModel: (value: string) => void;
+}) {
+  return (
+    <SplitRunReview
+      footer={args.fixture.footer}
+      organizationId={args.organizationId}
+      factoryKey={args.factoryKey}
+      orderNumber={args.orderNumber}
+      canAct={args.canUpdate}
+      onStart={args.draftStart}
+      onArchive={args.mutations.onArchive}
+      onReject={args.mutations.onReject}
+      onBackToDraft={args.backToDraft}
+      onStop={args.mutations.onStop}
+      startBusy={args.isDispatching}
+      actionBusy={args.footerBusy}
+      startDisabled={!args.canDispatch}
+      compact={args.fixture.footer.kind === "draft"}
+      modelSelect={analysisDraftStartModelSelect({
+        organizationId: args.organizationId,
+        factoryId: args.factoryId,
+        lineName: args.fixture.lineName,
+        footerKind: args.fixture.footer.kind,
+        hasStart: args.fixture.footer.actions.some((action) => action.kind === "start"),
+        canPick: args.canPickDraftStartModel,
+        value: args.draftModel,
+        onChange: args.setDraftModel,
+        disabled: args.isDispatching,
+      })}
+    />
+  );
+}
+
+function analysisDraftStartModelSelect(args: {
+  organizationId?: string;
+  factoryId?: string;
+  lineName: string;
+  footerKind: string;
+  hasStart: boolean;
+  canPick: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  if (args.footerKind !== "draft" || !args.canPick || !args.hasStart) {
+    return undefined;
+  }
+  return (
+    <DraftStartModelSelect
+      organizationId={args.organizationId}
+      factoryId={args.factoryId}
+      lineName={args.lineName}
+      value={args.value}
+      onChange={args.onChange}
+      disabled={args.disabled}
+    />
   );
 }

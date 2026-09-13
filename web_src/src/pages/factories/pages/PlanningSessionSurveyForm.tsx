@@ -66,9 +66,7 @@ export function PlanningSessionSurveyForm({
                   <span
                     className={cn(
                       "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold",
-                      selected
-                        ? "sp-survey-pick"
-                        : "border-border bg-background text-muted-foreground",
+                      selected ? "sp-survey-pick" : "border-border bg-background text-muted-foreground",
                     )}
                     aria-hidden
                   >

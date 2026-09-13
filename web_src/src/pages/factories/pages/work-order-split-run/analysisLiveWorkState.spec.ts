@@ -92,7 +92,10 @@ describe("liveReasoningForTurn", () => {
       { id: "next", text: "The separate-pages-per-animal reading is clear." },
     ];
     expect(
-      liveReasoningForTurn(items, "I asked one survey question to pin down the intended reading. Once that is answered."),
+      liveReasoningForTurn(
+        items,
+        "I asked one survey question to pin down the intended reading. Once that is answered.",
+      ),
     ).toEqual([items[1], items[2]]);
     expect(liveReasoningForTurn(items)).toEqual(items);
   });

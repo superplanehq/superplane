@@ -47,9 +47,7 @@ describe("formatPlanningSurveyReply", () => {
 
 describe("parsePlanningSurveyReply", () => {
   it("splits each line into the question and the chosen answer", () => {
-    expect(
-      parsePlanningSurveyReply("What is the priority? High\nWhat is the scope? One file"),
-    ).toEqual([
+    expect(parsePlanningSurveyReply("What is the priority? High\nWhat is the scope? One file")).toEqual([
       { question: "What is the priority?", answer: "High" },
       { question: "What is the scope?", answer: "One file" },
     ]);

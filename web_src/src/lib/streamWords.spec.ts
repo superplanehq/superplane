@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { playStreamWords, streamUnits, streamWordsIn, visibleGeneratedMarkdown, wrapStreamWords } from "@/lib/streamWords";
+import {
+  playStreamWords,
+  streamUnits,
+  streamWordsIn,
+  visibleGeneratedMarkdown,
+  wrapStreamWords,
+} from "@/lib/streamWords";
 
 function reducedMotionMatchMedia(matches: boolean) {
   return (query: string) => ({

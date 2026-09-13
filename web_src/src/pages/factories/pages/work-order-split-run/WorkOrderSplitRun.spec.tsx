@@ -126,7 +126,9 @@ describe("WorkOrderSplitRunPopup", () => {
     const row = screen.getByTestId("popup-owner-time-cost");
     expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
     const views = screen.getByRole("tablist", { name: "Task views" });
-    expect(screen.getByRole("button", { name: "Close" }).compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Close" }).compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(views).getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
     expect(within(views).getByRole("tab", { name: "Task" })).toHaveClass("sp-popup-view-tab");
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "inactive");
