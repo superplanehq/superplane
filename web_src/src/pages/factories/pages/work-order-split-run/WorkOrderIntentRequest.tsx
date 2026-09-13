@@ -69,7 +69,6 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
 }
 
 function AnalysisRequestChat({
-  title,
   description,
   files,
   analysis,
@@ -87,7 +86,6 @@ function AnalysisRequestChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
-      <RequestHeader title={title} />
       <div className="relative min-h-0 flex-1">
         <div
           ref={follow.scrollRef}

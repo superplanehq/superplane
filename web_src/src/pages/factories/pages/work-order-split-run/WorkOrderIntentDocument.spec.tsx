@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
-import { ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
+import { ANALYSIS_REPLY_THINKING_STATES, ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
 import { resetStreamMemoryForTests } from "./StreamingText";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 
@@ -145,7 +145,7 @@ describe("WorkOrderIntentDocument", () => {
     );
   });
 
-  it("puts source context and confidence on the left after Start", () => {
+  it("puts source context on the left after Start and hides confidence", () => {
     renderDocument(
       <WorkOrderIntentDocument
         title="Show a clearer empty state"
@@ -166,9 +166,7 @@ describe("WorkOrderIntentDocument", () => {
     const request = screen.getByTestId("split-run-intent-request");
     const result = screen.getByTestId("split-run-intent-result");
     expect(within(request).getByTestId("split-run-overview-sidebar")).toHaveTextContent("Source");
-    expect(within(request).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(
-      `${CONFIDENCE_CHECK_NAME} 4/5`,
-    );
+    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
@@ -275,8 +273,11 @@ describe("WorkOrderIntentDocument", () => {
 
     const chat = within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-intent-chat");
     expect(chat).toBeInTheDocument();
-    expect(within(chat).getByText(CREATE_WITH_AGENT_COPY.request)).toBeInTheDocument();
+    expect(within(chat).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(chat).getByText(CREATE_WITH_AGENT_COPY.request)).toHaveClass("sp-user-note-label");
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
+    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer").closest(".sp-user-note")).not.toBeNull();
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
@@ -425,6 +426,59 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getAllByText("Use the current empty-state component.")).toHaveLength(1);
     expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
+  });
+
+  it("does not restream the last agent line after a survey answer", () => {
+    renderDocument(
+      <WorkOrderIntentDocument
+        title="Show a clearer empty state"
+        description="Imported from GitHub: billing empty state is unclear."
+        artifacts={[INTENT]}
+        analysis={{
+          organizationId: "org-1",
+          view: {
+            repository: "acme/payments",
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [
+              {
+                id: "agent-1",
+                kind: "text",
+                role: "agent",
+                text: "Because the premise is false, I scored this low (confidence 2) and asked one clarifying question: close it as already fixed with a test, upgrade the plain-text 404 into a real page, or provide steps where the 500 still occurs. Spec, score, and survey are published. Files written: /tmp/intake-analysis.json and /tmp/intent.md.",
+              },
+              {
+                id: "survey-1",
+                kind: "text",
+                role: "user",
+                origin: "survey",
+                text: "The delete route already returns 404 for a missing puppy. Add a test and close the ticket.",
+              },
+            ],
+            composer: "",
+            created: [],
+            right: { kind: "empty" },
+            endConfirmOpen: false,
+            selectableModelKey: "",
+            refining: false,
+          },
+          composer: "",
+          canSend: false,
+          onComposerChange: vi.fn(),
+          onSend: vi.fn(),
+          onSubmitSurvey: vi.fn(),
+        }}
+      />,
+    );
+
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    expect(within(transcript).getByText(/Because the premise is false/)).toBeInTheDocument();
+    expect(transcript.querySelector(".sp-stream-text")).toBeNull();
+    expect(screen.getAllByText(/Because the premise is false/)).toHaveLength(1);
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_REPLY_THINKING_STATES[0]);
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.machineStarting)).not.toBeInTheDocument();
   });
 
   it("does not send a multi-question survey when Next is clicked", async () => {

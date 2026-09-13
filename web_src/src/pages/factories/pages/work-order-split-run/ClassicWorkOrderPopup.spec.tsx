@@ -44,7 +44,7 @@ describe("ClassicWorkOrderPopup", () => {
     renderClassicPopup();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).not.toContain("w-[min(90rem");
+    expect(dialog.className).not.toContain("w-[min(80rem");
     for (const className of SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)) {
       expect(dialog).not.toHaveClass(className);
     }

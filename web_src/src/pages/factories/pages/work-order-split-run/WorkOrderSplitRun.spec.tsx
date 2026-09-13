@@ -158,7 +158,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
     expect(fullPage.className).toContain("w-full");
-    expect(fullPage.className).not.toContain("w-[min(90rem");
+    expect(fullPage.className).not.toContain("w-[min(80rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
     expect(fullPage.parentElement?.className).toContain("left-[var(--workspace-navigation-width)]");
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
@@ -750,8 +750,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
-    expect(within(request).getByTestId("split-run-overview-checks")).toBeInTheDocument();
-    expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
     expect(within(request).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
   });
@@ -778,9 +778,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const tab = screen.getByTestId("split-run-work-order-tab");
-    expect(within(tab).getByTestId("split-run-intent-session")).toHaveTextContent(
-      REVIEW_CANDIDATE_WORK_ORDERS[0].title ?? "",
-    );
+    expect(within(tab).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-description")).toHaveTextContent(
       "Webhook delivery stops after a transient provider error",
     );
@@ -873,7 +871,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
-  it("keeps the ingest confidence check on a downstream Description tab", async () => {
+  it("hides confidence on a downstream Description tab and keeps other checks", async () => {
     const user = userEvent.setup();
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS }),
@@ -881,7 +879,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("tab", { name: "Description" }));
     const tab = screen.getByTestId("split-run-work-order-tab");
-    expect(within(tab).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
+    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(tab).queryByText(/fit for an agent on this factory line/)).toBeNull();
     expect(within(tab).getByText("Risk score")).toBeInTheDocument();
   });
@@ -917,8 +915,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
-    expect(within(request).getByTestId("split-run-overview-checks")).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
   });
 
   it("explains a rejected result without Reopen", () => {

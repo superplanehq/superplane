@@ -33,7 +33,7 @@ export const SPLIT_RUN_PANE_GRID_CLASSNAME =
 
 /** Task popup size. Wider than the default overlay so Summary and Plan have room. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
-  "max-h-[min(62rem,calc(100vh-3rem))] h-[min(56rem,calc(100vh-3rem))] w-[min(90rem,calc(100vw-3rem))]";
+  "max-h-[min(56rem,calc(100vh-4rem))] h-[min(50rem,calc(100vh-4rem))] w-[min(80rem,calc(100vw-4rem))]";
 
 /** Shared height for the chat composer and the spec decision row. */
 export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =

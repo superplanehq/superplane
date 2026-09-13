@@ -18,7 +18,7 @@ export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
 /**
  * Description-tab reading pane. Drafts keep analysis chat on the left and
  * the summary plus confidence on the right. After Start, the left pane shows
- * source context and confidence. The summary stays on the right.
+ * source context. The summary stays on the right.
  */
 export function WorkOrderIntentDocument({
   title,
@@ -62,10 +62,7 @@ export function WorkOrderIntentDocument({
           data-testid="split-run-intent-request"
         >
           {contextSidebar ? (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-hidden">{contextSidebar}</div>
-              <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
-            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
           ) : (
             <WorkOrderIntentRequest title={sessionTitle} description={description} files={files} analysis={analysis} />
           )}
