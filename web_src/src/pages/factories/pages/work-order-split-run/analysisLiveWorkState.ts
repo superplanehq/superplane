@@ -13,6 +13,8 @@ export const ANALYSIS_THINKING_STATES = [
   "Reading the ticket",
 ] as const;
 
+export const ANALYSIS_REPLY_THINKING_STATES = ["Reading your reply", "Updating the plan"] as const;
+
 export type AnalysisLiveWorkKind = "idle" | "thinking" | "reasoning";
 
 export type ReasoningItem = {
@@ -41,9 +43,71 @@ export function hasAgentReasoning(items: ReasoningItem[]): boolean {
   return items.some((item) => !item.details?.length);
 }
 
-export function thinkingStatusFor(elapsedMs: number, intervalMs = ANALYSIS_THINKING_INTERVAL_MS): string {
+export function waitingForAgentReply(messages: { role: string }[]): boolean {
+  return messages.at(-1)?.role !== "agent";
+}
+
+export function hidePreviousAgentStream(messages: { role: string }[]): boolean {
+  return messages.at(-1)?.role === "user";
+}
+
+export function previousAgentStreamText(messages: { role: string; text?: string }[]): string | undefined {
+  if (!hidePreviousAgentStream(messages)) {
+    return undefined;
+  }
+  const prior = messages
+    .filter((message) => message.role === "agent" && message.text)
+    .map((message) => message.text)
+    .join("\n");
+  return prior || undefined;
+}
+
+export function liveReasoningForTurn(
+  items: ReasoningItem[],
+  previousAgentText?: string,
+  staleIds: ReadonlySet<string> = new Set(),
+): ReasoningItem[] {
+  if (!previousAgentText?.trim() && staleIds.size === 0) {
+    return items;
+  }
+  return items.filter((item) => {
+    if (item.details?.length) {
+      return true;
+    }
+    if (staleIds.has(item.id)) {
+      return false;
+    }
+    return !previousAgentText || !isPreviousAgentNote(item.text, previousAgentText);
+  });
+}
+
+export function staleReasoningIds(items: ReasoningItem[]): Set<string> {
+  return new Set(items.filter((item) => !item.details?.length).map((item) => item.id));
+}
+
+function isPreviousAgentNote(liveText: string, previousText: string): boolean {
+  const live = agentNoteFingerprint(liveText);
+  const previous = agentNoteFingerprint(previousText);
+  if (live.length < 16 || previous.length < 16) {
+    return false;
+  }
+  return previous.includes(live) || live.includes(previous);
+}
+
+function agentNoteFingerprint(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[.…]+$/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+export function thinkingStatusFor(
+  elapsedMs: number,
+  intervalMs = ANALYSIS_THINKING_INTERVAL_MS,
+  states: readonly string[] = ANALYSIS_THINKING_STATES,
+): string {
   const step = Math.max(0, Math.floor(elapsedMs / intervalMs));
-  return ANALYSIS_THINKING_STATES[step % ANALYSIS_THINKING_STATES.length];
+  return states[step % states.length];
 }
 
 export function reasoningLinesFromPlanningNotes(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
@@ -7,10 +7,14 @@ import { ChevronRight } from "lucide-react";
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { PLANNING_SESSION_AGENT_LINE_ID } from "../planningSessionActivity";
 import {
+  ANALYSIS_REPLY_THINKING_STATES,
   ANALYSIS_THINKING_INTERVAL_MS,
+  ANALYSIS_THINKING_STATES,
   analysisLiveWorkKind,
   hasAgentReasoning,
+  liveReasoningForTurn,
   reasoningLinesFromPlanningNotes,
+  staleReasoningIds,
   thinkingStatusFor,
   type ReasoningItem,
 } from "./analysisLiveWorkState";
@@ -23,6 +27,7 @@ export function AnalysisLiveWork({
   executionId,
   items,
   waitingForAgent = false,
+  previousAgentText,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
   organizationId?: string;
@@ -30,6 +35,7 @@ export function AnalysisLiveWork({
   executionId?: string;
   items?: ReasoningItem[];
   waitingForAgent?: boolean;
+  previousAgentText?: string;
 }) {
   const liveItems = useAnalysisReasoningItems({
     organizationId,
@@ -38,7 +44,9 @@ export function AnalysisLiveWork({
     active: machineStatus === "starting" || machineStatus === "running",
     skip: items !== undefined,
   });
-  const reasoningItems = items ?? liveItems;
+  const rawItems = items ?? liveItems;
+  const staleIds = useStaleReasoningIds(rawItems, Boolean(previousAgentText));
+  const reasoningItems = liveReasoningForTurn(rawItems, previousAgentText, staleIds);
   const kind = analysisLiveWorkKind({ machineStatus, items: reasoningItems });
 
   if (kind === "idle") {
@@ -48,13 +56,30 @@ export function AnalysisLiveWork({
     waitingForAgent && !hasAgentReasoning(reasoningItems) && (kind === "thinking" || kind === "reasoning");
   return (
     <div data-testid="split-run-intent-live-work">
-      {showThinking ? <ThinkingStatus /> : null}
+      {showThinking ? <ThinkingStatus reply={Boolean(previousAgentText)} /> : null}
       {kind === "reasoning" ? <ReasoningStream items={reasoningItems} /> : null}
     </div>
   );
 }
 
-function ThinkingStatus() {
+function useStaleReasoningIds(items: ReasoningItem[], hidePrevious: boolean): ReadonlySet<string> {
+  const staleIds = useRef<Set<string>>(new Set());
+  const wasHiding = useRef<boolean | null>(null);
+  if (wasHiding.current === null) {
+    wasHiding.current = hidePrevious;
+    return staleIds.current;
+  }
+  if (hidePrevious && !wasHiding.current) {
+    staleIds.current = staleReasoningIds(items);
+  }
+  if (!hidePrevious) {
+    staleIds.current = new Set();
+  }
+  wasHiding.current = hidePrevious;
+  return staleIds.current;
+}
+
+function ThinkingStatus({ reply = false }: { reply?: boolean }) {
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -62,7 +87,11 @@ function ThinkingStatus() {
     }, ANALYSIS_THINKING_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, []);
-  const status = thinkingStatusFor(elapsedMs);
+  const status = thinkingStatusFor(
+    elapsedMs,
+    ANALYSIS_THINKING_INTERVAL_MS,
+    reply ? ANALYSIS_REPLY_THINKING_STATES : ANALYSIS_THINKING_STATES,
+  );
 
   return (
     <div className="px-2 py-1.5">

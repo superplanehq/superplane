@@ -17,7 +17,7 @@ export function WorkOrderIntentTranscript({
     return null;
   }
 
-  const lastAgentId = [...messages].reverse().find((message) => message.role === "agent")?.id;
+  const last = messages.at(-1);
 
   return (
     <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
@@ -25,7 +25,7 @@ export function WorkOrderIntentTranscript({
         <TranscriptMessage
           key={message.id}
           message={message}
-          streaming={streaming && message.role === "agent" && message.id === lastAgentId}
+          streaming={streaming && last?.role === "agent" && message.id === last.id}
         />
       ))}
     </div>

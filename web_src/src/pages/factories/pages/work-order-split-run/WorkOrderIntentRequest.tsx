@@ -9,6 +9,7 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
+import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
@@ -102,7 +103,8 @@ function AnalysisRequestChat({
               organizationId={analysis.organizationId}
               canvasId={analysis.view.canvasId}
               executionId={analysis.view.executionId}
-              waitingForAgent={!analysis.view.messages.some((message) => message.role === "agent")}
+              waitingForAgent={waitingForAgentReply(analysis.view.messages)}
+              previousAgentText={previousAgentStreamText(analysis.view.messages)}
             />
           ) : null}
           {state.showSurvey && analysis.view.survey ? (
