@@ -303,6 +303,7 @@ describe("PriceBooks", () => {
   });
 
   it("renames and removes VM rates on the current catalog", async () => {
+    const renamedVm = "e1-xlarge-amd64";
     const catalog = {
       ...currentCatalog,
       vms: [
@@ -315,7 +316,7 @@ describe("PriceBooks", () => {
         const body = JSON.parse(String(init.body)) as {
           vms: { match_key: string; micros_per_second: number }[];
         };
-        expect(body.vms).toEqual([{ match_key: "e1-xlarge-amd64", match_mode: "exact", micros_per_second: 70 }]);
+        expect(body.vms).toEqual([{ match_key: renamedVm, match_mode: "exact", micros_per_second: 70 }]);
         return jsonResponse(savedCatalog);
       }
       return jsonResponse(catalog);
@@ -331,7 +332,7 @@ describe("PriceBooks", () => {
     await user.clear(machineType);
     await user.type(machineType, " E1-XLARGE-AMD64 ");
     await user.tab();
-    expect(machineType).toHaveValue("e1-xlarge-amd64");
+    expect(machineType).toHaveValue(renamedVm);
 
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     await user.click(removeButtons[1]);
