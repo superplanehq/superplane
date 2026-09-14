@@ -12,6 +12,7 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { workOrdersPath } from "../lib/factoryPagePaths";
 import {
   VELOCITY_PERIOD_OPTIONS,
+  isVelocityPeriodDays,
   type VelocityBreakdown,
   type VelocityPeriodDays,
   type VelocityReport,
@@ -187,7 +188,7 @@ function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
             value={String(model.periodDays)}
             onValueChange={(value) => {
               const next = Number(value);
-              if (next === 14 || next === 30) model.setPeriodDays(next as VelocityPeriodDays);
+              if (isVelocityPeriodDays(next)) model.setPeriodDays(next);
             }}
             options={VELOCITY_PERIOD_OPTIONS}
           />
