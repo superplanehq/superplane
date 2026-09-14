@@ -66,7 +66,34 @@ function addPendingRedelivers(
   return next;
 }
 
-export function usePolarWebhooks() {
+function removePendingEventIds(
+  current: Map<string, PendingPolarRedeliver>,
+  eventIds: string[],
+): Map<string, PendingPolarRedeliver> {
+  const next = new Map(current);
+  for (const eventId of eventIds) {
+    next.delete(eventId);
+  }
+  return next;
+}
+
+async function fetchPolarWebhooksPage(
+  page: number,
+  statusFilter: PolarWebhookStatusFilter,
+  eventType: string,
+  signal: AbortSignal,
+): Promise<PolarWebhooksResponse> {
+  const response = await fetch(`/admin/api/polar/webhooks?${polarWebhookListQuery(page, statusFilter, eventType)}`, {
+    credentials: "include",
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook deliveries."));
+  }
+  return response.json();
+}
+
+function usePolarWebhookList() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [items, setItems] = useState<PolarWebhookDelivery[]>([]);
   const [total, setTotal] = useState(0);
@@ -76,7 +103,6 @@ export function usePolarWebhooks() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingRedelivers, setPendingRedelivers] = useState<Map<string, PendingPolarRedeliver>>(new Map());
-  const [bulkBusy, setBulkBusy] = useState(false);
   const loadAbort = useRef<AbortController | null>(null);
   const loadGeneration = useRef(0);
 
@@ -87,25 +113,15 @@ export function usePolarWebhooks() {
       loadAbort.current = controller;
       const generation = ++loadGeneration.current;
       const isCurrentLoad = () => generation === loadGeneration.current;
-
       if (showLoading) {
         setLoading(true);
       }
 
       try {
-        const response = await fetch(
-          `/admin/api/polar/webhooks?${polarWebhookListQuery(page, statusFilter, eventType)}`,
-          { credentials: "include", signal: controller.signal },
-        );
-        if (!response.ok) {
-          throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook deliveries."));
-        }
-
-        const data: PolarWebhooksResponse = await response.json();
+        const data = await fetchPolarWebhooksPage(page, statusFilter, eventType, controller.signal);
         if (!isCurrentLoad()) {
           return;
         }
-
         const nextItems = data.items ?? [];
         setConfigured(data.configured);
         setItems(nextItems);
@@ -140,31 +156,46 @@ export function usePolarWebhooks() {
     if (configured !== true) {
       return;
     }
-
     const intervalId = window.setInterval(() => {
       void loadDeliveries(false);
     }, POLAR_WEBHOOK_POLL_INTERVAL_MS);
-
     return () => {
       window.clearInterval(intervalId);
     };
   }, [configured, loadDeliveries]);
 
-  const failedEventIds = useMemo(() => uniqueFailedEventIds(items), [items]);
-  const redelivering = useMemo(() => new Set(pendingRedelivers.keys()), [pendingRedelivers]);
+  return {
+    configured,
+    items,
+    total,
+    page,
+    setPage,
+    statusFilter,
+    setStatusFilter,
+    eventType,
+    setEventType,
+    loading,
+    loadError,
+    pendingRedelivers,
+    setPendingRedelivers,
+    loadDeliveries,
+  };
+}
+
+export function usePolarWebhooks() {
+  const list = usePolarWebhookList();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const failedEventIds = useMemo(() => uniqueFailedEventIds(list.items), [list.items]);
+  const redelivering = useMemo(() => new Set(list.pendingRedelivers.keys()), [list.pendingRedelivers]);
 
   const handleRedeliver = async (eventId: string) => {
-    setPendingRedelivers((current) => addPendingRedelivers(current, [eventId], items, Date.now()));
+    list.setPendingRedelivers((current) => addPendingRedelivers(current, [eventId], list.items, Date.now()));
     try {
       await redeliverPolarEvent(eventId);
       showSuccessToast("Polar will send the event again.");
-      await loadDeliveries(false);
+      await list.loadDeliveries(false);
     } catch (error) {
-      setPendingRedelivers((current) => {
-        const next = new Map(current);
-        next.delete(eventId);
-        return next;
-      });
+      list.setPendingRedelivers((current) => removePendingEventIds(current, [eventId]));
       showErrorToast(
         error instanceof Error ? error.message : "SuperPlane could not ask Polar to send the event again.",
       );
@@ -175,45 +206,36 @@ export function usePolarWebhooks() {
     if (failedEventIds.length === 0) {
       return;
     }
-
-    setPendingRedelivers((current) => addPendingRedelivers(current, failedEventIds, items, Date.now()));
+    list.setPendingRedelivers((current) => addPendingRedelivers(current, failedEventIds, list.items, Date.now()));
     setBulkBusy(true);
     try {
       const result = await redeliverFailedPolarEvents(failedEventIds);
-      if (result.failed.length > 0) {
-        setPendingRedelivers((current) => {
-          const next = new Map(current);
-          for (const eventId of result.failed) {
-            next.delete(eventId);
-          }
-          return next;
-        });
-      }
+      list.setPendingRedelivers((current) => removePendingEventIds(current, result.failed));
       reportRedeliverCounts(result.accepted.length, result.failed.length);
-      await loadDeliveries(false);
+      await list.loadDeliveries(false);
     } finally {
       setBulkBusy(false);
     }
   };
 
   return {
-    configured,
-    items,
-    total,
-    page,
-    setPage,
-    statusFilter,
+    configured: list.configured,
+    items: list.items,
+    total: list.total,
+    page: list.page,
+    setPage: list.setPage,
+    statusFilter: list.statusFilter,
     changeStatusFilter: (value: PolarWebhookStatusFilter) => {
-      setPage(1);
-      setStatusFilter(value);
+      list.setPage(1);
+      list.setStatusFilter(value);
     },
-    eventType,
+    eventType: list.eventType,
     changeEventType: (value: string) => {
-      setPage(1);
-      setEventType(value);
+      list.setPage(1);
+      list.setEventType(value);
     },
-    loading,
-    loadError,
+    loading: list.loading,
+    loadError: list.loadError,
     redelivering,
     bulkBusy,
     failedEventIds,

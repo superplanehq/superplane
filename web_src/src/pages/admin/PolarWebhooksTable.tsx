@@ -29,6 +29,14 @@ const eventStatusBadgeClass = (status: PolarWebhookEventStatus) => {
   return "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300";
 };
 
+function PolarStatusBadge({ label, className, testId }: { label: string; className: string; testId?: string }) {
+  return (
+    <span data-testid={testId} className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+      {label}
+    </span>
+  );
+}
+
 export function PolarWebhooksTable({
   items,
   expandedIds,
@@ -115,19 +123,17 @@ function PolarWebhookRow({
         <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100">{item.event_type || "—"}</td>
         <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{item.http_code ?? "—"}</td>
         <td className="px-4 py-2.5">
-          <span
-            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${deliveryBadgeClass(item.succeeded)}`}
-          >
-            {item.succeeded ? "Succeeded" : "Failed"}
-          </span>
+          <PolarStatusBadge
+            label={item.succeeded ? "Succeeded" : "Failed"}
+            className={deliveryBadgeClass(item.succeeded)}
+          />
         </td>
         <td className="px-4 py-2.5">
-          <span
-            data-testid="polar-webhook-event-status"
-            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${eventStatusBadgeClass(eventStatus)}`}
-          >
-            {polarWebhookEventStatusLabel(eventStatus)}
-          </span>
+          <PolarStatusBadge
+            testId="polar-webhook-event-status"
+            label={polarWebhookEventStatusLabel(eventStatus)}
+            className={eventStatusBadgeClass(eventStatus)}
+          />
         </td>
         <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300" title={item.event_id}>
           {item.event_id || "—"}

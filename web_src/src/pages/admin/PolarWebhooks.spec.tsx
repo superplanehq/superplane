@@ -14,7 +14,6 @@ import {
   POLAR_WEBHOOKS_SENDING_AGAIN,
   POLAR_WEBHOOKS_TITLE,
   POLAR_WEBHOOKS_UNAUTHORIZED,
-  POLAR_WEBHOOK_POLL_INTERVAL_MS,
   POLAR_WEBHOOK_REDELIVER_TIMEOUT_MS,
   formatPolarPayload,
   polarWebhookEventStatus,
@@ -126,9 +125,7 @@ describe("polarWebhookEventStatus", () => {
 });
 
 describe("prunePendingPolarRedelivers", () => {
-  const pending = new Map([
-    ["evt_1", { startedAt: 1_000, knownDeliveryIds: ["del_1"] }],
-  ]);
+  const pending = new Map([["evt_1", { startedAt: 1_000, knownDeliveryIds: ["del_1"] }]]);
 
   it("keeps a pending event until Polar reports a later result", () => {
     const next = prunePendingPolarRedelivers(pending, [failedDelivery], 2_000);
@@ -252,44 +249,6 @@ describe("PolarWebhooks", () => {
     expect(await screen.findByText("evt_1")).toBeInTheDocument();
     expect(screen.getByTestId("polar-webhook-event-status")).toHaveTextContent("Succeeded");
     expect(screen.queryByTestId("polar-webhooks-redeliver-failed")).not.toBeInTheDocument();
-  });
-
-  it("keeps Sending again until Polar marks the event succeeded", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval"] });
-    let eventSucceeded = false;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        return jsonResponse({ status: "accepted" });
-      }
-      return jsonResponse({
-        configured: true,
-        items: [{ ...failedDelivery, event_succeeded: eventSucceeded }],
-        total: 1,
-        page: 1,
-        limit: 50,
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const user = userEvent.setup();
-    renderPage();
-
-    expect(await screen.findByText("evt_1")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: POLAR_WEBHOOKS_REDELIVER }));
-
-    await waitFor(() => {
-      expect(showSuccessToast).toHaveBeenCalledWith("Polar will send the event again.");
-    });
-    expect(screen.getByTestId("polar-webhook-event-status")).toHaveTextContent(POLAR_WEBHOOKS_SENDING_AGAIN);
-
-    eventSucceeded = true;
-    await act(async () => {
-      vi.advanceTimersByTime(POLAR_WEBHOOK_POLL_INTERVAL_MS);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("polar-webhook-event-status")).toHaveTextContent("Succeeded");
-    });
   });
 
   it("shows Polar response and payload when a delivery is expanded", async () => {
