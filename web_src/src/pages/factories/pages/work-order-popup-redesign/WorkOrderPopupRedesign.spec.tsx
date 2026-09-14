@@ -278,6 +278,18 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
+    expect(waitingNote).toHaveAttribute("data-variant", "pull-request");
+    const request = within(dialog).queryByTestId("split-run-intent-request");
+    if (request) {
+      expect(within(request).getByTestId("split-run-attention-note")).toBe(waitingNote);
+      expect(
+        within(within(dialog).getByTestId("split-run-intent-result")).queryByTestId("split-run-attention-note"),
+      ).toBeNull();
+    } else {
+      const sidebar = within(dialog).getByTestId("split-run-overview-sidebar");
+      expect(sidebar).toContainElement(waitingNote);
+      expect(within(dialog).getByTestId("split-run-work-order-tab").firstElementChild).toBe(sidebar);
+    }
     expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
     expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();

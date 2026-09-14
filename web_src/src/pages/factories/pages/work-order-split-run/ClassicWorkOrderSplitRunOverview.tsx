@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
@@ -31,9 +33,10 @@ type ClassicWorkOrderSplitRunOverviewProps = {
   source?: SplitRunSource;
   files?: FilesFile[];
   sessionLookupError?: string;
+  resultFooter?: ReactNode;
 };
 
-/** The task details shown when live refinement is not active. */
+/** The task details shown when live refinement is not active. Context sits on the left. */
 export function ClassicWorkOrderSplitRunOverview({
   description,
   artifacts,
@@ -54,10 +57,39 @@ export function ClassicWorkOrderSplitRunOverview({
   source,
   files,
   sessionLookupError,
+  resultFooter,
 }: ClassicWorkOrderSplitRunOverviewProps) {
   return (
     <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
-      <div className="flex min-h-0 flex-col border-b border-border md:border-r md:border-b-0">
+      <aside
+        className="flex min-h-0 flex-col overflow-hidden border-b border-border md:border-r md:border-b-0"
+        data-testid="split-run-overview-sidebar"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div className="flex flex-col gap-6">
+            <section aria-label="Source">
+              <SidebarSectionHeading>Source</SidebarSectionHeading>
+              {source ? (
+                <WorkOrderSplitRunSource source={source} />
+              ) : (
+                <p className="mt-2 text-[13px] text-muted-foreground">No source yet.</p>
+              )}
+            </section>
+            <WorkOrderArtifactsList
+              artifacts={classicSplitRunLinkedArtifacts(artifacts, source)}
+              isLoading={artifactsLoading}
+            />
+            <WorkOrderPullRequestsList
+              pullRequests={pullRequests}
+              isLoading={pullRequestsLoading}
+              error={pullRequestsError}
+            />
+          </div>
+        </div>
+        {resultFooter}
+      </aside>
+
+      <div className="flex min-h-0 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           {sessionLookupError ? (
             <p className="mb-4 text-[13px] text-destructive" role="alert">
@@ -96,28 +128,6 @@ export function ClassicWorkOrderSplitRunOverview({
           ) : null}
         </div>
       </div>
-
-      <aside className="min-h-0 overflow-y-auto px-6 py-6" data-testid="split-run-overview-sidebar">
-        <div className="flex flex-col gap-6">
-          <section aria-label="Source">
-            <SidebarSectionHeading>Source</SidebarSectionHeading>
-            {source ? (
-              <WorkOrderSplitRunSource source={source} />
-            ) : (
-              <p className="mt-2 text-[13px] text-muted-foreground">No source yet.</p>
-            )}
-          </section>
-          <WorkOrderArtifactsList
-            artifacts={classicSplitRunLinkedArtifacts(artifacts, source)}
-            isLoading={artifactsLoading}
-          />
-          <WorkOrderPullRequestsList
-            pullRequests={pullRequests}
-            isLoading={pullRequestsLoading}
-            error={pullRequestsError}
-          />
-        </div>
-      </aside>
     </div>
   );
 }

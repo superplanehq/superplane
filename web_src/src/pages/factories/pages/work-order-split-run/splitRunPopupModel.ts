@@ -27,9 +27,9 @@ export function refinePopupShowsAutomations(args: {
   return !(args.mode === "analysis" && args.footerKind === "draft");
 }
 
-/** Classic Description uses a 3/2 reading-to-side split. */
+/** Classic Description uses a 2/3 context-to-reading split. */
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
-  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
+  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]";
 
 /** Task popup size. Wider than the default overlay so Summary and Plan have room. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
