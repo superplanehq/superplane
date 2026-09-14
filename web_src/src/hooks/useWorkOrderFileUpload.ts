@@ -87,13 +87,15 @@ async function uploadOneWorkOrderFile(
             body: { filename: file.name, contentType: file.type },
           }),
         );
-    const id = created.data?.file?.id;
-    if (!id) {
+    const createdFile = created.data?.file;
+    const id = createdFile?.id;
+    const uploadUrl = createdFile?.uploadUrl;
+    if (!id || !uploadUrl) {
       showErrorToast("The file could not be stored.");
       return null;
     }
 
-    const response = await fetch(`/api/v1/files/${id}/content`, {
+    const response = await fetch(uploadUrl, {
       method: "PUT",
       credentials: "include",
       headers: {
