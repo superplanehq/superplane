@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -41,13 +42,11 @@ func (s *RolesSteps) fillInCreateRoleForm(name string) {
 	nameInput := q.Locator(`input[placeholder="Enter role name"]`)
 
 	s.session.FillIn(nameInput, name)
-	s.session.Sleep(300)
 }
 
 func (s *RolesSteps) selectAllOrganizationPermissions() {
 	selectAllButtons := q.Locator(`button:has-text("Select all")`)
 	s.session.Click(selectAllButtons)
-	s.session.Sleep(300)
 }
 
 func (s *RolesSteps) submitRoleForm() {
@@ -55,19 +54,21 @@ func (s *RolesSteps) submitRoleForm() {
 
 	s.session.ScrollToTheBottomOfPage()
 	s.session.Click(createButton)
-	s.session.Sleep(1500)
+	s.session.WaitUntilURLDoesNotContain("/create-role")
 }
 
 func (s *RolesSteps) assertRoleSavedInDB(displayName string) {
-	var metadata []models.RoleMetadata
-	err := database.Conn().Where("domain_type = ? AND domain_id = ?", models.DomainTypeOrganization, s.session.OrgID.String()).Find(&metadata).Error
-	require.NoError(s.t, err)
-
-	for _, m := range metadata {
-		if m.DisplayName == displayName {
-			return
+	require.Eventually(s.t, func() bool {
+		var metadata []models.RoleMetadata
+		err := database.Conn().Where("domain_type = ? AND domain_id = ?", models.DomainTypeOrganization, s.session.OrgID.String()).Find(&metadata).Error
+		if err != nil {
+			return false
 		}
-	}
-
-	require.Fail(s.t, "role metadata not found for display name %q", displayName)
+		for _, m := range metadata {
+			if m.DisplayName == displayName {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 200*time.Millisecond, "role %q was not saved", displayName)
 }

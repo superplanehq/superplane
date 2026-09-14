@@ -68,17 +68,23 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 }
 
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.session.Sleep(500)
+	require.Eventually(s.t, func() bool {
+		val, exists, found := s.getExpressionField()
+		return found && exists && val == ""
+	}, 15*time.Second, 200*time.Millisecond, "cleared expression was not saved")
 }
 
 func (s *settingsAutoSaveSteps) switchToInfoTab() {
 	s.session.Click(q.Text("Info"))
-	s.session.Sleep(500)
+	s.session.WaitUntil(func() bool {
+		visible, err := q.TestID("expression-field-expression").Run(s.session).IsVisible()
+		return err == nil && !visible
+	}, "configuration tab did not hide")
 }
 
 func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(500)
+	s.session.WaitForEnabled(q.TestID("expression-field-expression"))
 }
 
 func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, expected string) {

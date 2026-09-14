@@ -235,13 +235,14 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop
 
 func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {
 	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(200)
-
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+	require.Eventually(s.t, func() bool {
+		count, err := typeSelects.Count()
+		return err == nil && count >= 2
+	}, 10*time.Second, 100*time.Millisecond)
 	s.session.Click(q.Locator(`[data-testid="field-type-select"]`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Any one")`))
 
@@ -255,13 +256,10 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 		s.t.Fatalf("opening user select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
 	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
@@ -270,13 +268,10 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
-
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
 	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
@@ -285,28 +280,26 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
-
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
 	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(400)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(400)
 
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+	require.Eventually(s.t, func() bool {
+		count, err := typeSelects.Count()
+		return err == nil && count >= 3
+	}, 10*time.Second, 100*time.Millisecond)
 
 	// Set type and value per approver so autosave does not persist type=user with an empty user field.
 	if err := typeSelects.Nth(0).Click(); err != nil {
 		s.t.Fatalf("clicking first approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
-	s.session.Sleep(200)
 	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
 	if err := userSelect.Click(); err != nil {
 		s.t.Fatalf("opening user select: %v", err)
@@ -317,7 +310,6 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 		s.t.Fatalf("clicking second approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
-	s.session.Sleep(200)
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
@@ -325,12 +317,20 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 		s.t.Fatalf("clicking third approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
-	s.session.Sleep(200)
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
+	s.waitForDraftApproverCount(nodeName, 3)
+}
 
-	// Configuration sidebar autosaves on a 1200ms safety-net timer for scripted flows.
-	s.session.Sleep(1500)
+func (s *ApprovalSteps) waitForDraftApproverCount(nodeName string, n int) {
+	require.Eventually(s.t, func() bool {
+		node, ok := s.canvas.DraftNodeByName(nodeName)
+		if !ok {
+			return false
+		}
+		items, ok := node.Configuration["items"].([]any)
+		return ok && len(items) >= n
+	}, 15*time.Second, 200*time.Millisecond, "approval %s did not save %d approvers", nodeName, n)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
@@ -349,11 +349,10 @@ func (s *ApprovalSteps) waitForApprovalExecutionToBeWaiting() {
 func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		executions := s.canvas.GetExecutionsForNode("Approval")
-		if len(executions) > 0 {
+		if len(s.canvas.GetExecutionsForNode("Approval")) > 0 {
 			return true
 		}
-		s.session.Sleep(500)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	return false
@@ -387,9 +386,9 @@ func (s *ApprovalSteps) deleteNodeFromCanvas(nodeName string) {
 	)
 
 	s.session.HoverOver(nodeHeader)
-	s.session.Sleep(100)
+	s.session.AssertVisible(deleteButton)
 	s.session.Click(deleteButton)
-	s.session.Sleep(300)
+	s.session.AssertHidden(nodeHeader)
 }
 
 func (s *ApprovalSteps) assertApprovalNodeDeletedFromDB() {
@@ -466,26 +465,26 @@ func (s *ApprovalSteps) approveAnyoneRequirement() {
 }
 
 func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount int, pendingCount int, approvedType string) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < 5*time.Second {
+	require.Eventually(s.t, func() bool {
 		executions := s.canvas.GetExecutionsForNode(nodeName)
 		if len(executions) == 0 {
-			s.session.Sleep(500)
-			continue
+			return false
 		}
 
 		metadata := executions[0].Metadata.Data()
 		rawRecords, ok := metadata["records"].([]any)
-		require.True(s.t, ok, "expected approval records metadata")
+		if !ok {
+			return false
+		}
 
 		approved := 0
 		pending := 0
 		approvedTypeMatch := false
 		for _, rawRecord := range rawRecords {
 			record, ok := rawRecord.(map[string]any)
-			require.True(s.t, ok, "expected approval record metadata")
+			if !ok {
+				return false
+			}
 			state, _ := record["state"].(string)
 			recordType, _ := record["type"].(string)
 			switch state {
@@ -499,15 +498,8 @@ func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount i
 			}
 		}
 
-		if approved == approvedCount && pending == pendingCount && approvedTypeMatch {
-			found = true
-			break
-		}
-
-		s.session.Sleep(500)
-	}
-
-	require.True(s.t, found, "timed out waiting for approval metadata to update")
+		return approved == approvedCount && pending == pendingCount && approvedTypeMatch
+	}, 15*time.Second, 200*time.Millisecond, "timed out waiting for approval metadata to update")
 }
 
 func (s *ApprovalSteps) assertNoApproveButtons() {
