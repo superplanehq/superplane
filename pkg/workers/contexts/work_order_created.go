@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -22,12 +23,26 @@ func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order); err != nil {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
 }
 
-func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) error {
+func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
+		return nil
+	}
+	refinementEnabled := true
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
+}
+
+func emitWorkOrderCreated(
+	tx *gorm.DB,
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	onlyCanvas uuid.UUID,
+	refinementEnabledOverride *bool,
+) error {
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
 		return err
@@ -51,10 +66,13 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return err
 	}
 
-	payload := workOrderCreatedPayload(tx, order)
+	payload := workOrderCreatedPayloadWithRefinement(tx, order, refinementEnabledOverride)
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
+		if onlyCanvas != uuid.Nil && live[i].ID != onlyCanvas {
+			continue
+		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
 			continue
@@ -87,6 +105,14 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 }
 
 func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
+	return workOrderCreatedPayloadWithRefinement(tx, order, nil)
+}
+
+func workOrderCreatedPayloadWithRefinement(
+	tx *gorm.DB,
+	order *models.FactoryWorkOrder,
+	refinementEnabledOverride *bool,
+) map[string]any {
 	description := order.Description
 	filePayloads := []any{}
 	markdown, files, err := storedfiles.DescriptionForDispatch(
@@ -129,7 +155,23 @@ func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[st
 		workOrder["origin"] = origin
 	}
 
-	return map[string]any{"workOrder": workOrder}
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	return map[string]any{
+		"workOrder": workOrder,
+		models.WorkOrderCreatedRefinementEnabledDataKey: refinementEnabled,
+	}
+}
+
+func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) bool {
+	organization, err := models.FindOrganizationByIDInTransaction(tx, order.OrganizationID.String())
+	if err != nil {
+		log.WithError(err).Warnf("failed to snapshot task refinement feature for work order %s", order.ID)
+		return false
+	}
+	return organization.HasExperimentalFeature(features.FeatureFactoryCreateWithAgent)
 }
 
 func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {

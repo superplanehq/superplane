@@ -1,21 +1,22 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { OrganizationsCreateIntegrationResponse } from "@/api-client";
 import type * as StartDirectGitHubConnectModule from "@/lib/startDirectGitHubConnect";
 import type * as ReactRouterModule from "react-router";
+import { unmockedPackage, unmockedSrc } from "@/test/unmockedModule";
 
 import { useHostedGitHubConnect } from "./useIntegrationConnectDialog";
 
 const startDirectGitHubConnect = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 
-vi.mock("@/lib/startDirectGitHubConnect", async (importOriginal) => {
-  const actual = await importOriginal<typeof StartDirectGitHubConnectModule>();
+vi.mock("@/lib/startDirectGitHubConnect", () => {
+  const actual = unmockedSrc<typeof StartDirectGitHubConnectModule>("lib/startDirectGitHubConnect");
   return { ...actual, startDirectGitHubConnect };
 });
 
-vi.mock("react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouterModule>();
+vi.mock("react-router", () => {
+  const actual = unmockedPackage<typeof ReactRouterModule>("react-router/dist/development/index.js");
   return { ...actual, useNavigate: () => vi.fn() };
 });
 

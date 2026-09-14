@@ -1,4 +1,4 @@
-export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "failed";
+export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "passed" | "failed";
 
 export type CreateWithAgentCreatedOrder = {
   id: string;

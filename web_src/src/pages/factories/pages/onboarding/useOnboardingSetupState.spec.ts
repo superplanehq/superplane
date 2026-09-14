@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";

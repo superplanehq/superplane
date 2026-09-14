@@ -389,8 +389,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	}).Methods("GET")
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
-	s.Router.HandleFunc("/api/v1/runner/planning-sessions/drafts", s.handleRunnerPlanningDraft).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -736,6 +738,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
+	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
+	adminRoute.HandleFunc("/price-books/sync", s.adminSyncPriceBooks).Methods("POST")
+	adminRoute.HandleFunc("/price-books/current", s.adminActivatePriceBook).Methods("PUT")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")

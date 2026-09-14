@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -129,6 +129,7 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
+	@$(MAKE) ensure.bun
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
@@ -219,10 +220,13 @@ check.build.ui:
 check.build.storybook:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
 
-check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+ensure.bun:
+	$(COMPOSE) exec app bash -lc 'command -v bun >/dev/null || bash /app/scripts/docker/install-bun.sh'
 
-check.test.ui.shard:
+check.test.ui: ensure.bun
+	$(COMPOSE) exec app bash -lc "cd /app/web_src && bun test --isolate $(FILES)"
+
+check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
@@ -311,6 +315,21 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+
+# Local only. Writes this worktree's superplane_dev to
+# .local/superplane_dev.dump so a later restore can skip owner setup
+# and GitHub connection. Postgres in this stack is db:5432.
+# The dump is gitignored.
+db.snapshot:
+	@$(COMPOSE) exec app ./scripts/db_snapshot.sh superplane_dev
+
+# Local only. Replaces this worktree's superplane_dev from
+# .local/superplane_dev.dump, then applies pending migrations. Use this
+# to create a new local environment without owner setup or GitHub
+# connection. It does not touch superplane_test. Restart make
+# dev.server after restore if it is already running.
+db.restore:
+	@$(COMPOSE) exec app ./scripts/db_restore.sh superplane_dev
 
 # Local only. Puts every org on a 14-day trial, clears Polar ids, and
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox

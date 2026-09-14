@@ -60,6 +60,25 @@ export const HOSTED_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
   machineTypes: ["e1-standard-amd64"],
 };
 
+export const SUB_CENT_VM_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
+  ...HOSTED_USAGE_HISTORY_ROW,
+  workOrderExecutionId: "exec-usage-analysis",
+  workOrderKey: "SUPER-199",
+  workOrderNumber: "199",
+  title: "Score the intake",
+  totalTokens: "177800",
+  durationSeconds: "45",
+  costCents: "18",
+  hostedCostCents: "18",
+  byokCostCents: "0",
+  costMicros: "183150",
+  hostedCostMicros: "180000",
+  byokCostMicros: "0",
+  models: ["openrouter/x-ai/grok-4.6"],
+  byokModels: [],
+  machineTypes: ["e1-large-amd64"],
+};
+
 export const DEFAULT_USAGE_HISTORY_ROWS: FactoriesWorkOrderRunUsageRow[] = [
   BYOK_USAGE_HISTORY_ROW,
   HOSTED_USAGE_HISTORY_ROW,

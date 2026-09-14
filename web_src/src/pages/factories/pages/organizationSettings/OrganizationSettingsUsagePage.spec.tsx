@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
@@ -11,7 +11,11 @@ import {
   PRIMARY_FACTORY_KEY,
   defaultFactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
-import { DEFAULT_USAGE_HISTORY_ROWS, usageHistoryRows } from "../../__fixtures__/usageHistoryFixtures";
+import {
+  DEFAULT_USAGE_HISTORY_ROWS,
+  SUB_CENT_VM_USAGE_HISTORY_ROW,
+  usageHistoryRows,
+} from "../../__fixtures__/usageHistoryFixtures";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 describe("OrganizationSettingsUsagePage", () => {
@@ -76,6 +80,25 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[2]).toHaveTextContent("Large x64");
     expect(rows[2]).toHaveTextContent("$1.23");
     expect(rows[2]).toHaveTextContent("$0.17");
+  }, 10000);
+
+  it("shows VM price below one cent", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          usageHistoryByFactoryId: { [PRIMARY_FACTORY_ID]: [SUB_CENT_VM_USAGE_HISTORY_ROW] },
+        }}
+      />,
+    );
+
+    const row = await screen.findByTestId("organization-usage-row", {}, { timeout: 8000 });
+    expect(row).toHaveTextContent("SUPER-199");
+    expect(row).toHaveTextContent("45 s");
+    expect(row).toHaveTextContent("Large x64");
+    expect(row).toHaveTextContent("$0.18");
+    expect(row).toHaveTextContent("$0.00315");
   }, 10000);
 
   it("shows an empty state when the period has no task spend", async () => {
