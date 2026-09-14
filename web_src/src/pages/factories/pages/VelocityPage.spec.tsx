@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { PEOPLE_FIRST_PAGE_SIZE, PEOPLE_LOAD_MORE_SIZE, peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
+import { VELOCITY_TIME_COLORS } from "../lib/velocitySeriesColors";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { VelocityPage } from "./VelocityPage";
 
@@ -160,6 +161,18 @@ function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
       </TooltipProvider>
     </QueryClientProvider>,
   );
+}
+
+function metricCell(container: HTMLElement, label: string): HTMLElement {
+  const cell = within(container).getByText(label).closest("div.min-w-0");
+  if (!(cell instanceof HTMLElement)) {
+    throw new Error(`No metric cell for ${label}`);
+  }
+  return cell;
+}
+
+function metricColorDot(cell: HTMLElement): HTMLElement | null {
+  return cell.querySelector("span[aria-hidden]");
 }
 
 function resetState() {
@@ -609,9 +622,18 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     const taskTime = screen.getByTestId("velocity-task-time");
-    expect(taskTime).toHaveTextContent("Cycle time");
-    expect(taskTime).toHaveTextContent("Time running");
-    expect(taskTime).toHaveTextContent("Time in Waiting");
+    const cycle = metricCell(taskTime, "Cycle time");
+    const running = metricCell(taskTime, "Time running");
+    const waiting = metricCell(taskTime, "Time in Waiting");
+
+    expect(cycle.parentElement).toHaveClass("lg:grid-cols-3");
+    expect(within(cycle).getByText("14h")).toHaveClass("text-[30px]");
+    expect(within(running).getByText("8h")).toHaveClass("text-[30px]");
+    expect(within(waiting).getByText("6h")).toHaveClass("text-[30px]");
+    expect(cycle).toHaveTextContent("From 1 task closed in this period");
+    expect(metricColorDot(cycle)).toBeNull();
+    expect(metricColorDot(running)).toHaveStyle({ backgroundColor: VELOCITY_TIME_COLORS.running });
+    expect(metricColorDot(waiting)).toHaveStyle({ backgroundColor: VELOCITY_TIME_COLORS.waiting });
   });
 
   it("reports tracked spend split between tokens and compute", () => {
