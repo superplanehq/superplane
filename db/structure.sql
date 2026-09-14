@@ -467,7 +467,7 @@ CREATE TABLE public.factory_planning_sessions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     factory_id uuid NOT NULL,
-    created_by_user_id uuid NOT NULL,
+    created_by_user_id uuid,
     repository text NOT NULL,
     state text NOT NULL,
     canvas_id uuid,
@@ -488,7 +488,8 @@ CREATE TABLE public.factory_planning_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     selectable_model_key text DEFAULT ''::text NOT NULL,
     kind text NOT NULL,
-    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text])))
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text]))),
+    CONSTRAINT factory_planning_sessions_task_creation_creator_check CHECK (((kind <> 'task_creation'::text) OR (created_by_user_id IS NOT NULL)))
 );
 
 
@@ -4428,7 +4429,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260914072615	f
+20260914143216	f
 \.
 
 

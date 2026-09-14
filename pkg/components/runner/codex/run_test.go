@@ -123,6 +123,18 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
+func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+	args := codexExecArgsFromScriptWithPrompt(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, "gpt-5", "/task/planning_session_mcp.js", "", string(protocol)+"\n\nTask:\nFix retries.")
+
+	assert.Contains(t, strings.Join(args, " "), "developer_instructions")
+	assert.Contains(t, strings.Join(args, " "), strings.Split(string(protocol), "\n")[0])
+}
+
 func TestPlanningEnabledFromScript(t *testing.T) {
 	assert.True(t, planningEnabledFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -217,6 +229,14 @@ func codexExecArgsFromScriptWithSession(
 	env map[string]string,
 	model, mcpScriptPath, sessionID string,
 ) []string {
+	return codexExecArgsFromScriptWithPrompt(t, env, model, mcpScriptPath, sessionID, "")
+}
+
+func codexExecArgsFromScriptWithPrompt(
+	t *testing.T,
+	env map[string]string,
+	model, mcpScriptPath, sessionID, prompt string,
+) []string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
@@ -225,12 +245,13 @@ func codexExecArgsFromScriptWithSession(
 	cmd := exec.Command(
 		"node",
 		"-e",
-		`const { codexExecArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexExecArgs(JSON.parse(process.argv[2]), process.argv[3], process.argv[4], process.argv[5])));`,
+		`const { codexExecArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexExecArgs(JSON.parse(process.argv[2]), process.argv[3], process.argv[4], process.argv[5], process.argv[6])));`,
 		script,
 		string(envPayload),
 		model,
 		mcpScriptPath,
 		sessionID,
+		prompt,
 	)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))

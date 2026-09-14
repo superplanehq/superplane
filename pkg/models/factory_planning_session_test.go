@@ -30,7 +30,7 @@ func TestFactory_StartPlanningSession(t *testing.T) {
 	assert.Equal(t, "acme/payments", session.Repository)
 	assert.Equal(t, canvas.ID, *session.CanvasID)
 	require.NotNil(t, session.CanvasRunID)
-	assert.Equal(t, userID, session.CreatedByUserID)
+	assert.Equal(t, userID, *session.CreatedByUserID)
 	assert.Empty(t, session.Messages)
 
 	var run CanvasRun
@@ -52,6 +52,32 @@ func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 		Entrypoint:      entrypoint,
 	})
 	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+}
+
+func TestFactory_StartPlanningSession_RequiresCreator(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-creator")
+	db := database.DB(t.Context())
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+
+	_, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		Repository: "acme/payments",
+		CanvasID:   canvas.ID,
+		Entrypoint: entrypoint,
+	})
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+
+	err = db.Create(&FactoryPlanningSession{
+		ID:             uuid.New(),
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		Repository:     "acme/payments",
+		Kind:           PlanningSessionKindTaskCreation,
+		State:          PlanningSessionStateRunning,
+		HeartbeatAt:    time.Now(),
+	}).Error
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "factory_planning_sessions_task_creation_creator_check")
 }
 
 func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
@@ -242,7 +268,7 @@ func TestFactoryPlanningSession_CreateDraftBeforeWaitIsKept(t *testing.T) {
 		Title:       "Retry refunds",
 		Description: "Stop double charges.",
 	}))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 	assert.Equal(t, PlanningWaitKindCreated, session.Wait().Kind)
 	assert.Equal(t, order.ID.String(), session.Wait().WorkOrderID)
@@ -368,7 +394,7 @@ func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
 	}))
 	require.NoError(t, session.BeginWait(db))
 
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 	assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
 	assert.Equal(t, "Retry refunds", order.Title)
@@ -392,7 +418,7 @@ func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
 		Description: "Stop double charges.",
 	}))
 	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 	_, err = session.ConsumeWait(db)
 	require.NoError(t, err)
@@ -444,7 +470,7 @@ func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *test
 		Description: "Stop double charges.",
 	}))
 	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 
 	require.NoError(t, session.BeginWait(db))
@@ -462,7 +488,7 @@ func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *test
 	}))
 	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
 
-	updated, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	updated, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 	assert.Equal(t, order.ID, updated.ID)
 	assert.Equal(t, "Retry refunds once", updated.Title)
@@ -484,7 +510,7 @@ func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
 		Description: "Stop double charges.",
 	}))
 	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 
 	require.NoError(t, session.BeginWait(db))
@@ -517,7 +543,7 @@ func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdates
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", session.CreatedByUserID, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, session.BeginWait(db))
@@ -536,7 +562,7 @@ func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdates
 	}))
 	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
 
-	updated, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	updated, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
 	require.NoError(t, err)
 	assert.Equal(t, order.ID, updated.ID)
 	assert.Equal(t, "Retry refunds once", updated.Title)
@@ -553,11 +579,11 @@ func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", session.CreatedByUserID, nil, nil)
 	require.NoError(t, err)
 	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 		ToState: FactoryWorkOrderStateOpen,
-		Actor:   &session.CreatedByUserID,
+		Actor:   session.CreatedByUserID,
 	})
 	require.NoError(t, err)
 

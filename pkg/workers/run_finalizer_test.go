@@ -1328,7 +1328,7 @@ func attachPlanningSessionToRun(t *testing.T, r *support.ResourceRegistry, canva
 		ID:              uuid.New(),
 		OrganizationID:  r.Organization.ID,
 		FactoryID:       factoryModel.ID,
-		CreatedByUserID: r.User,
+		CreatedByUserID: &r.User,
 		Repository:      "acme/payments",
 		Kind:            models.PlanningSessionKindTaskCreation,
 		State:           models.PlanningSessionStateRunning,

@@ -36,6 +36,14 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
 function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
   if (!planningAnalysisEnabled(env)) {
     return prompt;
@@ -278,10 +286,11 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
-  if (planningAnalysisEnabled(env) && taskDir) {
+  const protocol = planningSystemPrompt(env);
+  if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
     try {
-      fs.writeFileSync(protocolPath, `${loadAnalysisProtocol()}\n`);
+      fs.writeFileSync(protocolPath, `${protocol}\n`);
     } catch (_err) {
       // Tests pass a fake task dir. The runner writes this file when the dir exists.
     }
@@ -350,6 +359,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
   let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
+  if (planningAnalysisEnabled(env)) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;

@@ -39,11 +39,10 @@ type analysisMessageWindow struct {
 }
 
 type AttachAnalysisSessionParams struct {
-	CreatedByUserID uuid.UUID
-	Repository      string
-	CanvasID        uuid.UUID
-	CanvasRunID     uuid.UUID
-	WorkOrderID     uuid.UUID
+	Repository  string
+	CanvasID    uuid.UUID
+	CanvasRunID uuid.UUID
+	WorkOrderID uuid.UUID
 }
 
 func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessionParams) (*FactoryPlanningSession, error) {
@@ -97,7 +96,6 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		ID:               uuid.New(),
 		OrganizationID:   f.OrganizationID,
 		FactoryID:        f.ID,
-		CreatedByUserID:  params.CreatedByUserID,
 		Repository:       strings.TrimSpace(params.Repository),
 		Kind:             PlanningSessionKindWorkOrderAnalysis,
 		State:            PlanningSessionStateRunning,
@@ -470,9 +468,6 @@ func MaybeAttachAnalysisSession(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	if order.State != FactoryWorkOrderStateDraft {
 		return nil
 	}
-	if order.CreatedByID == nil || *order.CreatedByID == uuid.Nil {
-		return nil
-	}
 	repository := created.Repository
 	if repository == "" && order.Repository != nil {
 		repository = strings.TrimSpace(*order.Repository)
@@ -481,11 +476,10 @@ func MaybeAttachAnalysisSession(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 		repository = strings.TrimSpace(factoryModel.OnboardingConfigValue().AppRepository)
 	}
 	_, err = factoryModel.AttachAnalysisSession(tx, AttachAnalysisSessionParams{
-		CreatedByUserID: *order.CreatedByID,
-		Repository:      repository,
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  repository,
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	return err
 }

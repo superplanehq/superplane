@@ -71,6 +71,16 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Empty(t, unknown)
 }
 
+func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+
+	analysis := planningSystemPromptFromScriptWithPrompt(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, string(protocol)+"\n\nTask:\nFix retries.")
+	assert.Equal(t, " "+strings.TrimSpace(string(protocol)), analysis)
+}
+
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{})
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
@@ -422,12 +432,16 @@ func claudeContinuationArgsFromScript(t *testing.T, promptCount int, sessionID s
 }
 
 func planningSystemPromptFromScript(t *testing.T, env map[string]string) string {
+	return planningSystemPromptFromScriptWithPrompt(t, env, "")
+}
+
+func planningSystemPromptFromScriptWithPrompt(t *testing.T, env map[string]string, prompt string) string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
 	payload, err := json.Marshal(env)
 	require.NoError(t, err)
-	cmd := exec.Command("node", "-e", `const { planningSystemPrompt } = require(process.argv[1]); process.stdout.write(planningSystemPrompt(JSON.parse(process.argv[2])));`, script, string(payload))
+	cmd := exec.Command("node", "-e", `const { planningSystemPrompt } = require(process.argv[1]); process.stdout.write(planningSystemPrompt(JSON.parse(process.argv[2]), process.argv[3]));`, script, string(payload), prompt)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)

@@ -1,5 +1,13 @@
 package models
 
+import (
+	"fmt"
+	"maps"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
 const (
 	FactoryAppTemplateMetadataKey = "factoryTemplate"
 	FactoryAppTemplateBacklogID   = "backlog"
@@ -30,21 +38,82 @@ func FactoryAppTemplateID(nodes []Node) string {
 	return ""
 }
 
-func IsBacklogFactoryApp(nodes []Node, edges []Edge) bool {
+func IsBacklogFactoryApp(nodes []Node, _ []Edge) bool {
 	if FactoryAppTemplateID(nodes) == FactoryAppTemplateBacklogID {
 		return true
 	}
 
-	if len(nodes) != 5 || len(edges) != 4 {
+	legacyNodeIDs := map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"analyze":                  true,
+		"report-confidence":        true,
+		"attach-intent":            true,
+		"add-run-error":            true,
+	}
+	if matchesBacklogIdentity(nodes, legacyNodeIDs) {
+		return true
+	}
+
+	versionTwoNodeIDs := map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"task-refinement-enabled":  true,
+		"analyze":                  true,
+		"refine-task":              true,
+		"report-confidence":        true,
+		"attach-intent":            true,
+		"add-run-error":            true,
+	}
+	return matchesBacklogIdentity(nodes, versionTwoNodeIDs)
+}
+
+// StampFactoryAppTemplate records template identity in the live version and
+// its normalized trigger node. Canvas changesets keep component metadata
+// private, so generated templates stamp this server-owned key after publish.
+func (c *Canvas) StampFactoryAppTemplate(tx *gorm.DB, triggerNodeID, templateID string, version int) error {
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, c.ID)
+	if err != nil {
+		return err
+	}
+
+	metadata := FactoryAppTemplateMetadata(templateID, version)
+	found := false
+	for i := range liveVersion.Nodes {
+		if liveVersion.Nodes[i].ID != triggerNodeID {
+			continue
+		}
+		found = true
+		liveVersion.Nodes[i].Metadata = maps.Clone(liveVersion.Nodes[i].Metadata)
+		if liveVersion.Nodes[i].Metadata == nil {
+			liveVersion.Nodes[i].Metadata = map[string]any{}
+		}
+		maps.Copy(liveVersion.Nodes[i].Metadata, metadata)
+		break
+	}
+	if !found {
+		return fmt.Errorf("template trigger node %s not found", triggerNodeID)
+	}
+
+	activeNode, err := FindCanvasNode(tx, c.ID, triggerNodeID)
+	if err != nil {
+		return err
+	}
+	activeMetadata := maps.Clone(activeNode.Metadata.Data())
+	if activeMetadata == nil {
+		activeMetadata = map[string]any{}
+	}
+	maps.Copy(activeMetadata, metadata)
+	if err := tx.Model(activeNode).Update("metadata", activeMetadata).Error; err != nil {
+		return err
+	}
+
+	return tx.Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(liveVersion.Nodes)).Error
+}
+
+func matchesBacklogIdentity(nodes []Node, requiredNodeIDs map[string]bool) bool {
+	if len(nodes) != len(requiredNodeIDs) {
 		return false
 	}
-	requiredNodes := map[string]string{
-		FactoryAppBacklogTriggerID: "onWorkOrder",
-		"analyze":                  "",
-		"report-confidence":        "reportWorkOrderCheck",
-		"attach-intent":            "addWorkOrderArtifact",
-		"add-run-error":            "addRunError",
-	}
+
 	analysisComponents := map[string]bool{
 		SuperPlaneRunnerComponent: true,
 		"runnerClaudeCode":        true,
@@ -52,29 +121,16 @@ func IsBacklogFactoryApp(nodes []Node, edges []Edge) bool {
 		"runnerOpenRouter":        true,
 	}
 	for _, node := range nodes {
-		expectedComponent, ok := requiredNodes[node.ID]
-		if !ok {
+		if !requiredNodeIDs[node.ID] {
 			return false
 		}
-		if node.ID == "analyze" {
+		if node.ID == "analyze" || node.ID == "refine-task" {
 			if !analysisComponents[node.ComponentName()] {
 				return false
 			}
 			continue
 		}
-		if node.ComponentName() != expectedComponent {
-			return false
-		}
-	}
-
-	requiredEdges := map[Edge]bool{
-		{SourceID: FactoryAppBacklogTriggerID, TargetID: "analyze", Channel: "default"}: true,
-		{SourceID: "analyze", TargetID: "report-confidence", Channel: "passed"}:         true,
-		{SourceID: "analyze", TargetID: "attach-intent", Channel: "passed"}:             true,
-		{SourceID: "analyze", TargetID: "add-run-error", Channel: "failed"}:             true,
-	}
-	for _, edge := range edges {
-		if !requiredEdges[edge] {
+		if node.ID == FactoryAppBacklogTriggerID && node.ComponentName() != "onWorkOrder" {
 			return false
 		}
 	}
