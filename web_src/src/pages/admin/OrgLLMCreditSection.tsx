@@ -41,6 +41,46 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
   );
 }
 
+function OrgBillingPlanField(args: {
+  polarManaged: boolean;
+  planKnown: boolean;
+  planValue: string;
+  setPlanValue: (value: string) => void;
+  savingPlan: boolean;
+  savePlan: () => void;
+}) {
+  const planLocked = !args.planKnown || args.polarManaged;
+  return (
+    <div className="mb-4 max-w-sm">
+      <Label className="mb-2 block text-left">Billing plan</Label>
+      <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
+        <SelectTrigger data-testid="admin-org-billing-plan">
+          <SelectValue placeholder="Select a plan" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="trial">Trial</SelectItem>
+          <SelectItem value="business">Business</SelectItem>
+          <SelectItem value="none">None</SelectItem>
+        </SelectContent>
+      </Select>
+      <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {billingPlanHelp(args.planKnown, args.polarManaged)}
+      </Text>
+      {planLocked ? null : (
+        <Button
+          type="button"
+          className="mt-3"
+          data-testid="admin-org-billing-plan-save"
+          onClick={args.savePlan}
+          disabled={args.savingPlan}
+        >
+          {args.savingPlan ? "Saving..." : "Save plan"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
   if (!planKnown) {
     return ADMIN_PLAN_UNKNOWN_COPY;
@@ -70,36 +110,16 @@ function OrgHostedCreditCard(args: {
   saveMarkup: () => void;
   savePlan: () => void;
 }) {
-  const planLocked = !args.planKnown || args.polarManaged;
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
-      <div className="mb-4 max-w-sm">
-        <Label className="mb-2 block text-left">Billing plan</Label>
-        <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
-          <SelectTrigger data-testid="admin-org-billing-plan">
-            <SelectValue placeholder="Select a plan" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="trial">Trial</SelectItem>
-            <SelectItem value="business">Business</SelectItem>
-            <SelectItem value="none">None</SelectItem>
-          </SelectContent>
-        </Select>
-        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {billingPlanHelp(args.planKnown, args.polarManaged)}
-        </Text>
-        {planLocked ? null : (
-          <Button
-            type="button"
-            className="mt-3"
-            data-testid="admin-org-billing-plan-save"
-            onClick={args.savePlan}
-            disabled={args.savingPlan}
-          >
-            {args.savingPlan ? "Saving..." : "Save plan"}
-          </Button>
-        )}
-      </div>
+      <OrgBillingPlanField
+        polarManaged={args.polarManaged}
+        planKnown={args.planKnown}
+        planValue={args.planValue}
+        setPlanValue={args.setPlanValue}
+        savingPlan={args.savingPlan}
+        savePlan={args.savePlan}
+      />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <CreditMetric label="Remaining hosted credit" value={formatUsdCents(args.credit.remaining_credit_cents)} />
         <CreditMetric label="SuperPlane grant" value={formatUsdCents(args.credit.superplane_grant_cents)} />

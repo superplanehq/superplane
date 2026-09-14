@@ -51,6 +51,28 @@ async function putOrganizationBillingPlan(orgId: string, plan: string): Promise<
   return (await response.json()) as OrganizationBillingPlan;
 }
 
+async function loadOrganizationCreditState(
+  orgId: string,
+  applyCredit: (data: OrganizationLLMCredit) => void,
+  applyPlan: (plan: OrganizationBillingPlan) => void,
+  clearPlan: () => void,
+) {
+  const [creditResponse, nextPlan] = await Promise.all([
+    fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" }),
+    fetchOrganizationBillingPlan(orgId),
+  ]);
+  if (!creditResponse.ok) {
+    throw new Error(await readErrorMessage(creditResponse, "Failed to load organization credit"));
+  }
+  applyCredit(await creditResponse.json());
+  if (nextPlan) {
+    applyPlan(nextPlan);
+    return;
+  }
+  clearPlan();
+  showErrorToast("Failed to load billing plan");
+}
+
 export function useOrgLLMCredit(orgId: string) {
   const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
@@ -76,20 +98,7 @@ export function useOrgLLMCredit(orgId: string) {
   const loadCredit = useCallback(async () => {
     setLoading(true);
     try {
-      const [creditResponse, nextPlan] = await Promise.all([
-        fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" }),
-        fetchOrganizationBillingPlan(orgId),
-      ]);
-      if (!creditResponse.ok) {
-        throw new Error(await readErrorMessage(creditResponse, "Failed to load organization credit"));
-      }
-      applyCredit(await creditResponse.json());
-      if (nextPlan) {
-        applyPlan(nextPlan);
-      } else {
-        setPlan(null);
-        showErrorToast("Failed to load billing plan");
-      }
+      await loadOrganizationCreditState(orgId, applyCredit, applyPlan, () => setPlan(null));
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
     } finally {
