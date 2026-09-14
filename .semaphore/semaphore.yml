@@ -148,6 +148,23 @@ blocks:
           commands:
             - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
 
+  - name: "Build Image"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      secrets:
+        - name: github-token
+      jobs:
+        - name: Build image
+          commands:
+            - make image.build
+            - |
+              if [ "${SEMAPHORE_GIT_BRANCH}" = "main" ]; then
+                make image.auth
+                make image.push
+              fi
+
 after_pipeline:
   task:
     jobs:
