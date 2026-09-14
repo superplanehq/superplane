@@ -75,7 +75,7 @@ run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
 - Go `1.26.2` (pinned in `go.mod`; provided by the dev container).
-- Node.js + npm (provided by the dev container; used by Vite/frontend).
+- Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
 Run these three steps once, in order:

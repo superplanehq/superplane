@@ -123,7 +123,7 @@ blocks:
             - make check.build.storybook
 
         - name: Unit Tests
-          parallelism: 4
+          parallelism: 2
           commands:
             - make check.tool.configs
             - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
@@ -142,6 +142,11 @@ blocks:
           commands:
             - make check.tool.configs
             - make check.lint.ui.knip
+
+      epilogue:
+        always:
+          commands:
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
 
 after_pipeline:
   task:

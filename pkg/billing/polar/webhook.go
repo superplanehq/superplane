@@ -1,6 +1,7 @@
 package polar
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -200,9 +201,6 @@ func isSubscriptionEventType(eventType string) bool {
 }
 
 func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*ParsedWebhook, error) {
-	if _, err := decodeWebhookSecret(secret); err != nil {
-		return nil, err
-	}
 	if err := verifySignature(headers, body, secret); err != nil {
 		return nil, err
 	}
@@ -272,7 +270,23 @@ func verifySignature(headers http.Header, body []byte, secret string) error {
 	if msgID == "" || timestamp == "" || signatures == "" {
 		return ErrInvalidWebhookSignature
 	}
+	if err := verifyWebhookTimestamp(timestamp); err != nil {
+		return err
+	}
 
+	keys, err := webhookSigningKeys(secret)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if hmacSignatureMatches(key, msgID, timestamp, signatures, body) {
+			return nil
+		}
+	}
+	return ErrInvalidWebhookSignature
+}
+
+func verifyWebhookTimestamp(timestamp string) error {
 	unix, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		return ErrInvalidWebhookSignature
@@ -281,12 +295,10 @@ func verifySignature(headers http.Header, body []byte, secret string) error {
 	if time.Since(issuedAt) > signatureTolerance || time.Until(issuedAt) > signatureTolerance {
 		return ErrInvalidWebhookSignature
 	}
+	return nil
+}
 
-	key, err := decodeWebhookSecret(secret)
-	if err != nil {
-		return err
-	}
-
+func hmacSignatureMatches(key []byte, msgID, timestamp, signatures string, body []byte) bool {
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(msgID))
 	mac.Write([]byte("."))
@@ -305,18 +317,55 @@ func verifySignature(headers http.Header, body []byte, secret string) error {
 			continue
 		}
 		if hmac.Equal(expected, actual) {
-			return nil
+			return true
 		}
 	}
-	return ErrInvalidWebhookSignature
+	return false
 }
 
-func decodeWebhookSecret(secret string) ([]byte, error) {
+// Polar HMAC keys are the UTF-8 bytes of the full secret string, including
+// the prefix. Secrets generated on or after 8 September 2026 use Standard
+// Webhooks: strip the whsec_ prefix and base64-decode the remainder. Polar
+// signs with one scheme per secret. Try both so old and new secrets verify.
+func webhookSigningKeys(secret string) ([][]byte, error) {
 	trimmed := strings.TrimSpace(secret)
 	if webhookSecretMaterial(trimmed) == "" {
 		return nil, ErrWebhookSecretMissing
 	}
-	return []byte(trimmed), nil
+
+	keys := [][]byte{[]byte(trimmed)}
+	if specKey, ok := standardWebhooksKey(trimmed); ok && !bytes.Equal(specKey, keys[0]) {
+		keys = append(keys, specKey)
+	}
+	return keys, nil
+}
+
+func decodeWebhookSecret(secret string) ([]byte, error) {
+	keys, err := webhookSigningKeys(secret)
+	if err != nil {
+		return nil, err
+	}
+	return keys[0], nil
+}
+
+func standardWebhooksKey(secret string) ([]byte, bool) {
+	encoded := strings.TrimPrefix(secret, "whsec_")
+	return decodeBase64Secret(encoded)
+}
+
+func decodeBase64Secret(encoded string) ([]byte, bool) {
+	if encoded == "" {
+		return nil, false
+	}
+	padded := encoded
+	if remainder := len(encoded) % 4; remainder != 0 {
+		padded += strings.Repeat("=", 4-remainder)
+	}
+	key, err := base64.StdEncoding.DecodeString(padded)
+	if err != nil || len(key) == 0 {
+		return nil, false
+	}
+	return key, true
 }
 
 func webhookSecretMaterial(secret string) string {

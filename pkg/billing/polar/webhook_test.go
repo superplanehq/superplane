@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,18 +37,32 @@ func Test__VerifyAndParseOrderPaidUsesLiteralSecretBytes(t *testing.T) {
 	assert.Equal(t, "order_literal", event.Data.ID)
 }
 
-func Test__VerifyAndParseOrderPaidRejectsStandardWebhooksKeyDerivation(t *testing.T) {
+func Test__VerifyAndParseOrderPaidAcceptsPolarAndStandardWebhooksKeys(t *testing.T) {
 	raw := []byte("webhook-secret")
 	secret := "whsec_" + base64.StdEncoding.EncodeToString(raw)
 	body := orderPaidBody("order_encoded")
-	headers := signedHeadersWithKey("msg_encoded", body, raw)
 
-	_, err := VerifyAndParseOrderPaid(headers, body, secret)
-	require.ErrorIs(t, err, ErrInvalidWebhookSignature)
+	t.Run("standard webhooks key", func(t *testing.T) {
+		headers := signedHeadersWithKey("msg_encoded", body, raw)
+		event, err := VerifyAndParseOrderPaid(headers, body, secret)
+		require.NoError(t, err)
+		assert.Equal(t, "order_encoded", event.Data.ID)
+	})
 
-	headers = signedHeaders("msg_encoded", body, secret)
-	_, err = VerifyAndParseOrderPaid(headers, body, secret)
-	require.NoError(t, err)
+	t.Run("polar hmac key", func(t *testing.T) {
+		headers := signedHeaders("msg_encoded", body, secret)
+		event, err := VerifyAndParseOrderPaid(headers, body, secret)
+		require.NoError(t, err)
+		assert.Equal(t, "order_encoded", event.Data.ID)
+	})
+
+	t.Run("unpadded standard webhooks secret", func(t *testing.T) {
+		unpadded := "whsec_" + strings.TrimRight(base64.StdEncoding.EncodeToString(raw), "=")
+		headers := signedHeadersWithKey("msg_unpadded", body, raw)
+		event, err := VerifyAndParseOrderPaid(headers, body, unpadded)
+		require.NoError(t, err)
+		assert.Equal(t, "order_encoded", event.Data.ID)
+	})
 }
 
 func Test__VerifyAndParseOrderPaidRejectsEmptySecret(t *testing.T) {
