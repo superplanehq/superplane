@@ -6,7 +6,6 @@ import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { CopyableKeyButton } from "../../CopyableKeyButton";
 import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { OrgUserReference } from "../../OrgUserReference";
@@ -74,7 +73,6 @@ function PopupFullScreenButton({ expanded, onToggle }: { expanded: boolean; onTo
 
 export function PopupHeader({
   title,
-  displayKey,
   children,
   onClose,
   actions,
@@ -88,7 +86,6 @@ export function PopupHeader({
   titleAriaLabel = "Task title",
 }: {
   title: string;
-  displayKey?: string;
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
@@ -105,8 +102,8 @@ export function PopupHeader({
     <header className="relative shrink-0 border-b border-border px-5 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h2 className="min-w-0 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+          <div className="flex min-w-0 items-center gap-3">
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
               {canEditTitle && onTitleSave ? (
                 <ClickToRename
                   value={title}
@@ -122,7 +119,6 @@ export function PopupHeader({
                 title
               )}
             </h2>
-            {displayKey ? <CopyableKeyButton value={displayKey} /> : null}
           </div>
           {children}
         </div>
@@ -143,7 +139,7 @@ export function PopupHeader({
 
 type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
 
-/** Owner and spend. No elapsed time, status, or author. The ticket ID sits next to the title. */
+/** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
   modelLabel,

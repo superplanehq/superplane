@@ -23,7 +23,6 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import {
   draftStartAction,
   footerMutationHandlers,
-  popupWorkOrderDisplayKey,
   popupWorkOrderUrl,
   returnToBacklogAction,
 } from "./workOrderPopupActions";
@@ -155,7 +154,6 @@ function AnalysisWorkOrderPopup({
         header={(views) => (
           <PopupHeader
             title={edits.title}
-            displayKey={popupWorkOrderDisplayKey({ key: fixture.key, number: orderNumber, id: orderId }, factoryKey)}
             onClose={onClose}
             canEditTitle={edits.canEdit}
             titleBusy={edits.titleBusy}
