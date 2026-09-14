@@ -33,7 +33,9 @@ describe("useWorkOrderFileUpload", () => {
   });
 
   it("uploads a workspace file and returns an sp-file ref", async () => {
-    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id: "file-1" } } });
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
     const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
 
     let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
@@ -45,12 +47,28 @@ describe("useWorkOrderFileUpload", () => {
     expect(filesCreateWorkOrderFile).not.toHaveBeenCalled();
     expect(uploaded).toEqual([
       expect.objectContaining({
-        id: "file-1",
-        ref: "sp-file://file-1",
+        id,
+        ref: `sp-file://${id}`,
         isImage: true,
       }),
     ]);
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/v1/files/file-1/content", expect.any(Object)));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(uploadUrl, expect.any(Object)));
+  });
+
+  it("does not upload content when the API omits the minted upload URL", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      data: { file: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } },
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["png"], "bug.png", { type: "image/png" })]);
+    });
+
+    expect(uploaded).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
   });
 
   it("rejects a file type that SuperPlane does not store", async () => {
