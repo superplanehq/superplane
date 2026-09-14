@@ -48,11 +48,10 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -203,11 +202,10 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	token, err := runneraction.MintPlanningSessionToken(signer, runneraction.PlanningSessionScope{
@@ -406,11 +404,10 @@ func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Serv
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	return server, session, factoryModel, mustPlanningRunnerToken(t, signer, session)

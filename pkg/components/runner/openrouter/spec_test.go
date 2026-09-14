@@ -189,6 +189,7 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	require.Equal(t, runner.PlanningSessionMCPScript(), requireTaskFile(t, got.Files, "planning_session_mcp.js").Content)
 	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
 	require.Equal(t, runner.PlanningSessionProtocolFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.js").Content)
+	require.Equal(t, runner.PlanningSessionProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.md").Content)
 }
 
 func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {

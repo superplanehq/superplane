@@ -38,6 +38,14 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
+function loadAnalysisProtocolForPrompt(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.analysisProtocolForPrompt === "function") {
+    return mod.analysisProtocolForPrompt(prompt);
+  }
+  return loadAnalysisProtocol();
+}
+
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
   if (!planningAnalysisEnabled()) {
     return prompt;
@@ -68,8 +76,9 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? ` ${loadAnalysisProtocol()}` : "";
+function planningSystemPrompt(env = process.env, prompt = "") {
+  const protocol = planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
+  return protocol ? ` ${protocol}` : "";
 }
 
 function allowedClaudeTools(env = process.env) {
@@ -174,7 +183,7 @@ async function runPrompt(promptFile, model) {
   if (planningToolsEnabled) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
-    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt();
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt(process.env, prompt);
     const mcpConfigPath = path.join(sp, "mcp.runtime.json");
     fs.writeFileSync(
       mcpConfigPath,

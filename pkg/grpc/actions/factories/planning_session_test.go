@@ -47,11 +47,10 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -76,6 +75,17 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	require.NoError(t, err)
 	require.NotNil(t, found.Session)
 	assert.Equal(t, execution.ID.String(), found.Session.ExecutionId)
+
+	refinementExecution := support.CreateCanvasNodeExecution(t, canvas.ID, backlogRefinementNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(refinementExecution).Update("run_id", run.ID).Error)
+
+	found, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, refinementExecution.ID.String(), found.Session.ExecutionId)
 }
 
 func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
@@ -90,11 +100,10 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
@@ -139,11 +148,10 @@ func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, finishCanvasRun(db, run, models.CanvasRunResultCancelled))
@@ -184,11 +192,10 @@ func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testi
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	before, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
@@ -220,11 +227,10 @@ func Test__SendPlanningSessionMessage__DoesNotRestartAfterTaskStarts(t *testing.
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, order.TransitionOnDispatch(db, &r.User))

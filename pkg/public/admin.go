@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
@@ -816,6 +817,37 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
 		http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
 		return
+	}
+
+	if featureID == features.FeatureFactoryCreateWithAgent {
+		result, upgradeErr := factoryactions.UpgradeDefaultBacklogTemplates(
+			r.Context(),
+			factoryactions.IntakeDependencies{
+				Registry:       s.registry,
+				Encryptor:      s.encryptor,
+				AuthService:    s.authService,
+				GitProvider:    s.gitProvider,
+				WebhookBaseURL: s.WebhooksBaseURL,
+				UsageService:   s.usageService,
+			},
+			parsedOrgID,
+		)
+		if upgradeErr != nil {
+			log.Errorf(
+				"admin: failed to upgrade Backlog templates for org %s: upgraded=%d skipped=%d: %v",
+				orgID,
+				result.Upgraded,
+				result.Skipped,
+				upgradeErr,
+			)
+		} else {
+			log.Infof(
+				"admin: upgraded Backlog templates for org %s: upgraded=%d skipped=%d",
+				orgID,
+				result.Upgraded,
+				result.Skipped,
+			)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

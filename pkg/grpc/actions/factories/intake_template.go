@@ -381,6 +381,47 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 // intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK
 // agents also receive credentials and a model.
 func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName string) map[string]any {
+	configuration := intakeRunnerConfiguration(agent, githubName)
+	configuration["steps"] = []any{
+		map[string]any{
+			"name":    "Clone repository",
+			"type":    runner.AgentStepBash,
+			"command": intakeAnalysisCloneCommand(),
+		},
+		map[string]any{
+			"name":             "Analyze and score",
+			"type":             "prompt",
+			"workingDirectory": "repo",
+			"prompt":           intakeAnalysisPrompt(spec.analysisSubject),
+		},
+		map[string]any{
+			"name":    "Use analysis as output",
+			"type":    runner.AgentStepBash,
+			"command": intakeAnalysisOutputCommand(),
+		},
+	}
+	return configuration
+}
+
+func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {
+	configuration := intakeRunnerConfiguration(agent, githubName)
+	configuration["steps"] = []any{
+		map[string]any{
+			"name":    "Clone repository",
+			"type":    runner.AgentStepBash,
+			"command": intakeAnalysisCloneCommand(),
+		},
+		map[string]any{
+			"name":             "Refine Task",
+			"type":             "prompt",
+			"workingDirectory": "repo",
+			"prompt":           intakeRefinementPrompt(),
+		},
+	}
+	return configuration
+}
+
+func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string]any {
 	if strings.TrimSpace(githubName) == "" {
 		githubName = intakeGitHubAppName
 	}
@@ -408,24 +449,6 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName
 				"valueSource": "literal",
 			},
 		},
-		"steps": []any{
-			map[string]any{
-				"name":    "Clone repository",
-				"type":    runner.AgentStepBash,
-				"command": intakeAnalysisCloneCommand(),
-			},
-			map[string]any{
-				"name":             "Analyze and score",
-				"type":             "prompt",
-				"workingDirectory": "repo",
-				"prompt":           intakeAnalysisPrompt(spec.analysisSubject),
-			},
-			map[string]any{
-				"name":    "Use analysis as output",
-				"type":    runner.AgentStepBash,
-				"command": intakeAnalysisOutputCommand(),
-			},
-		},
 	}
 
 	if credentials := agent.credentials(); credentials != nil {
@@ -436,6 +459,10 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName
 	}
 
 	return configuration
+}
+
+func intakeRefinementPrompt() string {
+	return runner.PlanningSessionProtocolMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
 func intakeAnalysisCloneCommand() string {

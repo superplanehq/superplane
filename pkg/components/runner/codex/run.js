@@ -31,6 +31,14 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
+function loadAnalysisProtocolForPrompt(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.analysisProtocolForPrompt === "function") {
+    return mod.analysisProtocolForPrompt(prompt);
+  }
+  return loadAnalysisProtocol();
+}
+
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
   if (!planningAnalysisEnabled()) {
     return prompt;
@@ -54,14 +62,14 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
+function planningSystemPrompt(env = process.env, prompt = "") {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
 }
 
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
-function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
+function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "", prompt = "") {
   const args = ["exec"];
   if (sessionID) {
     args.push("resume", sessionID);
@@ -70,7 +78,10 @@ function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") 
   if (planningEnabled(env)) {
     args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
     args.push(...mcpConfigOverrides(mcpScriptPath));
-    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
+    const protocol = loadAnalysisProtocolForPrompt(prompt);
+    if (protocol) {
+      args.push("-c", `developer_instructions=${tomlString(protocol)}`);
+    }
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
   }
@@ -162,7 +173,7 @@ async function runPrompt(promptFile, model) {
 
   const startedAt = Date.now();
   const planning = planningEnabled();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
+  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID, prompt);
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write("sandbox: read-only\n");

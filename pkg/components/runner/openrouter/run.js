@@ -36,6 +36,14 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
+function loadAnalysisProtocolForPrompt(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.analysisProtocolForPrompt === "function") {
+    return mod.analysisProtocolForPrompt(prompt);
+  }
+  return loadAnalysisProtocol();
+}
+
 function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
   if (!planningAnalysisEnabled(env)) {
     return prompt;
@@ -59,8 +67,8 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
+function planningSystemPrompt(env = process.env, prompt = "") {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
 }
 
 function catalogModelId(model) {
@@ -232,7 +240,7 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
   return args;
 }
 
-function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
+function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [], prompt = "" } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     permission: planning
@@ -278,10 +286,11 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
-  if (planningAnalysisEnabled(env) && taskDir) {
+  const protocol = planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
+  if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
     try {
-      fs.writeFileSync(protocolPath, `${loadAnalysisProtocol()}\n`);
+      fs.writeFileSync(protocolPath, `${protocol}\n`);
     } catch (_err) {
       // Tests pass a fake task dir. The runner writes this file when the dir exists.
     }
@@ -290,12 +299,13 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models) {
+function writeOpenCodeConfig(taskDir, env, models, prompt) {
   const config = buildOpenCodeConfig({
     taskDir,
     env,
     planning: planningEnabled(env),
     models,
+    prompt,
   });
   fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
@@ -364,7 +374,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   ensureXdgDirs(sp);
 
   const currentModel = catalogModelId(model);
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : [], prompt);
   const childEnv = openCodeProcessEnv(sp, env);
 
   const deadline = waitDeadlineMs(env, now);

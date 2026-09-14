@@ -251,6 +251,7 @@ func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 	assert.True(t, hasTaskFile(files, "planning_session_mcp.js"))
 	assert.True(t, hasTaskFile(files, "mcp.json"))
 	assert.True(t, hasTaskFile(files, "analysis_protocol.js"))
+	assert.True(t, hasTaskFile(files, "analysis_protocol.md"))
 	assert.False(t, hasTaskFile(files, "openrouter_models.json"))
 }
 

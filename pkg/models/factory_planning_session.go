@@ -84,7 +84,7 @@ type FactoryPlanningSession struct {
 	ID                 uuid.UUID
 	OrganizationID     uuid.UUID
 	FactoryID          uuid.UUID
-	CreatedByUserID    uuid.UUID
+	CreatedByUserID    *uuid.UUID
 	Repository         string
 	Kind               string
 	State              string
@@ -176,11 +176,12 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 	}
 
 	canvasID := params.CanvasID
+	createdByUserID := params.CreatedByUserID
 	session := &FactoryPlanningSession{
 		ID:              uuid.New(),
 		OrganizationID:  f.OrganizationID,
 		FactoryID:       f.ID,
-		CreatedByUserID: params.CreatedByUserID,
+		CreatedByUserID: &createdByUserID,
 		Repository:      repository,
 		Kind:            PlanningSessionKindTaskCreation,
 		State:           PlanningSessionStateRunning,
