@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { JumpToLatestPill } from "./JumpToLatestPill";
-import { phaseWithRunnerModel } from "./draftStartModel";
+import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunLogHeader } from "./SplitRunLogHeader";
 import { runningSplitRunPhaseId } from "./followLogScroll";
@@ -102,7 +102,10 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
             >
               <li className="min-w-0">
                 <PhaseLogCard
-                  phase={phaseWithRunnerModel(model.phase, model.canvas?.nodes)}
+                  phase={phaseWithRunnerModel(
+                    model.phase,
+                    canvasNodesForRunnerModel(model.canvas?.nodes, model.canvas?.statuses),
+                  )}
                   expanded
                   collapsible={false}
                   stream={model.stream}

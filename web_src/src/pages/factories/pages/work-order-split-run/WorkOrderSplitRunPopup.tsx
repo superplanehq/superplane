@@ -13,6 +13,7 @@ import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -87,6 +88,7 @@ function AnalysisWorkOrderPopup({
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
+  const modelLabel = useImplementationRunnerModel(organizationId, fixture.phases);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
@@ -168,7 +170,11 @@ function AnalysisWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+            <OwnerTimeCostRow
+              fixture={{ ...fixture, owner: edits.owner }}
+              modelLabel={modelLabel}
+              assigneeIds={edits.assigneeIds}
+            />
           </PopupHeader>
         )}
       />

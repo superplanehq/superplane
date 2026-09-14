@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
-import { phaseWithRunnerModel } from "./draftStartModel";
+import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
 import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { autoExpandedPhaseId, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
@@ -179,7 +179,7 @@ function SplitRunPhaseLogItem({
 
   return (
     <PhaseLogCard
-      phase={phaseWithRunnerModel(entry, live.canvas?.nodes)}
+      phase={phaseWithRunnerModel(entry, canvasNodesForRunnerModel(live.canvas?.nodes, live.canvas?.statuses))}
       expanded={expanded}
       stream={stream ?? entry.stream}
       streamLoading={live.isLoading}

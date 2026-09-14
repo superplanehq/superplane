@@ -32,6 +32,7 @@ export function joinRunnerModels(ids: Array<string | undefined>): string {
 }
 
 type RunnerCanvasNode = {
+  id?: string;
   component?: string;
   configuration?: { model?: unknown } | Record<string, unknown>;
 };
@@ -44,12 +45,29 @@ const RUNNER_PROVIDER: Record<string, string> = {
 };
 
 export function runnerModelsFromCanvasNodes(nodes?: RunnerCanvasNode[]): string {
-  return joinRunnerModels(
-    (nodes ?? []).map((node) => {
-      const model = node.configuration && "model" in node.configuration ? node.configuration.model : undefined;
-      return typeof model === "string" ? model : undefined;
-    }),
-  );
+  return joinRunnerModels((nodes ?? []).map(runnerModelFromCanvasNode));
+}
+
+function runnerModelFromCanvasNode(node: RunnerCanvasNode): string | undefined {
+  const model = node.configuration && "model" in node.configuration ? node.configuration.model : undefined;
+  return typeof model === "string" ? model : undefined;
+}
+
+export function canvasNodesForRunnerModel(
+  nodes?: RunnerCanvasNode[],
+  statuses?: Record<string, string>,
+): RunnerCanvasNode[] | undefined {
+  if (!nodes || !statuses) {
+    return nodes;
+  }
+  const ran = nodes.filter((node) => {
+    const status = node.id ? statuses[node.id] : undefined;
+    return Boolean(status && status !== "did_not_run");
+  });
+  if (ran.some((node) => runnerModelFromCanvasNode(node)?.trim())) {
+    return ran;
+  }
+  return nodes;
 }
 
 function runnerAcceptsStartModel(component: string | undefined, model: string): boolean {
