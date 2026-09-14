@@ -4,7 +4,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
-import { analysisFirstResultDelivered } from "../../lib/analysisOutcome";
+import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
@@ -54,7 +54,9 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   });
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
+    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
     refinementEnabled,
+    analysisActive: isAnalyzing,
     hasLookupIdentity,
   });
 
@@ -103,7 +105,6 @@ function AnalysisWorkOrderPopup({
   const [tab, setTab] = useState(initialTab);
   const [fullPage, setFullPage] = useState(false);
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const showAnalysisChat = analysis.showChat || !factoryId || !orderId;
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
   const review = analysisPopupReview({
@@ -147,7 +148,7 @@ function AnalysisWorkOrderPopup({
         canUpdate={canUpdate}
         footerActions={footerActions}
         resultFooter={tab === "description" ? review : undefined}
-        analysis={fixture.footer.kind === "draft" && showAnalysisChat ? analysis : undefined}
+        analysis={fixture.footer.kind === "draft" ? analysis : undefined}
         header={(views) => (
           <PopupHeader
             title={edits.title}
