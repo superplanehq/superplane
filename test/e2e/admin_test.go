@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,22 +50,13 @@ func TestAdminDashboard(t *testing.T) {
 		steps.promoteToAdmin()
 		steps.session.Login()
 
-		// Navigate to admin accounts page
 		steps.session.Visit("/admin/accounts")
-		steps.session.Sleep(500)
+		steps.session.AssertText("Impersonate")
 
-		// Start impersonation on the other user
 		steps.clickImpersonate()
-		steps.session.Sleep(2000)
-
-		// Should land on org selector with the impersonation banner
 		steps.assertImpersonationBannerVisible()
 
-		// End impersonation by clicking Exit
 		steps.clickExitImpersonation()
-		steps.session.Sleep(2000)
-
-		// Should be back on admin page
 		steps.assertOnAdminPage()
 	})
 
@@ -147,7 +139,6 @@ func (s *adminSteps) assertOrganizationVisible(name string) {
 
 func (s *adminSteps) clickOrganization(name string) {
 	s.session.Click(q.Text(name))
-	s.session.Sleep(500)
 }
 
 func (s *adminSteps) assertUserVisible(name string) {
@@ -254,16 +245,11 @@ func (s *adminSetupSteps) fillInOwnerDetailsAndSubmit() {
 }
 
 func (s *adminSetupSteps) waitForSetupToComplete() {
-	for i := 0; i < 50; i++ {
+	require.Eventually(s.t, func() bool {
 		var count int64
 		err := database.Conn().Model(&models.Organization{}).Count(&count).Error
-		if err == nil && count > 0 {
-			s.session.Sleep(500)
-			return
-		}
-		s.session.Sleep(200)
-	}
-	s.t.Fatal("timed out waiting for owner setup to complete")
+		return err == nil && count > 0
+	}, 10*time.Second, 200*time.Millisecond, "timed out waiting for owner setup to complete")
 }
 
 func (s *adminSetupSteps) assertAccountIsInstallationAdmin() {

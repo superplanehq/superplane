@@ -1,10 +1,10 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -86,7 +86,7 @@ func (s *triggerRunTitleSteps) givenACanvasWithManualTrigger(canvasName, trigger
 func (s *triggerRunTitleSteps) whenRunTitleToggleIsEnabled() {
 	runTitleSwitch := q.Locator(`div:has(> label:has-text("Run title")) button[role="switch"]`)
 	s.session.Click(runTitleSwitch)
-	s.session.Sleep(300)
+	s.session.WaitForEnabled(q.TestID("string-field-customname"))
 }
 
 func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
@@ -94,7 +94,7 @@ func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
 }
 
 func (s *triggerRunTitleSteps) waitForAutoSave() {
-	s.session.Sleep(500)
+	s.canvas.WaitForStaging(uuid.Nil)
 }
 
 func (s *triggerRunTitleSteps) saveAndPublish() {
@@ -103,8 +103,7 @@ func (s *triggerRunTitleSteps) saveAndPublish() {
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
-	s.session.Click(q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(s.trigger) + `-header"]) [data-testid="start-template-run"]`))
-	s.session.Sleep(2000)
+	s.canvas.RunManualTrigger(s.trigger)
 }
 
 func (s *triggerRunTitleSteps) thenRunTitleInDBEquals(expected string) {

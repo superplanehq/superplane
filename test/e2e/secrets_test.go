@@ -97,7 +97,7 @@ func (s *SecretsSteps) start() {
 
 func (s *SecretsSteps) visitSecretsPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/secrets")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("secrets-create-btn"))
 }
 
 func (s *SecretsSteps) clickCreateSecret() {
@@ -105,14 +105,13 @@ func (s *SecretsSteps) clickCreateSecret() {
 	createBtn := page.GetByTestId("secrets-create-btn")
 	err := createBtn.First().Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("secrets-create-name"))
 }
 
 func (s *SecretsSteps) fillSecretName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("secrets-create-name").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 }
 
 func (s *SecretsSteps) fillKeyValuePair(index int, key, value string) {
@@ -120,18 +119,16 @@ func (s *SecretsSteps) fillKeyValuePair(index int, key, value string) {
 	keyInput := page.GetByTestId("secrets-create-key").Nth(index)
 	err := keyInput.Fill(key)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 	valueTextarea := page.GetByTestId("secrets-create-value").Nth(index)
 	err = valueTextarea.Fill(value)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *SecretsSteps) clickAddPair() {
 	page := s.session.Page()
 	err := page.GetByTestId("secrets-create-add-pair").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	require.NoError(s.t, page.GetByTestId("secrets-create-key").Nth(1).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
 }
 
 // clickAddKey clicks "Add key" on the secret detail page to show the add-key form.
@@ -142,7 +139,7 @@ func (s *SecretsSteps) clickAddKey() {
 	require.NoError(s.t, err)
 	err = addKeyBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("secret-detail-add-key-name"))
 }
 
 // fillAddKeyForm fills the key name and value in the add-key form on the secret detail page.
@@ -150,10 +147,8 @@ func (s *SecretsSteps) fillAddKeyForm(key, value string) {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-add-key-name").Fill(key)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 	err = page.GetByTestId("secret-detail-add-value").Fill(value)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 // submitAddKey clicks Save in the add-key form on the secret detail page.
@@ -161,7 +156,7 @@ func (s *SecretsSteps) submitAddKey() {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-add-save").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("secret-detail-add-key-name"))
 }
 
 // clickRemoveKeyOnDetail clicks the Nth "Remove key" button on the secret detail page (removes that key immediately).
@@ -170,7 +165,6 @@ func (s *SecretsSteps) clickRemoveKeyOnDetail(index int) {
 	removeBtn := page.GetByTestId("secret-detail-remove-key").Nth(index)
 	err := removeBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
 }
 
 // clickEditKeyOnDetail clicks the Nth "Edit value" button on the secret detail page to expand the edit form.
@@ -181,7 +175,7 @@ func (s *SecretsSteps) clickEditKeyOnDetail(index int) {
 	require.NoError(s.t, err)
 	err = editBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("secret-detail-edit-value"))
 }
 
 // fillEditingValue fills the value textarea in the edit form on the secret detail page.
@@ -189,7 +183,6 @@ func (s *SecretsSteps) fillEditingValue(value string) {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-edit-value").Fill(value)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 // submitEditKey clicks Save in the edit form on the secret detail page.
@@ -197,7 +190,7 @@ func (s *SecretsSteps) submitEditKey() {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-edit-save").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("secret-detail-edit-value"))
 }
 
 // clickEditSecretName clicks the edit-name (pencil) button on the secret detail page to show the name input.
@@ -208,7 +201,7 @@ func (s *SecretsSteps) clickEditSecretName() {
 	require.NoError(s.t, err)
 	err = editNameBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("secret-detail-edit-name-input"))
 }
 
 // fillSecretNameInput fills the secret name input in the inline edit form on the secret detail page.
@@ -216,7 +209,6 @@ func (s *SecretsSteps) fillSecretNameInput(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-edit-name-input").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 // submitEditSecretName clicks Save in the secret name edit form on the secret detail page.
@@ -224,14 +216,13 @@ func (s *SecretsSteps) submitEditSecretName() {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-edit-name-save").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("secret-detail-edit-name-input"))
 }
 
 func (s *SecretsSteps) removeKeyValuePair(index int) {
 	page := s.session.Page()
 	err := page.GetByTestId("secrets-create-remove-pair").Nth(index).Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 }
 
 func (s *SecretsSteps) submitCreateSecret() {
@@ -239,7 +230,6 @@ func (s *SecretsSteps) submitCreateSecret() {
 	createBtn := page.GetByTestId("secrets-create-submit")
 	err := createBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 	err = createBtn.Click()
 	require.NoError(s.t, err)
 
@@ -255,7 +245,6 @@ func (s *SecretsSteps) submitCreateSecret() {
 		s.t.Fatalf("modal did not close after submitting: %v", err)
 	}
 
-	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) submitUpdateSecret() {
@@ -269,7 +258,6 @@ func (s *SecretsSteps) submitUpdateSecret() {
 		}
 		s.t.Fatalf("modal did not close after update: %v", err)
 	}
-	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) clickEditSecret(secretName string) {
@@ -278,7 +266,7 @@ func (s *SecretsSteps) clickEditSecret(secretName string) {
 	link := page.GetByTestId("secrets-secret-link").GetByText(secretName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	err := link.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("secret-detail-delete"))
 }
 
 func (s *SecretsSteps) clickDeleteSecret(secretName string) {
@@ -286,7 +274,7 @@ func (s *SecretsSteps) clickDeleteSecret(secretName string) {
 	page := s.session.Page()
 	err := page.GetByTestId("secret-detail-delete").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("secrets-create-btn"))
 }
 
 func (s *SecretsSteps) assertSecretSavedInDB(name string, expectedData map[string]string) {
@@ -319,7 +307,6 @@ func (s *SecretsSteps) assertSecretVisibleInList(name string) {
 
 func (s *SecretsSteps) assertSecretNotVisibleInList(name string) {
 	s.visitSecretsPage()
-	s.session.Sleep(500)
 	// Use exact match so "E2E Test Secret 5" does not match "E2E Test Secret 5 Renamed"
 	locator := s.session.Page().GetByText(name, pw.PageGetByTextOptions{Exact: pw.Bool(true)})
 	count, err := locator.Count()

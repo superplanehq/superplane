@@ -1,10 +1,11 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -67,17 +68,7 @@ func (s *ownerSetupSteps) visitRootPage() {
 }
 
 func (s *ownerSetupSteps) assertRedirectedToSetup() {
-	// Give the router a moment to handle the redirect.
-	for i := 0; i < 10; i++ {
-		currentURL := s.session.Page().URL()
-		if strings.Contains(currentURL, "/setup") {
-			return
-		}
-		s.session.Sleep(200)
-	}
-
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/setup", "expected to be redirected to owner setup")
+	s.session.WaitUntilURLContains("/setup")
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
@@ -96,19 +87,11 @@ func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, passwor
 }
 
 func (s *ownerSetupSteps) waitForSetupToComplete() {
-	// Poll for up to 10 seconds, checking every 200ms
-	for i := 0; i < 50; i++ {
+	require.Eventually(s.t, func() bool {
 		var orgCount int64
 		err := database.Conn().Model(&models.Organization{}).Count(&orgCount).Error
-		if err == nil && orgCount > 0 {
-			// Setup completed - give it a moment for redirect
-			s.session.Sleep(500)
-			return
-		}
-		s.session.Sleep(200)
-	}
-	// If we get here, setup didn't complete in time
-	s.t.Log("Warning: Setup may not have completed - proceeding with assertions")
+		return err == nil && orgCount > 0
+	}, 10*time.Second, 200*time.Millisecond, "owner setup did not create an organization")
 }
 
 func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
@@ -152,19 +135,19 @@ func (s *ownerSetupSteps) clearCookies() {
 
 func (s *ownerSetupSteps) visitLoginPage() {
 	s.session.Visit("/login")
-	s.session.Sleep(500) // wait for page load
+	s.session.AssertVisible(q.Text("Welcome to SuperPlane"))
 }
 
 func (s *ownerSetupSteps) fillInEmailAndPassword(email, password string) {
 	// With magic code enabled, toggle to password form first,
 	// then fill in the fields that belong to it.
 	s.session.Click(q.Text("Sign in with password instead"))
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.Locator(`input[type="password"]`))
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[type="password"]`), password)
 }
 
 func (s *ownerSetupSteps) submitLoginForm() {
 	s.session.Click(q.Text("Login"))
-	s.session.Sleep(1000) // wait for redirect
+	s.session.WaitUntilURLDoesNotContain("/login")
 }

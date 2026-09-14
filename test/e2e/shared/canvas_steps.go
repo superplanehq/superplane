@@ -53,7 +53,6 @@ func (s *CanvasSteps) EnterEditModeWithoutStagingActionAssertions() {
 	s.waitForEnabledEditButton()
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
 	s.AssertEditModeTabChrome()
 }
@@ -158,7 +157,6 @@ func (s *CanvasSteps) ExitEditMode() {
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
 	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.waitForEnabledEditButton()
-	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) isOnLiveView() bool {
@@ -181,7 +179,6 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 
 	s.ensureVersionsSidebarOpen()
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) ensureEditMode() {
@@ -216,7 +213,6 @@ func (s *CanvasSteps) SelectVersionInHistorySidebar(versionLabel string) {
 	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-live-version-row"]:has-text("%s")`, versionLabel))
 	s.waitForVisible(selector, 15*time.Second)
 	s.session.Click(selector)
-	s.session.Sleep(300)
 }
 
 // AssertPreviewingPreviousVersionBarVisible verifies the previous-version preview chrome is shown.
@@ -267,7 +263,7 @@ func (s *CanvasSteps) SelectRunInSidebar(runID string) {
 		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID))
 		if visible, err := runLink.Run(s.session).IsVisible(); err == nil && visible {
 			s.session.Click(runLink)
-			s.session.Sleep(300)
+			s.session.AssertVisible(q.TestID("run-inspector-panel"))
 			return
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -341,19 +337,7 @@ func (s *CanvasSteps) AssertVersionHistoryContains(labels ...string) {
 }
 
 func (s *CanvasSteps) waitForEnabledEditButton() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			return
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+	s.session.WaitForEnabled(q.TestID("canvas-edit-button"))
 }
 
 func (s *CanvasSteps) WaitForEnabledExitEditButton() {
@@ -361,22 +345,7 @@ func (s *CanvasSteps) WaitForEnabledExitEditButton() {
 }
 
 func (s *CanvasSteps) waitForEnabledExitEditButton() {
-	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		visible, visibleErr := exitEditButton.IsVisible()
-		if visibleErr == nil && visible {
-			disabled, err := exitEditButton.IsDisabled()
-			require.NoError(s.t, err)
-			if !disabled {
-				return
-			}
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("exit edit button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+	s.session.WaitForEnabled(q.TestID("canvas-exit-edit-button"))
 }
 
 // WaitForStaging waits until the current user has workflow_staged_files rows.
@@ -748,28 +717,21 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 		// Newer canvas UI keeps the component sidebar open after selecting a node.
 		// Deselecting the node reveals the floating Components button again.
 		s.ClickOnEmptyCanvasArea()
-		s.session.Sleep(150)
 
 		if isVisible, _ := sidebar.IsVisible(); isVisible {
 			return
 		}
 
 		if isVisible, _ := editButton.IsVisible(); isVisible {
-			if err := editButton.Click(); err == nil {
-				s.session.Sleep(250)
-			}
+			_ = editButton.Click()
 		}
 
 		if isVisible, _ := addComponentButton.IsVisible(); isVisible {
-			if err := addComponentButton.Click(); err == nil {
-				s.session.Sleep(250)
-			}
+			_ = addComponentButton.Click()
 		}
 
 		if isVisible, _ := openButton.IsVisible(); isVisible {
-			if err := openButton.Click(); err == nil {
-				s.session.Sleep(250)
-			}
+			_ = openButton.Click()
 		}
 
 		time.Sleep(100 * time.Millisecond)
@@ -796,7 +758,10 @@ func (s *CanvasSteps) OpenBuildingBlockCategory(categoryName string) {
 		`[data-testid="building-blocks-sidebar"] details:has(summary :text-is("%s")) summary`,
 		categoryName,
 	)))
-	s.session.Sleep(200)
+	require.Eventually(s.t, func() bool {
+		open, err := details.GetAttribute("open")
+		return err == nil && open != ""
+	}, 5*time.Second, 100*time.Millisecond, "building-block category %s did not open", categoryName)
 }
 
 // ClickOnEmptyCanvasArea clicks on an empty area of the canvas to dismiss
@@ -822,11 +787,9 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 
 	source := q.TestID("building-block-noop")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(500)
 
 	s.selectLatestNoopNode()
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Sleep(300)
 	s.waitForDraftNodeID(name)
 }
 
@@ -836,7 +799,7 @@ func (s *CanvasSteps) AddNote() {
 	sidebar := q.TestID("building-blocks-sidebar").Run(s.session)
 	if isVisible, _ := sidebar.IsVisible(); isVisible {
 		s.ClickOnEmptyCanvasArea()
-		s.session.Sleep(300)
+		s.session.AssertVisible(q.TestID("add-note-button"))
 	}
 
 	s.session.Click(q.TestID("add-note-button"))
@@ -845,7 +808,6 @@ func (s *CanvasSteps) AddNote() {
 		return ok
 	}, 10*time.Second, 200*time.Millisecond)
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
-	s.session.Sleep(300)
 }
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
@@ -854,17 +816,15 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 
 	source := q.TestID("building-block-noop")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(500)
 
 	s.selectLatestNoopNode()
 
-	// Get the auto-generated name from the input field
 	nameInput := q.TestID("node-name-input")
+	s.session.AssertVisible(nameInput)
 	loc := nameInput.Run(s.session)
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
-
-	s.session.Sleep(300)
+	require.NotEmpty(s.t, generatedName)
 
 	return generatedName
 }
@@ -876,11 +836,7 @@ func (s *CanvasSteps) Save() {
 	if isVisible, _ := loc.IsVisible(); isVisible {
 		s.session.Click(saveButton)
 		s.session.AssertText("Canvas changes saved")
-		s.session.Sleep(500)
-		return
 	}
-
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -888,7 +844,6 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 
 	source := q.TestID("building-block-approval")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
 	s.openComponentSidebarForLatestBlock("building-block-approval")
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -898,8 +853,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Sleep(300)
+	s.waitForDraftNodeID(nodeName)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -909,7 +863,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.addBlockFromSidebar(startSource, pos)
 	s.openComponentSidebarForLatestBlock("building-block-start")
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -917,7 +871,6 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 
 	source := q.TestID("building-block-wait")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
 	s.openComponentSidebarForLatestBlock("building-block-wait")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
@@ -931,8 +884,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	unitTrigger := q.TestID("field-unit-select")
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
-
-	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
@@ -940,11 +892,10 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 
 	source := q.TestID("building-block-filter")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
 	s.openComponentSidebarForLatestBlock("building-block-filter")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -952,7 +903,6 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
 	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -963,7 +913,6 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
 	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -972,14 +921,12 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
-
-	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
-	s.session.Sleep(500)
 	s.openComponentSidebarForLatestBlock(blockTestID)
 }
 
@@ -994,12 +941,15 @@ func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
 		`.react-flow__node [data-testid^="node-%s"][data-testid$="-header"]`,
 		slug,
 	))
+	require.Eventually(s.t, func() bool {
+		count, err := headers.Count()
+		return err == nil && count > 0
+	}, 15*time.Second, 100*time.Millisecond, "expected at least one %s node after dropping block", slug)
+
 	count, err := headers.Count()
 	require.NoError(s.t, err)
-	require.Greater(s.t, count, 0, "expected at least one %s node after dropping block", slug)
-
 	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(150)
+	s.session.AssertVisible(q.TestID("node-name-input"))
 }
 
 func (s *CanvasSteps) selectLatestNoopNode() {
@@ -1013,8 +963,9 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 	sourceHandle := q.Locator(`.react-flow__node[data-id="` + sourceNodeID + `"] .react-flow__handle-right`)
 	targetHandle := q.Locator(`.react-flow__node[data-id="` + targetNodeID + `"] .react-flow__handle-left`)
 
+	_, before := s.DraftEffectiveSpec()
 	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
-	s.session.Sleep(300)
+	s.waitForDraftEdgeCount(len(before) + 1)
 }
 
 func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
@@ -1115,9 +1066,7 @@ func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 
 	mouse := s.session.Page().Mouse()
 	require.NoError(s.t, mouse.Move(midX, midY))
-	s.session.Sleep(300)
 	require.NoError(s.t, mouse.Click(midX, midY))
-	s.session.Sleep(500)
 	s.waitForDraftEdgeCount(0)
 }
 
@@ -1132,7 +1081,7 @@ func (s *CanvasSteps) StartEditingNode(name string) {
 	// Click on the node header to open the sidebar where settings can be accessed
 	nodeHeader := q.TestID("node", name, "header")
 	s.session.Click(nodeHeader)
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("node-name-input"))
 }
 
 func (s *CanvasSteps) RunManualTrigger(name string) {
@@ -1263,37 +1212,13 @@ func (s *CanvasSteps) GetExecutionsForNodeInStates(name string, states []string)
 }
 
 func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.Duration) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < timeout {
-		executions := s.GetExecutionsForNodeInState(name, state)
-		if len(executions) > 0 {
-			found = true
-			break
-		}
-
-		s.t.Log("waiting for execution of node", name)
-		s.session.Sleep(1000)
-	}
-
-	require.True(s.t, found, "timed out waiting for execution of node %s", name)
+	require.Eventually(s.t, func() bool {
+		return len(s.GetExecutionsForNodeInState(name, state)) > 0
+	}, timeout, 200*time.Millisecond, "timed out waiting for execution of node %s in state %s", name, state)
 }
 
 func (s *CanvasSteps) WaitForExecutionInStates(name string, states []string, timeout time.Duration) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < timeout {
-		executions := s.GetExecutionsForNodeInStates(name, states)
-		if len(executions) > 0 {
-			found = true
-			break
-		}
-
-		s.t.Log("waiting for execution of node", name)
-		s.session.Sleep(1000)
-	}
-
-	require.True(s.t, found, "timed out waiting for execution of node %s", name)
+	require.Eventually(s.t, func() bool {
+		return len(s.GetExecutionsForNodeInStates(name, states)) > 0
+	}, timeout, 200*time.Millisecond, "timed out waiting for execution of node %s in states %v", name, states)
 }

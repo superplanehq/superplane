@@ -102,12 +102,11 @@ func (s *factorySteps) fillFactorySettingsName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("factory-settings-name").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *factorySteps) submitFactorySettings() {
 	s.session.Click(q.TestID("factory-settings-save"))
-	s.session.Sleep(1000)
+	s.session.AssertDisabled(q.TestID("factory-settings-save"))
 }
 
 func (s *factorySteps) assertFactorySettingsName(name string) {
@@ -126,13 +125,12 @@ func (s *factorySteps) assertFactorySavedInDB(factoryID uuid.UUID, name, descrip
 
 func (s *factorySteps) clickDeleteFactory() {
 	s.session.Click(q.TestID("factory-settings-delete-button"))
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("factory-delete-confirm-button"))
 }
 
 func (s *factorySteps) confirmDeleteFactory() {
 	s.session.AssertVisible(q.TestID("factory-delete-confirm-button"))
 	s.session.Click(q.TestID("factory-delete-confirm-button"))
-	s.session.Sleep(1000)
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {

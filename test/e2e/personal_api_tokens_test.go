@@ -7,6 +7,7 @@ import (
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
@@ -67,7 +68,7 @@ func (s *personalTokenSteps) start() {
 
 func (s *personalTokenSteps) visitProfilePage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/profile")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("user-token-create-btn"))
 }
 
 func (s *personalTokenSteps) createToken(name string) {
@@ -75,15 +76,12 @@ func (s *personalTokenSteps) createToken(name string) {
 
 	err := page.GetByTestId("user-token-create-btn").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 
-	err = page.GetByTestId("user-token-create-name").Fill(name)
-	require.NoError(s.t, err)
-	s.session.Sleep(200)
+	nameInput := page.GetByTestId("user-token-create-name")
+	require.NoError(s.t, nameInput.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, nameInput.Fill(name))
 
-	err = page.GetByTestId("user-token-create-submit").Click()
-	require.NoError(s.t, err)
-	s.session.Sleep(1000)
+	require.NoError(s.t, page.GetByTestId("user-token-create-submit").Click())
 }
 
 func (s *personalTokenSteps) assertTokenRevealed() {
@@ -108,7 +106,7 @@ func (s *personalTokenSteps) dismissRevealedToken() {
 
 	err := page.GetByTestId("user-token-reveal-done").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("user-token-reveal-value"))
 }
 
 func (s *personalTokenSteps) assertTokenListed(name string) {
@@ -135,15 +133,15 @@ func (s *personalTokenSteps) revokeToken(name string) {
 	row := page.GetByTestId("user-token-row").Filter(pw.LocatorFilterOptions{HasText: name})
 	err := row.GetByTestId("user-token-row-menu").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 
-	err = page.GetByTestId("user-token-revoke-btn").Click()
-	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	revokeBtn := page.GetByTestId("user-token-revoke-btn")
+	require.NoError(s.t, revokeBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, revokeBtn.Click())
 
-	err = page.GetByTestId("user-token-revoke-confirm").Click()
-	require.NoError(s.t, err)
-	s.session.Sleep(1000)
+	confirm := page.GetByTestId("user-token-revoke-confirm")
+	require.NoError(s.t, confirm.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, confirm.Click())
+	require.NoError(s.t, row.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(15000)}))
 }
 
 // assertBearerTokenAuthenticatesAsSessionUser calls the real API with the

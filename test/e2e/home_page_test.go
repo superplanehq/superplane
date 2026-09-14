@@ -153,7 +153,6 @@ func (steps *TestHomePageSteps) LoginWithCanvasPermissions(roleLabel string, per
 
 func (steps *TestHomePageSteps) ClickStartFromScratch() {
 	steps.session.Click(q.Text("Create a blank app"))
-	steps.session.Sleep(500)
 }
 
 func (steps *TestHomePageSteps) AssertUpdatePermissionToast() {
@@ -164,5 +163,5 @@ func (steps *TestHomePageSteps) ClickNewApp() {
 	// An empty org opens /apps/new. The home toolbar is not on that page.
 	steps.session.WaitForBrowserPath("/" + steps.session.OrgSlug + "/apps/new")
 	steps.ClickStartFromScratch()
-	steps.session.Sleep(2500)
+	steps.session.WaitUntilURLContains("/apps/")
 }

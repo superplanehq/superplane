@@ -3,6 +3,7 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -40,18 +41,16 @@ func (s *GroupsSteps) fillInCreateGroupForm(name string) {
 	createButton := q.Text("Create Group")
 
 	s.session.FillIn(nameInput, name)
-	s.session.Sleep(500)
-
 	s.session.Click(createButton)
-	s.session.Sleep(500)
+	s.session.WaitUntilURLDoesNotContain("/create-group")
 }
 
 func (s *GroupsSteps) assertGroupSavedInDB(displayName string) {
 	groupName := normalizeGroupName(displayName)
-
-	metadata, err := models.FindGroupMetadata(groupName, models.DomainTypeOrganization, s.session.OrgID.String())
-	require.NoError(s.t, err)
-	require.Equal(s.t, displayName, metadata.DisplayName)
+	require.Eventually(s.t, func() bool {
+		metadata, err := models.FindGroupMetadata(groupName, models.DomainTypeOrganization, s.session.OrgID.String())
+		return err == nil && metadata.DisplayName == displayName
+	}, 10*time.Second, 200*time.Millisecond, "group %q was not saved", displayName)
 }
 
 func normalizeGroupName(name string) string {
