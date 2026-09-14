@@ -25,6 +25,14 @@ vi.mock("@/api-client", () => {
   };
 });
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 function renderRunningPopup() {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
