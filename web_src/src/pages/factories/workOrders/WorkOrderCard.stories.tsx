@@ -181,8 +181,8 @@ export const ChecksPassedLongTitle: Story = {
  * on the right.
  */
 /**
- * Draft task while backlog analysis still runs. The meter slot shows
- * thinking states and a matrix loader until the score arrives.
+ * Draft task while the agent still works. The meter slot shows
+ * thinking states and a matrix loader.
  */
 export const DraftAnalyzing: Story = {
   name: "Draft analyzing",
@@ -200,6 +200,30 @@ export const DraftAnalyzing: Story = {
     ),
     pullRequests: [],
     isAnalyzing: true,
+  },
+};
+
+/**
+ * Follow-up agent work after a score already exists. The meter slot
+ * stays on thinking states until the agent waits for the user.
+ */
+export const DraftAnalyzingWithScore: Story = {
+  name: "Draft analyzing after score",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-scored",
+        number: "2",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+    confidenceScore: 4,
   },
 };
 

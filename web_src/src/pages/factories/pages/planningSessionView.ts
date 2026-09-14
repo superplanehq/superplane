@@ -165,6 +165,32 @@ export function planningSessionHasPendingSurvey(
   return Boolean(planningSessionSurveyFromPayload(session?.survey));
 }
 
+/** True when the session is held for the next user message. */
+export function planningSessionIsWaiting(
+  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+): boolean {
+  return Boolean(session && session.state !== "ended" && session.waitState === "pending");
+}
+
+/** True when the agent is still running this session. */
+export function planningSessionIsWorking(
+  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+): boolean {
+  return Boolean(session && session.state !== "ended" && session.waitState !== "pending");
+}
+
+/**
+ * Draft cards show thinking states while the agent works, including
+ * follow-up work after a score exists. The meter returns when the
+ * session waits for the user.
+ */
+export function draftCardAgentIsWorking(
+  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+  backlogAnalyzing: boolean,
+): boolean {
+  return planningSessionIsWorking(session) || (backlogAnalyzing && !planningSessionIsWaiting(session));
+}
+
 export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
   return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
 }

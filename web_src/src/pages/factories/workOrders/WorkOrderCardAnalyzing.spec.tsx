@@ -89,8 +89,16 @@ describe("Confidence score on a backlog card", () => {
     expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Refining");
   });
 
-  it("replaces the spinner with the meter once the score arrives", () => {
+  it("keeps thinking states while the agent still works after a score arrives", () => {
     renderCard({ isAnalyzing: true, confidenceScore: 4 });
+
+    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
+    expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("shows the meter after analysis finishes", () => {
+    renderCard({ confidenceScore: 4 });
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
@@ -111,9 +119,12 @@ describe("Confidence score on a backlog card", () => {
   });
 
   it("shows Agent question when the analysis waits for an answer", () => {
-    renderCard({ isAnalyzing: true, hasAgentQuestion: true });
+    renderCard({ isAnalyzing: true, hasAgentQuestion: true, confidenceScore: 4 });
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 
   it("hides Agent question after the task leaves the backlog", () => {
