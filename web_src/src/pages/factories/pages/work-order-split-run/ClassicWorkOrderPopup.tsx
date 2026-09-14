@@ -11,6 +11,7 @@ import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { classicSplitRunFooter } from "./splitRunFooter";
 import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
+import { implementationRunnerModel } from "./splitRunWorkOrderDisplay";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -104,7 +105,11 @@ export function ClassicWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow fixture={{ ...classicFixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+            <OwnerTimeCostRow
+              fixture={{ ...classicFixture, owner: edits.owner }}
+              modelLabel={implementationRunnerModel(classicFixture.phases)}
+              assigneeIds={edits.assigneeIds}
+            />
           </PopupHeader>
         )}
       />

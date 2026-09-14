@@ -13,6 +13,7 @@ import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { implementationRunnerModel } from "./splitRunWorkOrderDisplay";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -168,7 +169,11 @@ function AnalysisWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+            <OwnerTimeCostRow
+              fixture={{ ...fixture, owner: edits.owner }}
+              modelLabel={implementationRunnerModel(fixture.phases)}
+              assigneeIds={edits.assigneeIds}
+            />
           </PopupHeader>
         )}
       />
