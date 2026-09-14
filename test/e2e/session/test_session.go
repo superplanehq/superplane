@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -183,6 +184,7 @@ func (s *TestSession) Login() {
 		Name:     "account_token",
 		Value:    token,
 		URL:      pw.String(s.BaseURL + "/"),
+		Path:     pw.String("/"),
 		HttpOnly: pw.Bool(true),
 	}}); err != nil {
 		s.t.Fatalf("add cookie: %v", err)
@@ -249,23 +251,33 @@ func (s *TestSession) setupTenant(seed tenantSeed) {
 		}
 	}
 
-	if svc, err := authorization.NewAuthService(); err == nil {
-		tx := database.Conn().Begin()
-		err = svc.SetupOrganization(tx, organization.ID.String(), user.ID.String())
-		if err != nil {
-			tx.Rollback()
-			s.t.Fatalf("setup organization error: %v", err)
-		}
-
-		err = tx.Commit().Error
-		if err != nil {
-			s.t.Fatalf("commit transaction: %v", err)
-		}
+	if err := setupOrganizationRoles(organization.ID.String(), user.ID.String()); err != nil {
+		s.t.Fatalf("setup organization: %v", err)
 	}
 
 	s.OrgID = organization.ID
 	s.OrgSlug = organization.Slug
 	s.Account = account
+}
+
+var setupOrganizationMu sync.Mutex
+
+func setupOrganizationRoles(organizationID, ownerID string) error {
+	setupOrganizationMu.Lock()
+	defer setupOrganizationMu.Unlock()
+
+	svc, err := authorization.NewAuthService()
+	if err != nil {
+		return err
+	}
+
+	tx := database.Conn().Begin()
+	if err := svc.SetupOrganization(tx, organizationID, ownerID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
 }
 
 func (s *TestSession) ensureAccount(seed tenantSeed) (*models.Account, error) {

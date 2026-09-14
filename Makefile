@@ -30,7 +30,7 @@ endif
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_ORG_PACKAGES := ./test/e2e/org
 E2E_INSTANCE_PACKAGES := ./test/e2e/instance
-E2E_ORG_PARALLEL ?= 4
+E2E_ORG_PARALLEL ?= 2
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
 # host directories that the CI cache can restore and store between jobs.

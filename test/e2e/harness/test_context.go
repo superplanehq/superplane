@@ -32,7 +32,7 @@ type TestContext struct {
 }
 
 func NewTestContext() *TestContext {
-	return &TestContext{timeoutMs: 15000, repoRoot: repoRoot()}
+	return &TestContext{timeoutMs: 30000, repoRoot: repoRoot()}
 }
 
 func (s *TestContext) Start() {
@@ -91,6 +91,7 @@ func (s *TestContext) Start() {
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
+	s.warmFrontend()
 }
 
 func (s *TestContext) ResetAgentProvider() {
@@ -122,6 +123,30 @@ func (s *TestContext) launchBrowser() {
 	}
 
 	s.browser = b
+}
+
+func (s *TestContext) warmFrontend() {
+	context, err := s.newBrowserContext()
+	if err != nil {
+		panic("warm frontend context: " + err.Error())
+	}
+	defer context.Close()
+
+	page, err := context.NewPage()
+	if err != nil {
+		panic("warm frontend page: " + err.Error())
+	}
+	defer page.Close()
+
+	// DomContentLoaded waits for the Vite module graph. Compile it once
+	// here so the first parallel tests do not all miss the 30s budget.
+	_, err = page.Goto(s.baseURL+"/setup", pw.PageGotoOptions{
+		WaitUntil: pw.WaitUntilStateDomcontentloaded,
+		Timeout:   pw.Float(60000),
+	})
+	if err != nil {
+		panic("warm frontend: " + err.Error())
+	}
 }
 
 func (s *TestContext) startAppServer() {
