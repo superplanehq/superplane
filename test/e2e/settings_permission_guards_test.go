@@ -136,24 +136,20 @@ func (s *settingsPermissionGuardSteps) visitAPIKeysSettings() {
 
 func (s *settingsPermissionGuardSteps) visitSettings(section string) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/" + section)
-	s.session.Sleep(500)
 }
 
 func (s *settingsPermissionGuardSteps) visitIntegrationDetail(integrationID string) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/integrations/" + integrationID)
-	s.session.Sleep(500)
 }
 
 func (s *settingsPermissionGuardSteps) openSecret(name string) {
 	link := s.session.Page().GetByTestId("secrets-secret-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	require.NoError(s.t, link.Click())
-	s.session.Sleep(500)
 }
 
 func (s *settingsPermissionGuardSteps) openAPIKey(name string) {
 	link := s.session.Page().GetByTestId("api-key-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	require.NoError(s.t, link.Click())
-	s.session.Sleep(500)
 }
 
 func (s *settingsPermissionGuardSteps) assertOrgUpdateDisabled() {
@@ -333,7 +329,6 @@ func (s *settingsPermissionGuardSteps) givenFactoryExists() *models.Factory {
 
 func (s *settingsPermissionGuardSteps) visitFactoryWorkspaceSettings(factory *models.Factory) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/settings/workspace/general")
-	s.session.Sleep(500)
 }
 
 func (s *settingsPermissionGuardSteps) assertPermissionDenied() {

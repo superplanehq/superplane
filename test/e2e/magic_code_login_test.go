@@ -123,12 +123,12 @@ func (s *magicCodeSteps) start() {
 
 func (s *magicCodeSteps) visitLoginPage() {
 	s.session.Visit("/login")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.Text("Continue with email"))
 }
 
 func (s *magicCodeSteps) visitSignupPage() {
 	s.session.Visit("/signup")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.Text("Continue with email"))
 }
 
 func (s *magicCodeSteps) assertMagicCodeFormVisible() {
@@ -139,7 +139,6 @@ func (s *magicCodeSteps) assertMagicCodeFormVisible() {
 func (s *magicCodeSteps) enterEmailAndRequestCode(email string) {
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.Click(q.Text("Continue with email"))
-	s.session.Sleep(500)
 }
 
 func (s *magicCodeSteps) assertCodeStepVisible() {
@@ -150,7 +149,6 @@ func (s *magicCodeSteps) assertCodeStepVisible() {
 
 func (s *magicCodeSteps) clickBackToEmail() {
 	s.session.Click(q.Text("Use a different email"))
-	s.session.Sleep(300)
 }
 
 // insertKnownMagicCode inserts a magic code with a known plaintext value
@@ -168,7 +166,6 @@ func (s *magicCodeSteps) insertKnownMagicCode(email, code string) {
 func (s *magicCodeSteps) enterCodeAndSubmit(code string) {
 	s.session.FillIn(q.Locator(`input[name="code"]`), code)
 	s.session.Click(q.Text("Sign in"))
-	s.session.Sleep(1500)
 }
 
 func (s *magicCodeSteps) assertMagicCodeCount(email string, expected int64) {
@@ -196,7 +193,6 @@ func (s *magicCodeSteps) assertInvalidCodeError() {
 
 func (s *magicCodeSteps) clickPasswordLoginToggle() {
 	s.session.Click(q.Text("Sign in with password instead"))
-	s.session.Sleep(300)
 }
 
 func (s *magicCodeSteps) assertPasswordFormVisible() {
@@ -206,7 +202,6 @@ func (s *magicCodeSteps) assertPasswordFormVisible() {
 
 func (s *magicCodeSteps) clickMagicCodeToggle() {
 	s.session.Click(q.Text("Sign in with email code instead"))
-	s.session.Sleep(300)
 }
 
 func (s *magicCodeSteps) createInviteLink() string {
@@ -221,5 +216,5 @@ func (s *magicCodeSteps) createInviteLink() string {
 
 func (s *magicCodeSteps) followInviteLinkToLogin(token string) {
 	s.session.Visit("/login?redirect=" + url.QueryEscape("/invite/"+token))
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.Text("Continue with email"))
 }

@@ -1,7 +1,10 @@
 package e2e
 
 import (
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -121,7 +124,7 @@ func (s *apiKeySteps) start() {
 
 func (s *apiKeySteps) visitAPIKeysPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/api-keys")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("api-key-create-btn"))
 }
 
 func (s *apiKeySteps) clickCreateAPIKey() {
@@ -129,21 +132,19 @@ func (s *apiKeySteps) clickCreateAPIKey() {
 	createBtn := page.GetByTestId("api-key-create-btn")
 	err := createBtn.First().Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.TestID("api-key-create-name"))
 }
 
 func (s *apiKeySteps) fillName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-name").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) fillDescription(description string) {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-description").Fill(description)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) selectRole(roleLabel string) {
@@ -152,19 +153,17 @@ func (s *apiKeySteps) selectRole(roleLabel string) {
 	trigger := page.GetByTestId("api-key-create-role")
 	err := trigger.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 
 	option := page.GetByRole("option", pw.PageGetByRoleOptions{Name: roleLabel, Exact: pw.Bool(true)})
-	err = option.Click()
-	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	require.NoError(s.t, option.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, option.Click())
+	s.session.AssertHidden(q.Locator(`div[role="option"]`))
 }
 
 func (s *apiKeySteps) submitCreate() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-submit").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
 }
 
 func (s *apiKeySteps) assertTokenDisplayed() {
@@ -182,7 +181,7 @@ func (s *apiKeySteps) dismissTokenModal() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-token-done").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("api-key-token-display"))
 }
 
 func (s *apiKeySteps) assertAPIKeySavedInDB(name, description, expectedRole string) {
@@ -240,7 +239,6 @@ func (s *apiKeySteps) clickAPIKeyLink(name string) {
 	link := page.GetByTestId("api-key-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	err := link.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
 }
 
 func (s *apiKeySteps) assertOnDetailPage(name string) {
@@ -252,7 +250,7 @@ func (s *apiKeySteps) clickEditButton() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-edit").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("api-key-detail-edit-name"))
 }
 
 func (s *apiKeySteps) clearAndFillEditName(name string) {
@@ -260,7 +258,6 @@ func (s *apiKeySteps) clearAndFillEditName(name string) {
 	input := page.GetByTestId("api-key-detail-edit-name")
 	err := input.Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) clearAndFillEditDescription(description string) {
@@ -268,7 +265,6 @@ func (s *apiKeySteps) clearAndFillEditDescription(description string) {
 	input := page.GetByTestId("api-key-detail-edit-description")
 	err := input.Fill(description)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) submitEdit() {
@@ -276,7 +272,7 @@ func (s *apiKeySteps) submitEdit() {
 	saveBtn := page.Locator("button:has-text('Save')").First()
 	err := saveBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
+	s.session.AssertHidden(q.TestID("api-key-detail-edit-name"))
 }
 
 func (s *apiKeySteps) assertAPIKeyNameInDB(name string) {
@@ -295,25 +291,34 @@ func (s *apiKeySteps) clickDeleteOnDetail() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-delete").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
+	s.session.WaitUntil(func() bool {
+		parsed, err := url.Parse(s.session.Page().URL())
+		if err != nil {
+			return false
+		}
+		return strings.HasSuffix(strings.TrimSuffix(parsed.Path, "/"), "/settings/api-keys")
+	}, "API key detail page did not close")
 }
 
 func (s *apiKeySteps) assertAPIKeyDeletedFromDB(name string) {
-	apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
-	require.NoError(s.t, err)
-
-	for _, apiKey := range apiKeys {
-		if apiKey.Name == name {
-			require.Fail(s.t, "API key %q should have been deleted", name)
+	require.Eventually(s.t, func() bool {
+		apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
+		if err != nil {
+			return false
 		}
-	}
+		for _, apiKey := range apiKeys {
+			if apiKey.Name == name {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond, "API key %q should have been deleted", name)
 }
 
 func (s *apiKeySteps) clickRegenerateToken() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-regenerate-token").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
 }
 
 func (s *apiKeySteps) loginAsOperator() {
