@@ -153,7 +153,7 @@ describe("useCreateWorkOrderComposer", () => {
       await result.current.handleCreate();
     });
 
-    expect(onCreated).toHaveBeenCalledWith("101");
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -172,6 +172,59 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     expect(result.current.title).toHaveLength(256);
+  });
+
+  it("creates from a request draft and fills the title from the first body line", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreate({
+        title: "",
+        description: "Refunds fail on retry.",
+      });
+    });
+
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "Refunds fail on retry.",
+      description: "Refunds fail on retry.",
+      assigneeIds: [],
+    });
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
+  });
+
+  it("uses New task when a request draft has no title text", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "102" });
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreate({
+        title: "",
+        description: "![receipt.png](sp-file://file-2)",
+      });
+    });
+
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "New task",
+      description: "![receipt.png](sp-file://file-2)",
+      assigneeIds: [],
+    });
   });
 
   it("keeps the first 5000 characters of a long pasted description", () => {
