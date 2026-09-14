@@ -71,14 +71,14 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Empty(t, unknown)
 }
 
-func TestPlanningSystemPromptSkipsProtocolAlreadyInPrompt(t *testing.T) {
+func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
 	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
 	require.NoError(t, err)
 
 	analysis := planningSystemPromptFromScriptWithPrompt(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	}, string(protocol)+"\n\nTask:\nFix retries.")
-	assert.Empty(t, analysis)
+	assert.Equal(t, " "+strings.TrimSpace(string(protocol)), analysis)
 }
 
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {

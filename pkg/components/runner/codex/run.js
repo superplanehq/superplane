@@ -31,12 +31,12 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
-function loadAnalysisProtocolForPrompt(prompt) {
+function withoutEmbeddedAnalysisProtocol(prompt) {
   const mod = loadAnalysisProtocolModule();
-  if (typeof mod.analysisProtocolForPrompt === "function") {
-    return mod.analysisProtocolForPrompt(prompt);
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
   }
-  return loadAnalysisProtocol();
+  return prompt;
 }
 
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
@@ -62,14 +62,14 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env, prompt = "") {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
 }
 
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
-function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "", prompt = "") {
+function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
   const args = ["exec"];
   if (sessionID) {
     args.push("resume", sessionID);
@@ -78,10 +78,7 @@ function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "", 
   if (planningEnabled(env)) {
     args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
     args.push(...mcpConfigOverrides(mcpScriptPath));
-    const protocol = loadAnalysisProtocolForPrompt(prompt);
-    if (protocol) {
-      args.push("-c", `developer_instructions=${tomlString(protocol)}`);
-    }
+    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
   }
@@ -169,11 +166,14 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
   let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  if (planningAnalysisEnabled()) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
   const planning = planningEnabled();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID, prompt);
+  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write("sandbox: read-only\n");

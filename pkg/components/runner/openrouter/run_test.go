@@ -97,14 +97,14 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
 }
 
-func TestBuildOpenCodeConfigSkipsProtocolAlreadyInPrompt(t *testing.T) {
+func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
 	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
 	require.NoError(t, err)
 	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	}, string(protocol)+"\n\nTask:\nFix retries.")
-	assert.Nil(t, config["instructions"])
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, config["instructions"])
 }
 
 func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {

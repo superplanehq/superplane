@@ -36,12 +36,12 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
-function loadAnalysisProtocolForPrompt(prompt) {
+function withoutEmbeddedAnalysisProtocol(prompt) {
   const mod = loadAnalysisProtocolModule();
-  if (typeof mod.analysisProtocolForPrompt === "function") {
-    return mod.analysisProtocolForPrompt(prompt);
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
   }
-  return loadAnalysisProtocol();
+  return prompt;
 }
 
 function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
@@ -67,8 +67,8 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env, prompt = "") {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
 }
 
 function catalogModelId(model) {
@@ -240,7 +240,7 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
   return args;
 }
 
-function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [], prompt = "" } = {}) {
+function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     permission: planning
@@ -286,7 +286,7 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
-  const protocol = planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
+  const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
     try {
@@ -299,13 +299,12 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models, prompt) {
+function writeOpenCodeConfig(taskDir, env, models) {
   const config = buildOpenCodeConfig({
     taskDir,
     env,
     planning: planningEnabled(env),
     models,
-    prompt,
   });
   fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
@@ -360,6 +359,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
   let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
+  if (planningAnalysisEnabled(env)) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;
@@ -374,7 +376,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   ensureXdgDirs(sp);
 
   const currentModel = catalogModelId(model);
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : [], prompt);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
   const childEnv = openCodeProcessEnv(sp, env);
 
   const deadline = waitDeadlineMs(env, now);

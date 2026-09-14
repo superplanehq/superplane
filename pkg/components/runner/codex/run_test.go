@@ -123,7 +123,7 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
-func TestCodexExecArgsSkipsProtocolAlreadyInPrompt(t *testing.T) {
+func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
 	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
 	require.NoError(t, err)
 	args := codexExecArgsFromScriptWithPrompt(t, map[string]string{
@@ -131,7 +131,8 @@ func TestCodexExecArgsSkipsProtocolAlreadyInPrompt(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	}, "gpt-5", "/task/planning_session_mcp.js", "", string(protocol)+"\n\nTask:\nFix retries.")
 
-	assert.NotContains(t, strings.Join(args, " "), "developer_instructions")
+	assert.Contains(t, strings.Join(args, " "), "developer_instructions")
+	assert.Contains(t, strings.Join(args, " "), strings.Split(string(protocol), "\n")[0])
 }
 
 func TestPlanningEnabledFromScript(t *testing.T) {

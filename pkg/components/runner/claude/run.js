@@ -38,12 +38,12 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
-function loadAnalysisProtocolForPrompt(prompt) {
+function withoutEmbeddedAnalysisProtocol(prompt) {
   const mod = loadAnalysisProtocolModule();
-  if (typeof mod.analysisProtocolForPrompt === "function") {
-    return mod.analysisProtocolForPrompt(prompt);
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
   }
-  return loadAnalysisProtocol();
+  return prompt;
 }
 
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
@@ -76,9 +76,8 @@ function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
 
-function planningSystemPrompt(env = process.env, prompt = "") {
-  const protocol = planningAnalysisEnabled(env) ? loadAnalysisProtocolForPrompt(prompt) : "";
-  return protocol ? ` ${protocol}` : "";
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? ` ${loadAnalysisProtocol()}` : "";
 }
 
 function allowedClaudeTools(env = process.env) {
@@ -162,7 +161,10 @@ async function runPrompt(promptFile, model) {
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  const prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  if (planningAnalysisEnabled()) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const sessionID = readSessionID(sp);
   const planningToolsEnabled = mcpToolsEnabled();
 
@@ -183,7 +185,7 @@ async function runPrompt(promptFile, model) {
   if (planningToolsEnabled) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
-    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt(process.env, prompt);
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt();
     const mcpConfigPath = path.join(sp, "mcp.runtime.json");
     fs.writeFileSync(
       mcpConfigPath,

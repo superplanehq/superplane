@@ -9,8 +9,12 @@ function analysisProtocol() {
   return ANALYSIS_PROTOCOL;
 }
 
-function analysisProtocolForPrompt(prompt) {
-  return String(prompt || "").includes(ANALYSIS_PROTOCOL) ? "" : ANALYSIS_PROTOCOL;
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const value = String(prompt || "");
+  if (!value.includes(ANALYSIS_PROTOCOL)) {
+    return value;
+  }
+  return value.replace(ANALYSIS_PROTOCOL, "").trimStart();
 }
 
 function withAnalysisContinuation(taskDir, promptCount, prompt) {
@@ -29,4 +33,4 @@ function withAnalysisContinuation(taskDir, promptCount, prompt) {
   }
 }
 
-module.exports = { ANALYSIS_PROTOCOL, analysisProtocol, analysisProtocolForPrompt, withAnalysisContinuation };
+module.exports = { ANALYSIS_PROTOCOL, analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation };

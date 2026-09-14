@@ -808,10 +808,12 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if _, err := models.FindOrganizationByID(orgID); err != nil {
+	organization, err := models.FindOrganizationByID(orgID)
+	if err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
 		return
 	}
+	featureWasEnabled := organization.HasExperimentalFeature(featureID)
 
 	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
 		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
@@ -840,14 +842,20 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 				result.Skipped,
 				upgradeErr,
 			)
-		} else {
-			log.Infof(
-				"admin: upgraded Backlog templates for org %s: upgraded=%d skipped=%d",
-				orgID,
-				result.Upgraded,
-				result.Skipped,
-			)
+			if !featureWasEnabled {
+				if rollbackErr := models.DisableExperimentalFeature(parsedOrgID, featureID); rollbackErr != nil {
+					log.Errorf("admin: failed to roll back feature %s for org %s: %v", featureID, orgID, rollbackErr)
+				}
+			}
+			http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
+			return
 		}
+		log.Infof(
+			"admin: upgraded Backlog templates for org %s: upgraded=%d skipped=%d",
+			orgID,
+			result.Upgraded,
+			result.Skipped,
+		)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

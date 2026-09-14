@@ -7,7 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { analysisProtocol, analysisProtocolForPrompt, withAnalysisContinuation } = require("./analysis_protocol");
+const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
 const { recordAgentMessage, writeAnalysisOutputs } = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
@@ -27,10 +27,10 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
 });
 
-test("analysis protocol is not injected when the visible prompt contains it", () => {
+test("embedded analysis protocol is removed from the task prompt", () => {
   const protocol = analysisProtocol();
-  assert.equal(analysisProtocolForPrompt(`Visible instructions:\n\n${protocol}\n\nTask:\nFix retries.`), "");
-  assert.equal(analysisProtocolForPrompt("Legacy analysis prompt."), protocol);
+  assert.equal(withoutEmbeddedAnalysisProtocol(`${protocol}\n\nTask:\nFix retries.`), "Task:\nFix retries.");
+  assert.equal(withoutEmbeddedAnalysisProtocol("Legacy analysis prompt."), "Legacy analysis prompt.");
 });
 
 test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
