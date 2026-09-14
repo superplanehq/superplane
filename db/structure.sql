@@ -892,8 +892,8 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     max_parallel_factory_tasks integer DEFAULT 50 NOT NULL,
-    CONSTRAINT installation_metadata_singleton CHECK ((id = 1)),
-    CONSTRAINT installation_metadata_max_parallel_factory_tasks_positive CHECK ((max_parallel_factory_tasks >= 1))
+    CONSTRAINT installation_metadata_max_parallel_factory_tasks_positive CHECK ((max_parallel_factory_tasks >= 1)),
+    CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
 
@@ -2780,7 +2780,7 @@ CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_
 -- Name: idx_factory_work_order_executions_factory_active; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_work_order_executions_factory_active ON public.factory_work_order_executions USING btree (factory_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+CREATE INDEX idx_factory_work_order_executions_factory_active ON public.factory_work_order_executions USING btree (factory_id) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text]));
 
 
 --
