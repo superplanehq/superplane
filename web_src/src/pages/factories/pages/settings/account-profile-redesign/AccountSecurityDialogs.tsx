@@ -32,7 +32,7 @@ export function DisconnectSsoDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Disconnect {provider.label}</DialogTitle>
-          <DialogDescription>You cannot sign in with {provider.label} until you connect it again.</DialogDescription>
+          <DialogDescription>{disconnectSsoDescription(provider)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -45,6 +45,13 @@ export function DisconnectSsoDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function disconnectSsoDescription(provider: SsoProviderItem): string {
+  if (provider.provider === "github") {
+    return "You cannot sign in with GitHub until you connect it again. Velocity reports stop crediting your pull requests to you.";
+  }
+  return `You cannot sign in with ${provider.label} until you connect it again.`;
 }
 
 export function PasswordDialog({

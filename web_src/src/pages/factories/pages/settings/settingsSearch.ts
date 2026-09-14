@@ -31,11 +31,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   entry("account", "profile", "Account", undefined, ["identity", "name", "avatar", "preferences"]),
   entry("account", "profile", "Identity", "account-redesign-identity", ["name", "primary email", "email", "avatar"]),
   entry("account", "profile", "Appearance", "account-redesign-appearance", ["theme", "light", "dark", "system"]),
-  entry("account", "profile", "GitHub for Velocity", "account-redesign-velocity-github", [
-    "github",
-    "velocity",
-    "pull requests",
-  ]),
   entry("account", "profile", "Security", "account-redesign-security", [
     "sign in",
     "password",
@@ -50,6 +45,8 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "github",
     "google",
     "sso",
+    "velocity",
+    "pull requests",
   ]),
   entry("account", "profile", "Personal tokens", "account-redesign-tokens", [
     "create token",
