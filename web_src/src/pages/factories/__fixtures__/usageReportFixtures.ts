@@ -149,6 +149,17 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   hasBillingCustomer: true,
 };
 
+export const ENDING_ORGANIZATION_BILLING = {
+  ...BUSINESS_ORGANIZATION_BILLING,
+  cancelAtPeriodEnd: true,
+};
+
+export const ADMIN_ORGANIZATION_BILLING = {
+  ...BUSINESS_ORGANIZATION_BILLING,
+  planSource: "admin",
+  polarSubscriptionStatus: "",
+};
+
 export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
   planSource: "system",
