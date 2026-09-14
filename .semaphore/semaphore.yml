@@ -146,7 +146,7 @@ blocks:
       epilogue:
         always:
           commands:
-            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
 
 after_pipeline:
   task:

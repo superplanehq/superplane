@@ -10,9 +10,10 @@ set -euo pipefail
 #   SHARD_INDEX=1 SHARD_COUNT=4 bash scripts/test_ui_autoparallel.sh
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${script_dir}/../web_src"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "${repo_root}/web_src"
 
-junit_file="${JUNIT_FILE:-/app/junit-report.xml}"
+junit_file="${JUNIT_FILE:-${repo_root}/junit-report.xml}"
 args=(
   --dots
   --reporter=junit
@@ -27,9 +28,13 @@ else
   args+=(--isolate)
 fi
 
+file_args=()
 if [[ -n "${FILES:-}" ]]; then
   read -r -a file_args <<< "${FILES}"
-  bun test "${args[@]}" "${file_args[@]}"
-else
-  bun test "${args[@]}"
 fi
+
+bun_status=0
+bun test "${args[@]}" "${file_args[@]}" || bun_status=$?
+
+bun "${script_dir}/flatten_junit.mjs" "${junit_file}"
+exit "${bun_status}"
