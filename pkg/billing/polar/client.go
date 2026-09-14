@@ -153,20 +153,11 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 		if !isCreditPack(item.Metadata) {
 			continue
 		}
-		custom := item.hasCustomPrice()
-		amount := int64(0)
-		if !custom {
-			amount = item.faceValueCents()
-			if amount <= 0 {
-				continue
-			}
+		pack, ok := creditPackFromProduct(item)
+		if !ok {
+			continue
 		}
-		packs = append(packs, Product{
-			ID:          item.ID,
-			Name:        item.Name,
-			AmountCents: amount,
-			CustomPrice: custom,
-		})
+		packs = append(packs, pack)
 	}
 	slices.SortFunc(packs, func(left, right Product) int {
 		if left.CustomPrice != right.CustomPrice {
@@ -193,20 +184,11 @@ func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product,
 	if !isCreditPack(payload.Metadata) {
 		return nil, ErrNotCreditPack
 	}
-	custom := payload.hasCustomPrice()
-	amount := int64(0)
-	if !custom {
-		amount = payload.faceValueCents()
-		if amount <= 0 {
-			return nil, fmt.Errorf("credit pack face value is missing")
-		}
+	pack, ok := creditPackFromProduct(payload)
+	if !ok {
+		return nil, fmt.Errorf("credit pack face value is missing")
 	}
-	return &Product{
-		ID:          payload.ID,
-		Name:        payload.Name,
-		AmountCents: amount,
-		CustomPrice: custom,
-	}, nil
+	return &pack, nil
 }
 
 func (c *Client) GetCustomerByExternalID(ctx context.Context, externalID string) (*Customer, error) {
@@ -559,6 +541,20 @@ type productJSON struct {
 	IsRecurring bool           `json:"is_recurring"`
 	Metadata    map[string]any `json:"metadata"`
 	Prices      []priceJSON    `json:"prices"`
+}
+
+func creditPackFromProduct(item productJSON) (Product, bool) {
+	amount := item.faceValueCents()
+	custom := item.hasCustomPrice() && amount <= 0
+	if !custom && amount <= 0 {
+		return Product{}, false
+	}
+	return Product{
+		ID:          item.ID,
+		Name:        item.Name,
+		AmountCents: amount,
+		CustomPrice: custom,
+	}, true
 }
 
 func (p productJSON) hasCustomPrice() bool {

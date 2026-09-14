@@ -96,6 +96,42 @@ func Test__ApplyOrderPaidUsesPurchasedPrice(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(2300), grant.AmountMicros)
 }
 
+func Test__ApplyOrderPaidGrantsFixedPriceWhenCatalogAlsoHasCustom(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event.Data.NetAmount = 2000
+	event.Data.Product.Prices = []priceJSON{
+		{AmountType: "fixed", PriceAmount: 2500},
+		{AmountType: "custom"},
+	}
+	event.Data.ProductPrice = priceJSON{AmountType: "fixed", PriceAmount: 2500}
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
+}
+
+func Test__ApplyOrderPaidGrantsCustomAmountWhenMixedCatalogSelectsCustom(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidCustomPackEvent(r.Organization.ID, orderID, 7350)
+	event.Data.Product.Prices = []priceJSON{
+		{AmountType: "fixed", PriceAmount: 2500},
+		{AmountType: "custom"},
+	}
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(7350), grant.AmountMicros)
+}
+
 func Test__ApplyOrderPaidIgnoresSubscriptionCycle(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

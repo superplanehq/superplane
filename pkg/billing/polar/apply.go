@@ -195,7 +195,7 @@ func orderHasCustomPrice(data OrderData) bool {
 			return true
 		}
 	}
-	return productJSON{Prices: data.Product.Prices}.hasCustomPrice()
+	return false
 }
 
 func customPaidAmountCents(data OrderData) int64 {

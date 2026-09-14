@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import type { OrganizationsHostedCreditProduct } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
@@ -26,44 +27,48 @@ export function HostedCreditTopUpBanner({
 
   return (
     <div className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-violet-100 py-1 pr-1.5 pl-2.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         disabled={disabled}
         aria-expanded={open}
         aria-label="Top up"
         data-testid="billing-top-up"
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-violet-800 disabled:pointer-events-none disabled:opacity-50 dark:text-violet-200"
+        className="h-auto gap-1 px-0 py-0 text-[12px] font-medium text-violet-800 hover:bg-transparent dark:text-violet-200 dark:hover:bg-transparent"
       >
         {checkoutPending ? "Opening checkout..." : "Top up"}
         <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
-      </button>
+      </Button>
       {open ? (
         <div className="flex items-center gap-1" data-testid="billing-top-up-options">
           {BUY_MORE_PACK_CENTS.map((cents) => {
             const product = findPackForCents(packs, cents);
             const productId = product?.id ?? "";
             return (
-              <button
+              <Button
                 key={cents}
                 type="button"
+                size="xs"
                 disabled={!productId || checkoutPending}
                 onClick={() => productId && void onAddCredit(productId)}
-                className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white hover:bg-violet-700 disabled:pointer-events-none disabled:opacity-40"
+                className="h-5 bg-violet-600 px-2.5 text-[11px] leading-none text-white hover:bg-violet-700 disabled:opacity-40"
               >
                 {formatUsdPackLabel(cents)}
-              </button>
+              </Button>
             );
           })}
-          <button
+          <Button
             type="button"
+            size="xs"
             disabled={!customPackId || checkoutPending}
             title={customPackId ? undefined : "Custom amounts are not available yet."}
             onClick={() => customPackId && void onAddCredit(customPackId)}
-            className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white hover:bg-violet-700 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-violet-600"
+            className="h-5 bg-violet-600 px-2.5 text-[11px] leading-none text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-violet-600"
           >
             Custom
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>
