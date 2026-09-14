@@ -8,7 +8,7 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { useWorkOrderPlanningSurvey } from "./useWorkOrderPlanningSurvey";
+import { useWorkOrderPlanningActivity } from "./useWorkOrderPlanningSurvey";
 
 export function LineBoardOrderCard({
   order,
@@ -53,7 +53,16 @@ export function LineBoardWorkOrderCard({
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
   const isDraft = entry.displayStatus === "draft";
-  const showAnalysisActivity = refinementEnabled && isDraft && Boolean(isAnalyzing);
+  const watchSession = refinementEnabled && isDraft && showConfidence;
+  const session = useWorkOrderPlanningActivity(
+    workOrderCardContext.organizationId,
+    workOrderCardContext.factoryId ?? "",
+    order.id ?? "",
+    watchSession,
+    isAnalyzing,
+  );
+  const agentWorking = session.isWorking || (Boolean(isAnalyzing) && !session.isWaiting);
+  const showAnalysisActivity = watchSession && agentWorking;
   const { data: checks = [], refetch } = useWorkOrderChecks(
     workOrderCardContext.organizationId,
     workOrderCardContext.factoryId ?? "",
@@ -70,20 +79,14 @@ export function LineBoardWorkOrderCard({
     }
     wasAnalyzing.current = showAnalysisActivity;
   }, [refetch, showAnalysisActivity, showConfidence]);
-  const hasAgentQuestion = useWorkOrderPlanningSurvey(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryId ?? "",
-    order.id ?? "",
-    showAnalysisActivity,
-  );
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
-      isAnalyzing={showConfidence && showAnalysisActivity}
-      hasAgentQuestion={showAnalysisActivity && hasAgentQuestion}
+      isAnalyzing={showConfidence && agentWorking}
+      hasAgentQuestion={session.hasAgentQuestion}
       onOpen={onOpen}
     />
   );
