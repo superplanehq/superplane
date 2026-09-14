@@ -152,10 +152,7 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
  * `factoryKey` is the parent factory's key; passing it lets callers render
  * an identifier when only the immutable per-order `number` is available.
  */
-export function getWorkOrderDisplayKey(
-  order: Pick<FactoriesWorkOrder, "id" | "key" | "number">,
-  factoryKey?: string | null,
-): string {
+export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: string | null): string {
   if (order.key) {
     return order.key;
   }

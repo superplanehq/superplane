@@ -64,15 +64,12 @@ describe("ClassicWorkOrderPopup", () => {
     expect(within(dialog).queryByText("Add context for this plan")).not.toBeInTheDocument();
   });
 
-  it("shows the workspace-scoped task ID next to the title", () => {
+  it("does not show a copyable task ID in the header", () => {
     renderClassicPopup();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    const displayKey = within(dialog).getByTestId("popup-work-order-display-key");
-    const title = within(dialog).getByTestId("popup-work-order-title");
-
-    expect(displayKey).toHaveTextContent("RF-105");
-    expect(displayKey).toHaveAccessibleName("Copy task ID RF-105");
-    expect(title.compareDocumentPosition(displayKey) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(dialog).queryByTestId("popup-work-order-display-key")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /Copy task ID/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("RF-105")).not.toBeInTheDocument();
   });
 });
