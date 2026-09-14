@@ -3,6 +3,43 @@ import { describe, expect, it } from "vitest";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 
 describe("workOrderPopupMode", () => {
+  it("waits for Task Refinement access before choosing a popup", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        refinementEnabled: false,
+        refinementLoading: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+      }),
+    ).toBe("loading");
+  });
+
+  it("waits for the session lookup when an existing session can change the popup", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        refinementEnabled: true,
+        sessionLoading: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+      }),
+    ).toBe("loading");
+  });
+
+  it("shows known analysis results while the session lookup continues", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: true,
+        refinementEnabled: true,
+        sessionLoading: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+      }),
+    ).toBe("analysis");
+  });
+
   it("uses the classic popup when refinement is disabled", () => {
     expect(
       workOrderPopupMode({

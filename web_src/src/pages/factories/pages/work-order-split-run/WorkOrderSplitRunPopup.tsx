@@ -36,7 +36,8 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const { organizationId, factoryId, orderId, fixture, canUpdate = true } = props;
-  const refinementEnabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const refinementFeature = useExperimentalFeature(organizationId);
+  const refinementEnabled = refinementFeature.has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -57,10 +58,15 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     hasPlanningSession: Boolean(analysis.session),
     hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
     refinementEnabled,
+    refinementLoading: refinementFeature.isLoading,
+    sessionLoading: analysis.isLoading,
     analysisActive: isAnalyzing,
     hasLookupIdentity,
   });
 
+  if (mode === "loading") {
+    return null;
+  }
   if (mode === "analysis") {
     return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
   }
