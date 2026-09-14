@@ -360,6 +360,16 @@ func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
 	assert.Equal(t, "read", listTask.Action)
 }
 
+func TestDuplicateWorkOrderRouteRequiresTaskRefinement(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}:duplicate"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", rule.Resource)
+	assert.Equal(t, "create", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}, rule.RequiredExperimentalFeatures)
+}
+
 func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

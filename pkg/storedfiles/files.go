@@ -82,6 +82,137 @@ func BindDescriptionFiles(
 	return result, nil
 }
 
+func CloneDescriptionFiles(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, sourceWorkOrderID, destWorkOrderID, createdBy uuid.UUID,
+	markdown string,
+) (next string, result BindResult, err error) {
+	next = markdown
+	ids := blob.FileIDsInMarkdown(markdown)
+	if len(ids) == 0 {
+		return next, result, nil
+	}
+	if provider == nil {
+		return next, result, blob.ErrProviderNotConfigured
+	}
+
+	files, listErr := models.ListFilesByIDs(tx, ids)
+	if listErr != nil {
+		return next, result, listErr
+	}
+	byID := map[uuid.UUID]models.File{}
+	for _, file := range files {
+		byID[file.ID] = file
+	}
+
+	openCount, err := models.LockAndCountOpenTaskFiles(tx, organizationID, destWorkOrderID)
+	if err != nil {
+		return next, result, err
+	}
+
+	defer func() {
+		if err != nil {
+			_ = DeleteObjects(ctx, provider, result.CopiedKeys)
+		}
+	}()
+
+	rewrites := map[uuid.UUID]string{}
+	for _, id := range ids {
+		file, ok := byID[id]
+		if !ok {
+			err = fmt.Errorf("%w: %s", models.ErrFileNotFound, id)
+			return next, result, err
+		}
+		if err = cloneableDescriptionFile(file, organizationID, factoryID, sourceWorkOrderID); err != nil {
+			return next, result, err
+		}
+		if openCount >= models.MaxFilesPerWorkOrder {
+			err = fmt.Errorf("%w: task file limit is %d", models.ErrFileQuotaExceeded, models.MaxFilesPerWorkOrder)
+			return next, result, err
+		}
+		var copied *models.File
+		var copiedKey string
+		copied, copiedKey, err = cloneReadyFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, destWorkOrderID, createdBy, &file)
+		if copiedKey != "" {
+			result.CopiedKeys = append(result.CopiedKeys, copiedKey)
+		}
+		if err != nil {
+			return next, result, err
+		}
+		rewrites[id] = blob.FileRef(copied.ID)
+		openCount++
+	}
+
+	next = blob.RewriteFileRefs(markdown, rewrites)
+	return next, result, nil
+}
+
+func cloneableDescriptionFile(file models.File, organizationID, factoryID, sourceWorkOrderID uuid.UUID) error {
+	if file.State != models.FileStateReady {
+		return fmt.Errorf("%w: %s", models.ErrFileNotReady, file.ID)
+	}
+	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
+		return models.ErrFileForeignReference
+	}
+	if file.FactoryID == nil || *file.FactoryID != factoryID {
+		return models.ErrFileForeignReference
+	}
+	switch file.Scope {
+	case blob.ScopeTask:
+		if file.WorkOrderID == nil || *file.WorkOrderID != sourceWorkOrderID {
+			return models.ErrFileForeignReference
+		}
+		return nil
+	case blob.ScopeWorkspace:
+		return nil
+	default:
+		return models.ErrFileForeignReference
+	}
+}
+
+func cloneReadyFileToWorkOrder(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID, createdBy uuid.UUID,
+	source *models.File,
+) (*models.File, string, error) {
+	created, err := models.CreatePendingFile(tx, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		Filename:       source.Filename,
+		ContentType:    source.ContentType,
+		CreatedByID:    createdBy,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	reader, err := provider.Get(ctx, source.StorageKey)
+	if err != nil {
+		return nil, "", err
+	}
+	putErr := provider.Put(ctx, created.StorageKey, reader, blob.PutOptions{ContentType: source.ContentType})
+	_ = reader.Close()
+	if putErr != nil {
+		_ = provider.Delete(ctx, created.StorageKey)
+		return nil, "", putErr
+	}
+
+	checksum := ""
+	if source.Checksum != nil {
+		checksum = *source.Checksum
+	}
+	if err := created.MarkReady(tx, source.SizeBytes, checksum); err != nil {
+		return nil, created.StorageKey, err
+	}
+	return created, created.StorageKey, nil
+}
+
 func ApplyBindResult(
 	ctx context.Context,
 	db *gorm.DB,

@@ -1,3 +1,4 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { JumpToLatestPill } from "./JumpToLatestPill";
@@ -31,6 +32,8 @@ export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "foot
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  canCreate?: boolean;
+  onOpenWorkOrder?: (orderId: string, order: FactoriesWorkOrder) => void;
 };
 
 type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;

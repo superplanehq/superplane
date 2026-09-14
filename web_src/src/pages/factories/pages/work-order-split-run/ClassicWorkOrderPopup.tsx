@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
@@ -15,6 +14,8 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
+import { useWorkOrderPopupDuplicate } from "./useWorkOrderPopupDuplicate";
+import { WorkOrderPopupHeaderActions } from "./WorkOrderPopupHeaderActions";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
 import {
   draftStartAction,
@@ -42,11 +43,20 @@ export function ClassicWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  canCreate = false,
+  onOpenWorkOrder,
   popupData,
   sessionLookupError,
 }: ClassicWorkOrderPopupProps) {
   const classicFixture = useMemo(() => ({ ...fixture, footer: classicSplitRunFooter(fixture.footer) }), [fixture]);
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
+  const duplicate = useWorkOrderPopupDuplicate({
+    organizationId,
+    factoryId,
+    orderId,
+    canCreate,
+    onOpenWorkOrder,
+  });
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, classicFixture, dismissCurrentPopup);
@@ -95,11 +105,11 @@ export function ClassicWorkOrderPopup({
             expanded={fullPage}
             onToggleExpanded={() => setFullPage((current) => !current)}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <WorkOrderPopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                canDuplicate={duplicate.canDuplicate}
+                onDuplicate={() => void duplicate.onDuplicate()}
+                duplicateBusy={duplicate.busy}
               />
             }
             accessory={views}
