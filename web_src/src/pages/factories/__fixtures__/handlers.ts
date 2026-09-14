@@ -34,6 +34,12 @@ import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import {
+  formatUsageCsvDollarsFromMicros,
+  usageSpendMicros,
+  usageTokenSpendMicros,
+  usageVmSpendMicros,
+} from "../lib/workOrderUsage";
 import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
@@ -195,10 +201,9 @@ function usageHistoryCsvBody(rows: FactoriesWorkOrderRunUsageRow[]): string {
 function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
   const totalTokens = Number(row.totalTokens ?? 0);
   const durationSeconds = Number(row.durationSeconds ?? 0);
-  const hostedCostCents = Number(row.hostedCostCents ?? 0);
-  const byokCostCents = Number(row.byokCostCents ?? 0);
-  const tokenPriceCents = hostedCostCents + byokCostCents;
-  const vmPriceCents = Math.max(0, Number(row.costCents ?? 0) - tokenPriceCents);
+  const hostedCostMicros = usageSpendMicros(row.hostedCostMicros, row.hostedCostCents);
+  const byokCostMicros = usageSpendMicros(row.byokCostMicros, row.byokCostCents);
+  const totalCostMicros = usageSpendMicros(row.costMicros, row.costCents);
 
   return [
     row.lastOccurredAt ? new Date(row.lastOccurredAt).toISOString() : "",
@@ -206,10 +211,10 @@ function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
     row.workOrderKey ?? "",
     usageHistoryCsvModels(row.models, row.byokModels),
     totalTokens > 0 ? String(totalTokens) : "",
-    tokenPriceCents > 0 ? (tokenPriceCents / 100).toFixed(2) : "",
+    formatUsageCsvDollarsFromMicros(usageTokenSpendMicros(hostedCostMicros, byokCostMicros)),
     (row.machineTypes ?? []).join(" · "),
     durationSeconds > 0 ? String(durationSeconds) : "",
-    vmPriceCents > 0 ? (vmPriceCents / 100).toFixed(2) : "",
+    formatUsageCsvDollarsFromMicros(usageVmSpendMicros(totalCostMicros, hostedCostMicros, byokCostMicros)),
   ];
 }
 

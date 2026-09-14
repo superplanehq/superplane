@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -87,6 +88,8 @@ func Test__ListFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Empty(t, row.Models)
 	assert.Contains(t, row.MachineTypes, "e1-large-amd64")
 	assert.Positive(t, row.CostCents)
+	assert.Equal(t, int64(90)*pricebook.MicrosPerSecondE1Large, row.CostMicros-row.ByokCostMicros)
+	assert.Zero(t, pricebook.MicrosToCents(row.CostMicros-row.ByokCostMicros))
 }
 
 func Test__ListFactoryWorkOrderRunUsage__RejectsInvalidWindow(t *testing.T) {
