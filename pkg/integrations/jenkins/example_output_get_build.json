@@ -1,0 +1,11 @@
+{
+  "data": {
+    "building": false,
+    "result": "SUCCESS",
+    "number": 42,
+    "url": "https://jenkins.example.com/job/my-job/42/",
+    "durationMs": 128374
+  },
+  "timestamp": "2026-08-08T12:34:56.000Z",
+  "type": "jenkins.build"
+}
