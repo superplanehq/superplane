@@ -105,7 +105,7 @@ export function DeliveryChart({
           <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
           <VelocityDayAxis ticks={ticks} />
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} className="text-[11px]" />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartTooltip content={<ChartTooltipContent formatter={formatDeliveryTooltip} />} />
           <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
           {series.map((item, index) => (
             <Bar
@@ -120,6 +120,20 @@ export function DeliveryChart({
           ))}
         </BarChart>
       </ChartContainer>
+    </div>
+  );
+}
+
+function formatDeliveryTooltip(value: unknown, name: unknown) {
+  const count = Array.isArray(value) ? Number(value[0]) : Number(value);
+  const label = String(name);
+
+  return (
+    <div className="flex w-full items-center justify-between gap-8">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-medium text-foreground tabular-nums">
+        {Number.isFinite(count) ? count.toLocaleString() : String(value)}
+      </span>
     </div>
   );
 }
