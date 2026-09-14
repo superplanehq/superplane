@@ -76,11 +76,40 @@ const TONE = {
   },
 } as const;
 
-/**
- * Sticky decision note. Actions sit beside the copy. No Update manually,
- * no source time. A waiting note that links to a pull request renders as
- * the pull-request review strip instead.
- */
+function waitingPullRequestStrip({
+  note,
+  tone,
+  actions,
+  actionBusy,
+  inColumn,
+  onAction,
+}: {
+  note: SplitRunFooterNote;
+  tone: SplitRunDecisionTone;
+  actions: SplitRunFooterAction[];
+  actionBusy: boolean;
+  inColumn: boolean;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  if (tone !== "waiting" || !note.cta) {
+    return null;
+  }
+  const pullRequest = pullRequestReviewNote(note);
+  if (!pullRequest) {
+    return null;
+  }
+  return (
+    <SplitRunPullRequestReviewNote
+      ctaLabel={note.cta.label}
+      pullRequest={pullRequest}
+      actions={actions}
+      actionBusy={actionBusy}
+      inColumn={inColumn}
+      onAction={onAction}
+    />
+  );
+}
+
 function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
   if (!note.actor) {
     return note.headline;
@@ -93,6 +122,11 @@ function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
   );
 }
 
+/**
+ * Sticky decision note. Actions sit beside the copy. No Update manually,
+ * no source time. A waiting note that links to a pull request renders as
+ * the pull-request review strip instead.
+ */
 export function SplitRunAttentionNote({
   note,
   tone = "waiting",
@@ -103,6 +137,7 @@ export function SplitRunAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  inColumn = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -114,19 +149,12 @@ export function SplitRunAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  inColumn?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
-  if (pullRequest && note.cta) {
-    return (
-      <SplitRunPullRequestReviewNote
-        ctaLabel={note.cta.label}
-        pullRequest={pullRequest}
-        actions={actions}
-        actionBusy={actionBusy}
-        onAction={onAction}
-      />
-    );
+  const pullRequestStrip = waitingPullRequestStrip({ note, tone, actions, actionBusy, inColumn, onAction });
+  if (pullRequestStrip) {
+    return pullRequestStrip;
   }
 
   if (compact) {

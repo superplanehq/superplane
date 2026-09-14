@@ -47,7 +47,8 @@ function reviewRunHref(
 }
 
 /**
- * Decision note under the plan on Description, and under Automations.
+ * Decision note on Description and under Automations. After Start, Description
+ * places the note in the left column.
  */
 export function SplitRunReview({
   footer,
@@ -66,6 +67,7 @@ export function SplitRunReview({
   startDisabled = false,
   modelSelect,
   compact = false,
+  inColumn = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -83,6 +85,7 @@ export function SplitRunReview({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  inColumn?: boolean;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
@@ -127,6 +130,7 @@ export function SplitRunReview({
         startDisabled={startDisabled}
         modelSelect={modelSelect}
         compact={compact}
+        inColumn={inColumn}
         onAction={onAction}
       />
     </div>

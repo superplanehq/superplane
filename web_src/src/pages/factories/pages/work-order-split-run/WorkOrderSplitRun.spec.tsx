@@ -490,8 +490,10 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
-    const note = screen.getByTestId("split-run-attention-note");
+    const request = screen.getByTestId("split-run-intent-request");
+    const note = within(request).getByTestId("split-run-attention-note");
     expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-attention-note")).toBeNull();
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(note).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(note).getAllByRole("listitem")).toHaveLength(3);
