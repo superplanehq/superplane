@@ -169,7 +169,7 @@ describe("PriceBooks", () => {
     await user.tab();
 
     await user.click(screen.getByRole("tab", { name: "VMs" }));
-    await user.type(screen.getByLabelText("Machine type"), "e1-test-amd64");
+    await user.type(screen.getByLabelText("Machine type", { selector: "#price-book-add-vm-key" }), "e1-test-amd64");
     await user.click(screen.getByRole("button", { name: "Add VM rate" }));
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
 
@@ -300,5 +300,151 @@ describe("PriceBooks", () => {
 
     expect(await screen.findByText("middle-model")).toBeInTheDocument();
     expect(screen.getByTestId("admin-price-book-activate")).toBeEnabled();
+  });
+
+  it("renames and removes VM rates on the current catalog", async () => {
+    const renamedVm = "e1-xlarge-amd64";
+    const catalog = {
+      ...currentCatalog,
+      vms: [
+        { match_key: "e1-large-amd64", match_mode: "exact", micros_per_second: 70 },
+        { match_key: "e1-small-amd64", match_mode: "exact", micros_per_second: 40 },
+      ],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
+        const body = JSON.parse(String(init.body)) as {
+          vms: { match_key: string; micros_per_second: number }[];
+        };
+        expect(body.vms).toEqual([{ match_key: renamedVm, match_mode: "exact", micros_per_second: 70 }]);
+        return jsonResponse(savedCatalog);
+      }
+      return jsonResponse(catalog);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    const machineType = screen.getByDisplayValue("e1-large-amd64");
+    await user.clear(machineType);
+    await user.type(machineType, " E1-XLARGE-AMD64 ");
+    await user.tab();
+    expect(machineType).toHaveValue(renamedVm);
+
+    const removeButtons = screen.getAllByRole("button", { name: "Remove" });
+    await user.click(removeButtons[1]);
+    expect(screen.queryByDisplayValue("e1-small-amd64")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-price-book-save-vms"));
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalled();
+    });
+  });
+
+  it("rejects empty and duplicate VM machine types", async () => {
+    const catalog = {
+      ...currentCatalog,
+      vms: [
+        { match_key: "e1-large-amd64", match_mode: "exact", micros_per_second: 70 },
+        { match_key: "e1-small-amd64", match_mode: "exact", micros_per_second: 40 },
+      ],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
+        const body = JSON.parse(String(init.body)) as {
+          vms: { match_key: string; micros_per_second: number }[];
+        };
+        expect(body.vms).toEqual([
+          { match_key: "e1-large-amd64", match_mode: "exact", micros_per_second: 70 },
+          { match_key: "e1-small-amd64", match_mode: "exact", micros_per_second: 40 },
+        ]);
+        return jsonResponse(savedCatalog);
+      }
+      return jsonResponse(catalog);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    const machineType = screen.getByDisplayValue("e1-large-amd64");
+
+    await user.clear(machineType);
+    await user.tab();
+    expect(showErrorToast).toHaveBeenCalledWith("Enter a machine type.");
+    expect(machineType).toHaveValue("e1-large-amd64");
+
+    await user.clear(machineType);
+    await user.type(machineType, "   ");
+    await user.tab();
+    expect(showErrorToast).toHaveBeenCalledWith("Enter a machine type.");
+    expect(machineType).toHaveValue("e1-large-amd64");
+
+    await user.clear(machineType);
+    await user.type(machineType, "e1-small-amd64");
+    await user.tab();
+    expect(showErrorToast).toHaveBeenCalledWith("That VM rate already exists.");
+    expect(machineType).toHaveValue("e1-large-amd64");
+
+    await user.click(screen.getByTestId("admin-price-book-save-vms"));
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalled();
+    });
+  });
+
+  it("saves an empty VM list after the last row is removed", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
+        const body = JSON.parse(String(init.body)) as { vms: unknown[] };
+        expect(body.vms).toEqual([]);
+        return jsonResponse({ ...savedCatalog, vms: [] });
+      }
+      return jsonResponse(currentCatalog);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(screen.getByText("This version has no VM rates.")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-price-book-save-vms")).toBeEnabled();
+
+    await user.click(screen.getByTestId("admin-price-book-save-vms"));
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalled();
+    });
+  });
+
+  it("keeps older VM rows read-only", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("version=2026-08-31.1")) {
+          return jsonResponse(olderCatalog);
+        }
+        return jsonResponse(currentCatalog);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+    await user.click(screen.getByTestId("admin-price-book-version"));
+    await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
+    expect(await screen.findByText("older-model")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    expect(screen.getByText("e1-large-amd64")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("e1-large-amd64")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
 });
