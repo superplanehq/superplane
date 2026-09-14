@@ -204,6 +204,10 @@ spec:
     expect(canvasYaml).toContain("@superplaneagent");
     expect(canvasYaml).toContain('name == "factory"');
     expect(canvasYaml).toContain("REPLACE ME WITH");
+    expect(canvasYaml).not.toContain("automation@example.com");
+    expect(canvasYaml).not.toContain("Factory Automation");
+    expect(canvasYaml).toContain("superplaneagent@superplane.com");
+    expect(canvasYaml).toContain("SuperPlane Agent");
     expect(canvasYaml).toContain("source: integration");
     expect(canvasYaml).toContain("environmentFrom:");
     expect(canvasYaml).toContain("name: acme-claude");
