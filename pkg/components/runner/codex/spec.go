@@ -69,7 +69,7 @@ type CodexBrokerTask struct {
 	Files    []runner.BrokerTaskFile
 }
 
-func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
+func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare Codex",
 		PrepareScript:    runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
@@ -77,6 +77,7 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 		RunScript:        runScript,
 		WorkingDirectory: spec.WorkingDirectory,
 		Steps:            spec.Steps,
+		DispatchedSteps:  dispatched,
 		Usage:            usage,
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
@@ -92,7 +93,11 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 }
 
 func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
-	return buildCodexBrokerTask(spec, usage, setups)
+	return buildCodexBrokerTask(spec, usage, setups, nil)
+}
+
+func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
+	return buildCodexBrokerTask(spec, usage, setups, dispatched)
 }
 
 func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {

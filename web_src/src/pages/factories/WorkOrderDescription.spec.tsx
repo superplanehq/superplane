@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+
 import { WorkOrderDescription } from "./WorkOrderDescription";
 
 let notifyResize: () => void;
@@ -22,6 +24,7 @@ describe("WorkOrderDescription", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearWorkOrderFileDownloadCache();
   });
 
   it("updates the collapse control when the rendered content height changes", () => {
@@ -142,5 +145,30 @@ describe("WorkOrderDescription", () => {
     act(() => notifyResize());
     expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(content).toHaveStyle({ maxHeight: "280px" });
+  });
+
+  it("uses the download URL as the image source when files are present", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <WorkOrderDescription
+        description={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(
+      <WorkOrderDescription
+        description="See ![bug](sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)"
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
   });
 });

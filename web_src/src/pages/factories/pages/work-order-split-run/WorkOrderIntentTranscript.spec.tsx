@@ -119,4 +119,16 @@ describe("WorkOrderIntentTranscript", () => {
     expect(within(note).getByRole("button", { name: /show less/i })).toBeInTheDocument();
     expect(content).not.toHaveStyle({ maxHeight: "220px" });
   });
+
+  it("uses the download URL for images in composer notes", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <WorkOrderIntentTranscript
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        messages={[{ id: "user-1", kind: "text", role: "user", text: `See ![bug](sp-file://${fileId})` }]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
 });

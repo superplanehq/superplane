@@ -10,7 +10,11 @@ import {
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
-import { analysisSessionPollInterval, useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import {
+  analysisSessionPollInterval,
+  analysisWorkOrderRefreshKey,
+  useAnalysisPlanningSession,
+} from "./useAnalysisPlanningSession";
 
 vi.mock("../planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(),
@@ -246,6 +250,33 @@ describe("useAnalysisPlanningSession", () => {
       expect(answerPlanningSessionSurvey).toHaveBeenCalledWith("org-1", "factory-1", "session-1", "Priority? High");
     });
     expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("analysisWorkOrderRefreshKey", () => {
+  it("stays the same when only the query timestamp would change", () => {
+    const session = {
+      id: "session-1",
+      state: "running",
+      messages: [{ id: "user-1", role: "user", text: "Add a screenshot." }],
+    };
+
+    expect(analysisWorkOrderRefreshKey(session)).toBe(analysisWorkOrderRefreshKey({ ...session }));
+  });
+
+  it("changes when the agent adds a message", () => {
+    const session = {
+      id: "session-1",
+      state: "running",
+      messages: [{ id: "user-1", role: "user", text: "Add a screenshot." }],
+    };
+
+    expect(
+      analysisWorkOrderRefreshKey({
+        ...session,
+        messages: [...session.messages, { id: "agent-1", role: "agent", text: "I see the image." }],
+      }),
+    ).not.toBe(analysisWorkOrderRefreshKey(session));
   });
 });
 

@@ -1,3 +1,4 @@
+import type { FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
@@ -13,9 +14,11 @@ const MESSAGE_MARKDOWN =
 export function WorkOrderIntentTranscript({
   messages,
   streaming = false,
+  files,
 }: {
   messages: CreateWithAgentMessage[];
   streaming?: boolean;
+  files?: FilesFile[];
 }) {
   if (messages.length === 0) {
     return null;
@@ -30,13 +33,22 @@ export function WorkOrderIntentTranscript({
           key={message.id}
           message={message}
           streaming={streaming && last?.role === "agent" && message.id === last.id}
+          files={files}
         />
       ))}
     </div>
   );
 }
 
-function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMessage; streaming: boolean }) {
+function TranscriptMessage({
+  message,
+  streaming,
+  files,
+}: {
+  message: CreateWithAgentMessage;
+  streaming: boolean;
+  files?: FilesFile[];
+}) {
   if (message.role === "user") {
     if (message.origin === "survey") {
       return <SurveyAnswerBubble text={message.text} />;
@@ -50,6 +62,7 @@ function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMes
           <p className="sp-user-note-label mb-1.5 text-[11px] font-medium leading-none">{CREATE_WITH_AGENT_COPY.you}</p>
           <WorkOrderDescription
             description={message.text}
+            files={files}
             previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
             fadeClassName="sp-user-note-fade"
           />
@@ -63,7 +76,7 @@ function TranscriptMessage({ message, streaming }: { message: CreateWithAgentMes
       <div
         className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${streaming ? "sp-stream-text" : "sp-text-reveal"}`}
       >
-        <MarkdownContent content={message.text} variant="workspace" className={MESSAGE_MARKDOWN} />
+        <MarkdownContent content={message.text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>
     </div>
   );
