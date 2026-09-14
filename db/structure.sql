@@ -1112,7 +1112,8 @@ CREATE TABLE public.usage_price_book_rates (
 CREATE TABLE public.usage_price_books (
     version text NOT NULL,
     effective_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_current boolean DEFAULT false NOT NULL
 );
 
 
@@ -3309,6 +3310,13 @@ CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btre
 
 
 --
+-- Name: usage_price_books_one_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX usage_price_books_one_current ON public.usage_price_books USING btree ((true)) WHERE is_current;
+
+
+--
 -- Name: workflows_factory_id_name_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4418,7 +4426,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260911164433	f
+20260913192620	f
 \.
 
 
