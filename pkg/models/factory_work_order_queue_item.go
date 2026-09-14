@@ -173,11 +173,11 @@ func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID uuid.UUID, stepInde
 
 // dropQueuedLineWork abandons a traversal that is waiting in a step's
 // queue: the queue item is deleted and its dispatch finishes as
-// cancelled. Called when the work order closes — a queued dispatch has no
-// in-flight run, so nothing would ever finish it otherwise, and a zombie
-// active dispatch would block re-dispatch after a reopen. Dispatches with
-// a running step are not touched here: the run finalizer cancels them
-// when their run ends.
+// cancelled. Called when the work order closes or returns to draft — a
+// queued dispatch has no in-flight run, so nothing would ever finish it
+// otherwise, and a zombie active dispatch would block re-dispatch after a
+// reopen or the open → draft revert. Dispatches with a running step are
+// not touched here: the run finalizer cancels them when their run ends.
 //
 // It holds the admission lock of every involved line while it works, so a
 // concurrent admission cannot consume a queue item this close is about to

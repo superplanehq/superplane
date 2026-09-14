@@ -6,12 +6,18 @@ import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
+import { firstStepQueueLabel } from "../lib/workOrderExecutions";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
 import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
-import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import {
+  CardOwnerMark,
+  QueuedFirstStepControls,
+  StartDraftButton,
+  type WorkOrderRowCallbacks,
+} from "./WorkOrderRowActions";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
 
@@ -33,6 +39,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   canAssign: boolean;
   /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
+  /** First-step queued tasks whose Cancel is in flight. */
+  cancelingOrderIds?: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   /** Tasks with a queued or running discussion or exclusive-repair run. */
   addressingFeedbackOrderIds?: ReadonlySet<string>;
@@ -46,6 +54,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   fixesPausedOrderIds?: ReadonlySet<string>;
   /** Pull requests attached to tasks on this board. */
   pullRequests?: FactoriesFactoryPullRequest[];
+  /** True when Start on a draft would join the first-step queue. */
+  willQueueOnStart?: boolean;
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
@@ -80,8 +90,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * request, then attention such as Waiting on status checks. The
  * footer shows when the task was created on the left, and the owner
  * given name plus avatar on the right (except on drafts). Drafts show
- * a Start button. Reviewed drafts also show a score to the left of
- * Start. The owner is display-only on the card.
+ * Start, or Queue when the first step has no free slot. A task that
+ * waits in that queue shows Queued #N and Cancel. Reviewed drafts also
+ * show a score to the left of Start. The owner is display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -91,6 +102,7 @@ export function WorkOrderCard({
   preferredLineName,
   canDispatch,
   dispatchingOrderIds,
+  cancelingOrderIds,
   addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
@@ -98,6 +110,7 @@ export function WorkOrderCard({
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   pullRequests = EMPTY_PULL_REQUESTS,
   onDispatch,
+  onCancelQueue,
   href,
   onOpen,
   confidenceScore,
@@ -105,12 +118,12 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  willQueueOnStart = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const isDraft = entry.displayStatus === "draft";
-  const showStart = isDraft;
+  const { isDraft, queueLabel, showStart } = cardStartState(entry);
   const showAgentQuestion = hasAgentQuestion && isDraft;
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
@@ -137,7 +150,7 @@ export function WorkOrderCard({
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
-          <WorkOrderStatusIcon status={entry.displayStatus} title={meta.label} aria-label={meta.label} />
+          <CardStatusIcon status={entry.displayStatus} queueLabel={queueLabel} fallbackLabel={meta.label} />
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
             {entry.title}
           </h3>
@@ -157,15 +170,46 @@ export function WorkOrderCard({
           preferredLineName={preferredLineName}
           canDispatch={canDispatch}
           isDispatching={dispatchingOrderIds.has(entry.id)}
+          isCanceling={isCancelingOrder(cancelingOrderIds, entry.id)}
           onDispatch={onDispatch}
+          onCancelQueue={onCancelQueue}
           createdAt={createdAt}
           showStart={showStart}
+          queueLabel={queueLabel}
+          willQueueOnStart={willQueueOnStart}
           confidenceScore={confidenceScore}
           isAnalyzing={isAnalyzing}
         />
       </div>
     </article>
   );
+}
+
+function isCancelingOrder(orderIds: ReadonlySet<string> | undefined, orderId: string): boolean {
+  return orderIds != null && orderIds.has(orderId);
+}
+
+function cardStartState(entry: WorkOrderListEntry): {
+  isDraft: boolean;
+  queueLabel: string | null;
+  showStart: boolean;
+} {
+  const queueLabel = firstStepQueueLabel(entry.order);
+  const isDraft = entry.displayStatus === "draft";
+  return { isDraft, queueLabel, showStart: isDraft && !queueLabel };
+}
+
+function CardStatusIcon({
+  status,
+  queueLabel,
+  fallbackLabel,
+}: {
+  status: WorkOrderListEntry["displayStatus"];
+  queueLabel: string | null;
+  fallbackLabel: string;
+}) {
+  const label = queueLabel ?? fallbackLabel;
+  return <WorkOrderStatusIcon status={status} queued={Boolean(queueLabel)} title={label} aria-label={label} />;
 }
 
 function WorkOrderCardOpenControl({
@@ -243,9 +287,13 @@ function WorkOrderCardMetaRow({
   preferredLineName,
   canDispatch,
   isDispatching,
+  isCanceling,
   onDispatch,
+  onCancelQueue,
   createdAt,
   showStart,
+  queueLabel,
+  willQueueOnStart,
   confidenceScore,
   isAnalyzing,
 }: {
@@ -255,14 +303,18 @@ function WorkOrderCardMetaRow({
   preferredLineName?: string;
   canDispatch: boolean;
   isDispatching: boolean;
+  isCanceling: boolean;
   onDispatch: WorkOrderCardContext["onDispatch"];
+  onCancelQueue?: WorkOrderCardContext["onCancelQueue"];
   createdAt: Date | null;
   showStart: boolean;
+  queueLabel: string | null;
+  willQueueOnStart: boolean;
   confidenceScore?: number;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
-  const showActions = confidenceScore != null || isAnalyzing || showStart;
+  const showActions = confidenceScore != null || isAnalyzing || showStart || Boolean(queueLabel);
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -272,12 +324,20 @@ function WorkOrderCardMetaRow({
       >
         {createdLabel}
       </span>
-      <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+      <div className="ml-auto flex min-h-5 min-w-0 items-center gap-1.5">
+        {showStart || queueLabel ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
             <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
-            {showStart ? (
+            {queueLabel ? (
+              <QueuedFirstStepControls
+                orderId={entry.id}
+                label={queueLabel}
+                canDispatch={canDispatch}
+                isCanceling={isCanceling}
+                onCancelQueue={onCancelQueue}
+              />
+            ) : showStart ? (
               <StartDraftButton
                 entry={entry}
                 lines={factoryLines}
@@ -285,6 +345,7 @@ function WorkOrderCardMetaRow({
                 canDispatch={canDispatch}
                 isDispatching={isDispatching}
                 onDispatch={onDispatch}
+                willQueueOnStart={willQueueOnStart}
               />
             ) : null}
           </>

@@ -343,9 +343,13 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Reverting `open → draft` while a line dispatch is still active would
-		// desync the FSM from the executor. Mirror the dispatch guard here.
+		// Reverting `open → draft` drops a queued wait first. A queued
+		// dispatch has no run, so leaving it active would block the revert.
+		// A running step still fails the dispatch guard.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
+			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
 			if err := o.ensureNoActiveLineDispatch(tx); err != nil {
 				return err
 			}

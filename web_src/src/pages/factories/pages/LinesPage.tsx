@@ -22,6 +22,7 @@ import { useMe } from "@/hooks/useMe";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useStabilizedItems } from "@/hooks/useStabilizedItems";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -73,6 +74,7 @@ import {
   type LinePhaseRunCard,
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
+import { reservedStartCount, willQueueFirstStepStart } from "../lib/firstStepAdmission";
 import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
@@ -578,6 +580,12 @@ export function LinesPage() {
               checksPassedOrderIds,
               fixesPausedOrderIds,
               pullRequests,
+              willQueueOnStart: willQueueFirstStepStart({
+                line: selectedLine,
+                workOrders,
+                factoryMaxParallelTasks: factory?.maxParallelTasks,
+                reservedStarts: reservedStartCount(workOrders, cardActions.dispatchingOrderIds),
+              }),
               ...cardActions,
             }}
             peekOrder={peekOrder ?? undefined}
@@ -740,7 +748,8 @@ function LineDetail({
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const sortedBacklogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? [], line.id), [workOrders, line.id]);
+  const backlogOrders = useStabilizedItems(sortedBacklogOrders, workOrderId, line.id ?? "");
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
     [workOrders, line, fullBoard],
@@ -996,6 +1005,10 @@ function executionRunIdForCanvas(
     runIdMatchingCanvasKey(dispatchExecutions, key) ??
     runIdMatchingCanvasKey(allExecutions, key)
   );
+}
+
+function workOrderId(order: FactoriesWorkOrder): string | undefined {
+  return order.id;
 }
 
 function runIdMatchingApp(

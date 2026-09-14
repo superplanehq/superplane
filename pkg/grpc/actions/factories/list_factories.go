@@ -31,8 +31,13 @@ func ListFactories(ctx context.Context, organizationID string) (*pb.ListFactorie
 		return nil, factoryErrorToStatus(err, "failed to list factories")
 	}
 
+	serialized, err := serializeFactories(db, orgID, factories, groupFactoryLinesByFactoryID(lines))
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list factories")
+	}
+
 	return &pb.ListFactoriesResponse{
-		Factories: serializeFactories(factories, groupFactoryLinesByFactoryID(lines)),
+		Factories: serialized,
 	}, nil
 }
 

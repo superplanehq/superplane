@@ -48,15 +48,12 @@ function ordersInCache(queryClient: QueryClient): FactoriesWorkOrder[] {
   return queryClient.getQueryData<FactoriesWorkOrder[]>(factoryQueryKeys.workOrders(ORGANIZATION_ID, FACTORY_ID)) ?? [];
 }
 
-describe("useDispatchWorkOrder optimistic cache patch", () => {
+describe("useDispatchWorkOrder cache updates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("moves the card to the first phase column before the dispatch request resolves", async () => {
-    // A promise that never resolves during the assertions below stands in
-    // for a dispatch request still in flight — the card must already be on
-    // the board without any response, let alone a ListWorkOrders refetch.
+  it("keeps the card in Backlog while the dispatch request is in flight", async () => {
     factoriesDispatchWorkOrder.mockReturnValue(new Promise(() => {}));
 
     const queryClient = seedClient([draftOrder()]);
@@ -68,21 +65,16 @@ describe("useDispatchWorkOrder optimistic cache patch", () => {
       result.current.mutate({ orderId: "wo-1", lineName: "hotfix" });
     });
 
-    // onMutate runs as a microtask, ahead of the (never-resolving) request
-    // above; wait only for that patch, not for any response.
     await waitFor(() => {
-      const orders = ordersInCache(queryClient);
-      expect(collectLineBacklogOrders(orders).map((order) => order.id)).not.toContain("wo-1");
+      expect(factoriesDispatchWorkOrder).toHaveBeenCalledTimes(1);
     });
 
     const orders = ordersInCache(queryClient);
-    const board = buildLinePhaseBoard(LINE, orders);
-
-    expect(board[0]?.runs.map((run) => run.workOrderId)).toContain("wo-1");
-    expect(factoriesDispatchWorkOrder).toHaveBeenCalledTimes(1);
+    expect(collectLineBacklogOrders(orders).map((order) => order.id)).toContain("wo-1");
+    expect(buildLinePhaseBoard(LINE, orders)[0]?.runs.map((run) => run.workOrderId)).not.toContain("wo-1");
   });
 
-  it("rolls the card back to Backlog when the dispatch request fails", async () => {
+  it("leaves the card in Backlog when the dispatch request fails", async () => {
     factoriesDispatchWorkOrder.mockRejectedValue(new Error("boom"));
 
     const original = [draftOrder()];
@@ -143,6 +135,45 @@ describe("useDispatchWorkOrder optimistic cache patch", () => {
 
     const board = buildLinePhaseBoard(LINE, orders);
     expect(board[0]?.runs.map((run) => run.workOrderId)).toContain("wo-1");
+  });
+
+  it("keeps a first-step queued task in Backlog after dispatch resolves", async () => {
+    const serverOrder: FactoriesWorkOrder = {
+      id: "wo-1",
+      title: "Fix the outage",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          id: "dispatch-queued-1",
+          line: { id: LINE.id, name: LINE.name },
+          state: "STATE_ACTIVE",
+          createdAt: "2026-08-31T00:00:00.000Z",
+          stepExecutions: [],
+          queueItem: {
+            id: "queue-1",
+            stepName: "hotfix",
+            stepIndex: 0,
+            position: 1,
+            appId: "app-build",
+          },
+        },
+      ],
+    };
+    factoriesDispatchWorkOrder.mockResolvedValue({ data: { order: serverOrder } });
+
+    const queryClient = seedClient([draftOrder()]);
+    const { result } = renderHook(() => useDispatchWorkOrder(ORGANIZATION_ID, FACTORY_ID), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ orderId: "wo-1", lineName: "hotfix" });
+    });
+
+    const orders = ordersInCache(queryClient);
+    expect(orders.find((order) => order.id === "wo-1")).toEqual(serverOrder);
+    expect(collectLineBacklogOrders(orders, LINE.id).map((order) => order.id)).toContain("wo-1");
+    expect(buildLinePhaseBoard(LINE, orders)[0]?.runs.map((run) => run.workOrderId)).not.toContain("wo-1");
   });
 
   it("falls back to invalidate-only when the line isn't in the factory-detail cache yet", async () => {
