@@ -44,39 +44,42 @@ func (s *WebhookResetSteps) givenACanvasWithWebhook(canvasName, nodeName string)
 	s.addWebhookTrigger(nodeName, models.Position{X: 500, Y: 200})
 	s.canvas.Save()
 	s.canvas.CommitAndPublish()
-	s.session.Sleep(1000)
 }
 
 func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) {
 	s.canvas.AddBuildingBlockByTestID("building-block-webhook", pos)
-	s.session.Sleep(500)
-
+	s.session.WaitForEnabled(q.TestID("node-name-input"))
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Sleep(300)
 }
 
 func (s *WebhookResetSteps) openWebhookConfiguration(nodeName string) {
 	s.canvas.EnterEditMode()
 	s.canvas.StartEditingNode(nodeName)
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(200)
+	s.session.WaitUntil(func() bool {
+		return s.webhookURLValue() != ""
+	}, "webhook URL field did not appear")
+}
+
+func (s *WebhookResetSteps) webhookURLValue() string {
+	value, err := s.session.Page().Locator("#webhook-url-input").InputValue()
+	if err != nil {
+		return ""
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || strings.Contains(value, "URL GENERATED") {
+		return ""
+	}
+	return value
 }
 
 func (s *WebhookResetSteps) waitForWebhookURL() string {
-	start := time.Now()
-	input := q.Locator(`label:has-text("Webhook URL") + div input[type="text"]`)
-
-	for time.Since(start) < 20*time.Second {
-		loc := input.Run(s.session)
-		value, err := loc.InputValue()
-		if err == nil && strings.TrimSpace(value) != "" && !strings.Contains(value, "URL GENERATED") {
-			return value
-		}
-		s.session.Sleep(500)
-	}
-
-	s.t.Fatalf("timed out waiting for webhook URL")
-	return ""
+	var value string
+	require.Eventually(s.t, func() bool {
+		value = s.webhookURLValue()
+		return strings.HasPrefix(value, "http")
+	}, 20*time.Second, 200*time.Millisecond, "timed out waiting for webhook URL")
+	return value
 }
 
 func (s *WebhookResetSteps) resetWebhookSecret() {

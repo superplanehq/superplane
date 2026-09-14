@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
@@ -24,7 +25,7 @@ func TestFactories(t *testing.T) {
 		factory := steps.givenFactoryExists(originalName, "original description")
 		steps.visitFactorySettings(factory)
 		steps.fillFactorySettingsName(updatedName)
-		steps.submitFactorySettings()
+		steps.submitFactorySettings(factory.ID, updatedName)
 		steps.visitFactorySettings(factory)
 		steps.assertFactorySettingsName(updatedName)
 		steps.assertFactorySavedInDB(factory.ID, updatedName, "original description")
@@ -102,12 +103,14 @@ func (s *factorySteps) fillFactorySettingsName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("factory-settings-name").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
-func (s *factorySteps) submitFactorySettings() {
+func (s *factorySteps) submitFactorySettings(factoryID uuid.UUID, name string) {
 	s.session.Click(q.TestID("factory-settings-save"))
-	s.session.Sleep(1000)
+	require.Eventually(s.t, func() bool {
+		factory, err := models.FindFactory(database.DB(s.t.Context()), s.session.OrgID, factoryID)
+		return err == nil && factory.Name == name
+	}, 10*time.Second, 200*time.Millisecond, "factory name was not saved")
 }
 
 func (s *factorySteps) assertFactorySettingsName(name string) {
@@ -126,13 +129,12 @@ func (s *factorySteps) assertFactorySavedInDB(factoryID uuid.UUID, name, descrip
 
 func (s *factorySteps) clickDeleteFactory() {
 	s.session.Click(q.TestID("factory-settings-delete-button"))
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("factory-delete-confirm-button"))
 }
 
 func (s *factorySteps) confirmDeleteFactory() {
 	s.session.AssertVisible(q.TestID("factory-delete-confirm-button"))
 	s.session.Click(q.TestID("factory-delete-confirm-button"))
-	s.session.Sleep(1000)
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
