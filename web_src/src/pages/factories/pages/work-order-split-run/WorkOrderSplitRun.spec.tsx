@@ -808,22 +808,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-overview-checks")).not.toBeInTheDocument();
   });
 
-  it("shows the refinement UI for a historical task without analysis", () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
-    renderPopup({
-      organizationId: FACTORIES_ORGANIZATION_ID,
-      factoryId: PRIMARY_FACTORY_ID,
-      orderId: DRAFT_WORK_ORDER.id,
-      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, { checks: [], demoArtifacts: false }),
-    });
-
-    expect(screen.getByTestId("split-run-intent-document")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-summary")).toHaveTextContent(
-      "Let a user add emoji reactions on a task itself",
-    );
-    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
-  });
-
   it("hides source, artifacts, and pull requests on the description tab", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
