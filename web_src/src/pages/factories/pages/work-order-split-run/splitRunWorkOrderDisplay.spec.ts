@@ -50,6 +50,15 @@ describe("implementationRunnerModel", () => {
     expect(implementationRunnerModel([{ id: "implement-0", name: "Implement", status: "running" }])).toBe("");
   });
 
+  it("fills Auto from the implementation canvas", () => {
+    expect(
+      implementationRunnerModel(
+        [{ id: "implement-0", name: "Implement", status: "running" }],
+        [{ configuration: { model: "hosted::openrouter::x-ai/grok-4.6" } }],
+      ),
+    ).toBe("grok-4.6");
+  });
+
   it("shortens the active implement model", () => {
     expect(
       implementationRunnerModel([
