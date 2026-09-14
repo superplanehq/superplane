@@ -5,5 +5,5 @@ import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 export function useImplementationRunnerModel(organizationId: string | undefined, phases: SplitRunPhase[]): string {
   const selected = selectedImplementationPhase(phases);
   const live = useSplitRunLiveCanvas(organizationId, selected);
-  return implementationRunnerModel(phases, live.canvas?.nodes);
+  return implementationRunnerModel(phases, live.canvas?.nodes, live.canvas?.statuses);
 }

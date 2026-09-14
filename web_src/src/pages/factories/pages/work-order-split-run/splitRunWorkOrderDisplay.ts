@@ -3,7 +3,7 @@ import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-clie
 import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
-import { displayRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
+import { canvasNodesForRunnerModel, displayRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
 import { formatCostCents, formatTokenCount } from "./splitRunFormat";
 import type { SplitRunPhaseStatus } from "./splitRunMocks";
 
@@ -24,6 +24,7 @@ type ImplementationPhase = {
 };
 
 type ImplementationCanvasNode = {
+  id?: string;
   component?: string;
   configuration?: { model?: unknown } | Record<string, unknown>;
 };
@@ -39,12 +40,15 @@ export function selectedImplementationPhase<T extends ImplementationPhase>(phase
 export function implementationRunnerModel(
   phases: ImplementationPhase[],
   canvasNodes?: ImplementationCanvasNode[],
+  canvasStatuses?: Record<string, string>,
 ): string {
   const selected = selectedImplementationPhase(phases);
   if (!selected) {
     return "";
   }
-  return displayRunnerModel(phaseWithRunnerModel(selected, canvasNodes).model ?? "");
+  return displayRunnerModel(
+    phaseWithRunnerModel(selected, canvasNodesForRunnerModel(canvasNodes, canvasStatuses)).model ?? "",
+  );
 }
 
 function isImplementationPhase(phase: ImplementationPhase): boolean {

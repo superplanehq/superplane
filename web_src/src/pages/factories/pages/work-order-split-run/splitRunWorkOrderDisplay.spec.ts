@@ -59,6 +59,19 @@ describe("implementationRunnerModel", () => {
     ).toBe("grok-4.6");
   });
 
+  it("uses the executed runner when the canvas has unused runners", () => {
+    expect(
+      implementationRunnerModel(
+        [{ id: "implement-0", name: "Implement", status: "running" }],
+        [
+          { id: "ran", configuration: { model: "hosted::openrouter::x-ai/grok-4.6" } },
+          { id: "idle", configuration: { model: "anthropic/claude-sonnet-4-6" } },
+        ],
+        { ran: "running", idle: "did_not_run" },
+      ),
+    ).toBe("grok-4.6");
+  });
+
   it("shortens the active implement model", () => {
     expect(
       implementationRunnerModel([

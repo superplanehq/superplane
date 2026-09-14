@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   DRAFT_START_MODEL_AUTO,
+  canvasNodesForRunnerModel,
   displayRunnerModel,
   draftStartModelPayload,
   phaseWithRunnerModel,
@@ -43,6 +44,20 @@ describe("runnerModelsFromCanvasNodes", () => {
         { configuration: { model: "anthropic/claude-sonnet-4-6" } },
       ]),
     ).toBe("anthropic/claude-opus-4-6 · anthropic/claude-sonnet-4-6");
+  });
+});
+
+describe("canvasNodesForRunnerModel", () => {
+  const ran = { id: "ran", configuration: { model: "hosted::openrouter::x-ai/grok-4.6" } };
+  const idle = { id: "idle", configuration: { model: "anthropic/claude-sonnet-4-6" } };
+
+  it("keeps all nodes when the run has no executed runner model", () => {
+    expect(canvasNodesForRunnerModel([ran, idle], { ran: "did_not_run", idle: "did_not_run" })).toEqual([ran, idle]);
+    expect(canvasNodesForRunnerModel([ran, idle])).toEqual([ran, idle]);
+  });
+
+  it("keeps nodes that ran when one of them has a model", () => {
+    expect(canvasNodesForRunnerModel([ran, idle], { ran: "running", idle: "did_not_run" })).toEqual([ran]);
   });
 });
 
