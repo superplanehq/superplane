@@ -199,12 +199,48 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
         current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)),
       );
     },
-    handleVMChange: (index: number, micros: number) => {
-      catalog.setVMs((current) =>
-        current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, micros_per_second: micros } : rate)),
-      );
+    handleVMChange: (index: number, patch: Partial<PriceBookVMRate>) => patchVMRate(catalog, index, patch),
+    handleRemoveVM: (index: number) => {
+      catalog.setVMs((current) => current.filter((_, rateIndex) => rateIndex !== index));
     },
   };
+}
+
+function patchVMRate(catalog: PriceBookEditCatalog, index: number, patch: Partial<PriceBookVMRate>): boolean {
+  const current = catalog.vms[index];
+  if (!current) {
+    return false;
+  }
+
+  if (patch.match_key !== undefined) {
+    const matchKey = normalizeVMMatchKey(patch.match_key);
+    if (matchKey === undefined) {
+      return false;
+    }
+
+    const matchMode = patch.match_mode ?? current.match_mode;
+    const duplicate = catalog.vms.some(
+      (rate, rateIndex) => rateIndex !== index && rate.match_key === matchKey && rate.match_mode === matchMode,
+    );
+    if (duplicate) {
+      showErrorToast("That VM rate already exists.");
+      return false;
+    }
+
+    patch = { ...patch, match_key: matchKey };
+  }
+
+  catalog.setVMs((rates) => rates.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)));
+  return true;
+}
+
+function normalizeVMMatchKey(matchKey: string): string | undefined {
+  const key = matchKey.trim().toLowerCase();
+  if (key === "") {
+    showErrorToast("Enter a machine type.");
+    return undefined;
+  }
+  return key;
 }
 
 function appendUniqueModel(
@@ -232,9 +268,8 @@ function appendUniqueVM(
   rate: PriceBookVMRate,
   setVMs: Dispatch<SetStateAction<PriceBookVMRate[]>>,
 ): boolean {
-  const key = rate.match_key.trim().toLowerCase();
-  if (key === "") {
-    showErrorToast("Enter a machine type.");
+  const key = normalizeVMMatchKey(rate.match_key);
+  if (key === undefined) {
     return false;
   }
   if (keys.has(`${key}:${rate.match_mode}`)) {

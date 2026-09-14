@@ -53,7 +53,8 @@ type PriceBooksCatalogProps = {
   onTabChange: (tab: PriceBooksTab) => void;
   onVersionChange: (version: string) => void;
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-  onVMChange: (index: number, micros: number) => void;
+  onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
+  onRemoveVM: (index: number) => void;
   onAddModel: (rate: PriceBookModelRate) => boolean;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
@@ -114,6 +115,7 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             saving={props.saving}
             actionsDisabled={actionsDisabled}
             onVMChange={props.onVMChange}
+            onRemoveVM={props.onRemoveVM}
             onAddVM={props.onAddVM}
             onSave={props.onSave}
           />
@@ -242,6 +244,7 @@ function VMsPanel({
   saving,
   actionsDisabled,
   onVMChange,
+  onRemoveVM,
   onAddVM,
   onSave,
 }: {
@@ -249,7 +252,8 @@ function VMsPanel({
   vms: PriceBookVMRate[];
   saving: boolean;
   actionsDisabled: boolean;
-  onVMChange: (index: number, micros: number) => void;
+  onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
+  onRemoveVM: (index: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
 }) {
@@ -268,7 +272,7 @@ function VMsPanel({
           </Button>
         </div>
       )}
-      <VMsTable rates={vms} editable={isCurrent && !actionsDisabled} onChange={onVMChange} />
+      <VMsTable rates={vms} editable={isCurrent && !actionsDisabled} onChange={onVMChange} onRemove={onRemoveVM} />
       {isCurrent && <AddVMRateForm disabled={actionsDisabled} onAdd={onAddVM} />}
     </>
   );
