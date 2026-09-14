@@ -262,7 +262,7 @@ function HostedCreditRemainingCard({
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
   const remainingShares = billingCreditRemainingShares(buckets);
-  const spendOrderCopy = billingSpendOrderCopy(buckets.some((bucket) => bucket.key === "grant"));
+  const spendOrderCopy = billingSpendOrderCopy(buckets);
 
   return (
     <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
