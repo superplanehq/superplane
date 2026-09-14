@@ -32,4 +32,10 @@ migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/migr
 migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/data_migrations -database "${DB_URL}&x-migrations-table=data_migrations" up
 
 echo "Starting server..."
-/app/build/superplane
+
+#
+# exec replaces this shell, so the server runs as PID 1 and receives SIGTERM
+# directly. Without it the shell keeps the signal, the server is only killed
+# when the grace period expires, and no graceful shutdown ever runs.
+#
+exec /app/build/superplane

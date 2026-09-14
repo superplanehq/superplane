@@ -115,6 +115,7 @@ func (w *FactoryVelocitySyncWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, velocitySyncConcurrency)
 			return
 		case <-ticker.C:
 			w.tick(ctx)

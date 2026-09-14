@@ -29,7 +29,7 @@ type EventRouter struct {
 
 func NewEventRouter(rabbitMQURL string) *EventRouter {
 	return &EventRouter{
-		semaphore:   semaphore.NewWeighted(25),
+		semaphore:   semaphore.NewWeighted(maxConcurrentTasks),
 		logger:      log.WithFields(log.Fields{"worker": "EventRouter"}),
 		rabbitMQURL: rabbitMQURL,
 	}
@@ -48,6 +48,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
@@ -60,6 +61,15 @@ func (w *EventRouter) Start(ctx context.Context) {
 			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
 
 			for _, event := range events {
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue

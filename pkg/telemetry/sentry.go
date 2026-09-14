@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,4 +38,12 @@ func InitSentry() {
 	}
 
 	log.Info("Sentry telemetry initialized")
+}
+
+// FlushSentry sends the buffered events before the process exits. It is a no-op
+// when InitSentry did not configure a client.
+func FlushSentry(timeout time.Duration) {
+	if !sentry.Flush(timeout) {
+		log.Warn("Sentry flush timed out, some events were dropped")
+	}
 }
