@@ -40,14 +40,16 @@ OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL=
 
 #
-# Long sausage command to run tests with gotestsum
+# Long sausage command to run unit tests with gotestsum
 #
 # - starts a docker container for unit tests
 # - mounts tmp/screenshots
 # - exports junit report
-# - sets parallelism to 1
+# - each test process clones superplane_test so packages can run in parallel
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
+TEST_COMPOSE_RUN_OPTS=$(COMPOSE) run --rm -e DB_NAME=superplane_test -e DB_POOL_SIZE=5 $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots
+TEST_COMPOSE_RUN=$(TEST_COMPOSE_RUN_OPTS) app
+GOTESTSUM=$(TEST_COMPOSE_RUN) bash -lc 'scripts/db_drop_process_test_clones.sh && gotestsum --format short --junitfile junit-report.xml --packages="$(PKG_TEST_PACKAGES)" --'
 
 #
 # Targets for test environment
@@ -69,10 +71,10 @@ test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
 
 test:
-	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+	$(GOTESTSUM)
 
 test.coverage:
-	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+	$(TEST_COMPOSE_RUN) bash -lc 'scripts/db_drop_process_test_clones.sh && gotestsum --format short --junitfile junit-report.xml --packages="$(PKG_TEST_PACKAGES)" -- -coverprofile=coverage-go.out -covermode=atomic'
 	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
 
 test.coverage.check:
@@ -80,7 +82,7 @@ test.coverage.check:
 	$(MAKE) check.coverage.go
 
 test.coverage.autoparallel:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
+	$(TEST_COMPOSE_RUN_OPTS) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
@@ -90,10 +92,10 @@ test.license.check:
 	bash ./scripts/license-check.sh
 
 test.watch:
-	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
+	$(TEST_COMPOSE_RUN) bash -lc 'scripts/db_drop_process_test_clones.sh && gotestsum --format short --junitfile junit-report.xml --packages="$(PKG_TEST_PACKAGES)" --watch --'
 
 test.shell:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
+	$(TEST_COMPOSE_RUN) /bin/bash
 
 #
 # Code formatting

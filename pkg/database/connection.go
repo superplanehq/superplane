@@ -101,7 +101,10 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 }
 
 func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, error) {
-	c := dsnConfigFromEnv()
+	c, err := dsnConfigForConn()
+	if err != nil {
+		return nil, err
+	}
 	if applicationName != "" {
 		c.ApplicationName = applicationName
 	}
@@ -128,8 +131,21 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	return sqlDB, nil
 }
 
-func connect() *gorm.DB {
+func dsnConfigForConn() (DSNConfig, error) {
 	c := dsnConfigFromEnv()
+	name, err := isolateTestDatabaseName(c)
+	if err != nil {
+		return DSNConfig{}, err
+	}
+	c.Name = name
+	return c, nil
+}
+
+func connect() *gorm.DB {
+	c, err := dsnConfigForConn()
+	if err != nil {
+		panic(err)
+	}
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 

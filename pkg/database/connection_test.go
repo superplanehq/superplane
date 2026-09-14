@@ -76,6 +76,7 @@ func TestOpenDedicatedSQLDB_ConfiguresDedicatedPool(t *testing.T) {
 
 func TestIsTestDatabaseName(t *testing.T) {
 	require.True(t, isTestDatabaseName("superplane_test"))
+	require.True(t, isTestDatabaseName("superplane_12345_test"))
 	require.False(t, isTestDatabaseName("superplane_dev"))
 	require.False(t, isTestDatabaseName("superplane"))
 	require.False(t, isTestDatabaseName("superplane_test_backup_dev"))
@@ -139,6 +140,9 @@ func TestPostgres_statementTimeoutEnforced(t *testing.T) {
 		Ssl:             sslMode,
 		ApplicationName: os.Getenv("APPLICATION_NAME"),
 	}
+	name, err := isolateTestDatabaseName(c)
+	require.NoError(t, err)
+	c.Name = name
 
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)

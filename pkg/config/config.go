@@ -13,7 +13,10 @@ func RabbitMQURL() (string, error) {
 		return "", fmt.Errorf("RABBITMQ_URL not set")
 	}
 
-	return URL, nil
+	isolatedRabbitURLOnce.Do(func() {
+		isolatedRabbitURL, isolatedRabbitURLErr = isolateRabbitMQURL(URL)
+	})
+	return isolatedRabbitURL, isolatedRabbitURLErr
 }
 
 func UsageGRPCURL() string {
