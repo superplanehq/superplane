@@ -143,6 +143,11 @@ blocks:
             - make check.tool.configs
             - make check.lint.ui.knip
 
+      epilogue:
+        always:
+          commands:
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
+
 after_pipeline:
   task:
     jobs:
