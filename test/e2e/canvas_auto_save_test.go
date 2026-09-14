@@ -219,9 +219,15 @@ func (s *canvasAutoSaveSteps) waitForSaved() {
 }
 
 func (s *canvasAutoSaveSteps) waitUntilNodeCenterNear(name string, expected *pw.Rect) {
+	stable := 0
 	require.Eventually(s.t, func() bool {
 		center := s.nodeCenter(name)
-		return absDelta(center.X, expected.X) <= 2 && absDelta(center.Y, expected.Y) <= 2
+		if absDelta(center.X, expected.X) <= 2 && absDelta(center.Y, expected.Y) <= 2 {
+			stable++
+			return stable >= 8
+		}
+		stable = 0
+		return false
 	}, 5*time.Second, 100*time.Millisecond, "node %s should stay at the saved position", name)
 }
 

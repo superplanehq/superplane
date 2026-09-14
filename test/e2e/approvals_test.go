@@ -319,7 +319,18 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
-	s.canvas.WaitForStaging(uuid.Nil)
+	s.waitForDraftApproverCount(nodeName, 3)
+}
+
+func (s *ApprovalSteps) waitForDraftApproverCount(nodeName string, n int) {
+	require.Eventually(s.t, func() bool {
+		node, ok := s.canvas.DraftNodeByName(nodeName)
+		if !ok {
+			return false
+		}
+		items, ok := node.Configuration["items"].([]any)
+		return ok && len(items) >= n
+	}, 15*time.Second, 200*time.Millisecond, "approval %s did not save %d approvers", nodeName, n)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {

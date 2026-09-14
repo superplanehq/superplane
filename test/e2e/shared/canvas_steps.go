@@ -748,9 +748,7 @@ func (s *CanvasSteps) OpenBuildingBlockCategory(categoryName string) {
 		categoryName,
 	)).Run(s.session)
 
-	open, err := details.GetAttribute("open")
-	require.NoError(s.t, err)
-	if open != "" {
+	if detailsElementIsOpen(details) {
 		return
 	}
 
@@ -759,9 +757,19 @@ func (s *CanvasSteps) OpenBuildingBlockCategory(categoryName string) {
 		categoryName,
 	)))
 	require.Eventually(s.t, func() bool {
-		open, err := details.GetAttribute("open")
-		return err == nil && open != ""
+		return detailsElementIsOpen(details)
 	}, 5*time.Second, 100*time.Millisecond, "building-block category %s did not open", categoryName)
+}
+
+func detailsElementIsOpen(details pw.Locator) bool {
+	// HTML boolean attributes such as open serialize as "". Use the IDL
+	// property so an open <details> is not treated as closed.
+	value, err := details.Evaluate("el => Boolean(el && el.open)", nil)
+	if err != nil {
+		return false
+	}
+	open, ok := value.(bool)
+	return ok && open
 }
 
 // ClickOnEmptyCanvasArea clicks on an empty area of the canvas to dismiss

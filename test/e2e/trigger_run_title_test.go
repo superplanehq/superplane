@@ -1,10 +1,10 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -94,7 +94,10 @@ func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
 }
 
 func (s *triggerRunTitleSteps) waitForAutoSave() {
-	s.canvas.WaitForStaging(uuid.Nil)
+	require.Eventually(s.t, func() bool {
+		val, exists, found := s.getCustomNameField()
+		return found && exists && val != ""
+	}, 15*time.Second, 200*time.Millisecond, "run title was not saved")
 }
 
 func (s *triggerRunTitleSteps) saveAndPublish() {
@@ -103,7 +106,7 @@ func (s *triggerRunTitleSteps) saveAndPublish() {
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger(s.trigger)
+	s.session.Click(q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(s.trigger) + `-header"]) [data-testid="start-template-run"]`))
 }
 
 func (s *triggerRunTitleSteps) thenRunTitleInDBEquals(expected string) {

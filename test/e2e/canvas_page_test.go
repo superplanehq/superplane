@@ -693,11 +693,10 @@ func (s *CanvasPageSteps) stopRunFromInspector() {
 }
 
 func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
-	executions := s.canvas.GetExecutionsForNode(nodeName)
-	require.Greater(s.t, len(executions), 0, "expected at least one execution")
-
-	execution := executions[0]
-	require.Equal(s.t, models.CanvasNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
+	require.Eventually(s.t, func() bool {
+		executions := s.canvas.GetExecutionsForNode(nodeName)
+		return len(executions) > 0 && executions[0].Result == models.CanvasNodeExecutionResultCancelled
+	}, 15*time.Second, 200*time.Millisecond, "expected execution to be cancelled")
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {

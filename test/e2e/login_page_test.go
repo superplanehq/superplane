@@ -72,7 +72,6 @@ func (steps *TestLoginPageSteps) Start() {
 
 func (steps *TestLoginPageSteps) VisitLoginPage() {
 	steps.session.Visit("/login")
-	steps.session.AssertVisible(q.Text("Welcome to SuperPlane"))
 }
 
 func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {

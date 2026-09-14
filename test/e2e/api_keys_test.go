@@ -1,7 +1,10 @@
 package e2e
 
 import (
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -288,18 +291,28 @@ func (s *apiKeySteps) clickDeleteOnDetail() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-delete").Click()
 	require.NoError(s.t, err)
-	s.session.WaitUntilURLContains("/settings/api-keys")
+	s.session.WaitUntil(func() bool {
+		parsed, err := url.Parse(s.session.Page().URL())
+		if err != nil {
+			return false
+		}
+		return strings.HasSuffix(strings.TrimSuffix(parsed.Path, "/"), "/settings/api-keys")
+	}, "API key detail page did not close")
 }
 
 func (s *apiKeySteps) assertAPIKeyDeletedFromDB(name string) {
-	apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
-	require.NoError(s.t, err)
-
-	for _, apiKey := range apiKeys {
-		if apiKey.Name == name {
-			require.Fail(s.t, "API key %q should have been deleted", name)
+	require.Eventually(s.t, func() bool {
+		apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
+		if err != nil {
+			return false
 		}
-	}
+		for _, apiKey := range apiKeys {
+			if apiKey.Name == name {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond, "API key %q should have been deleted", name)
 }
 
 func (s *apiKeySteps) clickRegenerateToken() {

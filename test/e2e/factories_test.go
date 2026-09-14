@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
@@ -24,7 +25,7 @@ func TestFactories(t *testing.T) {
 		factory := steps.givenFactoryExists(originalName, "original description")
 		steps.visitFactorySettings(factory)
 		steps.fillFactorySettingsName(updatedName)
-		steps.submitFactorySettings()
+		steps.submitFactorySettings(factory.ID, updatedName)
 		steps.visitFactorySettings(factory)
 		steps.assertFactorySettingsName(updatedName)
 		steps.assertFactorySavedInDB(factory.ID, updatedName, "original description")
@@ -104,9 +105,12 @@ func (s *factorySteps) fillFactorySettingsName(name string) {
 	require.NoError(s.t, err)
 }
 
-func (s *factorySteps) submitFactorySettings() {
+func (s *factorySteps) submitFactorySettings(factoryID uuid.UUID, name string) {
 	s.session.Click(q.TestID("factory-settings-save"))
-	s.session.AssertDisabled(q.TestID("factory-settings-save"))
+	require.Eventually(s.t, func() bool {
+		factory, err := models.FindFactory(database.DB(s.t.Context()), s.session.OrgID, factoryID)
+		return err == nil && factory.Name == name
+	}, 10*time.Second, 200*time.Millisecond, "factory name was not saved")
 }
 
 func (s *factorySteps) assertFactorySettingsName(name string) {

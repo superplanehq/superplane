@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -278,26 +280,37 @@ func (s *SecretsSteps) clickDeleteSecret(secretName string) {
 }
 
 func (s *SecretsSteps) assertSecretSavedInDB(name string, expectedData map[string]string) {
-	secret, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
-	require.NoError(s.t, err)
-	require.Equal(s.t, name, secret.Name)
-	require.Equal(s.t, models.DomainTypeOrganization, secret.DomainType)
-	require.Equal(s.t, s.session.OrgID.String(), secret.DomainID.String())
-
-	// Secrets created via UI are encrypted; decrypt before comparing
-	encryptor := encryptorFromEnv()
-	decrypted, err := encryptor.Decrypt(context.Background(), secret.Data, []byte(secret.Name))
-	require.NoError(s.t, err)
-	var secretData map[string]string
-	err = json.Unmarshal(decrypted, &secretData)
-	require.NoError(s.t, err)
-	require.Equal(s.t, expectedData, secretData)
+	require.Eventually(s.t, func() bool {
+		secret, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
+		if err != nil {
+			return false
+		}
+		encryptor := encryptorFromEnv()
+		decrypted, err := encryptor.Decrypt(context.Background(), secret.Data, []byte(secret.Name))
+		if err != nil {
+			return false
+		}
+		var secretData map[string]string
+		if err := json.Unmarshal(decrypted, &secretData); err != nil {
+			return false
+		}
+		if len(secretData) != len(expectedData) {
+			return false
+		}
+		for key, value := range expectedData {
+			if secretData[key] != value {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond, "secret %q was not saved as expected", name)
 }
 
 func (s *SecretsSteps) assertSecretDeletedFromDB(name string) {
-	_, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
-	require.Error(s.t, err)
-	require.Contains(s.t, err.Error(), "record not found")
+	require.Eventually(s.t, func() bool {
+		_, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
+		return err != nil && strings.Contains(err.Error(), "record not found")
+	}, 10*time.Second, 200*time.Millisecond, "secret %q should have been deleted", name)
 }
 
 func (s *SecretsSteps) assertSecretVisibleInList(name string) {

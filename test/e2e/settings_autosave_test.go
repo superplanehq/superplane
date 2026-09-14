@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -69,7 +68,10 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 }
 
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.canvas.WaitForStaging(uuid.Nil)
+	require.Eventually(s.t, func() bool {
+		val, exists, found := s.getExpressionField()
+		return found && exists && val == ""
+	}, 15*time.Second, 200*time.Millisecond, "cleared expression was not saved")
 }
 
 func (s *settingsAutoSaveSteps) switchToInfoTab() {

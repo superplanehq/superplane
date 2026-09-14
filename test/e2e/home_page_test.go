@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -163,5 +164,8 @@ func (steps *TestHomePageSteps) ClickNewApp() {
 	// An empty org opens /apps/new. The home toolbar is not on that page.
 	steps.session.WaitForBrowserPath("/" + steps.session.OrgSlug + "/apps/new")
 	steps.ClickStartFromScratch()
-	steps.session.WaitUntilURLContains("/apps/")
+	steps.session.WaitUntil(func() bool {
+		current := steps.session.Page().URL()
+		return strings.Contains(current, "/apps/") && !strings.Contains(current, "/apps/new")
+	}, "canvas was not created")
 }

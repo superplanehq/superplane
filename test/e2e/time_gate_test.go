@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -121,7 +120,15 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.canvas.WaitForStaging(uuid.Nil)
+	require.Eventually(s.t, func() bool {
+		node, ok := s.canvas.DraftNodeByName("timeGate")
+		if !ok {
+			return false
+		}
+		_, hasRange := node.Configuration["timeRange"]
+		_, hasTimezone := node.Configuration["timezone"]
+		return hasRange && hasTimezone
+	}, 15*time.Second, 200*time.Millisecond, "time gate configuration was not saved")
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {
