@@ -1,7 +1,19 @@
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { getWorkOrderDisplayKey } from "../../lib/workOrderProgress";
 import { draftStartModelPayload } from "./draftStartModel";
 import type { SplitRunFixture } from "./splitRunMocks";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
+
+export function popupWorkOrderDisplayKey(
+  order: { id?: string; key?: string; number?: string },
+  factoryKey?: string | null,
+): string | undefined {
+  const displayKey = getWorkOrderDisplayKey(order, factoryKey);
+  if (displayKey === "—") {
+    return undefined;
+  }
+  return displayKey;
+}
 
 export function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNumber?: string, lineId?: string) {
   if (!organizationId || !factoryKey || !orderNumber) {
