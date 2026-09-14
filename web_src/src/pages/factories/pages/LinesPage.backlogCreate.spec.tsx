@@ -126,11 +126,17 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: () => ({
+  useWorkOrderPlanningActivity: (
+    _organizationId: string,
+    _factoryId: string,
+    _workOrderId: string,
+    enabled: boolean,
+    backlogAnalyzing = false,
+  ) => ({
     hasAgentQuestion: false,
     isWaiting: false,
     isWorking: false,
-    isAgentWorking: false,
+    isAgentWorking: Boolean(enabled && backlogAnalyzing),
   }),
   workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
     "planning-session-by-work-order",
