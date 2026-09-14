@@ -10,7 +10,11 @@ import {
   type ConfidenceBand,
 } from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
+import {
+  CONFIDENCE_ANALYZING_TOOLTIP,
+  ConfidenceAnalyzingIndicator,
+  ConfidenceMeter,
+} from "../../workOrders/ConfidenceMeter";
 
 const CHIP_TONE: Record<ConfidenceBand, string> = {
   High: "border-emerald-500/30 bg-emerald-500/10",
@@ -19,7 +23,6 @@ const CHIP_TONE: Record<ConfidenceBand, string> = {
 };
 
 const FALLBACK_WHY = "The analysis scored how clear this work is.";
-const ANALYZING_WHY = "The analysis is still running.";
 
 type WorkOrderIntentConfidenceFooterProps = {
   confidence?: WorkOrderCheckPresentation;
@@ -35,7 +38,11 @@ export function WorkOrderIntentConfidenceFooter({
   if (isAnalyzing && !confidence) {
     return (
       <ConfidenceFooterShell flush={flush}>
-        <ConfidenceWhyChip key="analyzing" label={`${CONFIDENCE_CHECK_NAME}. Analyzing`} why={ANALYZING_WHY}>
+        <ConfidenceWhyChip
+          key="analyzing"
+          label={`${CONFIDENCE_CHECK_NAME}. Analyzing`}
+          why={CONFIDENCE_ANALYZING_TOOLTIP}
+        >
           <ConfidenceAnalyzingIndicator
             testId="split-run-intent-confidence-meter"
             showTooltip={false}
