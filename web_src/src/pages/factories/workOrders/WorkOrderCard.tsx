@@ -76,12 +76,13 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional pills sit on a middle row: an attached pull
- * request, then attention such as Waiting on status checks. The
- * footer shows when the task was created on the left, and the owner
- * given name plus avatar on the right (except on drafts). Drafts show
- * a Start button. Reviewed drafts also show a score to the left of
- * Start. The owner is display-only on the card.
+ * to the title. The workspace-scoped ID sits under the title. Optional
+ * pills sit on a middle row: an attached pull request, then attention
+ * such as Waiting on status checks. The footer shows when the task was
+ * created on the left, and the owner given name plus avatar on the
+ * right (except on drafts). Drafts show a Start button. Reviewed
+ * drafts also show a score to the left of Start. The owner is
+ * display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -136,12 +137,7 @@ export function WorkOrderCard({
       <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
-        <div className="flex min-w-0 items-center gap-2">
-          <WorkOrderStatusIcon status={entry.displayStatus} title={meta.label} aria-label={meta.label} />
-          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
-            {entry.title}
-          </h3>
-        </div>
+        <WorkOrderCardHeading entry={entry} statusLabel={meta.label} />
 
         <WorkOrderCardStatusRow
           entryId={entry.id}
@@ -165,6 +161,31 @@ export function WorkOrderCard({
         />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardHeading({ entry, statusLabel }: { entry: WorkOrderListEntry; statusLabel: string }) {
+  const showKey = entry.displayKey !== "—";
+  return (
+    <div className="flex min-w-0 items-start gap-2">
+      <WorkOrderStatusIcon
+        status={entry.displayStatus}
+        title={statusLabel}
+        aria-label={statusLabel}
+        className="mt-0.5"
+      />
+      <div className="min-w-0 flex-1">
+        <h3 className="truncate text-[13px] font-medium leading-snug text-foreground">{entry.title}</h3>
+        {showKey ? (
+          <p
+            className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground"
+            data-testid={`work-order-card-display-key-${entry.id}`}
+          >
+            {entry.displayKey}
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
