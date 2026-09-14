@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage:
 #   bash scripts/test_ui_autoparallel.sh
 #   FILES="src/lib/duration.spec.ts" bash scripts/test_ui_autoparallel.sh
-#   SHARD_INDEX=1 SHARD_COUNT=4 bash scripts/test_ui_autoparallel.sh
+#   SHARD_INDEX=1 SHARD_COUNT=2 bash scripts/test_ui_autoparallel.sh
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
