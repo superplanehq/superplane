@@ -76,4 +76,19 @@ describe("workOrderFiles", () => {
     expect(workOrderFileDownloadMap([{ id, downloadUrl: first }])[id]).toBe(first);
     expect(workOrderFileDownloadMap([{ id, downloadUrl: next }])[id]).toBe(next);
   });
+
+  it("evicts the oldest URL after caching 200 files", () => {
+    const firstId = "file-0";
+    const first = "https://files.example/file-0.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/file-0.png?expires=9999999999&sig=two";
+    workOrderFileDownloadMap([{ id: firstId, downloadUrl: first }]);
+
+    for (let index = 1; index <= 200; index += 1) {
+      workOrderFileDownloadMap([
+        { id: `file-${index}`, downloadUrl: `https://files.example/file-${index}.png?expires=9999999999` },
+      ]);
+    }
+
+    expect(workOrderFileDownloadMap([{ id: firstId, downloadUrl: reminted }])[firstId]).toBe(reminted);
+  });
 });

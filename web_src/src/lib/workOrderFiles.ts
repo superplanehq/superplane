@@ -17,6 +17,7 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
 const previewUrls = new Map<string, string>();
 const downloadUrls = new Map<string, string>();
 const DOWNLOAD_URL_REFRESH_WINDOW_MS = 60_000;
+const DOWNLOAD_URL_CACHE_LIMIT = 200;
 
 export type WorkOrderFileRef = Pick<FilesFile, "id" | "downloadUrl" | "filename" | "contentType">;
 
@@ -103,17 +104,27 @@ export function rewriteWorkOrderFileRefs(markdown: string, files: WorkOrderFileR
 function stableWorkOrderFileDownloadUrl(id: string, nextUrl: string): string {
   const currentUrl = downloadUrls.get(id);
   if (!currentUrl || currentUrl === nextUrl || downloadUrlResource(currentUrl) !== downloadUrlResource(nextUrl)) {
-    downloadUrls.set(id, nextUrl);
-    return nextUrl;
+    return rememberWorkOrderFileDownloadUrl(id, nextUrl);
   }
 
   const expiresAt = signedDownloadUrlExpiresAt(currentUrl);
   if (expiresAt !== undefined && expiresAt - Date.now() < DOWNLOAD_URL_REFRESH_WINDOW_MS) {
-    downloadUrls.set(id, nextUrl);
-    return nextUrl;
+    return rememberWorkOrderFileDownloadUrl(id, nextUrl);
   }
 
-  return currentUrl;
+  return rememberWorkOrderFileDownloadUrl(id, currentUrl);
+}
+
+function rememberWorkOrderFileDownloadUrl(id: string, url: string): string {
+  downloadUrls.delete(id);
+  downloadUrls.set(id, url);
+  if (downloadUrls.size > DOWNLOAD_URL_CACHE_LIMIT) {
+    const oldestId = downloadUrls.keys().next().value;
+    if (oldestId !== undefined) {
+      downloadUrls.delete(oldestId);
+    }
+  }
+  return url;
 }
 
 function downloadUrlResource(rawUrl: string): string {
