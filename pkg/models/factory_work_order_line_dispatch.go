@@ -131,7 +131,8 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
 	}
 
-	if _, err := lockFactoryForAdmission(tx, l.FactoryID); err != nil {
+	factory, err := lockFactoryForAdmission(tx, l.FactoryID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -157,12 +158,16 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 
-	atFactoryCap, err := factoryAtParallelCapacity(tx, l.OrganizationID, l.FactoryID)
-	if err != nil {
-		return nil, err
-	}
-	if atFactoryCap {
-		return l.enqueueStep(tx, order, stepIndex)
+	// Without a factory row there is no cap to read and no lock to hold,
+	// so only the step's own parallelism applies.
+	if factory != nil {
+		atFactoryCap, err := factoryAtParallelCapacity(tx, l.OrganizationID, l.FactoryID)
+		if err != nil {
+			return nil, err
+		}
+		if atFactoryCap {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
 	}
 
 	return l.StartStep(tx, order, stepIndex)

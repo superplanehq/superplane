@@ -582,3 +582,54 @@ func Test__StepQueue_InstallationDefaultSkipsOverriddenOrganization(t *testing.T
 	assert.Empty(t, admitted)
 	assert.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
 }
+
+func softDeleteFactory(t *testing.T, f *models.Factory) {
+	t.Helper()
+	require.NoError(t, f.SoftDelete(database.Conn()))
+}
+
+// A soft-deleted factory can still hold queue items, and one of those
+// must not stop the organization's live factories from using the cap
+// the admin just raised.
+func Test__StepQueue_DeletedFactoryDoesNotBlockOrganizationAdmission(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	deleted := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	live := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	for _, fixture := range []*stepQueueFixture{deleted, live} {
+		running := fixture.createOpenWorkOrder(t, r, "Running")
+		_, runningResult := fixture.dispatchLine(t, running)
+		require.NotNil(t, runningResult.Run)
+	}
+
+	deletedWaiter := deleted.createOpenWorkOrder(t, r, "Waiting in deleted factory")
+	deletedDispatch, deletedResult := deleted.dispatchLine(t, deletedWaiter)
+	require.NotNil(t, deletedResult.QueueItem)
+
+	liveWaiter := live.createOpenWorkOrder(t, r, "Waiting in live factory")
+	liveDispatch, liveResult := live.dispatchLine(t, liveWaiter)
+	require.NotNil(t, liveResult.QueueItem)
+
+	softDeleteFactory(t, deleted.factory)
+
+	two := 2
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &two))
+
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		admitted, err = models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+
+	require.Len(t, admitted, 1)
+	assert.Nil(t, queueItemForDispatch(t, liveDispatch.ID))
+	assert.Len(t, executionsForOrder(t, liveWaiter.ID), 1)
+	assert.NotNil(t, queueItemForDispatch(t, deletedDispatch.ID))
+	assert.Empty(t, executionsForOrder(t, deletedWaiter.ID))
+}

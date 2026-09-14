@@ -315,6 +315,11 @@ func AdmitQueuedForFactory(tx *gorm.DB, factoryID uuid.UUID) ([]*FactoryLineStep
 	if err != nil {
 		return nil, err
 	}
+	// A deleted factory must not start more work. Its leftover queue
+	// items wait for the cleanup worker.
+	if factory == nil {
+		return nil, nil
+	}
 
 	items, err := listFactoryWorkOrderQueueItemsOldestFirst(tx, factoryID)
 	if err != nil {

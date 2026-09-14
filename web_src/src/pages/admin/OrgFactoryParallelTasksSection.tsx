@@ -3,6 +3,7 @@ import { Text } from "@/components/Text/text";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { parsePositiveWholeNumber } from "@/lib/positiveWholeNumber";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Factory } from "lucide-react";
@@ -19,14 +20,6 @@ type FactorySettingsRequest = {
 };
 
 const limitHint = "Enter a whole number of at least 1, or leave the field empty.";
-
-const getErrorMessage = async (response: Response, fallback: string) => {
-  const text = await response.text();
-  if (text.trim() === "") {
-    return fallback;
-  }
-  return text;
-};
 
 // An empty field clears the override. Any other value must be a whole
 // number, so the saved limit matches what the administrator typed.
@@ -61,7 +54,7 @@ export function OrgFactoryParallelTasksSection({ orgId }: { orgId: string }) {
         credentials: "include",
       });
       if (!response.ok) {
-        throw new Error(await getErrorMessage(response, "Failed to load factory settings"));
+        throw new Error(await getResponseErrorMessage(response, "Failed to load factory settings"));
       }
       applySettings(await response.json());
     } catch (error) {
@@ -91,7 +84,7 @@ export function OrgFactoryParallelTasksSection({ orgId }: { orgId: string }) {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        throw new Error(await getErrorMessage(response, "Failed to update factory limit"));
+        throw new Error(await getResponseErrorMessage(response, "Failed to update factory limit"));
       }
       applySettings(await response.json());
       showSuccessToast("Factory limit updated");

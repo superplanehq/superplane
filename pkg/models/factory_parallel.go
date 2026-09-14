@@ -66,6 +66,11 @@ func ResolveOrganizationFactoryMaxParallelTasks(tx *gorm.DB, orgID uuid.UUID) (i
 	return installation.MaxParallelFactoryTasks, nil
 }
 
+// lockFactoryForAdmission takes the factory's admission lock and returns
+// a nil factory when the row is gone. Deleting a factory only soft
+// deletes it, and its lines and queue items stay until the cleanup worker
+// removes them. A missing factory holds no cap, so callers skip it
+// instead of failing the whole admission pass.
 func lockFactoryForAdmission(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
 	var factory Factory
 	err := tx.
@@ -75,7 +80,7 @@ func lockFactoryForAdmission(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error)
 		Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryNotFound
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -116,8 +121,15 @@ func countActiveFactoryExecutions(tx *gorm.DB, factoryID uuid.UUID) (int64, erro
 	return count, nil
 }
 
+// factoryAtParallelCapacity reports whether the factory already runs as
+// many tasks as its organization allows. A soft-deleted organization
+// keeps no cap to enforce, so a missing row reads as "not at capacity"
+// rather than failing the admission pass.
 func factoryAtParallelCapacity(tx *gorm.DB, orgID, factoryID uuid.UUID) (bool, error) {
 	max, err := ResolveOrganizationFactoryMaxParallelTasks(tx, orgID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
