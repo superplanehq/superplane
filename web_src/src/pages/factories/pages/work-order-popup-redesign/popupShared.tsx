@@ -6,6 +6,7 @@ import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import { CopyableKeyButton } from "../../CopyableKeyButton";
 import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { OrgUserReference } from "../../OrgUserReference";
@@ -104,16 +105,8 @@ export function PopupHeader({
     <header className="relative shrink-0 border-b border-border px-5 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
-          {displayKey ? (
-            <p
-              className="mb-0.5 select-text font-mono text-[11px] tabular-nums text-muted-foreground"
-              data-testid="popup-work-order-display-key"
-            >
-              {displayKey}
-            </p>
-          ) : null}
-          <div className="flex min-w-0 items-center gap-3">
-            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="min-w-0 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
               {canEditTitle && onTitleSave ? (
                 <ClickToRename
                   value={title}
@@ -129,6 +122,7 @@ export function PopupHeader({
                 title
               )}
             </h2>
+            {displayKey ? <CopyableKeyButton value={displayKey} /> : null}
           </div>
           {children}
         </div>
@@ -149,7 +143,7 @@ export function PopupHeader({
 
 type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
 
-/** Owner and spend. No elapsed time, status, or author. The ticket key is above the title. */
+/** Owner and spend. No elapsed time, status, or author. The ticket ID sits next to the title. */
 export function OwnerTimeCostRow({
   fixture,
   className,
