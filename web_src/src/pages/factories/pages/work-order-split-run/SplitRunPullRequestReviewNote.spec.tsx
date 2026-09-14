@@ -58,6 +58,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     expect(note).not.toHaveTextContent("Waiting for user review");
     expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
+    expect(within(note).getByRole("list", { name: "Next steps" })).not.toHaveClass("sm:grid-cols-3");
   });
 
   it("makes the pull request link the one large call to action", () => {
@@ -125,5 +126,6 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note.className).not.toMatch(/\bborder-t\b/);
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(screen.getByTestId("split-run-pull-request-cta")).toHaveClass("w-full");
+    expect(within(note).getByRole("list", { name: "Next steps" })).toHaveClass("pl-4");
   });
 });
