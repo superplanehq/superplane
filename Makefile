@@ -461,12 +461,18 @@ cli.build.m1:
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+DEV_BASE_IMAGE?=ghcr.io/superplanehq/superplane-dev-base:app-latest
 VITE_ASSET_BASE_URL?=
 FRONTEND_PREBUILT?=0
 # pb.gen runs in the compose app container; run `make dev.up` first.
+# Pass host Go caches into the builder when CI restored tmp/go and tmp/go-build.
 image.build:
 	$(MAKE) pb.gen
+	mkdir -p tmp/go tmp/go-build
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner \
+	  --build-context ci-go-mod=tmp/go \
+	  --build-context ci-go-build=tmp/go-build \
+	  --cache-from $(DEV_BASE_IMAGE) \
 	  --build-arg BASE_URL=$(BASE_URL) \
 	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \

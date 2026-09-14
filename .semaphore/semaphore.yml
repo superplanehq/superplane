@@ -27,12 +27,6 @@ global_job_config:
     commands:
       - checkout
       - mkdir -p tmp/go tmp/go-build
-      # Only main stores these caches, so the keys carry no branch name.
-      # See scripts/ci_cache_store_go.sh.
-      - "cache restore go-mod-$(checksum go.sum),go-mod"
-      - "cache restore go-build-$(checksum go.sum),go-build"
-      - make dev.up
-      - make dev.setup
 
 auto_cancel:
   running:
@@ -45,6 +39,14 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          # Only main stores these caches, so the keys carry no branch name.
+          # See scripts/ci_cache_store_go.sh.
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
         - name: Lint
           commands:
@@ -85,6 +87,9 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - make dev.up
       jobs:
         - name: Tool configs
           commands:
@@ -111,12 +116,13 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
-        - name: Check Build
-          commands:
-            - make check.tool.configs
-            - make check.build.ui
-
         - name: Storybook Build
           commands:
             - make check.tool.configs
@@ -155,6 +161,12 @@ blocks:
     task:
       secrets:
         - name: ghcr-push-token
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup.npm
       jobs:
         - name: Build image
           commands:
