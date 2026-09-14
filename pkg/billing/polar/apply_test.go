@@ -64,6 +64,20 @@ func Test__ApplyOrderPaidIgnoresNonPacks(t *testing.T) {
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
 }
 
+func Test__ApplyOrderPaidGrantsCustomPaidAmount(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidCustomPackEvent(r.Organization.ID, orderID, 7350)
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
+
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(7350), grant.AmountMicros)
+}
+
 func Test__ApplyOrderPaidUsesPurchasedPrice(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
@@ -185,6 +199,26 @@ func Test__ApplyOrderRefundedFullAndIdempotent(t *testing.T) {
 	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
+	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
+}
+
+func Test__ApplyOrderRefundedCustomFullAndPartial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidCustomPackEvent(r.Organization.ID, orderID, 7350), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(r.Organization.ID, orderID, "partially_refunded", 7350, 2000), nil))
+	partial, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2000), partial.GrantMicros)
+
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(r.Organization.ID, orderID, "refunded", 7350, 7350), nil))
+	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.GrantMicros-models.CentsToMicros(7350), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
@@ -317,6 +351,33 @@ func paidPackEvent(orgID uuid.UUID, orderID string, amountCents int64) *OrderWeb
 			ProductPrice: priceJSON{AmountType: "fixed", PriceAmount: amountCents},
 		},
 	}
+}
+
+func paidCustomPackEvent(orgID uuid.UUID, orderID string, paidCents int64) *OrderWebhookEvent {
+	event := paidPackEvent(orgID, orderID, paidCents)
+	event.Data.NetAmount = paidCents
+	event.Data.Product.ID = "prod_custom"
+	event.Data.Product.Prices = []priceJSON{{AmountType: "custom", PriceAmount: 0}}
+	event.Data.ProductPrice = priceJSON{AmountType: "custom"}
+	event.Data.Items = []orderItemJSON{{
+		Amount:       paidCents,
+		ProductPrice: priceJSON{AmountType: "custom"},
+		Product: OrderProduct{
+			ID: "prod_custom",
+			Metadata: map[string]any{
+				"superplane_credit_pack": true,
+			},
+		},
+	}}
+	return event
+}
+
+func refundedCustomPackEvent(orgID uuid.UUID, orderID, status string, paidCents, refundedNet int64) *OrderWebhookEvent {
+	event := paidCustomPackEvent(orgID, orderID, paidCents)
+	event.Type = orderRefundedType
+	event.Data.Status = status
+	event.Data.RefundedAmount = refundedNet
+	return event
 }
 
 func refundedPackEvent(orgID uuid.UUID, orderID, status string, refundedNet int64) *OrderWebhookEvent {

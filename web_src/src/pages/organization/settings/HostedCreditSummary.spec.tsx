@@ -35,6 +35,31 @@ describe("HostedCreditSummary", () => {
     expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(3);
   });
 
+  it("does not show a card for a custom credit pack", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="2500"
+        grantTotalCents="2500"
+        superplaneGrantCents="2500"
+        purchasedCreditCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling
+        products={[
+          { id: "prod-25", amountCents: "2500" },
+          { id: "prod-custom", amountCents: "0" },
+        ]}
+        onAddCredit={vi.fn()}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(1);
+    expect(screen.getAllByText("$25.00").length).toBeGreaterThan(0);
+  });
+
   it("shows SuperPlane grant and purchased hosted credit separately", () => {
     render(
       <HostedCreditSummary
