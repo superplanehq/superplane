@@ -48,6 +48,8 @@ type PriceBooksCatalogProps = {
   saving: boolean;
   syncing: boolean;
   activating: boolean;
+  versionLoading: boolean;
+  pendingVersion?: string;
   onTabChange: (tab: PriceBooksTab) => void;
   onVersionChange: (version: string) => void;
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
@@ -61,6 +63,7 @@ type PriceBooksCatalogProps = {
 
 export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
   const isCurrent = props.data.version === props.data.current_version;
+  const actionsDisabled = props.saving || props.syncing || props.activating || props.versionLoading;
 
   return (
     <div className="space-y-6">
@@ -68,6 +71,9 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
         data={props.data}
         isCurrent={isCurrent}
         activating={props.activating}
+        mutating={props.saving || props.syncing || props.activating}
+        actionsDisabled={actionsDisabled}
+        pendingVersion={props.pendingVersion}
         onVersionChange={props.onVersionChange}
         onActivate={props.onActivate}
       />
@@ -94,6 +100,7 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             models={props.models}
             saving={props.saving}
             syncing={props.syncing}
+            actionsDisabled={actionsDisabled}
             onModelChange={props.onModelChange}
             onAddModel={props.onAddModel}
             onSave={props.onSave}
@@ -105,6 +112,7 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             isCurrent={isCurrent}
             vms={props.vms}
             saving={props.saving}
+            actionsDisabled={actionsDisabled}
             onVMChange={props.onVMChange}
             onAddVM={props.onAddVM}
             onSave={props.onSave}
@@ -119,12 +127,18 @@ function PriceBooksToolbar({
   data,
   isCurrent,
   activating,
+  mutating,
+  actionsDisabled,
+  pendingVersion,
   onVersionChange,
   onActivate,
 }: {
   data: PriceBooksResponse;
   isCurrent: boolean;
   activating: boolean;
+  mutating: boolean;
+  actionsDisabled: boolean;
+  pendingVersion?: string;
   onVersionChange: (version: string) => void;
   onActivate: () => void;
 }) {
@@ -134,7 +148,7 @@ function PriceBooksToolbar({
       <div className="flex flex-col gap-3 sm:items-end">
         <div className="flex flex-col gap-1">
           <Label htmlFor="admin-price-book-version">Version</Label>
-          <Select value={data.version} onValueChange={onVersionChange}>
+          <Select value={pendingVersion ?? data.version} onValueChange={onVersionChange} disabled={mutating}>
             <SelectTrigger id="admin-price-book-version" data-testid="admin-price-book-version">
               <SelectValue />
             </SelectTrigger>
@@ -154,7 +168,7 @@ function PriceBooksToolbar({
             variant="outline"
             size="sm"
             data-testid="admin-price-book-activate"
-            disabled={activating}
+            disabled={actionsDisabled}
             onClick={onActivate}
           >
             {activating ? "Switching version..." : "Use this version"}
@@ -170,6 +184,7 @@ function ModelsPanel({
   models,
   saving,
   syncing,
+  actionsDisabled,
   onModelChange,
   onAddModel,
   onSave,
@@ -179,6 +194,7 @@ function ModelsPanel({
   models: PriceBookModelRate[];
   saving: boolean;
   syncing: boolean;
+  actionsDisabled: boolean;
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
   onAddModel: (rate: PriceBookModelRate) => boolean;
   onSave: () => void;
@@ -194,7 +210,7 @@ function ModelsPanel({
               variant="outline"
               size="sm"
               data-testid="admin-price-book-sync"
-              disabled={syncing || saving}
+              disabled={actionsDisabled}
               onClick={onSync}
             >
               {syncing ? "Updating model rates..." : "Update model rates"}
@@ -207,15 +223,15 @@ function ModelsPanel({
             type="button"
             size="sm"
             data-testid="admin-price-book-save"
-            disabled={saving || syncing}
+            disabled={actionsDisabled}
             onClick={onSave}
           >
             {saving ? "Saving rates..." : "Save rates"}
           </Button>
         </div>
       )}
-      <ModelsTable rates={models} editable={isCurrent} onChange={onModelChange} />
-      {isCurrent && <AddModelRateForm onAdd={onAddModel} />}
+      <ModelsTable rates={models} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+      {isCurrent && <AddModelRateForm disabled={actionsDisabled} onAdd={onAddModel} />}
     </>
   );
 }
@@ -224,6 +240,7 @@ function VMsPanel({
   isCurrent,
   vms,
   saving,
+  actionsDisabled,
   onVMChange,
   onAddVM,
   onSave,
@@ -231,6 +248,7 @@ function VMsPanel({
   isCurrent: boolean;
   vms: PriceBookVMRate[];
   saving: boolean;
+  actionsDisabled: boolean;
   onVMChange: (index: number, micros: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
@@ -239,13 +257,19 @@ function VMsPanel({
     <>
       {isCurrent && (
         <div className="flex justify-end">
-          <Button type="button" size="sm" data-testid="admin-price-book-save-vms" disabled={saving} onClick={onSave}>
+          <Button
+            type="button"
+            size="sm"
+            data-testid="admin-price-book-save-vms"
+            disabled={actionsDisabled}
+            onClick={onSave}
+          >
             {saving ? "Saving rates..." : "Save rates"}
           </Button>
         </div>
       )}
-      <VMsTable rates={vms} editable={isCurrent} onChange={onVMChange} />
-      {isCurrent && <AddVMRateForm onAdd={onAddVM} />}
+      <VMsTable rates={vms} editable={isCurrent && !actionsDisabled} onChange={onVMChange} />
+      {isCurrent && <AddVMRateForm disabled={actionsDisabled} onAdd={onAddVM} />}
     </>
   );
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -10,7 +11,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// ErrUsagePriceBookConflict is returned when a publish uses a stale current version.
+var ErrUsagePriceBookConflict = errors.New("current price book changed")
 
 const (
 	UsagePriceBookMatchExact  = "exact"
@@ -179,15 +184,20 @@ func ValidateUsagePriceBookRates(rows []UsagePriceBookRate) error {
 	return nil
 }
 
-// PublishUsagePriceBook inserts a new current catalog. It does not touch the
-// in-memory book, because the caller can still roll the transaction back.
-// Call LoadCurrentPriceBook after the commit.
-func PublishUsagePriceBook(tx *gorm.DB, rates []UsagePriceBookRate) (*UsagePriceBook, error) {
+// PublishUsagePriceBook inserts a new current catalog. expectedCurrentVersion
+// must match the locked current row. It does not touch the in-memory book,
+// because the caller can still roll the transaction back. Call
+// LoadCurrentPriceBook after the commit.
+func PublishUsagePriceBook(tx *gorm.DB, rates []UsagePriceBookRate, expectedCurrentVersion string) (*UsagePriceBook, error) {
 	normalized := make([]UsagePriceBookRate, 0, len(rates))
 	for _, row := range rates {
 		normalized = append(normalized, NormalizeUsagePriceBookRate(row))
 	}
 	if err := ValidateUsagePriceBookRates(normalized); err != nil {
+		return nil, err
+	}
+
+	if err := ensureCurrentUsagePriceBook(tx, expectedCurrentVersion); err != nil {
 		return nil, err
 	}
 
@@ -289,6 +299,25 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 	}
 
 	pricebook.Replace(loaded)
+	return nil
+}
+
+func ensureCurrentUsagePriceBook(tx *gorm.DB, expectedVersion string) error {
+	expectedVersion = strings.TrimSpace(expectedVersion)
+	if expectedVersion == "" {
+		return fmt.Errorf("base version cannot be empty")
+	}
+
+	current, err := FindCurrentUsagePriceBook(tx.Clauses(clause.Locking{Strength: "UPDATE"}))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUsagePriceBookConflict
+		}
+		return err
+	}
+	if current.Version != expectedVersion {
+		return ErrUsagePriceBookConflict
+	}
 	return nil
 }
 

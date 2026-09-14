@@ -52,6 +52,7 @@ export async function fetchPriceBooks(version?: string, signal?: AbortSignal): P
 }
 
 export async function savePriceBooks(
+  baseVersion: string,
   models: PriceBookModelRate[],
   vms: PriceBookVMRate[],
 ): Promise<PriceBooksResponse> {
@@ -59,7 +60,7 @@ export async function savePriceBooks(
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models, vms }),
+    body: JSON.stringify({ base_version: baseVersion, models, vms }),
   });
   if (!response.ok) {
     throw new Error(await readAdminError(response, "Failed to save price books"));

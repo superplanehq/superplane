@@ -146,9 +146,11 @@ describe("PriceBooks", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
         const body = JSON.parse(String(init.body)) as {
+          base_version: string;
           models: { input_cents_per_million: number }[];
           vms: { match_key: string }[];
         };
+        expect(body.base_version).toBe("2026-09-09.1");
         expect(body.models[0].input_cents_per_million).toBe(400);
         expect(body.vms.some((rate) => rate.match_key === "e1-test-amd64")).toBe(true);
         return jsonResponse(savedCatalog);
@@ -228,5 +230,75 @@ describe("PriceBooks", () => {
     expect(screen.getByTestId("admin-price-book-sync")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-price-book-activate")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("3.00")).toBeInTheDocument();
+  });
+
+  it("disables save while a version change is loading", async () => {
+    const olderRequest = new Promise<Response>(() => undefined);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("version=2026-08-31.1")) {
+          return olderRequest;
+        }
+        return jsonResponse(currentCatalog);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-price-book-version"));
+    await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-price-book-save")).toBeDisabled();
+    });
+    expect(screen.getByTestId("admin-price-book-sync")).toBeDisabled();
+  });
+
+  it("disables activate until the selected version finishes loading", async () => {
+    let resolveMiddle: ((response: Response) => void) | undefined;
+    const middleRequest = new Promise<Response>((resolve) => {
+      resolveMiddle = resolve;
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("version=2026-09-01.1")) {
+          return middleRequest;
+        }
+        if (url.includes("version=2026-08-31.1")) {
+          return jsonResponse(olderCatalog);
+        }
+        return jsonResponse(currentCatalog);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+    await user.click(screen.getByTestId("admin-price-book-version"));
+    await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
+    expect(await screen.findByText("older-model")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-price-book-version"));
+    await user.click(await screen.findByRole("option", { name: "2026-09-01.1" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-price-book-activate")).toBeDisabled();
+    });
+
+    await act(async () => {
+      resolveMiddle?.(jsonResponse(middleCatalog));
+      await middleRequest;
+    });
+
+    expect(await screen.findByText("middle-model")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-price-book-activate")).toBeEnabled();
   });
 });

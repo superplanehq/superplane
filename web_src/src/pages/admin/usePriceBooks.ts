@@ -25,13 +25,23 @@ export function usePriceBookCatalog() {
   const [vms, setVMs] = useState<PriceBookVMRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [versionLoading, setVersionLoading] = useState(false);
+  const [pendingVersion, setPendingVersion] = useState<string | undefined>();
   const loadAbort = useRef<AbortController | null>(null);
   const loadGeneration = useRef(0);
 
   const applyCatalog = useCallback((payload: PriceBooksResponse) => {
     setData(payload);
+    setPendingVersion(payload.version);
     setModels(payload.models.map((rate) => ({ ...rate })));
     setVMs(payload.vms.map((rate) => ({ ...rate })));
+  }, []);
+
+  const supersedeLoads = useCallback(() => {
+    loadAbort.current?.abort();
+    loadAbort.current = null;
+    loadGeneration.current += 1;
+    setVersionLoading(false);
   }, []);
 
   const loadPriceBooks = useCallback(
@@ -44,6 +54,8 @@ export function usePriceBookCatalog() {
         setLoading,
         setLoadFailed,
         setData,
+        setVersionLoading,
+        setPendingVersion,
       });
     },
     [applyCatalog],
@@ -57,7 +69,20 @@ export function usePriceBookCatalog() {
     };
   }, [loadPriceBooks]);
 
-  return { data, models, vms, setModels, setVMs, loading, loadFailed, applyCatalog, loadPriceBooks };
+  return {
+    data,
+    models,
+    vms,
+    setModels,
+    setVMs,
+    loading,
+    loadFailed,
+    versionLoading,
+    pendingVersion,
+    applyCatalog,
+    loadPriceBooks,
+    supersedeLoads,
+  };
 }
 
 async function loadCatalogVersion({
@@ -68,6 +93,8 @@ async function loadCatalogVersion({
   setLoading,
   setLoadFailed,
   setData,
+  setVersionLoading,
+  setPendingVersion,
 }: {
   version?: string;
   loadAbort: MutableRefObject<AbortController | null>;
@@ -76,11 +103,16 @@ async function loadCatalogVersion({
   setLoading: (value: boolean) => void;
   setLoadFailed: (value: boolean) => void;
   setData: (value: PriceBooksResponse | null) => void;
+  setVersionLoading: (value: boolean) => void;
+  setPendingVersion: (value: string | undefined) => void;
 }) {
   const isFirstLoad = version === undefined;
   if (isFirstLoad) {
     setLoading(true);
     setLoadFailed(false);
+  } else {
+    setPendingVersion(version);
+    setVersionLoading(true);
   }
 
   loadAbort.current?.abort();
@@ -105,10 +137,17 @@ async function loadCatalogVersion({
     if (isFirstLoad) {
       setLoadFailed(true);
       setData(null);
+    } else {
+      setPendingVersion(undefined);
     }
   } finally {
-    if (isFirstLoad && generation === loadGeneration.current) {
+    if (generation !== loadGeneration.current) {
+      return;
+    }
+    if (isFirstLoad) {
       setLoading(false);
+    } else {
+      setVersionLoading(false);
     }
   }
 }
@@ -119,6 +158,8 @@ export function usePriceBookEdits(
   setModels: Dispatch<SetStateAction<PriceBookModelRate[]>>,
   setVMs: Dispatch<SetStateAction<PriceBookVMRate[]>>,
   applyCatalog: (payload: PriceBooksResponse) => void,
+  version: string,
+  supersedeLoads: () => void,
 ) {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -132,10 +173,10 @@ export function usePriceBookEdits(
     activating,
     handleAddModel: (rate: PriceBookModelRate) => appendUniqueModel(models, modelKeys, rate, setModels),
     handleAddVM: (rate: PriceBookVMRate) => appendUniqueVM(vms, vmKeys, rate, setVMs),
-    handleSave: () => void saveCurrentRates(models, vms, applyCatalog, setSaving),
-    handleSync: () => void syncCurrentRates(applyCatalog, setSyncing),
-    handleActivate: (version: string, onDone: () => void) =>
-      void activateCurrentVersion(version, applyCatalog, setActivating, onDone),
+    handleSave: () => void saveCurrentRates(version, models, vms, applyCatalog, supersedeLoads, setSaving),
+    handleSync: () => void syncCurrentRates(applyCatalog, supersedeLoads, setSyncing),
+    handleActivate: (targetVersion: string, onDone: () => void) =>
+      void activateCurrentVersion(targetVersion, applyCatalog, supersedeLoads, setActivating, onDone),
     handleModelChange: (index: number, patch: Partial<PriceBookModelRate>) => {
       setModels((current) => current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)));
     },
@@ -186,14 +227,17 @@ function appendUniqueVM(
 }
 
 async function saveCurrentRates(
+  version: string,
   models: PriceBookModelRate[],
   vms: PriceBookVMRate[],
   applyCatalog: (payload: PriceBooksResponse) => void,
+  supersedeLoads: () => void,
   setSaving: (value: boolean) => void,
 ) {
   setSaving(true);
+  supersedeLoads();
   try {
-    applyCatalog(await savePriceBooks(models, vms));
+    applyCatalog(await savePriceBooks(version, models, vms));
     showSuccessToast("Saved a new current price book.");
   } catch (error) {
     showErrorToast(error instanceof Error ? error.message : "Failed to save price books");
@@ -204,9 +248,11 @@ async function saveCurrentRates(
 
 async function syncCurrentRates(
   applyCatalog: (payload: PriceBooksResponse) => void,
+  supersedeLoads: () => void,
   setSyncing: (value: boolean) => void,
 ) {
   setSyncing(true);
+  supersedeLoads();
   try {
     const payload = await syncPriceBooks();
     applyCatalog(payload);
@@ -221,10 +267,12 @@ async function syncCurrentRates(
 async function activateCurrentVersion(
   version: string,
   applyCatalog: (payload: PriceBooksResponse) => void,
+  supersedeLoads: () => void,
   setActivating: (value: boolean) => void,
   onDone: () => void,
 ) {
   setActivating(true);
+  supersedeLoads();
   try {
     applyCatalog(await activatePriceBook(version));
     onDone();

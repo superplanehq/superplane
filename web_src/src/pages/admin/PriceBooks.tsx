@@ -10,7 +10,15 @@ type PriceBooksTab = "models" | "vms";
 
 export function PriceBooks() {
   const catalog = usePriceBookCatalog();
-  const edits = usePriceBookEdits(catalog.models, catalog.vms, catalog.setModels, catalog.setVMs, catalog.applyCatalog);
+  const edits = usePriceBookEdits(
+    catalog.models,
+    catalog.vms,
+    catalog.setModels,
+    catalog.setVMs,
+    catalog.applyCatalog,
+    catalog.data?.version ?? "",
+    catalog.supersedeLoads,
+  );
   const [tab, setTab] = useState<PriceBooksTab>("models");
   const [activateOpen, setActivateOpen] = useState(false);
 
@@ -53,8 +61,13 @@ export function PriceBooks() {
         saving={edits.saving}
         syncing={edits.syncing}
         activating={edits.activating}
+        versionLoading={catalog.versionLoading}
+        pendingVersion={catalog.pendingVersion}
         onTabChange={setTab}
-        onVersionChange={(version) => void catalog.loadPriceBooks(version)}
+        onVersionChange={(version) => {
+          setActivateOpen(false);
+          void catalog.loadPriceBooks(version);
+        }}
         onModelChange={edits.handleModelChange}
         onVMChange={edits.handleVMChange}
         onAddModel={edits.handleAddModel}
@@ -71,7 +84,7 @@ export function PriceBooks() {
         <DialogActions>
           <Button
             data-testid="admin-price-book-activate-confirm"
-            disabled={edits.activating}
+            disabled={edits.activating || catalog.versionLoading}
             onClick={() => edits.handleActivate(data.version, () => setActivateOpen(false))}
           >
             {edits.activating ? "Switching version..." : "Use this version"}

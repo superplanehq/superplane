@@ -109,7 +109,11 @@ func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
 		MicrosPerSecond: 9,
 	})
 
-	payload, err := json.Marshal(adminPriceBooksSaveRequest{Models: current.Models, VMs: current.VMs})
+	payload, err := json.Marshal(adminPriceBooksSaveRequest{
+		BaseVersion: current.Version,
+		Models:      current.Models,
+		VMs:         current.VMs,
+	})
 	require.NoError(t, err)
 
 	save := execRequest(server, requestParams{
@@ -140,6 +144,71 @@ func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
 	assert.Equal(t, "2026-09-09.1", restored.CurrentVersion)
 	assert.Equal(t, "2026-09-09.1", restored.Version)
 	assert.False(t, containsVMRate(restored.VMs, "e1-test-amd64", 9))
+}
+
+func TestAdminSavePriceBooks_RejectsStaleBaseVersion(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	t.Cleanup(func() {
+		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-09.1")
+	})
+
+	getBody := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/admin/api/price-books",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, getBody.Code)
+	var current adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(getBody.Body.Bytes(), &current))
+
+	payload, err := json.Marshal(adminPriceBooksSaveRequest{
+		BaseVersion: "2026-08-31.1",
+		Models:      current.Models,
+		VMs:         current.VMs,
+	})
+	require.NoError(t, err)
+
+	save := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books",
+		authCookie:  token,
+		body:        payload,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusConflict, save.Code)
+	assert.Contains(t, save.Body.String(), "The current price book changed")
+
+	after := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/admin/api/price-books",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, after.Code)
+	var stillCurrent adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(after.Body.Bytes(), &stillCurrent))
+	assert.Equal(t, current.CurrentVersion, stillCurrent.CurrentVersion)
+}
+
+func TestAdminSavePriceBooks_RequiresBaseVersion(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	payload, err := json.Marshal(adminPriceBooksSaveRequest{
+		Models: []adminPriceBookModelRate{{
+			MatchKey:  "claude-sonnet",
+			MatchMode: "prefix",
+		}},
+	})
+	require.NoError(t, err)
+
+	save := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books",
+		authCookie:  token,
+		body:        payload,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusBadRequest, save.Code)
+	assert.Contains(t, save.Body.String(), "Base version is required")
 }
 
 func TestAdminSyncPriceBooks_RequiresPricedProvider(t *testing.T) {

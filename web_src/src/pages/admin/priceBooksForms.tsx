@@ -6,7 +6,13 @@ import { useState } from "react";
 import { usdInputToCents } from "./priceBookFormat";
 import type { PriceBookModelRate, PriceBookVMRate } from "./priceBooksApi";
 
-export function AddModelRateForm({ onAdd }: { onAdd: (rate: PriceBookModelRate) => boolean }) {
+export function AddModelRateForm({
+  onAdd,
+  disabled = false,
+}: {
+  onAdd: (rate: PriceBookModelRate) => boolean;
+  disabled?: boolean;
+}) {
   const [matchKey, setMatchKey] = useState("");
   const [matchMode, setMatchMode] = useState("prefix");
   const [input, setInput] = useState("0.00");
@@ -17,6 +23,9 @@ export function AddModelRateForm({ onAdd }: { onAdd: (rate: PriceBookModelRate) 
       className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end"
       onSubmit={(event) => {
         event.preventDefault();
+        if (disabled) {
+          return;
+        }
         const added = onAdd({
           match_key: matchKey.trim(),
           match_mode: matchMode,
@@ -39,12 +48,13 @@ export function AddModelRateForm({ onAdd }: { onAdd: (rate: PriceBookModelRate) 
           id="price-book-add-model-key"
           className="mt-1 font-mono text-xs"
           value={matchKey}
+          disabled={disabled}
           onChange={(event) => setMatchKey(event.target.value)}
         />
       </div>
       <div className="w-40">
         <Label htmlFor="price-book-add-model-mode">Mode</Label>
-        <Select value={matchMode} onValueChange={setMatchMode}>
+        <Select value={matchMode} onValueChange={setMatchMode} disabled={disabled}>
           <SelectTrigger id="price-book-add-model-mode" className="mt-1">
             <SelectValue />
           </SelectTrigger>
@@ -63,6 +73,7 @@ export function AddModelRateForm({ onAdd }: { onAdd: (rate: PriceBookModelRate) 
           step="0.01"
           className="mt-1 text-right"
           value={input}
+          disabled={disabled}
           onChange={(event) => setInput(event.target.value)}
         />
       </div>
@@ -75,17 +86,24 @@ export function AddModelRateForm({ onAdd }: { onAdd: (rate: PriceBookModelRate) 
           step="0.01"
           className="mt-1 text-right"
           value={output}
+          disabled={disabled}
           onChange={(event) => setOutput(event.target.value)}
         />
       </div>
-      <Button type="submit" variant="outline" size="sm">
+      <Button type="submit" variant="outline" size="sm" disabled={disabled}>
         Add model rate
       </Button>
     </form>
   );
 }
 
-export function AddVMRateForm({ onAdd }: { onAdd: (rate: PriceBookVMRate) => boolean }) {
+export function AddVMRateForm({
+  onAdd,
+  disabled = false,
+}: {
+  onAdd: (rate: PriceBookVMRate) => boolean;
+  disabled?: boolean;
+}) {
   const [matchKey, setMatchKey] = useState("");
   const [micros, setMicros] = useState("0");
 
@@ -94,6 +112,9 @@ export function AddVMRateForm({ onAdd }: { onAdd: (rate: PriceBookVMRate) => boo
       className="flex flex-col gap-3 sm:flex-row sm:items-end"
       onSubmit={(event) => {
         event.preventDefault();
+        if (disabled) {
+          return;
+        }
         const parsed = Number.parseInt(micros, 10);
         const added = onAdd({
           match_key: matchKey.trim(),
@@ -112,6 +133,7 @@ export function AddVMRateForm({ onAdd }: { onAdd: (rate: PriceBookVMRate) => boo
           id="price-book-add-vm-key"
           className="mt-1 font-mono text-xs"
           value={matchKey}
+          disabled={disabled}
           onChange={(event) => setMatchKey(event.target.value)}
         />
       </div>
@@ -124,10 +146,11 @@ export function AddVMRateForm({ onAdd }: { onAdd: (rate: PriceBookVMRate) => boo
           step="1"
           className="mt-1 text-right font-mono text-xs"
           value={micros}
+          disabled={disabled}
           onChange={(event) => setMicros(event.target.value)}
         />
       </div>
-      <Button type="submit" variant="outline" size="sm">
+      <Button type="submit" variant="outline" size="sm" disabled={disabled}>
         Add VM rate
       </Button>
     </form>

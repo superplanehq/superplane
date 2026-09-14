@@ -49,8 +49,9 @@ type adminPriceBooksResponse struct {
 }
 
 type adminPriceBooksSaveRequest struct {
-	Models []adminPriceBookModelRate `json:"models"`
-	VMs    []adminPriceBookVMRate    `json:"vms"`
+	BaseVersion string                    `json:"base_version"`
+	Models      []adminPriceBookModelRate `json:"models"`
+	VMs         []adminPriceBookVMRate    `json:"vms"`
 }
 
 type adminPriceBookCurrentRequest struct {
@@ -77,6 +78,10 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 	var req adminPriceBooksSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.BaseVersion) == "" {
+		http.Error(w, "Base version is required", http.StatusBadRequest)
 		return
 	}
 
@@ -108,7 +113,7 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 
 	var published *models.UsagePriceBook
 	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		book, pubErr := models.PublishUsagePriceBook(tx, rates)
+		book, pubErr := models.PublishUsagePriceBook(tx, rates, req.BaseVersion)
 		if pubErr != nil {
 			return pubErr
 		}
@@ -116,7 +121,7 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writePublishPriceBookError(w, err)
 		return
 	}
 	reloadCurrentPriceBook(r.Context())
@@ -182,7 +187,7 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 
 	var published *models.UsagePriceBook
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		book, pubErr := models.PublishUsagePriceBook(tx, sync.rates)
+		book, pubErr := models.PublishUsagePriceBook(tx, sync.rates, sync.baseVersion)
 		if pubErr != nil {
 			return pubErr
 		}
@@ -190,6 +195,10 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, models.ErrUsagePriceBookConflict) {
+			writePublishPriceBookError(w, err)
+			return
+		}
 		log.Errorf("admin: failed to publish synced price book: %v", err)
 		http.Error(w, "Failed to save price books", http.StatusInternalServerError)
 		return
@@ -220,12 +229,23 @@ func reloadCurrentPriceBook(ctx context.Context) {
 
 var errNoPricedCatalogProvider = errors.New("no enabled provider publishes catalog prices")
 
+const adminPriceBookConflictMessage = "The current price book changed. Load the latest version and try again."
+
+func writePublishPriceBookError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrUsagePriceBookConflict) {
+		http.Error(w, adminPriceBookConflictMessage, http.StatusConflict)
+		return
+	}
+	http.Error(w, err.Error(), http.StatusBadRequest)
+}
+
 // catalogSync is the price book that provider catalogs produce, before it is published.
 type catalogSync struct {
-	rates   []models.UsagePriceBookRate
-	updated int
-	added   int
-	skipped []string
+	rates       []models.UsagePriceBookRate
+	baseVersion string
+	updated     int
+	added       int
+	skipped     []string
 }
 
 // collectCatalogRates reads the current rates and merges provider catalog
@@ -245,7 +265,11 @@ func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB) (catalogS
 		return catalogSync{}, err
 	}
 
-	sync := catalogSync{rates: models.CloneUsagePriceBookRates(rows), skipped: make([]string, 0)}
+	sync := catalogSync{
+		rates:       models.CloneUsagePriceBookRates(rows),
+		baseVersion: current.Version,
+		skipped:     make([]string, 0),
+	}
 	fetchedPricedProvider := false
 	for _, provider := range providers {
 		if !provider.Enabled || !provider.HasAPIKey() {

@@ -163,7 +163,7 @@ func Test__PublishAndActivateUsagePriceBook(t *testing.T) {
 	cloned := models.CloneUsagePriceBookRates(rows)
 	cloned[findTestRate(t, cloned, models.UsageKindModel, "claude-sonnet")].InputCentsPerMillion = 350
 
-	published, err := models.PublishUsagePriceBook(db, cloned)
+	published, err := models.PublishUsagePriceBook(db, cloned, current.Version)
 	require.NoError(t, err)
 	require.NoError(t, models.LoadCurrentPriceBook(db))
 	assert.True(t, published.IsCurrent)
@@ -184,6 +184,28 @@ func Test__PublishAndActivateUsagePriceBook(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "2026-09-09.1", restored.Version)
 	assert.Equal(t, int64(3_000_000), pricebook.EstimateMicros("anthropic", "claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0))
+}
+
+func Test__PublishUsagePriceBook__RejectsStaleBaseVersion(t *testing.T) {
+	_ = support.Setup(t)
+	db := database.DB(t.Context())
+	t.Cleanup(pricebook.Reset)
+	t.Cleanup(func() {
+		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-09.1")
+	})
+
+	current, err := models.FindCurrentUsagePriceBook(db)
+	require.NoError(t, err)
+	rows, err := models.ListUsagePriceBookRates(db, current.Version)
+	require.NoError(t, err)
+
+	cloned := models.CloneUsagePriceBookRates(rows)
+	_, err = models.PublishUsagePriceBook(db, cloned, "2026-08-31.1")
+	require.ErrorIs(t, err, models.ErrUsagePriceBookConflict)
+
+	reloaded, err := models.FindCurrentUsagePriceBook(db)
+	require.NoError(t, err)
+	assert.Equal(t, current.Version, reloaded.Version)
 }
 
 func findTestRate(t *testing.T, rows []models.UsagePriceBookRate, kind, matchKey string) int {
