@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import type { SsoProviderItem } from "./accountSecuritySso";
+import { ssoDisconnectDescription, type SsoProviderItem } from "./accountSecuritySso";
 
 export function DisconnectSsoDialog({
   provider,
@@ -32,7 +32,7 @@ export function DisconnectSsoDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Disconnect {provider.label}</DialogTitle>
-          <DialogDescription>You cannot sign in with {provider.label} until you connect it again.</DialogDescription>
+          <DialogDescription>{ssoDisconnectDescription(provider.provider, provider.label)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

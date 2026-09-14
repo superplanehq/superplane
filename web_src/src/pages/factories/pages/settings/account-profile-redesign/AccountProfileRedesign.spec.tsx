@@ -42,8 +42,8 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(
       screen.getByText("Preferences, profile information, and security for your SuperPlane account."),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
-    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Link GitHub" })).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
     expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
@@ -75,12 +75,13 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(save).toBeDisabled();
   });
 
-  it("links GitHub for Velocity from Profile", async () => {
-    const user = userEvent.setup();
+  it("keeps GitHub sign-in copy on the combined Account page", () => {
     renderPlayground();
 
-    await user.click(screen.getByRole("button", { name: "Link GitHub" }));
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("Linked as ada");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
+      "Connected as ada. Used to sign in and to credit pull requests.",
+    );
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
   });
 
   it("lets the user switch the profile email across sign-in methods", async () => {
@@ -165,7 +166,9 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
+      "Connected as ada. Used to sign in and to credit pull requests.",
+    );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
     expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
     expect(
@@ -173,7 +176,7 @@ describe("AccountProfileRedesignPlayground", () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
   });
 
   it("connects Google and disconnects GitHub on the same account", async () => {
@@ -186,7 +189,9 @@ describe("AccountProfileRedesignPlayground", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
+      "Connected as ada. Used to sign in and to credit pull requests.",
+    );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
 
     await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
@@ -195,9 +200,16 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(
       within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Disconnect" }),
     );
+    expect(
+      screen.getByText(
+        "You cannot sign in with GitHub until you connect it again. Velocity also stops crediting your pull requests.",
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Not connected");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
+      "Used to sign in and to credit pull requests.",
+    );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
   });
 

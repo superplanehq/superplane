@@ -29,8 +29,6 @@ interface AccountProfileRedesignState {
   connectSso: (provider: AccountRedesignSsoProvider) => void;
   disconnectSso: (provider: AccountRedesignSsoProvider) => void;
   changePassword: () => void;
-  linkVelocityGithub: () => void;
-  removeVelocityGithub: () => void;
   createToken: (name: string) => string;
   revokeToken: (id: string) => void;
   setNotifications: (notifications: AccountRedesignNotifications) => void;
@@ -80,17 +78,6 @@ export function AccountProfileRedesignProvider({
       showSuccessToast(provider === "github" ? "GitHub disconnected." : "Google disconnected.");
     },
     changePassword: () => undefined,
-    linkVelocityGithub: () => {
-      setProfile((current) => ({
-        ...current,
-        velocityGithubUsername: githubIdentity(current.name),
-      }));
-      showSuccessToast("GitHub account linked.");
-    },
-    removeVelocityGithub: () => {
-      setProfile((current) => ({ ...current, velocityGithubUsername: null }));
-      showSuccessToast("GitHub link removed.");
-    },
     createToken: (name) => {
       const id = `token-${profile.tokens.length + 1}`;
       const secret = `sp_pat_${id.replace("-", "")}_mock`;
@@ -123,19 +110,8 @@ function useAccountProfileRedesign() {
 }
 
 export function AccountProfileRedesignRoutePage() {
-  const {
-    profile,
-    setName,
-    setEmail,
-    saveName,
-    linkVelocityGithub,
-    removeVelocityGithub,
-    changePassword,
-    connectSso,
-    disconnectSso,
-    createToken,
-    revokeToken,
-  } = useAccountProfileRedesign();
+  const { profile, setName, setEmail, saveName, changePassword, connectSso, disconnectSso, createToken, revokeToken } =
+    useAccountProfileRedesign();
   return (
     <AccountProfileRedesignPage
       name={profile.name}
@@ -150,9 +126,6 @@ export function AccountProfileRedesignRoutePage() {
       onNameChange={setName}
       onEmailChange={setEmail}
       onSave={saveName}
-      velocityGithubUsername={profile.velocityGithubUsername}
-      onLinkVelocityGithub={linkVelocityGithub}
-      onRemoveVelocityGithub={removeVelocityGithub}
       security={
         <AccountSecurityRedesignPage
           passwordSet={profile.passwordSet}

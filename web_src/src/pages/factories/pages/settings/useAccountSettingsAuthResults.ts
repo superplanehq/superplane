@@ -5,7 +5,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 /**
  * Reads OAuth return params on Account settings pages.
- * Profile uses this for GitHub-for-Velocity. Security uses it for sign-in methods.
+ * Profile uses this for sign-in methods.
  */
 export function useAccountSettingsAuthResults(refreshAccount: () => Promise<void>) {
   const location = useLocation();
