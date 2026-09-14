@@ -2,7 +2,12 @@ import { describe, expect, it } from "bun:test";
 
 import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 
-import { displayStatusForLineStatus, durationForExecution, elapsedForDisplay } from "./splitRunWorkOrderDisplay";
+import {
+  displayStatusForLineStatus,
+  durationForExecution,
+  elapsedForDisplay,
+  implementationRunnerModel,
+} from "./splitRunWorkOrderDisplay";
 
 const START = "2026-08-21T12:00:00.000Z";
 const FOUR_MINUTES = 4 * 60 * 1000;
@@ -36,6 +41,47 @@ describe("elapsedForDisplay", () => {
     expect(elapsedForDisplay("completed", { createdAt: START, updatedAt })).toBe(
       formatDuration(FOUR_MINUTES, { precision: "second" }),
     );
+  });
+});
+
+describe("implementationRunnerModel", () => {
+  it("returns empty when no implement phase has a model", () => {
+    expect(implementationRunnerModel([{ id: "backlog", name: "Backlog", status: "passed" }])).toBe("");
+    expect(implementationRunnerModel([{ id: "implement-0", name: "Implement", status: "running" }])).toBe("");
+  });
+
+  it("shortens the active implement model", () => {
+    expect(
+      implementationRunnerModel([
+        { id: "backlog", name: "Backlog", status: "passed", model: "opus" },
+        {
+          id: "implement-0",
+          name: "Implement",
+          status: "running",
+          canvasKey: "implementation",
+          model: "hosted::openrouter::x-ai/grok-4.6",
+        },
+      ]),
+    ).toBe("grok-4.6");
+  });
+
+  it("prefers the active implement phase over an older one", () => {
+    expect(
+      implementationRunnerModel([
+        { id: "implement-0", name: "Implement", status: "passed", model: "anthropic/claude-sonnet-4-6" },
+        { id: "implement-1", name: "Implement", status: "running", model: "hosted::openrouter::x-ai/grok-4.6" },
+      ]),
+    ).toBe("grok-4.6");
+  });
+
+  it("uses the latest implement phase when none is active", () => {
+    expect(
+      implementationRunnerModel([
+        { id: "implement-0", name: "Implement", status: "passed", model: "anthropic/claude-sonnet-4-6" },
+        { id: "verify-1", name: "Verify", status: "passed", model: "ignored" },
+        { id: "implement-1", name: "Implement", status: "passed", model: "hosted::openrouter::x-ai/grok-4.6" },
+      ]),
+    ).toBe("grok-4.6");
   });
 });
 
