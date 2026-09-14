@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import {
@@ -53,7 +53,7 @@ describe("BacklogCreatePopover", () => {
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-create-menu")).toHaveAttribute("data-side", "right");
+    expect(screen.getByTestId("lines-backlog-create-menu").getAttribute("data-side")).toBe("right");
     expect(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually })).toBeInTheDocument();
     expect(screen.getByText(BACKLOG_CREATE_COPY.createManuallyHint)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();
@@ -140,34 +140,6 @@ describe("BacklogCreatePopover", () => {
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
     expect(trigger).toHaveClass("bg-muted/70");
     expect(trigger).toHaveClass("text-foreground");
-  });
-
-  it("starts an agent session from the create menu", async () => {
-    const onCreateWithAgent = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onCreateWithAgent={onCreateWithAgent}
-        onImportItem={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    expect(screen.getByText(BACKLOG_CREATE_COPY.createWithAgentHint)).toBeInTheDocument();
-    const agent = screen.getByTestId("lines-backlog-create-with-agent");
-    const manual = screen.getByTestId("lines-backlog-create-manually");
-    expect(agent.compareDocumentPosition(manual) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createWithAgent }));
-    expect(onCreateWithAgent).toHaveBeenCalledTimes(1);
   });
 
   it("shows GitHub issues when the menu opens without a search click", async () => {
@@ -344,7 +316,6 @@ describe("BacklogCreatePopover", () => {
 
   it("opens the create menu when no intakes are configured", async () => {
     const onCreateManually = vi.fn();
-    const onCreateWithAgent = vi.fn();
     const user = userEvent.setup();
     render(
       <BacklogCreatePopover
@@ -356,7 +327,6 @@ describe("BacklogCreatePopover", () => {
         onQueryChange={vi.fn()}
         onFocusedIntakeChange={vi.fn()}
         onCreateManually={onCreateManually}
-        onCreateWithAgent={onCreateWithAgent}
         onImportItem={vi.fn()}
       />,
     );

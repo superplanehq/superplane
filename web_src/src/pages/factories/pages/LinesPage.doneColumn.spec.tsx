@@ -1,11 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,
@@ -68,7 +76,18 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -76,8 +95,8 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof canvasData>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),

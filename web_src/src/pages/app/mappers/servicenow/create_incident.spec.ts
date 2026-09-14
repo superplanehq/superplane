@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { createIncidentMapper } from "./create_incident";
 import type { ComponentBaseContext, NodeInfo } from "../types";
 

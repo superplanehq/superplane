@@ -726,53 +726,35 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}: {
-			Resource:                     "work_orders",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
-		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}: {
 			Resource:                     "work_orders",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"}: {
+			Resource:                     "work_orders",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey-answer"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
-		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"}: {
-			Resource:                     "work_orders",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
-		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"}: {
-			Resource:                     "work_orders",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
-		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"}: {
-			Resource:                     "work_orders",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		// A sync refreshes what the velocity report reads, so it takes the same
 		// permission as reading the report.

@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { AddIntakePicker } from "./AddIntakePicker";
 import { ADD_INTAKE_TEMPLATES } from "./lineIntakeModel";

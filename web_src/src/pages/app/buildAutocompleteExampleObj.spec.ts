@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { SuperplaneComponentsNode, TriggersTrigger } from "@/api-client";
 import { evaluateExpr } from "@/lib/exprEvaluator";
 import { buildAutocompleteExampleObj, type AutocompleteExampleContext } from "./buildAutocompleteExampleObj";

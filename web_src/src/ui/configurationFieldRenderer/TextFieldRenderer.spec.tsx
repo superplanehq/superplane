@@ -1,16 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { ChangeEvent } from "react";
 
 import type { ConfigurationField } from "@/api-client";
+import { unmockedPackage } from "@/test/unmockedModule";
 
 import { TextFieldRenderer } from "./TextFieldRenderer";
 
 const monacoRenderValues = vi.hoisted((): string[] => []);
 
-vi.mock("@monaco-editor/react", async () => {
-  const { useState: useMockState } = await vi.importActual<{ useState: typeof useState }>("react");
+vi.mock("@monaco-editor/react", () => {
+  const { useState: useMockState } = unmockedPackage<{ useState: typeof useState }>("react");
 
   return {
     default: function MockMonacoEditor({

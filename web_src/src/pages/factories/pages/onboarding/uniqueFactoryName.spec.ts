@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { isFactoryNameAlreadyExistsError, saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 
@@ -21,7 +21,8 @@ describe("saveWithFreeWorkspaceName", () => {
     const save = vi.fn().mockResolvedValue("saved");
 
     await expect(saveWithFreeWorkspaceName({ name: "Payments Service", save })).resolves.toBe("saved");
-    expect(save).toHaveBeenCalledExactlyOnceWith("Payments Service");
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith("Payments Service");
   });
 
   it("skips the names the organization already holds", async () => {
@@ -33,7 +34,8 @@ describe("saveWithFreeWorkspaceName", () => {
       save,
     });
 
-    expect(save).toHaveBeenCalledExactlyOnceWith("Payments Service 3");
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith("Payments Service 3");
   });
 
   it("counts up the suffix while the API reports a conflict", async () => {

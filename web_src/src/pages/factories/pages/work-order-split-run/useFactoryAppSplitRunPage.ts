@@ -1,4 +1,4 @@
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPullRequests, useFactoryWorkOrders, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
@@ -50,6 +50,7 @@ function useSplitRunWorkOrderExtras(
 ) {
   const orderId = order?.id ?? "";
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
   const { data: pullRequests = [] } = useFactoryPullRequests(
     organizationId,
     factoryId,
@@ -63,7 +64,7 @@ function useSplitRunWorkOrderExtras(
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
-  return { orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing };
+  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
 }
 
 export function useFactoryAppSplitRunPage() {
@@ -72,7 +73,7 @@ export function useFactoryAppSplitRunPage() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
-  const { orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
+  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
     organizationId,
     factoryId,
     order,
@@ -83,10 +84,11 @@ export function useFactoryAppSplitRunPage() {
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
         prFeedbackRuns,
         analysisRuns,
+        artifacts,
         isAnalyzing,
         resolveUser,
       }),
-    [order, orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(

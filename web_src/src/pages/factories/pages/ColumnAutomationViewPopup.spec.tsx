@@ -2,11 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
@@ -23,8 +24,8 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof CanvasDataModule>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData");
   return {
     ...actual,
     useInfiniteCanvasRuns,
