@@ -1,0 +1,309 @@
+package harness
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	pw "github.com/mxschmitt/playwright-go"
+	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/server"
+	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
+)
+
+type TestContext struct {
+	runner    *pw.Playwright
+	browser   pw.Browser
+	timeoutMs float64
+	viteCmd   *exec.Cmd
+	repoRoot  string
+
+	baseURL string
+
+	AgentProvider *support.TestAgentProvider
+}
+
+func NewTestContext() *TestContext {
+	return &TestContext{timeoutMs: 15000, repoRoot: repoRoot()}
+}
+
+func (s *TestContext) Start() {
+	os.Setenv("DB_NAME", "superplane_test")
+	os.Setenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/superplane_test")
+	os.Setenv("START_PUBLIC_API", "yes")
+	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
+	os.Setenv("START_WEB_SERVER", "yes")
+	os.Setenv("WEB_BASE_PATH", "")
+	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
+	os.Setenv("START_CONSUMERS", "yes")
+	os.Setenv("START_EVENT_ROUTER", "yes")
+	os.Setenv("START_RUN_FINALIZER", "yes")
+	os.Setenv("START_RUN_INITIALIZER", "yes")
+	os.Setenv("START_NODE_EXECUTOR", "yes")
+	os.Setenv("START_EXECUTION_TERMINATOR", "yes")
+	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
+	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
+	os.Setenv("START_APP_MESSAGE_WORKER", "yes")
+	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
+	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
+	os.Setenv("NO_ENCRYPTION", "yes")
+	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+	os.Setenv("JWT_SECRET", "test-jwt-secret")
+	os.Setenv("OIDC_KEYS_PATH", filepath.Join(s.repoRoot, "test/fixtures/oidc-keys"))
+	os.Setenv("PUBLIC_API_PORT", "8001")
+	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("VITE_DEV_HOST", "127.0.0.1")
+	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	os.Setenv("ALLOWED_WS_ORIGINS", "http://127.0.0.1:8001")
+	os.Setenv("APP_ENV", "development")
+	os.Setenv("OWNER_SETUP_ENABLED", "yes")
+	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
+	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+	os.Setenv("BLOCK_SIGNUP", "no")
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		os.Setenv("GOOGLE_CLIENT_ID", "e2e-google-client-id")
+		os.Setenv("GOOGLE_CLIENT_SECRET", "e2e-google-client-secret")
+	}
+	if os.Getenv("GITHUB_CLIENT_ID") == "" {
+		os.Setenv("GITHUB_CLIENT_ID", "e2e-github-client-id")
+		os.Setenv("GITHUB_CLIENT_SECRET", "e2e-github-client-secret")
+	}
+	if os.Getenv("BLOB_STORAGE_PROVIDER") == "" {
+		os.Setenv("BLOB_STORAGE_PROVIDER", "filesystem")
+	}
+	if os.Getenv("BLOB_STORAGE_LOCAL_PATH") == "" {
+		os.Setenv("BLOB_STORAGE_LOCAL_PATH", filepath.Join(os.TempDir(), "superplane-e2e-blobs"))
+	}
+
+	s.AgentProvider = support.NewAgentProvider()
+	s.ResetAgentProvider()
+	server.SetAgentProviderForTests(s.AgentProvider)
+
+	s.startVite()
+	s.startAppServer()
+	s.startPlaywright()
+	s.launchBrowser()
+}
+
+func (s *TestContext) ResetAgentProvider() {
+	s.AgentProvider.Reset()
+	s.AgentProvider.SetSendMessageEvents(agentTurnCompletedEvent())
+	s.AgentProvider.SetDefineOutcomeEvents(agentTurnCompletedEvent())
+}
+
+func agentTurnCompletedEvent() agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: "e2e-turn-completed-" + uuid.NewString(),
+		Type:            agents.ProviderEventTurnCompleted,
+	}
+}
+
+func (s *TestContext) startPlaywright() {
+	r, err := pw.Run()
+	if err != nil {
+		panic("playwright: " + err.Error())
+	}
+
+	s.runner = r
+}
+
+func (s *TestContext) launchBrowser() {
+	b, err := s.runner.Chromium.Launch()
+	if err != nil {
+		panic("browser launch: " + err.Error())
+	}
+
+	s.browser = b
+}
+
+func (s *TestContext) startAppServer() {
+	go server.Start()
+	s.baseURL = os.Getenv("BASE_URL")
+	// server.Start logs "SuperPlane is UP" before ListenAndServe. A fixed
+	// sleep races on CI: the first test then times out on /setup and, when
+	// that test reset owner setup, later tests in the shard stay on /setup.
+	waitForHTTP(s.baseURL+"/health", 60*time.Second)
+	waitForHTTP(s.baseURL+"/setup", 60*time.Second)
+}
+
+func (s *TestContext) Shutdown() {
+	if s.browser != nil {
+		s.browser.Close()
+	}
+	if s.runner != nil {
+		s.runner.Stop()
+	}
+	if s.viteCmd != nil && s.viteCmd.Process != nil {
+		_ = s.viteCmd.Process.Kill()
+	}
+}
+
+func (s *TestContext) startVite() {
+	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
+	cmd.Dir = filepath.Join(s.repoRoot, "web_src")
+	// Point Vite proxy at the test server's API port
+	cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
+
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Start(); err != nil {
+		panic("start vite: " + err.Error())
+	}
+
+	s.viteCmd = cmd
+	waitForHTTP("http://127.0.0.1:5173/", 60*time.Second)
+}
+
+func waitForHTTP(url string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode < 500 {
+				return
+			}
+			lastErr = fmt.Errorf("status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no response")
+	}
+	panic("wait for " + url + ": " + lastErr.Error())
+}
+
+func repoRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic("working directory: " + err.Error())
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			panic("repo root not found from " + dir)
+		}
+		dir = parent
+	}
+}
+
+const initScript = `
+	(() => {
+		try {
+			let last = location.href;
+			const notify = () => {
+				const href = location.href;
+				if (href !== last) {
+					last = href;
+				if (window._spNav) {
+					window._spNav(href);
+				}
+			}
+		};
+			const push = history.pushState;
+			const replace = history.replaceState;
+			history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
+			history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
+			window.addEventListener('popstate', notify);
+			window.addEventListener('hashchange', notify);
+
+			// Auto-accept all confirm dialogs in tests
+			try {
+				const originalConfirm = window.confirm;
+				window.confirm = function(message) {
+					return true;
+				};
+				window._spOriginalConfirm = originalConfirm;
+			} catch (_) {
+				// ignore
+			}
+
+			// Initial report
+			if (window._spNav) { window._spNav(location.href); }
+		} catch (_) { /* ignore */ }
+	})();
+`
+
+func (s *TestContext) newBrowserContext() (pw.BrowserContext, error) {
+	context, err := s.browser.NewContext(pw.BrowserNewContextOptions{
+		Viewport: &pw.Size{
+			Width:  2560,
+			Height: 1440,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := context.AddInitScript(pw.Script{Content: pw.String(initScript)}); err != nil {
+		_ = context.Close()
+		return nil, err
+	}
+	return context, nil
+}
+
+func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
+	context, err := s.newBrowserContext()
+	if err != nil {
+		t.Fatalf("browser context: %v", err)
+	}
+
+	p, err := context.NewPage()
+	if err != nil {
+		_ = context.Close()
+		t.Fatalf("page: %v", err)
+	}
+
+	sess := session.NewTestSession(t, context, p, s.timeoutMs, s.baseURL)
+
+	p.OnConsole(func(m pw.ConsoleMessage) {
+		text := m.Text()
+
+		// Ignore noisy dev-time logs from Vite and React DevTools suggestions
+		if strings.Contains(text, "[vite] connecting") ||
+			strings.Contains(text, "[vite] connected") ||
+			strings.Contains(text, "React DevTools") ||
+			strings.Contains(text, "Download the React DevTools") {
+			return
+		}
+
+		t.Logf("[console.%s] %s", m.Type(), text)
+	})
+
+	p.OnPageError(func(err error) {
+		t.Logf("[Browser Logs] %v", err)
+	})
+
+	p.OnRequestFailed(func(r pw.Request) {
+		if err := r.Failure(); err != nil {
+			if strings.Contains(err.Error(), "ERR_ABORTED") {
+				return
+			}
+			t.Logf("[Browser Logs] %s (%s)", r.URL(), err.Error())
+			return
+		}
+		t.Logf("[Browser Logs] %s (request failed)", r.URL())
+	})
+
+	p.OnResponse(func(resp pw.Response) {
+		if status := resp.Status(); status >= 400 {
+			t.Logf("[Browser Logs] %d %s", status, resp.URL())
+		}
+	})
+
+	return sess
+}
