@@ -23,6 +23,7 @@ vi.mock("@/contexts/useAccount", () => ({
       has_password: true,
       providers: [],
       linked_accounts: [],
+      organizations_pending_deletion: [],
     },
     refreshAccount,
   }),
