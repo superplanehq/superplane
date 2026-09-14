@@ -1,7 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
-import { ArrowLeft, BookOpen, Building, Network, Shield, Terminal, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Building, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
 import React from "react";
 import { Link, Navigate, NavLink, Outlet } from "react-router";
 
@@ -68,6 +68,10 @@ const AdminLayout: React.FC = () => {
               <NavLink to="/admin/runner-tasks" className={navLinkClass}>
                 <Terminal size={14} />
                 Runner Tasks
+              </NavLink>
+              <NavLink to="/admin/polar-webhooks" className={navLinkClass}>
+                <Webhook size={14} />
+                Polar Webhooks
               </NavLink>
             </nav>
           </div>
