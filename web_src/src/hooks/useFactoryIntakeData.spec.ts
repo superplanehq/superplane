@@ -1,19 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { factoriesCreateFactoryIntake } = vi.hoisted(() => ({
   factoriesCreateFactoryIntake: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    factoriesCreateFactoryIntake,
-  };
-});
+vi.mock("@/api-client", () => ({
+  factoriesCreateFactoryIntake,
+}));
 
 import { factoryQueryKeys } from "./useFactoryData";
 import { useCreateFactoryIntake } from "./useFactoryIntakeData";

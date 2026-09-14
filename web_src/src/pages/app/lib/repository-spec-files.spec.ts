@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { fetchRepositorySpecFileContent, fetchStagedCanvasVersionWithSpec } from "./repository-spec-files";
 

@@ -3,7 +3,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { handleStopMock, handleRejectMock, handleArchiveMock, handleBackToDraftMock, enabledExperimentalFeatures } =
   vi.hoisted(() => ({
@@ -130,23 +130,20 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
-  it("refines a draft from the note", async () => {
-    const user = userEvent.setup();
-    const onRefine = vi.fn();
+  it("does not refine a draft from the note", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
           <ThemeProvider>
             <TooltipProvider>
-              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} onRefine={onRefine} />
+              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} />
             </TooltipProvider>
           </ThemeProvider>
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
-    expect(onRefine).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
   it("starts and archives a draft from the note", async () => {
@@ -159,6 +156,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
+                factoryId="factory-1"
+                orderId={DRAFT_WORK_ORDER.id}
                 fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
                 onDispatch={onDispatch}
                 canDispatch
@@ -176,7 +175,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(within(note).getByRole("button", { name: "Archive" }));
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
   });
 
@@ -295,12 +294,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
     );
     expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
   });
 
   it("keeps Automations open when To Backlog does not succeed", async () => {
@@ -330,6 +330,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),

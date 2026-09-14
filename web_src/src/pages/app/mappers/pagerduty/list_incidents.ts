@@ -8,7 +8,7 @@ import type {
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseMapper,
   OutputPayload,

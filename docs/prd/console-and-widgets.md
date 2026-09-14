@@ -1084,7 +1084,7 @@ Focused checks for console work:
 
 ```bash
 cd web_src
-npm run test:run -- src/pages/workflowv2/dashboard
+make check.test.ui FILES=src/pages/workflowv2/dashboard
 ```
 
 Repository checks after frontend changes:

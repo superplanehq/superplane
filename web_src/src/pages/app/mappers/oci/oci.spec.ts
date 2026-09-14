@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import React from "react";
 
 import { deleteInstanceMapper } from "./delete_instance";

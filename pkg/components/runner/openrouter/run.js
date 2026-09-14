@@ -19,23 +19,48 @@ const SESSION_FILE = "opencode_session";
 const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
-const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
-  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
-  "After you show a draft, tell the user it is on the right and ask them to review it. " +
-  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
-  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
-  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
-  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
-  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
-  "edit or write any files.";
+function loadAnalysisProtocolModule() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
+  if (!planningAnalysisEnabled(env)) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
 }
 
 function catalogModelId(model) {
@@ -253,6 +278,15 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
+  if (planningAnalysisEnabled(env) && taskDir) {
+    const protocolPath = path.join(taskDir, "analysis_protocol.md");
+    try {
+      fs.writeFileSync(protocolPath, `${loadAnalysisProtocol()}\n`);
+    } catch (_err) {
+      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+    }
+    config.instructions = [protocolPath];
+  }
   return config;
 }
 
@@ -313,17 +347,18 @@ async function runPrompt(promptFile, model, helpers = {}) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
+  const recordAgentMessage =
+    helpers.recordAgentMessage || ((text) => require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(text));
   const planning = planningEnabled(env);
   if (planning) {
     printLiveLogLine("Planning session tools enabled");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
   }
 
   ensureXdgDirs(sp);
@@ -452,6 +487,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await recordAgentMessage(payload.result);
+  }
   formatTurnResult({
     is_error: failed,
     num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
@@ -51,11 +51,18 @@ describe("WorkOrderSplitRunPopup Escape handling", () => {
   it("closes the popup when Escape is pressed", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     renderPopup(onClose);
 
     await user.keyboard("{Escape}");
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input).includes("/planning-sessions/") && String(input).endsWith("/end"),
+      ),
+    ).toBe(false);
+    fetchSpy.mockRestore();
   });
 
   it("cancels an in-progress title edit on the first Escape, and closes on the second", async () => {

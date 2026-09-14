@@ -52,6 +52,9 @@ RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN playwright install chromium-headless-shell --with-deps
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
+COPY scripts/docker/install-bun.sh /tmp/install-bun.sh
+RUN bash /tmp/install-bun.sh && rm /tmp/install-bun.sh
+
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------

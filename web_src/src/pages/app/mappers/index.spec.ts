@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
 import { getComponentBaseMapper, getExecutionDetails, getStateMap } from "./index";

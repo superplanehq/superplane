@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
 
 import type { CanvasSpecNode } from "../lib/columnCanvasAgent";
