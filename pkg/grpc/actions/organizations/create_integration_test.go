@@ -349,6 +349,25 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
 	})
 
+	t.Run("sentry uses hosted install when the public app env is set", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "sentry", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
+		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/api/v1/sentry/app/install?state=")
+	})
+
 	t.Run("github keeps legacy create when privateApp is set and setup flow feature is off", func(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
