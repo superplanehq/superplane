@@ -143,4 +143,29 @@ describe("WorkOrderDescription", () => {
     expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(content).toHaveStyle({ maxHeight: "280px" });
   });
+
+  it("uses the download URL as the image source when files are present", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <WorkOrderDescription
+        description={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(
+      <WorkOrderDescription
+        description="See ![bug](sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)"
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+  });
 });

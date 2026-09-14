@@ -1,20 +1,28 @@
 package contexts
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestFactoryContext_CreateWorkOrder(t *testing.T) {
@@ -881,6 +889,100 @@ func linkRunToWorkOrder(
 	}
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return line
+}
+
+func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	imageURL := "https://user-images.githubusercontent.com/1/ok.png"
+	description := "See ![bug](" + imageURL + ")"
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithRemoteImageFetch(
+		func(context.Context, *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(bytes.NewReader([]byte("png-bytes"))),
+			}, nil
+		},
+	)
+	created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From GitHub issue",
+		Description: description,
+	})
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.Contains(t, persisted.Description, blob.FileRefScheme+"://")
+	assert.NotContains(t, persisted.Description, imageURL)
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	reader, err := store.Get(t.Context(), files[0].StorageKey)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reader.Close() })
+	body, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("png-bytes"), body)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	assert.Contains(t, payload["description"], blob.FileRef(files[0].ID))
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 1)
+	item, ok := listed[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, files[0].ID.String(), item["id"])
+	url, ok := item["url"].(string)
+	require.True(t, ok)
+	assert.Contains(t, url, "/api/v1/public/files/"+files[0].ID.String())
+}
+
+func onWorkOrderEventWorkOrder(t *testing.T, event models.CanvasEvent) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(event.Data.Data())
+	require.NoError(t, err)
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	data, ok := envelope["data"].(map[string]any)
+	require.True(t, ok, "event data: %s", raw)
+	workOrder, ok := data["workOrder"].(map[string]any)
+	require.True(t, ok, "workOrder payload: %s", raw)
+	return workOrder
 }
 
 func setupFactoryAppExecution(

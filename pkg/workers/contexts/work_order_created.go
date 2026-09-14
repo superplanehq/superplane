@@ -115,7 +115,7 @@ func workOrderCreatedPayloadWithRefinement(
 ) map[string]any {
 	description := order.Description
 	filePayloads := []any{}
-	markdown, files, err := storedfiles.DescriptionForDispatch(
+	_, files, err := storedfiles.DescriptionForDispatch(
 		context.Background(),
 		tx,
 		blob.Current(),
@@ -128,7 +128,6 @@ func workOrderCreatedPayloadWithRefinement(
 	if err != nil {
 		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
 	} else {
-		description = markdown
 		for _, file := range files {
 			filePayloads = append(filePayloads, file.Map())
 		}

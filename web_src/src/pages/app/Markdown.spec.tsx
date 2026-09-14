@@ -310,3 +310,25 @@ describe("MarkdownContent mentions", () => {
     expect(card).toHaveTextContent("test@test.com");
   });
 });
+
+describe("MarkdownContent work order files", () => {
+  const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+  it("uses the download URL as the image source when files are present", () => {
+    render(
+      <MarkdownContent
+        content={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(<MarkdownContent content={`See ![bug](sp-file://${fileId})`} />);
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+});
