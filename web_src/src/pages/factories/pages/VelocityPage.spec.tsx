@@ -576,6 +576,44 @@ describe("VelocityPage shell", () => {
     expect(taskTime).toHaveTextContent("We could not load task time.");
   });
 
+  it("shows cycle time, time running, and time in Waiting as equal metrics", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    const now = Date.now();
+    const hour = 60 * 60 * 1000;
+    const iso = (hoursAgo: number) => new Date(now - hoursAgo * hour).toISOString();
+    workOrdersHookState.data = [
+      {
+        id: "order-1",
+        state: "STATE_CLOSED",
+        createdAt: iso(16),
+        updatedAt: iso(2),
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            stepExecutions: [
+              {
+                id: "first",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                createdAt: iso(16),
+                finishedAt: iso(12),
+              },
+              { id: "second", state: "STATE_FINISHED", result: "RESULT_PASSED", createdAt: iso(8), finishedAt: iso(4) },
+            ],
+          },
+        ],
+      },
+    ];
+
+    renderShell();
+
+    const taskTime = screen.getByTestId("velocity-task-time");
+    expect(taskTime).toHaveTextContent("Cycle time");
+    expect(taskTime).toHaveTextContent("Time running");
+    expect(taskTime).toHaveTextContent("Time in Waiting");
+  });
+
   it("reports tracked spend split between tokens and compute", () => {
     resetState();
     velocityHookState.data = populatedResponse();
