@@ -116,4 +116,12 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
+
+  it("drops the full-bleed top border when the strip sits in a column", () => {
+    renderNote({ inColumn: true });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note.className).not.toMatch(/\bborder-t\b/);
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+  });
 });

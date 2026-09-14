@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink, GitPullRequest } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import type { SplitRunFooterAction } from "./splitRunFooter";
@@ -20,17 +21,22 @@ export function SplitRunPullRequestReviewNote({
   pullRequest,
   actions = [],
   actionBusy = false,
+  inColumn = false,
   onAction,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
   actions?: SplitRunFooterAction[];
   actionBusy?: boolean;
+  inColumn?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
     <div
-      className="border-t border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] px-5 py-5"
+      className={cn(
+        "bg-[color:var(--status-completed-bg)] px-5 py-5",
+        !inColumn && "border-t border-[color:var(--status-completed-border)]",
+      )}
       data-testid="split-run-attention-note"
       data-variant="pull-request"
     >

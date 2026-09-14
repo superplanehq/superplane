@@ -18,7 +18,7 @@ export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
 /**
  * Description-tab reading pane. Drafts keep analysis chat on the left and
  * the summary plus confidence on the right. After Start, the left pane shows
- * source context. The summary stays on the right.
+ * source context and the decision footer. The summary stays on the right.
  */
 export function WorkOrderIntentDocument({
   title,
@@ -62,7 +62,10 @@ export function WorkOrderIntentDocument({
           data-testid="split-run-intent-request"
         >
           {contextSidebar ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
+            <>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
+              {resultFooter}
+            </>
           ) : (
             <WorkOrderIntentRequest title={sessionTitle} description={description} files={files} analysis={analysis} />
           )}
@@ -102,22 +105,21 @@ export function WorkOrderIntentDocument({
             />
             {resultAfterBody}
           </div>
-          {contextSidebar ? (
-            resultFooter
-          ) : refineOpen ? (
-            <div
-              className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "justify-between gap-4")}
-              data-testid="split-run-intent-decision"
-            >
-              <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />
-              {resultFooter}
-            </div>
-          ) : (
-            <>
-              <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
-              {resultFooter}
-            </>
-          )}
+          {!contextSidebar &&
+            (refineOpen ? (
+              <div
+                className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "justify-between gap-4")}
+                data-testid="split-run-intent-decision"
+              >
+                <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />
+                {resultFooter}
+              </div>
+            ) : (
+              <>
+                <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+                {resultFooter}
+              </>
+            ))}
         </div>
       </div>
     </article>

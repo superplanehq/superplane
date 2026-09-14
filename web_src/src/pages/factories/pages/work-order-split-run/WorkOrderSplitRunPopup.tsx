@@ -124,6 +124,7 @@ function AnalysisWorkOrderPopup({
     canPickDraftStartModel,
     draftModel,
     setDraftModel,
+    inColumn: tab === "description" && fixture.footer.kind !== "draft",
   });
 
   return (
@@ -195,6 +196,7 @@ function analysisPopupReview(args: {
   canPickDraftStartModel: boolean;
   draftModel: string;
   setDraftModel: (value: string) => void;
+  inColumn: boolean;
 }) {
   return (
     <SplitRunReview
@@ -212,6 +214,7 @@ function analysisPopupReview(args: {
       actionBusy={args.footerBusy}
       startDisabled={!args.canDispatch}
       compact={args.fixture.footer.kind === "draft"}
+      inColumn={args.inColumn}
       modelSelect={analysisDraftStartModelSelect({
         organizationId: args.organizationId,
         factoryId: args.factoryId,
