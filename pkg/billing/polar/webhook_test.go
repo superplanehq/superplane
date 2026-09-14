@@ -94,6 +94,33 @@ func Test__VerifyAndParseOrderPaidIgnoresOtherEvents(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnsupportedWebhookEvent)
 }
 
+func Test__VerifyAndParseSubscriptionReadsModifiedAt(t *testing.T) {
+	secret := "whsec_test-secret"
+	modifiedAt := time.Now().UTC().Truncate(time.Second)
+	body := []byte(fmt.Sprintf(`{
+		"type": "subscription.updated",
+		"timestamp": %q,
+		"data": {
+			"id": "sub_modified",
+			"status": "active",
+			"cancel_at_period_end": true,
+			"modified_at": %q,
+			"current_period_start": %q,
+			"current_period_end": %q,
+			"external_customer_id": "11111111-1111-1111-1111-111111111111"
+		}
+	}`, modifiedAt.Add(time.Minute).Format(time.RFC3339), modifiedAt.Format(time.RFC3339), modifiedAt.Format(time.RFC3339), modifiedAt.AddDate(0, 1, 0).Format(time.RFC3339)))
+	headers := signedHeaders("msg_sub", body, secret)
+
+	parsed, err := VerifyAndParseWebhook(headers, body, secret)
+	require.NoError(t, err)
+	require.NotNil(t, parsed.Subscription)
+	assert.Equal(t, "sub_modified", parsed.Subscription.Data.ID)
+	assert.True(t, parsed.Subscription.Data.CancelAtPeriodEnd)
+	assert.True(t, parsed.Subscription.Data.ModifiedAt.Time.Equal(modifiedAt))
+	assert.True(t, parsed.Subscription.Timestamp.Time.Equal(modifiedAt.Add(time.Minute)))
+}
+
 func orderPaidBody(orderID string) []byte {
 	return []byte(fmt.Sprintf(`{
 		"type": "order.paid",

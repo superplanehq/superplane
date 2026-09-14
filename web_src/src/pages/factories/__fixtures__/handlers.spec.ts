@@ -228,6 +228,33 @@ describe("matchFactoryPageFixture", () => {
     expect(fixture.organizationBilling).toMatchObject({ plan: "business" });
   });
 
+  it("cancels and resumes Polar Business on the billing routes", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      organizationBilling: { ...BUSINESS_ORGANIZATION_BILLING },
+    };
+
+    const canceled = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/cancel`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(canceled.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: true,
+    });
+
+    const resumed = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/resume`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(resumed.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: false,
+    });
+  });
+
   it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
     const response = await fetchFactoryPageFixture(
       `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
