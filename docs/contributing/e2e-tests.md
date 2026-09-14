@@ -16,7 +16,10 @@ This document explains how to write and run E2E tests for SuperPlane.
 Tests are written in Go and use Playwright via the `mxschmitt/playwright-go` bindings to
 drive the UI against a locally started application server.
 
-All e2e tests live under the `test/e2e` directory.
+All e2e tests live under `test/e2e`. Put org-scoped specs in `test/e2e/org`
+(unique tenant per test, `t.Parallel()`). Put instance-wide specs in
+`test/e2e/instance` (serial, may truncate the database). Shared helpers live in
+`test/e2e/harness`, `test/e2e/session`, `test/e2e/queries`, and `test/e2e/shared`.
 
 ## How to run e2e tests
 
@@ -28,16 +31,23 @@ DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup
 make setup.playwright
 ```
 
-To run all e2e tests (takes 20m+):
+To run all e2e tests (org suite in parallel, then instance suite serially):
 
 ```
 make test.e2e
 ```
 
+To run one suite:
+
+```
+make test.e2e.org
+make test.e2e.instance
+```
+
 To run an individual test:
 
 ```
-make test.e2e FILE=test/e2e/canvas_page_test.go LINE=19
+make test.e2e FILE=test/e2e/org/canvas_page_test.go LINE=19
 ```
 
 To run a test from VSCode, set up the following keybindings (cmd+shift+p keybidings):
@@ -76,6 +86,7 @@ Good example (narrative + steps):
 
 ```go
 func TestNoopComponent(t *testing.T) {
+  t.Parallel()
   steps := &NoopSteps{t: t}
 
   t.Run("adding a noop node", func(t *testing.T) {
@@ -146,13 +157,15 @@ When a test edits a canvas and promotes changes to live, call `canvas.CommitAndP
 
 ## Writing a New E2E Test (Pattern)
 
-1. Create a spec under `test/e2e/` ending with `_test.go`.
+1. Create a spec under `test/e2e/org` (or `test/e2e/instance` for install-wide
+   flows such as `/setup`, `/login`, and `/admin`) ending with `_test.go`.
 2. Use a steps struct and Cucumber‑style method names. The test composes steps; step methods do the work.
+3. Call `t.Parallel()` in org-scoped tests. Do not call it in instance-wide tests.
 
 Example skeleton:
 
 ```go
-package e2e
+package org
 
 import (
     "testing"
@@ -160,6 +173,7 @@ import (
 )
 
 func TestExampleCanvasFlow(t *testing.T) {
+    t.Parallel()
     steps := &exampleSteps{t: t}
 
     t.Run("create and save a canvas", func(t *testing.T) {

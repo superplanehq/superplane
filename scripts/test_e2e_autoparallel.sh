@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Shard e2e Go tests across CI workers.
-# Usage (Semaphore example):
-#   make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
+# Shard one E2E suite across CI workers.
+# Usage:
+#   E2E_DIR=./test/e2e/org E2E_PACKAGE=./test/e2e/org E2E_GO_PARALLEL=4 \
+#     make test.e2e.org.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
+#   E2E_DIR=./test/e2e/instance E2E_PACKAGE=./test/e2e/instance E2E_GO_PARALLEL=1 \
+#     make test.e2e.instance.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
 
-echo "Running e2e tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
+E2E_DIR="${E2E_DIR:-./test/e2e/org}"
+E2E_PACKAGE="${E2E_PACKAGE:-${E2E_DIR}}"
+E2E_GO_PARALLEL="${E2E_GO_PARALLEL:-4}"
+E2E_TIMEOUT="${E2E_TIMEOUT:-15m}"
 
-if [[ ! -d "./test/e2e" ]]; then
-  echo "No ./test/e2e directory found, nothing to run."
+echo "Running e2e tests in ${E2E_DIR} shard ${SHARD_INDEX}/${SHARD_COUNT} (go -parallel ${E2E_GO_PARALLEL})"
+
+if [[ ! -d "${E2E_DIR}" ]]; then
+  echo "No ${E2E_DIR} directory found, nothing to run."
   exit 0
 fi
 
@@ -28,10 +36,10 @@ while IFS= read -r file; do
       print line
     }
   ' "$file")
-done < <(find ./test/e2e -maxdepth 1 -type f -name '*_test.go' | sort)
+done < <(find "${E2E_DIR}" -maxdepth 1 -type f -name '*_test.go' | sort)
 
 if [[ "${#all_tests[@]}" -eq 0 ]]; then
-  echo "No e2e tests found in ./test/e2e, nothing to run."
+  echo "No e2e tests found in ${E2E_DIR}, nothing to run."
   exit 0
 fi
 
@@ -70,8 +78,9 @@ gotestsum \
   --junitfile "${junit_file}" \
   --rerun-fails=3 \
   --rerun-fails-max-failures=1 \
-  --packages="./test/e2e/..." \
+  --packages="${E2E_PACKAGE}" \
   -- \
   -p 1 \
-  -timeout 15m \
+  -parallel "${E2E_GO_PARALLEL}" \
+  -timeout "${E2E_TIMEOUT}" \
   -run "${regex}"

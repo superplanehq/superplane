@@ -55,10 +55,15 @@ blocks:
           commands:
             - make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
-        - name: E2E Tests
-          parallelism: 10
+        - name: E2E Org Tests
+          parallelism: 8
           commands:
-            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
+            - make test.e2e.org.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
+
+        - name: E2E Instance Tests
+          parallelism: 4
+          commands:
+            - make test.e2e.instance.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: Checks
           commands:

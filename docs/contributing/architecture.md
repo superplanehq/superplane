@@ -152,7 +152,7 @@ Organization (1) ──→ (N) Integrations
 
 - **`test/`** - Test files
 
-  - `test/e2e/` - End-to-end tests
+  - `test/e2e/` - End-to-end tests (`org/` parallel, `instance/` serial)
   - `test/support/` - Test support utilities
 
 - **`docs/`** - Documentation (concepts, contributing guides, examples)

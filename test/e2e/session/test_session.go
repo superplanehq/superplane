@@ -54,9 +54,19 @@ func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeo
 	return sess
 }
 
+// Start seeds a unique account and organization. It does not truncate the
+// database, so org-scoped tests can run in parallel.
 func (s *TestSession) Start() {
+	s.setupTenant(uniqueTenant())
+	middleware.MarkOwnerSetupCompleted()
+}
+
+// StartFreshInstance truncates the test database and seeds the shared
+// e2e-org tenant. Use this only from instance-wide tests that must run
+// serially.
+func (s *TestSession) StartFreshInstance() {
 	s.resetDatabase()
-	s.setupUserAndOrganization()
+	s.setupTenant(sharedTenant())
 	middleware.MarkOwnerSetupCompleted()
 }
 
@@ -72,11 +82,16 @@ func (s *TestSession) Close() {
 		// Close the page first to finalize the video
 		videoPath, _ := s.page.Video().Path()
 		_ = s.page.Close()
+		s.page = nil
 
 		// If test failed, keep the video, otherwise delete it
 		if !s.t.Failed() && videoPath != "" {
 			_ = os.Remove(videoPath)
 		}
+	}
+	if s.context != nil {
+		_ = s.context.Close()
+		s.context = nil
 	}
 }
 
@@ -124,11 +139,20 @@ func (s *TestSession) Sleep(ms int) {
 }
 
 func (s *TestSession) resetDatabase() {
+	if err := ResetTestDatabase(); err != nil {
+		s.t.Fatalf("reset database: %v", err)
+	}
+}
+
+// ResetTestDatabase truncates application tables in superplane_test.
+// Org-scoped suites call this once from TestMain. Instance-wide tests
+// also call it per test via StartFreshInstance or StartWithoutUser.
+func ResetTestDatabase() error {
 	// Guard against truncating a developer's database: the E2E bootstrap
 	// points DB_NAME at superplane_test, but if that ever regresses we want
 	// a loud failure here instead of silently wiping superplane_dev.
 	if err := database.VerifyTestDatabase(database.Conn()); err != nil {
-		s.t.Fatalf("reset database: %v", err)
+		return err
 	}
 
 	sql := `DO $$
@@ -144,9 +168,7 @@ func (s *TestSession) resetDatabase() {
         END LOOP;
     END$$;`
 
-	if err := database.Conn().Exec(sql).Error; err != nil {
-		s.t.Fatalf("reset database: %v", err)
-	}
+	return database.Conn().Exec(sql).Error
 }
 
 func (s *TestSession) Login() {
@@ -167,24 +189,46 @@ func (s *TestSession) Login() {
 	}
 }
 
-func (s *TestSession) setupUserAndOrganization() {
-	email := "e2e@superplane.local"
-	name := "E2E User"
-	account, err := models.FindAccountByEmail(email)
+const (
+	sharedE2EEmail = "e2e@superplane.local"
+	sharedE2EName  = "E2E User"
+	sharedE2EOrg   = "e2e-org"
+)
+
+type tenantSeed struct {
+	email         string
+	name          string
+	orgName       string
+	reuseExisting bool
+}
+
+func uniqueTenant() tenantSeed {
+	suffix := uuid.NewString()
+	return tenantSeed{
+		email:   fmt.Sprintf("e2e-%s@superplane.local", suffix),
+		name:    sharedE2EName,
+		orgName: fmt.Sprintf("e2e-org-%s", suffix),
+	}
+}
+
+func sharedTenant() tenantSeed {
+	return tenantSeed{
+		email:         sharedE2EEmail,
+		name:          sharedE2EName,
+		orgName:       sharedE2EOrg,
+		reuseExisting: true,
+	}
+}
+
+func (s *TestSession) setupTenant(seed tenantSeed) {
+	account, err := s.ensureAccount(seed)
 	if err != nil {
-		account, err = models.CreateAccount(name, email)
-		if err != nil {
-			s.t.Fatalf("create account: %v", err)
-		}
+		s.t.Fatalf("create account: %v", err)
 	}
 
-	orgName := "e2e-org"
-	organization, err := models.FindOrganizationByName(orgName)
+	organization, err := s.ensureOrganization(seed)
 	if err != nil {
-		organization, err = models.CreateOrganization(orgName, "")
-		if err != nil {
-			s.t.Fatalf("create organization: %v", err)
-		}
+		s.t.Fatalf("create organization: %v", err)
 	}
 
 	// New orgs enable factories by default. Classic canvas and Apps home
@@ -193,9 +237,9 @@ func (s *TestSession) setupUserAndOrganization() {
 		s.t.Fatalf("disable factories: %v", err)
 	}
 
-	user, err := models.FindMaybeDeletedUserByEmail(organization.ID.String(), email)
+	user, err := models.FindMaybeDeletedUserByEmail(organization.ID.String(), seed.email)
 	if err != nil {
-		user, err = models.CreateUser(organization.ID, account.ID, email, name)
+		user, err = models.CreateUser(organization.ID, account.ID, seed.email, seed.name)
 		if err != nil {
 			s.t.Fatalf("create user: %v", err)
 		}
@@ -222,6 +266,26 @@ func (s *TestSession) setupUserAndOrganization() {
 	s.OrgID = organization.ID
 	s.OrgSlug = organization.Slug
 	s.Account = account
+}
+
+func (s *TestSession) ensureAccount(seed tenantSeed) (*models.Account, error) {
+	if seed.reuseExisting {
+		account, err := models.FindAccountByEmail(seed.email)
+		if err == nil {
+			return account, nil
+		}
+	}
+	return models.CreateAccount(seed.name, seed.email)
+}
+
+func (s *TestSession) ensureOrganization(seed tenantSeed) (*models.Organization, error) {
+	if seed.reuseExisting {
+		organization, err := models.FindOrganizationByName(seed.orgName)
+		if err == nil {
+			return organization, nil
+		}
+	}
+	return models.CreateOrganization(seed.orgName, "")
 }
 
 func (s *TestSession) Click(q queries.Query) {

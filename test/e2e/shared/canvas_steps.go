@@ -897,7 +897,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
 
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
 
 	s.session.Sleep(300)
 }
