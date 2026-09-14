@@ -17,6 +17,7 @@ export type OrganizationBillingPlan = {
   plan: string;
   plan_source: string;
   polar_subscription_status: string;
+  polar_managed: boolean;
   trial_ends_at: string | null;
   current_period_end: string | null;
 };
@@ -85,6 +86,9 @@ export function useOrgLLMCredit(orgId: string) {
       applyCredit(await creditResponse.json());
       if (nextPlan) {
         applyPlan(nextPlan);
+      } else {
+        setPlan(null);
+        showErrorToast("Failed to load billing plan");
       }
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");

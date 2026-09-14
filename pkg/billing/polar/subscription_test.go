@@ -463,24 +463,34 @@ func Test__SyncOrganizationSubscriptionLeavesTrialWhenPolarIsIncomplete(t *testi
 	assert.True(t, plan.IsOpenTrial(time.Now()))
 }
 
-func Test__SyncOrganizationSubscriptionSkipsAdminPlan(t *testing.T) {
+func Test__SyncOrganizationSubscriptionReplacesAdminTrialWithPolarPaid(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	require.NoError(t, err)
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	usePolarSubscriptionServer(t, r.Organization.ID.String(), []map[string]any{
+		polarSubscriptionJSON("sub_sync_admin", "active", r.Organization.ID.String(), periodStart, periodEnd),
+	})
+
+	require.NoError(t, SyncOrganizationSubscription(context.Background(), db, r.Organization.ID))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.Equal(t, models.BillingPlanSourcePolar, plan.PlanSource)
+	assert.True(t, plan.IsActiveBusiness())
+}
+
+func Test__SyncOrganizationSubscriptionLeavesAdminBusinessWhenPolarHasNone(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
 	require.NoError(t, err)
-
-	called := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		called = true
-		http.Error(w, "should not list subscriptions for admin plans", http.StatusInternalServerError)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
-	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
-	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	usePolarSubscriptionServer(t, r.Organization.ID.String(), nil)
 
 	require.NoError(t, SyncOrganizationSubscription(context.Background(), db, r.Organization.ID))
-	assert.False(t, called)
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)

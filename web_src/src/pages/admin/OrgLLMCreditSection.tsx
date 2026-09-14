@@ -11,6 +11,11 @@ import { Wallet } from "lucide-react";
 import { useOrgLLMCredit, type OrganizationLLMCredit } from "./useOrgLLMCredit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+export const ADMIN_POLAR_MANAGED_PLAN_COPY =
+  "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
+export const ADMIN_LOCAL_PLAN_COPY = "No Polar subscription. Set Trial, Business, or None for this organization.";
+export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
+
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
   const credit = useOrgLLMCredit(orgId);
 
@@ -25,14 +30,31 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
       {credit.loading && !credit.credit ? (
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading hosted credit...</Text>
       ) : credit.credit ? (
-        <OrgHostedCreditCard {...credit} credit={credit.credit} />
+        <OrgHostedCreditCard
+          {...credit}
+          credit={credit.credit}
+          polarManaged={credit.plan?.polar_managed === true}
+          planKnown={credit.plan != null}
+        />
       ) : null}
     </div>
   );
 }
 
+function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
+  if (!planKnown) {
+    return ADMIN_PLAN_UNKNOWN_COPY;
+  }
+  if (polarManaged) {
+    return ADMIN_POLAR_MANAGED_PLAN_COPY;
+  }
+  return ADMIN_LOCAL_PLAN_COPY;
+}
+
 function OrgHostedCreditCard(args: {
   credit: OrganizationLLMCredit;
+  polarManaged: boolean;
+  planKnown: boolean;
   grantDollars: string;
   setGrantDollars: (value: string) => void;
   note: string;
@@ -48,11 +70,12 @@ function OrgHostedCreditCard(args: {
   saveMarkup: () => void;
   savePlan: () => void;
 }) {
+  const planLocked = !args.planKnown || args.polarManaged;
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
       <div className="mb-4 max-w-sm">
         <Label className="mb-2 block text-left">Billing plan</Label>
-        <Select value={args.planValue} onValueChange={args.setPlanValue}>
+        <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
           <SelectTrigger data-testid="admin-org-billing-plan">
             <SelectValue placeholder="Select a plan" />
           </SelectTrigger>
@@ -63,17 +86,19 @@ function OrgHostedCreditCard(args: {
           </SelectContent>
         </Select>
         <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Admin Business skips Polar payment. Polar webhooks do not change this plan.
+          {billingPlanHelp(args.planKnown, args.polarManaged)}
         </Text>
-        <Button
-          type="button"
-          className="mt-3"
-          data-testid="admin-org-billing-plan-save"
-          onClick={args.savePlan}
-          disabled={args.savingPlan}
-        >
-          {args.savingPlan ? "Saving..." : "Save plan"}
-        </Button>
+        {planLocked ? null : (
+          <Button
+            type="button"
+            className="mt-3"
+            data-testid="admin-org-billing-plan-save"
+            onClick={args.savePlan}
+            disabled={args.savingPlan}
+          >
+            {args.savingPlan ? "Saving..." : "Save plan"}
+          </Button>
+        )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <CreditMetric label="Remaining hosted credit" value={formatUsdCents(args.credit.remaining_credit_cents)} />
