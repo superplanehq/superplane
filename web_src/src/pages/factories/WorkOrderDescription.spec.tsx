@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+
 import { WorkOrderDescription } from "./WorkOrderDescription";
 
 let notifyResize: () => void;
@@ -22,6 +24,7 @@ describe("WorkOrderDescription", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearWorkOrderFileDownloadCache();
   });
 
   it("updates the collapse control when the rendered content height changes", () => {
@@ -142,5 +145,22 @@ describe("WorkOrderDescription", () => {
     act(() => notifyResize());
     expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(content).toHaveStyle({ maxHeight: "280px" });
+  });
+
+  it("keeps the image source when a file URL is reminted", () => {
+    const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const description = `![Screenshot](sp-file://${id})`;
+    const first = "https://files.example/screenshot.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/screenshot.png?expires=9999999999&sig=two";
+    const { rerender } = render(
+      <WorkOrderDescription description={description} files={[{ id, downloadUrl: first }]} />,
+    );
+    const image = screen.getByRole("img", { name: "Screenshot" });
+
+    expect(image).toHaveAttribute("src", first);
+
+    rerender(<WorkOrderDescription description={description} files={[{ id, downloadUrl: reminted }]} />);
+
+    expect(image).toHaveAttribute("src", first);
   });
 });
