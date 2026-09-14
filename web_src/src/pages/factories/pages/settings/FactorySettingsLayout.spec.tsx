@@ -127,7 +127,8 @@ describe("FactorySettingsLayout sidebar", () => {
         "page",
       );
     });
-    expect(await screen.findByTestId("account-redesign-velocity-github")).toBeInTheDocument();
+    expect(await screen.findByTestId("account-redesign-signin")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
   }, 10000);
 
   it("shows the shipped Notifications page from Account settings", async () => {
