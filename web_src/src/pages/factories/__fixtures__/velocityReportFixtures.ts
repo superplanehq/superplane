@@ -269,6 +269,7 @@ function buildReport(
 }
 
 export const DEFAULT_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  7: buildReport(7, true),
   14: buildReport(14, true),
   30: buildReport(30, true),
 };
@@ -365,6 +366,7 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: VelocityResponse = (() => {
  * story keeps rendering one page with no control.
  */
 export const PEOPLE_LOAD_MORE_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  7: buildReport(7, true, MANY_PEOPLE_AUTHORS),
   14: buildReport(14, true, MANY_PEOPLE_AUTHORS),
   30: buildReport(30, true, MANY_PEOPLE_AUTHORS),
 };

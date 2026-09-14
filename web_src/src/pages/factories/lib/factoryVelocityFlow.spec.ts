@@ -61,6 +61,14 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.timeTrend).toHaveLength(14);
   });
 
+  it("builds a 7-day window", () => {
+    const flow = aggregateFactoryVelocityFlow([], 7, NOW);
+
+    expect(flow.days).toBe(7);
+    expect(flow.label).toBe("Last 7 days");
+    expect(flow.timeTrend).toHaveLength(7);
+  });
+
   it("skips draft/open orders and orders without executions", () => {
     const orders: FactoriesWorkOrder[] = [
       closedOrder({ id: "no-exec", executions: [] }),
