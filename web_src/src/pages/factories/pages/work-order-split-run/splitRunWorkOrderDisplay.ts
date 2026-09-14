@@ -3,6 +3,7 @@ import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-clie
 import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import { displayRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
 import { formatCostCents, formatTokenCount } from "./splitRunFormat";
 import type { SplitRunPhaseStatus } from "./splitRunMocks";
 
@@ -12,6 +13,44 @@ export function costUsdForDisplay(order: FactoriesWorkOrder): string {
 
 export function tokensLabelForDisplay(order: FactoriesWorkOrder): string {
   return formatTokenCount(order.totalTokens) ?? "0 tokens";
+}
+
+type ImplementationPhase = {
+  id: string;
+  name: string;
+  status: string;
+  canvasKey?: string | null;
+  model?: string;
+};
+
+type ImplementationCanvasNode = {
+  component?: string;
+  configuration?: { model?: unknown } | Record<string, unknown>;
+};
+
+export function selectedImplementationPhase<T extends ImplementationPhase>(phases: T[]): T | undefined {
+  const implementPhases = phases.filter(isImplementationPhase);
+  const active = [...implementPhases]
+    .reverse()
+    .find((phase) => phase.status === "running" || phase.status === "pending");
+  return active ?? implementPhases.at(-1);
+}
+
+export function implementationRunnerModel(
+  phases: ImplementationPhase[],
+  canvasNodes?: ImplementationCanvasNode[],
+): string {
+  const selected = selectedImplementationPhase(phases);
+  if (!selected) {
+    return "";
+  }
+  return displayRunnerModel(phaseWithRunnerModel(selected, canvasNodes).model ?? "");
+}
+
+function isImplementationPhase(phase: ImplementationPhase): boolean {
+  return (
+    phase.canvasKey === "implementation" || phase.name === "Implement" || phase.id.toLowerCase().startsWith("implement")
+  );
 }
 
 export function startedLabelForOrder(order: Pick<FactoriesWorkOrder, "createdAt">): string {

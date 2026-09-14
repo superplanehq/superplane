@@ -127,12 +127,31 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
+    expect(row).toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
     const close = screen.getByRole("button", { name: "Close" });
     const views = screen.getByRole("tablist", { name: "Task views" });
     expect(close.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
+  });
+
+  it("shows the implement model next to spend while the task is running", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(row).toHaveTextContent("$0.73 · 2.7k tokens · claude-sonnet-4-6");
+    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("does not show a model on a draft that has not started", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(row).toHaveTextContent("$0.00");
+    expect(row).toHaveTextContent("0 tokens");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
+    expect(row).not.toHaveTextContent("grok-4.6");
   });
 
   it("opens the Task tab when no automation is running", () => {

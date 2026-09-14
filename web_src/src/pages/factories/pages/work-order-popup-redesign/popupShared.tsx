@@ -142,6 +142,7 @@ type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel
 /** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
+  modelLabel,
   className,
   children,
   organizationId,
@@ -151,6 +152,7 @@ export function OwnerTimeCostRow({
   onOwnerSave,
 }: {
   fixture: OwnerTimeCostFields;
+  modelLabel?: string;
   className?: string;
   children?: ReactNode;
   organizationId?: string;
@@ -201,6 +203,12 @@ export function OwnerTimeCostRow({
       )}
       <span className="text-foreground">
         {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
+        {modelLabel ? (
+          <>
+            {" "}
+            <span className="text-muted-foreground">·</span> {modelLabel}
+          </>
+        ) : null}
       </span>
       {children}
     </div>
