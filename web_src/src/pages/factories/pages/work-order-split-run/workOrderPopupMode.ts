@@ -1,23 +1,33 @@
-export type WorkOrderPopupMode = "classic" | "analysis";
+export type WorkOrderPopupMode = "loading" | "classic" | "analysis";
 
 export function workOrderPopupMode({
   hasPlanningSession,
   hasAnalysisResult = false,
   refinementEnabled,
+  refinementLoading = false,
+  sessionLoading = false,
   analysisActive,
   hasLookupIdentity,
 }: {
   hasPlanningSession: boolean;
   hasAnalysisResult?: boolean;
   refinementEnabled: boolean;
+  refinementLoading?: boolean;
+  sessionLoading?: boolean;
   analysisActive: boolean;
   hasLookupIdentity: boolean;
 }): WorkOrderPopupMode {
   if (!hasLookupIdentity || hasPlanningSession) {
     return "analysis";
   }
+  if (refinementLoading) {
+    return "loading";
+  }
   if (!refinementEnabled) {
     return "classic";
   }
-  return hasAnalysisResult || analysisActive ? "analysis" : "classic";
+  if (hasAnalysisResult || analysisActive) {
+    return "analysis";
+  }
+  return sessionLoading ? "loading" : "classic";
 }

@@ -1,6 +1,8 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { canvasKeys, useCanvas, useCommitCanvasStaging, useUpdateCanvasVersion } from "@/hooks/useCanvasData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { getApiErrorMessage } from "@/lib/errors";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -9,6 +11,7 @@ import { planningReviewDraftFromCanvas, primaryAgentNode, serializeColumnAgentCa
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
+const REFINEMENT_AGENT_NODE_ID = "refine-task";
 
 export function useColumnCanvasAgentEditor(organizationId: string, appId: string | undefined) {
   const enabled = Boolean(appId);
@@ -18,9 +21,11 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
   const commitStaging = useCommitCanvasStaging(canvasId);
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
+  const features = useExperimentalFeature(organizationId);
 
   const canvas = canvasQuery.data;
-  const agentNode = primaryAgentNode(canvas?.spec);
+  const preferredAgentNodeId = features.has(FEATURE_FACTORY_CREATE_WITH_AGENT) ? REFINEMENT_AGENT_NODE_ID : undefined;
+  const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
 
   const save = async (nextDraft: PlanningReviewDraft) => {
@@ -37,7 +42,7 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
 
   return {
     agentNode,
-    isLoading: enabled && canvasQuery.isPending,
+    isLoading: enabled && (canvasQuery.isPending || features.isLoading),
     draft,
     editorOpen,
     openEditor: agentNode ? () => setEditorOpen(true) : undefined,
