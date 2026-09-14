@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
@@ -108,9 +109,9 @@ export function CreateWorkOrderRequestDialog({
             titleValue={form.titleValue}
             onTitleChange={form.handleTitleChange}
           />
-          <label htmlFor="work-order-description-input" className="sr-only">
+          <Label htmlFor="work-order-description-input" className="sr-only">
             {CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
-          </label>
+          </Label>
           <div
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]"
             data-testid="create-work-order-request-body"
@@ -186,9 +187,9 @@ function RequestDialogTitleField({
 }) {
   return (
     <div className="shrink-0 px-4 pt-4 pr-20">
-      <label htmlFor="create-work-order-request-title" className="sr-only">
+      <Label htmlFor="create-work-order-request-title" className="sr-only">
         {CREATE_WORK_ORDER_REQUEST_COPY.titleField}
-      </label>
+      </Label>
       <Textarea
         id="create-work-order-request-title"
         data-testid="create-work-order-request-title"

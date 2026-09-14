@@ -63,6 +63,8 @@ describe("CreateWorkOrderRequestDialog", () => {
     renderRequestDialog();
 
     expect(screen.getByRole("dialog", { name: CREATE_WORK_ORDER_REQUEST_COPY.title })).toBeInTheDocument();
+    expect(screen.getByLabelText(CREATE_WORK_ORDER_REQUEST_COPY.titleField)).toHaveValue("");
+    expect(screen.getByLabelText(CREATE_WORK_ORDER_REQUEST_COPY.placeholder)).toBeInTheDocument();
     expect(screen.getByTestId("create-work-order-request-title")).toHaveValue("");
     expect(screen.getByTestId("create-work-order-request-attach")).toHaveAccessibleName(
       CREATE_WORK_ORDER_REQUEST_COPY.attach,
