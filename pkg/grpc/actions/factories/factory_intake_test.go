@@ -153,11 +153,16 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 
-	t.Run("creating an intake also creates a Backlog scorer", func(t *testing.T) {
+	t.Run("creating an intake also creates Backlog template version 2", func(t *testing.T) {
 		factory := newFactory(t)
 		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
-		require.NotNil(t, liveBacklogCanvas(t, factory))
+		backlog := liveBacklogCanvas(t, factory)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), backlog)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryAppTemplateBacklogID, models.FactoryAppTemplateID(liveVersion.Nodes))
+		assert.Equal(t, backlogTemplateVersion, backlogTemplateVersionFrom(liveVersion.Nodes))
+		assert.Len(t, liveVersion.Nodes, 7)
 	})
 
 	t.Run("creating a work order emits to the Backlog trigger", func(t *testing.T) {

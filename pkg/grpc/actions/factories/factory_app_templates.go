@@ -574,7 +574,7 @@ func materializeBacklogDefaults(
 		if node.ID != backlogTriggerNodeID {
 			continue
 		}
-		node.Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, factoryTemplateVersion)
+		node.Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion)
 	}
 	encoded, err := goyaml.Marshal(defaults)
 	if err != nil {

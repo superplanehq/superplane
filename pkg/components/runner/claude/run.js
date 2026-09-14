@@ -38,6 +38,14 @@ function loadAnalysisProtocol() {
   return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
 }
 
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
   if (!planningAnalysisEnabled()) {
     return prompt;
@@ -153,7 +161,10 @@ async function runPrompt(promptFile, model) {
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  const prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  if (planningAnalysisEnabled()) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const sessionID = readSessionID(sp);
   const planningToolsEnabled = mcpToolsEnabled();
 
