@@ -1,0 +1,17 @@
+export const CREATE_WORK_ORDER_REQUEST_COPY = {
+  title: "New task",
+  description: "Create a task for this workspace.",
+  titleField: "Title",
+  titlePlaceholder: "Title",
+  placeholder: "Describe the task. You can attach images.",
+  attach: "Attach image",
+  attachedImages: "Attached images",
+  openImage: "Open image",
+  closeImage: "Close image",
+  deleteImage: "Delete image",
+  removeImage: "Delete image",
+  create: "Create task",
+  creating: "Creating...",
+  expand: "Open full screen",
+  collapse: "Exit full screen",
+} as const;
