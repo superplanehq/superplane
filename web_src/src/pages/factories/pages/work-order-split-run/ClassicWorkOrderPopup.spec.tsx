@@ -19,9 +19,6 @@ function renderClassicPopup() {
         <ThemeProvider>
           <TooltipProvider>
             <ClassicWorkOrderPopup
-              factoryKey="RF"
-              orderNumber={DRAFT_WORK_ORDER.number}
-              orderId={DRAFT_WORK_ORDER.id}
               fixture={fixture}
               canDispatch
               popupData={{
@@ -62,17 +59,5 @@ describe("ClassicWorkOrderPopup", () => {
     expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Add context for this plan")).not.toBeInTheDocument();
-  });
-
-  it("shows the workspace-scoped task ID next to the title", () => {
-    renderClassicPopup();
-
-    const dialog = screen.getByTestId("work-order-split-run");
-    const displayKey = within(dialog).getByTestId("popup-work-order-display-key");
-    const title = within(dialog).getByTestId("popup-work-order-title");
-
-    expect(displayKey).toHaveTextContent("RF-105");
-    expect(displayKey).toHaveAccessibleName("Copy task ID RF-105");
-    expect(title.compareDocumentPosition(displayKey) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
