@@ -278,10 +278,16 @@ func FindIntegrationByName(db *gorm.DB, orgID uuid.UUID, integrationName string)
 	return &integration, nil
 }
 
-func ListDeletedIntegrations() ([]Integration, error) {
+func ListDeletedIntegrations(limit int) ([]Integration, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var integrations []Integration
 	err := database.Conn().Unscoped().
 		Where("deleted_at IS NOT NULL").
+		Order("deleted_at ASC").
+		Limit(limit).
 		Find(&integrations).
 		Error
 

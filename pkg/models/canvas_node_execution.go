@@ -111,13 +111,18 @@ func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
+func ListPendingNodeExecutions(limit int) ([]CanvasNodeExecution, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var executions []CanvasNodeExecution
 	query := database.Conn().
 		Table("workflow_node_executions").
 		Select("workflow_node_executions.*").
 		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStatePending).
-		Order("workflow_node_executions.created_at DESC")
+		Order("workflow_node_executions.created_at ASC").
+		Limit(limit)
 
 	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
 		Find(&executions).
@@ -129,14 +134,19 @@ func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
 	return executions, nil
 }
 
-func ListCancellingNodeExecutions(db *gorm.DB) ([]CanvasNodeExecution, error) {
+func ListCancellingNodeExecutions(db *gorm.DB, limit int) ([]CanvasNodeExecution, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var executions []CanvasNodeExecution
 	query := db.
 		Table("workflow_node_executions").
 		Select("workflow_node_executions.*").
 		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStateCancelling).
 		Where("workflow_node_executions.cancelled_at IS NOT NULL").
-		Order("workflow_node_executions.cancelled_at ASC")
+		Order("workflow_node_executions.cancelled_at ASC").
+		Limit(limit)
 
 	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
 		Find(&executions).

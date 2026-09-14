@@ -146,10 +146,16 @@ func FindActiveWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]Ca
 	return nodes, nil
 }
 
-func ListPendingWebhooks() ([]Webhook, error) {
+func ListPendingWebhooks(limit int) ([]Webhook, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var webhooks []Webhook
 	err := database.Conn().
 		Where("state = ?", WebhookStatePending).
+		Order("created_at ASC").
+		Limit(limit).
 		Find(&webhooks).
 		Error
 
@@ -160,10 +166,16 @@ func ListPendingWebhooks() ([]Webhook, error) {
 	return webhooks, nil
 }
 
-func ListDeletedWebhooks() ([]Webhook, error) {
+func ListDeletedWebhooks(limit int) ([]Webhook, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var webhooks []Webhook
 	err := database.Conn().Unscoped().
 		Where("deleted_at IS NOT NULL").
+		Order("deleted_at ASC").
+		Limit(limit).
 		Find(&webhooks).
 		Error
 

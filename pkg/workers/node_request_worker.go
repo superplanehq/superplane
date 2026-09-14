@@ -56,7 +56,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			requests, err := models.ListNodeRequests()
+			requests, err := models.ListNodeRequests(workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}

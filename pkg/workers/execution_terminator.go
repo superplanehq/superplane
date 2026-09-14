@@ -64,7 +64,7 @@ func (w *ExecutionTerminator) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			executions, err := models.ListCancellingNodeExecutions(database.Conn())
+			executions, err := models.ListCancellingNodeExecutions(database.Conn(), workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding cancelling executions: %v", err)
 				continue

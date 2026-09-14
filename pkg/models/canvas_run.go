@@ -676,11 +676,16 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	return CanvasRunResultPassed, nil
 }
 
-func ListPendingRuns(tx *gorm.DB) ([]CanvasRun, error) {
+func ListPendingRuns(tx *gorm.DB, limit int) ([]CanvasRun, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var runs []CanvasRun
 	err := tx.
 		Where("state = ?", CanvasRunStatePending).
 		Order("created_at ASC").
+		Limit(limit).
 		Find(&runs).
 		Error
 	if err != nil {

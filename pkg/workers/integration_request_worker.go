@@ -57,7 +57,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			requests, err := models.ListIntegrationRequests()
+			requests, err := models.ListIntegrationRequests(workerPollBatchSize)
 			if err != nil {
 				w.log("Error finding app installation requests: %v", err)
 			}

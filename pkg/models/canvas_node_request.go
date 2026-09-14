@@ -71,7 +71,11 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	return &request, nil
 }
 
-func ListNodeRequests() ([]CanvasNodeRequest, error) {
+func ListNodeRequests(limit int) ([]CanvasNodeRequest, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var requests []CanvasNodeRequest
 
 	now := time.Now()
@@ -79,7 +83,9 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now)
+		Where("workflow_node_requests.run_at <= ?", now).
+		Order("workflow_node_requests.run_at ASC").
+		Limit(limit)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		Find(&requests).

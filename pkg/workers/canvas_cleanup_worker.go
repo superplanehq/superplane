@@ -55,7 +55,7 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			canvases, err := models.ListDeletedCanvases(database.Conn())
+			canvases, err := models.ListDeletedCanvases(database.Conn(), workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding deleted canvases: %v", err)
 				continue
