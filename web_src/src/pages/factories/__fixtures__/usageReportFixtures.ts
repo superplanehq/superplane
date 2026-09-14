@@ -133,6 +133,12 @@ export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
   { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
 ];
 
+export const STORYBOOK_CUSTOM_CREDIT_PRODUCT = {
+  id: "prod-custom",
+  name: "Hosted credit custom",
+  amountCents: "0",
+};
+
 export const BUSINESS_ORGANIZATION_BILLING = {
   plan: "business",
   planSource: "polar",
