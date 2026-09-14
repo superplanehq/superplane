@@ -1,8 +1,9 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
-import { Input, InputGroup } from "@/components/Input/input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { parsePositiveWholeNumber } from "@/lib/positiveWholeNumber";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Factory } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -13,12 +14,33 @@ type OrganizationFactorySettings = {
   effective: number;
 };
 
+type FactorySettingsRequest = {
+  max_parallel_factory_tasks: number | null;
+};
+
+const limitHint = "Enter a whole number of at least 1, or leave the field empty.";
+
 const getErrorMessage = async (response: Response, fallback: string) => {
   const text = await response.text();
   if (text.trim() === "") {
     return fallback;
   }
   return text;
+};
+
+// An empty field clears the override. Any other value must be a whole
+// number, so the saved limit matches what the administrator typed.
+const buildRequestBody = (value: string): FactorySettingsRequest | null => {
+  if (value.trim() === "") {
+    return { max_parallel_factory_tasks: null };
+  }
+
+  const limit = parsePositiveWholeNumber(value);
+  if (limit == null) {
+    return null;
+  }
+
+  return { max_parallel_factory_tasks: limit };
 };
 
 export function OrgFactoryParallelTasksSection({ orgId }: { orgId: string }) {
@@ -54,17 +76,10 @@ export function OrgFactoryParallelTasksSection({ orgId }: { orgId: string }) {
   }, [loadSettings]);
 
   const save = async () => {
-    const trimmed = value.trim();
-    let body: { max_parallel_factory_tasks: number | null };
-    if (trimmed === "") {
-      body = { max_parallel_factory_tasks: null };
-    } else {
-      const parsed = Number.parseInt(trimmed, 10);
-      if (!Number.isInteger(parsed) || parsed < 1) {
-        showErrorToast("Enter a whole number of at least 1, or leave the field empty.");
-        return;
-      }
-      body = { max_parallel_factory_tasks: parsed };
+    const body = buildRequestBody(value);
+    if (body == null) {
+      showErrorToast(limitHint);
+      return;
     }
 
     setSaving(true);
@@ -103,24 +118,20 @@ export function OrgFactoryParallelTasksSection({ orgId }: { orgId: string }) {
             Maximum parallel factory tasks
           </Label>
           <div className="max-w-sm">
-            <InputGroup>
-              <Input
-                id="org-max-parallel-factory-tasks"
-                data-testid="admin-org-max-parallel-factory-tasks"
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                placeholder={`Installation default (${settings.installation_default})`}
-                inputMode="numeric"
-              />
-            </InputGroup>
+            <Input
+              id="org-max-parallel-factory-tasks"
+              data-testid="admin-org-max-parallel-factory-tasks"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              placeholder={`Installation default (${settings.installation_default})`}
+              inputMode="numeric"
+            />
           </div>
           <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Each factory in this organization can run this many tasks at the same time. Leave empty to use the
             installation default.
           </Text>
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Effective limit: {settings.effective}
-          </Text>
+          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">Effective limit: {settings.effective}</Text>
           <Button
             type="button"
             className="mt-3"

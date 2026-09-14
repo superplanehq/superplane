@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+import { showErrorToast } from "@/lib/toast";
 import { OrgFactoryParallelTasksSection } from "./OrgFactoryParallelTasksSection";
 
 vi.mock("@/lib/toast", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/lib/toast", () => ({
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe("OrgFactoryParallelTasksSection", () => {
@@ -75,5 +77,33 @@ describe("OrgFactoryParallelTasksSection", () => {
     expect(JSON.parse(String((patchCall?.[1] as RequestInit).body))).toEqual({
       max_parallel_factory_tasks: null,
     });
+  });
+
+  it("does not save a value that is not a whole number", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      return new Response(
+        JSON.stringify({
+          max_parallel_factory_tasks: 3,
+          installation_default: 50,
+          effective: 3,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<OrgFactoryParallelTasksSection orgId="org-1" />);
+
+    const input = await screen.findByTestId("admin-org-max-parallel-factory-tasks");
+    await userEvent.clear(input);
+    await userEvent.type(input, "1.5");
+    await userEvent.click(screen.getByTestId("admin-org-max-parallel-factory-tasks-save"));
+
+    const patchCall = fetchMock.mock.calls.find((call) => {
+      const init = call[1] as RequestInit | undefined;
+      return init?.method === "PATCH";
+    });
+    expect(patchCall).toBeUndefined();
+    expect(showErrorToast).toHaveBeenCalledWith("Enter a whole number of at least 1, or leave the field empty.");
   });
 });
