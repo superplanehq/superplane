@@ -1,5 +1,17 @@
 export function formatCentsPerMillionUsd(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return `$${centsToUsdInput(cents)}`;
+}
+
+export function centsToUsdInput(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+export function usdInputToCents(value: string): number {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.round(parsed * 100);
 }
 
 export function formatMicrosPerSecondUsdPerMinute(microsPerSecond: number): string {
