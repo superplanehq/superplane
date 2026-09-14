@@ -160,7 +160,8 @@ blocks:
           commands:
             - make image.build
             - |
-              if [ "${SEMAPHORE_GIT_BRANCH}" = "main" ]; then
+              set -euo pipefail
+              if [ "${SEMAPHORE_GIT_REF_TYPE}" = "branch" ] && [ "${SEMAPHORE_GIT_BRANCH}" = "main" ]; then
                 make image.auth
                 make image.push
               fi

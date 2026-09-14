@@ -473,7 +473,8 @@ image.build:
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
-	@printf "%s" "$(GHCR_PUSH_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
+	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)
+	@printf "%s" "$$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
 
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
