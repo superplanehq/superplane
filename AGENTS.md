@@ -122,8 +122,8 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 
 - One-shot backend tests: `make test` (Go).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
-- Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
-  (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
+- Targeted E2E tests: `make test.e2e.org` or `make test.e2e.instance`
+  (or `make test.e2e FILE=test/e2e/org/foo_test.go LINE=19` for a single test).
 - UI unit tests: `make check.test.ui` (Bun + Happy DOM).
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.

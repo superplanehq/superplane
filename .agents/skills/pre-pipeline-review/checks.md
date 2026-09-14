@@ -46,7 +46,7 @@ Do **not** run unless the user explicitly asks:
 | Target | Why skip |
 | --- | --- |
 | `make test` / `make test.coverage.autoparallel` | Slow backend unit suite |
-| `make test.e2e` / `make test.e2e.autoparallel` | Slow E2E suite |
+| `make test.e2e` / `make test.e2e.org.autoparallel` / `make test.e2e.instance.autoparallel` | Slow E2E suite |
 | `make check.test.ui` / `make check.test.ui.shard` | Slow frontend unit shards |
 | `make check.build.storybook` | Slow Storybook build |
 | `make check.lint.ui.knip` | Dead-file check; slower and often noisy |

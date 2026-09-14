@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard test.e2e.org test.e2e.instance test.e2e.org.autoparallel test.e2e.instance.autoparallel
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -28,7 +28,9 @@ endif
 endif
 
 PKG_TEST_PACKAGES := ./pkg/...
-E2E_TEST_PACKAGES := ./test/e2e/...
+E2E_ORG_PACKAGES := ./test/e2e/org
+E2E_INSTANCE_PACKAGES := ./test/e2e/instance
+E2E_ORG_PARALLEL ?= 2
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
 # host directories that the CI cache can restore and store between jobs.
@@ -68,10 +70,20 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
+	$(MAKE) test.e2e.org
+	$(MAKE) test.e2e.instance
 
-test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+test.e2e.org:
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_ORG_PACKAGES)" -- -p 1 -parallel $(E2E_ORG_PARALLEL) -timeout 30m
+
+test.e2e.instance:
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_INSTANCE_PACKAGES)" -- -p 1 -parallel 1 -timeout 30m
+
+test.e2e.org.autoparallel:
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -e E2E_DIR=./test/e2e/org -e E2E_PACKAGE=./test/e2e/org -e E2E_GO_PARALLEL=$(E2E_ORG_PARALLEL) app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+
+test.e2e.instance.autoparallel:
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -e E2E_DIR=./test/e2e/instance -e E2E_PACKAGE=./test/e2e/instance -e E2E_GO_PARALLEL=1 app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
