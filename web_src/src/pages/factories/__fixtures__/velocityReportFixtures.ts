@@ -275,31 +275,39 @@ export const DEFAULT_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
 };
 
 /** A new workspace: nothing merged, nothing closed, nothing spent. */
-export const EMPTY_FACTORY_VELOCITY: VelocityResponse = {
-  yesterday: { superplaneMerged: 0, waste: 0 },
-  totals: {
-    superplaneMerged: 0,
-    peopleMerged: 0,
-    waste: 0,
-    superplaneSharePct: 0,
-    wastePct: 0,
-    costCents: "0",
-    tokens: "0",
-    wasteCostCents: "0",
-    tasksClosed: 0,
-    tasksWaste: 0,
-  },
-  points: Array.from({ length: 14 }, (_, index) => ({
-    day: dayLabel(index, 14),
-    superplaneMerged: 0,
-    peopleMerged: 0,
-    waste: 0,
-  })),
-  hasPeopleCohort: false,
-  hasPreviousWindow: false,
-  intakeSources: [],
-  people: [],
-  automations: [],
+function emptyReport(periodDays: number): VelocityResponse {
+  return {
+    yesterday: { superplaneMerged: 0, waste: 0 },
+    totals: {
+      superplaneMerged: 0,
+      peopleMerged: 0,
+      waste: 0,
+      superplaneSharePct: 0,
+      wastePct: 0,
+      costCents: "0",
+      tokens: "0",
+      wasteCostCents: "0",
+      tasksClosed: 0,
+      tasksWaste: 0,
+    },
+    points: Array.from({ length: periodDays }, (_, index) => ({
+      day: dayLabel(index, periodDays),
+      superplaneMerged: 0,
+      peopleMerged: 0,
+      waste: 0,
+    })),
+    hasPeopleCohort: false,
+    hasPreviousWindow: false,
+    intakeSources: [],
+    people: [],
+    automations: [],
+  };
+}
+
+export const EMPTY_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  7: emptyReport(7),
+  14: emptyReport(14),
+  30: emptyReport(30),
 };
 
 /**
@@ -307,8 +315,8 @@ export const EMPTY_FACTORY_VELOCITY: VelocityResponse = {
  * the whole period, because Velocity reads repository history, but SuperPlane
  * has one day of output. There is no earlier period to compare with.
  */
-export const EARLY_USAGE_FACTORY_VELOCITY: VelocityResponse = (() => {
-  const report = buildReport(14, false);
+function earlyUsageReport(periodDays: number): VelocityResponse {
+  const report = buildReport(periodDays, false);
   const points = (report.points ?? []).map((point, index, all) => {
     const isLastDay = index === all.length - 1;
     if (isLastDay) return point;
@@ -337,15 +345,21 @@ export const EARLY_USAGE_FACTORY_VELOCITY: VelocityResponse = (() => {
     intakeSources: intakeSources(points as Point[]),
     people: buildPeople(totals),
   };
-})();
+}
+
+export const EARLY_USAGE_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  7: earlyUsageReport(7),
+  14: earlyUsageReport(14),
+  30: earlyUsageReport(30),
+};
 
 /**
  * A workspace that just connected a repository. SuperPlane output is already
  * there, but the background sync has not stored the repository history yet, so
  * the People series and the SuperPlane share are withheld.
  */
-export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: VelocityResponse = (() => {
-  const report = buildReport(14, true);
+function peopleSyncPendingReport(periodDays: number): VelocityResponse {
+  const report = buildReport(periodDays, true);
   const points = (report.points ?? []).map((point) => ({ ...point, peopleMerged: 0 }));
   const totals = sumTotals(points as Point[]);
 
@@ -358,7 +372,13 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: VelocityResponse = (() => {
     peopleSyncPending: true,
     people: buildPeople(totals).map((person) => ({ ...person, authoredMerged: 0 })),
   };
-})();
+}
+
+export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  7: peopleSyncPendingReport(7),
+  14: peopleSyncPendingReport(14),
+  30: peopleSyncPendingReport(30),
+};
 
 /**
  * Fourteen people with activity, so the People table's "Show more" control has
