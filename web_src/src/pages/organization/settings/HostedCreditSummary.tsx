@@ -336,6 +336,7 @@ function BillingActions({
 }) {
   const packs = products
     .slice()
+    .filter((product) => parseWorkOrderMetric(product.amountCents) > 0)
     .sort((left, right) => parseWorkOrderMetric(left.amountCents) - parseWorkOrderMetric(right.amountCents));
 
   return (

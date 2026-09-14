@@ -45,13 +45,12 @@ The On Task trigger starts a workflow execution when task events occur in a Prod
   `attributes` such as `title` and `description`, and a `meta.event` field that names the
   change (`task.created` or `task.updated`).
 
-### How tasks arrive
+### Webhook Setup
 
-The trigger reads the project every minute and emits the tasks that changed since the read before it.
-Tasks that already exist when you add the trigger are not reported; only later changes are.
-
-Productive.io offers webhooks on selected plans only, and rejects webhook registration on the other
-plans. Polling therefore works on every plan, at the cost of up to one minute of delay.
+This trigger registers a Productive.io webhook automatically when configured, and removes it when the
+trigger is deleted. Productive.io sells webhooks as a plan feature and rejects registration with a 403
+"webhooks_limit_exceeded" response on plans that do not include it, in which case setup fails until the
+organization upgrades to a plan with webhooks.
 
 ### Example Data
 
