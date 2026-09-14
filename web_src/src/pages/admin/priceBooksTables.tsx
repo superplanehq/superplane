@@ -1,4 +1,5 @@
 import { Text } from "@/components/Text/text";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -120,14 +121,48 @@ export function ModelsTable({
   );
 }
 
+function MachineTypeInput({
+  id,
+  matchKey,
+  disabled,
+  onCommit,
+}: {
+  id: string;
+  matchKey: string;
+  disabled: boolean;
+  onCommit: (matchKey: string) => boolean;
+}) {
+  const [text, setText] = useState(matchKey);
+  useEffect(() => {
+    setText(matchKey);
+  }, [matchKey]);
+
+  return (
+    <Input
+      id={id}
+      className="h-8 font-mono text-xs"
+      disabled={disabled}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() => {
+        if (!onCommit(text)) {
+          setText(matchKey);
+        }
+      }}
+    />
+  );
+}
+
 export function VMsTable({
   rates,
   editable,
   onChange,
+  onRemove,
 }: {
   rates: PriceBookVMRate[];
   editable: boolean;
-  onChange: (index: number, micros: number) => void;
+  onChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
+  onRemove: (index: number) => void;
 }) {
   if (rates.length === 0) {
     return <EmptyRatesMessage message="This version has no VM rates." />;
@@ -141,16 +176,28 @@ export function VMsTable({
             <th className={headerCellClass}>Machine type</th>
             <th className={numericHeaderCellClass}>Micros per second</th>
             <th className={numericHeaderCellClass}>Rate</th>
+            {editable && <th className={headerCellClass} />}
           </tr>
         </thead>
         <tbody>
           {rates.map((rate, index) => (
-            <tr key={`${rate.match_key}:${rate.match_mode}`} className={rowClass}>
-              <td className={`${bodyCellClass} font-mono text-xs`}>{rate.match_key}</td>
+            <tr key={index} className={rowClass}>
+              <td className={`${bodyCellClass} font-mono text-xs`}>
+                {editable ? (
+                  <MachineTypeInput
+                    id={`price-book-vm-${index}-match-key`}
+                    matchKey={rate.match_key}
+                    disabled={!editable}
+                    onCommit={(matchKey) => onChange(index, { match_key: matchKey })}
+                  />
+                ) : (
+                  rate.match_key
+                )}
+              </td>
               <td className={numericCellClass}>
                 {editable ? (
                   <Input
-                    id={`price-book-vm-${rate.match_key}-micros`}
+                    id={`price-book-vm-${index}-micros`}
                     type="number"
                     min="0"
                     step="1"
@@ -158,7 +205,9 @@ export function VMsTable({
                     value={rate.micros_per_second}
                     onChange={(event) => {
                       const parsed = Number.parseInt(event.target.value, 10);
-                      onChange(index, Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
+                      onChange(index, {
+                        micros_per_second: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+                      });
                     }}
                   />
                 ) : (
@@ -166,6 +215,13 @@ export function VMsTable({
                 )}
               </td>
               <td className={numericCellClass}>{formatMicrosPerSecondUsdPerMinute(rate.micros_per_second)}</td>
+              {editable && (
+                <td className={bodyCellClass}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(index)}>
+                    Remove
+                  </Button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
