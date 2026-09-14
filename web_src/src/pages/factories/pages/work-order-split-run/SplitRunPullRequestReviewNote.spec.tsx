@@ -47,6 +47,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     const steps = within(within(note).getByRole("list", { name: "Next steps" })).getAllByRole("listitem");
     expect(steps).toHaveLength(3);
+    expect(steps[0]).toHaveClass("w-full");
     expect(steps[0]).toHaveTextContent("1");
     expect(steps[0]).toHaveTextContent("Review the pull request");
     expect(steps[1]).toHaveTextContent("2");
@@ -115,5 +116,14 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).not.toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  });
+
+  it("drops the full-bleed top border when the strip sits in a column", () => {
+    renderNote({ inColumn: true });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note.className).not.toMatch(/\bborder-t\b/);
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(screen.getByTestId("split-run-pull-request-cta")).toHaveClass("w-full");
   });
 });

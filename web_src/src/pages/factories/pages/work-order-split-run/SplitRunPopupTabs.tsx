@@ -86,6 +86,7 @@ export function SplitRunPopupTabs({
         onDescriptionSave={edits.saveDescription}
         source={fixture.source}
         sessionLookupError={sessionLookupError}
+        resultFooter={resultFooter}
       />
     ) : (
       <WorkOrderSplitRunOverview
