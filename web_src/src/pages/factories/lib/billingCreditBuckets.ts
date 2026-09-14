@@ -1,4 +1,4 @@
-import { parseWelcomeCreditExpiresAt } from "./hostedCreditEmpty";
+import { isWelcomeCreditExpired, parseWelcomeCreditExpiresAt } from "./hostedCreditEmpty";
 import { CREDIT_GRANT_KIND_ADMIN } from "./hostedCreditGrants";
 import { BILLING_INCLUDED_USAGE_CENTS, billingUsagePercentUsed } from "./billingPlans";
 import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
@@ -44,6 +44,13 @@ export interface BillingCreditBarShare {
   percent: number;
 }
 
+const BILLING_BUCKET_SPEND_ORDER_NAME: Record<BillingCreditBucketKey, string> = {
+  trial: "trial credit",
+  included: "included usage",
+  topup: "top-up credit",
+  grant: "SuperPlane grant",
+};
+
 export function adminCreditGrantCents(grants: Array<{ kind?: string; amountCents?: string | number }>): number {
   return grants.reduce((sum, grant) => {
     if (grant.kind !== CREDIT_GRANT_KIND_ADMIN) {
@@ -53,67 +60,78 @@ export function adminCreditGrantCents(grants: Array<{ kind?: string; amountCents
   }, 0);
 }
 
-export function billingSpendOrderCopy(hasSuperPlaneGrant: boolean): string {
-  if (hasSuperPlaneGrant) {
-    return BILLING_SPEND_ORDER_WITH_GRANT_COPY;
+export function billingSpendOrderCopy(buckets: Array<{ key: BillingCreditBucketKey }>): string {
+  const names = buckets.map((bucket) => BILLING_BUCKET_SPEND_ORDER_NAME[bucket.key]);
+  if (names.length === 0) {
+    return "";
   }
-  return BILLING_SPEND_ORDER_COPY;
+  if (names.length === 1) {
+    return `Hosted runs spend ${names[0]} first.`;
+  }
+  return `Hosted runs spend ${names[0]} first, then ${names.slice(1).join(", then ")}.`;
 }
 
 export function billingCreditBucketsView(args: BillingCreditBucketsInput): BillingCreditBucketView[] {
   const now = args.now ?? new Date();
-  const trialExpiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
+  const trialExpiresAt = args.trialEndsAt ?? args.welcomeCreditExpiresAt;
   const periodEnd = parseWelcomeCreditExpiresAt(args.currentPeriodEnd);
+  const welcomeRemainingCents = Math.max(0, args.welcomeRemainingCents);
   const adminRemainingCents = Math.max(0, args.adminRemainingCents ?? 0);
+  const showTrialCredit = welcomeRemainingCents > 0 && !isWelcomeCreditExpired(trialExpiresAt, now);
   const showSuperPlaneGrant = adminRemainingCents > 0;
 
-  const buckets: BillingCreditBucketView[] = [
-    {
+  const buckets: Omit<BillingCreditBucketView, "spendOrderLabel">[] = [];
+
+  if (showTrialCredit) {
+    buckets.push({
       key: "trial",
       heading: "Trial credit",
-      spendOrderLabel: "Spend first",
-      remainingCents: Math.max(0, args.welcomeRemainingCents),
+      remainingCents: welcomeRemainingCents,
       remainingLabel: `${formatUsdCents(args.welcomeRemainingCents)} remaining`,
       usedPercent: billingUsagePercentUsed(args.welcomeRemainingCents, BILLING_TRIAL_CREDIT_CENTS),
-      footer: trialCreditFooter(trialExpiresAt, now),
-    },
-    {
-      key: "included",
-      heading: "Included usage",
-      spendOrderLabel: "Spend next",
-      remainingCents: Math.max(0, args.includedRemainingCents),
-      remainingLabel: `${formatUsdCents(args.includedRemainingCents)} remaining`,
-      usedPercent: billingUsagePercentUsed(args.includedRemainingCents, BILLING_INCLUDED_USAGE_CENTS),
-      footer: includedUsageFooter(args.plan, periodEnd),
-    },
-    {
-      key: "topup",
-      heading: "Top-up credit",
-      spendOrderLabel: showSuperPlaneGrant ? "Spend third" : "Spend last",
-      remainingCents: Math.max(0, args.purchasedRemainingCents),
-      remainingLabel: `${formatUsdCents(args.purchasedRemainingCents)} remaining`,
-      usedPercent: billingUsagePercentUsed(
-        args.purchasedRemainingCents,
-        Math.max(args.purchasedCents, args.purchasedRemainingCents),
-      ),
-      footer: null,
-    },
-  ];
-
-  if (!showSuperPlaneGrant) {
-    return buckets;
+      footer: trialCreditFooter(parseWelcomeCreditExpiresAt(trialExpiresAt)),
+    });
   }
 
   buckets.push({
-    key: "grant",
-    heading: "SuperPlane grant",
-    spendOrderLabel: "Spend last",
-    remainingCents: adminRemainingCents,
-    remainingLabel: `${formatUsdCents(adminRemainingCents)} remaining`,
-    usedPercent: billingUsagePercentUsed(adminRemainingCents, Math.max(args.adminGrantCents ?? 0, adminRemainingCents)),
+    key: "included",
+    heading: "Included usage",
+    remainingCents: Math.max(0, args.includedRemainingCents),
+    remainingLabel: `${formatUsdCents(args.includedRemainingCents)} remaining`,
+    usedPercent: billingUsagePercentUsed(args.includedRemainingCents, BILLING_INCLUDED_USAGE_CENTS),
+    footer: includedUsageFooter(args.plan, periodEnd),
+  });
+
+  buckets.push({
+    key: "topup",
+    heading: "Top-up credit",
+    remainingCents: Math.max(0, args.purchasedRemainingCents),
+    remainingLabel: `${formatUsdCents(args.purchasedRemainingCents)} remaining`,
+    usedPercent: billingUsagePercentUsed(
+      args.purchasedRemainingCents,
+      Math.max(args.purchasedCents, args.purchasedRemainingCents),
+    ),
     footer: null,
   });
-  return buckets;
+
+  if (showSuperPlaneGrant) {
+    buckets.push({
+      key: "grant",
+      heading: "SuperPlane grant",
+      remainingCents: adminRemainingCents,
+      remainingLabel: `${formatUsdCents(adminRemainingCents)} remaining`,
+      usedPercent: billingUsagePercentUsed(
+        adminRemainingCents,
+        Math.max(args.adminGrantCents ?? 0, adminRemainingCents),
+      ),
+      footer: null,
+    });
+  }
+
+  return buckets.map((bucket, index) => ({
+    ...bucket,
+    spendOrderLabel: spendOrderLabelAt(index, buckets.length),
+  }));
 }
 
 export function billingCreditRemainingShares(buckets: BillingCreditBucketView[]): BillingCreditBarShare[] {
@@ -138,15 +156,27 @@ export function billingCreditRemainingShares(buckets: BillingCreditBucketView[])
   return rounded;
 }
 
-function trialCreditFooter(expiresAt: Date | null, now: Date): string {
+function spendOrderLabelAt(index: number, count: number): string {
+  if (index === 0) {
+    return "Spend first";
+  }
+  if (index === count - 1) {
+    return "Spend last";
+  }
+  if (index === 1) {
+    return "Spend next";
+  }
+  if (index === 2) {
+    return "Spend third";
+  }
+  return `Spend ${index + 1}`;
+}
+
+function trialCreditFooter(expiresAt: Date | null): string {
   if (!expiresAt) {
     return BILLING_TRIAL_TTL_COPY;
   }
-  const dateLabel = expiresAt.toLocaleDateString();
-  if (expiresAt.getTime() <= now.getTime()) {
-    return `Expired on ${dateLabel}. ${BILLING_TRIAL_TTL_COPY}`;
-  }
-  return `Expires on ${dateLabel}. ${BILLING_TRIAL_TTL_COPY}`;
+  return `Expires on ${expiresAt.toLocaleDateString()}. ${BILLING_TRIAL_TTL_COPY}`;
 }
 
 function includedUsageFooter(plan: string | undefined, periodEnd: Date | null): string {

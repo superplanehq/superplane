@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding ensure.bun check.test.ui check.test.ui.shard  db.snapshot db.restore
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
