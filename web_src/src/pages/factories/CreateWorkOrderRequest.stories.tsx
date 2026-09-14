@@ -17,9 +17,6 @@ const STORY_STACK_IMAGES = [
   { id: "story-invoice", url: "https://placehold.co/320x240/7c3aed/ffffff/png?text=Invoice", alt: "Invoice" },
   { id: "story-label", url: "https://placehold.co/320x240/db2777/ffffff/png?text=Label", alt: "Label" },
 ] as const;
-const STORY_IMAGE_MARKDOWN = `Refunds fail when the customer retries checkout.
-
-![Checkout error](${workOrderFileRef(STORY_IMAGE_ID)})`;
 const STORY_STACK_MARKDOWN = `Refunds fail when the customer retries checkout.
 
 ${STORY_STACK_IMAGES.map((image) => `![${image.alt}](${workOrderFileRef(image.id)})`).join("\n\n")}`;
@@ -48,11 +45,9 @@ async function mockUploadFiles(files: FileList | File[]): Promise<UploadedWorkOr
 
 function RequestDialogPlayground({
   initialDescription = "",
-  isCreating = false,
   fileUrls,
 }: {
   initialDescription?: string;
-  isCreating?: boolean;
   fileUrls?: Record<string, string>;
 }) {
   const [description, setDescription] = useState(initialDescription);
@@ -62,7 +57,6 @@ function RequestDialogPlayground({
       open
       description={description}
       maxLength={5000}
-      isCreating={isCreating}
       fileUrls={fileUrls}
       onClose={() => {
         console.log("close");
@@ -105,21 +99,6 @@ export const Empty: Story = {
   render: () => <RequestDialogPlayground />,
 };
 
-export const Typed: Story = {
-  name: "Typed message",
-  render: () => <RequestDialogPlayground initialDescription={"Refunds fail when the customer retries checkout."} />,
-};
-
-export const WithImage: Story = {
-  name: "Attached image",
-  render: () => (
-    <RequestDialogPlayground
-      initialDescription={STORY_IMAGE_MARKDOWN}
-      fileUrls={{ [STORY_IMAGE_ID]: STORY_IMAGE_URL }}
-    />
-  ),
-};
-
 export const WithImageStack: Story = {
   name: "Attached images",
   render: () => (
@@ -127,13 +106,6 @@ export const WithImageStack: Story = {
       initialDescription={STORY_STACK_MARKDOWN}
       fileUrls={Object.fromEntries(STORY_STACK_IMAGES.map((image) => [image.id, image.url]))}
     />
-  ),
-};
-
-export const Creating: Story = {
-  name: "Creating",
-  render: () => (
-    <RequestDialogPlayground initialDescription={"Refunds fail when the customer retries checkout."} isCreating />
   ),
 };
 

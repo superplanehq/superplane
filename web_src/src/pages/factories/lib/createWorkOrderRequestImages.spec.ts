@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  appendUploadedWorkOrderImages,
   createWorkOrderRequestImages,
   mergeCreateWorkOrderRequestImages,
   removeCreateWorkOrderRequestMarkdownImage,
@@ -63,6 +64,31 @@ describe("mergeCreateWorkOrderRequestImages", () => {
       { id: "file-1", alt: "Checkout", src: "https://cdn.example.com/checkout.png" },
       { id: "file-2", alt: "receipt.png", src: "https://cdn.example.com/receipt.png" },
     ]);
+  });
+});
+
+describe("appendUploadedWorkOrderImages", () => {
+  it("appends image markdown and strips label delimiters", () => {
+    expect(
+      appendUploadedWorkOrderImages("Refunds fail on retry.", [
+        {
+          id: "file-1",
+          filename: "check]out(1).png",
+          contentType: "image/png",
+          ref: "sp-file://file-1",
+          previewUrl: "https://cdn.example.com/checkout.png",
+          isImage: true,
+        },
+        {
+          id: "file-2",
+          filename: "notes.md",
+          contentType: "text/markdown",
+          ref: "sp-file://file-2",
+          previewUrl: "https://cdn.example.com/notes.md",
+          isImage: false,
+        },
+      ]),
+    ).toBe("Refunds fail on retry.\n\n![checkout1.png](sp-file://file-1)");
   });
 });
 

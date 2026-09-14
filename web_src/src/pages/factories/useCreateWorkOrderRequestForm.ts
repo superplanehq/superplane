@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestDraft } from "./CreateWorkOrderRequestDialog";
-import { appendUploadedWorkOrderFiles } from "./lib/createWorkOrderRequestFiles";
-import { removeCreateWorkOrderRequestMarkdownImage } from "./lib/createWorkOrderRequestImages";
+import {
+  appendUploadedWorkOrderImages,
+  removeCreateWorkOrderRequestMarkdownImage,
+} from "./lib/createWorkOrderRequestImages";
 import { derivedWorkOrderTitle, MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 
 export function useCreateWorkOrderRequestForm({
@@ -36,8 +40,8 @@ export function useCreateWorkOrderRequestForm({
 
   const createDraft = useCallback(
     (): CreateWorkOrderRequestDraft => ({
-      title: titleValue.trim() || derivedTitle,
-      description: appendUploadedWorkOrderFiles(description, attachedFiles).trim(),
+      title: titleValue.trim() || derivedTitle || CREATE_WORK_ORDER_REQUEST_COPY.title,
+      description: appendUploadedWorkOrderImages(description, attachedFiles).trim(),
     }),
     [attachedFiles, derivedTitle, description, titleValue],
   );
@@ -78,7 +82,7 @@ export function useCreateWorkOrderRequestForm({
     if (uploaded.length === 0) {
       return;
     }
-    setAttachedFiles((current) => [...current, ...uploaded]);
+    setAttachedFiles((current) => [...current, ...uploaded].slice(0, MAX_IMAGE_ATTACHMENTS));
   };
 
   const handleRemoveAttachment = (id: string) => {

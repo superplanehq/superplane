@@ -8,16 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
 
-import { CreateWorkOrderRequestAttachMenu } from "./CreateWorkOrderRequestAttachMenu";
+import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
-
-export const CREATE_WORK_ORDER_REQUEST_FILE_ACCEPT =
-  "image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp";
 
 export interface CreateWorkOrderRequestDraft {
   title: string;
@@ -71,7 +68,7 @@ export function CreateWorkOrderRequestDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !isCreating) {
+        if (!nextOpen && !isCreating && !isUploading) {
           onClose();
         }
       }}
@@ -234,7 +231,7 @@ function RequestDialogFooter({
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
         <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {onUploadFiles ? <CreateWorkOrderRequestAttachMenu disabled={busy} onAttach={onAttach} /> : <span />}
+          {onUploadFiles ? <CreateWorkOrderRequestAttachButton disabled={busy} onAttach={onAttach} /> : <span />}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
           ) : null}

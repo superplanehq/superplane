@@ -23,13 +23,13 @@ interface CreateWorkOrderDialogProps {
 
 export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
   const { organizationId } = useFactoriesLayout();
-  const useRequestComposer = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const features = useExperimentalFeature(organizationId);
 
-  if (!open) {
+  if (!open || features.isLoading) {
     return null;
   }
 
-  if (useRequestComposer) {
+  if (features.has(FEATURE_FACTORY_CREATE_WITH_AGENT)) {
     return <CreateWorkOrderRequestSession onClose={onClose} onCreated={onCreated} />;
   }
 
@@ -55,7 +55,7 @@ function CreateWorkOrderRequestSession({
       isCreating={composer.isCreating}
       isUploading={fileUpload.isUploading}
       onClose={() => {
-        if (!composer.isCreating) {
+        if (!composer.isCreating && !fileUpload.isUploading) {
           onClose();
         }
       }}

@@ -9,7 +9,6 @@ export const CREATE_WORK_ORDER_REQUEST_COPY = {
   openImage: "Open image",
   closeImage: "Close image",
   deleteImage: "Delete image",
-  removeImage: "Delete image",
   create: "Create task",
   creating: "Creating...",
   expand: "Open full screen",

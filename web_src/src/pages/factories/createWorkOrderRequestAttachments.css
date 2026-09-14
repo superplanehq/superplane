@@ -26,7 +26,7 @@
 
 @media (hover: hover) {
   .create-work-order-request-attachments .t-stack:hover {
-    width: max(5.5rem, calc(3.5rem + (var(--stack-n) - 1) * 3.75rem + 12px));
+    width: min(14rem, max(5.5rem, calc(3.5rem + (var(--stack-n) - 1) * 3.75rem + 12px)));
   }
 }
 

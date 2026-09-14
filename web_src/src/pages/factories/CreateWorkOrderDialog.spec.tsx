@@ -14,12 +14,15 @@ import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
-const { createMutate, dispatchMutate, meUser, enabledExperimentalFeatures } = vi.hoisted(() => ({
-  createMutate: vi.fn(),
-  dispatchMutate: vi.fn(),
-  meUser: { current: null as { id: string; name: string } | null },
-  enabledExperimentalFeatures: new Set<string>(),
-}));
+const { createMutate, dispatchMutate, meUser, enabledExperimentalFeatures, experimentalFeaturesLoading } = vi.hoisted(
+  () => ({
+    createMutate: vi.fn(),
+    dispatchMutate: vi.fn(),
+    meUser: { current: null as { id: string; name: string } | null },
+    enabledExperimentalFeatures: new Set<string>(),
+    experimentalFeaturesLoading: { current: false },
+  }),
+);
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
@@ -34,7 +37,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
     enabledExperimentalFeatures: [...enabledExperimentalFeatures],
-    isLoading: false,
+    isLoading: experimentalFeaturesLoading.current,
   }),
 }));
 
@@ -71,6 +74,7 @@ describe("CreateWorkOrderDialog", () => {
     dispatchMutate.mockReset();
     meUser.current = null;
     enabledExperimentalFeatures.clear();
+    experimentalFeaturesLoading.current = false;
   });
 
   afterEach(async () => {
@@ -83,6 +87,14 @@ describe("CreateWorkOrderDialog", () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+  });
+
+  it("does not mount a create form until experimental features load", () => {
+    experimentalFeaturesLoading.current = true;
+    renderDialog();
+
+    expect(screen.queryByTestId("create-work-order-dialog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-work-order-request-dialog")).not.toBeInTheDocument();
   });
 
   it("names the dialog New task instead of the fallback Dialog title", () => {

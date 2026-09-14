@@ -59,6 +59,13 @@ export function mergeCreateWorkOrderRequestImages(
   return images;
 }
 
+export function appendUploadedWorkOrderImages(description: string, files: UploadedWorkOrderFile[]): string {
+  const blocks = files
+    .filter((file) => file.isImage)
+    .map((file) => `![${markdownImageLabel(file.filename)}](${file.ref})`);
+  return [description.trimEnd(), ...blocks].filter((part) => part.length > 0).join("\n\n");
+}
+
 export function removeCreateWorkOrderRequestMarkdownImage(markdown: string, id: string): string {
   const next = markdown.replace(MARKDOWN_IMAGE, (full, _alt: string, rawSrc: string) => {
     const src = rawSrc.trim();
@@ -66,4 +73,8 @@ export function removeCreateWorkOrderRequestMarkdownImage(markdown: string, id: 
     return imageId === id ? "" : full;
   });
   return next.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function markdownImageLabel(filename: string): string {
+  return filename.replace(/[[\]()]/g, "").trim() || "image";
 }
