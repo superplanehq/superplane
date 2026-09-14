@@ -1468,16 +1468,33 @@ type AccountLinkedAccountResponse struct {
 	AvatarURL string `json:"avatar_url,omitempty"`
 }
 
+type AccountOrganizationPendingDeletion struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type AccountResponse struct {
-	ID                string                         `json:"id"`
-	Name              string                         `json:"name"`
-	Email             string                         `json:"email"`
-	AvatarURL         string                         `json:"avatar_url"`
-	InstallationAdmin bool                           `json:"installation_admin"`
-	HasPassword       bool                           `json:"has_password"`
-	Providers         []AccountProviderResponse      `json:"providers"`
-	LinkedAccounts    []AccountLinkedAccountResponse `json:"linked_accounts"`
-	Impersonation     *AccountImpersonation          `json:"impersonation,omitempty"`
+	ID                           string                               `json:"id"`
+	Name                         string                               `json:"name"`
+	Email                        string                               `json:"email"`
+	AvatarURL                    string                               `json:"avatar_url"`
+	InstallationAdmin            bool                                 `json:"installation_admin"`
+	HasPassword                  bool                                 `json:"has_password"`
+	Providers                    []AccountProviderResponse            `json:"providers"`
+	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
+	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
+	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+}
+
+func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
+	pending := make([]AccountOrganizationPendingDeletion, 0, len(organizations))
+	for _, organization := range organizations {
+		pending = append(pending, AccountOrganizationPendingDeletion{
+			ID:   organization.ID.String(),
+			Name: organization.Name,
+		})
+	}
+	return pending
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1516,15 +1533,23 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pendingOrgs, err := models.ListOrganizationsPendingAccountDeletion(database.DB(r.Context()), account.ID)
+	if err != nil {
+		log.Errorf("Error listing organizations pending deletion for %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
-		ID:                account.ID.String(),
-		Name:              account.Name,
-		Email:             account.Email,
-		AvatarURL:         getAvatarURL(providers),
-		InstallationAdmin: account.IsInstallationAdmin(),
-		HasPassword:       hasPassword,
-		Providers:         accountProviderResponses(providers),
-		LinkedAccounts:    accountLinkedAccountResponses(linkedAccounts),
+		ID:                           account.ID.String(),
+		Name:                         account.Name,
+		Email:                        account.Email,
+		AvatarURL:                    getAvatarURL(providers),
+		InstallationAdmin:            account.IsInstallationAdmin(),
+		HasPassword:                  hasPassword,
+		Providers:                    accountProviderResponses(providers),
+		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
+		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {

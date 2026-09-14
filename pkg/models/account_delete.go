@@ -3,6 +3,8 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,7 +13,6 @@ import (
 )
 
 var (
-	ErrAccountDeleteLastUncreatedOwner    = errors.New("transfer ownership of organizations you did not create before you delete this account")
 	ErrAccountDeleteLastInstallationAdmin = errors.New("promote another installation admin before you delete this account")
 	ErrLastSignInMethod                   = errors.New("keep at least one sign-in method")
 	ErrSignInMethodNotConnected           = errors.New("this sign-in method is not connected")
@@ -108,16 +109,79 @@ func tombstoneEmail(accountID uuid.UUID, now time.Time) string {
 	return fmt.Sprintf("deleted-%s-%d@deleted.invalid", accountID, now.Unix())
 }
 
+func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
+	users, err := ListActiveHumanUsersForAccount(tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	created, err := ListOrganizationsCreatedByAccount(tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	byID := make(map[uuid.UUID]Organization, len(users)+len(created))
+	for _, organization := range created {
+		byID[organization.ID] = organization
+	}
+
+	missingIDs := make([]uuid.UUID, 0)
+	for _, user := range users {
+		if _, exists := byID[user.OrganizationID]; exists {
+			continue
+		}
+		missingIDs = append(missingIDs, user.OrganizationID)
+	}
+	if len(missingIDs) > 0 {
+		var membershipOrgs []Organization
+		if err := tx.Where("id IN ?", missingIDs).Find(&membershipOrgs).Error; err != nil {
+			return nil, err
+		}
+		for _, organization := range membershipOrgs {
+			byID[organization.ID] = organization
+		}
+	}
+
+	pending := make([]Organization, 0, len(byID))
+	for _, organization := range byID {
+		owners, err := ListOrganizationOwners(tx, organization.ID)
+		if err != nil {
+			return nil, err
+		}
+		if organizationHasOtherHumanOwner(owners, accountID) {
+			continue
+		}
+		pending = append(pending, organization)
+	}
+
+	slices.SortFunc(pending, func(a, b Organization) int {
+		if n := strings.Compare(a.Name, b.Name); n != 0 {
+			return n
+		}
+		return strings.Compare(a.ID.String(), b.ID.String())
+	})
+	return pending, nil
+}
+
+func organizationHasOtherHumanOwner(owners []User, accountID uuid.UUID) bool {
+	for i := range owners {
+		if owners[i].AccountID != nil && *owners[i].AccountID == accountID {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	if a == nil {
 		return errors.New("account is required")
 	}
 
-	createdOrgs, err := ListOrganizationsCreatedByAccount(tx, a.ID)
+	pendingOrgs, err := ListOrganizationsPendingAccountDeletion(tx, a.ID)
 	if err != nil {
 		return err
 	}
-	for _, organization := range createdOrgs {
+	for _, organization := range pendingOrgs {
 		if err := SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); err != nil {
 			return err
 		}
