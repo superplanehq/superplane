@@ -11,7 +11,11 @@ vi.mock("./planningSessionClient", () => ({
   findPlanningSessionByWorkOrder,
 }));
 
-import { useWorkOrderPlanningSurvey } from "./useWorkOrderPlanningSurvey";
+import {
+  planningActivityPollInterval,
+  useWorkOrderPlanningActivity,
+  useWorkOrderPlanningSurvey,
+} from "./useWorkOrderPlanningSurvey";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -59,5 +63,54 @@ describe("useWorkOrderPlanningSurvey", () => {
     await waitFor(() => expect(result.current).toBe(true));
     rerender({ enabled: false });
     expect(result.current).toBe(false);
+  });
+});
+
+describe("useWorkOrderPlanningActivity", () => {
+  beforeEach(() => {
+    findPlanningSessionByWorkOrder.mockReset();
+  });
+
+  it("marks an open session as working", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValue({
+      executionId: "exec-1",
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isWorking).toBe(true));
+    expect(result.current.isWaiting).toBe(false);
+    expect(result.current.hasAgentQuestion).toBe(false);
+  });
+
+  it("marks a pending wait as waiting, not working", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValue({
+      executionId: "exec-1",
+      waitState: "pending",
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isWaiting).toBe(true));
+    expect(result.current.isWorking).toBe(false);
+  });
+});
+
+describe("planningActivityPollInterval", () => {
+  it("polls while the agent works or a backlog run is active", () => {
+    expect(planningActivityPollInterval(true, { state: "running" }, false)).toBe(1500);
+    expect(planningActivityPollInterval(true, null, true)).toBe(1500);
+    expect(planningActivityPollInterval(true, { state: "ended" }, true)).toBe(1500);
+  });
+
+  it("stops when the session waits or analysis is idle", () => {
+    expect(planningActivityPollInterval(true, { state: "running", waitState: "pending" }, true)).toBe(false);
+    expect(planningActivityPollInterval(true, { state: "ended" }, false)).toBe(false);
+    expect(planningActivityPollInterval(true, null, false)).toBe(false);
+    expect(planningActivityPollInterval(false, { state: "running" }, true)).toBe(false);
   });
 });
