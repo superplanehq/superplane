@@ -1,6 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -138,18 +139,25 @@ function MachineTypeInput({
   }, [matchKey]);
 
   return (
-    <Input
-      id={id}
-      className="h-8 font-mono text-xs"
-      disabled={disabled}
-      value={text}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={() => {
-        if (!onCommit(text)) {
-          setText(matchKey);
-        }
-      }}
-    />
+    <>
+      <Label htmlFor={id} className="sr-only">
+        Machine type
+      </Label>
+      <Input
+        id={id}
+        className="h-8 font-mono text-xs"
+        disabled={disabled}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={() => {
+          if (!onCommit(text)) {
+            setText(matchKey);
+            return;
+          }
+          setText(text.trim().toLowerCase());
+        }}
+      />
+    </>
   );
 }
 
