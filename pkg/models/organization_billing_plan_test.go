@@ -25,7 +25,34 @@ func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
 	assert.True(t, plan.IsOpenTrial(time.Now()))
 }
 
-func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
+func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+
+	now := time.Now()
+	end := now.AddDate(0, 1, 0)
+	after, grantIncluded, err := models.ApplyPolarSubscription(
+		db,
+		r.Organization.ID,
+		models.PolarSubscriptionApply{
+			ID:          "sub_admin_trial",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, grantIncluded)
+	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
+	assert.Equal(t, models.BillingPlanSourcePolar, after.PlanSource)
+	assert.True(t, after.IsActiveBusiness())
+}
+
+func Test__ApplyPolarSubscriptionReplacesAdminBusinessOnCancel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
@@ -50,8 +77,45 @@ func Test__SetAdminOrganizationPlanBusinessSkipsPolarCancel(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
-	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
-	assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
+	assert.Equal(t, models.BillingPlanTrial, after.Plan)
+	assert.Equal(t, models.BillingPlanSourcePolar, after.PlanSource)
+	assert.True(t, after.IsOpenTrial(time.Now()))
+	assert.False(t, after.IsActiveBusiness())
+}
+
+func Test__SetAdminOrganizationPlanRejectsPolarCustomer(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_polar"))
+
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.ErrorIs(t, err, models.ErrPolarManagedBillingPlan)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	assert.Equal(t, models.BillingPlanSourceSystem, plan.PlanSource)
+}
+
+func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	subID := "sub_1"
+	polarPlan := &models.OrganizationBillingPlan{PlanSource: models.BillingPlanSourcePolar}
+	adminWithSub := &models.OrganizationBillingPlan{
+		PlanSource:          models.BillingPlanSourceAdmin,
+		PolarSubscriptionID: &subID,
+	}
+	adminTrial := &models.OrganizationBillingPlan{PlanSource: models.BillingPlanSourceAdmin}
+
+	assert.True(t, models.OrganizationBillingIsPolarManaged(nil, "cust_1"))
+	assert.True(t, models.OrganizationBillingIsPolarManaged(polarPlan, ""))
+	assert.True(t, models.OrganizationBillingIsPolarManaged(adminWithSub, ""))
+	assert.False(t, models.OrganizationBillingIsPolarManaged(adminTrial, ""))
+	assert.False(t, models.OrganizationBillingIsPolarManaged(nil, ""))
+
+	t.Setenv("POLAR_ACCESS_TOKEN", "")
+	assert.False(t, models.OrganizationBillingIsPolarManaged(polarPlan, "cust_1"))
 }
 
 func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
