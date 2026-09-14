@@ -40,4 +40,5 @@ export {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  SentryIntakeSetupPage,
 } from "./pages";
