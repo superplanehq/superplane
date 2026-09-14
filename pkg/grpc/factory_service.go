@@ -187,6 +187,11 @@ func (s *FactoryService) CreateWorkOrder(ctx context.Context, req *pb.CreateWork
 	return actions.CreateWorkOrder(ctx, organizationID, req)
 }
 
+func (s *FactoryService) DuplicateWorkOrder(ctx context.Context, req *pb.DuplicateWorkOrderRequest) (*pb.DuplicateWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DuplicateWorkOrder(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeWorkOrder(ctx context.Context, req *pb.DescribeWorkOrderRequest) (*pb.DescribeWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeWorkOrder(ctx, organizationID, req)

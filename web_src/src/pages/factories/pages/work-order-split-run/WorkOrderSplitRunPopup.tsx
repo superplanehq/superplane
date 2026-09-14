@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
@@ -18,6 +17,8 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useWorkOrderPopupDuplicate } from "./useWorkOrderPopupDuplicate";
+import { WorkOrderPopupHeaderActions } from "./WorkOrderPopupHeaderActions";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import {
   draftStartAction,
@@ -80,6 +81,8 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  canCreate = false,
+  onOpenWorkOrder,
   analysis,
   popupData,
 }: WorkOrderSplitRunPopupProps & {
@@ -87,6 +90,13 @@ function AnalysisWorkOrderPopup({
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
+  const duplicate = useWorkOrderPopupDuplicate({
+    organizationId,
+    factoryId,
+    orderId,
+    canCreate,
+    onOpenWorkOrder,
+  });
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
@@ -159,11 +169,11 @@ function AnalysisWorkOrderPopup({
             expanded={fullPage}
             onToggleExpanded={() => setFullPage((current) => !current)}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <WorkOrderPopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                canDuplicate={duplicate.canDuplicate}
+                onDuplicate={() => void duplicate.onDuplicate()}
+                duplicateBusy={duplicate.busy}
               />
             }
             accessory={views}

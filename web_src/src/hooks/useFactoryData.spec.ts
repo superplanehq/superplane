@@ -5,15 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder } = vi.hoisted(() => ({
+const { factoriesCreateWorkOrder, factoriesDuplicateWorkOrder } = vi.hoisted(() => ({
   factoriesCreateWorkOrder: vi.fn(),
+  factoriesDuplicateWorkOrder: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
+  factoriesDuplicateWorkOrder,
 }));
 
-import { useCreateWorkOrder } from "./useFactoryData";
+import { useCreateWorkOrder, useDuplicateWorkOrder } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -44,6 +46,35 @@ describe("useCreateWorkOrder", () => {
     });
 
     await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["backlog-analysis-runs", "org-1"],
+    });
+  });
+});
+
+describe("useDuplicateWorkOrder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    clearBacklogAnalysisPending("wo-dup-1");
+  });
+
+  it("marks the copy pending analysis and invalidates backlog-analysis-runs", async () => {
+    factoriesDuplicateWorkOrder.mockResolvedValue({ data: { order: { id: "wo-dup-1" } } });
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDuplicateWorkOrder("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync("wo-source-1");
+    });
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-dup-1")).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["backlog-analysis-runs", "org-1"],
     });

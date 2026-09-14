@@ -832,11 +832,13 @@ function LineDetail({
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
+          canCreate={canCreateWorkOrder}
           canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
+          onOpenWorkOrder={onOpenWorkOrder}
           onClose={onClosePeek}
         />
       ) : null}
@@ -853,11 +855,13 @@ function LineBoardSplitRunPopup({
   peekOrderId,
   peekOrder,
   canDispatch,
+  canCreate,
   canUpdate,
   isDispatching,
   onDispatch,
   analysisRuns,
   isAnalyzing,
+  onOpenWorkOrder,
   onClose,
 }: {
   organizationId: string;
@@ -868,11 +872,13 @@ function LineBoardSplitRunPopup({
   peekOrderId: string;
   peekOrder: FactoriesWorkOrder;
   canDispatch: boolean;
+  canCreate: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
@@ -908,11 +914,13 @@ function LineBoardSplitRunPopup({
         resolveUser,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
+      canCreate={canCreate}
       canUpdate={canUpdate}
       isDispatching={isDispatching}
       onDispatch={
         resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
       }
+      onOpenWorkOrder={onOpenWorkOrder}
       onClose={onClose}
       fixed
     />

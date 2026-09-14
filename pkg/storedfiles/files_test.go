@@ -118,6 +118,54 @@ func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
 	assert.ErrorIs(t, err, models.ErrFileForeignReference)
 }
 
+func TestCloneDescriptionFilesRewritesRefsAndLeavesSource(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	source, err := factoryModel.CreateWorkOrder(db, "Source", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dest, err := factoryModel.CreateWorkOrder(db, "Dest", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    source.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	markdown := "See ![bug](" + blob.FileRef(file.ID) + ")"
+	next, bound, err := CloneDescriptionFiles(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		source.ID,
+		dest.ID,
+		r.User,
+		markdown,
+	)
+	require.NoError(t, err)
+	require.Len(t, bound.CopiedKeys, 1)
+	assert.NotContains(t, next, blob.FileRef(file.ID))
+	assert.Contains(t, next, blob.FileRefScheme)
+
+	original, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	assert.Equal(t, source.ID, *original.WorkOrderID)
+	_, err = provider.Head(t.Context(), original.StorageKey)
+	require.NoError(t, err)
+}
+
 func TestBindDescriptionFilesDeletesCopiedObjectWhenLaterFileFails(t *testing.T) {
 	r := support.Setup(t)
 	provider := setupFileStore(t)

@@ -1,21 +1,40 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import {
+  clearBacklogAnalysisPending,
+  markBacklogAnalysisPending,
+  pendingBacklogAnalysisIds,
+} from "../../lib/backlogAnalysis";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const enabledExperimentalFeatures = new Set<string>();
+const { duplicateMutate } = vi.hoisted(() => ({
+  duplicateMutate: vi.fn(),
+}));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
     enabledExperimentalFeatures: [...enabledExperimentalFeatures],
     isLoading: false,
+  }),
+}));
+
+vi.mock("./useWorkOrderPopupDuplicate", () => ({
+  useWorkOrderPopupDuplicate: (args: {
+    canCreate?: boolean;
+    onOpenWorkOrder?: (orderId: string, order: { id: string }) => void;
+  }) => ({
+    canDuplicate: Boolean(args.canCreate) && enabledExperimentalFeatures.has("factory_create_with_agent"),
+    busy: false,
+    onDuplicate: () => duplicateMutate(args),
   }),
 }));
 
@@ -71,6 +90,11 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     enabledExperimentalFeatures.clear();
+    duplicateMutate.mockReset();
+  });
+
+  afterEach(() => {
+    clearBacklogAnalysisPending("wo-dup-1");
   });
 
   it("does not put an expand control on the Log heading", () => {
@@ -1183,5 +1207,75 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-title")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+  });
+
+  it("shows Duplicate next to Copy link for a draft when Task Refinement is on", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      canCreate: true,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    const copy = screen.getByTestId("popup-work-order-copy-link-button");
+    const duplicate = screen.getByRole("button", { name: "Duplicate" });
+    expect(copy.compareDocumentPosition(duplicate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows Duplicate next to Copy link for a non-draft when Task Refinement is on", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: OPEN_WORK_ORDER.id,
+      canCreate: true,
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
+    });
+
+    const copy = screen.getByTestId("popup-work-order-copy-link-button");
+    const duplicate = screen.getByRole("button", { name: "Duplicate" });
+    expect(copy.compareDocumentPosition(duplicate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hides Duplicate when Task Refinement is off", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      canCreate: true,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    expect(screen.queryByRole("button", { name: "Duplicate" })).not.toBeInTheDocument();
+  });
+
+  it("opens the new draft peek and marks backlog analysis pending", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
+    duplicateMutate.mockImplementation(
+      async (args: { onOpenWorkOrder?: (orderId: string, order: { id: string }) => void }) => {
+        const order = { id: "wo-dup-1", number: "200", title: "Ship refunds" };
+        markBacklogAnalysisPending(order.id);
+        args.onOpenWorkOrder?.(order.id, order);
+      },
+    );
+    const onOpenWorkOrder = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      canCreate: true,
+      onOpenWorkOrder,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+
+    await waitFor(() =>
+      expect(onOpenWorkOrder).toHaveBeenCalledWith("wo-dup-1", expect.objectContaining({ id: "wo-dup-1" })),
+    );
+    expect(pendingBacklogAnalysisIds().has("wo-dup-1")).toBe(true);
   });
 });

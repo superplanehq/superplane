@@ -8,6 +8,7 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesDuplicateWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
   factoriesListWorkOrderArtifacts,
@@ -360,6 +361,36 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       // The Backlog run for this order is created asynchronously after this
       // RPC returns, so show "Analyzing" optimistically and start polling
       // for the real run right away instead of waiting for a page reload.
+      markBacklogAnalysisPending(order.id);
+      void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
+      if (order.id) {
+        void queryClient.invalidateQueries({
+          queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
+        });
+      }
+    },
+  });
+}
+
+export function useDuplicateWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await factoriesDuplicateWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+          body: {},
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to duplicate task");
+      }
+      return response.data.order;
+    },
+    onSuccess: (order) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       markBacklogAnalysisPending(order.id);
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
