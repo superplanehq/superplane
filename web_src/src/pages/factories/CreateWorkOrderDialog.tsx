@@ -1,3 +1,4 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,7 @@ import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 interface CreateWorkOrderDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }
 
 export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
@@ -41,7 +42,7 @@ function CreateWorkOrderRequestSession({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
@@ -73,7 +74,7 @@ function CreateWorkOrderDialogSession({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });

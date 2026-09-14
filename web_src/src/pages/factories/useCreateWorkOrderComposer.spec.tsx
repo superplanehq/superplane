@@ -153,7 +153,7 @@ describe("useCreateWorkOrderComposer", () => {
       await result.current.handleCreate();
     });
 
-    expect(onCreated).toHaveBeenCalledWith("101");
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -198,7 +198,7 @@ describe("useCreateWorkOrderComposer", () => {
       description: "Refunds fail on retry.",
       assigneeIds: [],
     });
-    expect(onCreated).toHaveBeenCalledWith("101");
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
   });
 
   it("uses New task when a request draft has no title text", async () => {

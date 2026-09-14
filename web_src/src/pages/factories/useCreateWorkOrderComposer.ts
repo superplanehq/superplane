@@ -1,3 +1,4 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -19,7 +20,7 @@ interface UseCreateWorkOrderComposerArgs {
   organizationId: string;
   factoryId: string;
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }
 
 export function useCreateWorkOrderComposer({
@@ -53,9 +54,9 @@ export function useCreateWorkOrderComposer({
     setAssigneeIdsInternal([me.id]);
   }, [me?.id]);
 
-  const goToOrder = (order: { number?: string | number } | null) => {
+  const goToOrder = (order: FactoriesWorkOrder | null) => {
     if (order?.number !== undefined && order.number !== "") {
-      onCreated(String(order.number));
+      onCreated(String(order.number), order);
       return;
     }
     onClose();
