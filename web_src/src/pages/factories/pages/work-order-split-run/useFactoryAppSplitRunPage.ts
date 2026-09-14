@@ -1,4 +1,9 @@
-import { useFactoryPullRequests, useFactoryWorkOrders, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
+import {
+  useFactoryPullRequests,
+  useFactoryWorkOrders,
+  useWorkOrder,
+  useWorkOrderArtifacts,
+} from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
@@ -73,6 +78,7 @@ export function useFactoryAppSplitRunPage() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
+  const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
   const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
     organizationId,
     factoryId,
@@ -158,5 +164,6 @@ export function useFactoryAppSplitRunPage() {
     stream,
     streamLoading: live.isLoading,
     subtitle: resolveFactoryAppCanvasSubtitle({ factoryName: factory?.name }),
+    files: liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined,
   };
 }

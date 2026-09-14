@@ -12,6 +12,13 @@ import { IntegrationButton } from "@/components/AgentSidebar/widgets/Integration
 import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
+import {
+  isReachableWorkOrderFileUrl,
+  parseWorkOrderFileId,
+  resolveWorkOrderFileSrc,
+  workOrderFileDownloadMap,
+  type WorkOrderFileRef,
+} from "@/lib/workOrderFiles";
 import type { WorkOrderMentionCandidate } from "@/lib/workOrderMentions";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +96,8 @@ const MARKDOWN_SANITIZE_SCHEMA = {
   },
   protocols: {
     ...(defaultSchema.protocols ?? {}),
-    href: [...(defaultSchema.protocols?.href ?? []), "node", "integration"],
+    href: [...(defaultSchema.protocols?.href ?? []), "node", "integration", "sp-file"],
+    src: [...(defaultSchema.protocols?.src ?? ["http", "https"]), "sp-file"],
   },
 };
 
@@ -100,6 +108,7 @@ interface MarkdownContentProps {
   canvasId?: string;
   organizationId?: string;
   mentionPeople?: WorkOrderMentionCandidate[];
+  files?: WorkOrderFileRef[];
   "data-testid"?: string;
 }
 
@@ -120,10 +129,12 @@ export function MarkdownContent({
   canvasId,
   organizationId,
   mentionPeople,
+  files,
   "data-testid": dataTestId,
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
+  const fileUrls = workOrderFileDownloadMap(files);
   const contentClassName = variant === "workspace" ? WORKSPACE_MARKDOWN_CONTENT_CLASSES : MARKDOWN_CONTENT_CLASSES;
   const headingClassName = (level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES) =>
     variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
@@ -132,7 +143,7 @@ export function MarkdownContent({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
-        urlTransform={(url) => (isSpecialMarkdownLink(url) ? url : defaultUrlTransform(url))}
+        urlTransform={(url) => markdownUrlTransform(url, fileUrls)}
         components={{
           p: ({ children, ...props }) => <p {...props}>{mentionAwareChildren(mentionPeople, children)}</p>,
           li: ({ children, ...props }) => <li {...props}>{mentionAwareChildren(mentionPeople, children)}</li>,
@@ -186,6 +197,7 @@ export function MarkdownContent({
               {children}
             </MarkdownLink>
           ),
+          img: ({ node: _node, ...props }) => <MarkdownImage fileUrls={fileUrls} {...props} />,
           blockquote: MarkdownBlockquote,
           code: MarkdownCodeWithDiagrams,
           pre: MarkdownPre,
@@ -275,11 +287,41 @@ function MarkdownLink({
     );
   }
 
+  if (!isReachableWorkOrderFileUrl(href) && parseWorkOrderFileId(href)) {
+    return <span>{children}</span>;
+  }
+
   return (
     <a href={href} {...props}>
       {children}
     </a>
   );
+}
+
+function MarkdownImage({
+  src,
+  alt,
+  fileUrls,
+  node: _node,
+  ...props
+}: ComponentProps<"img"> & ExtraProps & { fileUrls?: Record<string, string> }) {
+  const resolved = resolveWorkOrderFileSrc(src, fileUrls);
+  if (isReachableWorkOrderFileUrl(resolved)) {
+    return <img src={resolved} alt={alt} {...props} />;
+  }
+  const label = alt?.trim() || "image";
+  return <span>{label}</span>;
+}
+
+function markdownUrlTransform(url: string, fileUrls: Record<string, string>): string {
+  if (isSpecialMarkdownLink(url)) {
+    return url;
+  }
+  const id = parseWorkOrderFileId(url);
+  if (id) {
+    return fileUrls[id] ?? url;
+  }
+  return defaultUrlTransform(url);
 }
 
 function isSpecialMarkdownLink(url: string): boolean {

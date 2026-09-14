@@ -95,7 +95,12 @@ export function WorkOrderDescription({
     <section className={className} data-testid="work-order-description">
       <div className="relative">
         <div ref={contentRef} style={clamp ? { maxHeight: `${collapsedMaxHeight}px`, overflow: "hidden" } : undefined}>
-          <MarkdownContent content={rendered} variant="workspace" data-testid="work-order-description-markdown" />
+          <MarkdownContent
+            content={rendered}
+            files={files}
+            variant="workspace"
+            data-testid="work-order-description-markdown"
+          />
         </div>
         {showFade ? (
           <div

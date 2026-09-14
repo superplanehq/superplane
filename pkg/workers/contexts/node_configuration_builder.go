@@ -1250,7 +1250,7 @@ func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string 
 }
 
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
-	markdown, files, err := storedfiles.DescriptionForDispatch(
+	_, files, err := storedfiles.DescriptionForDispatch(
 		context.Background(),
 		tx,
 		blob.Current(),
@@ -1268,7 +1268,6 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 	for _, file := range files {
 		filePayloads = append(filePayloads, file.Map())
 	}
-	payload["description"] = markdown
 	payload["files"] = filePayloads
 	return nil
 }
