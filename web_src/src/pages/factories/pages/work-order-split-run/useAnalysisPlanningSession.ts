@@ -97,15 +97,40 @@ function useRefreshAnalysisWorkOrder(args: {
   factoryId: string;
   workOrderId: string;
   session: PlanningSessionPayload | null;
-  sessionUpdatedAt: number;
 }) {
-  const { queryClient, organizationId, factoryId, workOrderId, session, sessionUpdatedAt } = args;
+  const { queryClient, organizationId, factoryId, workOrderId, session } = args;
+  const refreshKey = analysisWorkOrderRefreshKey(session);
   useEffect(() => {
-    if (!session?.id || !sessionUpdatedAt) {
+    if (!refreshKey) {
       return;
     }
     void refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
-  }, [factoryId, organizationId, queryClient, session?.id, sessionUpdatedAt, workOrderId]);
+  }, [factoryId, organizationId, queryClient, refreshKey, workOrderId]);
+}
+
+export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | null | undefined): string {
+  if (!session?.id) {
+    return "";
+  }
+  return JSON.stringify(analysisWorkOrderRefreshFields(session));
+}
+
+function analysisWorkOrderRefreshFields(session: PlanningSessionPayload) {
+  const messages = session.messages || [];
+  const last = messages[messages.length - 1] || {};
+  const draft = session.draft || {};
+  const created = session.created || [];
+  return {
+    id: session.id,
+    state: session.state || "",
+    workOrderId: draft.workOrderId || "",
+    title: draft.title || "",
+    description: draft.description || "",
+    messageCount: messages.length,
+    lastId: last.id || "",
+    lastText: last.text || "",
+    created: created.map((item) => item.id || ""),
+  };
 }
 
 function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
@@ -160,7 +185,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     session,
-    sessionUpdatedAt: query.dataUpdatedAt,
   });
 
   const onMutationSuccess = async (next: PlanningSessionPayload) => {

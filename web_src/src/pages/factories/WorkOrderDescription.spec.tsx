@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+
 import { WorkOrderDescription } from "./WorkOrderDescription";
 
 let notifyResize: () => void;
@@ -22,6 +24,7 @@ describe("WorkOrderDescription", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearWorkOrderFileDownloadCache();
   });
 
   it("updates the collapse control when the rendered content height changes", () => {

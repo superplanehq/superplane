@@ -1,6 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+
 import { MarkdownContent } from "./Markdown";
 
 vi.mock("@/components/AgentSidebar/widgets/MermaidWidget", () => ({
@@ -314,6 +317,10 @@ describe("MarkdownContent mentions", () => {
 describe("MarkdownContent work order files", () => {
   const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 
+  afterEach(() => {
+    clearWorkOrderFileDownloadCache();
+  });
+
   it("uses the download URL as the image source when files are present", () => {
     render(
       <MarkdownContent
@@ -330,5 +337,21 @@ describe("MarkdownContent work order files", () => {
 
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+
+  it("does not change the image source when the download URL is reminted", () => {
+    const first = "https://files.example/bug.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/bug.png?expires=9999999999&sig=two";
+    const { rerender } = render(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: first }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+
+    rerender(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: reminted }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
   });
 });
