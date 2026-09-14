@@ -82,7 +82,7 @@ Run these three steps once, in order:
 
 1. `make dev.up` — builds the dev-base image and starts containers (app, db,
    rabbitmq). The first run builds the image (~3-5 min); later runs reuse it.
-2. `make dev.setup` — installs JS deps with bun, downloads Go modules, runs protobuf
+2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
    codegen, and creates + migrates the databases. Re-run when protos, Go
    modules, or frontend deps change. By default only `superplane_dev` is
    migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also

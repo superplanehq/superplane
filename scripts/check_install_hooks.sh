@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Fail if root or web_src package.json grows a lifecycle install hook.
-# Those hooks run on bun install and npm install in CI (including make dev.setup).
+# Those hooks run on npm install in CI (including make dev.setup).
 
 set -euo pipefail
 

@@ -59,7 +59,7 @@ make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside 
 make dev.server    # Start air + Vite (UI at http://localhost:8000)
 ```
 
-After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `bun install`, codegen, or migrations.
+After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 

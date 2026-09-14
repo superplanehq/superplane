@@ -139,8 +139,7 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
-	@$(MAKE) ensure.bun
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && bun install"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
@@ -293,8 +292,8 @@ profile.goroutines:
 	$(COMPOSE) exec app curl -s "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/goroutine?debug=2"
 
 
-storybook: ensure.bun
-	$(COMPOSE) exec app bash -lc "cd /app/web_src && bun install && npm run storybook"
+storybook:
+	$(COMPOSE) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 ui.setup:
 	npm install
