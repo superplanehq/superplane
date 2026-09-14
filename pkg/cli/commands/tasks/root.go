@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/cli/commands/workspaces"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -44,7 +43,7 @@ Examples:
   superplane tasks list --state all`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(taskListCmd, &taskListWorkspace)
+	taskListCmd.Flags().StringVar(&taskListWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	taskListCmd.Flags().StringSliceVar(&taskListAssignees, "assignees", nil, "filter by assignee user UUID or email (repeatable)")
 	taskListCmd.Flags().StringSliceVar(&taskListStates, "state", nil, "filter by task state (repeatable, e.g. open or STATE_OPEN); defaults to open when omitted; pass 'all' to include every state")
 	taskListCmd.Flags().StringSliceVar(&taskListResults, "result", nil, "filter by task result (repeatable, e.g. completed or RESULT_COMPLETED)")
@@ -76,7 +75,7 @@ Example:
   superplane tasks describe --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(taskDescribeCmd, &taskDescribeWorkspace)
+	taskDescribeCmd.Flags().StringVar(&taskDescribeWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	bindTaskIDFlag(taskDescribeCmd, &taskDescribeTaskID)
 	core.Bind(taskDescribeCmd, &taskDescribeCommand{
 		workspace: &taskDescribeWorkspace,
@@ -114,7 +113,7 @@ Examples:
     --assignee bob@example.com`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(taskCreateCmd, &taskCreateWorkspace)
+	taskCreateCmd.Flags().StringVar(&taskCreateWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	taskCreateCmd.Flags().StringVar(&taskCreateTitle, "title", "", "task title (required)")
 	taskCreateCmd.Flags().StringVar(&taskCreateDescription, "description", "", "task description (inline)")
 	taskCreateCmd.Flags().StringVarP(&taskCreateFile, "file", "f", "", "read description from file (or - for stdin)")
@@ -148,7 +147,7 @@ Example:
   superplane tasks dispatch --workspace super --task 1823 --line build`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(taskDispatchCmd, &taskDispatchWorkspace)
+	taskDispatchCmd.Flags().StringVar(&taskDispatchWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	bindTaskIDFlag(taskDispatchCmd, &taskDispatchTaskID)
 	taskDispatchCmd.Flags().StringVar(&taskDispatchLine, "line", "", "workspace line name (required)")
 	core.Bind(taskDispatchCmd, &taskDispatchCommand{
@@ -180,7 +179,7 @@ Example:
   superplane tasks assign --workspace super --task 1823 --assignee alice@example.com --assignee bob@example.com`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(taskAssignCmd, &taskAssignWorkspace)
+	taskAssignCmd.Flags().StringVar(&taskAssignWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	bindTaskIDFlag(taskAssignCmd, &taskAssignTaskID)
 	taskAssignCmd.Flags().StringArrayVar(&taskAssignAssignees, "assignee", nil, "assignee user UUID or email (repeatable, required); replaces the full assignee list")
 	core.Bind(taskAssignCmd, &taskAssignCommand{
@@ -244,14 +243,15 @@ Examples:
     --title Preview`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(artifactAddCmd, &artifactAddWorkspace)
-	bindTaskIDFlag(artifactAddCmd, &artifactAddTaskID)
+	artifactAddCmd.Flags().StringVar(&artifactAddWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	artifactAddCmd.Flags().StringVar(&artifactAddTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
 	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, or link")
 	artifactAddCmd.Flags().StringVar(&artifactAddTitle, "title", "", "artifact title")
 	artifactAddCmd.Flags().StringVar(&artifactAddBody, "body", "", "markdown body (inline)")
 	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "read markdown body from file (or - for stdin)")
 	artifactAddCmd.Flags().StringVar(&artifactAddURL, "url", "", "artifact URL (required for link)")
 	artifactAddCmd.Flags().StringVar(&artifactAddName, "name", "", "branch name (required for branch)")
+	_ = artifactAddCmd.MarkFlagRequired("task")
 	_ = artifactAddCmd.MarkFlagRequired("type")
 	core.Bind(artifactAddCmd, &artifactAddCommand{
 		workspace: &artifactAddWorkspace,
@@ -280,8 +280,9 @@ Example:
   superplane tasks artifacts list --workspace super --task 1823`,
 		Args: cobra.NoArgs,
 	}
-	workspaces.BindNameFlag(artifactListCmd, &artifactListWorkspace)
-	bindTaskIDFlag(artifactListCmd, &artifactListTaskID)
+	artifactListCmd.Flags().StringVar(&artifactListWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	artifactListCmd.Flags().StringVar(&artifactListTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
+	_ = artifactListCmd.MarkFlagRequired("task")
 	core.Bind(artifactListCmd, &artifactListCommand{
 		workspace: &artifactListWorkspace,
 		taskID:    &artifactListTaskID,
@@ -302,7 +303,4 @@ Example:
 
 func bindTaskIDFlag(cmd *cobra.Command, dest *string) {
 	cmd.Flags().StringVar(dest, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
-	cmd.Flags().StringVar(dest, "order", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
-	_ = cmd.Flags().MarkDeprecated("order", "use --task")
-	_ = cmd.Flags().MarkHidden("order")
 }

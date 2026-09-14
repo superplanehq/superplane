@@ -40,7 +40,7 @@ Examples:
   superplane workspaces describe --workspace super`,
 		Args: cobra.MaximumNArgs(1),
 	}
-	BindNameFlag(describeCmd, &describeWorkspace)
+	describeCmd.Flags().StringVar(&describeWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	core.Bind(describeCmd, &describeCommand{
 		workspace: &describeWorkspace,
 	}, options)

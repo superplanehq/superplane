@@ -71,7 +71,6 @@ func init() {
 	RootCmd.AddCommand(tasks.NewCommand(options))
 	RootCmd.AddCommand(usage.NewCommand(options))
 	RootCmd.AddCommand(workspaces.NewCommand(options))
-	RootCmd.AddCommand(newDeprecatedFactoryCommand(options))
 }
 
 func initConfig() {
