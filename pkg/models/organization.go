@@ -165,6 +165,13 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
+	return FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
+}
+
 func FindOrganizationByName(name string) (*Organization, error) {
 	organization := Organization{}
 
