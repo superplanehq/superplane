@@ -7,15 +7,21 @@ import type {
 import { VELOCITY_ORIGIN_COLORS, VELOCITY_OUTCOME_COLORS, velocityIntakeColor } from "./velocitySeriesColors";
 import { parseWorkOrderMetric } from "./workOrderUsage";
 
-export type VelocityPeriodDays = 14 | 30;
+export const VELOCITY_PERIOD_DAYS = [7, 14, 30] as const;
+
+export type VelocityPeriodDays = (typeof VELOCITY_PERIOD_DAYS)[number];
+
+export function isVelocityPeriodDays(value: number): value is VelocityPeriodDays {
+  return VELOCITY_PERIOD_DAYS.some((days) => days === value);
+}
 
 /** How the delivery chart splits merged pull requests. */
 export type VelocityBreakdown = "origin" | "outcome" | "intake";
 
-export const VELOCITY_PERIOD_OPTIONS: { value: string; label: string }[] = [
-  { value: "14", label: "14d" },
-  { value: "30", label: "30d" },
-];
+export const VELOCITY_PERIOD_OPTIONS: { value: string; label: string }[] = VELOCITY_PERIOD_DAYS.map((days) => ({
+  value: String(days),
+  label: `${days}d`,
+}));
 
 export const VELOCITY_BREAKDOWN_OPTIONS: { value: VelocityBreakdown; label: string }[] = [
   { value: "origin", label: "Who created" },
