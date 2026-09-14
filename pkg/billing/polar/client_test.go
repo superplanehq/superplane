@@ -58,6 +58,16 @@ func Test__ListCreditPacksFiltersMetadata(t *testing.T) {
 						{"amount_type": "fixed", "price_amount": 10000},
 					},
 				},
+				{
+					"id":   "prod_custom",
+					"name": "Hosted credit custom",
+					"metadata": map[string]string{
+						"superplane_credit_pack": "true",
+					},
+					"prices": []map[string]any{
+						{"amount_type": "custom", "minimum_amount": 100, "preset_amount": 2500},
+					},
+				},
 			},
 			"pagination": map[string]any{"max_page": 1},
 		}))
@@ -67,9 +77,41 @@ func Test__ListCreditPacksFiltersMetadata(t *testing.T) {
 	client := NewClient(server.URL, "oat_test", server.Client())
 	packs, err := client.ListCreditPacks(context.Background())
 	require.NoError(t, err)
-	require.Len(t, packs, 3)
-	assert.Equal(t, []string{"prod_25", "prod_100", "prod_500"}, []string{packs[0].ID, packs[1].ID, packs[2].ID})
-	assert.Equal(t, []int64{2500, 10000, 50000}, []int64{packs[0].AmountCents, packs[1].AmountCents, packs[2].AmountCents})
+	require.Len(t, packs, 4)
+	assert.Equal(t, []string{"prod_25", "prod_100", "prod_500", "prod_custom"}, []string{packs[0].ID, packs[1].ID, packs[2].ID, packs[3].ID})
+	assert.Equal(t, []int64{2500, 10000, 50000, 0}, []int64{packs[0].AmountCents, packs[1].AmountCents, packs[2].AmountCents, packs[3].AmountCents})
+	assert.False(t, packs[0].CustomPrice)
+	assert.True(t, packs[3].CustomPrice)
+}
+
+func Test__ListCreditPacksKeepsFixedPriceOnMixedProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":   "prod_mixed",
+					"name": "Hosted credit mixed",
+					"metadata": map[string]string{
+						"superplane_credit_pack": "true",
+					},
+					"prices": []map[string]any{
+						{"amount_type": "fixed", "price_amount": 5000},
+						{"amount_type": "custom", "minimum_amount": 100},
+					},
+				},
+			},
+			"pagination": map[string]any{"max_page": 1},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	packs, err := client.ListCreditPacks(context.Background())
+	require.NoError(t, err)
+	require.Len(t, packs, 1)
+	assert.Equal(t, "prod_mixed", packs[0].ID)
+	assert.Equal(t, int64(5000), packs[0].AmountCents)
+	assert.False(t, packs[0].CustomPrice)
 }
 
 func Test__GetCreditPackRejectsNonPackProducts(t *testing.T) {
@@ -114,6 +156,56 @@ func Test__GetCreditPackReturnsPack(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "prod_25", pack.ID)
 	assert.Equal(t, int64(2500), pack.AmountCents)
+	assert.False(t, pack.CustomPrice)
+}
+
+func Test__GetCreditPackReturnsCustomPack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_custom", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_custom",
+			"name": "Hosted credit custom",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "true",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "custom", "minimum_amount": 100, "preset_amount": 2500},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_custom")
+	require.NoError(t, err)
+	assert.Equal(t, "prod_custom", pack.ID)
+	assert.Equal(t, int64(0), pack.AmountCents)
+	assert.True(t, pack.CustomPrice)
+}
+
+func Test__GetCreditPackKeepsFixedPriceOnMixedProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_mixed", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_mixed",
+			"name": "Hosted credit mixed",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "true",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "custom", "minimum_amount": 100},
+				{"amount_type": "fixed", "price_amount": 5000},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_mixed")
+	require.NoError(t, err)
+	assert.Equal(t, "prod_mixed", pack.ID)
+	assert.Equal(t, int64(5000), pack.AmountCents)
+	assert.False(t, pack.CustomPrice)
 }
 
 func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {

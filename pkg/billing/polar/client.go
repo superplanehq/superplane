@@ -43,6 +43,7 @@ type Product struct {
 	ID          string
 	Name        string
 	AmountCents int64
+	CustomPrice bool
 }
 
 type Customer struct {
@@ -152,17 +153,19 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 		if !isCreditPack(item.Metadata) {
 			continue
 		}
-		amount := item.faceValueCents()
-		if amount <= 0 {
+		pack, ok := creditPackFromProduct(item)
+		if !ok {
 			continue
 		}
-		packs = append(packs, Product{
-			ID:          item.ID,
-			Name:        item.Name,
-			AmountCents: amount,
-		})
+		packs = append(packs, pack)
 	}
 	slices.SortFunc(packs, func(left, right Product) int {
+		if left.CustomPrice != right.CustomPrice {
+			if left.CustomPrice {
+				return 1
+			}
+			return -1
+		}
 		return cmp.Compare(left.AmountCents, right.AmountCents)
 	})
 	return packs, nil
@@ -181,15 +184,11 @@ func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product,
 	if !isCreditPack(payload.Metadata) {
 		return nil, ErrNotCreditPack
 	}
-	amount := payload.faceValueCents()
-	if amount <= 0 {
+	pack, ok := creditPackFromProduct(payload)
+	if !ok {
 		return nil, fmt.Errorf("credit pack face value is missing")
 	}
-	return &Product{
-		ID:          payload.ID,
-		Name:        payload.Name,
-		AmountCents: amount,
-	}, nil
+	return &pack, nil
 }
 
 func (c *Client) GetCustomerByExternalID(ctx context.Context, externalID string) (*Customer, error) {
@@ -544,9 +543,32 @@ type productJSON struct {
 	Prices      []priceJSON    `json:"prices"`
 }
 
+func creditPackFromProduct(item productJSON) (Product, bool) {
+	amount := item.faceValueCents()
+	custom := item.hasCustomPrice() && amount <= 0
+	if !custom && amount <= 0 {
+		return Product{}, false
+	}
+	return Product{
+		ID:          item.ID,
+		Name:        item.Name,
+		AmountCents: amount,
+		CustomPrice: custom,
+	}, true
+}
+
+func (p productJSON) hasCustomPrice() bool {
+	for _, price := range p.Prices {
+		if price.isCustom() {
+			return true
+		}
+	}
+	return false
+}
+
 func (p productJSON) faceValueCents() int64 {
 	for _, price := range p.Prices {
-		if price.AmountType != "" && price.AmountType != "fixed" {
+		if !price.isFixed() {
 			continue
 		}
 		if price.PriceAmount > 0 {
@@ -559,6 +581,15 @@ func (p productJSON) faceValueCents() int64 {
 type priceJSON struct {
 	AmountType  string `json:"amount_type"`
 	PriceAmount int64  `json:"price_amount"`
+}
+
+func (p priceJSON) isCustom() bool {
+	return strings.EqualFold(strings.TrimSpace(p.AmountType), "custom")
+}
+
+func (p priceJSON) isFixed() bool {
+	amountType := strings.TrimSpace(p.AmountType)
+	return amountType == "" || strings.EqualFold(amountType, "fixed")
 }
 
 type orderItemJSON struct {
