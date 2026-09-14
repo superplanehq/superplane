@@ -386,15 +386,18 @@ func (s *ApprovalSteps) deleteNodeFromCanvas(nodeName string) {
 	).Run(s.session)
 
 	// The control is group-hover only and sits above the node. A Playwright
-	// click can miss it while a run inspector is open. A DOM click still
-	// runs the React handler.
+	// pointer click can miss it while a run inspector is open. One DOM click
+	// still runs the React handler. Do not click again after the node leaves
+	// the canvas: the locator is then stale while the draft save is in flight.
 	require.Eventually(s.t, func() bool {
-		if _, ok := s.canvas.DraftNodeByName(nodeName); !ok {
-			return true
-		}
-		if _, err := deleteButton.Evaluate(`el => { el.click(); return true }`, nil); err != nil {
-			return false
-		}
+		count, err := deleteButton.Count()
+		return err == nil && count > 0
+	}, 15*time.Second, 200*time.Millisecond, "approval delete control was not present")
+
+	_, err := deleteButton.Evaluate(`el => { el.click(); return true }`, nil)
+	require.NoError(s.t, err, "approval delete control click failed")
+
+	require.Eventually(s.t, func() bool {
 		_, ok := s.canvas.DraftNodeByName(nodeName)
 		return !ok
 	}, 15*time.Second, 200*time.Millisecond, "approval node was not removed from the draft canvas")
