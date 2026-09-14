@@ -1,5 +1,5 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   POLAR_WEBHOOK_ALL_VALUE,
@@ -57,9 +57,17 @@ export function usePolarWebhooks() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [redelivering, setRedelivering] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const loadAbort = useRef<AbortController | null>(null);
+  const loadGeneration = useRef(0);
 
   const loadDeliveries = useCallback(
     async (showLoading: boolean) => {
+      loadAbort.current?.abort();
+      const controller = new AbortController();
+      loadAbort.current = controller;
+      const generation = ++loadGeneration.current;
+      const isCurrentLoad = () => generation === loadGeneration.current;
+
       if (showLoading) {
         setLoading(true);
       }
@@ -67,23 +75,30 @@ export function usePolarWebhooks() {
       try {
         const response = await fetch(
           `/admin/api/polar/webhooks?${polarWebhookListQuery(page, statusFilter, eventType)}`,
-          { credentials: "include" },
+          { credentials: "include", signal: controller.signal },
         );
         if (!response.ok) {
           throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook deliveries."));
         }
 
         const data: PolarWebhooksResponse = await response.json();
+        if (!isCurrentLoad()) {
+          return;
+        }
+
         setConfigured(data.configured);
         setItems(data.items ?? []);
         setTotal(data.total ?? 0);
         setLoadError(null);
       } catch (error) {
+        if (controller.signal.aborted || !isCurrentLoad()) {
+          return;
+        }
         const message = error instanceof Error ? error.message : "SuperPlane could not load Polar webhook deliveries.";
         setLoadError(message);
         showErrorToast(message);
       } finally {
-        if (showLoading) {
+        if (isCurrentLoad()) {
           setLoading(false);
         }
       }
@@ -93,6 +108,10 @@ export function usePolarWebhooks() {
 
   useEffect(() => {
     void loadDeliveries(true);
+    const abortRef = loadAbort;
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [loadDeliveries]);
 
   const failedEventIds = useMemo(() => uniqueFailedEventIds(items), [items]);

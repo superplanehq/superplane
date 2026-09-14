@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
-import PolarWebhooks from "./PolarWebhooks";
+import { PolarWebhooks } from "./PolarWebhooks";
 import {
   POLAR_WEBHOOKS_EMPTY,
   POLAR_WEBHOOKS_HELP,
@@ -224,6 +224,44 @@ describe("PolarWebhooks", () => {
       ]);
     });
     expect(showSuccessToast).toHaveBeenCalledWith("Polar will send 2 events again.");
+  });
+
+  it("keeps the newest rows when a slow load finishes after a filter change", async () => {
+    let finishSucceededLoad: ((value: Response) => void) | undefined;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("succeeded=true")) {
+        return new Promise<Response>((resolve) => {
+          finishSucceededLoad = resolve;
+        });
+      }
+      const items = url.includes("succeeded=false") ? [failedDelivery] : [otherFailedDelivery];
+      return Promise.resolve(jsonResponse({ configured: true, items, total: 1, page: 1, limit: 50 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("evt_1")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("polar-webhooks-status"));
+    await user.click(screen.getByRole("option", { name: "Succeeded" }));
+    await waitFor(() => {
+      expect(finishSucceededLoad).toBeDefined();
+    });
+
+    await user.click(screen.getByTestId("polar-webhooks-status"));
+    await user.click(screen.getByRole("option", { name: "All" }));
+    expect(await screen.findByText("evt_2")).toBeInTheDocument();
+
+    finishSucceededLoad?.(jsonResponse({ configured: true, items: [succeededDelivery], total: 1, page: 1, limit: 50 }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText("evt_ok")).not.toBeInTheDocument();
+    expect(screen.getByText("evt_2")).toBeInTheDocument();
   });
 
   it("shows an empty filter state", async () => {

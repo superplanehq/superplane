@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Webhook } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 
 import AdminPagination from "./AdminPagination";
 import { PolarWebhooksTable } from "./PolarWebhooksTable";
@@ -21,7 +21,7 @@ import {
 } from "./polarWebhookDeliveries";
 import { usePolarWebhooks } from "./usePolarWebhooks";
 
-const PolarWebhooks: React.FC = () => {
+export function PolarWebhooks() {
   const pageState = usePolarWebhooks();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -58,7 +58,7 @@ const PolarWebhooks: React.FC = () => {
       <PolarWebhooksBody pageState={pageState} expandedIds={expandedIds} onToggle={toggleExpanded} />
     </div>
   );
-};
+}
 
 function PolarWebhooksHeader({
   showBulk,
@@ -198,5 +198,3 @@ function PolarWebhooksNotice({ message, dashed }: { message: string; dashed: boo
     </div>
   );
 }
-
-export default PolarWebhooks;
