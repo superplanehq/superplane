@@ -31,14 +31,15 @@ type WebhookDeliveryPage struct {
 }
 
 type WebhookDelivery struct {
-	ID        string
-	CreatedAt string
-	Succeeded bool
-	HTTPCode  *int
-	Response  string
-	EventType string
-	EventID   string
-	Payload   string
+	ID             string
+	CreatedAt      string
+	Succeeded      bool
+	HTTPCode       *int
+	Response       string
+	EventType      string
+	EventID        string
+	EventSucceeded *bool
+	Payload        string
 }
 
 type listWebhookDeliveriesJSON struct {
@@ -59,9 +60,10 @@ type webhookDeliveryJSON struct {
 }
 
 type webhookEventJSON struct {
-	ID      string          `json:"id"`
-	Type    string          `json:"type"`
-	Payload json.RawMessage `json:"payload"`
+	ID        string          `json:"id"`
+	Type      string          `json:"type"`
+	Succeeded *bool           `json:"succeeded"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 func (c *Client) ListWebhookDeliveries(ctx context.Context, filter WebhookDeliveryFilter) (*WebhookDeliveryPage, error) {
@@ -115,14 +117,15 @@ func (c *Client) RedeliverWebhookEvent(ctx context.Context, eventID string) erro
 
 func (item webhookDeliveryJSON) toDelivery() WebhookDelivery {
 	return WebhookDelivery{
-		ID:        strings.TrimSpace(item.ID),
-		CreatedAt: strings.TrimSpace(item.CreatedAt),
-		Succeeded: item.Succeeded,
-		HTTPCode:  item.HTTPCode,
-		Response:  strings.TrimSpace(item.Response),
-		EventType: strings.TrimSpace(item.WebhookEvent.Type),
-		EventID:   strings.TrimSpace(item.WebhookEvent.ID),
-		Payload:   payloadString(item.WebhookEvent.Payload),
+		ID:             strings.TrimSpace(item.ID),
+		CreatedAt:      strings.TrimSpace(item.CreatedAt),
+		Succeeded:      item.Succeeded,
+		HTTPCode:       item.HTTPCode,
+		Response:       strings.TrimSpace(item.Response),
+		EventType:      strings.TrimSpace(item.WebhookEvent.Type),
+		EventID:        strings.TrimSpace(item.WebhookEvent.ID),
+		EventSucceeded: item.WebhookEvent.Succeeded,
+		Payload:        payloadString(item.WebhookEvent.Payload),
 	}
 }
 

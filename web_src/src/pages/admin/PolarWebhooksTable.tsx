@@ -4,12 +4,38 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import React from "react";
 
-import { formatPolarPayload, POLAR_WEBHOOKS_REDELIVER, type PolarWebhookDelivery } from "./polarWebhookDeliveries";
+import {
+  formatPolarPayload,
+  polarWebhookEventStatus,
+  polarWebhookEventStatusLabel,
+  POLAR_WEBHOOKS_REDELIVER,
+  POLAR_WEBHOOKS_SENDING_AGAIN,
+  type PolarWebhookDelivery,
+  type PolarWebhookEventStatus,
+} from "./polarWebhookDeliveries";
 
-const statusBadgeClass = (succeeded: boolean) =>
+const deliveryBadgeClass = (succeeded: boolean) =>
   succeeded
     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
     : "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300";
+
+const eventStatusBadgeClass = (status: PolarWebhookEventStatus) => {
+  if (status === "sending") {
+    return "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
+  }
+  if (status === "succeeded") {
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
+  }
+  return "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300";
+};
+
+function PolarStatusBadge({ label, className, testId }: { label: string; className: string; testId?: string }) {
+  return (
+    <span data-testid={testId} className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+      {label}
+    </span>
+  );
+}
 
 export function PolarWebhooksTable({
   items,
@@ -34,6 +60,7 @@ export function PolarWebhooksTable({
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Event type</th>
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">HTTP status</th>
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Result</th>
+            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Event status</th>
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Event ID</th>
             <th className="text-right px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Action</th>
           </tr>
@@ -44,7 +71,7 @@ export function PolarWebhooksTable({
               key={item.id}
               item={item}
               expanded={expandedIds.has(item.id)}
-              redelivering={redelivering.has(item.event_id)}
+              pendingEventIds={redelivering}
               onToggle={onToggle}
               onRedeliver={onRedeliver}
             />
@@ -58,16 +85,19 @@ export function PolarWebhooksTable({
 function PolarWebhookRow({
   item,
   expanded,
-  redelivering,
+  pendingEventIds,
   onToggle,
   onRedeliver,
 }: {
   item: PolarWebhookDelivery;
   expanded: boolean;
-  redelivering: boolean;
+  pendingEventIds: ReadonlySet<string>;
   onToggle: (id: string) => void;
   onRedeliver: (eventId: string) => void;
 }) {
+  const eventStatus = polarWebhookEventStatus(item, pendingEventIds);
+  const redelivering = pendingEventIds.has(item.event_id);
+
   return (
     <React.Fragment>
       <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50">
@@ -93,11 +123,17 @@ function PolarWebhookRow({
         <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100">{item.event_type || "—"}</td>
         <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{item.http_code ?? "—"}</td>
         <td className="px-4 py-2.5">
-          <span
-            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.succeeded)}`}
-          >
-            {item.succeeded ? "Succeeded" : "Failed"}
-          </span>
+          <PolarStatusBadge
+            label={item.succeeded ? "Succeeded" : "Failed"}
+            className={deliveryBadgeClass(item.succeeded)}
+          />
+        </td>
+        <td className="px-4 py-2.5">
+          <PolarStatusBadge
+            testId="polar-webhook-event-status"
+            label={polarWebhookEventStatusLabel(eventStatus)}
+            className={eventStatusBadgeClass(eventStatus)}
+          />
         </td>
         <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300" title={item.event_id}>
           {item.event_id || "—"}
@@ -110,13 +146,13 @@ function PolarWebhookRow({
             disabled={!item.event_id || redelivering}
             onClick={() => onRedeliver(item.event_id)}
           >
-            {POLAR_WEBHOOKS_REDELIVER}
+            {redelivering ? POLAR_WEBHOOKS_SENDING_AGAIN : POLAR_WEBHOOKS_REDELIVER}
           </Button>
         </td>
       </tr>
       {expanded ? (
         <tr className="border-b border-slate-50 bg-slate-50/70 dark:border-gray-800/70 dark:bg-gray-950/40">
-          <td colSpan={7} className="px-6 py-3">
+          <td colSpan={8} className="px-6 py-3">
             <div className="grid gap-3 md:grid-cols-2">
               <PolarDetailBlock label="Polar response" value={item.response} />
               <PolarDetailBlock label="Event payload" value={formatPolarPayload(item.payload)} />
