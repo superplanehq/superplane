@@ -10,15 +10,7 @@ type PriceBooksTab = "models" | "vms";
 
 export function PriceBooks() {
   const catalog = usePriceBookCatalog();
-  const edits = usePriceBookEdits(
-    catalog.models,
-    catalog.vms,
-    catalog.setModels,
-    catalog.setVMs,
-    catalog.applyCatalog,
-    catalog.data?.version ?? "",
-    catalog.supersedeLoads,
-  );
+  const edits = usePriceBookEdits(catalog);
   const [tab, setTab] = useState<PriceBooksTab>("models");
   const [activateOpen, setActivateOpen] = useState(false);
 
