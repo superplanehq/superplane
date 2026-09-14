@@ -275,4 +275,11 @@ describe("matchFactoryPageFixture", () => {
     expect(byOrder["wo-pr-closure-receipts"]).toMatchObject({ number: "510", state: "STATE_MERGED" });
     expect(byOrder["wo-board-done-rejected"]).toMatchObject({ number: "112", state: "STATE_CLOSED" });
   });
+
+  it("returns a 7-day velocity series when periodDays is 7", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/velocity?periodDays=7`);
+    const body = (await response.json()) as { points?: unknown[] };
+
+    expect(body.points).toHaveLength(7);
+  });
 });

@@ -64,7 +64,7 @@ export const Default: Story = {
 /** New workspace with no merges and no spend — empty state that points at the board. */
 export const ZeroState: Story = {
   name: "Zero state",
-  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: { 14: EMPTY_FACTORY_VELOCITY, 30: EMPTY_FACTORY_VELOCITY } }),
+  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: EMPTY_FACTORY_VELOCITY }),
 };
 
 /**
@@ -73,8 +73,7 @@ export const ZeroState: Story = {
  */
 export const EarlyUsage: Story = {
   name: "Early usage",
-  render: () =>
-    renderVelocity({ [PRIMARY_FACTORY_ID]: { 14: EARLY_USAGE_FACTORY_VELOCITY, 30: EARLY_USAGE_FACTORY_VELOCITY } }),
+  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: EARLY_USAGE_FACTORY_VELOCITY }),
 };
 
 /**
@@ -96,11 +95,5 @@ export const PeopleLoadMore: Story = {
  */
 export const PeopleSyncPending: Story = {
   name: "People sync pending",
-  render: () =>
-    renderVelocity({
-      [PRIMARY_FACTORY_ID]: {
-        14: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
-        30: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
-      },
-    }),
+  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY }),
 };
