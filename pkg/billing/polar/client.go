@@ -359,6 +359,33 @@ func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, prod
 	return subscriptions, nil
 }
 
+func (c *Client) CancelSubscriptionAtPeriodEnd(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {
+	return c.setSubscriptionCancelAtPeriodEnd(ctx, subscriptionID, true)
+}
+
+func (c *Client) ResumeSubscription(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {
+	return c.setSubscriptionCancelAtPeriodEnd(ctx, subscriptionID, false)
+}
+
+func (c *Client) setSubscriptionCancelAtPeriodEnd(ctx context.Context, subscriptionID string, cancelAtPeriodEnd bool) (*SubscriptionData, error) {
+	id := strings.TrimSpace(subscriptionID)
+	if id == "" {
+		return nil, fmt.Errorf("subscription id is required")
+	}
+
+	var payload SubscriptionData
+	err := c.patch(ctx, "/subscriptions/"+url.PathEscape(id), map[string]any{
+		"cancel_at_period_end": cancelAtPeriodEnd,
+	}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload.ID) == "" {
+		return nil, fmt.Errorf("polar subscription update did not return an id")
+	}
+	return &payload, nil
+}
+
 func (c *Client) ListOrders(ctx context.Context, externalCustomerID string) ([]Order, error) {
 	externalID := strings.TrimSpace(externalCustomerID)
 	if externalID == "" {
@@ -399,6 +426,10 @@ func (c *Client) get(ctx context.Context, path string, dest any) error {
 
 func (c *Client) post(ctx context.Context, path string, body any, dest any) error {
 	return c.do(ctx, http.MethodPost, path, body, dest)
+}
+
+func (c *Client) patch(ctx context.Context, path string, body any, dest any) error {
+	return c.do(ctx, http.MethodPatch, path, body, dest)
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body any, dest any) error {

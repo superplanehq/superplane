@@ -158,6 +158,202 @@ func Test__ApplySubscriptionIncompleteKeepsTrial(t *testing.T) {
 	assert.False(t, plan.IsActiveBusiness())
 }
 
+func Test__ApplySubscriptionCancelAtPeriodEndKeepsBusiness(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	event := subscriptionEvent(r.Organization.ID, "sub_ending", "active", periodStart, periodEnd)
+	event.Data.CancelAtPeriodEnd = true
+
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.True(t, plan.CancelAtPeriodEnd)
+	assert.True(t, plan.IsActiveBusiness())
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+}
+
+func Test__CancelOrganizationSubscriptionSchedulesPeriodEnd(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_cancel", "active", periodStart, periodEnd)))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, http.MethodPatch, req.Method)
+		assert.Equal(t, "/subscriptions/sub_cancel", req.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_cancel",
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	require.NoError(t, CancelOrganizationSubscription(context.Background(), db, r.Organization.ID))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.True(t, plan.CancelAtPeriodEnd)
+	assert.True(t, plan.IsActiveBusiness())
+}
+
+func Test__ResumeOrganizationSubscriptionClearsPeriodEndCancel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	event := subscriptionEvent(r.Organization.ID, "sub_resume", "active", periodStart, periodEnd)
+	event.Data.CancelAtPeriodEnd = true
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, http.MethodPatch, req.Method)
+		assert.Equal(t, "/subscriptions/sub_resume", req.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_resume",
+			"status":               "active",
+			"cancel_at_period_end": false,
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	require.NoError(t, ResumeOrganizationSubscription(context.Background(), db, r.Organization.ID))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.False(t, plan.CancelAtPeriodEnd)
+}
+
+func Test__ResumeWithoutModifiedAtDoesNotBlockLaterWebhook(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	provider := periodStart.Add(-30 * time.Second)
+	laterWebhook := periodStart.Add(-10 * time.Second)
+
+	event := subscriptionEvent(r.Organization.ID, "sub_resume", "active", periodStart, periodEnd)
+	event.Data.CancelAtPeriodEnd = true
+	event.Data.ModifiedAt = polarTime{Time: provider}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, event))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, http.MethodPatch, req.Method)
+		assert.Equal(t, "/subscriptions/sub_resume", req.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_resume",
+			"status":               "active",
+			"cancel_at_period_end": false,
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	require.NoError(t, ResumeOrganizationSubscription(context.Background(), db, r.Organization.ID))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.False(t, plan.CancelAtPeriodEnd)
+	require.NotNil(t, plan.PolarModifiedAt)
+	assert.True(t, plan.PolarModifiedAt.Equal(provider))
+
+	webhook := subscriptionEvent(r.Organization.ID, "sub_resume", "active", periodStart, periodEnd)
+	webhook.Data.ModifiedAt = polarTime{Time: laterWebhook}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, webhook))
+
+	plan, err = models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.False(t, plan.CancelAtPeriodEnd)
+	require.NotNil(t, plan.PolarModifiedAt)
+	assert.True(t, plan.PolarModifiedAt.Equal(laterWebhook))
+}
+
+func Test__ApplySubscriptionIgnoresStaleCancelAfterResume(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	older := periodStart.Add(-time.Minute)
+	newer := periodStart
+
+	resumed := subscriptionEvent(r.Organization.ID, "sub_order", "active", periodStart, periodEnd)
+	resumed.Data.ModifiedAt = polarTime{Time: newer}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, resumed))
+
+	staleCancel := subscriptionEvent(r.Organization.ID, "sub_order", "active", periodStart, periodEnd)
+	staleCancel.Data.CancelAtPeriodEnd = true
+	staleCancel.Data.ModifiedAt = polarTime{Time: older}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, staleCancel))
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+	assert.False(t, plan.CancelAtPeriodEnd)
+	require.NotNil(t, plan.PolarModifiedAt)
+	assert.True(t, plan.PolarModifiedAt.Equal(newer))
+}
+
+func Test__CancelOrganizationSubscriptionRejectsTrial(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+	err := CancelOrganizationSubscription(context.Background(), db, r.Organization.ID)
+	require.ErrorIs(t, err, ErrSubscriptionNotCancelable)
+}
+
+func Test__CancelOrganizationSubscriptionRejectsAdminPlan(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+	err = CancelOrganizationSubscription(context.Background(), db, r.Organization.ID)
+	require.ErrorIs(t, err, ErrAdminPlanCannotCancel)
+}
+
 func Test__ApplySubscriptionIncludedGrantIsIdempotentWithoutPeriodStart(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
