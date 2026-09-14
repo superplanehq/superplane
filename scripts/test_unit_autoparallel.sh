@@ -66,13 +66,15 @@ for package_dir in "${shard_packages[@]}"; do
 done
 echo ""
 
+bash scripts/db_drop_process_test_clones.sh
+
 # gotestsum expects the package patterns separated by spaces.
+# Each process clones superplane_test, so packages can run in parallel.
 gotestsum \
   --format short \
   --junitfile junit-report.xml \
   --packages="${shard_packages[*]}" \
   -- \
-  -p 1 \
   -coverprofile=coverage-go.out \
   -covermode=atomic
 
