@@ -5,6 +5,14 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 
+const { showErrorToast } = vi.hoisted(() => ({
+  showErrorToast: vi.fn(),
+}));
+
+vi.mock("@/lib/toast", () => ({
+  showErrorToast,
+}));
+
 vi.mock("./WorkOrderDescriptionEditor", () => ({
   WorkOrderDescriptionEditor: ({ autoFocus, className }: { autoFocus?: boolean; className?: string }) => (
     <textarea
@@ -34,6 +42,7 @@ function renderRequestDialog(overrides: Partial<Parameters<typeof CreateWorkOrde
 describe("CreateWorkOrderRequestDialog", () => {
   afterEach(async () => {
     cleanup();
+    showErrorToast.mockReset();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -215,5 +224,33 @@ describe("CreateWorkOrderRequestDialog", () => {
     await user.click(screen.getByTestId("create-work-order-request-image-remove"));
 
     expect(onDescriptionChange).toHaveBeenCalledWith("Refunds fail.");
+  });
+
+  it("uploads only the remaining image slots", async () => {
+    const user = userEvent.setup();
+    const onUploadFiles = vi.fn().mockImplementation(async (files: FileList | File[]) =>
+      Array.from(files).map((file, index) => ({
+        id: `file-${index + 9}`,
+        filename: file.name,
+        contentType: "image/png",
+        ref: `sp-file://file-${index + 9}`,
+        previewUrl: `https://cdn.example.com/${file.name}`,
+        isImage: true,
+      })),
+    );
+    const description = Array.from({ length: 7 }, (_, index) => `![shot-${index}](sp-file://file-${index})`).join(
+      "\n\n",
+    );
+
+    renderRequestDialog({ description, onUploadFiles });
+
+    await user.upload(
+      screen.getByTestId("create-work-order-request-image-input"),
+      Array.from({ length: 3 }, (_, index) => new File(["img"], `extra-${index}.png`, { type: "image/png" })),
+    );
+
+    expect(onUploadFiles).toHaveBeenCalledTimes(1);
+    expect(Array.from(onUploadFiles.mock.calls[0][0] as File[])).toHaveLength(1);
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
   });
 });

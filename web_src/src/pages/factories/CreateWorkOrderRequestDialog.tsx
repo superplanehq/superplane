@@ -1,5 +1,5 @@
 import { ArrowUp, Loader2, Maximize2, Minimize2, XIcon } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +49,7 @@ export function CreateWorkOrderRequestDialog({
   initialAttachedFiles = [],
 }: CreateWorkOrderRequestDialogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const form = useCreateWorkOrderRequestForm({
     open,
     description,
@@ -74,6 +75,7 @@ export function CreateWorkOrderRequestDialog({
       }}
     >
       <DialogContent
+        ref={contentRef}
         showCloseButton={false}
         size={isExpanded ? "90vw" : "large"}
         className={cn(
@@ -85,7 +87,7 @@ export function CreateWorkOrderRequestDialog({
         data-testid="create-work-order-request-dialog"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          const description = event.currentTarget.querySelector<HTMLElement>("#work-order-description-input");
+          const description = contentRef.current?.querySelector<HTMLElement>("#work-order-description-input");
           description?.focus();
         }}
       >
@@ -122,7 +124,7 @@ export function CreateWorkOrderRequestDialog({
                 placeholder={CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
                 className="min-h-[6.5rem] max-w-full text-[14px] leading-6 [&_.ProseMirror]:max-w-full [&_.work-order-file-image]:my-2 [&_.work-order-file-image]:max-h-40 [&_.work-order-file-image]:w-auto [&_.work-order-file-image]:max-w-full [&_.work-order-file-image]:object-contain"
                 fileUrls={fileUrls}
-                onUploadFiles={onUploadFiles}
+                onUploadFiles={form.uploadAcceptedFiles}
                 isUploading={isUploading}
                 canRemoveImages
                 onChange={onDescriptionChange}
@@ -131,12 +133,12 @@ export function CreateWorkOrderRequestDialog({
           </div>
           <RequestDialogFooter
             attachedImages={attachedImages}
-            busy={form.busy}
+            canAttach={Boolean(onUploadFiles) && form.canAttach}
             canCreate={form.canCreate}
             isCreating={isCreating}
+            showAttach={Boolean(onUploadFiles)}
             onAttach={(files) => void form.handleAttach(files)}
             onRemoveAttachment={form.handleRemoveAttachment}
-            onUploadFiles={onUploadFiles}
           />
         </form>
       </DialogContent>
@@ -212,26 +214,26 @@ function RequestDialogTitleField({
 
 function RequestDialogFooter({
   attachedImages,
-  busy,
+  canAttach,
   canCreate,
   isCreating,
+  showAttach,
   onAttach,
   onRemoveAttachment,
-  onUploadFiles,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
-  busy: boolean;
+  canAttach: boolean;
   canCreate: boolean;
   isCreating: boolean;
+  showAttach: boolean;
   onAttach: (files: FileList | File[]) => void;
   onRemoveAttachment: (id: string) => void;
-  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 }) {
   return (
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
         <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {onUploadFiles ? <CreateWorkOrderRequestAttachButton disabled={busy} onAttach={onAttach} /> : <span />}
+          {showAttach ? <CreateWorkOrderRequestAttachButton disabled={!canAttach} onAttach={onAttach} /> : <span />}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
           ) : null}

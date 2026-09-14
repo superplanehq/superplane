@@ -41,8 +41,8 @@ describe("CreateWorkOrderRequestAttachments", () => {
       .getByLabelText(CREATE_WORK_ORDER_REQUEST_COPY.attachedImages)
       .querySelectorAll(".t-stack-card");
     expect(cards).toHaveLength(5);
-    expect(cards[3].getAttribute("style")).toContain("11.25rem");
-    expect(cards[4].getAttribute("style")).toContain("15rem");
+    expect(cards[3].getAttribute("style")).toContain("7.875rem");
+    expect(cards[4].getAttribute("style")).toContain("10.5rem");
 
     await user.click(screen.getByTestId("create-work-order-request-attachment-file-4"));
     expect(screen.getByRole("dialog", { name: "Invoice" })).toHaveAttribute(
@@ -52,6 +52,7 @@ describe("CreateWorkOrderRequestAttachments", () => {
     expect(screen.getByTestId("create-work-order-request-image-close")).toHaveFocus();
 
     await user.click(screen.getByTestId("create-work-order-request-image-close"));
+    expect(screen.getByTestId("create-work-order-request-attachment-file-4")).toHaveFocus();
     await user.click(screen.getByTestId("create-work-order-request-attachment-file-5"));
     expect(screen.getByRole("dialog", { name: "Label" }).querySelector("img")).toHaveAttribute(
       "src",
@@ -65,6 +66,9 @@ describe("CreateWorkOrderRequestAttachments", () => {
     renderStack(images, onRemove);
 
     await user.click(screen.getByTestId("create-work-order-request-attachment-file-2"));
+    expect(screen.getByTestId("create-work-order-request-image-close")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByTestId("create-work-order-request-image-remove")).toHaveFocus();
     await user.click(screen.getByTestId("create-work-order-request-image-remove"));
 
     expect(onRemove).toHaveBeenCalledWith("file-2");

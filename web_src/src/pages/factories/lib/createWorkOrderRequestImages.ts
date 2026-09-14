@@ -1,3 +1,4 @@
+import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { parseWorkOrderFileId, resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 
@@ -33,6 +34,44 @@ export function createWorkOrderRequestImages(
     });
   }
   return images;
+}
+
+export function countCreateWorkOrderRequestImages(markdown: string, attached: UploadedWorkOrderFile[] = []): number {
+  const seen = new Set<string>();
+  for (const match of markdown.matchAll(MARKDOWN_IMAGE)) {
+    const rawSrc = match[2]?.trim() ?? "";
+    if (!rawSrc) {
+      continue;
+    }
+    seen.add(parseWorkOrderFileId(rawSrc) ?? rawSrc);
+  }
+  for (const file of attached) {
+    if (file.isImage) {
+      seen.add(file.id);
+    }
+  }
+  return seen.size;
+}
+
+export function selectCreateWorkOrderRequestUploads(
+  files: FileList | File[],
+  currentImageCount: number,
+): { accepted: File[]; rejectedCount: number } {
+  const remaining = Math.max(0, MAX_IMAGE_ATTACHMENTS - currentImageCount);
+  const images: File[] = [];
+  const others: File[] = [];
+  for (const file of Array.from(files)) {
+    if (isSupportedImageFile(file)) {
+      images.push(file);
+    } else {
+      others.push(file);
+    }
+  }
+  const acceptedImages = images.slice(0, remaining);
+  return {
+    accepted: [...acceptedImages, ...others],
+    rejectedCount: images.length - acceptedImages.length,
+  };
 }
 
 export function mergeCreateWorkOrderRequestImages(

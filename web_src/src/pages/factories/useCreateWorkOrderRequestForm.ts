@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { showErrorToast } from "@/lib/toast";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestDraft } from "./CreateWorkOrderRequestDialog";
 import {
   appendUploadedWorkOrderImages,
+  countCreateWorkOrderRequestImages,
   removeCreateWorkOrderRequestMarkdownImage,
+  selectCreateWorkOrderRequestUploads,
 } from "./lib/createWorkOrderRequestImages";
 import { derivedWorkOrderTitle, MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 
@@ -33,6 +36,8 @@ export function useCreateWorkOrderRequestForm({
   const [title, setTitle] = useState("");
   const [titleDirty, setTitleDirty] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<UploadedWorkOrderFile[]>(initialAttachedFiles);
+  const attachedFilesRef = useRef(attachedFiles);
+  attachedFilesRef.current = attachedFiles;
   const busy = isCreating || isUploading;
   const derivedTitle = derivedWorkOrderTitle(description);
   const titleValue = titleDirty ? title : derivedTitle;
@@ -74,15 +79,29 @@ export function useCreateWorkOrderRequestForm({
     setTitle(next.replace(/[\r\n]+/g, " ").slice(0, MAX_DERIVED_WORK_ORDER_TITLE_LENGTH));
   };
 
-  const handleAttach = async (files: FileList | File[]) => {
+  const uploadAcceptedFiles = async (files: FileList | File[]): Promise<UploadedWorkOrderFile[]> => {
     if (!onUploadFiles || busy) {
-      return;
+      return [];
     }
-    const uploaded = (await onUploadFiles(files)).filter((file) => file.isImage);
+    const selected = selectCreateWorkOrderRequestUploads(
+      files,
+      countCreateWorkOrderRequestImages(description, attachedFilesRef.current),
+    );
+    if (selected.rejectedCount > 0) {
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
+    }
+    if (selected.accepted.length === 0) {
+      return [];
+    }
+    return onUploadFiles(selected.accepted);
+  };
+
+  const handleAttach = async (files: FileList | File[]) => {
+    const uploaded = (await uploadAcceptedFiles(files)).filter((file) => file.isImage);
     if (uploaded.length === 0) {
       return;
     }
-    setAttachedFiles((current) => [...current, ...uploaded].slice(0, MAX_IMAGE_ATTACHMENTS));
+    setAttachedFiles((current) => [...current, ...uploaded]);
   };
 
   const handleRemoveAttachment = (id: string) => {
@@ -96,6 +115,7 @@ export function useCreateWorkOrderRequestForm({
   return {
     attachedFiles,
     busy,
+    canAttach: !busy && countCreateWorkOrderRequestImages(description, attachedFiles) < MAX_IMAGE_ATTACHMENTS,
     canCreate,
     derivedTitle,
     titleDirty,
@@ -104,5 +124,6 @@ export function useCreateWorkOrderRequestForm({
     handleRemoveAttachment,
     handleTitleChange,
     submitDraft,
+    uploadAcceptedFiles,
   };
 }
