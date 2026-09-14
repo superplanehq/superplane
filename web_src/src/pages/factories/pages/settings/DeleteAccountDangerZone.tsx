@@ -12,16 +12,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import type { AccountOrganizationPendingDeletion } from "@/contexts/accountContextState";
 import { deleteAccount } from "@/lib/accountSettings";
 import { showErrorToast } from "@/lib/toast";
 
 import { FactorySettingsCard } from "./FactorySettingsCard";
 
-export function DeleteAccountDangerZone({ email }: { email: string }) {
+export function DeleteAccountDangerZone({
+  email,
+  organizationsPendingDeletion = [],
+}: {
+  email: string;
+  organizationsPendingDeletion?: AccountOrganizationPendingDeletion[];
+}) {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [saving, setSaving] = useState(false);
   const canDelete = confirmation.trim().toLowerCase() === email.toLowerCase();
+  const marksOrganizations = organizationsPendingDeletion.length > 0;
 
   const handleDelete = async () => {
     if (!canDelete) {
@@ -44,8 +52,9 @@ export function DeleteAccountDangerZone({ email }: { email: string }) {
           <div className="min-w-0 space-y-0.5">
             <p className="text-[13px] font-medium text-foreground">Delete account</p>
             <p className="text-[12px] text-muted-foreground">
-              SuperPlane deletes organizations you created. Those organizations stay for 30 days, then SuperPlane
-              removes them. You lose access now.
+              {marksOrganizations
+                ? "SuperPlane marks organizations where you are the last Owner. Those organizations stay for 30 days, then SuperPlane removes them. You lose access now."
+                : "This deletes your SuperPlane account. You lose access now."}
             </p>
           </div>
           <Button
@@ -73,10 +82,19 @@ export function DeleteAccountDangerZone({ email }: { email: string }) {
           <DialogHeader>
             <DialogTitle>Delete account</DialogTitle>
             <DialogDescription>
-              Type {email} to confirm. SuperPlane deletes organizations you created. Those organizations stay for 30
-              days, then SuperPlane removes them.
+              Type {email} to confirm.
+              {marksOrganizations
+                ? " SuperPlane marks these organizations for deletion. Those organizations stay for 30 days, then SuperPlane removes them."
+                : ""}
             </DialogDescription>
           </DialogHeader>
+          {marksOrganizations ? (
+            <ul className="list-disc space-y-1 pl-5 text-sm" data-testid="account-redesign-delete-orgs">
+              {organizationsPendingDeletion.map((organization) => (
+                <li key={organization.id}>{organization.name}</li>
+              ))}
+            </ul>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="account-delete-email">Email</Label>
             <Input

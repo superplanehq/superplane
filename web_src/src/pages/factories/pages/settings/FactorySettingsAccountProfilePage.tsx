@@ -126,7 +126,12 @@ export function FactorySettingsAccountProfilePage() {
             }}
           />
         }
-        dangerZone={<DeleteAccountDangerZone email={account.email} />}
+        dangerZone={
+          <DeleteAccountDangerZone
+            email={account.email}
+            organizationsPendingDeletion={account.organizations_pending_deletion}
+          />
+        }
       />
       {account.has_password ? <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} /> : null}
       <PersonalApiTokenDialogs panel={tokensPanel} />
