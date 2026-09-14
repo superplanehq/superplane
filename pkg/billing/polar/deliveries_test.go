@@ -31,9 +31,10 @@ func Test__ListWebhookDeliveriesMapsDeliveriesAndFilters(t *testing.T) {
 					"http_code":  code,
 					"response":   "unable to apply order",
 					"webhook_event": map[string]any{
-						"id":      "evt_1",
-						"type":    "order.paid",
-						"payload": `{"type":"order.paid","data":{"id":"ord_1"}}`,
+						"id":        "evt_1",
+						"type":      "order.paid",
+						"succeeded": true,
+						"payload":   `{"type":"order.paid","data":{"id":"ord_1"}}`,
 					},
 				},
 				{
@@ -77,9 +78,12 @@ func Test__ListWebhookDeliveriesMapsDeliveriesAndFilters(t *testing.T) {
 	assert.Equal(t, 500, *page.Items[0].HTTPCode)
 	assert.Equal(t, "unable to apply order", page.Items[0].Response)
 	assert.Equal(t, `{"type":"order.paid","data":{"id":"ord_1"}}`, page.Items[0].Payload)
+	require.NotNil(t, page.Items[0].EventSucceeded)
+	assert.True(t, *page.Items[0].EventSucceeded)
 
 	assert.Equal(t, "evt_2", page.Items[1].EventID)
 	assert.Nil(t, page.Items[1].HTTPCode)
+	assert.Nil(t, page.Items[1].EventSucceeded)
 	assert.JSONEq(t, `{"type":"subscription.updated"}`, page.Items[1].Payload)
 }
 
