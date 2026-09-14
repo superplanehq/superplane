@@ -110,7 +110,8 @@ export function WorkOrderCard({
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
-  const showStart = isDraft;
+  const analysisInProgress = isAnalyzing && confidenceScore == null;
+  const showStart = isDraft && !analysisInProgress;
   const showAgentQuestion = hasAgentQuestion && isDraft;
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
@@ -159,6 +160,7 @@ export function WorkOrderCard({
           isDispatching={dispatchingOrderIds.has(entry.id)}
           onDispatch={onDispatch}
           createdAt={createdAt}
+          isDraft={isDraft}
           showStart={showStart}
           confidenceScore={confidenceScore}
           isAnalyzing={isAnalyzing}
@@ -245,6 +247,7 @@ function WorkOrderCardMetaRow({
   isDispatching,
   onDispatch,
   createdAt,
+  isDraft,
   showStart,
   confidenceScore,
   isAnalyzing,
@@ -257,6 +260,7 @@ function WorkOrderCardMetaRow({
   isDispatching: boolean;
   onDispatch: WorkOrderCardContext["onDispatch"];
   createdAt: Date | null;
+  isDraft: boolean;
   showStart: boolean;
   confidenceScore?: number;
   isAnalyzing: boolean;
@@ -273,7 +277,7 @@ function WorkOrderCardMetaRow({
         {createdLabel}
       </span>
       <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+        {isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
             <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
@@ -295,9 +299,9 @@ function WorkOrderCardMetaRow({
 }
 
 /**
- * Score meter, or a spinner while the Backlog automation still analyzes the
- * task. Both take the same slot, so the card does not move when the
- * score arrives.
+ * Score meter, or thinking states while the Backlog automation still
+ * analyzes the task. Both take the same slot, so the card does not
+ * move when the score arrives.
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
   if (score != null) {

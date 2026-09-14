@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import { CONFIDENCE_ANALYZING_TOOLTIP } from "./ConfidenceMeter";
 import { WorkOrderCard } from "./WorkOrderCard";
 
 const factory: FactoriesFactory = { id: "factory-1", name: "Refunds", key: "RF" };
@@ -43,12 +45,48 @@ function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; ha
   );
 }
 
+function liveThinkingCopy(testId: string): string | undefined {
+  return [...screen.getByTestId(testId).querySelectorAll(".t-think-text")].find(
+    (el) => !el.classList.contains("is-exit"),
+  )?.textContent;
+}
+
 describe("Confidence score on a backlog card", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("shows that analysis runs while the score is not ready", () => {
     renderCard({ isAnalyzing: true });
 
-    expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toHaveTextContent("Analyzing");
+    const indicator = screen.getByTestId("work-order-card-analyzing-wo-1");
+    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
+    expect(indicator.querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("explains the full analysis step on hover", async () => {
+    const user = userEvent.setup();
+    renderCard({ isAnalyzing: true });
+
+    await user.hover(screen.getByTestId("work-order-card-analyzing-wo-1"));
+
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent(CONFIDENCE_ANALYZING_TOOLTIP);
+    expect(tip).not.toHaveTextContent("Confidence score");
+    expect(tip).not.toHaveTextContent("SuperPlane");
+  });
+
+  it("cycles thinking copy while analysis runs", () => {
+    vi.useFakeTimers();
+    renderCard({ isAnalyzing: true });
+
+    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
+    act(() => {
+      vi.advanceTimersByTime(2050);
+    });
+    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Refining");
   });
 
   it("replaces the spinner with the meter once the score arrives", () => {
@@ -56,6 +94,7 @@ describe("Confidence score on a backlog card", () => {
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 
   it("stays quiet when no automation analyzes the task", () => {

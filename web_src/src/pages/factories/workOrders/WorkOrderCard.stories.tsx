@@ -180,6 +180,29 @@ export const ChecksPassedLongTitle: Story = {
  * keeps created time on the left and the owner given name plus avatar
  * on the right.
  */
+/**
+ * Draft task while backlog analysis still runs. The meter slot shows
+ * thinking states and a matrix loader until the score arrives.
+ */
+export const DraftAnalyzing: Story = {
+  name: "Draft analyzing",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft",
+        number: "1",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+  },
+};
+
 export const OpenOwned: Story = {
   name: "Open with owner",
   args: {
