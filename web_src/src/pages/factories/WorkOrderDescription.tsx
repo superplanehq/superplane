@@ -41,6 +41,7 @@ export function WorkOrderDescription({
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
   const [collapsedMaxHeight, setCollapsedMaxHeight] = useState(FALLBACK_COLLAPSED_MAX_HEIGHT_PX);
+  const fileIds = (files ?? []).map((file) => file.id).join(",");
 
   useLayoutEffect(() => {
     if (!collapsible) {
@@ -80,7 +81,7 @@ export function WorkOrderDescription({
       }
     }
     return () => observer.disconnect();
-  }, [description, files, collapsible, previewHeight]);
+  }, [collapsible, description, fileIds, previewHeight]);
 
   const rendered = rewriteWorkOrderFileRefs(description, files);
 

@@ -1,4 +1,4 @@
-import { Children, isValidElement } from "react";
+import { Children, isValidElement, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { defaultUrlTransform } from "react-markdown";
@@ -190,11 +190,32 @@ export function MarkdownContent({
           code: MarkdownCodeWithDiagrams,
           pre: MarkdownPre,
           hr: MarkdownDivider,
+          img: variant === "workspace" ? WorkspaceMarkdownImage : DefaultMarkdownImage,
         }}
       >
         {normalized}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function DefaultMarkdownImage({ node: _node, alt, ...props }: ComponentProps<"img"> & ExtraProps) {
+  return <img {...props} alt={alt} />;
+}
+
+function WorkspaceMarkdownImage({ node: _node, src, alt, className, ...props }: ComponentProps<"img"> & ExtraProps) {
+  const [loadedSrc, setLoadedSrc] = useState<string>();
+  const isLoaded = Boolean(src && loadedSrc === src);
+
+  return (
+    <img
+      {...props}
+      src={src}
+      alt={alt}
+      className={cn(className, !isLoaded && "opacity-0")}
+      onLoad={() => setLoadedSrc(src)}
+      onError={() => setLoadedSrc(undefined)}
+    />
   );
 }
 
