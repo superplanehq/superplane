@@ -36,6 +36,39 @@ describe("toolCallSummary", () => {
   });
 });
 
+describe("PhaseLogCard elapsed timestamps", () => {
+  it("shows elapsed timestamps on thought and action rows", () => {
+    const stream: SplitRunStreamLine[] = [
+      line({
+        id: "agent",
+        componentName: "Run Claude Code",
+        component: "runnerClaudeCode",
+        orderKey: 1_000,
+      }),
+      line({
+        id: "thought",
+        note: true,
+        componentName: "I will inspect the repository.",
+        componentType: "note",
+        orderKey: 2_000,
+      }),
+      line({
+        id: "action",
+        note: true,
+        noteParentId: "thought",
+        componentName: "git status",
+        componentType: "bash",
+        orderKey: 2_341_000,
+      }),
+    ];
+
+    render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+    expect(screen.getByTestId("split-run-stream-elapsed-thought")).toHaveTextContent("00:01");
+    expect(screen.getByTestId("split-run-stream-elapsed-action")).toHaveTextContent("39:00");
+  });
+});
+
 describe("groupClaudeSteps", () => {
   it("keeps tools and agent notes in log order", () => {
     const write = groupClaudeSteps(PLANNING_STREAM.filter((entry) => entry.note)).find(

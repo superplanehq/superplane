@@ -3,7 +3,7 @@ import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
 
 const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
-import { formatClockDurationLabel } from "@/lib/duration";
+import { formatClockDuration, formatClockDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
@@ -889,6 +889,7 @@ function StreamNode({
     : mergeLiveStreamNotes(liveNotes, notes);
   const steps = compactSessionLog ? groupPlanningSessionLog(merged) : groupClaudeSteps(merged);
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
+  const runStartedAt = line.orderKey ?? firstTimestamp(merged);
 
   return (
     <li className="min-w-0">
@@ -910,6 +911,7 @@ function StreamNode({
               step={step}
               highlightUserTalk={compactSessionLog}
               stickyHeader={!compactSessionLog}
+              runStartedAt={runStartedAt}
             />
           ))}
         </ol>
@@ -992,10 +994,12 @@ function StreamStep({
   step,
   highlightUserTalk = false,
   stickyHeader = true,
+  runStartedAt,
 }: {
   step: ClaudeStepGroup;
   highlightUserTalk?: boolean;
   stickyHeader?: boolean;
+  runStartedAt?: number;
 }) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
@@ -1018,6 +1022,7 @@ function StreamStep({
             {step.line.componentName}
           </StreamLineTitle>
           <StepStatusMark status={step.line.status} />
+          <StreamElapsedTimestamp line={step.line} runStartedAt={runStartedAt} />
         </div>
       ) : null}
       {hasBody ? (
@@ -1025,9 +1030,20 @@ function StreamStep({
           {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
           {step.events.map((event) =>
             event.kind === "note" ? (
-              <StreamTalkNote key={event.line.id} line={event.line} highlightUserTalk={highlightUserTalk} />
+              <StreamTalkNote
+                key={event.line.id}
+                line={event.line}
+                highlightUserTalk={highlightUserTalk}
+                runStartedAt={runStartedAt}
+              />
             ) : (
-              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} label={event.label} />
+              <StreamToolGroup
+                key={event.id}
+                stepId={event.id}
+                tools={event.tools}
+                label={event.label}
+                runStartedAt={runStartedAt}
+              />
             ),
           )}
         </>
@@ -1036,7 +1052,15 @@ function StreamStep({
   );
 }
 
-function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine; highlightUserTalk: boolean }) {
+function StreamTalkNote({
+  line,
+  highlightUserTalk,
+  runStartedAt,
+}: {
+  line: SplitRunStreamLine;
+  highlightUserTalk: boolean;
+  runStartedAt?: number;
+}) {
   const isUserTalk = highlightUserTalk && (line.componentType === "prompt" || Boolean(line.userTalk));
   const youLabel = line.userTalk === "survey" ? CREATE_WITH_AGENT_COPY.youSurvey : CREATE_WITH_AGENT_COPY.you;
   return (
@@ -1056,11 +1080,22 @@ function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine;
           <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
         </div>
       )}
+      <StreamElapsedTimestamp line={line} runStartedAt={runStartedAt} />
     </div>
   );
 }
 
-function StreamToolGroup({ stepId, tools, label }: { stepId: string; tools: SplitRunStreamLine[]; label?: string }) {
+function StreamToolGroup({
+  stepId,
+  tools,
+  label,
+  runStartedAt,
+}: {
+  stepId: string;
+  tools: SplitRunStreamLine[];
+  label?: string;
+  runStartedAt?: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const summary = label ?? toolCallSummary(tools);
 
@@ -1079,11 +1114,12 @@ function StreamToolGroup({ stepId, tools, label }: { stepId: string; tools: Spli
           <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
         </span>
         <StreamLineTitle>{summary}</StreamLineTitle>
+        <StreamElapsedTimestamp line={tools[0]} runStartedAt={runStartedAt} />
       </button>
       {expanded ? (
         <ol className="min-w-0">
           {tools.map((tool) => (
-            <StreamTool key={tool.id} tool={tool} />
+            <StreamTool key={tool.id} tool={tool} runStartedAt={runStartedAt} />
           ))}
         </ol>
       ) : null}
@@ -1091,7 +1127,7 @@ function StreamToolGroup({ stepId, tools, label }: { stepId: string; tools: Spli
   );
 }
 
-function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
+function StreamTool({ tool, runStartedAt }: { tool: SplitRunStreamLine; runStartedAt?: number }) {
   const [expanded, setExpanded] = useState(tool.status === "running");
   useEffect(() => {
     if (tool.status === "running") {
@@ -1107,6 +1143,7 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
       ) : null}
       <StreamLineTitle wrap>{tool.componentName}</StreamLineTitle>
       <StepStatusMark status={tool.status} />
+      <StreamElapsedTimestamp line={tool} runStartedAt={runStartedAt} />
     </>
   );
 
@@ -1134,6 +1171,32 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
       )}
       {expanded && hasOutput ? <StreamOutput text={tool.detail ?? ""} /> : null}
     </li>
+  );
+}
+
+function firstTimestamp(lines: SplitRunStreamLine[]): number | undefined {
+  return lines.reduce<number | undefined>((first, line) => {
+    if (line.orderKey === undefined) {
+      return first;
+    }
+    return first === undefined ? line.orderKey : Math.min(first, line.orderKey);
+  }, undefined);
+}
+
+function StreamElapsedTimestamp({ line, runStartedAt }: { line?: SplitRunStreamLine; runStartedAt?: number }) {
+  if (runStartedAt === undefined || line?.orderKey === undefined) {
+    return null;
+  }
+
+  const elapsed = formatClockDuration(Math.max(0, line.orderKey - runStartedAt));
+  return (
+    <span
+      data-testid={`split-run-stream-elapsed-${line.id}`}
+      aria-label={`Elapsed time ${elapsed}`}
+      className="ml-3 shrink-0 tabular-nums text-muted-foreground"
+    >
+      {elapsed}
+    </span>
   );
 }
 

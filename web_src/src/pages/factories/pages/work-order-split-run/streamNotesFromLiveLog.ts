@@ -27,6 +27,11 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
+/** A tool's own start time takes priority over its section's, when known. */
+function toolOrderKey(tool: { started_at?: number | null }, sectionOrderKey: number | undefined): number | undefined {
+  return tool.started_at ?? sectionOrderKey;
+}
+
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -85,7 +90,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentName: tool.text,
           status: streamStatus(tool.status),
           detail: tool.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n") || undefined,
-          ...orderKeyProps(orderKey),
+          ...orderKeyProps(toolOrderKey(tool, orderKey)),
         });
       }
     }
