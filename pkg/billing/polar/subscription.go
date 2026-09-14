@@ -79,9 +79,6 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				return err
 			}
 		}
-		if plan != nil && plan.PlanSource == models.BillingPlanSourceAdmin {
-			return nil
-		}
 		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
 			OrganizationID:   orgID,
 			SubscriptionID:   data.ID,
@@ -94,14 +91,6 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
 	if !SubscriptionCheckoutEnabled() {
-		return nil
-	}
-
-	plan, err := models.FindOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return err
-	}
-	if plan != nil && plan.PlanSource == models.BillingPlanSourceAdmin {
 		return nil
 	}
 
