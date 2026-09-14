@@ -45,12 +45,7 @@ func TestCanvasAutoSave(t *testing.T) {
 		finalCenter := steps.nodeCenter("Queued Move Node")
 		require.Greater(t, finalCenter.X, initialCenter.X+180)
 		require.Greater(t, finalCenter.Y, initialCenter.Y+80)
-
-		steps.session.Sleep(1500)
-
-		stableCenter := steps.nodeCenter("Queued Move Node")
-		require.InDelta(t, finalCenter.X, stableCenter.X, 2)
-		require.InDelta(t, finalCenter.Y, stableCenter.Y, 2)
+		steps.waitUntilNodeCenterNear("Queued Move Node", finalCenter)
 	})
 
 	t.Run("versioned canvas auto-saves note edits on blur", func(t *testing.T) {
@@ -111,7 +106,10 @@ func (s *canvasAutoSaveSteps) addNote() {
 
 func (s *canvasAutoSaveSteps) dismissSidebar() {
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Sleep(300)
+	s.session.WaitUntil(func() bool {
+		visible, err := q.TestID("node-name-input").Run(s.session).IsVisible()
+		return err == nil && !visible
+	}, "node sidebar did not close")
 }
 
 func (s *canvasAutoSaveSteps) startEditingNoteWithText(text string) {
@@ -183,7 +181,15 @@ func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
 	))
 	require.NoError(s.t, s.session.Page().Mouse().Up())
 
-	s.session.Sleep(300)
+	require.Eventually(s.t, func() bool {
+		moved, err := loc.BoundingBox()
+		if err != nil || moved == nil {
+			return false
+		}
+		centerX := moved.X + moved.Width/2
+		centerY := moved.Y + moved.Height/2
+		return absDelta(centerX, startX) > 5 || absDelta(centerY, startY) > 5
+	}, 5*time.Second, 50*time.Millisecond, "node %s did not move", name)
 }
 
 func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
@@ -210,5 +216,18 @@ func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
 // waitForSaved waits until the current user's staged canvas reflects the latest autosave.
 func (s *canvasAutoSaveSteps) waitForSaved() {
 	s.canvas.WaitForStaging(uuid.Nil)
-	s.session.Sleep(800)
+}
+
+func (s *canvasAutoSaveSteps) waitUntilNodeCenterNear(name string, expected *pw.Rect) {
+	require.Eventually(s.t, func() bool {
+		center := s.nodeCenter(name)
+		return absDelta(center.X, expected.X) <= 2 && absDelta(center.Y, expected.Y) <= 2
+	}, 5*time.Second, 100*time.Millisecond, "node %s should stay at the saved position", name)
+}
+
+func absDelta(a, b float64) float64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }

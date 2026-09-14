@@ -109,8 +109,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
 		steps.openSidebarForNode("Wait")
 
-		steps.session.Sleep(1000)
-
 		steps.assertRunningItemsCount("Wait", 1)
 		steps.assertQueuedItemsCount("Wait", 0)
 		steps.cancelRunningExecutionFromSidebar()
@@ -228,7 +226,6 @@ func (s *CanvasPageSteps) addFilter(name string) {
 func (s *CanvasPageSteps) addHTTP(name string) {
 	s.canvas.AddBuildingBlockByTestID("building-block-http", models.Position{X: 900, Y: 200})
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) addNoopWithDefaultName(pos models.Position) string {
@@ -331,9 +328,8 @@ func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
 	)
 
 	s.session.HoverOver(node)
-	s.session.Sleep(100)
+	s.session.AssertVisible(toggleButton)
 	s.session.Click(toggleButton)
-	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
@@ -344,9 +340,9 @@ func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
 		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-delete"]`,
 	)
 	s.session.HoverOver(nodeHeader)
-	s.session.Sleep(100)
+	s.session.AssertVisible(deleteButton)
 	s.session.Click(deleteButton)
-	s.session.Sleep(300)
+	s.session.AssertHidden(nodeHeader)
 }
 
 func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
@@ -396,11 +392,9 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 
 	for i := 0; i < itemsAmount; i++ {
 		s.canvas.EmitManualTrigger("Start")
-		s.session.Sleep(100)
 	}
 
-	// wait for the first item to start processing
-	s.session.Sleep(500)
+	s.canvas.WaitForExecution("Wait", models.CanvasNodeExecutionStateStarted, 15*time.Second)
 }
 
 func (s *CanvasPageSteps) cleanupQueuedWaitWork(nodeName string) {
@@ -487,7 +481,6 @@ func (s *CanvasPageSteps) openSidebarForNode(node string) {
 func (s *CanvasPageSteps) openNodeSettings(node string) {
 	s.canvas.StartEditingNode(node)
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(200)
 }
 
 func (s *CanvasPageSteps) typeExpression(value string) {
@@ -502,7 +495,6 @@ func (s *CanvasPageSteps) typeHTTPURL(value string) {
 
 func (s *CanvasPageSteps) pressEnterInExpressionAutocomplete() {
 	s.session.PressKey("Enter")
-	s.session.Sleep(1500)
 }
 
 func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
@@ -603,9 +595,10 @@ func (s *CanvasPageSteps) assertExpressionInputEquals(expected string) {
 }
 
 func (s *CanvasPageSteps) assertHTTPURLInputContains(expected string) {
-	value, err := q.TestID("string-field-url").Run(s.session).InputValue()
-	require.NoError(s.t, err)
-	require.Contains(s.t, value, expected)
+	require.Eventually(s.t, func() bool {
+		value, err := q.TestID("string-field-url").Run(s.session).InputValue()
+		return err == nil && strings.Contains(value, expected)
+	}, 10*time.Second, 100*time.Millisecond, "HTTP URL input should contain %q", expected)
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
@@ -697,7 +690,6 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 
 func (s *CanvasPageSteps) stopRunFromInspector() {
 	s.session.Click(q.Locator(`[data-testid="run-inspector-panel"] button:has-text("Stop")`))
-	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
 func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
@@ -741,7 +733,6 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 func (s *CanvasPageSteps) openFilesTab() {
 	s.canvas.Save()
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Sleep(300)
 	filesTab := q.TestID("canvas-view-mode-files")
 	s.session.AssertVisible(filesTab)
 	s.session.Click(filesTab)
@@ -752,7 +743,7 @@ func (s *CanvasPageSteps) openFilesTab() {
 
 func (s *CanvasPageSteps) returnToCanvasTab() {
 	s.session.Click(q.TestID("canvas-view-mode-live"))
-	s.session.Sleep(500)
+	s.session.AssertHidden(q.TestID("files-overlay"))
 }
 
 func (s *CanvasPageSteps) assertFileIsOpen(name string) {

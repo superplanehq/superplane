@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -68,17 +69,20 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 }
 
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.session.Sleep(500)
+	s.canvas.WaitForStaging(uuid.Nil)
 }
 
 func (s *settingsAutoSaveSteps) switchToInfoTab() {
 	s.session.Click(q.Text("Info"))
-	s.session.Sleep(500)
+	s.session.WaitUntil(func() bool {
+		visible, err := q.TestID("expression-field-expression").Run(s.session).IsVisible()
+		return err == nil && !visible
+	}, "configuration tab did not hide")
 }
 
 func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(500)
+	s.session.WaitForEnabled(q.TestID("expression-field-expression"))
 }
 
 func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, expected string) {

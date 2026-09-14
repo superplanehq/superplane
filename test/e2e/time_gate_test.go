@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -120,13 +121,13 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.session.Sleep(300)
+	s.canvas.WaitForStaging(uuid.Nil)
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {
 	s.canvas.StartEditingNode(node)
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(200)
+	s.session.AssertVisible(q.TestID("time-field-timeRange-start"))
 }
 
 func (s *TimeGateSteps) assertTimeGateSavedToDB(timeRange, timezoneLabel string, days []string) {
