@@ -84,6 +84,19 @@ describe("primaryAgentNode", () => {
     expect(primaryAgentNode({ nodes: [triggerNode(), planner, implementer] })?.id).toBe("planner-agent");
   });
 
+  it("returns the preferred agent when it exists", () => {
+    const analysis = agentNode({ id: "analyze", name: "Analyze intake" });
+    const refinement = agentNode({ id: "refine-task", name: "Refine Task" });
+
+    expect(primaryAgentNode({ nodes: [triggerNode(), analysis, refinement] }, "refine-task")?.id).toBe("refine-task");
+  });
+
+  it("returns the first agent when the preferred agent does not exist", () => {
+    const analysis = agentNode({ id: "analyze", name: "Analyze intake" });
+
+    expect(primaryAgentNode({ nodes: [triggerNode(), analysis] }, "refine-task")?.id).toBe("analyze");
+  });
+
   it("returns undefined when no agent exists", () => {
     expect(primaryAgentNode({ nodes: [triggerNode()] })).toBeUndefined();
   });
