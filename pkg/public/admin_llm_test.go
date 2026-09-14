@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -233,5 +234,88 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
 		require.NotNil(t, credit.MarkupOverrideBPS)
 		assert.Equal(t, 0, *credit.MarkupOverrideBPS)
+	})
+}
+
+func TestAdminOrganizationBillingPlan(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("admin can set a plan when Polar is not set up", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "business"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
+	t.Run("GET syncs Polar paid over an admin plan", func(t *testing.T) {
+		periodStart := time.Now().UTC().Truncate(time.Second)
+		periodEnd := periodStart.AddDate(0, 1, 0)
+		polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/subscriptions/", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"id":                   "sub_admin_sync",
+						"status":               "active",
+						"current_period_start": periodStart.Format(time.RFC3339),
+						"current_period_end":   periodEnd.Format(time.RFC3339),
+						"customer_id":          "cust_polar_1",
+						"external_customer_id": r.Organization.ID.String(),
+						"customer": map[string]any{
+							"id":          "cust_polar_1",
+							"external_id": r.Organization.ID.String(),
+						},
+					},
+				},
+				"pagination": map[string]any{"max_page": 1},
+			}))
+		}))
+		t.Cleanup(polarServer.Close)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Setenv("POLAR_API_BASE_URL", polarServer.URL)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourcePolar, plan.PlanSource)
+		assert.True(t, plan.PolarManaged)
+	})
+
+	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
+
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cancel or change the subscription in Polar")
 	})
 }

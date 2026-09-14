@@ -346,6 +346,17 @@ func UpsertOrganizationLLMMarkup(tx *gorm.DB, orgID uuid.UUID, markupBPS *int) e
 	}).Create(&settings).Error
 }
 
+func OrganizationPolarCustomerID(tx *gorm.DB, orgID uuid.UUID) (string, error) {
+	settings, err := FindOrganizationLLMSettings(tx, orgID)
+	if err != nil {
+		return "", err
+	}
+	if settings == nil || settings.PolarCustomerID == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(*settings.PolarCustomerID), nil
+}
+
 func FindOrganizationLLMSettings(tx *gorm.DB, orgID uuid.UUID) (*OrganizationLLMSettings, error) {
 	var settings OrganizationLLMSettings
 	err := tx.Where("organization_id = ?", orgID).First(&settings).Error

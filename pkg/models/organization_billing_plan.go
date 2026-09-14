@@ -37,6 +37,7 @@ const (
 var (
 	ErrHostedSubscriptionRequired = errors.New("a Business subscription is required for SuperPlane-hosted runs")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
+	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
 
 // OrganizationBillingPlan is the org plan and Polar subscription period.
@@ -191,6 +192,25 @@ func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationB
 	return loadedOrganizationBillingPlan(tx, orgID)
 }
 
+func OrganizationBillingIsPolarManaged(plan *OrganizationBillingPlan, polarCustomerID string) bool {
+	if !HostedPlanGatesEnabled() {
+		return false
+	}
+	if strings.TrimSpace(polarCustomerID) != "" {
+		return true
+	}
+	if plan == nil {
+		return false
+	}
+	if plan.PlanSource == BillingPlanSourcePolar {
+		return true
+	}
+	if plan.PolarSubscriptionID == nil {
+		return false
+	}
+	return strings.TrimSpace(*plan.PolarSubscriptionID) != ""
+}
+
 func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*OrganizationBillingPlan, error) {
 	if orgID == uuid.Nil {
 		return nil, fmt.Errorf("organization is required")
@@ -206,6 +226,13 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		existing, err := FindOrganizationBillingPlan(inner, orgID)
 		if err != nil {
 			return err
+		}
+		polarCustomerID, err := OrganizationPolarCustomerID(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if OrganizationBillingIsPolarManaged(existing, polarCustomerID) {
+			return ErrPolarManagedBillingPlan
 		}
 
 		now := time.Now()
@@ -276,9 +303,6 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 	existing, err := EnsureOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return nil, false, err
-	}
-	if existing.PlanSource == BillingPlanSourceAdmin {
-		return existing, false, nil
 	}
 	if polarSnapshotIsStale(existing, sub.ModifiedAt) {
 		return existing, false, nil
