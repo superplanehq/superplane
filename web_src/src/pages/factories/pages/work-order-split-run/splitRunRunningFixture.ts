@@ -23,6 +23,7 @@ const OWNER: OrgUserDisplay = {
 
 export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   title: "Add refund reconciliation test",
+  key: RUNNING_WORK_ORDER.key,
   descriptionText: OPEN_WORK_ORDER.description ?? "",
   owner: OWNER,
   assigneeIds: [STORYBOOK_ME_USER_ID],
