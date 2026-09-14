@@ -15,10 +15,14 @@ import (
 
 const (
 	backlogDefaultName        = "Backlog"
-	backlogDefaultDescription = "Score new work orders for how well an agent can complete them."
+	backlogDefaultDescription = "Refine new tasks or score how well an agent can complete them."
+	backlogTemplateVersion    = 2
 	backlogTriggerNodeID      = "trigger"
 	backlogTriggerName        = "On Task"
 	backlogAnalysisSubject    = "work order"
+
+	backlogRefinementFilterNodeID = "task-refinement-enabled"
+	backlogRefinementNodeID       = "refine-task"
 )
 
 // ensureBacklogCanvas creates the factory Backlog automation when the factory
@@ -131,6 +135,20 @@ func createBacklogCanvas(
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create Backlog automation")
 	}
+	if err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		canvasModel, err := models.FindCanvasInTransaction(tx, factoryModel.OrganizationID, canvasID)
+		if err != nil {
+			return err
+		}
+		return canvasModel.StampFactoryAppTemplate(
+			tx,
+			backlogTriggerNodeID,
+			models.FactoryAppTemplateBacklogID,
+			backlogTemplateVersion,
+		)
+	}); err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to mark Backlog automation version")
+	}
 
 	return canvasID, nil
 }
@@ -158,6 +176,104 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 		},
 		Spec: &yaml.CanvasSpec{
 			Edges: []yaml.Edge{
+				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: backlogRefinementFilterNodeID},
+				{Channel: "false", SourceID: backlogRefinementFilterNodeID, TargetID: intakeAnalysisNodeID},
+				{Channel: "true", SourceID: backlogRefinementFilterNodeID, TargetID: backlogRefinementNodeID},
+				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeIntentArtifactNodeID},
+				{Channel: "failed", SourceID: intakeAnalysisNodeID, TargetID: intakeAddRunErrorNodeID},
+				{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
+			},
+			Nodes: []yaml.Node{
+				{
+					ID:        backlogTriggerNodeID,
+					Name:      backlogTriggerName,
+					Type:      yaml.NodeTypeTrigger,
+					Component: factory.OnWorkOrderTriggerName,
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion),
+					Position:  yaml.Position{X: 160, Y: 80},
+				},
+				{
+					ID:        backlogRefinementFilterNodeID,
+					Name:      "Refine task?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeFilterComponent,
+					Configuration: map[string]any{
+						"expression": "{{ root().data.taskRefinementEnabled == true }}",
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 260},
+				},
+				{
+					ID:            intakeAnalysisNodeID,
+					Name:          intakeAnalysisNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeAnalysisConfiguration(spec, request.Agent, request.GitHubName),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 40, Y: 440},
+				},
+				{
+					ID:            backlogRefinementNodeID,
+					Name:          "Refine Task",
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.GitHubName),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 400, Y: 440},
+				},
+				{
+					ID:            intakeReportConfidenceNodeID,
+					Name:          "Report Confidence",
+					Type:          yaml.NodeTypeAction,
+					Component:     intakeReportConfidenceComponent,
+					Configuration: intakeConfidenceReportConfiguration(backlogAnalysisSubject),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 40, Y: 620},
+				},
+				{
+					ID:            intakeIntentArtifactNodeID,
+					Name:          intakeIntentArtifactNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     factory.AddWorkOrderArtifactComponentName,
+					Configuration: intakeIntentArtifactConfiguration(),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 280, Y: 620},
+				},
+				{
+					ID:        intakeAddRunErrorNodeID,
+					Name:      intakeAddRunErrorNodeName,
+					Type:      yaml.NodeTypeAction,
+					Component: intakeAddRunErrorComponent,
+					Configuration: map[string]any{
+						"message": intakeAddRunErrorMessage,
+					},
+					Position: yaml.Position{X: 520, Y: 620},
+				},
+			},
+		},
+	}
+}
+
+// buildLegacyBacklogCanvas is the version 1 graph used to identify canvases
+// that users did not customize. Keep this snapshot stable.
+func buildLegacyBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		name = backlogDefaultName
+	}
+
+	spec := intakeSpec{analysisSubject: backlogAnalysisSubject}
+
+	return &yaml.Canvas{
+		APIVersion: yaml.APIVersion,
+		Kind:       yaml.KindCanvas,
+		Metadata: &yaml.CanvasMetadata{
+			Name:        name,
+			Description: "Score new work orders for how well an agent can complete them.",
+		},
+		Spec: &yaml.CanvasSpec{
+			Edges: []yaml.Edge{
 				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
 				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
 				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeIntentArtifactNodeID},
@@ -169,7 +285,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:      backlogTriggerName,
 					Type:      yaml.NodeTypeTrigger,
 					Component: factory.OnWorkOrderTriggerName,
-					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, factoryTemplateVersion),
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 1),
 					Position:  yaml.Position{X: 160, Y: 80},
 				},
 				{

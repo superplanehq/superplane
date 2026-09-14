@@ -97,6 +97,16 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
 }
 
+func TestBuildOpenCodeConfigSkipsProtocolAlreadyInPrompt(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, string(protocol)+"\n\nTask:\nFix retries.")
+	assert.Nil(t, config["instructions"])
+}
+
 func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "anthropic/claude-sonnet-4-6",
@@ -1185,10 +1195,19 @@ func jsOpencodeArgs(t *testing.T, input map[string]any) []string {
 }
 
 func jsBuildConfig(t *testing.T, taskDir string, env map[string]string) map[string]any {
+	return jsBuildConfigWithPrompt(t, taskDir, env, "")
+}
+
+func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string, prompt string) map[string]any {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	payload, err := json.Marshal(map[string]any{"taskDir": taskDir, "env": env, "planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != ""})
+	payload, err := json.Marshal(map[string]any{
+		"taskDir":  taskDir,
+		"env":      env,
+		"planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != "",
+		"prompt":   prompt,
+	})
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
 	out, err := cmd.CombinedOutput()

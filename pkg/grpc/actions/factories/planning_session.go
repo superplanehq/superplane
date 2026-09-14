@@ -379,5 +379,5 @@ func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSess
 }
 
 func isPlanningSessionAgentNode(nodeID string) bool {
-	return nodeID == intakeAnalysisNodeID
+	return nodeID == intakeAnalysisNodeID || nodeID == backlogRefinementNodeID
 }
