@@ -97,15 +97,29 @@ function useRefreshAnalysisWorkOrder(args: {
   factoryId: string;
   workOrderId: string;
   session: PlanningSessionPayload | null;
-  sessionUpdatedAt: number;
 }) {
-  const { queryClient, organizationId, factoryId, workOrderId, session, sessionUpdatedAt } = args;
+  const { queryClient, organizationId, factoryId, workOrderId, session } = args;
+  const refreshKey = analysisWorkOrderRefreshKey(session);
   useEffect(() => {
-    if (!session?.id || !sessionUpdatedAt) {
+    if (!refreshKey) {
       return;
     }
     void refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
-  }, [factoryId, organizationId, queryClient, session?.id, sessionUpdatedAt, workOrderId]);
+  }, [factoryId, organizationId, queryClient, refreshKey, workOrderId]);
+}
+
+export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | null | undefined): string {
+  if (!session?.id) {
+    return "";
+  }
+  return JSON.stringify({
+    id: session.id,
+    state: session.state,
+    waitState: session.waitState,
+    messages: session.messages?.map(({ id, role, text, createdAt }) => ({ id, role, text, createdAt })),
+    draft: session.draft,
+    created: session.created,
+  });
 }
 
 function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
@@ -160,16 +174,14 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     session,
-    sessionUpdatedAt: query.dataUpdatedAt,
   });
 
-  const onMutationSuccess = async (next: PlanningSessionPayload) => {
+  const onMutationSuccess = (next: PlanningSessionPayload) => {
     queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
       mergePlanningSessionHistory(previous, next),
     );
     setComposer("");
     setComposerError("");
-    await refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
   };
   const onMutationError = (error: Error) => {
     setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
