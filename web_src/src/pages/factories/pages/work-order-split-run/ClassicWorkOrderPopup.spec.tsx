@@ -6,13 +6,13 @@ import { describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 
-function renderClassicPopup() {
-  const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
+function renderClassicPopup(workOrder = DRAFT_WORK_ORDER) {
+  const fixture = splitRunFixtureForWorkOrder(workOrder);
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -20,8 +20,8 @@ function renderClassicPopup() {
           <TooltipProvider>
             <ClassicWorkOrderPopup
               factoryKey="RF"
-              orderNumber={DRAFT_WORK_ORDER.number}
-              orderId={DRAFT_WORK_ORDER.id}
+              orderNumber={workOrder.number}
+              orderId={workOrder.id}
               fixture={fixture}
               canDispatch
               popupData={{
@@ -74,5 +74,18 @@ describe("ClassicWorkOrderPopup", () => {
     expect(displayKey).toHaveTextContent("RF-105");
     expect(displayKey).toHaveAccessibleName("Copy task ID RF-105");
     expect(title.compareDocumentPosition(displayKey) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("puts the pull request review note in the left context column", () => {
+    renderClassicPopup(OPEN_WORK_ORDER);
+
+    const dialog = screen.getByTestId("work-order-split-run");
+    const tab = within(dialog).getByTestId("split-run-work-order-tab");
+    const sidebar = within(tab).getByTestId("split-run-overview-sidebar");
+    const note = within(sidebar).getByTestId("split-run-attention-note");
+
+    expect(tab.firstElementChild).toBe(sidebar);
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
   });
 });

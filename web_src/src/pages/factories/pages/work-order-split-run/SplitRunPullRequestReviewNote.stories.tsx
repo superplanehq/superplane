@@ -61,3 +61,20 @@ export const ReadOnly: Story = {
     </PopupShell>
   ),
 };
+
+export const InColumn: Story = {
+  name: "Pull request is ready — left column",
+  render: () => (
+    <div className="w-[22.5rem] overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+      {footer.note ? (
+        <SplitRunAttentionNote
+          note={footer.note}
+          tone="waiting"
+          actions={footer.actions}
+          inColumn
+          onAction={() => {}}
+        />
+      ) : null}
+    </div>
+  ),
+};

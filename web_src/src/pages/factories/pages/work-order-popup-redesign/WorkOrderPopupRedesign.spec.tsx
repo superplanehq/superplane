@@ -286,11 +286,9 @@ describe("Line board job popup", () => {
         within(within(dialog).getByTestId("split-run-intent-result")).queryByTestId("split-run-attention-note"),
       ).toBeNull();
     } else {
-      const tab = within(dialog).getByTestId("split-run-work-order-tab");
-      expect(tab.firstElementChild).toContainElement(waitingNote);
-      expect(
-        within(within(dialog).getByTestId("split-run-overview-sidebar")).queryByTestId("split-run-attention-note"),
-      ).toBeNull();
+      const sidebar = within(dialog).getByTestId("split-run-overview-sidebar");
+      expect(sidebar).toContainElement(waitingNote);
+      expect(within(dialog).getByTestId("split-run-work-order-tab").firstElementChild).toBe(sidebar);
     }
     expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
     expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();

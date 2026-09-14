@@ -47,6 +47,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     const steps = within(within(note).getByRole("list", { name: "Next steps" })).getAllByRole("listitem");
     expect(steps).toHaveLength(3);
+    expect(steps[0]).toHaveClass("w-full");
     expect(steps[0]).toHaveTextContent("1");
     expect(steps[0]).toHaveTextContent("Review the pull request");
     expect(steps[1]).toHaveTextContent("2");
@@ -123,5 +124,6 @@ describe("SplitRunAttentionNote for a pull request", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(note.className).not.toMatch(/\bborder-t\b/);
     expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(screen.getByTestId("split-run-pull-request-cta")).toHaveClass("w-full");
   });
 });
