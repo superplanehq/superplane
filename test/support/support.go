@@ -407,6 +407,34 @@ func CreateFactoryLineDispatch(
 	return &dispatch
 }
 
+// CreateFactoryLineWithSteps creates a line whose steps run one
+// onRun-triggered app each, with the given per-step maxParallelism. A nil
+// entry leaves the step at the default maxParallelism.
+func CreateFactoryLineWithSteps(
+	t require.TestingT,
+	r *ResourceRegistry,
+	factory *models.Factory,
+	stepMaxParallelisms []*int,
+) *models.FactoryLine {
+	line, err := factory.CreateLine(database.Conn(), RandomName("line"), nil)
+	require.NoError(t, err)
+
+	steps := make([]models.FactoryLineStep, len(stepMaxParallelisms))
+	for i, limit := range stepMaxParallelisms {
+		name := RandomName("step")
+		app, entrypoint := CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, name, "start-"+name)
+		steps[i] = models.FactoryLineStep{
+			Type:           models.FactoryLineStepTypeRunApp,
+			AppID:          app.ID,
+			Entrypoint:     entrypoint,
+			MaxParallelism: limit,
+		}
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+
+	return line
+}
+
 // CompleteFactoryOnboarding marks a factory as past the setup wizard so
 // workspace pages render instead of redirecting to /setup.
 func CompleteFactoryOnboarding(t require.TestingT, factory *models.Factory) {

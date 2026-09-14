@@ -16,6 +16,7 @@ type InstallationMetadata struct {
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
+	MaxParallelFactoryTasks   int
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -59,9 +60,10 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 	}
 
 	metadata = InstallationMetadata{
-		ID:             installationMetadataID,
-		InstallationID: uuid.NewString(),
-		SignupsEnabled: true,
+		ID:                      installationMetadataID,
+		InstallationID:          uuid.NewString(),
+		SignupsEnabled:          true,
+		MaxParallelFactoryTasks: DefaultFactoryMaxParallelTasks,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{

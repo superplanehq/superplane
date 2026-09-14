@@ -32,23 +32,10 @@ func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParall
 	f, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	line, err := f.CreateLine(database.Conn(), support.RandomName("line"), nil)
-	require.NoError(t, err)
-
-	steps := make([]models.FactoryLineStep, len(stepMaxParallelisms))
-	for i, limit := range stepMaxParallelisms {
-		name := support.RandomName("step")
-		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, f.ID, name, "start-"+name)
-		steps[i] = models.FactoryLineStep{
-			Type:           models.FactoryLineStepTypeRunApp,
-			AppID:          app.ID,
-			Entrypoint:     entrypoint,
-			MaxParallelism: limit,
-		}
+	return &stepQueueFixture{
+		factory: f,
+		line:    support.CreateFactoryLineWithSteps(t, r, f, stepMaxParallelisms),
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
-
-	return &stepQueueFixture{factory: f, line: line}
 }
 
 func (f *stepQueueFixture) createOpenWorkOrder(t *testing.T, r *support.ResourceRegistry, title string) *models.FactoryWorkOrder {
@@ -433,4 +420,165 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
 	assertExecutionRunID(t, thirdPending[0].runID, admitted)
+}
+
+func Test__StepQueue_FactoryCapQueuesWhenStepHasRoom(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	assert.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, secondDispatch.State)
+	assert.Empty(t, executionsForOrder(t, second.ID))
+}
+
+func Test__StepQueue_FinishedRunAdmitsWaiterOnOtherLine(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	firstLine := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	secondLine := &stepQueueFixture{
+		factory: firstLine.factory,
+		line:    support.CreateFactoryLineWithSteps(t, r, firstLine.factory, []*int{stepMaxParallelism(10)}),
+	}
+
+	first := firstLine.createOpenWorkOrder(t, r, "First")
+	second := firstLine.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := firstLine.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := secondLine.dispatchLine(t, second)
+	assert.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
+	require.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
+
+	finishRun(t, firstResult.Run, models.CanvasRunResultPassed)
+	pending := advanceFactoryLine(t, r, firstResult.Run.ID)
+	require.Len(t, pending, 1)
+
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	secondExecutions := executionsForOrder(t, second.ID)
+	require.Len(t, secondExecutions, 1)
+	assertExecutionRunID(t, pending[0].runID, secondExecutions[0])
+}
+
+// Raising a cap only stores a number. The save path must also admit the
+// work that now fits, or the new slot stays empty until a running task
+// finishes.
+func Test__StepQueue_RaisedFactoryCapAdmitsQueuedWork(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	two := 2
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &two))
+
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		admitted, err = models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+
+	require.Len(t, admitted, 1)
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	secondExecutions := executionsForOrder(t, second.ID)
+	require.Len(t, secondExecutions, 1)
+	assertExecutionRunID(t, admitted[0].Run.ID, secondExecutions[0])
+}
+
+// The installation default applies to organizations without an override,
+// so raising it must admit their queued work too.
+func Test__StepQueue_RaisedInstallationDefaultAdmitsQueuedWork(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	require.NoError(t, models.SetInstallationMaxParallelFactoryTasks(database.Conn(), 1))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	require.NoError(t, models.SetInstallationMaxParallelFactoryTasks(database.Conn(), 2))
+
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		admitted, err = models.AdmitQueuedOnInstallationDefault(tx)
+		return err
+	}))
+
+	require.Len(t, admitted, 1)
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	assert.Len(t, executionsForOrder(t, second.ID), 1)
+}
+
+// An organization override shields its factories from the installation
+// default, so raising the default must not admit their queued work.
+func Test__StepQueue_InstallationDefaultSkipsOverriddenOrganization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetInstallationMaxParallelFactoryTasks(database.Conn(), 1))
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	require.NoError(t, models.SetInstallationMaxParallelFactoryTasks(database.Conn(), 10))
+
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		admitted, err = models.AdmitQueuedOnInstallationDefault(tx)
+		return err
+	}))
+
+	assert.Empty(t, admitted)
+	assert.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
 }
