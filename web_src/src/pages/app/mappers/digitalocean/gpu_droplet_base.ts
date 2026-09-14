@@ -1,5 +1,5 @@
 import type { EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 import type { DropletData } from "./types";

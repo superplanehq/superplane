@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { getDashboardMapper } from "./get_dashboard";
 import { renderPanelMapper } from "./render_panel";

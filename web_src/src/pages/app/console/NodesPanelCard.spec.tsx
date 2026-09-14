@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "bun:test";
 
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 import type { SuperplaneComponentsNode } from "@/api-client";

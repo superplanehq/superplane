@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { promotePackageMapper, promotePackageEventStateRegistry } from "./promote_package";
 import { buildDetailsCtx, buildPackageData, buildPackageOutput, buildNode } from "./test_helpers";
 
