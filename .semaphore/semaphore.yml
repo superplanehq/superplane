@@ -55,11 +55,6 @@ blocks:
           commands:
             - make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
-        - name: E2E Tests
-          parallelism: 10
-          commands:
-            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
-
         - name: Checks
           commands:
             - make check.db.structure
@@ -72,6 +67,27 @@ blocks:
             - make check.grpc.actions.status
             - make check.models.tx.debt
             - make check.generated.artifacts
+
+      epilogue:
+        always:
+          commands:
+            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
+            - bash scripts/ci_cache_store_go.sh
+
+  - name: "E2E Tests"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      agent:
+        machine:
+          type: f1-standard-4
+          os_image: ubuntu2204
+      jobs:
+        - name: E2E Tests
+          parallelism: 6
+          commands:
+            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
       epilogue:
         always:
