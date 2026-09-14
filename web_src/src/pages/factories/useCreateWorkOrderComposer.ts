@@ -4,8 +4,16 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
+import { derivedWorkOrderTitle } from "./lib/derivedWorkOrderTitle";
+
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
+
+export interface CreateWorkOrderComposerDraft {
+  title: string;
+  description: string;
+}
 
 interface UseCreateWorkOrderComposerArgs {
   organizationId: string;
@@ -53,8 +61,11 @@ export function useCreateWorkOrderComposer({
     onClose();
   };
 
-  const handleCreate = async () => {
-    const trimmedTitle = title.trim();
+  const handleCreate = async (draft?: CreateWorkOrderComposerDraft) => {
+    const trimmedDescription = (draft?.description ?? description).trim();
+    const trimmedTitle =
+      (draft?.title ?? title).trim() ||
+      (draft ? derivedWorkOrderTitle(trimmedDescription) || CREATE_WORK_ORDER_REQUEST_COPY.title : "");
     if (!trimmedTitle) {
       setTitleError("Title is required");
       return;
@@ -64,7 +75,7 @@ export function useCreateWorkOrderComposer({
     try {
       const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
-        description: description.trim(),
+        description: trimmedDescription,
         assigneeIds,
       });
       goToOrder(order);
