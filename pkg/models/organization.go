@@ -32,6 +32,7 @@ type Organization struct {
 	UsageSyncedAt               *time.Time
 	UsageRetentionWindowDays    *int32
 	UsageLimitsSyncedAt         *time.Time
+	MaxParallelFactoryTasks     *int
 	CreatedAt                   *time.Time
 	UpdatedAt                   *time.Time
 	DeletedAt                   gorm.DeletedAt `gorm:"index"`

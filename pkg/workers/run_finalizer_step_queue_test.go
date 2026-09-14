@@ -434,3 +434,88 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
 	assertExecutionRunID(t, thirdPending[0].runID, admitted)
 }
+
+func addStepQueueLine(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	f *models.Factory,
+	stepMaxParallelisms []*int,
+) *models.FactoryLine {
+	t.Helper()
+
+	line, err := f.CreateLine(database.Conn(), support.RandomName("line"), nil)
+	require.NoError(t, err)
+
+	steps := make([]models.FactoryLineStep, len(stepMaxParallelisms))
+	for i, limit := range stepMaxParallelisms {
+		name := support.RandomName("step")
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, f.ID, name, "start-"+name)
+		steps[i] = models.FactoryLineStep{
+			Type:           models.FactoryLineStepTypeRunApp,
+			AppID:          app.ID,
+			Entrypoint:     entrypoint,
+			MaxParallelism: limit,
+		}
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+	return line
+}
+
+func Test__StepQueue_FactoryCapQueuesWhenStepHasRoom(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	assert.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, secondDispatch.State)
+	assert.Empty(t, executionsForOrder(t, second.ID))
+}
+
+func Test__StepQueue_FinishedRunAdmitsWaiterOnOtherLine(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	firstLine := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	secondLine := addStepQueueLine(t, r, firstLine.factory, []*int{stepMaxParallelism(10)})
+
+	first := firstLine.createOpenWorkOrder(t, r, "First")
+	second := firstLine.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := firstLine.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	var secondDispatch *models.FactoryWorkOrderLineDispatch
+	var secondResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		secondDispatch, secondResult, err = secondLine.Dispatch(tx, second)
+		return err
+	}))
+	assert.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
+	require.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
+
+	finishRun(t, firstResult.Run, models.CanvasRunResultPassed)
+	pending := advanceFactoryLine(t, r, firstResult.Run.ID)
+	require.Len(t, pending, 1)
+
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	secondExecutions := executionsForOrder(t, second.ID)
+	require.Len(t, secondExecutions, 1)
+	assertExecutionRunID(t, pending[0].runID, secondExecutions[0])
+}

@@ -592,6 +592,17 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 
 	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
 
+	admitFactoryWaiters := func() error {
+		extra, admitErr := models.AdmitQueuedForFactory(tx, execution.FactoryID)
+		if admitErr != nil {
+			return admitErr
+		}
+		morePending, moreUpdates := factoryAdmissionOutcomes(extra)
+		pendingRuns = append(pendingRuns, morePending...)
+		orderUpdates = append(orderUpdates, moreUpdates...)
+		return nil
+	}
+
 	//
 	// Advance (or finish) the line dispatch this step run belongs to. The
 	// dispatch's steps snapshot — not the live line — is authoritative for
@@ -613,11 +624,20 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil, err
 	}
 	if openWork {
+		if err := admitFactoryWaiters(); err != nil {
+			return nil, nil, err
+		}
 		return pendingRuns, orderUpdates, nil
 	}
 
 	if run.Result != models.CanvasRunResultPassed {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, run.Result)
+		if err := dispatch.Finish(tx, run.Result); err != nil {
+			return nil, nil, err
+		}
+		if err := admitFactoryWaiters(); err != nil {
+			return nil, nil, err
+		}
+		return pendingRuns, orderUpdates, nil
 	}
 
 	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
@@ -635,12 +655,24 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// doesn't keep a zombie active dispatch (which would block any
 	// re-dispatch after a reopen).
 	if !workOrder.IsOpen() {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+		if err := dispatch.Finish(tx, models.CanvasRunResultCancelled); err != nil {
+			return nil, nil, err
+		}
+		if err := admitFactoryWaiters(); err != nil {
+			return nil, nil, err
+		}
+		return pendingRuns, orderUpdates, nil
 	}
 
 	nextIndex := execution.StepIndex + 1
 	if nextIndex >= len(dispatch.Steps) {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
+		if err := dispatch.Finish(tx, models.CanvasRunResultPassed); err != nil {
+			return nil, nil, err
+		}
+		if err := admitFactoryWaiters(); err != nil {
+			return nil, nil, err
+		}
+		return pendingRuns, orderUpdates, nil
 	}
 
 	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
@@ -655,6 +687,9 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		})
 	}
 
+	if err := admitFactoryWaiters(); err != nil {
+		return nil, nil, err
+	}
 	return pendingRuns, orderUpdates, nil
 }
 
