@@ -104,6 +104,22 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-review")).toBeNull();
   });
 
+  it("puts a decision footer under the source pane after Start", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        contextSidebar={<aside data-testid="split-run-overview-sidebar">Source</aside>}
+        resultFooter={<div data-testid="split-run-review">Ready</div>}
+      />,
+    );
+
+    expect(within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-review")).toHaveTextContent(
+      "Ready",
+    );
+    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-review")).toBeNull();
+  });
+
   it("switches to the full plan", async () => {
     const user = userEvent.setup();
     renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);

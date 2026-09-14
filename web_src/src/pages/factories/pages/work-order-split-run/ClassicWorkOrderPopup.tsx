@@ -69,6 +69,24 @@ export function ClassicWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
+  const review = classicPopupReview({
+    fixture: classicFixture,
+    organizationId,
+    factoryId,
+    factoryKey,
+    orderNumber,
+    canUpdate,
+    draftStart,
+    mutations,
+    backToDraft,
+    isDispatching,
+    footerBusy: footerActions.busy,
+    canDispatch,
+    canPickDraftStartModel,
+    draftModel,
+    setDraftModel,
+    inColumn: tab === "description",
+  });
 
   return (
     <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
@@ -87,6 +105,7 @@ export function ClassicWorkOrderPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
+        resultFooter={tab === "description" ? review : undefined}
         sessionLookupError={sessionLookupError?.message}
         header={(views) => (
           <PopupHeader
@@ -119,33 +138,57 @@ export function ClassicWorkOrderPopup({
           </PopupHeader>
         )}
       />
-      <SplitRunReview
-        footer={classicFixture.footer}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        canAct={canUpdate}
-        onStart={draftStart}
-        onArchive={mutations.onArchive}
-        onReject={mutations.onReject}
-        onBackToDraft={backToDraft}
-        onStop={mutations.onStop}
-        startBusy={isDispatching}
-        actionBusy={footerActions.busy}
-        startDisabled={!canDispatch}
-        modelSelect={
-          classicFixture.footer.kind === "draft" && canPickDraftStartModel ? (
-            <DraftStartModelSelect
-              organizationId={organizationId}
-              factoryId={factoryId}
-              lineName={classicFixture.lineName}
-              value={draftModel}
-              onChange={setDraftModel}
-              disabled={isDispatching}
-            />
-          ) : undefined
-        }
-      />
+      {tab !== "description" ? review : null}
     </PopupShell>
+  );
+}
+
+function classicPopupReview(args: {
+  fixture: ClassicWorkOrderPopupProps["fixture"];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  canUpdate: boolean;
+  draftStart: ReturnType<typeof draftStartAction>;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  backToDraft: ReturnType<typeof returnToBacklogAction>;
+  isDispatching: boolean;
+  footerBusy: boolean;
+  canDispatch: boolean;
+  canPickDraftStartModel: boolean;
+  draftModel: string;
+  setDraftModel: (value: string) => void;
+  inColumn: boolean;
+}) {
+  return (
+    <SplitRunReview
+      footer={args.fixture.footer}
+      organizationId={args.organizationId}
+      factoryKey={args.factoryKey}
+      orderNumber={args.orderNumber}
+      canAct={args.canUpdate}
+      onStart={args.draftStart}
+      onArchive={args.mutations.onArchive}
+      onReject={args.mutations.onReject}
+      onBackToDraft={args.backToDraft}
+      onStop={args.mutations.onStop}
+      startBusy={args.isDispatching}
+      actionBusy={args.footerBusy}
+      startDisabled={!args.canDispatch}
+      inColumn={args.inColumn}
+      modelSelect={
+        args.fixture.footer.kind === "draft" && args.canPickDraftStartModel ? (
+          <DraftStartModelSelect
+            organizationId={args.organizationId}
+            factoryId={args.factoryId}
+            lineName={args.fixture.lineName}
+            value={args.draftModel}
+            onChange={args.setDraftModel}
+            disabled={args.isDispatching}
+          />
+        ) : undefined
+      }
+    />
   );
 }

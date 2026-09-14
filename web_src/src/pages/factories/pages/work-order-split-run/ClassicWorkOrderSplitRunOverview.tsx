@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
@@ -31,6 +33,7 @@ type ClassicWorkOrderSplitRunOverviewProps = {
   source?: SplitRunSource;
   files?: FilesFile[];
   sessionLookupError?: string;
+  resultFooter?: ReactNode;
 };
 
 /** The task details shown when live refinement is not active. */
@@ -54,6 +57,7 @@ export function ClassicWorkOrderSplitRunOverview({
   source,
   files,
   sessionLookupError,
+  resultFooter,
 }: ClassicWorkOrderSplitRunOverviewProps) {
   return (
     <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
@@ -95,6 +99,7 @@ export function ClassicWorkOrderSplitRunOverview({
             </section>
           ) : null}
         </div>
+        {resultFooter}
       </div>
 
       <aside className="min-h-0 overflow-y-auto px-6 py-6" data-testid="split-run-overview-sidebar">
