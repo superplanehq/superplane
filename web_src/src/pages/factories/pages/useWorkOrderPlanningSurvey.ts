@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { findPlanningSessionByWorkOrder } from "./planningSessionClient";
 import {
+  draftCardAgentIsWorking,
   planningSessionHasPendingSurvey,
   planningSessionIsWaiting,
   planningSessionIsWorking,
@@ -25,7 +26,7 @@ export function planningActivityPollInterval(
   if (planningSessionIsWaiting(session)) {
     return false;
   }
-  if (planningSessionIsWorking(session) || (backlogAnalyzing && !session)) {
+  if (planningSessionIsWorking(session) || backlogAnalyzing) {
     return SURVEY_POLL_MS;
   }
   return false;
@@ -41,7 +42,7 @@ export function useWorkOrderPlanningActivity(
   workOrderId: string,
   enabled: boolean,
   backlogAnalyzing = false,
-): { hasAgentQuestion: boolean; isWaiting: boolean; isWorking: boolean } {
+): { hasAgentQuestion: boolean; isWaiting: boolean; isWorking: boolean; isAgentWorking: boolean } {
   const { data } = useQuery({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -50,12 +51,13 @@ export function useWorkOrderPlanningActivity(
       planningActivityPollInterval(enabled, query.state.data as PlanningSessionPayload | null, backlogAnalyzing),
   });
   if (!enabled) {
-    return { hasAgentQuestion: false, isWaiting: false, isWorking: false };
+    return { hasAgentQuestion: false, isWaiting: false, isWorking: false, isAgentWorking: backlogAnalyzing };
   }
   return {
     hasAgentQuestion: planningSessionHasPendingSurvey(data),
     isWaiting: planningSessionIsWaiting(data),
     isWorking: planningSessionIsWorking(data),
+    isAgentWorking: draftCardAgentIsWorking(data, backlogAnalyzing),
   };
 }
 

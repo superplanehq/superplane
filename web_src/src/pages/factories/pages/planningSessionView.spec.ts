@@ -198,7 +198,7 @@ describe("createWithAgentViewFromSession", () => {
 
   it("treats a pending wait as waiting, not working", () => {
     const waiting = {
-      executionId: "exec-1",
+      state: "running",
       waitState: "pending",
     };
     expect(planningSessionIsWaiting(waiting)).toBe(true);
@@ -206,7 +206,7 @@ describe("createWithAgentViewFromSession", () => {
   });
 
   it("treats an open session without a wait as working", () => {
-    const running = { executionId: "exec-1" };
+    const running = { state: "running" };
     expect(planningSessionIsWaiting(running)).toBe(false);
     expect(planningSessionIsWorking(running)).toBe(true);
   });
@@ -218,8 +218,8 @@ describe("createWithAgentViewFromSession", () => {
   });
 
   it("keeps thinking states for follow-up work after a score exists", () => {
-    const running = { executionId: "exec-1" };
-    const waiting = { executionId: "exec-1", waitState: "pending" };
+    const running = { state: "running" };
+    const waiting = { state: "running", waitState: "pending" };
     expect(draftCardAgentIsWorking(running, false)).toBe(true);
     expect(draftCardAgentIsWorking(waiting, false)).toBe(false);
     expect(draftCardAgentIsWorking(waiting, true)).toBe(false);

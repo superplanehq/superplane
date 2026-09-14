@@ -110,9 +110,7 @@ export function WorkOrderCard({
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
-  const showAgentQuestion = hasAgentQuestion && isDraft;
-  const agentWorking = isAnalyzing && !showAgentQuestion;
-  const showStart = isDraft && !agentWorking;
+  const { showAgentQuestion, agentWorking, showStart } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -296,6 +294,12 @@ function WorkOrderCardMetaRow({
       </div>
     </div>
   );
+}
+
+function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
+  const showAgentQuestion = hasAgentQuestion && isDraft;
+  const agentWorking = isAnalyzing && !showAgentQuestion;
+  return { showAgentQuestion, agentWorking, showStart: isDraft && !agentWorking };
 }
 
 /**

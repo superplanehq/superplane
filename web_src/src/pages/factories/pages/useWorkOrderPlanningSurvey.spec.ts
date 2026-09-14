@@ -101,15 +101,16 @@ describe("useWorkOrderPlanningActivity", () => {
 });
 
 describe("planningActivityPollInterval", () => {
-  it("polls while the agent works and while a backlog run has no session yet", () => {
-    expect(planningActivityPollInterval(true, { executionId: "exec-1" }, false)).toBe(1500);
+  it("polls while the agent works or a backlog run is active", () => {
+    expect(planningActivityPollInterval(true, { state: "running" }, false)).toBe(1500);
     expect(planningActivityPollInterval(true, null, true)).toBe(1500);
+    expect(planningActivityPollInterval(true, { state: "ended" }, true)).toBe(1500);
   });
 
   it("stops when the session waits or analysis is idle", () => {
-    expect(planningActivityPollInterval(true, { executionId: "exec-1", waitState: "pending" }, true)).toBe(false);
+    expect(planningActivityPollInterval(true, { state: "running", waitState: "pending" }, true)).toBe(false);
     expect(planningActivityPollInterval(true, { state: "ended" }, false)).toBe(false);
     expect(planningActivityPollInterval(true, null, false)).toBe(false);
-    expect(planningActivityPollInterval(false, { executionId: "exec-1" }, true)).toBe(false);
+    expect(planningActivityPollInterval(false, { state: "running" }, true)).toBe(false);
   });
 });

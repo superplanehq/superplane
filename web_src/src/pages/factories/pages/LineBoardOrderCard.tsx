@@ -61,7 +61,7 @@ export function LineBoardWorkOrderCard({
     watchSession,
     isAnalyzing,
   );
-  const agentWorking = session.isWorking || (Boolean(isAnalyzing) && !session.isWaiting);
+  const agentWorking = session.isAgentWorking;
   const showAnalysisActivity = watchSession && agentWorking;
   const { data: checks = [], refetch } = useWorkOrderChecks(
     workOrderCardContext.organizationId,
