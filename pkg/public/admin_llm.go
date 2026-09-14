@@ -424,6 +424,10 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
+		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
+	}
+
 	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -444,15 +448,11 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	if err != nil {
 		return organizationBillingPlanResponse{}, err
 	}
-	polarCustomerID, err := models.OrganizationPolarCustomerID(tx, orgID)
-	if err != nil {
-		return organizationBillingPlanResponse{}, err
-	}
 	return organizationBillingPlanResponse{
 		Plan:                    plan.Plan,
 		PlanSource:              plan.PlanSource,
 		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
-		PolarManaged:            models.OrganizationBillingIsPolarManaged(plan, polarCustomerID),
+		PolarManaged:            models.OrganizationBillingIsPolarManaged(plan),
 		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
 		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
 	}, nil

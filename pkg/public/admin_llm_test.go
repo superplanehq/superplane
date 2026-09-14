@@ -260,6 +260,28 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		assert.False(t, plan.PolarManaged)
 	})
 
+	t.Run("PUT allows a plan when only a Polar customer exists", func(t *testing.T) {
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
+
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
 	t.Run("GET syncs Polar paid over an admin plan", func(t *testing.T) {
 		periodStart := time.Now().UTC().Truncate(time.Second)
 		periodEnd := periodStart.AddDate(0, 1, 0)
@@ -303,8 +325,16 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 	})
 
 	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+			ID:          "sub_admin_put",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		})
+		require.NoError(t, err)
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
-		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
 
 		body, err := json.Marshal(map[string]any{"plan": "trial"})
 		require.NoError(t, err)

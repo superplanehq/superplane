@@ -1,7 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import { ADMIN_LOCAL_PLAN_COPY, ADMIN_POLAR_MANAGED_PLAN_COPY, OrgLLMCreditSection } from "./OrgLLMCreditSection";
+import {
+  ADMIN_LOCAL_PLAN_COPY,
+  ADMIN_PLAN_UNKNOWN_COPY,
+  ADMIN_POLAR_MANAGED_PLAN_COPY,
+  OrgLLMCreditSection,
+} from "./OrgLLMCreditSection";
+
+vi.mock("@/lib/toast", () => ({
+  showErrorToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+}));
 
 const credit = {
   remaining_credit_cents: 5000,
@@ -68,5 +78,29 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
     expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
     expect(screen.getByText(ADMIN_POLAR_MANAGED_PLAN_COPY)).toBeInTheDocument();
+  });
+
+  it("disables the plan control when billing plan is unknown", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/llm-credit") && !url.includes("/grants")) {
+          return new Response(JSON.stringify(credit), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/billing-plan")) {
+          return new Response("failed", { status: 500 });
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
+    expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
+    expect(screen.getByText(ADMIN_PLAN_UNKNOWN_COPY)).toBeInTheDocument();
   });
 });

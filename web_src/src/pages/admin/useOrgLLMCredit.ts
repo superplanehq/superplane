@@ -86,6 +86,9 @@ export function useOrgLLMCredit(orgId: string) {
       applyCredit(await creditResponse.json());
       if (nextPlan) {
         applyPlan(nextPlan);
+      } else {
+        setPlan(null);
+        showErrorToast("Failed to load billing plan");
       }
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
