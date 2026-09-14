@@ -77,7 +77,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "light",
           "dark",
           "system",
-          "github for velocity",
           "velocity",
           "pull requests",
           "preferences",
