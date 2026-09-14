@@ -72,7 +72,6 @@ func (steps *TestLoginPageSteps) Start() {
 
 func (steps *TestLoginPageSteps) VisitLoginPage() {
 	steps.session.Visit("/login")
-	steps.session.Sleep(500)
 }
 
 func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {
@@ -85,7 +84,7 @@ func (steps *TestLoginPageSteps) AssertLoginPageVisible() {
 }
 
 func (steps *TestLoginPageSteps) AssertRedirectedToLoginWithRedirectParam() {
-	steps.session.Sleep(500)
+	steps.session.WaitUntilURLContains("/login")
 	steps.session.AssertURLContains("/login")
 	steps.session.AssertURLContains("redirect=")
 
@@ -94,7 +93,7 @@ func (steps *TestLoginPageSteps) AssertRedirectedToLoginWithRedirectParam() {
 }
 
 func (steps *TestLoginPageSteps) AssertRedirectedFromLoginPage() {
-	steps.session.Sleep(1000)
+	steps.session.WaitUntilURLDoesNotContain("/login")
 	currentURL := steps.session.Page().URL()
 	assert.False(steps.t, strings.Contains(currentURL, "/login"), "expected to redirect away from login, got %s", currentURL)
 }
@@ -238,7 +237,6 @@ func (s *providerSSONoAccountSteps) assertLeftLoginPage() {
 }
 
 func (s *providerSSONoAccountSteps) capture(name string) {
-	s.session.Sleep(300)
 	path := fmt.Sprintf("/app/tmp/screenshots/%s-%s.png", s.spec.screenshot, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		s.t.Fatalf("screenshot dir %s: %v", path, err)

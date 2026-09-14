@@ -86,7 +86,7 @@ func (s *triggerRunTitleSteps) givenACanvasWithManualTrigger(canvasName, trigger
 func (s *triggerRunTitleSteps) whenRunTitleToggleIsEnabled() {
 	runTitleSwitch := q.Locator(`div:has(> label:has-text("Run title")) button[role="switch"]`)
 	s.session.Click(runTitleSwitch)
-	s.session.Sleep(300)
+	s.session.WaitForEnabled(q.TestID("string-field-customname"))
 }
 
 func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
@@ -94,7 +94,10 @@ func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
 }
 
 func (s *triggerRunTitleSteps) waitForAutoSave() {
-	s.session.Sleep(500)
+	require.Eventually(s.t, func() bool {
+		val, exists, found := s.getCustomNameField()
+		return found && exists && val != ""
+	}, 15*time.Second, 200*time.Millisecond, "run title was not saved")
 }
 
 func (s *triggerRunTitleSteps) saveAndPublish() {
@@ -104,7 +107,6 @@ func (s *triggerRunTitleSteps) saveAndPublish() {
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
 	s.session.Click(q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(s.trigger) + `-header"]) [data-testid="start-template-run"]`))
-	s.session.Sleep(2000)
 }
 
 func (s *triggerRunTitleSteps) thenRunTitleInDBEquals(expected string) {
