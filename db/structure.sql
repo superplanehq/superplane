@@ -910,6 +910,8 @@ CREATE TABLE public.organization_billing_plans (
     trial_started_at timestamp with time zone,
     trial_ends_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancel_at_period_end boolean DEFAULT false NOT NULL,
+    polar_modified_at timestamp with time zone,
     CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );

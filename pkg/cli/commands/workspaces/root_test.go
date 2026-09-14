@@ -21,6 +21,7 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	require.NotNil(t, describeCmd)
 	assert.Contains(t, describeCmd.Use, "describe")
 	require.NotNil(t, describeCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, describeCmd.Flags().Lookup("factory"))
 
 	activeCmd, _, err := root.Find([]string{"active"})
 	require.NoError(t, err)

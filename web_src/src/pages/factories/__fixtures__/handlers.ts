@@ -1,4 +1,4 @@
-import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -849,6 +849,38 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
   };
 }
 
+function organizationBillingCancelRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/cancel"),
+    resolve: () => {
+      fixture.organizationBilling = {
+        ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
+        plan: "business",
+        planSource: "polar",
+        creditPurchaseAllowed: true,
+        cancelAtPeriodEnd: true,
+      };
+      return { json: fixture.organizationBilling };
+    },
+  };
+}
+
+function organizationBillingResumeRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/resume"),
+    resolve: () => {
+      fixture.organizationBilling = {
+        ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
+        plan: "business",
+        planSource: "polar",
+        creditPurchaseAllowed: true,
+        cancelAtPeriodEnd: false,
+      };
+      return { json: fixture.organizationBilling };
+    },
+  };
+}
+
 function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/billing"),
@@ -948,6 +980,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
     organizationBillingSyncRoute(fixture),
+    organizationBillingCancelRoute(fixture),
+    organizationBillingResumeRoute(fixture),
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),
