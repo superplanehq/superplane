@@ -19,6 +19,7 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
 import {
   draftStartAction,
   footerMutationHandlers,
+  popupWorkOrderDisplayKey,
   popupWorkOrderUrl,
   returnToBacklogAction,
 } from "./workOrderPopupActions";
@@ -88,6 +89,10 @@ export function ClassicWorkOrderPopup({
         header={(views) => (
           <PopupHeader
             title={edits.title}
+            displayKey={popupWorkOrderDisplayKey(
+              { key: classicFixture.key, number: orderNumber, id: orderId },
+              factoryKey,
+            )}
             onClose={onClose}
             canEditTitle={edits.canEdit}
             titleBusy={edits.titleBusy}
