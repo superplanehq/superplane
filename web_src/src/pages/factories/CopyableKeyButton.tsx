@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -50,20 +51,20 @@ export function CopyableKeyButton({
   return (
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
-        <span>
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className={cn(
-              "shrink-0 rounded-sm px-1 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-              className,
-            )}
-            aria-label={copied ? "Copied" : `Copy task ID ${value}`}
-            data-testid={testId}
-          >
-            {value}
-          </button>
-        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => void handleCopy()}
+          className={cn(
+            "h-auto shrink-0 rounded-sm px-1 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            className,
+          )}
+          aria-label={copied ? "Copied" : `Copy task ID ${value}`}
+          data-testid={testId}
+        >
+          {value}
+        </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">{copied ? "Copied" : "Copy task ID"}</TooltipContent>
     </Tooltip>
