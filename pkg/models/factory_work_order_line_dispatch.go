@@ -119,15 +119,20 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 
 // EnqueueOrStartStep starts the step at stepIndex when it has a free slot,
 // or queues the dispatch for admission when the step is at its
-// maxParallelism. The step's queue is FIFO: when other dispatches already
-// wait for the step, the newcomer joins the back of the queue even if a
-// slot is free (a raised maxParallelism can leave free slots behind queued
-// work). It takes the line's admission lock, so concurrent decisions for
-// the same line cannot both see the last free slot.
+// maxParallelism or the factory is at its parallel-task cap. The step's
+// queue is FIFO: when other dispatches already wait for the step, the
+// newcomer joins the back of the queue even if a slot is free (a raised
+// maxParallelism can leave free slots behind queued work). It takes the
+// factory lock and then the line's admission lock, so concurrent decisions
+// cannot both see the last free factory or step slot.
 func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
+	}
+
+	if _, err := lockFactoryForAdmission(tx, l.FactoryID); err != nil {
+		return nil, err
 	}
 
 	line, err := lockFactoryLineForStepAdmission(tx, l.LineID)
@@ -149,6 +154,14 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 	if active >= int64(step.EffectiveMaxParallelism()) {
+		return l.enqueueStep(tx, order, stepIndex)
+	}
+
+	atFactoryCap, err := factoryAtParallelCapacity(tx, l.OrganizationID, l.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	if atFactoryCap {
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 
@@ -512,6 +525,12 @@ func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepInde
 		}
 		started = append(started, startedLineStepResults(admitted...)...)
 	}
+
+	factoryAdmitted, err := AdmitQueuedForFactory(tx, l.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	started = append(started, startedLineStepResults(factoryAdmitted...)...)
 
 	return started, nil
 }

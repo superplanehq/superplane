@@ -23,8 +23,9 @@ type InstallationSettingsResponse = {
   smtp_username: string;
   smtp_from_name: string;
   smtp_from_email: string;
-  smtp_use_tls: boolean;
-  smtp_password_configured: boolean;
+	smtp_use_tls: boolean;
+	smtp_password_configured: boolean;
+	max_parallel_factory_tasks: number;
 };
 
 type SMTPFormState = {
@@ -39,11 +40,12 @@ type SMTPFormState = {
 };
 
 type DerivedState = {
-  blockedHosts: string[];
-  privateRanges: string[];
-  hasNetworkChanges: boolean;
-  hasSignupChanges: boolean;
-  hasSMTPChanges: boolean;
+	blockedHosts: string[];
+	privateRanges: string[];
+	hasNetworkChanges: boolean;
+	hasSignupChanges: boolean;
+	hasSMTPChanges: boolean;
+	hasFactoryParallelChanges: boolean;
 };
 
 type SignupAccessSectionProps = {
@@ -64,6 +66,14 @@ type NetworkPolicySectionProps = {
   privateIPRangesOverridden: boolean;
   saving: boolean;
   onChange: (checked: boolean) => void;
+  onSave: () => void;
+};
+
+type FactoryParallelSectionProps = {
+  value: string;
+  hasChanges: boolean;
+  saving: boolean;
+  onChange: (value: string) => void;
   onSave: () => void;
 };
 
@@ -133,6 +143,7 @@ const getDerivedState = (
   allowPrivateNetworkAccess: boolean,
   signupsEnabled: boolean,
   form: SMTPFormState,
+  maxParallelFactoryTasks: string,
 ): DerivedState => {
   const hasSMTPSettings = settings?.smtp_enabled ?? false;
 
@@ -151,6 +162,8 @@ const getDerivedState = (
         form.fromEmail.trim() !== settings.smtp_from_email ||
         ((form.enabled || hasSMTPSettings) && form.useTLS !== settings.smtp_use_tls) ||
         form.password !== ""),
+    hasFactoryParallelChanges:
+      settings != null && maxParallelFactoryTasks.trim() !== String(settings.max_parallel_factory_tasks),
   };
 };
 
@@ -478,6 +491,50 @@ const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChan
   </section>
 );
 
+const FactoryParallelSection = ({
+  value,
+  hasChanges,
+  saving,
+  onChange,
+  onSave,
+}: FactoryParallelSectionProps) => (
+  <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+    <div className="max-w-2xl">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Factories</p>
+      <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">Maximum parallel factory tasks</h2>
+      <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Each factory can run this many tasks at the same time. Organization overrides can replace this default.
+      </Text>
+    </div>
+
+    <div className="mt-5 max-w-sm">
+      <Label className="mb-2 block text-left" htmlFor="installation-max-parallel-factory-tasks">
+        Maximum parallel factory tasks
+      </Label>
+      <InputGroup>
+        <Input
+          id="installation-max-parallel-factory-tasks"
+          data-testid="installation-max-parallel-factory-tasks"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          inputMode="numeric"
+        />
+      </InputGroup>
+    </div>
+
+    <div className="mt-6 flex items-center gap-3">
+      <Button
+        type="button"
+        data-testid="installation-max-parallel-factory-tasks-save"
+        onClick={onSave}
+        disabled={saving || !hasChanges}
+      >
+        {saving ? "Saving..." : "Save factory limit"}
+      </Button>
+    </div>
+  </section>
+);
+
 const useInstallationSettingsState = () => {
   const [settings, setSettings] = useState<InstallationSettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -487,12 +544,15 @@ const useInstallationSettingsState = () => {
   const [savingSignups, setSavingSignups] = useState(false);
   const [smtpForm, setSMTPForm] = useState<SMTPFormState>(emptySMTPForm);
   const [savingSMTP, setSavingSMTP] = useState(false);
+  const [maxParallelFactoryTasks, setMaxParallelFactoryTasks] = useState("");
+  const [savingFactoryParallel, setSavingFactoryParallel] = useState(false);
 
   const applySettings = useCallback((data: InstallationSettingsResponse) => {
     setSettings(data);
     setAllowPrivateNetworkAccess(data.allow_private_network_access);
     setSignupsEnabled(data.signups_enabled);
     setSMTPForm(toSMTPFormState(data));
+    setMaxParallelFactoryTasks(String(data.max_parallel_factory_tasks));
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -577,6 +637,27 @@ const useInstallationSettingsState = () => {
     }
   }, [patchSettings, smtpForm]);
 
+  const saveFactoryParallelSettings = useCallback(async () => {
+    const parsed = Number.parseInt(maxParallelFactoryTasks.trim(), 10);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      showErrorToast("Enter a whole number of at least 1.");
+      return;
+    }
+
+    setSavingFactoryParallel(true);
+    try {
+      await patchSettings(
+        { max_parallel_factory_tasks: parsed },
+        "Factory limit updated",
+        "Failed to update factory limit",
+      );
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to update factory limit");
+    } finally {
+      setSavingFactoryParallel(false);
+    }
+  }, [maxParallelFactoryTasks, patchSettings]);
+
   const setSMTPField = useCallback((field: keyof SMTPFormState, value: boolean | string) => {
     setSMTPForm((current) => ({
       ...current,
@@ -593,12 +674,16 @@ const useInstallationSettingsState = () => {
     savingSignups,
     smtpForm,
     savingSMTP,
+    maxParallelFactoryTasks,
+    savingFactoryParallel,
     setAllowPrivateNetworkAccess,
     setSignupsEnabled,
     setSMTPField,
+    setMaxParallelFactoryTasks,
     saveNetworkSettings,
     saveSignupSettings,
     saveSMTPSettings,
+    saveFactoryParallelSettings,
   };
 };
 
@@ -612,12 +697,16 @@ const InstallationSettings: React.FC = () => {
     savingSignups,
     smtpForm,
     savingSMTP,
+    maxParallelFactoryTasks,
+    savingFactoryParallel,
     setAllowPrivateNetworkAccess,
     setSignupsEnabled,
     setSMTPField,
+    setMaxParallelFactoryTasks,
     saveNetworkSettings,
     saveSignupSettings,
     saveSMTPSettings,
+    saveFactoryParallelSettings,
   } = useInstallationSettingsState();
 
   useReportPageReady(!loading || !!settings);
@@ -631,7 +720,13 @@ const InstallationSettings: React.FC = () => {
     );
   }
 
-  const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, signupsEnabled, smtpForm);
+  const derivedState = getDerivedState(
+    settings,
+    allowPrivateNetworkAccess,
+    signupsEnabled,
+    smtpForm,
+    maxParallelFactoryTasks,
+  );
   const showSignupAccessSection = hasSignupWaitlistConfig();
 
   return (
@@ -639,7 +734,8 @@ const InstallationSettings: React.FC = () => {
       <div className="pb-2">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Installation Settings</h1>
         <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Configure installation-wide network policy, email delivery, and SuperPlane-hosted LLM credentials.
+          Configure installation-wide network policy, factory limits, email delivery, and SuperPlane-hosted LLM
+          credentials.
         </Text>
       </div>
 
@@ -665,6 +761,14 @@ const InstallationSettings: React.FC = () => {
           saving={savingNetwork}
           onChange={setAllowPrivateNetworkAccess}
           onSave={saveNetworkSettings}
+        />
+
+        <FactoryParallelSection
+          value={maxParallelFactoryTasks}
+          hasChanges={derivedState.hasFactoryParallelChanges}
+          saving={savingFactoryParallel}
+          onChange={setMaxParallelFactoryTasks}
+          onSave={saveFactoryParallelSettings}
         />
 
         <SMTPSection

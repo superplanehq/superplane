@@ -27,6 +27,7 @@ const installationSettingsResponse = {
   smtp_from_email: "",
   smtp_use_tls: true,
   smtp_password_configured: false,
+  max_parallel_factory_tasks: 50,
 };
 
 const llmSettingsResponse = {
@@ -98,6 +99,7 @@ describe("InstallationSettings", () => {
 
     expect(await screen.findByText("Network policy")).toBeInTheDocument();
     expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
+    expect(await screen.findByTestId("installation-max-parallel-factory-tasks")).toHaveValue("50");
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();
     expect(screen.queryByTestId("installation-signups-switch")).not.toBeInTheDocument();

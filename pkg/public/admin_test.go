@@ -150,6 +150,7 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
 		assert.False(t, result.SMTPEnabled)
+		assert.Equal(t, models.DefaultFactoryMaxParallelTasks, result.MaxParallelFactoryTasks)
 	})
 
 	t.Run("admin can update installation network settings", func(t *testing.T) {
@@ -359,6 +360,86 @@ func unsetEnvForAdminTest(t *testing.T, key string) {
 		}
 
 		require.NoError(t, os.Setenv(key, previousValue))
+	})
+}
+
+func TestAdminFactoryParallelSettings(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	orgPath := "/admin/api/organizations/" + r.Organization.ID.String() + "/factory-settings"
+
+	t.Run("admin can update the installation factory limit", func(t *testing.T) {
+		body, err := json.Marshal(map[string]int{
+			"max_parallel_factory_tasks": 12,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result installationSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		assert.Equal(t, 12, result.MaxParallelFactoryTasks)
+	})
+
+	t.Run("admin can set and clear an organization override", func(t *testing.T) {
+		body, err := json.Marshal(map[string]int{
+			"max_parallel_factory_tasks": 4,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        orgPath,
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result organizationFactorySettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.NotNil(t, result.MaxParallelFactoryTasks)
+		assert.Equal(t, 4, *result.MaxParallelFactoryTasks)
+		assert.Equal(t, 4, result.Effective)
+
+		clearBody, err := json.Marshal(map[string]any{
+			"max_parallel_factory_tasks": nil,
+		})
+		require.NoError(t, err)
+
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        orgPath,
+			body:        clearBody,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		assert.Nil(t, result.MaxParallelFactoryTasks)
+		assert.Equal(t, result.InstallationDefault, result.Effective)
+	})
+
+	t.Run("rejects a factory limit below 1", func(t *testing.T) {
+		body, err := json.Marshal(map[string]int{
+			"max_parallel_factory_tasks": 0,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        orgPath,
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 }
 

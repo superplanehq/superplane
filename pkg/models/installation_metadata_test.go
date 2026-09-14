@@ -19,6 +19,7 @@ func TestGetInstallationMetadata(t *testing.T) {
 	assert.NotEmpty(t, metadata.InstallationID)
 	assert.False(t, metadata.AllowPrivateNetworkAccess)
 	assert.True(t, metadata.SignupsEnabled)
+	assert.Equal(t, DefaultFactoryMaxParallelTasks, metadata.MaxParallelFactoryTasks)
 }
 
 func TestUpdateInstallationMetadata(t *testing.T) {
