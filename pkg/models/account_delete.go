@@ -125,38 +125,6 @@ func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) (
 	return pending, err
 }
 
-func organizationsTouchedByAccount(tx *gorm.DB, accountID uuid.UUID) *gorm.DB {
-	return tx.Where(`
-		(
-			created_by_account_id = ?
-			OR id IN (
-				SELECT organization_id FROM users
-				WHERE account_id = ?
-				AND type = ?
-				AND deleted_at IS NULL
-			)
-		)
-	`, accountID, accountID, UserTypeHuman)
-}
-
-func listOrganizationsForAccountDeletion(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
-	var organizations []Organization
-	err := organizationsTouchedByAccount(tx, accountID).
-		Order("id").
-		Find(&organizations).Error
-	return organizations, err
-}
-
-func organizationHasOtherHumanOwner(owners []User, accountID uuid.UUID) bool {
-	for i := range owners {
-		if owners[i].AccountID != nil && *owners[i].AccountID == accountID {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
 func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	if a == nil {
 		return errors.New("account is required")
@@ -219,4 +187,36 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 		"email":      tombstoneEmail(a.ID, now),
 		"deleted_at": now,
 	}).Error
+}
+
+func organizationsTouchedByAccount(tx *gorm.DB, accountID uuid.UUID) *gorm.DB {
+	return tx.Where(`
+		(
+			created_by_account_id = ?
+			OR id IN (
+				SELECT organization_id FROM users
+				WHERE account_id = ?
+				AND type = ?
+				AND deleted_at IS NULL
+			)
+		)
+	`, accountID, accountID, UserTypeHuman)
+}
+
+func listOrganizationsForAccountDeletion(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
+	var organizations []Organization
+	err := organizationsTouchedByAccount(tx, accountID).
+		Order("id").
+		Find(&organizations).Error
+	return organizations, err
+}
+
+func organizationHasOtherHumanOwner(owners []User, accountID uuid.UUID) bool {
+	for i := range owners {
+		if owners[i].AccountID != nil && *owners[i].AccountID == accountID {
+			continue
+		}
+		return true
+	}
+	return false
 }
