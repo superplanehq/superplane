@@ -954,10 +954,26 @@ func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
 		return err == nil && count > 0
 	}, 15*time.Second, 100*time.Millisecond, "expected at least one %s node after dropping block", slug)
 
-	count, err := headers.Count()
-	require.NoError(s.t, err)
-	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("node-name-input"))
+	if s.isNodeNameInputVisible() {
+		return
+	}
+
+	require.Eventually(s.t, func() bool {
+		if s.isNodeNameInputVisible() {
+			return true
+		}
+		count, err := headers.Count()
+		if err != nil || count == 0 {
+			return false
+		}
+		_ = headers.Nth(count - 1).Click(pw.LocatorClickOptions{Timeout: pw.Float(500)})
+		return s.isNodeNameInputVisible()
+	}, 15*time.Second, 200*time.Millisecond, "component sidebar did not open for %s", slug)
+}
+
+func (s *CanvasSteps) isNodeNameInputVisible() bool {
+	visible, err := q.TestID("node-name-input").Run(s.session).IsVisible()
+	return err == nil && visible
 }
 
 func (s *CanvasSteps) selectLatestNoopNode() {
@@ -1086,10 +1102,25 @@ func (s *CanvasSteps) waitForDraftEdgeCount(expected int) {
 }
 
 func (s *CanvasSteps) StartEditingNode(name string) {
-	// Click on the node header to open the sidebar where settings can be accessed
+	// Click the header to select the node. Live view opens the inspector.
+	// Edit mode opens the component sidebar. Do not require node-name-input;
+	// that field is only present in edit mode.
 	nodeHeader := q.TestID("node", name, "header")
 	s.session.Click(nodeHeader)
-	s.session.AssertVisible(q.TestID("node-name-input"))
+	s.session.WaitUntil(func() bool {
+		if s.isNodeNameInputVisible() {
+			return true
+		}
+		selected, err := nodeHeader.Run(s.session).Evaluate(`el => {
+			const node = el.closest('.react-flow__node');
+			return Boolean(node && node.classList.contains('selected'));
+		}`, nil)
+		if err != nil {
+			return false
+		}
+		isSelected, ok := selected.(bool)
+		return ok && isSelected
+	}, fmt.Sprintf("node %s was not selected", name))
 }
 
 func (s *CanvasSteps) RunManualTrigger(name string) {

@@ -56,20 +56,28 @@ func (s *WebhookResetSteps) openWebhookConfiguration(nodeName string) {
 	s.canvas.EnterEditMode()
 	s.canvas.StartEditingNode(nodeName)
 	s.session.Click(q.Text("Configuration"))
-	s.session.AssertVisible(q.Locator(`label:has-text("Webhook URL")`))
+	s.session.WaitUntil(func() bool {
+		return s.webhookURLValue() != ""
+	}, "webhook URL field did not appear")
+}
+
+func (s *WebhookResetSteps) webhookURLValue() string {
+	value, err := s.session.Page().Locator("#webhook-url-input").InputValue()
+	if err != nil {
+		return ""
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || strings.Contains(value, "URL GENERATED") {
+		return ""
+	}
+	return value
 }
 
 func (s *WebhookResetSteps) waitForWebhookURL() string {
-	input := q.Locator(`label:has-text("Webhook URL") + div input[type="text"]`)
 	var value string
 	require.Eventually(s.t, func() bool {
-		loc := input.Run(s.session)
-		next, err := loc.InputValue()
-		if err != nil {
-			return false
-		}
-		value = strings.TrimSpace(next)
-		return value != "" && !strings.Contains(value, "URL GENERATED")
+		value = s.webhookURLValue()
+		return strings.HasPrefix(value, "http")
 	}, 20*time.Second, 200*time.Millisecond, "timed out waiting for webhook URL")
 	return value
 }

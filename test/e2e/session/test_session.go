@@ -440,10 +440,17 @@ func (s *TestSession) AssertURLContains(part string) {
 func (s *TestSession) WaitForBrowserPath(expectedPath string) {
 	want := normalizeE2EBrowserPath(expectedPath)
 	s.t.Logf("Waiting for browser path %q", want)
-	s.WaitUntil(func() bool {
-		u, err := url.Parse(s.page.URL())
-		return err == nil && normalizeE2EBrowserPath(u.Path) == want
-	}, fmt.Sprintf("timed out waiting for browser path %q, last URL was %q", want, s.page.URL()))
+	last := s.page.URL()
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		last = s.page.URL()
+		u, err := url.Parse(last)
+		if err == nil && normalizeE2EBrowserPath(u.Path) == want {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for browser path %q, last URL was %q", want, last)
 }
 
 func normalizeE2EBrowserPath(p string) string {

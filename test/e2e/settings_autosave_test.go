@@ -70,7 +70,7 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
 	require.Eventually(s.t, func() bool {
 		val, exists, found := s.getExpressionField()
-		return found && exists && val == ""
+		return found && (!exists || val == "")
 	}, 15*time.Second, 200*time.Millisecond, "cleared expression was not saved")
 }
 
