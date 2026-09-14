@@ -154,7 +154,7 @@ blocks:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       secrets:
-        - name: github-token
+        - name: ghcr-push-token
       jobs:
         - name: Build image
           commands:
