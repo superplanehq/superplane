@@ -954,26 +954,35 @@ func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
 		return err == nil && count > 0
 	}, 15*time.Second, 100*time.Millisecond, "expected at least one %s node after dropping block", slug)
 
-	if s.isNodeNameInputVisible() {
-		return
-	}
-
 	require.Eventually(s.t, func() bool {
-		if s.isNodeNameInputVisible() {
-			return true
-		}
 		count, err := headers.Count()
 		if err != nil || count == 0 {
 			return false
 		}
-		_ = headers.Nth(count - 1).Click(pw.LocatorClickOptions{Timeout: pw.Float(500)})
-		return s.isNodeNameInputVisible()
+		latest := headers.Nth(count - 1)
+		if s.isReactFlowNodeSelected(latest) && s.isNodeNameInputVisible() {
+			return true
+		}
+		_ = latest.Click(pw.LocatorClickOptions{Timeout: pw.Float(500)})
+		return s.isReactFlowNodeSelected(latest) && s.isNodeNameInputVisible()
 	}, 15*time.Second, 200*time.Millisecond, "component sidebar did not open for %s", slug)
 }
 
 func (s *CanvasSteps) isNodeNameInputVisible() bool {
 	visible, err := q.TestID("node-name-input").Run(s.session).IsVisible()
 	return err == nil && visible
+}
+
+func (s *CanvasSteps) isReactFlowNodeSelected(header pw.Locator) bool {
+	selected, err := header.Evaluate(`el => {
+		const node = el.closest('.react-flow__node');
+		return Boolean(node && node.classList.contains('selected'));
+	}`, nil)
+	if err != nil {
+		return false
+	}
+	isSelected, ok := selected.(bool)
+	return ok && isSelected
 }
 
 func (s *CanvasSteps) selectLatestNoopNode() {
@@ -1111,15 +1120,7 @@ func (s *CanvasSteps) StartEditingNode(name string) {
 		if s.isNodeNameInputVisible() {
 			return true
 		}
-		selected, err := nodeHeader.Run(s.session).Evaluate(`el => {
-			const node = el.closest('.react-flow__node');
-			return Boolean(node && node.classList.contains('selected'));
-		}`, nil)
-		if err != nil {
-			return false
-		}
-		isSelected, ok := selected.(bool)
-		return ok && isSelected
+		return s.isReactFlowNodeSelected(nodeHeader.Run(s.session))
 	}, fmt.Sprintf("node %s was not selected", name))
 }
 

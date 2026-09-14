@@ -20,7 +20,7 @@ func TestOrganizationEntry(t *testing.T) {
 
 		require.NoError(t, models.EnableExperimentalFeature(session.OrgID, features.FeatureFactories))
 		session.Visit("/?select=true")
-		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
+		session.WaitForBrowserPathPrefix("/" + session.OrgSlug + "/workspaces")
 	})
 
 	t.Run("opens workspaces when factories are enabled and the org home is requested", func(t *testing.T) {
@@ -28,7 +28,7 @@ func TestOrganizationEntry(t *testing.T) {
 
 		require.NoError(t, models.EnableExperimentalFeature(session.OrgID, features.FeatureFactories))
 		session.Visit("/" + session.OrgSlug)
-		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
+		session.WaitForBrowserPathPrefix("/" + session.OrgSlug + "/workspaces")
 	})
 
 	t.Run("opens the legacy organization when factories are disabled", func(t *testing.T) {

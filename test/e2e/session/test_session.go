@@ -453,6 +453,25 @@ func (s *TestSession) WaitForBrowserPath(expectedPath string) {
 	s.t.Fatalf("timed out waiting for browser path %q, last URL was %q", want, last)
 }
 
+// WaitForBrowserPathPrefix polls until the URL path starts with prefix after
+// normalizing trailing slashes. Use this for factory routes that continue
+// into a workspace, such as /{org}/workspaces/newwo/setup.
+func (s *TestSession) WaitForBrowserPathPrefix(prefix string) {
+	want := normalizeE2EBrowserPath(prefix)
+	s.t.Logf("Waiting for browser path prefix %q", want)
+	last := s.page.URL()
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		last = s.page.URL()
+		u, err := url.Parse(last)
+		if err == nil && strings.HasPrefix(normalizeE2EBrowserPath(u.Path), want) {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for browser path prefix %q, last URL was %q", want, last)
+}
+
 func normalizeE2EBrowserPath(p string) string {
 	p = strings.TrimSpace(p)
 	if p == "" || p == "/" {

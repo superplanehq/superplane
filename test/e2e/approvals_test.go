@@ -373,38 +373,25 @@ func (s *ApprovalSteps) rememberWaitingApprovalExecution() {
 
 func (s *ApprovalSteps) deleteApprovalNodeFromCanvas() {
 	s.canvas.EnterEditMode()
+	s.canvas.ClickOnEmptyCanvasArea()
 	s.deleteNodeFromCanvas("Approval")
+	s.canvas.WaitForStaging(uuid.Nil)
 	s.canvas.CommitAndPublish()
 }
 
 func (s *ApprovalSteps) deleteNodeFromCanvas(nodeName string) {
 	safe := strings.ToLower(nodeName)
 	safe = strings.ReplaceAll(safe, " ", "-")
+	node := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`)
 	nodeHeader := q.TestID("node", nodeName, "header")
 	deleteButton := q.Locator(
 		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-delete"]`,
 	)
 
-	header := nodeHeader.Run(s.session)
-	remove := deleteButton.Run(s.session)
-	require.Eventually(s.t, func() bool {
-		hidden, err := header.IsHidden()
-		if err == nil && hidden {
-			return true
-		}
-		if err := header.Hover(); err != nil {
-			return false
-		}
-		visible, err := remove.IsVisible()
-		if err != nil || !visible {
-			return false
-		}
-		if err := remove.Click(); err != nil {
-			return false
-		}
-		hidden, err = header.IsHidden()
-		return err == nil && hidden
-	}, 15*time.Second, 200*time.Millisecond, "approval node was not deleted from the canvas")
+	s.session.HoverOver(node)
+	s.session.AssertVisible(deleteButton)
+	s.session.Click(deleteButton)
+	s.session.AssertHidden(nodeHeader)
 }
 
 func (s *ApprovalSteps) assertApprovalNodeDeletedFromDB() {
