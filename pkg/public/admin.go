@@ -124,6 +124,10 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 		s.registry.HTTPContext().InvalidatePolicyCache()
 	}
 
+	if req.MaxParallelFactoryTasks != nil {
+		admitQueuedFactoryWork(models.AdmitQueuedOnInstallationDefault)
+	}
+
 	response, err := s.buildInstallationSettingsResponse()
 	if err != nil {
 		log.Errorf("admin: failed to load updated installation settings: %v", err)

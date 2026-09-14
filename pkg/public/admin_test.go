@@ -443,6 +443,79 @@ func TestAdminFactoryParallelSettings(t *testing.T) {
 	})
 }
 
+// A saved cap is only a number. The endpoint must also start the queued
+// work that the larger cap now has room for.
+func TestAdminFactoryParallelSettingsAdmitsQueuedWork(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	stepLimit := 10
+	line := support.CreateFactoryLineWithSteps(t, r, factory, []*int{&stepLimit})
+
+	firstDispatch := dispatchFactoryWorkOrderForAdminTest(t, r, factory, line, "First")
+	require.NotNil(t, firstDispatch.Run)
+
+	secondDispatch := dispatchFactoryWorkOrderForAdminTest(t, r, factory, line, "Second")
+	require.NotNil(t, secondDispatch.QueueItem)
+
+	body, err := json.Marshal(map[string]int{"max_parallel_factory_tasks": 2})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      "PATCH",
+		path:        "/admin/api/organizations/" + r.Organization.ID.String() + "/factory-settings",
+		body:        body,
+		authCookie:  token,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var remaining int64
+	require.NoError(t, database.Conn().
+		Model(&models.FactoryWorkOrderQueueItem{}).
+		Where("factory_id = ?", factory.ID).
+		Count(&remaining).Error)
+	assert.Equal(t, int64(0), remaining)
+
+	var executions int64
+	require.NoError(t, database.Conn().
+		Model(&models.FactoryWorkOrderExecution{}).
+		Where("factory_id = ?", factory.ID).
+		Count(&executions).Error)
+	assert.Equal(t, int64(2), executions)
+}
+
+func dispatchFactoryWorkOrderForAdminTest(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factory *models.Factory,
+	line *models.FactoryLine,
+	title string,
+) *models.FactoryLineStepResult {
+	t.Helper()
+
+	order, err := factory.CreateWorkOrder(database.Conn(), title, "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, result, err = line.Dispatch(tx, order)
+		return err
+	}))
+
+	return result
+}
+
 func TestAdminListCanvases(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 

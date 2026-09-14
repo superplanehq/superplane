@@ -127,3 +127,63 @@ func factoryAtParallelCapacity(tx *gorm.DB, orgID, factoryID uuid.UUID) (bool, e
 	}
 	return active >= int64(max), nil
 }
+
+// AdmitQueuedForOrganization admits queued factory work in every factory
+// of the organization that has waiting dispatches. Storing a new cap does
+// not start anything by itself, so run this after the organization
+// override changes; without it, the extra slots stay empty until an
+// active task finishes. A lowered cap admits nothing, because each
+// factory rechecks its capacity.
+func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineStepResult, error) {
+	var factoryIDs []uuid.UUID
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Distinct().
+		Where("organization_id = ?", orgID).
+		Order("factory_id").
+		Pluck("factory_id", &factoryIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return admitQueuedForFactories(tx, factoryIDs)
+}
+
+// AdmitQueuedOnInstallationDefault admits queued factory work in every
+// factory whose organization has no cap override, which are the
+// organizations the installation default applies to. Run it after the
+// installation default changes.
+func AdmitQueuedOnInstallationDefault(tx *gorm.DB) ([]*FactoryLineStepResult, error) {
+	var factoryIDs []uuid.UUID
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Distinct().
+		Joins("JOIN organizations ON organizations.id = factory_work_order_queue_items.organization_id").
+		Where("organizations.deleted_at IS NULL").
+		Where("organizations.max_parallel_factory_tasks IS NULL").
+		Order("factory_work_order_queue_items.factory_id").
+		Pluck("factory_work_order_queue_items.factory_id", &factoryIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return admitQueuedForFactories(tx, factoryIDs)
+}
+
+// admitQueuedForFactories walks the factories in a fixed order, so two
+// concurrent cap changes cannot take the factory admission locks in
+// opposite orders and deadlock.
+func admitQueuedForFactories(tx *gorm.DB, factoryIDs []uuid.UUID) ([]*FactoryLineStepResult, error) {
+	var admitted []*FactoryLineStepResult
+	for _, factoryID := range factoryIDs {
+		results, err := AdmitQueuedForFactory(tx, factoryID)
+		if err != nil {
+			return nil, err
+		}
+		admitted = append(admitted, results...)
+	}
+
+	return admitted, nil
+}
