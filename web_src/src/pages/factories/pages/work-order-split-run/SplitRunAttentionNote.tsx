@@ -104,6 +104,7 @@ export function SplitRunAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  actionsOnly = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -115,6 +116,7 @@ export function SplitRunAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  actionsOnly?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
@@ -140,6 +142,7 @@ export function SplitRunAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        actionsOnly={actionsOnly}
         onAction={onAction}
       />
     );
@@ -195,6 +198,7 @@ function CompactAttentionNote({
   startBusy,
   startDisabled,
   modelSelect,
+  actionsOnly,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -204,18 +208,24 @@ function CompactAttentionNote({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
+  actionsOnly: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
-      <div
-        key={`${note.headline}-${note.text ?? ""}`}
-        className="sp-stream-text min-w-0 flex-1"
-        data-testid="split-run-intent-decision-tip"
-      >
-        <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
-        {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
-      </div>
+    <div
+      className={cn("flex items-center gap-3", actionsOnly ? "shrink-0" : "min-w-0 flex-1")}
+      data-testid="split-run-attention-note"
+    >
+      {actionsOnly ? null : (
+        <div
+          key={`${note.headline}-${note.text ?? ""}`}
+          className="sp-stream-text min-w-0 flex-1"
+          data-testid="split-run-intent-decision-tip"
+        >
+          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
+          {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
+        </div>
+      )}
       <NoteActionRow
         note={note}
         actions={actions}

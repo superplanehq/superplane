@@ -1,17 +1,21 @@
-import { useState, type PointerEvent, type ReactNode } from "react";
+import { cloneElement, isValidElement, useState, type PointerEvent, type ReactElement, type ReactNode } from "react";
 
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 
+import { hasAnalysisPlan } from "../../lib/analysisOutcome";
 import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { useFactoryPreviewFlag } from "../factoryPreviewFlagsContext";
 import { latestPlanScore } from "./latestPlanScore";
-import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, splitRunIntentDocument } from "./splitRunPopupModel";
+import { splitRunIntentDocument } from "./splitRunPopupModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
 import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
-import { DEFAULT_INTENT_LEFT_PERCENT, useSplitRunPanePercent } from "./useSplitRunPanePercent";
+import {
+  DEFAULT_INTENT_LEFT_PERCENT,
+  DEFAULT_REFINE_INTENT_LEFT_PERCENT,
+  useSplitRunPanePercent,
+} from "./useSplitRunPanePercent";
 import type { SplitRunSource } from "./splitRunSource";
 
 const SESSION_TITLE_FALLBACK = "Task";
@@ -56,10 +60,13 @@ export function WorkOrderIntentDocument({
   source?: SplitRunSource;
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
-  const oneBarPlanStrip = useFactoryPreviewFlag("oneBarPlanStrip");
   const [showPlan, setShowPlan] = useState(false);
   const [planPaneOpen, setPlanPaneOpen] = useState(false);
-  const split = useSplitRunPanePercent({ defaultPercent: DEFAULT_INTENT_LEFT_PERCENT, minPercent: 28, maxPercent: 68 });
+  const split = useSplitRunPanePercent({
+    defaultPercent: refineOpen ? DEFAULT_REFINE_INTENT_LEFT_PERCENT : DEFAULT_INTENT_LEFT_PERCENT,
+    minPercent: 28,
+    maxPercent: 68,
+  });
   const document = splitRunIntentDocument({ artifacts, description });
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
   const showPlanPane = !refineOpen || planPaneOpen;
@@ -69,15 +76,10 @@ export function WorkOrderIntentDocument({
         ...analysis,
         planPaneOpen,
         onTogglePlan: () => setPlanPaneOpen((current) => !current),
-        latestPlanScore: latestPlanScore(analysis.view.messages),
-        closedDecision: chatSolo ? (
-          <ClosedPlanActions
-            confidence={confidence}
-            isAnalyzing={isAnalyzing}
-            resultFooter={resultFooter}
-            oneBar={oneBarPlanStrip}
-          />
-        ) : undefined,
+        canTogglePlan: hasAnalysisPlan(artifacts),
+        latestPlanScore: latestPlanScore(analysis.view.messages) ?? confidence?.score,
+        isAnalyzing,
+        closedDecision: refineOpen ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
       }
     : undefined;
 
@@ -128,30 +130,12 @@ export function WorkOrderIntentDocument({
   );
 }
 
-function ClosedPlanActions({
-  confidence,
-  isAnalyzing,
-  resultFooter,
-  oneBar,
-}: {
-  confidence?: WorkOrderCheckPresentation;
-  isAnalyzing: boolean;
-  resultFooter?: ReactNode;
-  oneBar: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-wrap items-center justify-end",
-        oneBar
-          ? "gap-2 [&_[data-testid=split-run-attention-note]]:flex-none [&_[data-testid=split-run-intent-decision-tip]]:hidden [&_[data-testid=split-run-review]]:flex-none"
-          : "gap-3",
-      )}
-    >
-      {oneBar ? null : <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />}
-      {resultFooter}
-    </div>
-  );
+function ClosedPlanActions({ resultFooter }: { resultFooter?: ReactNode }) {
+  const actions =
+    isValidElement(resultFooter) && typeof resultFooter.type !== "string"
+      ? cloneElement(resultFooter as ReactElement<{ actionsOnly?: boolean }>, { actionsOnly: true })
+      : resultFooter;
+  return <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>;
 }
 
 function IntentSpecColumn({
@@ -218,13 +202,14 @@ function IntentSpecColumn({
           />
           {resultAfterBody}
         </div>
-        <IntentSpecFooter
-          confidence={confidence}
-          isAnalyzing={isAnalyzing}
-          resultFooter={resultFooter}
-          refineOpen={refineOpen}
-          contextSidebar={Boolean(contextSidebar)}
-        />
+        {refineOpen ? null : (
+          <IntentSpecFooter
+            confidence={confidence}
+            isAnalyzing={isAnalyzing}
+            resultFooter={resultFooter}
+            contextSidebar={Boolean(contextSidebar)}
+          />
+        )}
       </div>
     </>
   );
@@ -234,28 +219,15 @@ function IntentSpecFooter({
   confidence,
   isAnalyzing,
   resultFooter,
-  refineOpen,
   contextSidebar,
 }: {
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
-  refineOpen: boolean;
   contextSidebar: boolean;
 }) {
   if (contextSidebar) {
     return resultFooter;
-  }
-  if (refineOpen) {
-    return (
-      <div
-        className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "justify-between gap-4")}
-        data-testid="split-run-intent-decision"
-      >
-        <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} flush />
-        {resultFooter}
-      </div>
-    );
   }
   return (
     <>

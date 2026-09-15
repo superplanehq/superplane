@@ -56,25 +56,19 @@ export const AutomationRun: Story = {
   },
 };
 
-function refineChatOnBoard(previewFlags?: { oneBarPlanStrip?: boolean }) {
+function refineChatOnBoard() {
   const line = REFUND_FACTORY_LINES[0];
   return (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${DRAFT_WORK_ORDER.number}?lineId=${line.id}`}
       factoriesFixture={refineChatBoardFixture()}
       experimentalFeatures={[FEATURE_FACTORY_CREATE_WITH_AGENT]}
-      previewFlags={previewFlags}
     />
   );
 }
 
 /** Line board with the refine popup open: agent and user chat, a prior survey answer, and a pending survey. */
 export const RefineChatOnBoard: Story = {
-  name: "Refine chat on the board — today",
+  name: "Refine chat on the board",
   render: () => refineChatOnBoard(),
-};
-
-export const RefineChatOnBoardOneBar: Story = {
-  name: "Refine chat on the board — one bar",
-  render: () => refineChatOnBoard({ oneBarPlanStrip: true }),
 };

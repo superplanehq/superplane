@@ -27,26 +27,31 @@ type Story = StoryObj;
 
 const LOOKS: { look: PlanStripLook; label: string; note: string }[] = [
   {
-    look: "today",
-    label: "Today",
-    note: "Two bars. Plan updated, then 2/5 with the why sentence, Archive, and Start.",
-  },
-  {
     look: "oneBar",
     label: "One bar",
-    note: "Score bars, Plan updated, Show plan, Archive, and Start. No second 2/5. No why sentence.",
+    note: "Score bars, Plan updated, Show plan, Archive, and Start.",
   },
   {
     look: "oneBarOpen",
     label: "One bar, plan open",
-    note: "Score bars, Plan updated, and Hide plan. Start and Archive are not on this bar.",
+    note: "Score bars, Hide plan, Archive, and Start. No Plan updated title.",
+  },
+  {
+    look: "chips",
+    label: "Chips",
+    note: "Clarity, Show plan, Archive, and Start chips.",
+  },
+  {
+    look: "chipsOpen",
+    label: "Chips, plan open",
+    note: "Hide plan stays on the chips. Clarity, Archive, and Start stay.",
   },
 ];
 
 export const Compare: Story = {
   name: "Compare looks",
   render: () => (
-    <div className="grid gap-6 xl:grid-cols-3">
+    <div className="grid gap-6 xl:grid-cols-2">
       {LOOKS.map((entry) => (
         <LookColumn key={entry.look} title={entry.label} note={entry.note}>
           <PlanStripPreview look={entry.look} />
@@ -54,11 +59,6 @@ export const Compare: Story = {
       ))}
     </div>
   ),
-};
-
-export const Today: Story = {
-  name: "Today — two bars",
-  render: () => <PlanStripPreview look="today" />,
 };
 
 export const OneBar: Story = {
@@ -71,9 +71,24 @@ export const OneBarOpen: Story = {
   render: () => <PlanStripPreview look="oneBarOpen" />,
 };
 
+export const Chips: Story = {
+  name: "Chips",
+  render: () => <PlanStripPreview look="chips" />,
+};
+
+export const ChipsOpen: Story = {
+  name: "Chips, plan open",
+  render: () => <PlanStripPreview look="chipsOpen" />,
+};
+
 export const TryOneBar: Story = {
   name: "Try one bar",
-  render: () => <PlanStripPreviewToggle />,
+  render: () => <PlanStripPreviewToggle look="oneBar" />,
+};
+
+export const TryChips: Story = {
+  name: "Try chips",
+  render: () => <PlanStripPreviewToggle look="chips" />,
 };
 
 function LookColumn({ title, note, children }: { title: string; note: string; children: ReactNode }) {
