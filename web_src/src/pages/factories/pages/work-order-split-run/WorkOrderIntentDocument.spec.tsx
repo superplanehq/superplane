@@ -18,6 +18,7 @@ import {
   renderIntentDocument,
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 import type { SplitRunSource } from "./splitRunSource";
 
@@ -178,7 +179,9 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
-    expect(screen.getByTestId("split-run-intent-composer").closest(".sp-user-note")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "frame");
+    expect(screen.getByTestId("split-run-intent-composer-card").className).not.toContain("focus-within:ring");
+    expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
@@ -195,8 +198,18 @@ describe("WorkOrderIntentDocument", () => {
     }
     expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
     expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(chips.closest("[data-slot=frame-panel-header]")).not.toBeNull();
+    expect(chips.closest("[data-slot=frame-panel]")).toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=frame-panel]")).not.toBeNull();
+    expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
     expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+    expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
+    const send = screen.getByTestId("split-run-intent-composer-send");
+    expect(send).toHaveAttribute("data-size", "icon-sm");
+    expect(send).toHaveAttribute("aria-label", ANALYSIS_PLANNING_COPY.send);
+    expect(send.children).toHaveLength(1);
   });
 
   it("streams the summary when the spec updates after open", () => {

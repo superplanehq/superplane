@@ -35,8 +35,15 @@ export function ComposerPlanStack({
   onToggle?: () => void;
   actions?: ReactNode;
 }) {
+  const showScore = score != null || isAnalyzing;
+  const showPlan = canTogglePlan;
+  const showActions = Boolean(actions);
+  if (!showScore && !showPlan && !showActions) {
+    return null;
+  }
+
   return (
-    <div className="flex shrink-0 flex-col pb-1 pt-1" data-testid="split-run-intent-plan-updated">
+    <div className="flex w-full min-w-0 shrink-0 flex-col" data-testid="split-run-intent-plan-updated">
       <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
         <ScoreChip score={score} scoreSummary={scoreSummary} isAnalyzing={isAnalyzing} />
         {canTogglePlan ? <PlanToggle open={open} onToggle={onToggle} /> : null}

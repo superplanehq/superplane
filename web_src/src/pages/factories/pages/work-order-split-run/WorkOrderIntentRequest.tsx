@@ -2,8 +2,9 @@ import type { FormEvent, ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -14,7 +15,11 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
-import { splitRunChatColumnClassName, SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
+import {
+  splitRunChatColumnClassName,
+  SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME,
+  SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
+} from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
@@ -92,6 +97,10 @@ function AnalysisRequestChat({
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
     resumeOnBottom: true,
   });
+  const showComposerChips = Boolean(
+    analysis.onTogglePlan &&
+      (analysis.latestPlanScore != null || analysis.isAnalyzing || analysis.canTogglePlan),
+  );
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (analysis.canSend) {
@@ -105,7 +114,7 @@ function AnalysisRequestChat({
         <div
           ref={follow.scrollRef}
           onScroll={follow.onScroll}
-          className="absolute inset-0 overflow-y-auto"
+          className={cn("absolute inset-0", SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME)}
           data-testid="split-run-intent-chat-log"
         >
           <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
@@ -136,60 +145,79 @@ function AnalysisRequestChat({
         )}
       </div>
       <div
-        className={cn(chatColumnClass, "shrink-0", chatSolo ? "pb-6" : "pb-3")}
+        className={cn(
+          chatColumnClass,
+          SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME,
+          "shrink-0",
+          chatSolo ? "pb-4" : "pb-2",
+        )}
         data-testid="split-run-intent-chat-column"
       >
-        {analysis.onTogglePlan ? (
-          <ComposerPlanStack
-            open={Boolean(analysis.planPaneOpen)}
-            score={analysis.latestPlanScore}
-            scoreSummary={analysis.latestPlanSummary}
-            isAnalyzing={Boolean(analysis.isAnalyzing)}
-            canTogglePlan={Boolean(analysis.canTogglePlan)}
-            onToggle={analysis.onTogglePlan}
-            actions={analysis.closedDecision}
-          />
-        ) : null}
         <form
           className={cn(
             SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
-            "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0",
+            "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0 pb-0",
           )}
           onSubmit={handleSubmit}
         >
           <label htmlFor="split-run-intent-composer" className="sr-only">
             {ANALYSIS_PLANNING_COPY.composerPlaceholder}
           </label>
-          <div className="sp-user-note flex min-h-[3.5rem] w-full items-center gap-2 rounded-2xl border">
-            <Textarea
-              id="split-run-intent-composer"
-              data-testid="split-run-intent-composer"
-              value={analysis.composer}
-              placeholder={state.placeholder}
-              disabled={!analysis.canSend}
-              onChange={(event) => analysis.onComposerChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  if (analysis.canSend) {
-                    analysis.onSend();
-                  }
-                }
-              }}
-              className="min-h-[3.5rem] flex-1 resize-none rounded-2xl border-0 bg-transparent px-3.5 py-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
-              rows={2}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="mr-2 size-8 shrink-0 rounded-full"
-              disabled={!analysis.canSend || !analysis.composer.trim()}
-              aria-label={ANALYSIS_PLANNING_COPY.send}
-            >
-              <ArrowUp className="size-4" aria-hidden />
-              <span className="sr-only">{ANALYSIS_PLANNING_COPY.send}</span>
-            </Button>
-          </div>
+          <Frame dense data-testid="split-run-intent-composer-card">
+            {showComposerChips ? (
+              <FrameHeader className="px-3 py-1.5">
+                <ComposerPlanStack
+                  open={Boolean(analysis.planPaneOpen)}
+                  score={analysis.latestPlanScore}
+                  scoreSummary={analysis.latestPlanSummary}
+                  isAnalyzing={Boolean(analysis.isAnalyzing)}
+                  canTogglePlan={Boolean(analysis.canTogglePlan)}
+                  onToggle={analysis.onTogglePlan}
+                  actions={analysis.closedDecision}
+                />
+              </FrameHeader>
+            ) : null}
+            <FramePanel className="px-0 py-0" fit>
+              <InputGroup className="h-auto rounded-none border-0 bg-transparent shadow-none has-[[data-slot=input-group-control]:focus]:ring-0 dark:bg-transparent">
+                <InputGroupTextarea
+                  id="split-run-intent-composer"
+                  data-testid="split-run-intent-composer"
+                  value={analysis.composer}
+                  placeholder={state.placeholder}
+                  disabled={!analysis.canSend}
+                  onChange={(event) => analysis.onComposerChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      if (analysis.canSend) {
+                        analysis.onSend();
+                      }
+                    }
+                  }}
+                  className="min-h-[4.2rem] py-2 text-[13px]"
+                  rows={2}
+                />
+                <InputGroupAddon align="block-end" className="pb-1.5">
+                  <div className="ms-auto flex items-center gap-1.5">
+                    <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
+                      {ANALYSIS_PLANNING_COPY.sendShortcut}
+                    </Kbd>
+                    <InputGroupButton
+                      type="submit"
+                      variant="default"
+                      size="icon-sm"
+                      className="rounded-full"
+                      disabled={!analysis.canSend || !analysis.composer.trim()}
+                      aria-label={ANALYSIS_PLANNING_COPY.send}
+                      data-testid="split-run-intent-composer-send"
+                    >
+                      <ArrowUp className="size-4" aria-hidden />
+                    </InputGroupButton>
+                  </div>
+                </InputGroupAddon>
+              </InputGroup>
+            </FramePanel>
+          </Frame>
           {analysis.composerError ? (
             <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
               {analysis.composerError}
