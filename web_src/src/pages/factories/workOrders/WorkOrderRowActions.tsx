@@ -214,20 +214,22 @@ export function QueuedFirstStepControls({
       </span>
       {onCancelQueue ? (
         <PermissionTooltip allowed={canDispatch} message="You don't have permission to cancel this queue.">
-          <button
+          <Button
             type="button"
-            className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-50"
+            variant="ghost"
+            size="icon-xs"
+            className="size-6 text-muted-foreground hover:text-foreground"
             disabled={!canDispatch || isCanceling}
             aria-label="Remove from the queue"
             data-testid={`work-order-card-cancel-queue-${orderId}`}
             onClick={() => void onCancelQueue(orderId)}
           >
             {isCanceling ? (
-              <Loader2 className="size-3 animate-spin" aria-hidden />
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
             ) : (
-              <X className="size-3" aria-hidden />
+              <X className="size-3.5" aria-hidden />
             )}
-          </button>
+          </Button>
         </PermissionTooltip>
       ) : null}
     </div>
