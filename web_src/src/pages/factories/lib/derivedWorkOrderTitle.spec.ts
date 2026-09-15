@@ -41,6 +41,22 @@ describe("derivedWorkOrderTitle", () => {
     expect(derivedWorkOrderTitle("**Something")).toBe("**Something");
   });
 
+  it("keeps spaced asterisks that are not emphasis", () => {
+    expect(derivedWorkOrderTitle("5 * 3 * 2")).toBe("5 * 3 * 2");
+  });
+
+  it("keeps emphasis marks inside inline code", () => {
+    expect(derivedWorkOrderTitle("`retry*now*`")).toBe("`retry*now*`");
+  });
+
+  it("keeps escaped emphasis marks", () => {
+    expect(derivedWorkOrderTitle("\\*not italic\\*")).toBe("\\*not italic\\*");
+  });
+
+  it("strips emphasis that wraps inline code", () => {
+    expect(derivedWorkOrderTitle("**use `retry*now*` please**")).toBe("use `retry*now*` please");
+  });
+
   it("keeps underscores between word characters", () => {
     expect(derivedWorkOrderTitle("foo_bar")).toBe("foo_bar");
   });

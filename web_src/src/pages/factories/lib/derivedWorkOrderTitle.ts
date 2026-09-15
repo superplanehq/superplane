@@ -41,6 +41,12 @@ function unwrapDelimiter(line: string, delimiter: string): string {
   let result = "";
   let index = 0;
   while (index < line.length) {
+    const codeEnd = closedInlineCodeSpanEnd(line, index);
+    if (codeEnd !== -1) {
+      result += line.slice(index, codeEnd);
+      index = codeEnd;
+      continue;
+    }
     const closeAt = findEmphasisClose(line, index, delimiter);
     if (closeAt === -1) {
       result += line[index];
@@ -54,21 +60,43 @@ function unwrapDelimiter(line: string, delimiter: string): string {
 }
 
 function findEmphasisClose(line: string, openAt: number, delimiter: string): number {
-  if (!isEmphasisDelimiterAt(line, openAt, delimiter)) {
+  if (!canOpenEmphasisAt(line, openAt, delimiter)) {
     return -1;
   }
   const innerStart = openAt + delimiter.length;
-  for (let index = innerStart; index < line.length; index += 1) {
-    if (index === innerStart || !isEmphasisDelimiterAt(line, index, delimiter)) {
+  let index = innerStart;
+  while (index < line.length) {
+    const codeEnd = closedInlineCodeSpanEnd(line, index);
+    if (codeEnd !== -1) {
+      index = codeEnd;
       continue;
     }
-    return index;
+    if (index > innerStart && canCloseEmphasisAt(line, index, delimiter)) {
+      return index;
+    }
+    index += 1;
   }
   return -1;
 }
 
+function canOpenEmphasisAt(line: string, index: number, delimiter: string): boolean {
+  if (!isEmphasisDelimiterAt(line, index, delimiter)) {
+    return false;
+  }
+  const after = line[index + delimiter.length] ?? "";
+  return after !== "" && !isWhitespace(after);
+}
+
+function canCloseEmphasisAt(line: string, index: number, delimiter: string): boolean {
+  if (!isEmphasisDelimiterAt(line, index, delimiter)) {
+    return false;
+  }
+  const before = line[index - 1] ?? "";
+  return before !== "" && !isWhitespace(before);
+}
+
 function isEmphasisDelimiterAt(line: string, index: number, delimiter: string): boolean {
-  if (!line.startsWith(delimiter, index)) {
+  if (isEscapedAt(line, index) || !line.startsWith(delimiter, index)) {
     return false;
   }
   if (delimiter !== "_") {
@@ -77,6 +105,44 @@ function isEmphasisDelimiterAt(line: string, index: number, delimiter: string): 
   const left = index > 0 ? line[index - 1] : "";
   const right = index + 1 < line.length ? line[index + 1] : "";
   return !isWordChar(left) || !isWordChar(right);
+}
+
+function closedInlineCodeSpanEnd(line: string, start: number): number {
+  if (line[start] !== "`" || isEscapedAt(line, start)) {
+    return -1;
+  }
+  let openerLength = 0;
+  while (start + openerLength < line.length && line[start + openerLength] === "`") {
+    openerLength += 1;
+  }
+  let index = start + openerLength;
+  while (index < line.length) {
+    if (line[index] !== "`") {
+      index += 1;
+      continue;
+    }
+    let closerLength = 0;
+    while (index + closerLength < line.length && line[index + closerLength] === "`") {
+      closerLength += 1;
+    }
+    if (closerLength === openerLength) {
+      return index + closerLength;
+    }
+    index += closerLength;
+  }
+  return -1;
+}
+
+function isEscapedAt(line: string, index: number): boolean {
+  let slashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && line[cursor] === "\\"; cursor -= 1) {
+    slashes += 1;
+  }
+  return slashes % 2 === 1;
+}
+
+function isWhitespace(char: string): boolean {
+  return /\s/.test(char);
 }
 
 function isWordChar(char: string): boolean {
