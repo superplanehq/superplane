@@ -109,4 +109,43 @@ describe("collectLineVerifyOrders", () => {
     const board = buildLinePhaseBoard(LINE, [closed], APPS);
     expect(collectLineVerifyOrders(board)).toEqual([]);
   });
+
+  it("sorts Verify by work order created time when requested", () => {
+    const older = {
+      ...order("wo-old", "Older review", [
+        {
+          id: "e-old",
+          line: { id: "line-1", name: "poc" },
+          step: "demo",
+          stepIndex: 2,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T16:00:00.000Z",
+          updatedAt: "2026-08-11T16:00:00.000Z",
+        },
+      ]),
+      createdAt: "2026-08-11T09:00:00.000Z",
+      updatedAt: "2026-08-11T16:00:00.000Z",
+    };
+    const newer = {
+      ...order("wo-new", "Newer review", [
+        {
+          id: "e-new",
+          line: { id: "line-1", name: "poc" },
+          step: "demo",
+          stepIndex: 2,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+      createdAt: "2026-08-11T11:00:00.000Z",
+      updatedAt: "2026-08-11T12:00:00.000Z",
+    };
+
+    const board = buildLinePhaseBoard(LINE, [older, newer], APPS);
+    expect(collectLineVerifyOrders(board).map((entry) => entry.id)).toEqual(["wo-old", "wo-new"]);
+    expect(collectLineVerifyOrders(board, "created").map((entry) => entry.id)).toEqual(["wo-new", "wo-old"]);
+  });
 });

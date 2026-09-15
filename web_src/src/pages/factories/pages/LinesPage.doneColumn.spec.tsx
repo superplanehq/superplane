@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -23,6 +24,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
+import { LINE_COLUMN_SORT_STORAGE_KEY } from "../lib/lineColumnSort";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
 
@@ -77,6 +79,7 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  useWorkOrderChecksForOrders: () => [],
   ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
 }));
 
@@ -232,4 +235,84 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
   });
+
+  it("reorders Done by result without changing Backlog", async () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Completed task",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          createdAt: "2026-08-11T10:00:00.000Z",
+          updatedAt: "2026-08-11T18:00:00.000Z",
+          lineDispatches: [{ id: "dispatch-completed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+        {
+          id: "wo-failed",
+          title: "Failed task",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+          createdAt: "2026-08-11T11:00:00.000Z",
+          updatedAt: "2026-08-11T17:00:00.000Z",
+          lineDispatches: [{ id: "dispatch-failed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+        {
+          id: "wo-draft",
+          title: "Draft task",
+          state: "STATE_DRAFT",
+          createdAt: "2026-08-11T09:00:00.000Z",
+          updatedAt: "2026-08-11T19:00:00.000Z",
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    const user = userEvent.setup();
+    renderBoard();
+
+    expect(doneCardIds()).toEqual(["work-order-card-wo-completed", "work-order-card-wo-failed"]);
+    expect(within(screen.getByTestId("lines-backlog-column")).getByText("Draft task")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.queryByTestId("lines-done-menu-sort-confidence")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-done-menu-sort-result"));
+
+    expect(doneCardIds()).toEqual(["work-order-card-wo-failed", "work-order-card-wo-completed"]);
+    expect(within(screen.getByTestId("lines-backlog-column")).getByText("Draft task")).toBeInTheDocument();
+  });
+
+  it("restores a stored Done sort after reload", () => {
+    window.localStorage.setItem(
+      LINE_COLUMN_SORT_STORAGE_KEY,
+      JSON.stringify({ [REFUND_LINE_PLAN_ID]: { done: "result" } }),
+    );
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Completed task",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          updatedAt: "2026-08-11T18:00:00.000Z",
+          lineDispatches: [{ id: "dispatch-completed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+        {
+          id: "wo-failed",
+          title: "Failed task",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+          updatedAt: "2026-08-11T17:00:00.000Z",
+          lineDispatches: [{ id: "dispatch-failed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    renderBoard();
+
+    expect(doneCardIds()).toEqual(["work-order-card-wo-failed", "work-order-card-wo-completed"]);
+  });
 });
+
+function doneCardIds(): string[] {
+  return [
+    ...screen.getByTestId("lines-done-column-scroll").querySelectorAll("[data-testid^='work-order-card-wo-']"),
+  ].map((node) => node.getAttribute("data-testid") ?? "");
+}

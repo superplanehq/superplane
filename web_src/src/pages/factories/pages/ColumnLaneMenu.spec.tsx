@@ -215,4 +215,56 @@ describe("ColumnLaneMenu", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
+
+  it("labels the default sort option Newest activity", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu title="Plan" testId="lines-phase-menu-0" colorId={null} onColorChange={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByText("Sort by")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-menu-0-sort-updated")).toHaveTextContent("Newest activity");
+    expect(screen.getByTestId("lines-phase-menu-0-sort-created")).toHaveTextContent("Created time");
+    expect(screen.queryByTestId("lines-phase-menu-0-sort-result")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-menu-0-sort-confidence")).not.toBeInTheDocument();
+  });
+
+  it("offers Backlog and Done options only on those columns", async () => {
+    const onSortChange = vi.fn();
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          columnKey="backlog"
+          colorId={null}
+          onColorChange={vi.fn()}
+          onSortChange={onSortChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.getByTestId("lines-backlog-menu-sort-confidence")).toHaveTextContent("Confidence score");
+    expect(screen.queryByTestId("lines-backlog-menu-sort-completed")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-backlog-menu-sort-created"));
+    expect(onSortChange).toHaveBeenCalledWith("created");
+
+    rerender(
+      <MemoryRouter>
+        <ColumnLaneMenu title="Done" testId="lines-done-menu" columnKey="done" colorId={null} onColorChange={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.getByTestId("lines-done-menu-sort-completed")).toHaveTextContent("Completed time");
+    expect(screen.getByTestId("lines-done-menu-sort-result")).toHaveTextContent("Result");
+    expect(screen.queryByTestId("lines-done-menu-sort-confidence")).not.toBeInTheDocument();
+  });
 });

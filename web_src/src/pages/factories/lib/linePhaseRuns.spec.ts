@@ -12,9 +12,6 @@ import { REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageIds";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
-  findBacklogAutomationApp,
-  findClosureAutomationApp,
-  isDoneLineColumn,
   linePhaseRunHref,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
@@ -483,49 +480,5 @@ describe("collectLineBacklogOrders", () => {
 
     expect(workOrderIds(board)).toEqual([]);
     expect(collectLineBacklogOrders([returned]).map((entry) => entry.id)).toEqual(["wo-returned"]);
-  });
-});
-
-describe("findBacklogAutomationApp", () => {
-  it("returns the factory backlog automation", () => {
-    expect(
-      findBacklogAutomationApp([
-        { id: "app-plan", name: "Plan" },
-        { id: "app-refund-backlog", name: "Backlog" },
-      ]),
-    ).toEqual({ id: "app-refund-backlog", name: "Backlog" });
-  });
-
-  it("matches the Ingest app name", () => {
-    expect(findBacklogAutomationApp([{ id: "app-refund-backlog", name: "Ingest" }])).toEqual({
-      id: "app-refund-backlog",
-      name: "Ingest",
-    });
-  });
-});
-
-describe("findClosureAutomationApp", () => {
-  it("returns the factory PR Closure automation", () => {
-    expect(
-      findClosureAutomationApp([
-        { id: "app-plan", name: "Plan" },
-        { id: "app-pr-closure", name: "PR Closure" },
-      ]),
-    ).toEqual({ id: "app-pr-closure", name: "PR Closure" });
-  });
-
-  it("matches the refund done app id when the name is absent", () => {
-    expect(findClosureAutomationApp([{ id: "app-refund-done" }])).toEqual({
-      id: "app-refund-done",
-      name: "PR Closure",
-    });
-  });
-});
-
-describe("isDoneLineColumn", () => {
-  it("treats the Done name and the closure app id as special columns", () => {
-    expect(isDoneLineColumn({ stepName: "Done", appId: "app-plan" })).toBe(true);
-    expect(isDoneLineColumn({ stepName: "Phase 4", appId: "app-refund-done" })).toBe(true);
-    expect(isDoneLineColumn({ stepName: "Plan", appId: "app-plan" })).toBe(false);
   });
 });
