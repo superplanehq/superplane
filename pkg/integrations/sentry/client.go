@@ -46,6 +46,15 @@ func wrapReleaseScopeError(err error) error {
 }
 
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
+	}
+
+	if metadata.HostedApp {
+		return newHostedClient(httpContext, integration, metadata)
+	}
+
 	baseURL, err := integration.GetConfig("baseUrl")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sentry base URL: %w", err)
@@ -60,11 +69,6 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		return nil, fmt.Errorf("Sentry user token is missing")
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
-	}
-
 	if metadata.Organization == nil || metadata.Organization.Slug == "" {
 		return nil, fmt.Errorf("Sentry organization is not connected")
 	}
@@ -75,6 +79,78 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		userToken:   strings.TrimSpace(string(userToken)),
 		orgSlug:     metadata.Organization.Slug,
 	}, nil
+}
+
+func newHostedClient(httpContext core.HTTPContext, integration core.IntegrationContext, metadata Metadata) (*Client, error) {
+	app, ok := HostedAppFromEnv()
+	if !ok {
+		return nil, fmt.Errorf("hosted Sentry app is not configured")
+	}
+	if metadata.Organization == nil || metadata.Organization.Slug == "" {
+		return nil, fmt.Errorf("Sentry organization is not connected")
+	}
+
+	token, err := hostedAccessToken(httpContext, integration, app, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		httpContext: httpContext,
+		baseURL:     DefaultBaseURL,
+		userToken:   token,
+		orgSlug:     metadata.Organization.Slug,
+	}, nil
+}
+
+func hostedAccessToken(
+	httpContext core.HTTPContext,
+	integration core.IntegrationContext,
+	app HostedApp,
+	metadata Metadata,
+) (string, error) {
+	token := secretValue(integration, SecretAccessToken)
+	if token == "" {
+		return "", fmt.Errorf("Sentry installation token is missing")
+	}
+	if !hostedTokenExpired(metadata.TokenExpiresAt) {
+		return token, nil
+	}
+
+	refreshToken := secretValue(integration, SecretRefreshToken)
+	if refreshToken == "" {
+		return token, nil
+	}
+
+	tokens, err := refreshSentryAppToken(httpContext, app, metadata.InstallationUUID, refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to refresh Sentry installation token: %w", err)
+	}
+	if err := integration.SetSecret(SecretAccessToken, []byte(tokens.Token)); err != nil {
+		return "", err
+	}
+	if tokens.RefreshToken != "" {
+		if err := integration.SetSecret(SecretRefreshToken, []byte(tokens.RefreshToken)); err != nil {
+			return "", err
+		}
+	}
+	metadata.TokenExpiresAt = tokens.ExpiresAt
+	integration.SetMetadata(metadata)
+	if err := persistIntegration(integration); err != nil {
+		return "", fmt.Errorf("failed to persist Sentry installation token: %w", err)
+	}
+	return tokens.Token, nil
+}
+
+func secretValue(integration core.IntegrationContext, name string) string {
+	if secrets, err := integration.GetSecrets(); err == nil {
+		for _, secret := range secrets {
+			if secret.Name == name && len(secret.Value) > 0 {
+				return strings.TrimSpace(string(secret.Value))
+			}
+		}
+	}
+	return ""
 }
 
 func NewAPIClient(httpContext core.HTTPContext, baseURL, userToken string) *Client {
@@ -135,6 +211,10 @@ type Issue struct {
 	UserCount     int            `json:"userCount" mapstructure:"userCount"`
 	Permalink     string         `json:"permalink" mapstructure:"permalink"`
 	WebURL        string         `json:"web_url" mapstructure:"web_url"`
+	FirstSeen     string         `json:"firstSeen" mapstructure:"firstSeen"`
+	LastSeen      string         `json:"lastSeen" mapstructure:"lastSeen"`
+	Culprit       string         `json:"culprit" mapstructure:"culprit"`
+	Level         string         `json:"level" mapstructure:"level"`
 	Metadata      map[string]any `json:"metadata" mapstructure:"metadata"`
 	Tags          []IssueTag     `json:"tags" mapstructure:"tags"`
 	Stats         map[string]any `json:"stats" mapstructure:"stats"`
@@ -618,6 +698,42 @@ func (c *Client) ListIssues() ([]Issue, error) {
 		return nil, err
 	}
 
+	return issues, nil
+}
+
+func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue, error) {
+	if limit <= 0 {
+		limit = newestUnresolvedIssueLimit
+	}
+
+	path := fmt.Sprintf(
+		"/api/0/organizations/%s/issues/?query=%s&limit=%d",
+		url.PathEscape(c.orgSlug),
+		url.QueryEscape("is:unresolved"),
+		limit,
+	)
+	if project = strings.TrimSpace(project); project != "" {
+		path = fmt.Sprintf(
+			"/api/0/projects/%s/%s/issues/?query=%s&limit=%d",
+			url.PathEscape(c.orgSlug),
+			url.PathEscape(project),
+			url.QueryEscape("is:unresolved"),
+			limit,
+		)
+	}
+
+	responseBody, err := c.doJSON(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	issues := []Issue{}
+	if err := json.Unmarshal(responseBody, &issues); err != nil {
+		return nil, err
+	}
+	if len(issues) > limit {
+		issues = issues[:limit]
+	}
 	return issues, nil
 }
 
