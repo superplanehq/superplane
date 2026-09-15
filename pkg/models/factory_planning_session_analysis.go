@@ -223,8 +223,8 @@ func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, s
 }
 
 func validatePlanningConfidenceScore(score float64) error {
-	if !isFiniteCheckNumber(score) || score < 0 || score > PlanningConfidenceScoreMax {
-		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
+	if !isFiniteCheckNumber(score) || score < 1 || score > PlanningConfidenceScoreMax {
+		return fmt.Errorf("%w: confidence score must be 1 through 5", ErrFactoryPlanningSessionInvalid)
 	}
 	return nil
 }
@@ -314,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification. If the score is below 5, the summary must tell the user how to raise Clarity.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
