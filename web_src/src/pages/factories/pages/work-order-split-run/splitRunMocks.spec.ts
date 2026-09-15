@@ -1143,7 +1143,7 @@ describe("line board work-order examples", () => {
     expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("passed");
   });
 
-  it("keeps a cancelled analysis failed when no score or plan exists", () => {
+  it("keeps a cancelled analysis running when no score or plan exists", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       analysisRuns: [
@@ -1162,7 +1162,102 @@ describe("line board work-order examples", () => {
       ],
     });
 
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("running");
+  });
+
+  it("keeps a failed analysis failed when no score or plan exists", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:02:00Z",
+          },
+        },
+      ],
+    });
+
     expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("failed");
+  });
+
+  it("omits an older cancelled analysis when a newer analysis run exists", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-timeout",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_CANCELLED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:02:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-new",
+            canvasId: "canvas-backlog",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-28T12:03:00Z",
+            updatedAt: "2026-08-28T12:03:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => phase.runId)).toEqual([
+      "run-new",
+    ]);
+  });
+
+  it("keeps a failed analysis beside a newer analysis run", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-crash",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:02:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-new",
+            canvasId: "canvas-backlog",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-28T12:03:00Z",
+            updatedAt: "2026-08-28T12:03:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(
+      fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => [phase.runId, phase.status]),
+    ).toEqual([
+      ["run-crash", "failed"],
+      ["run-new", "running"],
+    ]);
   });
 
   it("puts the reported score on the newest analysis phase", () => {

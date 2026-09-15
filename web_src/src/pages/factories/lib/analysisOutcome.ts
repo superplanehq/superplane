@@ -39,3 +39,30 @@ export function analysisFinishedStatus<T extends string>(status: T, delivered: b
   }
   return status;
 }
+
+type AnalysisCanvasRun = {
+  result?: string;
+  state?: string;
+};
+
+/** Timed-out analysis stays running until a score and plan exist. A crash stays failed. */
+export function statusForAnalysisRun<T extends string>(
+  run: AnalysisCanvasRun,
+  status: T,
+  delivered: boolean,
+): T | "passed" | "running" {
+  if (delivered) {
+    return analysisFinishedStatus(status, delivered);
+  }
+  if (isUnfinishedCancelledAnalysis(run)) {
+    return "running";
+  }
+  return status;
+}
+
+export function isUnfinishedCancelledAnalysis(run: AnalysisCanvasRun): boolean {
+  if (run.result === "RESULT_CANCELLED") {
+    return true;
+  }
+  return run.state === "STATE_CANCELLING" && run.result !== "RESULT_PASSED" && run.result !== "RESULT_FAILED";
+}
