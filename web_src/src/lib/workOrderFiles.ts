@@ -68,6 +68,14 @@ export function clearWorkOrderFileDownloadCache(): void {
   downloadUrls.clear();
 }
 
+export function workOrderFileDownloadUrlIsFresh(url: string): boolean {
+  const expiresAt = signedDownloadUrlExpiresAt(url);
+  if (expiresAt === undefined) {
+    return true;
+  }
+  return expiresAt - Date.now() >= DOWNLOAD_URL_REFRESH_WINDOW_MS;
+}
+
 export function workOrderFileDownloadMap(files: WorkOrderFileRef[] | undefined): Record<string, string> {
   const urls: Record<string, string> = {};
   for (const file of files ?? []) {
