@@ -113,6 +113,12 @@ describe("CreateWorkOrderRequestDialog", () => {
     expect(screen.getByTestId("create-work-order-request-create")).not.toBeDisabled();
   });
 
+  it("strips paired markdown emphasis from a derived title", () => {
+    renderRequestDialog({ description: "**Refunds fail on retry.**" });
+
+    expect(screen.getByTestId("create-work-order-request-title")).toHaveValue("Refunds fail on retry.");
+  });
+
   it("adds attach-only images to the create payload", async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn();
