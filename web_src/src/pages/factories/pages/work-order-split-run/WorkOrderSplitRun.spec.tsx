@@ -40,12 +40,29 @@ import {
   LINE_BOARD_VERIFY_ENUM_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
-import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
-import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+
+function withPublishedSpec(fixture: SplitRunFixture): SplitRunFixture {
+  const spec = {
+    id: "art-spec-test",
+    type: "TYPE_MARKDOWN" as const,
+    data: {
+      name: SPEC_ARTIFACT_NAME,
+      title: SPEC_ARTIFACT_NAME,
+      body: "# Spec\n\n## Executive summary\n\nA published plan.\n",
+    },
+  };
+  const [first, ...rest] = fixture.phases;
+  if (!first) {
+    return fixture;
+  }
+  return { ...fixture, phases: [{ ...first, artifacts: [...first.artifacts, spec] }, ...rest] };
+}
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
@@ -752,9 +769,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(start.closest(".shrink-0")).not.toBeNull();
     expect(start.parentElement).not.toHaveClass("mt-3");
-    const tip = screen.getByTestId("split-run-intent-decision-tip");
-    expect(tip).toHaveTextContent("This task is ready to start");
-    expect(tip).toHaveTextContent("Review the summary and the plan. Then click Start to send it to the line.");
+    expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-attention-note")).toBe(
+      note,
+    );
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-result")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(64rem");
@@ -762,6 +780,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     expect(within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-attention-note")).toBe(note);
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show plan" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
@@ -793,10 +812,11 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
-    const tip = screen.getByTestId("split-run-intent-decision-tip");
-    expect(tip).toHaveTextContent("SuperPlane is currently analyzing this task");
-    expect(tip).toHaveTextContent("Wait for the analysis to finish. Or click Start to send this task to the line now.");
-    expect(screen.getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName("Confidence score. Analyzing");
+    expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-intent-plan-analyzing"),
+    ).toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
@@ -837,7 +857,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("hides source, artifacts, and pull requests on the description tab", async () => {
     renderPopup({
-      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      fixture: withPublishedSpec(
+        splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      ),
     });
 
     const tab = screen.getByTestId("split-run-work-order-tab");
@@ -851,12 +873,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).queryByRole("heading", { name: "Artifacts" })).not.toBeInTheDocument();
     expect(within(tab).queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
-    expect(within(tab).getByTestId("split-run-intent-confidence-chip")).toHaveAccessibleName(/Confidence score/);
+    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan }));
+    await userEvent.click(screen.getByRole("button", { name: "Show plan" }));
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
     expect(within(tab).getByTestId("split-run-check-comment-check-code-coverage")).not.toHaveAttribute("open");
     expect(within(tab).getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
@@ -869,8 +892,8 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
 
     const tab = screen.getByTestId("split-run-work-order-tab");
-    const chip = within(tab).getByTestId("split-run-intent-confidence-chip");
-    expect(chip).toHaveAccessibleName(/Confidence score/);
+    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByText("This issue is a good fit for an agent on this factory line.")).toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
   });
@@ -878,10 +901,12 @@ describe("WorkOrderSplitRunPopup", () => {
   it("opens and closes a check with details and summary", async () => {
     const user = userEvent.setup();
     renderPopup({
-      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      fixture: withPublishedSpec(
+        splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      ),
     });
 
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan }));
+    await user.click(screen.getByRole("button", { name: "Show plan" }));
     const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
     const coverage = screen.getByTestId("split-run-check-comment-check-code-coverage");
     expect(risk).not.toHaveAttribute("open");
@@ -893,10 +918,12 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("shows the full check summary without a one-line clamp", async () => {
     renderPopup({
-      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      fixture: withPublishedSpec(
+        splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+      ),
     });
 
-    await userEvent.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan }));
+    await userEvent.click(screen.getByRole("button", { name: "Show plan" }));
     const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
     const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
     expect(summary.tagName).toBe("P");

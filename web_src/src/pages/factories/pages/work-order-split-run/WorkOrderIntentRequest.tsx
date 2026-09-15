@@ -2,17 +2,14 @@ import type { FormEvent, ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
-import { Alert, AlertAction, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
-import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { useFactoryPreviewFlag } from "../factoryPreviewFlagsContext";
 import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
+import { ComposerPlanStack } from "./ComposerPlanControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
@@ -34,7 +31,9 @@ export type IntentAnalysisChat = {
   onSubmitSurvey: (text: string) => void;
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
+  canTogglePlan?: boolean;
   latestPlanScore?: number;
+  isAnalyzing?: boolean;
   closedDecision?: ReactNode;
 };
 
@@ -135,17 +134,19 @@ function AnalysisRequestChat({
       </div>
       <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "shrink-0 pb-4")} data-testid="split-run-intent-chat-column">
         {analysis.onTogglePlan ? (
-          <PlanToggleAlert
+          <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
             score={analysis.latestPlanScore}
+            isAnalyzing={Boolean(analysis.isAnalyzing)}
+            canTogglePlan={Boolean(analysis.canTogglePlan)}
             onToggle={analysis.onTogglePlan}
-            actions={analysis.planPaneOpen ? undefined : analysis.closedDecision}
+            actions={analysis.closedDecision}
           />
         ) : null}
         <form
           className={cn(
             SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
-            "w-full flex-col items-stretch justify-center border-0 px-0",
+            "w-full flex-col items-stretch justify-center border-0 px-0 pt-0",
           )}
           onSubmit={handleSubmit}
         >
@@ -241,48 +242,6 @@ function RequestMessage({
         ) : null}
         {body}
       </div>
-    </div>
-  );
-}
-
-function PlanToggleAlert({
-  open,
-  score,
-  onToggle,
-  actions,
-}: {
-  open: boolean;
-  score?: number;
-  onToggle: () => void;
-  actions?: ReactNode;
-}) {
-  const oneBar = useFactoryPreviewFlag("oneBarPlanStrip");
-  const label = open ? CREATE_WITH_AGENT_COPY.hidePlan : CREATE_WITH_AGENT_COPY.showPlan;
-
-  return (
-    <div className={cn("flex shrink-0 flex-col bg-background py-2", oneBar ? undefined : "gap-2")}>
-      <Alert className="grid-cols-[minmax(0,1fr)_auto] items-center" data-testid="split-run-intent-plan-updated">
-        <div className="flex min-w-0 items-center gap-3">
-          <AlertTitle className="col-start-1">{score == null ? label : CREATE_WITH_AGENT_COPY.planUpdated}</AlertTitle>
-          {score == null ? null : <ConfidenceMeter score={score} showTooltip={false} />}
-        </div>
-        <AlertAction className="col-start-2 max-sm:mt-0 max-sm:justify-end">
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-expanded={open}
-              aria-pressed={open}
-              onClick={onToggle}
-            >
-              {label}
-            </Button>
-            {oneBar ? actions : null}
-          </div>
-        </AlertAction>
-      </Alert>
-      {oneBar ? null : actions}
     </div>
   );
 }

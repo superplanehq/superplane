@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 
 import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { ComposerPlanStack } from "./ComposerPlanControls";
 
 /**
- * Storybook-only. Fake chat column so you can compare the current two bars
- * with one bar. The live popup stays unchanged until you pick a look.
+ * Isolated strip playground. Compare the live one-bar Alert with the chip row.
  */
-export type PlanStripLook = "today" | "oneBar" | "oneBarOpen";
+export type PlanStripLook = "today" | "oneBar" | "oneBarOpen" | "chips" | "chipsOpen";
 
 const TASK_TITLE = "Duplicate a task";
 const REVIEW_HEADLINE = "Review the plan before you start";
@@ -33,32 +33,50 @@ export function PlanStripPreview({ look }: { look: PlanStripLook }) {
         <p>I scored this 2. Prompt, harness, and a second run still need a decision.</p>
       </div>
       <div className="mx-auto w-full max-w-3xl shrink-0 px-6 pb-4">
-        {look === "today" ? <TodayStrip /> : <OneBarStrip open={look === "oneBarOpen"} />}
+        <PreviewStrip look={look} />
         <FakeComposer />
       </div>
     </div>
   );
 }
 
-export function PlanStripPreviewToggle() {
+export function PlanStripPreviewToggle({ look = "oneBar" }: { look?: "oneBar" | "chips" }) {
   const [open, setOpen] = useState(false);
   return (
     <div
       className="flex min-h-[420px] w-full max-w-[48rem] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm"
-      data-testid="plan-strip-preview-toggle"
+      data-testid={`plan-strip-preview-toggle-${look}`}
     >
-      <header className="shrink-0 border-b border-border px-5 py-3">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3">
         <h2 className="truncate text-[16px] font-semibold tracking-[-0.02em]">{TASK_TITLE}</h2>
       </header>
       <div className="min-h-0 flex-1 px-6 py-6 text-[14px] leading-6 text-muted-foreground">
         Click Show plan or Hide plan.
       </div>
       <div className="mx-auto w-full max-w-3xl shrink-0 px-6 pb-4">
-        <OneBarStrip open={open} onToggle={() => setOpen((current) => !current)} />
+        {look === "chips" ? (
+          <ChipStrip open={open} onToggle={() => setOpen((current) => !current)} />
+        ) : (
+          <OneBarStrip open={open} onToggle={() => setOpen((current) => !current)} />
+        )}
         <FakeComposer />
       </div>
     </div>
   );
+}
+
+function PreviewStrip({ look }: { look: PlanStripLook }) {
+  if (look === "today") {
+    return <TodayStrip />;
+  }
+  if (look === "chips" || look === "chipsOpen") {
+    return <ChipStrip open={look === "chipsOpen"} />;
+  }
+  return <OneBarStrip open={look === "oneBarOpen"} />;
+}
+
+function ChipStrip({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
+  return <ComposerPlanStack open={open} score={SCORE} onToggle={onToggle} actions={<DraftActions />} />;
 }
 
 function TodayStrip() {
@@ -84,7 +102,7 @@ function TodayStrip() {
 function OneBarStrip({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
   return (
     <div className="py-2">
-      <PlanTitleRow open={open} onToggle={onToggle} actions={open ? null : <DraftActions />} />
+      <PlanTitleRow open={open} onToggle={onToggle} actions={<DraftActions />} />
     </div>
   );
 }
@@ -95,7 +113,7 @@ function PlanTitleRow({ open, onToggle, actions }: { open: boolean; onToggle?: (
   return (
     <Alert className="grid-cols-[minmax(0,1fr)_auto] items-center" data-testid="plan-strip-preview-alert">
       <div className="flex min-w-0 items-center gap-3">
-        <AlertTitle className="col-start-1">{CREATE_WITH_AGENT_COPY.planUpdated}</AlertTitle>
+        {open ? null : <AlertTitle className="min-w-0 truncate">{CREATE_WITH_AGENT_COPY.planUpdated}</AlertTitle>}
         <ConfidenceMeter score={SCORE} showTooltip={false} />
       </div>
       <AlertAction className="col-start-2 max-sm:mt-0 max-sm:justify-end">
