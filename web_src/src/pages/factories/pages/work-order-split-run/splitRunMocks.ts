@@ -39,7 +39,11 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
-import { analysisFinishedStatus, analysisFirstResultDelivered } from "../../lib/analysisOutcome";
+import {
+  analysisResultDeliveredForRun,
+  isUnfinishedCancelledAnalysis,
+  statusForAnalysisRun,
+} from "../../lib/analysisOutcome";
 import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -640,15 +644,33 @@ function phasesForAnalysisRuns(
   const ordered = [...runs]
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
-  const delivered = analysisFirstResultDelivered({ checks: apiChecks, artifacts });
+  const result = { checks: apiChecks, artifacts };
+  const visible = visibleAnalysisRuns(ordered, result);
 
-  return ordered.map((entry, index) =>
-    analysisRunToPhase(
+  return visible.map((entry, index) => {
+    const isLast = index === visible.length - 1;
+    return analysisRunToPhase(
       entry,
-      index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined,
-      index === ordered.length - 1 && delivered,
-    ),
-  );
+      isLast ? confidenceChecks(apiChecks) : undefined,
+      analysisResultDeliveredForRun(entry.run, { ...result, isLast }),
+    );
+  });
+}
+
+function visibleAnalysisRuns(
+  ordered: BacklogAnalysisRun[],
+  result: { checks?: FactoriesWorkOrderCheck[]; artifacts?: FactoriesWorkOrderArtifact[] },
+): BacklogAnalysisRun[] {
+  if (ordered.length <= 1) {
+    return ordered;
+  }
+  return ordered.filter((entry, index) => {
+    if (index === ordered.length - 1) {
+      return true;
+    }
+    const delivered = analysisResultDeliveredForRun(entry.run, { ...result, isLast: false });
+    return !isUnfinishedCancelledAnalysis(entry.run, delivered);
+  });
 }
 
 function analysisRunToPhase(
@@ -656,7 +678,7 @@ function analysisRunToPhase(
   checks?: WorkOrderCheckPresentation[],
   delivered = false,
 ): SplitRunPhase {
-  const status = analysisFinishedStatus(statusForCanvasRun(entry.run), delivered);
+  const status = statusForAnalysisRun(entry.run, statusForCanvasRun(entry.run), delivered);
   const componentName = CONFIDENCE_CHECK_NAME;
   const duration = durationForExecution(
     {
