@@ -745,7 +745,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(start).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Model" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(start.closest(".shrink-0")).not.toBeNull();
     expect(start.parentElement).not.toHaveClass("mt-3");
     const tip = screen.getByTestId("split-run-intent-decision-tip");

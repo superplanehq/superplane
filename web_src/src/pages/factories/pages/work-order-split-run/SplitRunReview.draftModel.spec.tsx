@@ -59,7 +59,7 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn());
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("button", { name: "Model" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
@@ -86,8 +86,9 @@ describe("SplitRunReview draft model select", () => {
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
-    await user.click(screen.getByRole("button", { name: "Model" }));
-    await user.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    expect(await screen.findByRole("menuitemradio", { name: "Auto" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("menuitemradio", { name: "claude-opus-4-6" }));
     expect(onChange).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
@@ -95,6 +96,6 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, vi.fn(), true);
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Model" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
   });
 });

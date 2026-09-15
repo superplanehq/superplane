@@ -346,6 +346,7 @@ function NoteAction({
       variant={primary ? "default" : "outline"}
       disabled={disabled}
       onClick={onClick}
+      className={grouped ? "rounded-md rounded-r-none" : undefined}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
       {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
