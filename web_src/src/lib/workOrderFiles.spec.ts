@@ -10,6 +10,7 @@ import {
   setWorkOrderFilePreviewUrl,
   resolveWorkOrderFileSrc,
   workOrderFileDownloadMap,
+  workOrderFileDownloadUrlIsFresh,
   workOrderFileRef,
 } from "./workOrderFiles";
 
@@ -56,6 +57,16 @@ describe("workOrderFiles", () => {
 
     expect(workOrderFileDownloadMap([{ id, downloadUrl: first }])[id]).toBe(first);
     expect(workOrderFileDownloadMap([{ id, downloadUrl: reminted }])[id]).toBe(first);
+  });
+
+  it("treats unsigned URLs and far-future signed URLs as fresh", () => {
+    expect(workOrderFileDownloadUrlIsFresh("https://files.example/bug.png")).toBe(true);
+    expect(workOrderFileDownloadUrlIsFresh("https://files.example/bug.png?expires=9999999999&sig=one")).toBe(true);
+  });
+
+  it("treats a SuperPlane URL that is about to expire as stale", () => {
+    const expiring = `https://files.example/bug.png?expires=${Math.floor(Date.now() / 1000) + 10}&sig=old`;
+    expect(workOrderFileDownloadUrlIsFresh(expiring)).toBe(false);
   });
 
   it("replaces a SuperPlane URL that is about to expire", () => {
