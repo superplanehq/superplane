@@ -2,6 +2,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  groupPolarWebhookEvents,
   knownDeliveryIdsForEvent,
   POLAR_WEBHOOK_ALL_VALUE,
   POLAR_WEBHOOK_POLL_INTERVAL_MS,
@@ -9,6 +10,7 @@ import {
   prunePendingPolarRedelivers,
   readPolarAdminError,
   uniqueFailedEventIds,
+  visiblePolarWebhookEvents,
   type PendingPolarRedeliver,
   type PolarWebhookDelivery,
   type PolarWebhooksResponse,
@@ -185,8 +187,19 @@ function usePolarWebhookList() {
 export function usePolarWebhooks() {
   const list = usePolarWebhookList();
   const [bulkBusy, setBulkBusy] = useState(false);
-  const failedEventIds = useMemo(() => uniqueFailedEventIds(list.items), [list.items]);
+  const eventGroups = useMemo(
+    () => visiblePolarWebhookEvents(groupPolarWebhookEvents(list.items), list.statusFilter),
+    [list.items, list.statusFilter],
+  );
   const redelivering = useMemo(() => new Set(list.pendingRedelivers.keys()), [list.pendingRedelivers]);
+  const failedEventIds = useMemo(
+    () =>
+      uniqueFailedEventIds(
+        eventGroups.flatMap((group) => group.deliveries),
+        redelivering,
+      ),
+    [eventGroups, redelivering],
+  );
 
   const handleRedeliver = async (eventId: string) => {
     list.setPendingRedelivers((current) => addPendingRedelivers(current, [eventId], list.items, Date.now()));
@@ -220,7 +233,6 @@ export function usePolarWebhooks() {
 
   return {
     configured: list.configured,
-    items: list.items,
     total: list.total,
     page: list.page,
     setPage: list.setPage,
@@ -236,6 +248,7 @@ export function usePolarWebhooks() {
     },
     loading: list.loading,
     loadError: list.loadError,
+    eventGroups,
     redelivering,
     bulkBusy,
     failedEventIds,

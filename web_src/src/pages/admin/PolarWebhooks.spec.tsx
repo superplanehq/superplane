@@ -16,9 +16,12 @@ import {
   POLAR_WEBHOOKS_UNAUTHORIZED,
   POLAR_WEBHOOK_REDELIVER_TIMEOUT_MS,
   formatPolarPayload,
+  groupPolarWebhookEvents,
+  polarWebhookAttemptLabel,
   polarWebhookEventStatus,
   prunePendingPolarRedelivers,
   uniqueFailedEventIds,
+  visiblePolarWebhookEvents,
   type PolarWebhookDelivery,
 } from "./polarWebhookDeliveries";
 
@@ -48,7 +51,9 @@ const failedDelivery: PolarWebhookDelivery = {
 const duplicateFailedDelivery: PolarWebhookDelivery = {
   ...failedDelivery,
   id: "del_2",
-  event_id: "evt_1",
+  created_at: "2026-09-14T12:01:00Z",
+  http_code: 502,
+  response: "gateway timeout",
 };
 
 const recoveredFailedDelivery: PolarWebhookDelivery = {
@@ -107,6 +112,40 @@ describe("uniqueFailedEventIds", () => {
 
   it("skips events Polar already delivered later", () => {
     expect(uniqueFailedEventIds([recoveredFailedDelivery, otherFailedDelivery])).toEqual(["evt_2"]);
+  });
+
+  it("skips events that are already sending again", () => {
+    expect(uniqueFailedEventIds([failedDelivery, otherFailedDelivery], new Set(["evt_1"]))).toEqual(["evt_2"]);
+  });
+});
+
+describe("groupPolarWebhookEvents", () => {
+  it("merges deliveries that share an event id, newest first", () => {
+    const groups = groupPolarWebhookEvents([failedDelivery, duplicateFailedDelivery, otherFailedDelivery]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.eventId).toBe("evt_1");
+    expect(groups[0]?.deliveries.map((delivery) => delivery.id)).toEqual(["del_2", "del_1"]);
+    expect(groups[0]?.latest.id).toBe("del_2");
+    expect(groups[1]?.eventId).toBe("evt_2");
+  });
+});
+
+describe("visiblePolarWebhookEvents", () => {
+  it("hides recovered events on the Failed filter", () => {
+    const groups = groupPolarWebhookEvents([recoveredFailedDelivery, otherFailedDelivery]);
+    expect(visiblePolarWebhookEvents(groups, "failed").map((group) => group.eventId)).toEqual(["evt_2"]);
+  });
+
+  it("keeps recovered events on All", () => {
+    const groups = groupPolarWebhookEvents([recoveredFailedDelivery, otherFailedDelivery]);
+    expect(visiblePolarWebhookEvents(groups, "all")).toHaveLength(2);
+  });
+});
+
+describe("polarWebhookAttemptLabel", () => {
+  it("uses singular and plural attempt copy", () => {
+    expect(polarWebhookAttemptLabel(1)).toBe("1 attempt");
+    expect(polarWebhookAttemptLabel(2)).toBe("2 attempts");
   });
 });
 
@@ -214,6 +253,7 @@ describe("PolarWebhooks", () => {
     expect(await screen.findByText("order.paid")).toBeInTheDocument();
     expect(screen.getAllByText("Failed").length).toBeGreaterThan(1);
     expect(screen.getByText("evt_1")).toBeInTheDocument();
+    expect(screen.getByTestId("polar-webhook-attempts")).toHaveTextContent("1 attempt");
     expect(screen.getByTestId("polar-webhooks-redeliver-failed")).toBeInTheDocument();
     expect(screen.getByTestId("polar-webhook-event-status")).toHaveTextContent("Failed");
 
@@ -230,7 +270,7 @@ describe("PolarWebhooks", () => {
     expect(screen.getByRole("button", { name: POLAR_WEBHOOKS_SENDING_AGAIN })).toBeDisabled();
   });
 
-  it("shows Event status Succeeded when Polar delivered the event later", async () => {
+  it("hides recovered events on the Failed list", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -246,8 +286,8 @@ describe("PolarWebhooks", () => {
 
     renderPage();
 
-    expect(await screen.findByText("evt_1")).toBeInTheDocument();
-    expect(screen.getByTestId("polar-webhook-event-status")).toHaveTextContent("Succeeded");
+    expect(await screen.findByText(POLAR_WEBHOOKS_EMPTY)).toBeInTheDocument();
+    expect(screen.queryByText("evt_1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("polar-webhooks-redeliver-failed")).not.toBeInTheDocument();
   });
 
@@ -271,11 +311,38 @@ describe("PolarWebhooks", () => {
     expect(await screen.findByText("evt_1")).toBeInTheDocument();
     expect(screen.queryByText("Polar response")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Show delivery details" }));
+    await user.click(screen.getByRole("button", { name: "Show delivery attempts" }));
 
     expect(screen.getByText("Polar response")).toBeInTheDocument();
     expect(screen.getByText("unable to apply order")).toBeInTheDocument();
     expect(screen.getByText(/"type": "order.paid"/)).toBeInTheDocument();
+  });
+
+  it("merges deliveries for the same event and lists attempts on expand", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          configured: true,
+          items: [failedDelivery, duplicateFailedDelivery],
+          total: 2,
+          page: 1,
+          limit: 50,
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("evt_1")).toBeInTheDocument();
+    expect(screen.getByTestId("polar-webhook-attempts")).toHaveTextContent("2 attempts");
+    expect(screen.getAllByRole("button", { name: POLAR_WEBHOOKS_REDELIVER })).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Show delivery attempts" }));
+
+    expect(screen.getByText("unable to apply order")).toBeInTheDocument();
+    expect(screen.getByText("gateway timeout")).toBeInTheDocument();
   });
 
   it("redelivers unique failed events on the page", async () => {
