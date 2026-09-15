@@ -81,8 +81,51 @@ describe("workOrderPopupMode", () => {
         refinementEnabled: true,
         analysisActive: false,
         hasLookupIdentity: true,
+        isDraft: true,
       }),
     ).toBe("classic");
+  });
+
+  it("uses the analysis popup for a started task while artifacts load", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: false,
+        refinementEnabled: true,
+        artifactsLoading: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+        isDraft: false,
+      }),
+    ).toBe("analysis");
+  });
+
+  it("waits for artifacts before keeping an unrefined draft in classic mode", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: false,
+        refinementEnabled: true,
+        artifactsLoading: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+        isDraft: true,
+      }),
+    ).toBe("loading");
+  });
+
+  it("keeps the analysis popup when artifact lookup fails on a draft", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: false,
+        refinementEnabled: true,
+        artifactsFailed: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+        isDraft: true,
+      }),
+    ).toBe("analysis");
   });
 
   it("uses the classic popup when refinement is disabled even if a score exists", () => {

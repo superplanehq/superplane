@@ -30,6 +30,7 @@ function renderClassicPopup() {
                 sourceDescription: fixture.descriptionText ?? "",
                 useLive: false,
                 artifactsLoading: false,
+                artifactsError: null,
                 pullRequestsLoading: false,
                 pullRequestsError: null,
               }}
