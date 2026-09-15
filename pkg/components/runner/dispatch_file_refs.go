@@ -38,9 +38,10 @@ func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
 	if r.resolveErr != nil {
 		return "", r.resolveErr
 	}
+	ctx := context.Background()
 	rewritten, _, err := storedfiles.DescriptionForDispatch(
-		context.Background(),
-		database.Conn(),
+		ctx,
+		database.DB(ctx),
 		blob.Current(),
 		r.organizationID,
 		r.factoryID,
@@ -65,7 +66,8 @@ func (r *dispatchFileRewriter) resolve() {
 		r.resolveErr = fmt.Errorf("invalid canvas id %q: %w", r.exec.WorkflowID, err)
 		return
 	}
-	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	db := database.DB(context.Background())
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, canvasID)
 	if err != nil {
 		r.resolveErr = fmt.Errorf("load canvas for file dispatch: %w", err)
 		return
@@ -76,7 +78,7 @@ func (r *dispatchFileRewriter) resolve() {
 	}
 	r.organizationID = organizationID
 	r.factoryID = *canvas.FactoryID
-	execution, err := models.FindWorkOrderExecutionForRun(database.Conn(), r.exec.RunID)
+	execution, err := models.FindWorkOrderExecutionForRun(db, r.exec.RunID)
 	if err == nil {
 		r.workOrderID = execution.WorkOrderID
 	}
