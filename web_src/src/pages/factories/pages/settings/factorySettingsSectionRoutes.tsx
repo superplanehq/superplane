@@ -2,7 +2,7 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -141,7 +141,9 @@ export const factorySettingsSectionRoutes = [
     path="organization/models"
     element={
       <RequirePermission resource="org" action="read">
-        <FactoryOrganizationLLMModelsPage />
+        <RequireExperimentalFeature featureId={FEATURE_ORGANIZATION_BYOK}>
+          <FactoryOrganizationLLMModelsPage />
+        </RequireExperimentalFeature>
       </RequirePermission>
     }
   />,

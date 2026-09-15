@@ -187,6 +187,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the in-progress workspace Models settings page",
             },
             {
+              id: "organization_byok",
+              label: "Organization BYOK",
+              description: "Show the organization LLM Models settings page",
+            },
+            {
               id: "factory_create_with_agent",
               label: "Task Refinement",
               description: "Refine draft work orders with an agent",
