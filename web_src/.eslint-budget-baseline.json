@@ -1,10 +1,10 @@
 {
-  "maxAllowedTotalIssues": 618,
+  "maxAllowedTotalIssues": 608,
   "maxAllowedByRule": {
     "complexity": 215,
     "@typescript-eslint/no-explicit-any": 149,
-    "@typescript-eslint/no-non-null-asserted-optional-chain": 78,
     "max-lines-per-function": 73,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 68,
     "max-statements": 61,
     "max-lines": 25,
     "max-depth": 6,
@@ -16,5 +16,5 @@
     "max-lines": 3569,
     "complexity": 198
   },
-  "updatedAt": "2026-08-25T16:29:05.037Z"
+  "updatedAt": "2026-09-15T12:31:27.250Z"
 }
