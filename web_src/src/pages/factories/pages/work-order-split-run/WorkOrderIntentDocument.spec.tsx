@@ -403,4 +403,29 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByRole("button", { name: /show less/i })).toBeInTheDocument();
     expect(content).not.toHaveStyle({ maxHeight: "220px" });
   });
+
+  it("focuses the plan pane when the plan-updated banner is clicked", async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
+          },
+        })}
+      />,
+    );
+
+    const result = screen.getByTestId("split-run-intent-result");
+    result.scrollIntoView = scrollIntoView;
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated }));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
 });

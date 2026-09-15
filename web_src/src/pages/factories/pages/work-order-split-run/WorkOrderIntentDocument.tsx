@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
@@ -52,9 +52,18 @@ export function WorkOrderIntentDocument({
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
   const split = useSplitRunPanePercent({ defaultPercent: DEFAULT_INTENT_LEFT_PERCENT, minPercent: 28, maxPercent: 68 });
   const document = splitRunIntentDocument({ artifacts, description });
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
+  const analysisChat = analysis
+    ? {
+        ...analysis,
+        onOpenPlan: () => {
+          resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        },
+      }
+    : undefined;
 
   return (
     <article className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="split-run-intent-document">
@@ -71,7 +80,7 @@ export function WorkOrderIntentDocument({
               title={sessionTitle}
               description={description}
               files={files}
-              analysis={analysis}
+              analysis={analysisChat}
               source={source}
             />
           )}
@@ -94,7 +103,11 @@ export function WorkOrderIntentDocument({
           />
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:min-w-[16rem]" data-testid="split-run-intent-result">
+        <div
+          ref={resultRef}
+          className="flex min-h-0 min-w-0 flex-1 flex-col lg:min-w-[16rem]"
+          data-testid="split-run-intent-result"
+        >
           <header className="flex shrink-0 items-start justify-between gap-3 px-5 pt-5 pb-2">
             <h2 className="min-w-0 text-[17px] leading-6 font-semibold tracking-tight text-foreground">
               {document.title || INTENT_DOCUMENT_TITLE}

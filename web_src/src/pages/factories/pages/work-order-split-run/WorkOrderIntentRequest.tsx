@@ -28,6 +28,7 @@ export type IntentAnalysisChat = {
   onComposerChange: (value: string) => void;
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
+  onOpenPlan?: () => void;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -104,6 +105,7 @@ function AnalysisRequestChat({
             organizationId={analysis.organizationId}
             streaming={state.active}
             files={files}
+            onOpenPlan={analysis.onOpenPlan}
           />
           {state.active ? (
             <AnalysisLiveWork

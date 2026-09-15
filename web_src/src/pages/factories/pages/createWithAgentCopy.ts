@@ -41,6 +41,7 @@ export const CREATE_WITH_AGENT_COPY = {
   refineTooltip: "Ask an agent to update this task.",
   refineFurther: "Refine further",
   openTask: "Open task",
+  planUpdated: "Plan updated",
   greeting: "The repository is ready. What do you want to do?",
   afterCreate: "The task is created. Tell me if you want to do something else.",
   afterSkip: "Skipped that draft. Tell me if you want to do something else.",
