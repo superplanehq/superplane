@@ -99,6 +99,35 @@ describe("useWorkOrderPlanningActivity", () => {
     expect(result.current.isWorking).toBe(false);
   });
 
+  it("keeps a pending survey after the session ends", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValue({
+      state: "ended",
+      survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST", "GraphQL"] }] },
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", true, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.hasAgentQuestion).toBe(true));
+    expect(result.current.isWorking).toBe(false);
+    expect(result.current.isWaiting).toBe(false);
+  });
+
+  it("stays false when an ended session has an empty survey", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValue({
+      state: "ended",
+      survey: { questions: [] },
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", true, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(findPlanningSessionByWorkOrder).toHaveBeenCalled());
+    expect(result.current.hasAgentQuestion).toBe(false);
+  });
+
   it("finds a pending survey when analysis ends after an empty lookup", async () => {
     findPlanningSessionByWorkOrder.mockResolvedValueOnce(null).mockResolvedValueOnce({
       state: "ended",

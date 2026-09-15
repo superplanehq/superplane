@@ -252,6 +252,11 @@ describe("createWithAgentViewFromSession", () => {
       }),
     ).toBe(true);
     expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
+    const endedSessionWithSurvey = {
+      state: "ended",
+      survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
+    };
+    expect(planningSessionHasPendingSurvey(endedSessionWithSurvey)).toBe(true);
     expect(view.messages).toEqual([
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);
