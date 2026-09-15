@@ -48,7 +48,7 @@ func FileAccessURL(fileID uuid.UUID, ttl time.Duration, key []byte) (string, err
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
-	expires := time.Now().Add(ttl).Unix()
+	expires := StableExpiry(ttl).Unix()
 	sig, err := SignFileAccess(fileID, expires, key)
 	if err != nil {
 		return "", err

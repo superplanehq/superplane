@@ -94,7 +94,7 @@ function AnalysisRequestChat({
           data-testid="split-run-intent-chat-log"
         >
           <RequestMessage description={description} files={files} asChat />
-          <WorkOrderIntentTranscript messages={analysis.view.messages} streaming={state.active} />
+          <WorkOrderIntentTranscript messages={analysis.view.messages} streaming={state.active} files={files} />
           {state.active ? (
             <AnalysisLiveWork
               machineStatus={analysis.view.machineStatus}

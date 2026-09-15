@@ -4,6 +4,7 @@ import {
   clearWorkOrderFileDownloadCache,
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
+  isReachableWorkOrderFileUrl,
   parseWorkOrderFileId,
   rewriteWorkOrderFileRefs,
   setWorkOrderFilePreviewUrl,
@@ -38,6 +39,14 @@ describe("workOrderFiles", () => {
     expect(isAllowedWorkOrderFile(new File(["x"], "a.mp4", { type: "video/mp4" }))).toBe(false);
     expect(isInlineWorkOrderImage("image/jpeg")).toBe(true);
     expect(isInlineWorkOrderImage("application/pdf")).toBe(false);
+  });
+
+  it("treats http, https, and blob URLs as reachable image sources", () => {
+    expect(isReachableWorkOrderFileUrl("https://cdn.example/bug.png")).toBe(true);
+    expect(isReachableWorkOrderFileUrl("http://files.test/bug.png")).toBe(true);
+    expect(isReachableWorkOrderFileUrl("blob:preview")).toBe(true);
+    expect(isReachableWorkOrderFileUrl("sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).toBe(false);
+    expect(isReachableWorkOrderFileUrl("")).toBe(false);
   });
 
   it("keeps the current URL when only its signature changes", () => {
