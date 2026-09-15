@@ -98,6 +98,27 @@ describe("useWorkOrderPlanningActivity", () => {
     await waitFor(() => expect(result.current.isWaiting).toBe(true));
     expect(result.current.isWorking).toBe(false);
   });
+
+  it("finds a pending survey when analysis ends after an empty lookup", async () => {
+    findPlanningSessionByWorkOrder.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      state: "ended",
+      survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST", "GraphQL"] }] },
+    });
+    const queryClient = new QueryClient();
+    const { result, rerender } = renderHook(
+      ({ backlogAnalyzing }: { backlogAnalyzing: boolean }) =>
+        useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", true, backlogAnalyzing),
+      { wrapper: createWrapper(queryClient), initialProps: { backlogAnalyzing: true } },
+    );
+
+    await waitFor(() => expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1));
+    expect(result.current.hasAgentQuestion).toBe(false);
+
+    rerender({ backlogAnalyzing: false });
+
+    await waitFor(() => expect(result.current.hasAgentQuestion).toBe(true));
+    expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("planningActivityPollInterval", () => {
