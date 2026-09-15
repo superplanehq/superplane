@@ -679,6 +679,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
 	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
