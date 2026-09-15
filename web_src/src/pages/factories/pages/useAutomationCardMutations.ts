@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -27,7 +27,7 @@ function collectExistingCanvasNames(
   sessionNames: Iterable<string>,
 ): string[] {
   const names = new Set<string>([...sessionNames]);
-  const apps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, factoryId));
+  const apps = queryClient.getQueryData<FactoryAutomation[]>(factoryAppsKey(organizationId, factoryId));
   for (const app of apps ?? []) {
     if (app.name?.trim()) {
       names.add(app.name.trim());
@@ -37,7 +37,7 @@ function collectExistingCanvasNames(
 }
 
 async function runDuplicateAutomation(args: {
-  app: FactoryApp;
+  app: FactoryAutomation;
   factoryId: string;
   factoryKey: string;
   organizationId: string;
@@ -103,7 +103,7 @@ export function useAutomationCardMutations(args: {
   }, [factoryId, organizationId, queryClient]);
 
   const handleEditAutomation = useCallback(
-    (app: FactoryApp) => {
+    (app: FactoryAutomation) => {
       if (!app.id) {
         return;
       }
@@ -113,7 +113,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const handleDuplicateAutomation = useCallback(
-    async (app: FactoryApp) => {
+    async (app: FactoryAutomation) => {
       if (isDuplicating || !app.id) {
         return;
       }
@@ -150,7 +150,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const handleDeleteAutomation = useCallback(
-    async (app: FactoryApp) => {
+    async (app: FactoryAutomation) => {
       if (!app.id) {
         return;
       }
@@ -170,7 +170,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const actionsForApp = useCallback(
-    (app: FactoryApp): AutomationCardActions => ({
+    (app: FactoryAutomation): AutomationCardActions => ({
       onEdit: () => handleEditAutomation(app),
       onDuplicate: () => handleDuplicateAutomation(app),
       onDelete: () => handleDeleteAutomation(app),

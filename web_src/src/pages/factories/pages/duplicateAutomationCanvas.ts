@@ -3,7 +3,7 @@ import {
   canvasesDescribeCanvas,
   canvasesPutCanvasStaging,
   type CanvasesCanvas,
-  type FactoryApp,
+  type FactoryAutomation,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
@@ -39,7 +39,7 @@ type CanvasNodes = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>;
 
 export type DuplicateAutomationCanvasDeps = {
   factoryId: string;
-  app: FactoryApp;
+  app: FactoryAutomation;
   createCanvas: (input: CreateCanvasInput) => Promise<CreateCanvasResult>;
   /** Names already taken in the workspace (used to pick "X copy", "X copy (2)", …). */
   existingCanvasNames?: Iterable<string>;

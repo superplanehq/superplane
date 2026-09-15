@@ -1417,7 +1417,8 @@ CREATE TABLE public.workflows (
     folder_id uuid,
     description text DEFAULT ''::text NOT NULL,
     dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    factory_id uuid
+    factory_id uuid,
+    column_key text
 );
 
 
@@ -4438,7 +4439,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260915064721	f
+20260915193110	f
 \.
 
 

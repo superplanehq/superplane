@@ -57,7 +57,7 @@ export type ColumnAutomationsInput = {
   columns?: LinePhaseColumn[];
   intakes?: FactoriesFactoryIntake[];
   prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
-  apps?: Array<{ id?: string; name?: string }>;
+  apps?: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders?: FactoriesWorkOrder[];
 };
 
@@ -98,6 +98,18 @@ const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   name: "Custom automation",
   description: "Add a blank automation canvas to this column.",
   trigger: "On task in this column",
+  action: "Run the automation",
+  iconSrc: "",
+  iconAlt: "",
+  unique: false,
+};
+
+const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
+  id: CUSTOM_CATALOG_ID,
+  kind: "custom",
+  name: "Custom automation",
+  description: "Add a blank canvas. Choose a trigger and the steps to run.",
+  trigger: "On a trigger you choose",
   action: "Run the automation",
   iconSrc: "",
   iconAlt: "",
@@ -176,23 +188,26 @@ export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[]
     ];
   }
   if (key === "verify") {
-    return availablePRFeedbackSources().map((source) => {
-      const sentence = prFeedbackSentence(source.id);
-      return {
-        id: source.id,
-        kind: sentence.kind,
-        name: source.name,
-        description: source.description,
-        trigger: sentence.trigger,
-        action: sentence.action,
-        iconSrc: source.iconSrc,
-        iconAlt: source.iconAlt,
-        unique: true,
-      };
-    });
+    return [
+      ...availablePRFeedbackSources().map((source) => {
+        const sentence = prFeedbackSentence(source.id);
+        return {
+          id: source.id,
+          kind: sentence.kind,
+          name: source.name,
+          description: source.description,
+          trigger: sentence.trigger,
+          action: sentence.action,
+          iconSrc: source.iconSrc,
+          iconAlt: source.iconAlt,
+          unique: true,
+        };
+      }),
+      EVENT_CUSTOM_ENTRY,
+    ];
   }
   if (key === "done") {
-    return [PR_CLOSURE_ENTRY];
+    return [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY];
   }
   return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
 }
@@ -200,6 +215,15 @@ export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[]
 export function takenCatalogIds(automations: ColumnAutomation[], catalog: ColumnAutomationCatalogEntry[]): string[] {
   const present = new Set(automations.map((automation) => automation.catalogId));
   return catalog.filter((entry) => entry.unique && present.has(entry.id)).map((entry) => entry.id);
+}
+
+/** True when every unique catalog type is taken and custom is the only remaining choice. */
+export function onlyCustomCatalogRemains(
+  catalog: ColumnAutomationCatalogEntry[],
+  takenIds: readonly string[],
+): boolean {
+  const remaining = catalog.filter((entry) => !takenIds.includes(entry.id));
+  return remaining.length === 1 && remaining[0]?.kind === "custom";
 }
 
 export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): boolean {
@@ -221,10 +245,15 @@ function automationsForColumn(
     return [...intakeAutomations(input.intakes ?? [], workOrders), ...analysisAutomation(input.apps ?? [], workOrders)];
   }
   if (key === "verify") {
-    return prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders);
+    return [
+      ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders),
+      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, new Set()),
+    ];
   }
   if (key === "done") {
-    return closureAutomation(input.apps ?? [], workOrders);
+    const closure = closureAutomation(input.apps ?? [], workOrders);
+    const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
+    return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip)];
   }
   return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
 }
@@ -330,6 +359,35 @@ function prFeedbackAutomations(
   return handlers.flatMap((handler) => {
     const automation = prFeedbackAutomation(handler, workOrders);
     return automation ? [automation] : [];
+  });
+}
+
+function customColumnAutomations(
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  columnKey: "verify" | "done",
+  workOrders: FactoriesWorkOrder[],
+  skipIds: Set<string>,
+): ColumnAutomation[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    if (!id || skipIds.has(id) || app.columnKey !== columnKey) {
+      return [];
+    }
+    return [
+      {
+        id: `custom-${id}`,
+        kind: "custom" as const,
+        name: app.name?.trim() || EVENT_CUSTOM_ENTRY.name,
+        trigger: EVENT_CUSTOM_ENTRY.trigger,
+        action: EVENT_CUSTOM_ENTRY.action,
+        iconSrc: EVENT_CUSTOM_ENTRY.iconSrc,
+        iconAlt: EVENT_CUSTOM_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(id, workOrders),
+        catalogId: CUSTOM_CATALOG_ID,
+        canvasId: id,
+      },
+    ];
   });
 }
 
@@ -456,11 +514,12 @@ export function catalogEntryToAutomation(
   columnTitle: string,
   id: string,
 ): ColumnAutomation {
-  const trigger = entry.kind === "agent-step" || entry.kind === "custom" ? `On task in ${columnTitle}` : entry.trigger;
+  const isPhaseCustom = entry.kind === "custom" && entry.trigger === CUSTOM_ENTRY.trigger;
+  const trigger = entry.kind === "agent-step" || isPhaseCustom ? `On task in ${columnTitle}` : entry.trigger;
   const action =
     entry.kind === "agent-step"
       ? `Run the ${columnTitle} agent`
-      : entry.kind === "custom"
+      : isPhaseCustom
         ? `Run the ${columnTitle} automation`
         : entry.action;
   return {
@@ -498,6 +557,10 @@ export const COLUMN_AUTOMATIONS_COPY = {
   viewRetry: "Try again",
   rowsEmpty: "No automations",
   rowMenu: "Open automation",
+  deleteLabel: "Delete automation",
+  deletingLabel: "Deleting",
+  keepLabel: "Keep automation",
+  confirmDelete: "Delete this automation? This cannot be undone.",
   viewMenuLabel: "Board view",
   viewOptions: "View options",
   viewNames: "Automation names",

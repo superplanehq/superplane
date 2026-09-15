@@ -412,7 +412,7 @@ export function factoryAppPath(
   appId: string,
   options?: FactoryAppNavOptions,
 ) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}${buildFactoryAppSearchParams(options)}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}${buildFactoryAppSearchParams(options)}`;
 }
 
 export function factoryAppRunPath(
@@ -448,7 +448,7 @@ export function factoryAppSplitRunPath(
     search.set("canvas", options.canvas);
   }
   const qs = search.toString();
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}/split-run${qs ? `?${qs}` : ""}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}/split-run${qs ? `?${qs}` : ""}`;
 }
 
 export function factorySettingsPath(organizationId: string, factoryKey: string) {

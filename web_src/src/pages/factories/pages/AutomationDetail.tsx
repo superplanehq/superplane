@@ -1,4 +1,4 @@
-import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -32,7 +32,7 @@ export function AutomationDetail({
 }: {
   organizationId: string;
   factoryKey: string;
-  app: FactoryApp;
+  app: FactoryAutomation;
   actions: AutomationCardActions;
   factory: FactoriesFactory | null | undefined;
   workOrders: FactoriesWorkOrder[];
