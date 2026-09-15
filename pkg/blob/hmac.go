@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,6 +107,40 @@ func SignedFileURLs(text string) []string {
 		urls = append(urls, match)
 	}
 	return urls
+}
+
+func FileIDFromSignedURL(raw string) (uuid.UUID, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil, false
+	}
+	if parsed.Query().Get(SignedURLMarkerParam) != SignedURLMarkerValue {
+		return uuid.Nil, false
+	}
+	base := path.Base(strings.Trim(parsed.Path, "/"))
+	id, err := uuid.Parse(base)
+	if err != nil || id == uuid.Nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func RewriteSignedFileURLs(markdown string, replace func(uuid.UUID) (string, bool)) string {
+	next := markdown
+	for _, raw := range SignedFileURLs(markdown) {
+		id, ok := FileIDFromSignedURL(raw)
+		if !ok {
+			next = strings.ReplaceAll(next, raw, "")
+			continue
+		}
+		replacement, found := replace(id)
+		if !found {
+			next = strings.ReplaceAll(next, raw, "")
+			continue
+		}
+		next = strings.ReplaceAll(next, raw, replacement)
+	}
+	return next
 }
 
 func ResolveDownloadURL(ctx context.Context, provider Provider, storageKey string, fileID uuid.UUID, ttl time.Duration) (string, error) {
