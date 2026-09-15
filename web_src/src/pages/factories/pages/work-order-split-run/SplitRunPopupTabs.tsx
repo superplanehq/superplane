@@ -60,6 +60,7 @@ export function SplitRunPopupTabs({
   header,
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
+  const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
   const [streamTick, setStreamTick] = useState("");
   const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
     resumeOnBottom: true,
@@ -79,7 +80,7 @@ export function SplitRunPopupTabs({
         factoryKey={factoryKey}
         orderId={orderId}
         orderNumber={orderNumber}
-        files={liveWorkOrder.data?.files}
+        files={files}
         expandFirstCheck={fixture.footer.kind === "draft"}
         canEditDescription={edits.canEditDescription}
         descriptionBusy={edits.descriptionBusy}
@@ -102,7 +103,7 @@ export function SplitRunPopupTabs({
         factoryKey={factoryKey}
         orderId={orderId}
         orderNumber={orderNumber}
-        files={liveWorkOrder.data?.files}
+        files={files}
         expandFirstCheck={fixture.footer.kind === "draft"}
         resultFooter={resultFooter}
         analysis={analysis}
@@ -147,6 +148,7 @@ export function SplitRunPopupTabs({
           footerActions={footerActions}
           follow={follow}
           onStreamTick={setStreamTick}
+          files={files}
         />
       </TabsContent>
     </Tabs>

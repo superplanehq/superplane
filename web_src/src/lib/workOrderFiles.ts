@@ -89,6 +89,11 @@ export function resolveWorkOrderFileSrc(src: string | undefined, downloadUrls?: 
   return previewUrls.get(id) ?? downloadUrls?.[id] ?? src;
 }
 
+export function isReachableWorkOrderFileUrl(src: string | undefined): boolean {
+  const value = src?.trim() ?? "";
+  return /^(https?:|blob:)/i.test(value);
+}
+
 export function rewriteWorkOrderFileRefs(markdown: string, files: WorkOrderFileRef[] | undefined): string {
   if (!markdown || !files?.length) {
     return markdown;
