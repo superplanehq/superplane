@@ -16,6 +16,9 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: in-progress workspace Models settings page. */
 export const FEATURE_WORKSPACE_MODELS = "workspace_models";
 
+/** Organization experimental feature: organization LLM Models (BYOK) settings page. */
+export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
+
 /** Organization experimental feature: model selector next to Start on a draft task. */
 export const FEATURE_FACTORY_DRAFT_START_MODEL = "factory_draft_start_model";
 
