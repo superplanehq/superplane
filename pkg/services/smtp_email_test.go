@@ -328,6 +328,10 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, html, "https://app.superplane.com/org/workspaces/sp/work-order/52")
 	assert.Contains(t, html, "href=\"https://github.com/example/repo/pull/52\"")
 	assert.Contains(t, html, "Review PR #52")
+	assert.Contains(t, html, "Open the task in SuperPlane")
+	assert.Contains(t, html, "<title>Task update</title>")
+	assert.NotContains(t, html, "work order")
+	assert.NotContains(t, html, "Work order")
 
 	text, err := renderEmailTemplate(templateRoot, "work_order_notification.txt", data)
 	require.NoError(t, err)
@@ -336,6 +340,9 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, text, "Bugs · CI Loop")
 	assert.Contains(t, text, "8h ago")
 	assert.Contains(t, text, "Review PR #52: https://github.com/example/repo/pull/52")
+	assert.Contains(t, text, "Open the task in SuperPlane")
+	assert.NotContains(t, text, "work order")
+	assert.NotContains(t, text, "Work order")
 }
 
 func TestBuildEmailService(t *testing.T) {
