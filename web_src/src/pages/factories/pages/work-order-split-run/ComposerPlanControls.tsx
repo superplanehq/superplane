@@ -116,7 +116,11 @@ function ScoreChip({
           size="sm"
           aria-label={label}
           data-testid={score == null ? undefined : "split-run-intent-composer-score"}
-          countClassName={score == null ? undefined : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)])}
+          countClassName={
+            score == null
+              ? "min-w-7 self-stretch py-0"
+              : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)])
+          }
           count={
             score == null ? (
               <ConfidenceAnalyzingIndicator
