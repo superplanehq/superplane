@@ -110,6 +110,7 @@ export function AutomationsPage() {
           actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}
+          lines={model.factory?.lines}
         />
       </div>
 
