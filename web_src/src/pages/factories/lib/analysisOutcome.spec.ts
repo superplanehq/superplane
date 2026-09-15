@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   analysisFinishedStatus,
   analysisFirstResultDelivered,
+  analysisResultDeliveredForRun,
   hasAnalysisPlan,
   hasAnalysisScore,
   statusForAnalysisRun,
@@ -58,6 +59,44 @@ describe("analysisFinishedStatus", () => {
 
   it("does not change a running analysis", () => {
     expect(analysisFinishedStatus("running", true)).toBe("running");
+  });
+});
+
+describe("analysisResultDeliveredForRun", () => {
+  const scoreAndPlan = {
+    checks: [{ name: "Confidence score", key: "confidence", score: 4, runId: "run-b" }],
+    artifacts: [{ data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
+  };
+
+  it("attributes the first result to the run that reported the score", () => {
+    expect(analysisResultDeliveredForRun({ id: "run-b" }, { ...scoreAndPlan, isLast: true })).toBe(true);
+    expect(analysisResultDeliveredForRun({ id: "run-a" }, { ...scoreAndPlan, isLast: false })).toBe(false);
+  });
+
+  it("lets the last run inherit an unattributed first result", () => {
+    expect(
+      analysisResultDeliveredForRun(
+        { id: "run-a" },
+        {
+          checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
+          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          isLast: true,
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not let a historical run inherit an unattributed first result", () => {
+    expect(
+      analysisResultDeliveredForRun(
+        { id: "run-a" },
+        {
+          checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
+          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          isLast: false,
+        },
+      ),
+    ).toBe(false);
   });
 });
 

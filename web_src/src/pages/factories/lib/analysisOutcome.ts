@@ -33,6 +33,40 @@ export function analysisFirstResultDelivered(input: {
   return hasAnalysisScore(input.checks) && hasAnalysisPlan(input.artifacts);
 }
 
+type AnalysisScoreCheck = {
+  name?: string;
+  key?: string;
+  score?: number | null;
+  runId?: string;
+};
+
+function analysisScoreRunId(checks?: AnalysisScoreCheck[]): string | undefined {
+  const check = (checks ?? []).find((entry) => {
+    const named = entry.name === CONFIDENCE_CHECK_NAME || entry.key === CONFIDENCE_CHECK_KEY;
+    return named && entry.score != null && Boolean(entry.runId);
+  });
+  return check?.runId;
+}
+
+/** Score and plan belong to the run that reported the score, not the work order. */
+export function analysisResultDeliveredForRun(
+  run: { id?: string },
+  input: {
+    checks?: AnalysisScoreCheck[];
+    artifacts?: Array<{ data?: unknown }>;
+    isLast: boolean;
+  },
+): boolean {
+  if (!analysisFirstResultDelivered(input)) {
+    return false;
+  }
+  const scoreRunId = analysisScoreRunId(input.checks);
+  if (scoreRunId) {
+    return run.id === scoreRunId;
+  }
+  return input.isLast;
+}
+
 export function analysisFinishedStatus<T extends string>(status: T, delivered: boolean): T | "passed" {
   if (delivered && (status === "failed" || status === "cancelled")) {
     return "passed";
