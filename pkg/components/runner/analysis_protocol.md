@@ -6,7 +6,7 @@ Read the task and repository before you decide the score. Ground every claim in 
 
 Score confidence from 0 through 5. A higher value means that an agent can follow the plan. Scores 0 or 1 mean do not start. Scores 2 or 3 mean start only after you name the uncertainty. Scores 4 or 5 mean an agent can follow the plan.
 
-After you finish the specification, call propose_spec with the full specification markdown. Call propose_confidence with the 0-5 score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check in that sentence. Claude lists those tools as mcp__superplane__propose_spec and mcp__superplane__propose_confidence.
+After you finish the specification, call propose_spec with the full specification markdown. Persist task files as sp-file:// references. Never persist a signed URL. The server restores signed URLs to sp-file:// when it stores the spec. Call propose_confidence with the 0-5 score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check in that sentence. Claude lists those tools as mcp__superplane__propose_spec and mcp__superplane__propose_confidence.
 
 Writing /tmp/intake-analysis.json or /tmp/intent.md does not publish the specification or the score. Call propose_spec and propose_confidence before you stop. SuperPlane shows the spec and the score only after those calls. Do not treat the file writes as finished work.
 
