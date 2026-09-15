@@ -163,4 +163,50 @@ describe("collectLineDoneOrders", () => {
 
     expect(done.map((entry) => entry.id)).toEqual(["wo-rejected-ran"]);
   });
+
+  it("sorts closed work by created time, completed time, or result", () => {
+    const completed = closedOrder({
+      id: "wo-completed",
+      result: "RESULT_COMPLETED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T18:00:00.000Z",
+    });
+    completed.createdAt = "2026-08-11T09:00:00.000Z";
+    const failed = closedOrder({
+      id: "wo-failed",
+      result: "RESULT_FAILED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T12:00:00.000Z",
+    });
+    failed.createdAt = "2026-08-11T11:00:00.000Z";
+    const rejected = closedOrder({
+      id: "wo-rejected",
+      result: "RESULT_REJECTED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T16:00:00.000Z",
+    });
+    rejected.createdAt = "2026-08-11T10:00:00.000Z";
+
+    const orders = [completed, failed, rejected];
+    expect(collectLineDoneOrders(orders, LINE).map((entry) => entry.id)).toEqual([
+      "wo-completed",
+      "wo-rejected",
+      "wo-failed",
+    ]);
+    expect(collectLineDoneOrders(orders, LINE, [], "created").map((entry) => entry.id)).toEqual([
+      "wo-failed",
+      "wo-rejected",
+      "wo-completed",
+    ]);
+    expect(collectLineDoneOrders(orders, LINE, [], "completed").map((entry) => entry.id)).toEqual([
+      "wo-completed",
+      "wo-rejected",
+      "wo-failed",
+    ]);
+    expect(collectLineDoneOrders(orders, LINE, [], "result").map((entry) => entry.id)).toEqual([
+      "wo-failed",
+      "wo-rejected",
+      "wo-completed",
+    ]);
+  });
 });

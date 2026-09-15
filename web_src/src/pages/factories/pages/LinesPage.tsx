@@ -21,7 +21,7 @@ import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryInt
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
+import { useWorkOrderChecks, useWorkOrderChecksForOrders } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -42,6 +42,12 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
+import {
+  confidenceScoresFromCheckQueries,
+  useLineColumnSortPreference,
+  type LineColumnKey,
+  type LineColumnSortId,
+} from "../lib/lineColumnSort";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
@@ -785,13 +791,45 @@ function LineDetail({
   onClosePeek: () => void;
 }) {
   const steps = line.steps ?? [];
-  const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
+  const { sortFor, setSort } = useLineColumnSortPreference(line.id);
+  const backlogSort = sortFor("backlog");
+  const verifySort = sortFor("verify");
+  const doneSort = sortFor("done");
+  const phaseSorts = useMemo(() => {
+    const next: Record<number, LineColumnSortId> = {};
+    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+      next[stepIndex] = sortFor(`phase-${stepIndex}`);
+    }
+    return next;
+  }, [sortFor, steps.length]);
+  const draftIds = useMemo(
+    () => (workOrders ?? []).flatMap((order) => (order.id && order.state === "STATE_DRAFT" ? [order.id] : [])),
+    [workOrders],
+  );
+  const confidenceQueries = useWorkOrderChecksForOrders(
+    organizationId,
+    factoryId,
+    backlogSort === "confidence" ? draftIds : [],
+    backlogSort === "confidence",
+  );
+  const confidenceByOrderId = confidenceScoresFromCheckQueries(
+    backlogSort === "confidence" ? draftIds : [],
+    confidenceQueries,
+  );
+  const effectiveBacklogSort = backlogSort === "confidence" && confidenceByOrderId == null ? "updated" : backlogSort;
+  const fullBoard = useMemo(
+    () => buildLinePhaseBoard(line, workOrders ?? [], apps, phaseSorts),
+    [line, workOrders, apps, phaseSorts],
+  );
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, verifySort), [fullBoard, verifySort]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const backlogOrders = useMemo(
+    () => collectLineBacklogOrders(workOrders ?? [], effectiveBacklogSort, confidenceByOrderId),
+    [workOrders, effectiveBacklogSort, confidenceByOrderId],
+  );
   const doneOrders = useMemo(
-    () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
-    [workOrders, line, fullBoard],
+    () => collectLineDoneOrders(workOrders ?? [], line, fullBoard, doneSort),
+    [workOrders, line, fullBoard, doneSort],
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
@@ -883,6 +921,8 @@ function LineDetail({
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
+          sortFor={sortFor}
+          onSortChange={setSort}
         />
       )}
       <AddColumnAutomationPicker
@@ -1127,6 +1167,8 @@ function PhaseBoard({
   onAutomationRowAction,
   onAddVerifyAutomation,
   onAddDoneAutomation,
+  sortFor,
+  onSortChange,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1152,6 +1194,8 @@ function PhaseBoard({
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
   onAddDoneAutomation?: () => void;
+  sortFor: (columnKey: LineColumnKey) => LineColumnSortId;
+  onSortChange: (columnKey: LineColumnKey, sortId: LineColumnSortId) => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
@@ -1272,6 +1316,8 @@ function PhaseBoard({
           }}
           colorId={columnColors.backlog ?? null}
           onColorChange={(colorId) => void setColumnColor("backlog", colorId)}
+          sortId={sortFor("backlog")}
+          onSortChange={(sortId) => onSortChange("backlog", sortId)}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
@@ -1306,6 +1352,8 @@ function PhaseBoard({
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
               onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
+              sortId={sortFor(columnKey)}
+              onSortChange={(sortId) => onSortChange(columnKey, sortId)}
               canRename={canRename}
               onRename={(title) => setColumnTitle(columnKey, title)}
               workOrderCardContext={workOrderCardContext}
@@ -1326,6 +1374,8 @@ function PhaseBoard({
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
           onColorChange={(colorId) => void setColumnColor("verify", colorId)}
+          sortId={sortFor("verify")}
+          onSortChange={(sortId) => onSortChange("verify", sortId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("verify", title)}
           workOrderCardContext={workOrderCardContext}
@@ -1343,6 +1393,8 @@ function PhaseBoard({
           title={doneTitle}
           colorId={columnColors.done ?? null}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
+          sortId={sortFor("done")}
+          onSortChange={(sortId) => onSortChange("done", sortId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
           workOrderCardContext={workOrderCardContext}
@@ -1364,6 +1416,8 @@ function VerifyColumn({
   onAdd,
   colorId,
   onColorChange,
+  sortId,
+  onSortChange,
   canRename,
   onRename,
   workOrderCardContext,
@@ -1379,6 +1433,8 @@ function VerifyColumn({
   onAdd?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  sortId: LineColumnSortId;
+  onSortChange: (sortId: LineColumnSortId) => void;
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1427,9 +1483,12 @@ function VerifyColumn({
           <ColumnLaneMenu
             title={title}
             testId="lines-verify-menu"
+            columnKey="verify"
             colorId={colorId}
             onColorChange={onColorChange}
             onAddAutomation={onAddAutomation}
+            sortId={sortId}
+            onSortChange={onSortChange}
           />
         </div>
       }
@@ -1464,6 +1523,8 @@ function DoneColumn({
   title,
   colorId,
   onColorChange,
+  sortId,
+  onSortChange,
   canRename,
   onRename,
   workOrderCardContext,
@@ -1477,6 +1538,8 @@ function DoneColumn({
   title: string;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  sortId: LineColumnSortId;
+  onSortChange: (sortId: LineColumnSortId) => void;
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1513,9 +1576,12 @@ function DoneColumn({
           <ColumnLaneMenu
             title={title}
             testId="lines-done-menu"
+            columnKey="done"
             colorId={colorId}
             onColorChange={onColorChange}
             onAddAutomation={onAddAutomation}
+            sortId={sortId}
+            onSortChange={onSortChange}
           />
         </div>
       }
@@ -1565,6 +1631,8 @@ function PhaseColumn({
   onSaveParallelism,
   colorId,
   onColorChange,
+  sortId,
+  onSortChange,
   canRename,
   onRename,
   workOrderCardContext,
@@ -1582,6 +1650,8 @@ function PhaseColumn({
   onSaveParallelism: (value: number) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  sortId: LineColumnSortId;
+  onSortChange: (sortId: LineColumnSortId) => void;
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1659,10 +1729,13 @@ function PhaseColumn({
             <ColumnLaneMenu
               title={title}
               testId={`lines-phase-menu-${column.stepIndex}`}
+              columnKey={`phase-${column.stepIndex}`}
               onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
               parallelism={parallelism}
               colorId={colorId}
               onColorChange={onColorChange}
+              sortId={sortId}
+              onSortChange={onSortChange}
             />
           </div>
         }
