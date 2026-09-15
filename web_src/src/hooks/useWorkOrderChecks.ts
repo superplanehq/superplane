@@ -1,7 +1,7 @@
 import { factoriesListWorkOrderChecks } from "@/api-client";
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { factoryQueryKeys } from "./useFactoryData";
 
@@ -18,7 +18,28 @@ export function useWorkOrderChecks(
   orderId: string,
   options?: { enabled?: boolean; refetchInterval?: number | false },
 ) {
-  return useQuery({
+  return useQuery(workOrderChecksQuery(organizationId, factoryId, orderId, options));
+}
+
+/** Prefetch the same check cache LineBoardOrderCard reads. */
+export function useWorkOrderChecksForOrders(
+  organizationId: string,
+  factoryId: string,
+  orderIds: readonly string[],
+  enabled = true,
+) {
+  return useQueries({
+    queries: orderIds.map((orderId) => workOrderChecksQuery(organizationId, factoryId, orderId, { enabled })),
+  });
+}
+
+function workOrderChecksQuery(
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
+  return {
     queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
     queryFn: async (): Promise<FactoriesWorkOrderCheck[]> => {
       const response = await factoriesListWorkOrderChecks(
@@ -31,5 +52,5 @@ export function useWorkOrderChecks(
     },
     enabled: Boolean(organizationId && factoryId && orderId) && (options?.enabled ?? true),
     refetchInterval: options?.refetchInterval,
-  });
+  };
 }

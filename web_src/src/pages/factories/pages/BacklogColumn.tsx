@@ -9,6 +9,7 @@ import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
+import type { LineColumnSortId } from "../lib/lineColumnSort";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -29,6 +30,8 @@ export type BacklogColumnProps = {
   onSaveSettings: (settings: { name: string; size: number | null }) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  sortId?: LineColumnSortId;
+  onSortChange?: (sortId: LineColumnSortId) => void;
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -69,6 +72,8 @@ export function BacklogColumn({
   onSaveSettings,
   colorId,
   onColorChange,
+  sortId,
+  onSortChange,
   canCreateWorkOrder,
   canRename,
   onRename,
@@ -119,6 +124,8 @@ export function BacklogColumn({
             onAddIntake={onAddIntake}
             colorId={colorId}
             onColorChange={onColorChange}
+            sortId={sortId}
+            onSortChange={onSortChange}
           />
         }
         subheader={columnAutomationRowsSubheader({
@@ -161,6 +168,8 @@ function BacklogColumnHeaderActions({
   onAddIntake,
   colorId,
   onColorChange,
+  sortId,
+  onSortChange,
 }: Pick<
   BacklogColumnProps,
   | "title"
@@ -171,6 +180,8 @@ function BacklogColumnHeaderActions({
   | "onAddIntake"
   | "colorId"
   | "onColorChange"
+  | "sortId"
+  | "onSortChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
 }) {
@@ -188,10 +199,13 @@ function BacklogColumnHeaderActions({
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"
+        columnKey="backlog"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
         colorId={colorId}
         onColorChange={onColorChange}
+        sortId={sortId}
+        onSortChange={onSortChange}
       />
     </div>
   );
