@@ -494,4 +494,30 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.hidePlan })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
   });
+
+  it("opens the Clarity summary in a popover", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={HIGH_CONFIDENCE}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("split-run-intent-composer-score"));
+    expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+      "This issue is a good fit for an agent on this factory line.",
+    );
+  });
 });

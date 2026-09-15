@@ -76,7 +76,15 @@ function PreviewStrip({ look }: { look: PlanStripLook }) {
 }
 
 function ChipStrip({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
-  return <ComposerPlanStack open={open} score={SCORE} onToggle={onToggle} actions={<DraftActions />} />;
+  return (
+    <ComposerPlanStack
+      open={open}
+      score={SCORE}
+      scoreSummary={REVIEW_TEXT}
+      onToggle={onToggle}
+      actions={<DraftActions />}
+    />
+  );
 }
 
 function TodayStrip() {

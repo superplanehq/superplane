@@ -33,6 +33,7 @@ export type IntentAnalysisChat = {
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
   latestPlanScore?: number;
+  latestPlanSummary?: string;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
 };
@@ -137,6 +138,7 @@ function AnalysisRequestChat({
           <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
             score={analysis.latestPlanScore}
+            scoreSummary={analysis.latestPlanSummary}
             isAnalyzing={Boolean(analysis.isAnalyzing)}
             canTogglePlan={Boolean(analysis.canTogglePlan)}
             onToggle={analysis.onTogglePlan}

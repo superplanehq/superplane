@@ -78,6 +78,7 @@ export function WorkOrderIntentDocument({
         onTogglePlan: () => setPlanPaneOpen((current) => !current),
         canTogglePlan: hasAnalysisPlan(artifacts),
         latestPlanScore: latestPlanScore(analysis.view.messages) ?? confidence?.score,
+        latestPlanSummary: confidence?.summary?.trim(),
         isAnalyzing,
         closedDecision: refineOpen ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
       }
