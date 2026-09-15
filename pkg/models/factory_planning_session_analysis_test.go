@@ -25,24 +25,22 @@ func TestFactory_AttachAnalysisSessionReusesEndedSession(t *testing.T) {
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
-	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
+	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts.", uuid.Nil))
 	require.NoError(t, session.End(db))
 
 	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	again, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     nextRun.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: nextRun.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, session.ID, again.ID)
@@ -62,24 +60,22 @@ func TestFactory_AttachAnalysisSessionReconnectsRunningSessionWithoutRun(t *test
 	initialRun, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     initialRun.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: initialRun.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
-	require.NoError(t, session.SendUserMessage(db, "Use the existing retry helper."))
+	require.NoError(t, session.SendUserMessage(db, "Use the existing retry helper.", uuid.Nil))
 	require.NoError(t, session.DetachAgentRun(db))
 
 	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	reconnected, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     nextRun.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: nextRun.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -101,11 +97,10 @@ func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	assert.False(t, session.NeedsAnalysisRestart(db))
@@ -125,11 +120,12 @@ func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
 
 func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		state  string
-		result string
+		name              string
+		state             string
+		result            string
+		expectedRunResult string
 	}{
-		{name: "start", state: FactoryWorkOrderStateOpen},
+		{name: "start", state: FactoryWorkOrderStateOpen, expectedRunResult: CanvasRunResultPassed},
 		{name: "archive", state: FactoryWorkOrderStateClosed, result: FactoryWorkOrderResultRejected},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -142,11 +138,10 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 			require.NoError(t, err)
 			session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-				CreatedByUserID: userID,
-				Repository:      "acme/payments",
-				CanvasID:        canvas.ID,
-				CanvasRunID:     run.ID,
-				WorkOrderID:     order.ID,
+				Repository:  "acme/payments",
+				CanvasID:    canvas.ID,
+				CanvasRunID: run.ID,
+				WorkOrderID: order.ID,
 			})
 			require.NoError(t, err)
 
@@ -164,6 +159,7 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			run, err = FindUnscopedCanvasRun(db, run.ID)
 			require.NoError(t, err)
 			assert.Equal(t, CanvasRunStateCancelling, run.State)
+			assert.Equal(t, test.expectedRunResult, run.Result)
 		})
 	}
 }
@@ -178,17 +174,16 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
 	require.NoError(t, session.ProposeConfidence(db, 4, "This issue is a good fit for an agent."))
 	require.NoError(t, session.RecordAgentMessage(db, "I found the retry seam in billing/retry.go."))
-	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper."))
+	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper.", uuid.Nil))
 
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
@@ -254,17 +249,16 @@ func TestAnalysisContinuationTextBoundsRewindWithoutDeletingHistory(t *testing.T
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	for index := range 30 {
 		message := fmt.Sprintf("message-%02d %s", index, strings.Repeat("context ", 300))
 		if index%2 == 0 {
-			require.NoError(t, session.SendUserMessage(db, message))
+			require.NoError(t, session.SendUserMessage(db, message, uuid.Nil))
 			continue
 		}
 		require.NoError(t, session.RecordAgentMessage(db, message))
@@ -295,22 +289,20 @@ func TestFactory_AttachAnalysisSession(t *testing.T) {
 	require.NoError(t, err)
 
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
 	assert.Equal(t, run.ID, *session.CanvasRunID)
 
 	again, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, session.ID, again.ID)
@@ -326,11 +318,10 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -367,11 +358,10 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	otherRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	otherSession, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     otherRun.ID,
-		WorkOrderID:     other.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: otherRun.ID,
+		WorkOrderID: other.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, otherSession.ProposeSpec(db, "# Retry invoices\n\n## Executive summary\n\nStop double invoices.\n"))
@@ -402,11 +392,10 @@ func TestFactoryPlanningSession_ProposeSpecDoesNotOverwriteTitleOnlyArtifact(t *
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -425,7 +414,7 @@ func TestFactoryPlanningSession_ProposeSpecDoesNotOverwriteTitleOnlyArtifact(t *
 	}
 }
 
-func TestFactory_MaybeAttachAnalysisSession(t *testing.T) {
+func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-event")
 	db := database.DB(t.Context())
@@ -433,7 +422,7 @@ func TestFactory_MaybeAttachAnalysisSession(t *testing.T) {
 	canvas.Name = "Triage incoming tasks"
 	require.NoError(t, db.Model(canvas).Update("name", canvas.Name).Error)
 	require.NoError(t, EnableExperimentalFeature(org.ID, features.FeatureFactoryCreateWithAgent))
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", nil, nil, nil)
 	require.NoError(t, err)
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
 	require.NoError(t, err)
@@ -461,6 +450,7 @@ func TestFactory_MaybeAttachAnalysisSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
 	assert.Equal(t, PlanningSessionKindWorkOrderAnalysis, session.Kind)
+	assert.Nil(t, session.CreatedByUserID)
 	var sessionCount int64
 	require.NoError(t, db.Model(&FactoryPlanningSession{}).
 		Where("draft_work_order_id = ? AND kind = ?", order.ID, PlanningSessionKindWorkOrderAnalysis).
@@ -525,15 +515,14 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
+	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts.", uuid.Nil))
 
 	assert.Equal(t, "The retry lives in billing/retry.ts.", session.Wait().Text)
 	assert.NotContains(t, session.Wait().Text, "propose_spec")

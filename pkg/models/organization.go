@@ -166,6 +166,13 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
+	return FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
+}
+
 func FindOrganizationByName(name string) (*Organization, error) {
 	organization := Organization{}
 
@@ -197,7 +204,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Slug:                        slug,
 		Description:                 description,
 		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories, features.FeatureFactoryCreateWithAgent},
 		CreatedAt:                   &now,
 		UpdatedAt:                   &now,
 	}

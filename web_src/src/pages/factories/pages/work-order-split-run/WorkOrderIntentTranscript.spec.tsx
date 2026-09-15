@@ -3,7 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
+
+vi.mock("@/hooks/useOrgUserLookup", () => ({
+  useOrgUserLookup: () => ({
+    resolveUser: (id: string | undefined) => {
+      if (id === "user-ada") {
+        return { id, name: "Ada Lovelace", initials: "AL", avatarUrl: "https://example.com/ada.png" };
+      }
+      if (id === "user-alan") {
+        return { id, name: "Alan Turing", initials: "AT" };
+      }
+      return null;
+    },
+    isLoading: false,
+  }),
+}));
 
 let notifyResize: () => void;
 
@@ -17,6 +33,16 @@ class MockResizeObserver {
   disconnect() {}
 }
 
+function renderTranscript(messages: CreateWithAgentMessage[], extras: { streaming?: boolean } = {}) {
+  return render(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={extras.streaming} />);
+}
+
+function expectAvatarBeforeGivenName(container: HTMLElement, avatarName: string, givenName: string) {
+  const avatar = within(container).getByRole("img", { name: avatarName });
+  const name = within(container).getByText(givenName);
+  expect(avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("WorkOrderIntentTranscript", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
@@ -27,14 +53,12 @@ describe("WorkOrderIntentTranscript", () => {
   });
 
   it("does not restream the last agent line after a user reply", () => {
-    render(
-      <WorkOrderIntentTranscript
-        streaming
-        messages={[
-          { id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." },
-          { id: "user-1", kind: "text", role: "user", origin: "survey", text: "Add separate lists per animal." },
-        ]}
-      />,
+    renderTranscript(
+      [
+        { id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." },
+        { id: "user-1", kind: "text", role: "user", origin: "survey", text: "Add separate lists per animal." },
+      ],
+      { streaming: true },
     );
 
     const transcript = screen.getByTestId("split-run-intent-transcript");
@@ -43,69 +67,95 @@ describe("WorkOrderIntentTranscript", () => {
   });
 
   it("streams the latest agent line while that turn is still open", () => {
-    render(
-      <WorkOrderIntentTranscript
-        streaming
-        messages={[{ id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." }]}
-      />,
-    );
+    renderTranscript([{ id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." }], {
+      streaming: true,
+    });
 
     expect(screen.getByTestId("split-run-intent-transcript").querySelector(".sp-stream-text")).not.toBeNull();
   });
 
   it("shows survey answers as question and answer in a stronger bubble", () => {
-    render(
-      <WorkOrderIntentTranscript
-        messages={[
-          {
-            id: "user-1",
-            kind: "text",
-            role: "user",
-            origin: "survey",
-            text: "What should the agent build? Custom styled modal\nHow is the work done? Reviewer approves by taste",
-          },
-        ]}
-      />,
-    );
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        origin: "survey",
+        userId: "user-ada",
+        text: "What should the agent build? Custom styled modal\nHow is the work done? Reviewer approves by taste",
+      },
+    ]);
 
     const answer = screen.getByTestId("split-run-intent-survey-answer");
-    expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.youSurvey);
+    expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.answeredBy);
+    expect(answer).toHaveTextContent("Ada");
+    expectAvatarBeforeGivenName(answer, "Ada Lovelace", "Ada");
     expect(answer).toHaveTextContent("What should the agent build?");
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
     expect(answer).toHaveTextContent("Reviewer approves by taste");
     expect(answer).toHaveClass("sp-survey-card");
     expect(answer.className).toContain("border");
+    expect(answer.parentElement).toHaveClass("justify-end");
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
   });
 
-  it("shows composer notes in the same accent bubble as the survey", () => {
-    render(
-      <WorkOrderIntentTranscript
-        messages={[{ id: "user-1", kind: "text", role: "user", text: "Keep the current dark theme." }]}
-      />,
-    );
+  it("shows composer notes with the sender given name and avatar", () => {
+    renderTranscript([
+      { id: "user-1", kind: "text", role: "user", userId: "user-ada", text: "Keep the current dark theme." },
+    ]);
 
     const note = screen.getByTestId("split-run-intent-user-note");
     expect(note).toHaveClass("sp-user-note");
-    expect(note).toHaveTextContent(CREATE_WITH_AGENT_COPY.you);
+    expect(note).toHaveTextContent("Ada");
+    expect(within(note).getByRole("img", { name: "Ada Lovelace" })).toHaveAttribute(
+      "src",
+      "https://example.com/ada.png",
+    );
+    expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
+    expect(note.parentElement).toHaveClass("justify-end");
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("shows two senders on the same session as different people", () => {
+    renderTranscript([
+      { id: "user-1", kind: "text", role: "user", userId: "user-ada", text: "Keep the current dark theme." },
+      { id: "user-2", kind: "text", role: "user", userId: "user-alan", text: "Use the existing retry helper." },
+    ]);
+
+    const notes = screen.getAllByTestId("split-run-intent-user-note");
+    expect(notes[0]).toHaveTextContent("Ada");
+    expect(notes[1]).toHaveTextContent("Alan");
+  });
+
+  it("omits the sender header when the message has no user id", () => {
+    renderTranscript([{ id: "user-1", kind: "text", role: "user", text: "Keep the current dark theme." }]);
+
+    const note = screen.getByTestId("split-run-intent-user-note");
+    expect(note).toHaveTextContent("Keep the current dark theme.");
+    expect(note).not.toHaveTextContent("Ada");
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
+  });
+
+  it("keeps agent lines on the left", () => {
+    renderTranscript([{ id: "agent-1", kind: "text", role: "agent", text: "I updated the plan." }]);
+
+    const agent = screen.getByText("I updated the plan.");
+    expect(agent.closest(".justify-end")).toBeNull();
   });
 
   it("collapses a long composer note and expands it on Show more", async () => {
     const user = userEvent.setup();
-    render(
-      <WorkOrderIntentTranscript
-        messages={[
-          {
-            id: "user-1",
-            kind: "text",
-            role: "user",
-            text: "Need a payment method.\n".repeat(40),
-          },
-        ]}
-      />,
-    );
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        text: "Need a payment method.\n".repeat(40),
+      },
+    ]);
 
     const note = screen.getByTestId("split-run-intent-user-note");
     const content = within(note).getByTestId("work-order-description-markdown").parentElement;
@@ -118,5 +168,18 @@ describe("WorkOrderIntentTranscript", () => {
     await user.click(within(note).getByRole("button", { name: /show more/i }));
     expect(within(note).getByRole("button", { name: /show less/i })).toBeInTheDocument();
     expect(content).not.toHaveStyle({ maxHeight: "220px" });
+  });
+
+  it("uses the download URL for images in composer notes", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        messages={[{ id: "user-1", kind: "text", role: "user", text: `See ![bug](sp-file://${fileId})` }]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
   });
 });

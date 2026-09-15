@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { FilesFile } from "@/api-client";
+
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
-import { phaseWithRunnerModel } from "./draftStartModel";
+import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
 import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { autoExpandedPhaseId, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
@@ -22,6 +24,7 @@ type WorkOrderSplitRunBodyProps = {
   fixture: SplitRunFixture;
   canUpdate?: boolean;
   footerActions: SplitRunFooterActions;
+  files?: FilesFile[];
 };
 
 export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
@@ -48,6 +51,7 @@ export function WorkOrderSplitRunBody({
   footerActions,
   follow,
   onStreamTick,
+  files,
 }: WorkOrderSplitRunBodyProps & {
   follow: SplitRunFollow;
   onStreamTick: (tick: string) => void;
@@ -118,6 +122,7 @@ export function WorkOrderSplitRunBody({
               onRerun={automationRerun(entry)}
               actionBusy={footerActions.busy}
               onStreamLength={onStreamLength}
+              files={files}
               onToggle={() => {
                 setNodeId(null);
                 setOpenPhaseId((current) => (current === entry.id ? null : entry.id));
@@ -149,6 +154,7 @@ function SplitRunPhaseLogItem({
   actionBusy,
   onStreamLength,
   onToggle,
+  files,
 }: {
   entry: SplitRunPhase;
   organizationId?: string;
@@ -165,6 +171,7 @@ function SplitRunPhaseLogItem({
   actionBusy: boolean;
   onStreamLength: (phaseId: string, length: number) => void;
   onToggle: () => void;
+  files?: FilesFile[];
 }) {
   const [usageOpen, setUsageOpen] = useState(false);
   const live = useSplitRunLiveCanvas(organizationId, expanded || usageOpen ? entry : undefined);
@@ -179,7 +186,7 @@ function SplitRunPhaseLogItem({
 
   return (
     <PhaseLogCard
-      phase={phaseWithRunnerModel(entry, live.canvas?.nodes)}
+      phase={phaseWithRunnerModel(entry, canvasNodesForRunnerModel(live.canvas?.nodes, live.canvas?.statuses))}
       expanded={expanded}
       stream={stream ?? entry.stream}
       streamLoading={live.isLoading}
@@ -193,6 +200,7 @@ function SplitRunPhaseLogItem({
       actionBusy={actionBusy}
       onToggle={onToggle}
       onUsageOpenChange={setUsageOpen}
+      files={files}
     />
   );
 }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
-import { getComponentBaseMapper, getExecutionDetails, getStateMap } from "./index";
+import { getComponentBaseMapper, getExecutionDetails, getStateMap, getTriggerRenderer } from "./index";
+import { defaultTriggerRenderer } from "./default";
 import { RUNNER_STATE_REGISTRY } from "./runner";
 
 function makeNode(name: string): ComponentsNode {
@@ -270,5 +271,21 @@ describe("getExecutionDetails", () => {
     expect(props.customField).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerOpenRouter")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+});
+
+describe("getTriggerRenderer", () => {
+  it("uses the default renderer when the trigger name is empty", () => {
+    const event = {
+      id: "event-1",
+      createdAt: new Date().toISOString(),
+      data: {},
+      nodeId: "missing-trigger",
+      type: "unknown",
+    };
+
+    expect(getTriggerRenderer("").getTitleAndSubtitle({ event })).toEqual(
+      defaultTriggerRenderer.getTitleAndSubtitle({ event }),
+    );
   });
 });

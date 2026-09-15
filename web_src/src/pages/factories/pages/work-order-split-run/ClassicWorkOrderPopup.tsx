@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -12,6 +12,7 @@ import { SplitRunReview } from "./SplitRunReview";
 import { classicSplitRunFooter } from "./splitRunFooter";
 import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
+import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -46,7 +47,8 @@ export function ClassicWorkOrderPopup({
   sessionLookupError,
 }: ClassicWorkOrderPopupProps) {
   const classicFixture = useMemo(() => ({ ...fixture, footer: classicSplitRunFooter(fixture.footer) }), [fixture]);
-  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
+  const modelLabel = useImplementationRunnerModel(organizationId, classicFixture.phases);
+  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, classicFixture, dismissCurrentPopup);
@@ -104,7 +106,11 @@ export function ClassicWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow fixture={{ ...classicFixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+            <OwnerTimeCostRow
+              fixture={{ ...classicFixture, owner: edits.owner }}
+              modelLabel={modelLabel}
+              assigneeIds={edits.assigneeIds}
+            />
           </PopupHeader>
         )}
       />
@@ -130,7 +136,7 @@ export function ClassicWorkOrderPopup({
               lineName={classicFixture.lineName}
               value={draftModel}
               onChange={setDraftModel}
-              disabled={isDispatching}
+              disabled={isDispatching || !canDispatch}
             />
           ) : undefined
         }

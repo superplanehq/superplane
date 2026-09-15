@@ -444,7 +444,8 @@ CREATE TABLE public.factory_planning_session_messages (
     role text NOT NULL,
     text text NOT NULL,
     delivered boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid
 );
 
 
@@ -467,7 +468,7 @@ CREATE TABLE public.factory_planning_sessions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     factory_id uuid NOT NULL,
-    created_by_user_id uuid NOT NULL,
+    created_by_user_id uuid,
     repository text NOT NULL,
     state text NOT NULL,
     canvas_id uuid,
@@ -488,7 +489,8 @@ CREATE TABLE public.factory_planning_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     selectable_model_key text DEFAULT ''::text NOT NULL,
     kind text NOT NULL,
-    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text])))
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text]))),
+    CONSTRAINT factory_planning_sessions_task_creation_creator_check CHECK (((kind <> 'task_creation'::text) OR (created_by_user_id IS NOT NULL)))
 );
 
 
@@ -3520,6 +3522,14 @@ ALTER TABLE ONLY public.factory_planning_session_messages
 
 
 --
+-- Name: factory_planning_session_messages factory_planning_session_messages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_planning_session_work_orders factory_planning_session_work_orders_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4439,7 +4449,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260914151000	f
+20260915064721	f
 \.
 
 

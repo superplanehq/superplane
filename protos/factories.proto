@@ -2153,6 +2153,7 @@ message PlanningSessionMessage {
   string role = 2;
   string text = 3;
   google.protobuf.Timestamp created_at = 4;
+  string user_id = 5;
 }
 
 message PlanningSessionSurveyQuestion {

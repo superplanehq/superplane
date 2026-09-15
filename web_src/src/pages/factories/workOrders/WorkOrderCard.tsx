@@ -70,8 +70,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
   /**
-   * True while the Backlog automation analyzes this task. The card
-   * shows a spinner in the meter slot until the score arrives.
+   * True while the agent still works on this draft. The card shows
+   * thinking states in the meter slot, even after a score exists.
    */
   isAnalyzing?: boolean;
   /** Extra surface classes. Use for sidebar hover and selected fills. */
@@ -124,8 +124,13 @@ export function WorkOrderCard({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const { isDraft, queueLabel, showStart } = cardStartState(entry);
-  const showAgentQuestion = hasAgentQuestion && isDraft;
+  const { isDraft, queueLabel } = cardStartState(entry);
+  const {
+    showAgentQuestion,
+    agentWorking,
+    showStart: showDraftStart,
+  } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
+  const showStart = showDraftStart && !queueLabel;
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -175,11 +180,12 @@ export function WorkOrderCard({
           onDispatch={onDispatch}
           onCancelQueue={onCancelQueue}
           createdAt={createdAt}
+          isDraft={isDraft}
           showStart={showStart}
           queueLabel={queueLabel}
           willQueueOnStart={willQueueOnStart}
           confidenceScore={confidenceScore}
-          isAnalyzing={isAnalyzing}
+          isAnalyzing={agentWorking}
         />
       </div>
     </article>
@@ -193,11 +199,10 @@ function isCancelingOrder(orderIds: ReadonlySet<string> | undefined, orderId: st
 function cardStartState(entry: WorkOrderListEntry): {
   isDraft: boolean;
   queueLabel: string | null;
-  showStart: boolean;
 } {
   const queueLabel = firstStepQueueLabel(entry.order);
   const isDraft = entry.displayStatus === "draft";
-  return { isDraft, queueLabel, showStart: isDraft && !queueLabel };
+  return { isDraft, queueLabel };
 }
 
 function CardStatusIcon({
@@ -292,6 +297,7 @@ function WorkOrderCardMetaRow({
   onDispatch,
   onCancelQueue,
   createdAt,
+  isDraft,
   showStart,
   queueLabel,
   willQueueOnStart,
@@ -308,6 +314,7 @@ function WorkOrderCardMetaRow({
   onDispatch: WorkOrderCardContext["onDispatch"];
   onCancelQueue?: WorkOrderCardContext["onCancelQueue"];
   createdAt: Date | null;
+  isDraft: boolean;
   showStart: boolean;
   queueLabel: string | null;
   willQueueOnStart?: boolean;
@@ -326,7 +333,7 @@ function WorkOrderCardMetaRow({
         {createdLabel}
       </span>
       <div className="ml-auto flex min-h-5 min-w-0 items-center gap-1.5">
-        {showStart || queueLabel ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+        {isDraft || queueLabel ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
             <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
@@ -356,17 +363,22 @@ function WorkOrderCardMetaRow({
   );
 }
 
+function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
+  const showAgentQuestion = hasAgentQuestion && isDraft;
+  const agentWorking = isAnalyzing && !showAgentQuestion;
+  return { showAgentQuestion, agentWorking, showStart: isDraft && !agentWorking };
+}
+
 /**
- * Score meter, or a spinner while the Backlog automation still analyzes the
- * task. Both take the same slot, so the card does not move when the
- * score arrives.
+ * Thinking states while the agent still works, even after a score exists.
+ * The meter returns when the agent waits for the user.
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
-  if (score != null) {
-    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
-  }
   if (isAnalyzing) {
     return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+  }
+  if (score != null) {
+    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
   }
   return null;
 }

@@ -67,6 +67,7 @@ import {
   findClosureAutomationApp,
   isDoneLineColumn,
   LINE_PHASE_RUNS_PAGE_SIZE,
+  growPhaseRunWindow,
   visibleLineStageColumns,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -1502,6 +1503,7 @@ function PhaseColumn({
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
+  const previousTotalRef = useRef(totalRuns);
   const hasMore = visibleCount < totalRuns;
 
   const loadMore = useCallback(() => {
@@ -1513,11 +1515,17 @@ function PhaseColumn({
     onLoadMore: loadMore,
   });
 
+  useEffect(() => {
+    const previousTotal = previousTotalRef.current;
+    previousTotalRef.current = totalRuns;
+    setVisibleCount((current) => growPhaseRunWindow(current, previousTotal, totalRuns));
+  }, [totalRuns]);
+
   // When the window is short enough that the first page does not overflow,
   // pull the next page so a scrollbar can appear (same pattern as versions tab).
   useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);
-  }, [visibleCount, loadMoreIfNeeded]);
+  }, [visibleCount, totalRuns, loadMoreIfNeeded]);
 
   const visibleRuns = column.runs.slice(0, Math.min(visibleCount, totalRuns));
   const configureHref =

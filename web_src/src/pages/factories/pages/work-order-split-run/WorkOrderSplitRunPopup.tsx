@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
@@ -13,6 +14,7 @@ import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -34,8 +36,9 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  * The automation canvas lives on the full run page, not here.
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
-  const { organizationId, factoryId, orderId, fixture, canUpdate = true } = props;
-  const refinementEnabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
+  const refinementFeature = useExperimentalFeature(organizationId);
+  const refinementEnabled = refinementFeature.has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -56,14 +59,34 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     hasPlanningSession: Boolean(analysis.session),
     hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
     refinementEnabled,
+    refinementLoading: refinementFeature.isLoading,
+    sessionLoading: analysis.isLoading,
+    artifactsLoading: popupData.artifactsLoading,
+    artifactsFailed: Boolean(popupData.artifactsError),
     analysisActive: isAnalyzing,
     hasLookupIdentity,
+    isDraft: fixture.footer.kind === "draft",
   });
 
+  if (mode === "loading") {
+    return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
+  }
   if (mode === "analysis") {
     return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
   }
   return <ClassicWorkOrderPopup {...props} popupData={popupData} sessionLookupError={analysis.queryError} />;
+}
+
+function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
+  return (
+    <PopupShell testId="work-order-split-run-loading" fixed={fixed} onDismiss={onClose}>
+      <PopupHeader title={title} onClose={onClose} />
+      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        Loading task…
+      </div>
+    </PopupShell>
+  );
 }
 
 function AnalysisWorkOrderPopup({
@@ -86,7 +109,7 @@ function AnalysisWorkOrderPopup({
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
-  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
+  const modelLabel = useImplementationRunnerModel(organizationId, fixture.phases);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
@@ -120,7 +143,6 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    canPickDraftStartModel,
     draftModel,
     setDraftModel,
   });
@@ -168,7 +190,11 @@ function AnalysisWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
+            <OwnerTimeCostRow
+              fixture={{ ...fixture, owner: edits.owner }}
+              modelLabel={modelLabel}
+              assigneeIds={edits.assigneeIds}
+            />
           </PopupHeader>
         )}
       />
@@ -190,7 +216,6 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  canPickDraftStartModel: boolean;
   draftModel: string;
   setDraftModel: (value: string) => void;
 }) {
@@ -216,10 +241,9 @@ function analysisPopupReview(args: {
         lineName: args.fixture.lineName,
         footerKind: args.fixture.footer.kind,
         hasStart: args.fixture.footer.actions.some((action) => action.kind === "start"),
-        canPick: args.canPickDraftStartModel,
         value: args.draftModel,
         onChange: args.setDraftModel,
-        disabled: args.isDispatching,
+        disabled: args.isDispatching || !args.canDispatch,
       })}
     />
   );
@@ -231,12 +255,11 @@ function analysisDraftStartModelSelect(args: {
   lineName: string;
   footerKind: string;
   hasStart: boolean;
-  canPick: boolean;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
 }) {
-  if (args.footerKind !== "draft" || !args.canPick || !args.hasStart) {
+  if (args.footerKind !== "draft" || !args.hasStart) {
     return undefined;
   }
   return (

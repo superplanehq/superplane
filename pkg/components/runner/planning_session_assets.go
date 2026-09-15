@@ -22,6 +22,9 @@ var planningSessionMCPScript string
 //go:embed analysis_protocol.js
 var analysisProtocolScript string
 
+//go:embed analysis_protocol.md
+var analysisProtocolMarkdown string
+
 //go:embed mcp.json
 var planningSessionMCPConfig string
 
@@ -55,10 +58,25 @@ func PlanningSessionProtocolFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "analysis_protocol.js", Content: analysisProtocolScript, Mode: "0644"}
 }
 
+// PlanningSessionProtocolMarkdown returns the canonical refinement protocol.
+func PlanningSessionProtocolMarkdown() string {
+	return strings.TrimSpace(analysisProtocolMarkdown)
+}
+
+// PlanningSessionProtocolMarkdownFile ships the canonical protocol to runners.
+func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "analysis_protocol.md", Content: analysisProtocolMarkdown, Mode: "0644"}
+}
+
 // PlanningSessionMCPFiles returns the MCP server, static config, and analysis
 // protocol task files. Only attach these when HasPlanningSessionToken is true.
 func PlanningSessionMCPFiles() []BrokerTaskFile {
-	return []BrokerTaskFile{PlanningSessionMCPScriptFile(), PlanningSessionMCPConfigFile(), PlanningSessionProtocolFile()}
+	return []BrokerTaskFile{
+		PlanningSessionMCPScriptFile(),
+		PlanningSessionMCPConfigFile(),
+		PlanningSessionProtocolFile(),
+		PlanningSessionProtocolMarkdownFile(),
+	}
 }
 
 // FollowUpLoopFile returns the shared wait-loop task file. Only attach this

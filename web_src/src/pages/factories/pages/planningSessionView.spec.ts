@@ -5,7 +5,10 @@ import {
   applyPlanningSessionLiveRun,
   createWithAgentViewFromSession,
   mergePlanningSessionHistory,
+  draftCardAgentIsWorking,
   planningSessionHasPendingSurvey,
+  planningSessionIsWaiting,
+  planningSessionIsWorking,
 } from "./planningSessionView";
 
 describe("mergePlanningSessionHistory", () => {
@@ -193,6 +196,37 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.machineStatus).toBe("waiting");
   });
 
+  it("treats a pending wait as waiting, not working", () => {
+    const waiting = {
+      state: "running",
+      waitState: "pending",
+    };
+    expect(planningSessionIsWaiting(waiting)).toBe(true);
+    expect(planningSessionIsWorking(waiting)).toBe(false);
+  });
+
+  it("treats an open session without a wait as working", () => {
+    const running = { state: "running" };
+    expect(planningSessionIsWaiting(running)).toBe(false);
+    expect(planningSessionIsWorking(running)).toBe(true);
+  });
+
+  it("does not treat an ended session as working", () => {
+    const ended = { state: "ended" };
+    expect(planningSessionIsWaiting(ended)).toBe(false);
+    expect(planningSessionIsWorking(ended)).toBe(false);
+  });
+
+  it("keeps thinking states for follow-up work after a score exists", () => {
+    const running = { state: "running" };
+    const waiting = { state: "running", waitState: "pending" };
+    expect(draftCardAgentIsWorking(running, false)).toBe(true);
+    expect(draftCardAgentIsWorking(waiting, false)).toBe(false);
+    expect(draftCardAgentIsWorking(waiting, true)).toBe(false);
+    expect(draftCardAgentIsWorking(null, true)).toBe(true);
+    expect(draftCardAgentIsWorking(null, false)).toBe(false);
+  });
+
   it("exposes a pending survey and keeps it out of the chat messages", () => {
     const view = createWithAgentViewFromSession(
       {
@@ -253,6 +287,33 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.messages).toEqual([
       { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
+  it("passes the sender user id onto user messages", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "note", role: "user", text: "Keep the current form.", userId: "user-ada" },
+          { id: "reply", role: "user", text: "What is the priority? High", userId: "user-alan" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "note", kind: "text", role: "user", text: "Keep the current form.", userId: "user-ada" },
+      {
+        id: "reply",
+        kind: "text",
+        role: "user",
+        text: "What is the priority? High",
+        origin: "survey",
+        userId: "user-alan",
+      },
     ]);
   });
 

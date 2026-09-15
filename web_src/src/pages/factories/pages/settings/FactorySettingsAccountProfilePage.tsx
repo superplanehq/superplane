@@ -9,8 +9,6 @@ import { usePersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
 import {
   accountEmailOptions,
   disconnectAccountProvider,
-  disconnectLinkedAccount,
-  linkedAccountConnectHref,
   ssoLinkHref,
   updateAccountEmail,
   updateAccountName,
@@ -53,7 +51,6 @@ export function FactorySettingsAccountProfilePage() {
     return <p className="text-[13px] text-muted-foreground">Loading profile…</p>;
   }
 
-  const velocityGithub = (account.linked_accounts ?? []).find((linked) => linked.provider === "github");
   const tokens = tokensPanel.tokens.map((token) => ({
     id: token.id || "",
     name: token.name || "Unnamed",
@@ -96,20 +93,6 @@ export function FactorySettingsAccountProfilePage() {
             throw error;
           }
         }}
-        velocityGithubUsername={velocityGithub?.username ?? null}
-        onLinkVelocityGithub={() => {
-          window.location.assign(linkedAccountConnectHref("github", `${location.pathname}${location.search}`));
-        }}
-        onRemoveVelocityGithub={() => {
-          void disconnectLinkedAccount("github")
-            .then(async () => {
-              await refreshAccount();
-              showSuccessToast("GitHub link removed.");
-            })
-            .catch((error) => {
-              showErrorToast(getApiErrorMessage(error, "Failed to remove the linked account."));
-            });
-        }}
         security={
           <AccountSecurityRedesignPage
             passwordSet={account.has_password}
@@ -143,7 +126,12 @@ export function FactorySettingsAccountProfilePage() {
             }}
           />
         }
-        dangerZone={<DeleteAccountDangerZone email={account.email} />}
+        dangerZone={
+          <DeleteAccountDangerZone
+            email={account.email}
+            organizationsPendingDeletion={account.organizations_pending_deletion}
+          />
+        }
       />
       {account.has_password ? <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} /> : null}
       <PersonalApiTokenDialogs panel={tokensPanel} />

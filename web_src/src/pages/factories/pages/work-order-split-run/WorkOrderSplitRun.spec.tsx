@@ -127,12 +127,31 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
+    expect(row).toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
     const close = screen.getByRole("button", { name: "Close" });
     const views = screen.getByRole("tablist", { name: "Task views" });
     expect(close.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
+  });
+
+  it("shows the implement model next to spend while the task is running", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(row).toHaveTextContent("$0.73 · 2.7k tokens · claude-sonnet-4-6");
+    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("does not show a model on a draft that has not started", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(row).toHaveTextContent("$0.00");
+    expect(row).toHaveTextContent("0 tokens");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
+    expect(row).not.toHaveTextContent("grok-4.6");
   });
 
   it("opens the Task tab when no automation is running", () => {
@@ -718,7 +737,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-source")).not.toBeInTheDocument();
+    const description = screen.getByTestId("split-run-description");
+    expect(description).toHaveClass("justify-end");
+    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
+    expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
@@ -726,7 +748,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(start).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    expect(start.parentElement).toHaveClass("shrink-0");
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(start.closest(".shrink-0")).not.toBeNull();
     expect(start.parentElement).not.toHaveClass("mt-3");
     const tip = screen.getByTestId("split-run-intent-decision-tip");
     expect(tip).toHaveTextContent("This task is ready to start");

@@ -15,7 +15,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestWorkOrderCreatedPayloadRewritesFileRefs(t *testing.T) {
+func TestWorkOrderCreatedPayloadKeepsStoredFileRefs(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
 	t.Setenv("BASE_URL", "http://files.test")
@@ -49,8 +49,9 @@ func TestWorkOrderCreatedPayloadRewritesFileRefs(t *testing.T) {
 
 	rewritten, ok := workOrder["description"].(string)
 	require.True(t, ok)
-	assert.NotContains(t, rewritten, blob.FileRef(file.ID))
-	assert.Contains(t, rewritten, "/api/v1/public/files/"+file.ID.String())
+	assert.Equal(t, description, rewritten)
+	assert.Contains(t, rewritten, blob.FileRef(file.ID))
+	assert.NotContains(t, rewritten, "/api/v1/public/files/"+file.ID.String())
 
 	files, ok := workOrder["files"].([]any)
 	require.True(t, ok)
@@ -98,9 +99,9 @@ func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 	assert.Equal(t, true, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
 }
 
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {

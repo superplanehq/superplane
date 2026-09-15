@@ -207,6 +207,53 @@ export const QueuedFirstStep: Story = {
 };
 
 /**
+ * Draft task while the agent still works. The meter slot shows
+ * thinking states and a matrix loader.
+ */
+export const DraftAnalyzing: Story = {
+  name: "Draft analyzing",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft",
+        number: "1",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+  },
+};
+
+/**
+ * Follow-up agent work after a score already exists. The meter slot
+ * stays on thinking states until the agent waits for the user.
+ */
+export const DraftAnalyzingWithScore: Story = {
+  name: "Draft analyzing after score",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-scored",
+        number: "2",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+    confidenceScore: 4,
+  },
+};
+
+/**
  * Open task with no pull request and no attention chip. The footer
  * keeps created time on the left and the owner given name plus avatar
  * on the right.

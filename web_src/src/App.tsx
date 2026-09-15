@@ -77,6 +77,7 @@ import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
+import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
@@ -232,6 +233,7 @@ function AppRouter() {
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
+                <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />

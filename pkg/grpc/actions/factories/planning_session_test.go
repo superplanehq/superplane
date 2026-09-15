@@ -47,11 +47,10 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 
@@ -76,6 +75,53 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	require.NoError(t, err)
 	require.NotNil(t, found.Session)
 	assert.Equal(t, execution.ID.String(), found.Session.ExecutionId)
+
+	refinementExecution := support.CreateCanvasNodeExecution(t, canvas.ID, backlogRefinementNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(refinementExecution).Update("run_id", run.ID).Error)
+
+	found, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, found.Session)
+	assert.Equal(t, refinementExecution.ID.String(), found.Session.ExecutionId)
+}
+
+func Test__EndPlanningSession__OverridesPendingCompletionWithCancellation(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.RequestCompletion(tx, &r.User)
+		return err
+	}))
+
+	response, err := EndPlanningSession(ctx, r.Organization.ID.String(), &pb.EndPlanningSessionRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: session.ID.String(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, response.Session.State)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
 }
 
 func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
@@ -90,15 +136,14 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
-	require.NoError(t, session.SendUserMessage(db, "Use the current retry form."))
+	require.NoError(t, session.SendUserMessage(db, "Use the current retry form.", uuid.Nil))
 	require.NoError(t, session.RecordAgentMessage(db, "I updated the plan with the current form."))
 	require.NoError(t, session.End(db))
 
@@ -139,11 +184,10 @@ func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, finishCanvasRun(db, run, models.CanvasRunResultCancelled))
@@ -184,11 +228,10 @@ func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testi
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	before, err := models.ListCanvasEvents(db, canvas.ID, "start", 10, nil)
@@ -220,11 +263,10 @@ func Test__SendPlanningSessionMessage__DoesNotRestartAfterTaskStarts(t *testing.
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		CanvasRunID:     run.ID,
-		WorkOrderID:     order.ID,
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, order.TransitionOnDispatch(db, &r.User))
@@ -239,6 +281,65 @@ func Test__SendPlanningSessionMessage__DoesNotRestartAfterTaskStarts(t *testing.
 	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+}
+
+func Test__SendPlanningSessionMessage__StoresSenderUserID(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Use the current retry form.",
+	})
+	require.NoError(t, err)
+	require.Len(t, sent.Session.Messages, 1)
+	assert.Equal(t, r.User.String(), sent.Session.Messages[0].UserId)
+
+	described, err := DescribePlanningSession(ctx, r.Organization.ID.String(), &pb.DescribePlanningSessionRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, described.Session.Messages, 1)
+	assert.Equal(t, r.User.String(), described.Session.Messages[0].UserId)
+}
+
+func Test__AnswerPlanningSessionSurvey__StoresSenderUserID(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+
+	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "What is the priority? High",
+	})
+	require.NoError(t, err)
+	require.Len(t, answered.Session.Messages, 1)
+	assert.Equal(t, r.User.String(), answered.Session.Messages[0].UserId)
+}
+
+func openAnalysisSession(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.FactoryPlanningSession {
+	t.Helper()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	return session
 }
 
 func createOnWorkOrderCanvas(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID) *models.Canvas {

@@ -2,6 +2,8 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+
 import {
   EMPTY_FACTORY,
   PRIMARY_FACTORY_ID,
@@ -9,13 +11,18 @@ import {
   REFUND_FACTORY,
 } from "./__fixtures__/factoryPageResponses";
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
-const { createMutate, dispatchMutate, meUser } = vi.hoisted(() => ({
-  createMutate: vi.fn(),
-  dispatchMutate: vi.fn(),
-  meUser: { current: null as { id: string; name: string } | null },
-}));
+const { createMutate, dispatchMutate, meUser, enabledExperimentalFeatures, experimentalFeaturesLoading } = vi.hoisted(
+  () => ({
+    createMutate: vi.fn(),
+    dispatchMutate: vi.fn(),
+    meUser: { current: null as { id: string; name: string } | null },
+    enabledExperimentalFeatures: new Set<string>(),
+    experimentalFeaturesLoading: { current: false },
+  }),
+);
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
@@ -26,8 +33,22 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: meUser.current }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: experimentalFeaturesLoading.current,
+  }),
+}));
+
 vi.mock("./WorkOrderDescriptionEditor", () => ({
-  WorkOrderDescriptionEditor: () => <div data-testid="work-order-description-input" />,
+  WorkOrderDescriptionEditor: ({ value, onChange }: { value?: string; onChange?: (next: string) => void }) => (
+    <textarea
+      data-testid="work-order-description-input"
+      value={value}
+      onChange={(event) => onChange?.(event.target.value)}
+    />
+  ),
 }));
 
 function renderDialog(factory = REFUND_FACTORY) {
@@ -52,6 +73,8 @@ describe("CreateWorkOrderDialog", () => {
     createMutate.mockReset();
     dispatchMutate.mockReset();
     meUser.current = null;
+    enabledExperimentalFeatures.clear();
+    experimentalFeaturesLoading.current = false;
   });
 
   afterEach(async () => {
@@ -64,6 +87,14 @@ describe("CreateWorkOrderDialog", () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+  });
+
+  it("does not mount a create form until experimental features load", () => {
+    experimentalFeaturesLoading.current = true;
+    renderDialog();
+
+    expect(screen.queryByTestId("create-work-order-dialog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-work-order-request-dialog")).not.toBeInTheDocument();
   });
 
   it("names the dialog New task instead of the fallback Dialog title", () => {
@@ -116,5 +147,26 @@ describe("CreateWorkOrderDialog", () => {
     await userEvent.setup().type(screen.getByTestId("work-order-title-input"), "Draft only");
 
     expect(screen.getByTestId("work-order-create-button")).not.toBeDisabled();
+  });
+
+  it("opens the request composer when Task Refinement is on", async () => {
+    const user = userEvent.setup();
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+    renderDialog();
+
+    expect(screen.getByTestId("create-work-order-request-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-title-input")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: CREATE_WORK_ORDER_REQUEST_COPY.title })).toBeInTheDocument();
+
+    await user.type(screen.getByTestId("work-order-description-input"), "Refunds fail on retry.");
+    await user.click(screen.getByTestId("create-work-order-request-create"));
+
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "Refunds fail on retry.",
+      description: "Refunds fail on retry.",
+      assigneeIds: [],
+    });
+    expect(dispatchMutate).not.toHaveBeenCalled();
   });
 });
