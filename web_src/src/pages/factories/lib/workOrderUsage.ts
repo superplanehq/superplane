@@ -28,9 +28,17 @@ export function formatUsageDuration(seconds: number): string {
   return seconds > 0 ? formatDurationSeconds(seconds) : "—";
 }
 
+const MICROS_PER_DOLLAR = 1_000_000;
+const MICROS_PER_CENT = 10_000;
+
 /** Dollar amount for a usage column. Zero spend is an em dash. */
 export function formatUsageSpend(cents: number): string {
   return cents > 0 ? formatUsdCents(cents) : "—";
+}
+
+/** Dollar amount from ledger micros. Sub-cent spend stays visible. */
+export function formatUsageSpendMicros(micros: number): string {
+  return micros > 0 ? formatUsdMicros(micros) : "—";
 }
 
 /** Hosted model spend plus your-keys model spend. */
@@ -38,13 +46,64 @@ export function usageTokenSpendCents(hostedCostCents: number, byokCostCents: num
   return hostedCostCents + byokCostCents;
 }
 
+export function usageTokenSpendMicros(hostedCostMicros: number, byokCostMicros: number): number {
+  return hostedCostMicros + byokCostMicros;
+}
+
 /** VM spend is the remainder after model spend. */
 export function usageVmSpendCents(totalCostCents: number, hostedCostCents: number, byokCostCents: number): number {
   return Math.max(0, totalCostCents - hostedCostCents - byokCostCents);
 }
 
+export function usageVmSpendMicros(totalCostMicros: number, hostedCostMicros: number, byokCostMicros: number): number {
+  return Math.max(0, totalCostMicros - hostedCostMicros - byokCostMicros);
+}
+
+/**
+ * Prefers ledger micros. Rows that predate those fields still format from
+ * whole cents, including MSW fixtures that omit micros.
+ */
+export function usageSpendMicros(micros: string | number | undefined, cents: string | number | undefined): number {
+  if (micros !== undefined && micros !== "") {
+    return parseWorkOrderMetric(micros);
+  }
+  return parseWorkOrderMetric(cents) * MICROS_PER_CENT;
+}
+
 export function formatUsdCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+export function formatUsdMicros(micros: number): string {
+  if (!Number.isFinite(micros) || micros <= 0) {
+    return formatUsdCents(0);
+  }
+  const dollars = micros / MICROS_PER_DOLLAR;
+  if (dollars >= 0.01) {
+    return `$${dollars.toFixed(2)}`;
+  }
+  return `$${trimDollarFraction(dollars.toFixed(6))}`;
+}
+
+/** Spreadsheet dollar amount from micros. Zero stays empty. */
+export function formatUsageCsvDollarsFromMicros(micros: number): string {
+  if (!Number.isFinite(micros) || micros <= 0) {
+    return "";
+  }
+  const dollars = micros / MICROS_PER_DOLLAR;
+  if (dollars >= 0.01) {
+    return dollars.toFixed(2);
+  }
+  return trimDollarFraction(dollars.toFixed(6));
+}
+
+function trimDollarFraction(value: string): string {
+  const trimmed = value.replace(/0+$/, "").replace(/\.$/, "");
+  const dot = trimmed.indexOf(".");
+  if (dot === -1 || trimmed.length - dot - 1 >= 2) {
+    return trimmed;
+  }
+  return Number(trimmed).toFixed(2);
 }
 
 export function formatDurationSeconds(seconds: number): string {

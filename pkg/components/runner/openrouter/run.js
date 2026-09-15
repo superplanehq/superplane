@@ -19,23 +19,56 @@ const SESSION_FILE = "opencode_session";
 const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
-const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
-  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
-  "After you show a draft, tell the user it is on the right and ask them to review it. " +
-  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
-  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
-  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
-  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
-  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
-  "edit or write any files.";
+function loadAnalysisProtocolModule() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
+  if (!planningAnalysisEnabled(env)) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
 }
 
 function catalogModelId(model) {
@@ -159,6 +192,14 @@ function retryWaitLine(kind, model, waitMs, nextAttempt) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Waiting ${waitSecondsLabel(waitMs)}, then retrying (attempt ${nextAttempt} of ${MAX_ATTEMPTS}).`;
 }
 
+function callingOpenCodeLine(model, attempt) {
+  const labeled = openRouterModelId(model) || String(model || "").trim();
+  if (labeled) {
+    return `Calling OpenCode · ${labeled} (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+  }
+  return `Calling OpenCode (attempt ${attempt} of ${MAX_ATTEMPTS})`;
+}
+
 function stoppedAfterAttemptsLine(kind, model) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
 }
@@ -245,6 +286,16 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       },
     };
   }
+  const protocol = planningSystemPrompt(env);
+  if (protocol && taskDir) {
+    const protocolPath = path.join(taskDir, "analysis_protocol.md");
+    try {
+      fs.writeFileSync(protocolPath, `${protocol}\n`);
+    } catch (_err) {
+      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+    }
+    config.instructions = [protocolPath];
+  }
   return config;
 }
 
@@ -305,17 +356,21 @@ async function runPrompt(promptFile, model, helpers = {}) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
+  if (planningAnalysisEnabled(env)) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
+  const recordAgentMessage =
+    helpers.recordAgentMessage || ((text) => require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(text));
   const planning = planningEnabled(env);
   if (planning) {
-    println("Planning session tools enabled");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
+    printLiveLogLine("Planning session tools enabled");
   }
 
   ensureXdgDirs(sp);
@@ -331,13 +386,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let sessionID = readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
-    println(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
+    printLiveLogLine(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
   } else {
     const startModel = openRouterModelId(currentModel) || model;
     if (startModel) {
-      println(`Starting OpenCode · ${startModel}`);
+      printLiveLogLine(`Starting OpenCode · ${startModel}`);
     } else {
-      println("Starting OpenCode");
+      printLiveLogLine("Starting OpenCode");
     }
   }
 
@@ -346,18 +401,18 @@ async function runPrompt(promptFile, model, helpers = {}) {
     sessionID = id || sessionID;
     writeSessionID(sp, sessionID);
   });
+  const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
+  const sessionUsageBefore = loadSessionUsage(sp);
+  const sessionStepsBefore = readSessionStepUsages(sp);
+  const firstPromptTurn = telemetry.currentTurn() + 1;
 
   let failed = false;
   let exitCode = 0;
   let lastErrorText = "";
-  let attemptLabel = "";
   let attempt = 1;
 
   while (true) {
-    if (attemptLabel) {
-      println(attemptLabel);
-      attemptLabel = "";
-    }
+    printLiveLogLine(callingOpenCodeLine(currentModel, attempt));
     const sessionBeforeAttempt = sessionID;
     const args = opencodeRunArgs({
       model: currentModel,
@@ -370,12 +425,15 @@ async function runPrompt(promptFile, model, helpers = {}) {
       sessionID = spawnResult.sessionID;
       writeSessionID(sp, sessionID);
     }
-    if (spawnResult.usage && tokenTotal(spawnResult.usage) > 0) {
-      lastUsage = spawnResult.usage;
-      lastResult = spawnResult.lastEvent || lastResult;
+    if (spawnResult.lastEvent) {
+      lastResult = spawnResult.lastEvent;
     }
-    if (spawnResult.cost != null) {
-      lastCost = spawnResult.cost;
+    if (tokenTotal(spawnResult.usage) > 0) {
+      lastUsage = mergeUsage(lastUsage, spawnResult.usage);
+    }
+    const spawnCost = Number(spawnResult.cost);
+    if (Number.isFinite(spawnCost) && spawnCost > 0) {
+      lastCost += spawnCost;
     }
     lastErrorText = spawnResult.errorText || "";
     const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
@@ -393,18 +451,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (!isRetryableKind(classKind)) {
       failed = true;
       exitCode = failedExit;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
+      printRetryOutcome(lastErrorText);
       break;
     }
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
-      println(stoppedAfterAttemptsLine(classKind, currentModel));
+      printRetryOutcome(lastErrorText, stoppedAfterAttemptsLine(classKind, currentModel));
       break;
     }
     const waitMs = retryWaitMs(lastErrorText, attempt);
@@ -412,25 +465,26 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (remaining < waitMs || remaining <= 0) {
       failed = true;
       exitCode = 1;
-      if (lastErrorText) {
-        println(truncateText(lastErrorText));
-      }
-      println(waitExceededTimeoutLine(classKind));
+      printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
-    if (lastErrorText) {
-      println(truncateText(lastErrorText));
-    }
-    println(retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
     await sleep(waitMs);
     attempt += 1;
-    attemptLabel = `Retrying OpenCode · ${openRouterModelId(currentModel)}`;
   }
 
   formatter.flush(failed);
-  const usage = lastUsage;
-  if (tokenTotal(usage) > 0) {
-    telemetry.updateCurrentUsage(usage);
+  const sessionSteps = newSessionStepUsages(readSessionStepUsages(sp), sessionStepsBefore);
+  const recorded = preferRecordedUsage(
+    usageWithCost(lastUsage, lastCost),
+    subtractUsage(loadSessionUsage(sp), sessionUsageBefore),
+  );
+  const usage = recorded;
+  lastCost = Number(recorded.total_cost_usd) || lastCost;
+  if (sessionSteps.length > 0) {
+    applyRecordedStepsToTelemetry(telemetry, sessionSteps, firstPromptTurn);
+  } else {
+    applyRecordedUsageToTelemetry(telemetry, usage);
   }
   const payload = {
     type: "result",
@@ -445,6 +499,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await recordAgentMessage(payload.result);
+  }
   formatTurnResult({
     is_error: failed,
     num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
@@ -525,12 +582,18 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     child.stdin.end();
   }
   let stderrText = "";
-  if (child.stderr) {
+  const stderrDone = new Promise((resolve) => {
+    if (!child.stderr) {
+      resolve();
+      return;
+    }
     child.stderr.on("data", (chunk) => {
       stderrText += String(chunk);
       process.stderr.write(chunk);
     });
-  }
+    child.stderr.on("end", resolve);
+    child.stderr.on("error", resolve);
+  });
 
   const stdout = child.stdout;
   const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
@@ -555,16 +618,15 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     });
   } catch (err) {
-    await stdoutDone;
+    await Promise.all([stdoutDone, stderrDone]);
     throw err;
   }
-  await stdoutDone;
+  await Promise.all([stdoutDone, stderrDone]);
 
   const snapshot = formatter.snapshot();
-  const errorText = [snapshot.errorText, stderrText].filter(Boolean).join("\n");
   return {
     exitCode,
-    errorText,
+    errorText: combineErrorText(snapshot.errorText, stderrText),
     resultFailed: snapshot.resultFailed,
     sessionID: snapshot.sessionID,
     usage: snapshot.usage,
@@ -572,6 +634,21 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     lastEvent: snapshot.lastEvent,
     roundOpen: Boolean(snapshot.roundOpen),
   };
+}
+
+function combineErrorText(fromEvent, fromStderr) {
+  const eventText = String(fromEvent || "").trim();
+  const stderr = String(fromStderr || "").trim();
+  if (!eventText) {
+    return stderr;
+  }
+  if (!stderr || eventText.includes(stderr)) {
+    return eventText;
+  }
+  if (stderr.includes(eventText)) {
+    return stderr;
+  }
+  return `${eventText}\n${stderr}`;
 }
 
 function emptyUsage() {
@@ -612,6 +689,349 @@ function mergeUsage(left, right) {
     merged.total_cost_usd = cost;
   }
   return merged;
+}
+
+function usageWithCost(usage, cost) {
+  const next = mergeUsage(emptyUsage(), usage);
+  const usd = Number(cost);
+  if (Number.isFinite(usd) && usd > 0) {
+    next.total_cost_usd = usd;
+  }
+  return next;
+}
+
+function subtractUsage(after, before) {
+  const delta = {
+    input_tokens: Math.max(0, Number((after && after.input_tokens) || 0) - Number((before && before.input_tokens) || 0)),
+    output_tokens: Math.max(
+      0,
+      Number((after && after.output_tokens) || 0) - Number((before && before.output_tokens) || 0),
+    ),
+    cache_read_input_tokens: Math.max(
+      0,
+      Number((after && after.cache_read_input_tokens) || 0) - Number((before && before.cache_read_input_tokens) || 0),
+    ),
+    cache_creation_input_tokens: Math.max(
+      0,
+      Number((after && after.cache_creation_input_tokens) || 0) -
+        Number((before && before.cache_creation_input_tokens) || 0),
+    ),
+    reasoning_tokens: Math.max(
+      0,
+      Number((after && after.reasoning_tokens) || 0) - Number((before && before.reasoning_tokens) || 0),
+    ),
+  };
+  const cost = Math.max(
+    0,
+    Number((after && after.total_cost_usd) || 0) - Number((before && before.total_cost_usd) || 0),
+  );
+  if (cost) {
+    delta.total_cost_usd = cost;
+  }
+  return delta;
+}
+
+function preferRecordedUsage(left, right) {
+  const usage = {
+    input_tokens: Math.max(Number((left && left.input_tokens) || 0), Number((right && right.input_tokens) || 0)),
+    output_tokens: Math.max(Number((left && left.output_tokens) || 0), Number((right && right.output_tokens) || 0)),
+    cache_read_input_tokens: Math.max(
+      Number((left && left.cache_read_input_tokens) || 0),
+      Number((right && right.cache_read_input_tokens) || 0),
+    ),
+    cache_creation_input_tokens: Math.max(
+      Number((left && left.cache_creation_input_tokens) || 0),
+      Number((right && right.cache_creation_input_tokens) || 0),
+    ),
+    reasoning_tokens: Math.max(
+      Number((left && left.reasoning_tokens) || 0),
+      Number((right && right.reasoning_tokens) || 0),
+    ),
+  };
+  const cost = Math.max(Number((left && left.total_cost_usd) || 0), Number((right && right.total_cost_usd) || 0));
+  if (cost) {
+    usage.total_cost_usd = cost;
+  }
+  return usage;
+}
+
+function telemetryUsageTotal(telemetry) {
+  const snapshot = telemetry && typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  let total = emptyUsage();
+  for (const turn of turns) {
+    total = mergeUsage(total, turn && turn.usage);
+  }
+  return total;
+}
+
+function applyRecordedUsageToTelemetry(telemetry, recorded) {
+  if (!telemetry || tokenTotal(recorded) <= 0) {
+    return;
+  }
+  const live = telemetryUsageTotal(telemetry);
+  const gap = subtractUsage(recorded, live);
+  if (tokenTotal(gap) <= 0 && !(Number(gap.total_cost_usd) > 0)) {
+    return;
+  }
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
+  telemetry.mergeCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+}
+
+function newSessionStepUsages(after, before) {
+  const priorKeys = new Set((before || []).map((step) => step.key));
+  return (after || []).filter((step) => !priorKeys.has(step.key));
+}
+
+function promptTurnNumbers(telemetry, firstTurn) {
+  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  return turns
+    .map((item) => Number(item && item.turn))
+    .filter((turn) => Number.isFinite(turn) && turn >= firstTurn);
+}
+
+function applyRecordedStepsToTelemetry(telemetry, steps, firstTurn) {
+  if (!telemetry || !Array.isArray(steps)) {
+    return;
+  }
+  const billed = steps.filter((step) => step && tokenTotal(step.usage) > 0);
+  if (!billed.length) {
+    return;
+  }
+  const liveTurns = promptTurnNumbers(telemetry, firstTurn);
+  const offset = Math.max(0, liveTurns.length - billed.length);
+  for (const [index, step] of billed.entries()) {
+    const turn = liveTurns[offset + index];
+    if (turn && telemetry.replaceTurnUsage(turn, step.usage)) {
+      continue;
+    }
+    telemetry.beginTurn(step.usage, { forceNew: true });
+  }
+}
+
+function openCodeDataHome(taskDir) {
+  return path.join(taskDir, "xdg", "data", "opencode");
+}
+
+function parseStoredPart(raw) {
+  let value = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  if (value.part && typeof value.part === "object") {
+    return value.part;
+  }
+  return value;
+}
+
+function usageFromStoredPart(part) {
+  if (!part || typeof part !== "object") {
+    return emptyUsage();
+  }
+  const type = String(part.type || "");
+  if (type !== "step-finish" && type !== "step_finish") {
+    return emptyUsage();
+  }
+  return usageFromStepFinish(part);
+}
+
+function collectJsonFiles(dir, files = []) {
+  if (!dir || !fs.existsSync(dir)) {
+    return files;
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return files;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectJsonFiles(full, files);
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".json")) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+function sessionStepUsage(key, raw) {
+  const usage = usageFromStoredPart(parseStoredPart(raw));
+  if (tokenTotal(usage) <= 0 && !(Number(usage.total_cost_usd) > 0)) {
+    return null;
+  }
+  return { key, usage };
+}
+
+function readSessionStepUsagesFromJsonParts(openCodeHome) {
+  const roots = [path.join(openCodeHome, "storage", "part"), path.join(openCodeHome, "storage", "session", "part")];
+  const steps = [];
+  for (const root of roots) {
+    for (const file of collectJsonFiles(root).sort()) {
+      let parsed;
+      try {
+        parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      } catch {
+        continue;
+      }
+      const step = sessionStepUsage(file, parsed);
+      if (step) {
+        steps.push(step);
+      }
+    }
+  }
+  return steps;
+}
+
+function openCodeDatabasePaths(openCodeHome) {
+  if (!openCodeHome || !fs.existsSync(openCodeHome)) {
+    return [];
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(openCodeHome);
+  } catch {
+    return [];
+  }
+  return entries.filter((name) => /^opencode.*\.db$/.test(name)).map((name) => path.join(openCodeHome, name));
+}
+
+function stepUsagesFromRows(dbPath, rows) {
+  const steps = [];
+  for (const row of rows || []) {
+    const data = row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
+    const id = row && row.id != null ? String(row.id) : String(steps.length);
+    const step = sessionStepUsage(`${dbPath}:${id}`, data);
+    if (step) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+
+function sumStepUsages(steps) {
+  let usage = emptyUsage();
+  for (const step of steps || []) {
+    usage = mergeUsage(usage, step && step.usage);
+  }
+  return usage;
+}
+
+function withSilencedExperimentalWarnings(fn) {
+  const original = process.emitWarning;
+  process.emitWarning = function (warning, type, ...rest) {
+    const kind = typeof type === "string" ? type : warning && warning.name;
+    if (kind === "ExperimentalWarning") {
+      return;
+    }
+    return original.call(process, warning, type, ...rest);
+  };
+  try {
+    return fn();
+  } finally {
+    process.emitWarning = original;
+  }
+}
+
+function readSessionStepUsagesFromSqliteNative(dbPath) {
+  return withSilencedExperimentalWarnings(() => {
+    let DatabaseSync;
+    try {
+      ({ DatabaseSync } = require("node:sqlite"));
+    } catch {
+      return null;
+    }
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT id, data FROM part
+           WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+           ORDER BY time_created, id`,
+        )
+        .all();
+      return stepUsagesFromRows(dbPath, rows);
+    } finally {
+      db.close();
+    }
+  });
+}
+
+function readSessionStepUsagesFromSqliteCli(dbPath) {
+  const result = spawnSync(
+    "sqlite3",
+    [
+      "-readonly",
+      "-json",
+      dbPath,
+      `SELECT id, data FROM part
+       WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+       ORDER BY time_created, id`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0 || !String(result.stdout || "").trim()) {
+    return emptyUsage();
+  }
+  let rows;
+  try {
+    rows = JSON.parse(result.stdout);
+  } catch {
+    return [];
+  }
+  return stepUsagesFromRows(dbPath, rows);
+}
+
+function readSessionStepUsagesFromSqlite(dbPath) {
+  if (!dbPath || !fs.existsSync(dbPath)) {
+    return [];
+  }
+  try {
+    const native = readSessionStepUsagesFromSqliteNative(dbPath);
+    if (native) {
+      return native;
+    }
+  } catch {
+    // Missing tables or a locked WAL file are expected. Try the sqlite3 CLI.
+  }
+  try {
+    return readSessionStepUsagesFromSqliteCli(dbPath);
+  } catch {
+    return [];
+  }
+}
+
+function preferSessionSteps(left, right) {
+  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left)) ? right : left;
+}
+
+function readSessionStepUsages(taskDir) {
+  if (!taskDir) {
+    return [];
+  }
+  const openCodeHome = openCodeDataHome(taskDir);
+  let steps = [];
+  for (const dbPath of openCodeDatabasePaths(openCodeHome)) {
+    steps = preferSessionSteps(steps, readSessionStepUsagesFromSqlite(dbPath));
+  }
+  return preferSessionSteps(steps, readSessionStepUsagesFromJsonParts(openCodeHome));
+}
+
+function readSessionUsage(taskDir) {
+  return sumStepUsages(readSessionStepUsages(taskDir));
 }
 
 function usageFromStepFinish(part) {
@@ -716,12 +1136,33 @@ function promptSeriesName(promptFile) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
+function writeStdout(chunk) {
+  fs.writeSync(1, chunk);
+}
+
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  writeStdout(`${JSON.stringify(rec)}\n`);
+}
+
+function printLiveLogLine(text) {
+  const line = String(text || "");
+  if (!line) {
+    return;
+  }
+  println(line);
+}
+
+function printRetryOutcome(errorText, extraLine) {
+  if (errorText) {
+    printLiveLogLine(truncateText(errorText));
+  }
+  if (extraLine) {
+    printLiveLogLine(extraLine);
+  }
 }
 
 function println(text = "") {
-  process.stdout.write(`${text}\n`);
+  writeStdout(`${text}\n`);
 }
 
 function createOpenCodeFormatter(telemetry, onSession) {
@@ -820,7 +1261,8 @@ function createOpenCodeFormatter(telemetry, onSession) {
           }
           formatToolUse(part, tools);
           break;
-        case "step_finish": {
+        case "step_finish":
+        case "step-finish": {
           const stepUsage = usageFromStepFinish(part);
           usage = mergeUsage(usage, stepUsage);
           if (part.cost != null && Number.isFinite(Number(part.cost))) {
@@ -829,7 +1271,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
           if (!roundOpen) {
             beginRound(stepUsage, { message: lastText });
           } else {
-            tracker.updateCurrentUsage(usage);
+            tracker.mergeCurrentUsage(stepUsage);
           }
           roundOpen = false;
           break;
@@ -1077,4 +1519,5 @@ module.exports = {
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,
+  readSessionUsage,
 };

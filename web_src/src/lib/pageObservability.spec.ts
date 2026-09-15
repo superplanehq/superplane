@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { resolvePageObservability } from "@/lib/pageObservability";
 
 describe("resolvePageObservability", () => {
@@ -24,6 +24,7 @@ describe("resolvePageObservability", () => {
   it("maps admin routes", () => {
     expect(resolvePageObservability("/admin")).toEqual({ pageKey: "adminOrganizations", attributes: {} });
     expect(resolvePageObservability("/admin/accounts")).toEqual({ pageKey: "adminAccounts", attributes: {} });
+    expect(resolvePageObservability("/admin/price-books")).toEqual({ pageKey: "adminPriceBooks", attributes: {} });
     expect(resolvePageObservability("/admin/organizations/org-1")).toEqual({
       pageKey: "adminOrganizationDetail",
       attributes: { organization_id: "org-1" },

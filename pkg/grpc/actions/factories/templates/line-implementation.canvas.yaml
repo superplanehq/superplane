@@ -113,7 +113,7 @@ spec:
               Task title: {{ task().title }}
 
               Task description:
-              {{ task().description }}
+              {{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}
 
               1/ Create a new branch. Do not commit on {{ task().default_branch }}.
               2/ Implement the task. Keep the change focused.

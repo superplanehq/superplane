@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -13,10 +13,18 @@ DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
 
+# Quiet BuildKit and Compose progress in CI. Use DEBUG=1 for full logs.
+COMPOSE_PROGRESS := auto
+COMPOSE_UP_EXTRA :=
 ifeq ($(DEBUG),1)
 export BUILDKIT_PROGRESS := plain
+COMPOSE_PROGRESS := plain
 else
 export BUILDKIT_PROGRESS := quiet
+ifneq ($(strip $(CI)),)
+COMPOSE_PROGRESS := quiet
+COMPOSE_UP_EXTRA := --quiet-build
+endif
 endif
 
 PKG_TEST_PACKAGES := ./pkg/...
@@ -116,7 +124,9 @@ dev.test.is.running:
 
 dev.up:
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
-	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
+	@echo "Starting development containers..."
+	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
+	@echo "Development containers are ready."
 
 dev.setup:
 	@$(MAKE) dev.test.is.running
@@ -219,11 +229,14 @@ check.build.ui:
 check.build.storybook:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
 
-check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+ensure.bun:
+	$(COMPOSE) exec app bash -lc 'command -v bun >/dev/null || bash /app/scripts/docker/install-bun.sh'
 
-check.test.ui.shard:
-	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
+check.test.ui: ensure.bun
+	$(COMPOSE) exec -e FILES="$(FILES)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
+
+check.test.ui.shard: ensure.bun
+	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
@@ -311,6 +324,21 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+
+# Local only. Writes this worktree's superplane_dev to
+# .local/superplane_dev.dump so a later restore can skip owner setup
+# and GitHub connection. Postgres in this stack is db:5432.
+# The dump is gitignored.
+db.snapshot:
+	@$(COMPOSE) exec app ./scripts/db_snapshot.sh superplane_dev
+
+# Local only. Replaces this worktree's superplane_dev from
+# .local/superplane_dev.dump, then applies pending migrations. Use this
+# to create a new local environment without owner setup or GitHub
+# connection. It does not touch superplane_test. Restart make
+# dev.server after restore if it is already running.
+db.restore:
+	@$(COMPOSE) exec app ./scripts/db_restore.sh superplane_dev
 
 # Local only. Puts every org on a 14-day trial, clears Polar ids, and
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox

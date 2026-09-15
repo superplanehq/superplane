@@ -35,17 +35,19 @@ func UpdateWorkOrderAssignees(
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update work order assignees")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
-	}
-
 	tx := database.DB(ctx)
+	resolvedFactory, err := findFactory(tx, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(tx, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+	orderID := resolvedOrder.ID
+
 	assigneeIDs, err := parseAssigneeIDs(tx, orgID, req.GetAssigneeIds())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")

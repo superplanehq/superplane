@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -14,23 +13,13 @@ func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.Descr
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe work order")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe work order")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}

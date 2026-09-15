@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -14,13 +13,8 @@ func ListFactoryApps(ctx context.Context, organizationID string, req *pb.ListFac
 		return nil, factoryErrorToStatus(err, "failed to list factory apps")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory apps")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory apps")
 	}

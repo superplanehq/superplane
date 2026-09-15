@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
@@ -228,6 +228,33 @@ describe("matchFactoryPageFixture", () => {
     expect(fixture.organizationBilling).toMatchObject({ plan: "business" });
   });
 
+  it("cancels and resumes Polar Business on the billing routes", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      organizationBilling: { ...BUSINESS_ORGANIZATION_BILLING },
+    };
+
+    const canceled = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/cancel`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(canceled.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: true,
+    });
+
+    const resumed = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/resume`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(resumed.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: false,
+    });
+  });
+
   it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
     const response = await fetchFactoryPageFixture(
       `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
@@ -247,5 +274,12 @@ describe("matchFactoryPageFixture", () => {
     expect(byOrder["wo-open-refunds-schema"]).toMatchObject({ number: "102", state: "STATE_DRAFT" });
     expect(byOrder["wo-pr-closure-receipts"]).toMatchObject({ number: "510", state: "STATE_MERGED" });
     expect(byOrder["wo-board-done-rejected"]).toMatchObject({ number: "112", state: "STATE_CLOSED" });
+  });
+
+  it("returns a 7-day velocity series when periodDays is 7", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/velocity?periodDays=7`);
+    const body = (await response.json()) as { points?: unknown[] };
+
+    expect(body.points).toHaveLength(7);
   });
 });

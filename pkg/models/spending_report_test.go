@@ -111,6 +111,61 @@ func TestSummarizeSpendingKPITotalsAndExplorer(t *testing.T) {
 	assert.Equal(t, r.UserModel.Name, catalogs.Users[0].Label)
 }
 
+func TestSummarizeSpendingKPITotals__IncludesCancelledCanvasRun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Canceled run", "", &r.User, []uuid.UUID{r.User}, nil)
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	}, nil))
+
+	var execution *models.FactoryWorkOrderExecution
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, result, dispatchErr := line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		execution = result.Execution
+		return nil
+	}))
+	require.NotNil(t, execution.RunID)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     *execution.RunID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenAI,
+		Model:           "gpt-4o",
+		FundingSource:   models.UsageFundingSourceHosted,
+		InputTokens:     2500,
+		TotalTokens:     2500,
+	}))
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", *execution.RunID).Updates(map[string]any{
+		"state":  models.CanvasRunStateFinished,
+		"result": models.CanvasRunResultCancelled,
+	}).Error)
+
+	kpi, err := models.SummarizeSpendingKPITotals(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		Since:          time.Now().AddDate(0, 0, -7),
+		Until:          time.Now().Add(time.Hour),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2500), kpi.TotalTokens)
+	assert.Positive(t, kpi.CostMicros)
+}
+
 func TestSummarizeSpendingKPITotalsIgnoresFactoryFilter(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

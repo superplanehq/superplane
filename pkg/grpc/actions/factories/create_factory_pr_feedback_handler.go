@@ -26,16 +26,12 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
+	factoryID := factory.ID
 
 	repository := strings.TrimSpace(req.GetSettings().GetSubject().GetRepository())
 	if repository == "" {

@@ -285,6 +285,7 @@ func lookup(model string) (Rate, bool) {
 
 func normalizeModelID(model string) string {
 	normalized := strings.ToLower(strings.TrimSpace(model))
+	normalized = strings.TrimPrefix(normalized, "openrouter/")
 	provider, rest, found := strings.Cut(normalized, "/")
 	if found && provider != "" && rest != "" && !strings.Contains(rest, "/") {
 		return rest

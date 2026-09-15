@@ -21,9 +21,13 @@ export function findAgentNodes(spec: CanvasesCanvas["spec"] | null | undefined):
   });
 }
 
-/** First agent in canvas order. Extra agents stay on the full automation editor. */
-export function primaryAgentNode(spec: CanvasesCanvas["spec"] | null | undefined): CanvasSpecNode | undefined {
-  return findAgentNodes(spec)[0];
+/** Preferred agent, or the first agent in canvas order when no preference matches. */
+export function primaryAgentNode(
+  spec: CanvasesCanvas["spec"] | null | undefined,
+  preferredAgentNodeId?: string,
+): CanvasSpecNode | undefined {
+  const agentNodes = findAgentNodes(spec);
+  return agentNodes.find((node) => node.id === preferredAgentNodeId) ?? agentNodes[0];
 }
 
 export function canvasNodeToPlanningReviewComponent(node: CanvasSpecNode): PlanningReviewComponent {

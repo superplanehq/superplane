@@ -72,21 +72,17 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory intake")
-	}
-
 	source, err := parseFactoryIntakeSource(req.GetSource())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
+	factoryID := factory.ID
 
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {

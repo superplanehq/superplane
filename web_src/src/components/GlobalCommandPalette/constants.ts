@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   CircleUser,
   Gauge,
@@ -126,6 +127,13 @@ export const ADMIN_LINKS: Array<{
     description: "Installation network and SMTP settings",
     href: "/admin/settings",
     icon: Network,
+  },
+  {
+    id: "price-books",
+    label: "Price Books",
+    description: "Review model and VM rates for this installation",
+    href: "/admin/price-books",
+    icon: BookOpen,
   },
   {
     id: "runner-tasks",

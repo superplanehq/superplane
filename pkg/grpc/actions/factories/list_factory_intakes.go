@@ -16,13 +16,8 @@ func ListFactoryIntakes(ctx context.Context, organizationID string, req *pb.List
 		return nil, factoryErrorToStatus(err, "failed to list factory intakes")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory intakes")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intakes")
 	}

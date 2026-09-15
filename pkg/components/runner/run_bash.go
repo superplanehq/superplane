@@ -370,7 +370,7 @@ func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 }
 
 func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunBashFinishedEventType)
 }
 
 func (c *RunBash) Cleanup(ctx core.SetupContext) error { return nil }

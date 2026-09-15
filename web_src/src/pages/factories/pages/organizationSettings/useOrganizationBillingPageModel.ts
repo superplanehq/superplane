@@ -11,7 +11,11 @@ import type {
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
-import { syncOrganizationBilling, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import {
+  useOrganizationBilling,
+  useOrganizationSubscriptionActions,
+  syncOrganizationBilling,
+} from "@/hooks/useOrganizationBilling";
 import { useOrganizationBillingSync } from "@/hooks/useOrganizationBillingSync";
 import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants";
 import { useOrganization } from "@/hooks/useOrganizationData";
@@ -51,7 +55,14 @@ export type OrganizationBillingPageModel = {
   includedRemaining: number;
   purchasedRemaining: number;
   welcomeRemaining: number;
+  adminRemaining: number;
   currentPeriodEnd?: string;
+  planSource?: string;
+  cancelAtPeriodEnd: boolean;
+  cancelPending: boolean;
+  keepPending: boolean;
+  onCancelSubscription: () => Promise<void>;
+  onKeepSubscription: () => Promise<void>;
   superplaneGrant: number;
   welcomeCreditExpiresAt?: string;
   hasBillingCustomer: boolean;
@@ -82,9 +93,12 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
     purchasedRemaining: parseWorkOrderMetric(billing?.purchasedRemainingCents),
     welcomeRemaining: parseWorkOrderMetric(billing?.welcomeRemainingCents),
+    adminRemaining: parseWorkOrderMetric(billing?.adminRemainingCents),
     subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
     creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
     describeBillingEnabled: billing?.billingEnabled === true,
+    planSource: billing?.planSource,
+    cancelAtPeriodEnd: billing?.cancelAtPeriodEnd === true,
   };
 }
 
@@ -129,6 +143,8 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await syncOrganizationBilling(organizationId);
   }, [organizationId]);
 
+  const subscription = useOrganizationSubscriptionActions(organizationId);
+
   useOrganizationBillingSync({
     organizationId,
     subscribed,
@@ -158,7 +174,14 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     includedRemaining: flags.includedRemaining,
     purchasedRemaining: flags.purchasedRemaining,
     welcomeRemaining: flags.welcomeRemaining,
+    adminRemaining: flags.adminRemaining,
     currentPeriodEnd: flags.currentPeriodEnd,
+    planSource: flags.planSource,
+    cancelAtPeriodEnd: flags.cancelAtPeriodEnd,
+    cancelPending: subscription.cancelPending,
+    keepPending: subscription.keepPending,
+    onCancelSubscription: subscription.onCancelSubscription,
+    onKeepSubscription: subscription.onKeepSubscription,
     superplaneGrant: metrics.superplaneGrant,
     welcomeCreditExpiresAt: metrics.welcomeCreditExpiresAt,
     hasBillingCustomer: metrics.hasBillingCustomer,

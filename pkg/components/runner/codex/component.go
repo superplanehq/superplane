@@ -146,11 +146,16 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 
-	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups)
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	if err != nil {
+		return err
+	}
+	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
 	}
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
@@ -196,7 +201,7 @@ func (c *RunCodex) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (c *RunCodex) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx)
+	return runner.CancelBrokerTask(ctx, FinishedEventType)
 }
 
 func (c *RunCodex) Cleanup(ctx core.SetupContext) error { return nil }

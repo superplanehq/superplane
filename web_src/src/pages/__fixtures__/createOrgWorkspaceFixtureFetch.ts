@@ -32,6 +32,14 @@ function emptyOrgWorkspaceCatchAll(url: URL): { json: unknown } | null {
   return null;
 }
 
+function fixtureFetchBaseHref(): string {
+  const href = globalThis.location?.href;
+  if (typeof href === "string" && (href.startsWith("http://") || href.startsWith("https://"))) {
+    return href;
+  }
+  return "http://localhost/";
+}
+
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
@@ -66,7 +74,7 @@ export function createOrgWorkspaceFixtureFetch(
   const accountState = createStorybookAccountState(homeFixture.organizationId);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
+    const url = new URL(requestUrl(input), fixtureFetchBaseHref());
     const method = requestMethod(input, init);
     const body = await readRequestJson(input, init);
     const agentRoute = matchStorybookAgentMessageRoute({

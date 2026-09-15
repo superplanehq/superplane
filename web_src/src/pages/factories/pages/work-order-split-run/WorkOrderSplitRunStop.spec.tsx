@@ -3,7 +3,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { handleStopMock, handleRejectMock, handleArchiveMock, handleBackToDraftMock, enabledExperimentalFeatures } =
   vi.hoisted(() => ({
@@ -48,7 +48,7 @@ beforeAll(() => {
 });
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -105,7 +105,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
   });
 
-  it("hides the draft model select when the feature is off", async () => {
+  it("hides the draft model chevron on classic Start when Task Refinement is off", async () => {
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -114,6 +114,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
+                factoryId="factory-1"
+                orderId={DRAFT_WORK_ORDER.id}
                 fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
                 onDispatch={onDispatch}
                 canDispatch
@@ -126,31 +128,29 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
-  it("refines a draft from the note", async () => {
-    const user = userEvent.setup();
-    const onRefine = vi.fn();
+  it("does not refine a draft from the note", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
           <ThemeProvider>
             <TooltipProvider>
-              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} onRefine={onRefine} />
+              <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} />
             </TooltipProvider>
           </ThemeProvider>
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
-    expect(onRefine).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
   it("starts and archives a draft from the note", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -159,6 +159,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
+                factoryId="factory-1"
+                orderId={DRAFT_WORK_ORDER.id}
                 fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
                 onDispatch={onDispatch}
                 canDispatch
@@ -171,12 +173,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(within(note).getByRole("button", { name: "Archive" }));
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
   });
 
@@ -243,7 +246,6 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   });
 
   it("starts a draft with the listed model", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -263,8 +265,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const note = screen.getByTestId("split-run-attention-note");
-    await user.click(within(note).getByRole("combobox", { name: "Model" }));
-    await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
+    await user.click(within(note).getByRole("button", { name: "Model: Auto" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
@@ -295,12 +297,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
     );
     expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
   });
 
   it("keeps Automations open when To Backlog does not succeed", async () => {
@@ -330,6 +333,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       }),
     );
 
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),

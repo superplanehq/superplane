@@ -161,11 +161,7 @@ func (o *FactoryWorkOrder) CreateArtifact(
 // merged should update the live chip, not spam the timeline with one
 // entry per transition. Callers still notify the websocket channel
 // (see FactoryContext websocket notify) so the UI refreshes.
-func (o *FactoryWorkOrder) UpdateArtifactData(
-	tx *gorm.DB,
-	key string,
-	updates map[string]any,
-) (*FactoryWorkOrderArtifact, error) {
+func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryWorkOrderArtifact, error) {
 	trimmedKey := strings.TrimSpace(key)
 	if trimmedKey == "" {
 		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
@@ -180,6 +176,18 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderArtifactNotFound
 		}
+		return nil, err
+	}
+	return &artifact, nil
+}
+
+func (o *FactoryWorkOrder) UpdateArtifactData(
+	tx *gorm.DB,
+	key string,
+	updates map[string]any,
+) (*FactoryWorkOrderArtifact, error) {
+	artifact, err := o.FindArtifactByKey(tx, key)
+	if err != nil {
 		return nil, err
 	}
 
@@ -209,12 +217,12 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		)
 	}
 
-	if err := tx.Model(&artifact).Update("data", dataJSON).Error; err != nil {
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
 		return nil, err
 	}
 	artifact.Data = dataJSON
 
-	return &artifact, nil
+	return artifact, nil
 }
 
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {

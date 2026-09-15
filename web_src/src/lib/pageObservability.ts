@@ -47,6 +47,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
       return { pageKey: "adminSettings", attributes: {} };
     }
 
+    if (second === "price-books") {
+      return { pageKey: "adminPriceBooks", attributes: {} };
+    }
+
     if (second === "runner-tasks") {
       return { pageKey: "adminRunnerTasks", attributes: {} };
     }

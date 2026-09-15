@@ -927,6 +927,7 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents)
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent)
 	})
 
 	t.Run("enables a known feature", func(t *testing.T) {
@@ -940,6 +941,28 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
 		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
+	})
+
+	t.Run("rolls back task refinement when the Backlog upgrade fails", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		require.NoError(t, database.Conn().Model(canvas).Updates(map[string]any{
+			"factory_id":      factoryModel.ID,
+			"live_version_id": otherCanvas.LiveVersionID,
+		}).Error)
+
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactoryCreateWithAgent,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusInternalServerError, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureFactoryCreateWithAgent)
 	})
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {

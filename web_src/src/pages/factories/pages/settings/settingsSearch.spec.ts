@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { FACTORY_SETTINGS_NAV_GROUPS } from "./settingsNavItems";
 import {
@@ -78,6 +78,12 @@ describe("searchFactorySettings", () => {
     const titles = searchFactorySettings(index, "secur").map((result) => result.title);
     expect(titles).toContain("Security");
     expect(titles).toContain("Sign in methods");
+  });
+
+  it("sends a velocity query to Sign in methods", () => {
+    const results = searchFactorySettings(index, "velocity");
+    expect(results.some((result) => result.title === "Sign in methods")).toBe(true);
+    expect(results.map((result) => result.title)).not.toContain("GitHub for Velocity");
   });
 });
 

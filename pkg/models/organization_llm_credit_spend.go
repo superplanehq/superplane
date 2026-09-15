@@ -10,6 +10,7 @@ type hostedCreditSpend struct {
 	IncludedRemainingMicros  int64
 	PurchasedRemainingMicros int64
 	WelcomeRemainingMicros   int64
+	AdminRemainingMicros     int64
 	SuperPlaneGrantMicros    int64
 	PurchasedCreditMicros    int64
 	WelcomeCreditExpiresAt   *time.Time
@@ -140,6 +141,7 @@ func allocateHostedCreditSpend(
 		IncludedRemainingMicros:  includedRemaining,
 		PurchasedRemainingMicros: purchasedRemaining,
 		WelcomeRemainingMicros:   welcomeRemaining,
+		AdminRemainingMicros:     adminRemaining,
 		SuperPlaneGrantMicros:    superplane,
 		PurchasedCreditMicros:    purchased,
 		WelcomeCreditExpiresAt:   welcomeExpiresAt,

@@ -1,6 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
@@ -59,14 +60,16 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
   /**
-   * True while the Backlog automation analyzes this task. The card
-   * shows a spinner in the meter slot until the score arrives.
+   * True while the agent still works on this draft. The card shows
+   * thinking states in the meter slot, even after a score exists.
    */
   isAnalyzing?: boolean;
   /** Extra surface classes. Use for sidebar hover and selected fills. */
   className?: string;
   /** True when this card is the active item in a list. */
   selected?: boolean;
+  /** True when the draft analysis session waits for a multiple-choice answer. */
+  hasAgentQuestion?: boolean;
 }
 
 /**
@@ -101,11 +104,13 @@ export function WorkOrderCard({
   isAnalyzing = false,
   className,
   selected = false,
+  hasAgentQuestion = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const showStart = entry.displayStatus === "draft";
+  const isDraft = entry.displayStatus === "draft";
+  const { showAgentQuestion, agentWorking, showStart } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -138,9 +143,11 @@ export function WorkOrderCard({
         </div>
 
         <WorkOrderCardStatusRow
+          entryId={entry.id}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
+          hasAgentQuestion={showAgentQuestion}
         />
         <WorkOrderCardMetaRow
           entry={entry}
@@ -151,9 +158,10 @@ export function WorkOrderCard({
           isDispatching={dispatchingOrderIds.has(entry.id)}
           onDispatch={onDispatch}
           createdAt={createdAt}
+          isDraft={isDraft}
           showStart={showStart}
           confidenceScore={confidenceScore}
-          isAnalyzing={isAnalyzing}
+          isAnalyzing={agentWorking}
         />
       </div>
     </article>
@@ -178,20 +186,25 @@ function WorkOrderCardOpenControl({
 }
 
 function WorkOrderCardStatusRow({
+  entryId,
   reasons,
   feedbackLabel,
   cardPullRequest,
+  hasAgentQuestion,
 }: {
+  entryId: string;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
+  hasAgentQuestion: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest) {
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+      {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
       ) : null}
@@ -210,6 +223,19 @@ function WorkOrderCardStatusRow({
   );
 }
 
+function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
+  return (
+    <span
+      className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400"
+      data-testid={`work-order-card-agent-question-${entryId}`}
+      title="Agent question"
+    >
+      <Bot className="size-3 shrink-0" aria-hidden />
+      <span className="truncate">Agent question</span>
+    </span>
+  );
+}
+
 function WorkOrderCardMetaRow({
   entry,
   organizationId,
@@ -219,6 +245,7 @@ function WorkOrderCardMetaRow({
   isDispatching,
   onDispatch,
   createdAt,
+  isDraft,
   showStart,
   confidenceScore,
   isAnalyzing,
@@ -231,6 +258,7 @@ function WorkOrderCardMetaRow({
   isDispatching: boolean;
   onDispatch: WorkOrderCardContext["onDispatch"];
   createdAt: Date | null;
+  isDraft: boolean;
   showStart: boolean;
   confidenceScore?: number;
   isAnalyzing: boolean;
@@ -247,7 +275,7 @@ function WorkOrderCardMetaRow({
         {createdLabel}
       </span>
       <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+        {isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
             <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
@@ -268,17 +296,22 @@ function WorkOrderCardMetaRow({
   );
 }
 
+function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
+  const showAgentQuestion = hasAgentQuestion && isDraft;
+  const agentWorking = isAnalyzing && !showAgentQuestion;
+  return { showAgentQuestion, agentWorking, showStart: isDraft && !agentWorking };
+}
+
 /**
- * Score meter, or a spinner while the Backlog automation still analyzes the
- * task. Both take the same slot, so the card does not move when the
- * score arrives.
+ * Thinking states while the agent still works, even after a score exists.
+ * The meter returns when the agent waits for the user.
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
-  if (score != null) {
-    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
-  }
   if (isAnalyzing) {
     return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+  }
+  if (score != null) {
+    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
   }
   return null;
 }

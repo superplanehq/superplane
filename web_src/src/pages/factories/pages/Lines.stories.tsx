@@ -34,7 +34,7 @@ import { LinesPage } from "./LinesPage";
 
 /**
  * Line board is the workspace home: phase columns fill the pane. Cards open
- * the work-order popup. The backlog plus menu includes Create with an Agent.
+ * the work-order popup.
  */
 const meta = {
   title: "Factories/Pages/Lines",
@@ -279,7 +279,7 @@ export const LineDetailFivePhases: Story = {
   },
 };
 
-/** Welcome credit is empty. The board shows the trial-empty banner in the header. */
+/** Welcome credit is empty. The board shows the trial chip next to the title. */
 export const LineBoardHostedCreditEmpty: Story = {
   name: "Line board — hosted credit empty",
   render: () => {

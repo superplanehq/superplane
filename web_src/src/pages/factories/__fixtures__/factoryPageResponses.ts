@@ -324,10 +324,12 @@ export interface FactoriesFixture {
     includedRemainingCents?: string;
     purchasedRemainingCents?: string;
     welcomeRemainingCents?: string;
+    adminRemainingCents?: string;
     billingEnabled?: boolean;
     subscriptionCheckoutEnabled?: boolean;
     creditPurchaseAllowed?: boolean;
     hasBillingCustomer?: boolean;
+    cancelAtPeriodEnd?: boolean;
   };
   /** Count of POST /billing/sync calls in this fixture session. */
   billingSyncCalls?: number;

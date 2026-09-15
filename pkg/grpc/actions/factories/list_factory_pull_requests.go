@@ -19,18 +19,13 @@ func ListFactoryPullRequests(
 		return nil, factoryErrorToStatus(err, "failed to list factory pull requests")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory pull requests")
-	}
-
 	filter, err := listFactoryPullRequestFilter(req)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory pull requests")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory pull requests")
 	}

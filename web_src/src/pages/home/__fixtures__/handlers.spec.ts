@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { createHomeFixtureFetch } from "./handlers";
 
@@ -34,16 +34,16 @@ describe("createHomeFixtureFetch", () => {
     const me = await fetchFixture("/api/v1/me");
     const meBody = await me.json();
     expect(meBody).toMatchObject({
-      user: expect.objectContaining({ organizationId: expect.any(String) }),
+      user: expect.objectContaining({
+        organizationId: expect.any(String),
+        permissions: expect.arrayContaining([
+          expect.objectContaining({ resource: "agents", action: "read" }),
+          expect.objectContaining({ resource: "agents", action: "create" }),
+          expect.objectContaining({ resource: "work_orders", action: "create" }),
+          expect.objectContaining({ resource: "work_orders", action: "update" }),
+        ]),
+      }),
     });
-    expect(meBody.user.permissions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ resource: "agents", action: "read" }),
-        expect.objectContaining({ resource: "agents", action: "create" }),
-        expect.objectContaining({ resource: "work_orders", action: "create" }),
-        expect.objectContaining({ resource: "work_orders", action: "update" }),
-      ]),
-    );
   });
 
   it("serves the account organization list", async () => {
@@ -59,7 +59,10 @@ describe("createHomeFixtureFetch", () => {
   it("exposes the managed-agents experimental feature", async () => {
     const features = await fetchFixture("/account/experimental-features");
     await expect(features.json()).resolves.toMatchObject({
-      features: expect.arrayContaining([expect.objectContaining({ id: "claude_managed_agents", released: true })]),
+      features: expect.arrayContaining([
+        expect.objectContaining({ id: "claude_managed_agents", released: true }),
+        expect.objectContaining({ id: "factory_create_with_agent" }),
+      ]),
     });
   });
 });

@@ -61,7 +61,7 @@ export const Open: Story = {
 export const Trial: Story = {
   args: {
     ...defaultArgs,
-    isTrial: true,
+    planLabel: "Trial",
   },
 };
 
@@ -69,7 +69,25 @@ export const TrialOpen: Story = {
   name: "Trial (open)",
   args: {
     ...defaultArgs,
-    isTrial: true,
+    planLabel: "Trial",
+    defaultOpen: true,
+  },
+};
+
+export const BusinessOpen: Story = {
+  name: "Business (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "Business",
+    defaultOpen: true,
+  },
+};
+
+export const NoPlanOpen: Story = {
+  name: "No plan (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "No plan",
     defaultOpen: true,
   },
 };

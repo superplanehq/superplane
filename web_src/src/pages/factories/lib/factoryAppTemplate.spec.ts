@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
 
 import { hasFactoryAppDefaults, resolveFactoryAppTemplate } from "./factoryAppTemplate";
@@ -11,7 +11,6 @@ describe("resolveFactoryAppTemplate", () => {
   it.each([
     ["onrun-implement", "line-implementation"],
     ["on-pr-closed", "pr-closure"],
-    ["onrun-create-with-agent", "create-with-agent"],
   ])("matches %s to %s", (nodeId, templateId) => {
     expect(resolveFactoryAppTemplate(canvasWith([{ id: nodeId }]))?.id).toBe(templateId);
   });

@@ -9,7 +9,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "@/components/Link/link";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -409,10 +409,11 @@ type PhaseLogCardProps = {
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
-  /** Collapse setup noise and bash in the Create with an Agent session log. */
+  /** Collapse setup noise and bash in the planning session log. */
   compactSessionLog?: boolean;
   /** Live canvas or run details are still loading for this phase. */
   streamLoading?: boolean;
+  files?: FilesFile[];
   onUsageOpenChange?: (open: boolean) => void;
 };
 
@@ -436,6 +437,7 @@ export function PhaseLogCard({
   canvasId,
   compactSessionLog = false,
   streamLoading = false,
+  files,
   onUsageOpenChange,
 }: PhaseLogCardProps) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
@@ -521,6 +523,7 @@ export function PhaseLogCard({
                   organizationId={organizationId}
                   canvasId={canvasId ?? phase.appId}
                   compactSessionLog={compactSessionLog}
+                  files={files}
                 />
               ))}
             </ol>
@@ -867,6 +870,7 @@ function StreamNode({
   organizationId,
   canvasId,
   compactSessionLog,
+  files,
 }: {
   group: StreamNodeGroup;
   highlighted: boolean;
@@ -874,6 +878,7 @@ function StreamNode({
   organizationId?: string;
   canvasId?: string;
   compactSessionLog: boolean;
+  files?: FilesFile[];
 }) {
   const { line, notes, artifact, pullRequest } = group;
   const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
@@ -910,6 +915,7 @@ function StreamNode({
               step={step}
               highlightUserTalk={compactSessionLog}
               stickyHeader={!compactSessionLog}
+              files={files}
             />
           ))}
         </ol>
@@ -992,10 +998,12 @@ function StreamStep({
   step,
   highlightUserTalk = false,
   stickyHeader = true,
+  files,
 }: {
   step: ClaudeStepGroup;
   highlightUserTalk?: boolean;
   stickyHeader?: boolean;
+  files?: FilesFile[];
 }) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
@@ -1025,7 +1033,12 @@ function StreamStep({
           {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
           {step.events.map((event) =>
             event.kind === "note" ? (
-              <StreamTalkNote key={event.line.id} line={event.line} highlightUserTalk={highlightUserTalk} />
+              <StreamTalkNote
+                key={event.line.id}
+                line={event.line}
+                highlightUserTalk={highlightUserTalk}
+                files={files}
+              />
             ) : (
               <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} label={event.label} />
             ),
@@ -1036,7 +1049,15 @@ function StreamStep({
   );
 }
 
-function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine; highlightUserTalk: boolean }) {
+function StreamTalkNote({
+  line,
+  highlightUserTalk,
+  files,
+}: {
+  line: SplitRunStreamLine;
+  highlightUserTalk: boolean;
+  files?: FilesFile[];
+}) {
   const isUserTalk = highlightUserTalk && (line.componentType === "prompt" || Boolean(line.userTalk));
   const youLabel = line.userTalk === "survey" ? CREATE_WITH_AGENT_COPY.youSurvey : CREATE_WITH_AGENT_COPY.you;
   return (
@@ -1049,11 +1070,21 @@ function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine;
       {isUserTalk ? (
         <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
           <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">{youLabel}</span>
-          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
+          <MarkdownContent
+            content={line.componentName}
+            files={files}
+            variant="workspace"
+            className={STREAM_NOTE_MARKDOWN}
+          />
         </div>
       ) : (
         <div className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
-          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
+          <MarkdownContent
+            content={line.componentName}
+            files={files}
+            variant="workspace"
+            className={STREAM_NOTE_MARKDOWN}
+          />
         </div>
       )}
     </div>

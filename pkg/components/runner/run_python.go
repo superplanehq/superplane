@@ -363,7 +363,7 @@ func (c *RunPython) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 }
 
 func (c *RunPython) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunPythonFinishedEventType)
 }
 
 func (c *RunPython) Cleanup(ctx core.SetupContext) error { return nil }

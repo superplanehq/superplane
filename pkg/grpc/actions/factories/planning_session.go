@@ -2,90 +2,57 @@ package factories
 
 import (
 	"context"
-	"errors"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-func StartPlanningSession(ctx context.Context, organizationID string, req *pb.StartPlanningSessionRequest) (*pb.StartPlanningSessionResponse, error) {
-	orgID, factoryID, userID, err := planningSessionActor(ctx, organizationID, req.GetFactoryId())
+func FindPlanningSessionByWorkOrder(ctx context.Context, organizationID string, req *pb.FindPlanningSessionByWorkOrderRequest) (*pb.FindPlanningSessionByWorkOrderResponse, error) {
+	orgID, factoryID, _, err := planningSessionActor(ctx, organizationID, req.GetFactoryId())
 	if err != nil {
 		return nil, err
 	}
-
-	db := database.DB(ctx)
-	var session *models.FactoryPlanningSession
-	var factoryModel *models.Factory
-	err = db.Transaction(func(tx *gorm.DB) error {
-		var findErr error
-		factoryModel, findErr = models.FindFactory(tx, orgID, factoryID)
-		if findErr != nil {
-			return findErr
-		}
-		repository := strings.TrimSpace(req.GetRepository())
-		if repository == "" {
-			repository = strings.TrimSpace(factoryModel.OnboardingConfigValue().AppRepository)
-		}
-		if repository == "" {
-			return invalidArgument("repository is required")
-		}
-		canvas, entrypoint, findErr := ensurePlanningCanvas(tx, factoryModel, userID)
-		if findErr != nil {
-			return findErr
-		}
-		if _, findErr = models.LockCanvasForUpdate(tx, orgID, canvas.ID); findErr != nil {
-			return findErr
-		}
-		if findErr = rejectIfPlanningSessionAtCap(tx, factoryModel, canvas.ID); findErr != nil {
-			return findErr
-		}
-		workOrderID, parseErr := parseOptionalPlanningWorkOrderID(req.GetWorkOrderId())
-		if parseErr != nil {
-			return parseErr
-		}
-		session, findErr = factoryModel.StartPlanningSession(tx, models.StartPlanningSessionParams{
-			CreatedByUserID: userID,
-			Repository:      repository,
-			CanvasID:        canvas.ID,
-			Entrypoint:      entrypoint,
-			WorkOrderID:     workOrderID,
-		})
-		return findErr
-	})
+	workOrderID, err := parseOptionalPlanningWorkOrderID(req.GetWorkOrderId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to start planning session")
+		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
-
-	if session.CanvasID != nil && session.CanvasRunID != nil {
-		if err := messages.NewCanvasRunMessage(session.CanvasID.String(), session.CanvasRunID.String()).PublishPending(); err != nil {
-			log.WithError(err).Warnf("Failed to publish planning session run %s", session.CanvasRunID)
+	if workOrderID == uuid.Nil {
+		return nil, factoryErrorToStatus(invalidArgument("work order id is required"), "failed to find planning session")
+	}
+	db := database.DB(ctx)
+	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to find planning session")
+	}
+	session, err := models.FindPlanningSessionByDraftWorkOrder(db, orgID, factoryID, workOrderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to find planning session")
+	}
+	if session.State != models.PlanningSessionStateEnded {
+		if err := session.Heartbeat(db); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to find planning session")
 		}
 	}
-
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to start planning session")
+		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
-	return &pb.StartPlanningSessionResponse{Session: serialized}, nil
+	return &pb.FindPlanningSessionByWorkOrderResponse{Session: serialized}, nil
 }
 
 func DescribePlanningSession(ctx context.Context, organizationID string, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, _, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +70,7 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, _, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -120,219 +87,105 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 }
 
 func SendPlanningSessionMessage(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
-	if err := session.SendUserMessage(database.DB(ctx), req.GetText()); err != nil {
+	if err := requireAnalysisPlanningSession(session); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
+	db := database.DB(ctx)
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAnalysisSessionAndDraft(tx, session); err != nil {
+			return err
+		}
+		restartAnalysis := session.NeedsAnalysisRestart(tx)
+		if restartAnalysis {
+			if err := session.Reopen(tx); err != nil {
+				return err
+			}
+			if err := session.DetachAgentRun(tx); err != nil {
+				return err
+			}
+		}
+		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
+			return err
+		}
+		if !restartAnalysis {
+			return nil
+		}
+		if err := session.MarkUserMessagesDelivered(tx); err != nil {
+			return err
+		}
+		return restartAnalysisCanvasRun(tx, factoryModel, session)
+	}); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to send planning session message")
+	}
+	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
 }
 
-func UpdatePlanningSessionDraft(ctx context.Context, organizationID string, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
-	if err != nil {
-		return nil, err
-	}
-	if err := session.UpdateDraft(database.DB(ctx), models.PlanningSessionDraft{
-		Title:       req.GetTitle(),
-		Description: req.GetDescription(),
-	}); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update planning session draft")
-	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update planning session draft")
-	}
-	return &pb.UpdatePlanningSessionDraftResponse{Session: serialized}, nil
-}
-
-func CreatePlanningSessionWorkOrder(ctx context.Context, organizationID string, req *pb.CreatePlanningSessionWorkOrderRequest) (*pb.CreatePlanningSessionWorkOrderResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
-	if err != nil {
-		return nil, err
-	}
-	db := database.DB(ctx)
-	updating := strings.TrimSpace(session.Draft().WorkOrderID) != ""
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create planning session work order")
-	}
-	if !updating {
-		workersctx.EmitWorkOrderCreated(db, factoryModel, order)
-	}
-	if err := messages.PublishFactoryWorkOrderUpdated(factoryModel.ID.String(), order.ID.String(), factoryevents.EventTypeOrderStatusUpdated); err != nil {
-		log.WithError(err).Warnf("Failed to publish work order created from planning session %s", session.ID)
-	}
-	serialized, err := serializePlanningSession(db, factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create planning session work order")
-	}
-	return &pb.CreatePlanningSessionWorkOrderResponse{Session: serialized}, nil
-}
-
-func SkipPlanningSessionDraft(ctx context.Context, organizationID string, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
-	if err != nil {
-		return nil, err
-	}
-	if err := session.SkipDraft(database.DB(ctx)); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to skip planning session draft")
-	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to skip planning session draft")
-	}
-	return &pb.SkipPlanningSessionDraftResponse{Session: serialized}, nil
-}
-
-func ReloadPlanningSessionAgent(ctx context.Context, organizationID string, req *pb.ReloadPlanningSessionAgentRequest) (*pb.ReloadPlanningSessionAgentResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
-	if err != nil {
-		return nil, err
-	}
-	if session.State == models.PlanningSessionStateEnded {
-		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionEnded, "failed to reload planning session agent")
-	}
-	if session.CanvasID == nil {
-		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionInvalid, "failed to reload planning session agent")
-	}
-
-	db := database.DB(ctx)
-	selected, err := models.FindSelectableLLMModel(db, session.OrganizationID, &session.FactoryID, req.GetSelectableModelKey())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
-	}
-	if err := assertPlanningSelectableModelReady(db, session.OrganizationID, selected); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
-	}
-
-	oldRunID := session.CanvasRunID
-	var newRun *models.CanvasRun
-	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := session.LockForUpdate(tx); err != nil {
-			return err
-		}
-		if session.State == models.PlanningSessionStateEnded {
-			return models.ErrFactoryPlanningSessionEnded
-		}
-		canvas, err := models.FindCanvasInTransaction(tx, session.OrganizationID, *session.CanvasID)
-		if err != nil {
-			return err
-		}
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
-		if err != nil {
-			return err
-		}
-		nodes, err := clonePlanningCanvasNodes([]models.Node(liveVersion.Nodes))
-		if err != nil {
-			return err
-		}
-		if err := applySelectableModelToPlanningNodes(tx, session.OrganizationID, nodes, selected, session.Messages); err != nil {
-			return err
-		}
-		now := time.Now()
-		version := models.CanvasVersion{
-			ID:            uuid.New(),
-			WorkflowID:    canvas.ID,
-			OwnerID:       &session.CreatedByUserID,
-			CommitMessage: "Create with an Agent model",
-			Nodes:         datatypes.NewJSONSlice(nodes),
-			Edges:         liveVersion.Edges,
-			ConsolePanels: liveVersion.ConsolePanels,
-			ConsoleLayout: liveVersion.ConsoleLayout,
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
-		}
-		if err := tx.Create(&version).Error; err != nil {
-			return err
-		}
-		entrypoint, err := planningCanvasEntrypoint(tx, canvas.ID)
-		if err != nil {
-			return err
-		}
-		refine, err := session.RefineWorkOrder(tx, factoryModel)
-		if err != nil {
-			return err
-		}
-		newRun = models.NewPlanningSessionRun(canvas.ID, version.ID, entrypoint, factoryModel, session.Repository, selected.Key, refine)
-		if err := tx.Create(newRun).Error; err != nil {
-			return err
-		}
-		return session.AttachAgentRun(tx, newRun.ID, selected.Key)
+func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	response, err := SendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
+		FactoryId: req.GetFactoryId(),
+		SessionId: req.GetSessionId(),
+		Text:      req.GetText(),
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
+		return nil, err
 	}
-
-	if oldRunID != nil {
-		cancelPlanningSessionRunByID(ctx, db, session.OrganizationID, *session.CanvasID, *oldRunID)
-	}
-	if err := messages.NewCanvasRunMessage(session.CanvasID.String(), newRun.ID.String()).PublishPending(); err != nil {
-		log.WithError(err).Warnf("Failed to publish planning session run %s", newRun.ID)
-	}
-
-	serialized, err := serializePlanningSession(db, factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
-	}
-	return &pb.ReloadPlanningSessionAgentResponse{Session: serialized}, nil
+	return &pb.AnswerPlanningSessionSurveyResponse{Session: response.Session}, nil
 }
 
-func assertPlanningSelectableModelReady(tx *gorm.DB, orgID uuid.UUID, model models.SelectableLLMModel) error {
-	if model.Source.ID != models.UsageFundingSourceBYOK {
-		return nil
-	}
-	integration, err := models.FindReadyBYOKIntegration(tx, orgID, model.Provider.ID)
-	if err != nil {
+func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSession) error {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", session.ID).First(session).Error; err != nil {
 		return err
 	}
-	if integration == nil {
-		return errPlanningProviderRequired
+	if err := requireAnalysisPlanningSession(session); err != nil {
+		return err
+	}
+	if session.DraftWorkOrderID == nil {
+		return models.ErrFactoryPlanningSessionInvalid
+	}
+	var order models.FactoryWorkOrder
+	if err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where(
+			"id = ? AND organization_id = ? AND factory_id = ?",
+			*session.DraftWorkOrderID,
+			session.OrganizationID,
+			session.FactoryID,
+		).
+		First(&order).
+		Error; err != nil {
+		return err
+	}
+	if order.State != models.FactoryWorkOrderStateDraft {
+		return models.ErrFactoryPlanningSessionInvalid
 	}
 	return nil
 }
 
-func rejectIfPlanningSessionAtCap(tx *gorm.DB, factoryModel *models.Factory, canvasID uuid.UUID) error {
-	cap, err := planningSessionParallelismCap(tx, canvasID)
+func restartAnalysisCanvasRun(db *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) error {
+	if session.DraftWorkOrderID == nil || session.CanvasID == nil {
+		return models.ErrFactoryPlanningSessionInvalid
+	}
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	if err != nil {
 		return err
 	}
-	open, err := models.CountOpenPlanningSessions(tx, factoryModel.OrganizationID, factoryModel.ID)
-	if err != nil {
+	if err := workersctx.EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, *session.CanvasID); err != nil {
+		log.WithError(err).Warnf("failed to restart analysis run for session %s", session.ID)
 		return err
-	}
-	if open >= int64(cap) {
-		return models.ErrFactoryPlanningSessionBusy
 	}
 	return nil
-}
-
-func planningSessionParallelismCap(tx *gorm.DB, canvasID uuid.UUID) (int, error) {
-	node, err := models.FindCanvasNode(tx, canvasID, planningCanvasAgentNodeID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return models.DefaultFactoryLineStepMaxParallelism, nil
-		}
-		return 0, err
-	}
-	if max := node.ConcurrencyMax; max != nil && *max >= 1 {
-		return *max, nil
-	}
-	return models.DefaultFactoryLineStepMaxParallelism, nil
 }
 
 func planningSessionActor(ctx context.Context, organizationID, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
 	orgID, err := parseOrganizationID(organizationID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
-	}
-	parsedFactoryID, err := parseFactoryID(factoryID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
@@ -344,7 +197,11 @@ func planningSessionActor(ctx context.Context, organizationID, factoryID string)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to load planning session")
 	}
-	return orgID, parsedFactoryID, userID, nil
+	factory, err := findFactory(database.DB(ctx), orgID, factoryID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
+	}
+	return orgID, factory.ID, userID, nil
 }
 
 func parseSessionID(sessionID string) (uuid.UUID, error) {
@@ -370,25 +227,32 @@ func parseOptionalPlanningWorkOrderID(workOrderID string) (uuid.UUID, error) {
 func loadPlanningSession(
 	ctx context.Context,
 	organizationID, factoryID, sessionID string,
-) (*models.FactoryPlanningSession, *models.Factory, error) {
-	orgID, parsedFactoryID, _, err := planningSessionActor(ctx, organizationID, factoryID)
+) (*models.FactoryPlanningSession, *models.Factory, uuid.UUID, error) {
+	orgID, parsedFactoryID, userID, err := planningSessionActor(ctx, organizationID, factoryID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, uuid.Nil, err
 	}
 	parsedSessionID, err := parseSessionID(sessionID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
 	db := database.DB(ctx)
 	factoryModel, err := models.FindFactory(db, orgID, parsedFactoryID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
 	session, err := models.FindPlanningSession(db, orgID, parsedFactoryID, parsedSessionID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
-	return session, factoryModel, nil
+	return session, factoryModel, userID, nil
+}
+
+func requireAnalysisPlanningSession(session *models.FactoryPlanningSession) error {
+	if session == nil || !session.IsAnalysisSession() {
+		return models.ErrFactoryPlanningSessionInvalid
+	}
+	return nil
 }
 
 func cancelPlanningSessionRun(ctx context.Context, db *gorm.DB, session *models.FactoryPlanningSession) {
@@ -430,12 +294,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	}
 	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(messages))
 	for _, message := range messages {
-		messagesOut = append(messagesOut, &pb.PlanningSessionMessage{
-			Id:        message.ID.String(),
-			Role:      message.Role,
-			Text:      message.Text,
-			CreatedAt: timestamppb.New(message.CreatedAt),
-		})
+		messagesOut = append(messagesOut, serializePlanningSessionMessage(message))
 	}
 
 	out := &pb.PlanningSession{
@@ -446,6 +305,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		Messages:   messagesOut,
 		Created:    created,
 		WaitState:  session.WaitState,
+		Kind:       planningSessionKindToProto(session.Kind),
 	}
 	if session.CanvasID != nil {
 		out.CanvasId = session.CanvasID.String()
@@ -475,6 +335,30 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	return out, nil
 }
 
+func serializePlanningSessionMessage(message models.PlanningSessionMessage) *pb.PlanningSessionMessage {
+	out := &pb.PlanningSessionMessage{
+		Id:        message.ID.String(),
+		Role:      message.Role,
+		Text:      message.Text,
+		CreatedAt: timestamppb.New(message.CreatedAt),
+	}
+	if message.UserID != nil {
+		out.UserId = message.UserID.String()
+	}
+	return out
+}
+
+func planningSessionKindToProto(kind string) pb.PlanningSessionKind {
+	switch kind {
+	case models.PlanningSessionKindTaskCreation:
+		return pb.PlanningSessionKind_PLANNING_SESSION_KIND_TASK_CREATION
+	case models.PlanningSessionKindWorkOrderAnalysis:
+		return pb.PlanningSessionKind_PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS
+	default:
+		return pb.PlanningSessionKind_PLANNING_SESSION_KIND_UNSPECIFIED
+	}
+}
+
 func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.PlanningSessionSurveyQuestion {
 	questions := make([]*pb.PlanningSessionSurveyQuestion, 0, len(survey.Questions))
 	for _, question := range survey.Questions {
@@ -495,9 +379,13 @@ func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSess
 		return "", err
 	}
 	for i := len(executions) - 1; i >= 0; i-- {
-		if executions[i].NodeID == planningCanvasAgentNodeID {
+		if isPlanningSessionAgentNode(executions[i].NodeID) {
 			return executions[i].ID.String(), nil
 		}
 	}
 	return "", nil
+}
+
+func isPlanningSessionAgentNode(nodeID string) bool {
+	return nodeID == intakeAnalysisNodeID || nodeID == backlogRefinementNodeID
 }

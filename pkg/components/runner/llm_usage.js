@@ -107,6 +107,7 @@ function accumulate(taskDir, payload) {
     current.total_cost_usd = asNumber(current.total_cost_usd) + asNumber(payload.total_cost_usd);
   }
   fs.writeFileSync(sidecarPath(taskDir), `${JSON.stringify(current)}\n`);
+  mergeResult(process.env.SUPERPLANE_RESULT_FILE, taskDir);
   return current;
 }
 
@@ -117,17 +118,19 @@ function mergeResult(resultFile, taskDir) {
   const sidecar = readSidecar(taskDir);
   const series = readPromptSeries(taskDir);
   const telemetry = telemetryForResult(series);
-  if ((!sidecarHasUsage(sidecar) && !telemetry) || !fs.existsSync(resultFile)) {
+  if (!sidecarHasUsage(sidecar) && !telemetry) {
     return;
   }
-  let parsed;
-  try {
-    parsed = JSON.parse(fs.readFileSync(resultFile, "utf8"));
-  } catch (_err) {
-    return;
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return;
+  let parsed = {};
+  if (fs.existsSync(resultFile)) {
+    try {
+      parsed = JSON.parse(fs.readFileSync(resultFile, "utf8"));
+    } catch (_err) {
+      parsed = {};
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return;
+    }
   }
   const merged = Object.assign({}, parsed);
   if (sidecarHasUsage(sidecar)) {

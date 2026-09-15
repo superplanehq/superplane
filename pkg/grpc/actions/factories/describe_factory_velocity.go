@@ -39,17 +39,14 @@ func DescribeFactoryVelocity(
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
-	}
-
 	period := clampPeriodDays(int(req.GetPeriodDays()))
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
+	factoryID := factory.ID
 
 	now := time.Now().In(time.Local)
 	buckets := buildDayBuckets(now, period)

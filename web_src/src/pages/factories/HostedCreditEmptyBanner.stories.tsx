@@ -77,13 +77,17 @@ export const TrialLowCredit: Story = {
   },
 };
 
-/** Welcome credit is spent. The action opens Billing. */
+/** Welcome credit is spent. The trial chip sits next to the page title. */
 export const TrialEmpty: Story = {
   name: "Trial empty",
-  args: {
-    billingEnabled: true,
-    kind: "trial-empty",
-  },
+  render: (args) => (
+    <HostedCreditHeaderKicker
+      kind="trial"
+      spendingHref={args.spendingHref}
+      remainingCreditCents={0}
+      welcomeCreditExpiresAt={new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()}
+    />
+  ),
 };
 
 /** Welcome credit expired. The action opens Billing. */

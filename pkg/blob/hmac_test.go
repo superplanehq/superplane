@@ -1,6 +1,8 @@
 package blob
 
 import (
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -24,4 +26,22 @@ func TestFileAccessURLRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, VerifyFileAccess(fileID, expires, sig, key))
 	require.Error(t, VerifyFileAccess(fileID, time.Now().Add(-time.Minute).Unix(), sig, key))
+}
+
+func TestFileAccessURLStaysStableInsideExpiryBucket(t *testing.T) {
+	fileID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	key := []byte("signing-secret")
+	t.Setenv("BASE_URL", "https://app.example.test")
+
+	first, err := FileAccessURL(fileID, time.Hour, key)
+	require.NoError(t, err)
+	second, err := FileAccessURL(fileID, time.Hour, key)
+	require.NoError(t, err)
+	assert.Equal(t, first, second)
+
+	parsed, err := url.Parse(first)
+	require.NoError(t, err)
+	expires, err := strconv.ParseInt(parsed.Query().Get("expires"), 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, StableExpiry(time.Hour).Unix(), expires)
 }

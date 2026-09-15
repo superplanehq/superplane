@@ -1,4 +1,4 @@
-export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "failed";
+export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "passed" | "failed";
 
 export type CreateWithAgentCreatedOrder = {
   id: string;
@@ -23,6 +23,7 @@ export type CreateWithAgentMessage = {
   role: "user" | "agent";
   text: string;
   origin?: "survey";
+  userId?: string;
   /**
    * Epoch ms this message was created, when known. Lets the transcript
    * merge order this message against agent notes by true chronology

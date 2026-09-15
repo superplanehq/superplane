@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { organizationNameFromAccount } from "./organizationNameFromAccount";
 
@@ -13,6 +13,7 @@ describe("organizationNameFromAccount", () => {
         installation_admin: false,
         has_password: true,
         linked_accounts: [{ provider: "github", name: "GitHub Owner", username: "dev-user" }],
+        organizations_pending_deletion: [],
         providers: [{ provider: "github", username: "dev-user" }],
       }),
     ).toBe("Dev User");
@@ -28,6 +29,7 @@ describe("organizationNameFromAccount", () => {
         installation_admin: false,
         has_password: true,
         linked_accounts: [],
+        organizations_pending_deletion: [],
         providers: [],
       }),
     ).toBe("dev");

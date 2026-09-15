@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -14,13 +13,8 @@ func DescribeFactory(ctx context.Context, organizationID, factoryID string) (*pb
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}
 
-	id, err := parseFactoryID(factoryID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, id)
+	factory, err := findFactory(db, orgID, factoryID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}

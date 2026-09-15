@@ -6,7 +6,7 @@ import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
-import { isHostedCreditTrialOrg } from "../lib/hostedCreditEmpty";
+import { organizationPlanLabel } from "../lib/hostedCreditEmpty";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -30,7 +30,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
-  const isTrial = isHostedCreditTrialOrg({
+  const planLabel = organizationPlanLabel({
     purchasedCreditCents: spend.data?.purchasedCreditCents,
     welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
     plan: billing.data?.plan,
@@ -63,7 +63,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         userName={account?.name ?? "You"}
         userAvatarUrl={account?.avatar_url}
         organizationName={organization?.metadata?.name || "Organization"}
-        isTrial={isTrial}
+        planLabel={planLabel}
       />
     </aside>
   );

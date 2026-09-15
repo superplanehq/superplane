@@ -1,17 +1,26 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
+import { derivedWorkOrderTitle } from "./lib/derivedWorkOrderTitle";
+
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
+
+export interface CreateWorkOrderComposerDraft {
+  title: string;
+  description: string;
+}
 
 interface UseCreateWorkOrderComposerArgs {
   organizationId: string;
   factoryId: string;
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }
 
 export function useCreateWorkOrderComposer({
@@ -45,16 +54,19 @@ export function useCreateWorkOrderComposer({
     setAssigneeIdsInternal([me.id]);
   }, [me?.id]);
 
-  const goToOrder = (order: { number?: string | number } | null) => {
+  const goToOrder = (order: FactoriesWorkOrder | null) => {
     if (order?.number !== undefined && order.number !== "") {
-      onCreated(String(order.number));
+      onCreated(String(order.number), order);
       return;
     }
     onClose();
   };
 
-  const handleCreate = async () => {
-    const trimmedTitle = title.trim();
+  const handleCreate = async (draft?: CreateWorkOrderComposerDraft) => {
+    const trimmedDescription = (draft?.description ?? description).trim();
+    const trimmedTitle =
+      (draft?.title ?? title).trim() ||
+      (draft ? derivedWorkOrderTitle(trimmedDescription) || CREATE_WORK_ORDER_REQUEST_COPY.title : "");
     if (!trimmedTitle) {
       setTitleError("Title is required");
       return;
@@ -64,7 +76,7 @@ export function useCreateWorkOrderComposer({
     try {
       const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
-        description: description.trim(),
+        description: trimmedDescription,
         assigneeIds,
       });
       goToOrder(order);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { DEFAULT_CANVAS_FOLDER_COLOR, normalizeCanvasFolderColor } from "./useCanvasData";
 
 describe("normalizeCanvasFolderColor", () => {

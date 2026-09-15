@@ -318,6 +318,21 @@ function createTurnTelemetry(options) {
       persist();
       return snapshot.turn;
     },
+    replaceTurnUsage(turn, usage) {
+      const turnNumber = asNumber(turn);
+      const snapshot = state.turns.find((item) => item.turn === turnNumber);
+      if (!snapshot) {
+        return 0;
+      }
+      const incoming = normalizeUsage(usage);
+      if (usageEquals(snapshot.usage, incoming)) {
+        return snapshot.turn;
+      }
+      snapshot.usage = incoming;
+      persist();
+      emitTurn(snapshot);
+      return snapshot.turn;
+    },
     stampToolStart(record) {
       if (state.currentTurn < 1) {
         this.beginTurn({});

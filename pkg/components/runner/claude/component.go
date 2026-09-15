@@ -163,12 +163,16 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 
-	// command_list tasks only accept commands (+ optional files).
-	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups)
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	if err != nil {
+		return err
+	}
+	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
 	}
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
@@ -219,7 +223,7 @@ func (c *RunClaudeCode) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 }
 
 func (c *RunClaudeCode) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx)
+	return runner.CancelBrokerTask(ctx, FinishedEventType)
 }
 
 func (c *RunClaudeCode) Cleanup(ctx core.SetupContext) error { return nil }

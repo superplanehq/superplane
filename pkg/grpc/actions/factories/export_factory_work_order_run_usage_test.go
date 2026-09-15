@@ -27,7 +27,7 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, nil, nil)
+	order, err := factory.CreateWorkOrder(db, "Publish draft", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(db, "ship", nil)
@@ -114,7 +114,8 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 	tokenPriceCents, err := strconv.ParseFloat(row[5], 64)
 	require.NoError(t, err)
 	assert.Greater(t, tokenPriceCents, 0.0)
-	assert.Equal(t, formatUsageCSVCents(computeCostCents), row[8])
+	computeMicros := pricebook.EstimateComputeMicros(computeMachineType, computeMachineType, computeSeconds)
+	assert.Equal(t, formatUsageCSVDollarsFromMicros(computeMicros), row[8])
 }
 
 func Test__ExportFactoryWorkOrderRunUsage__NoRows(t *testing.T) {
@@ -181,10 +182,12 @@ func Test__FormatUsageCSVInt(t *testing.T) {
 	assert.Equal(t, "42", formatUsageCSVInt(42))
 }
 
-func Test__FormatUsageCSVCents(t *testing.T) {
-	assert.Equal(t, "", formatUsageCSVCents(0))
-	assert.Equal(t, "1.23", formatUsageCSVCents(123))
-	assert.Equal(t, "0.03", formatUsageCSVCents(3))
+func Test__FormatUsageCSVDollarsFromMicros(t *testing.T) {
+	assert.Equal(t, "", formatUsageCSVDollarsFromMicros(0))
+	assert.Equal(t, "1.23", formatUsageCSVDollarsFromMicros(1_230_000))
+	assert.Equal(t, "0.03", formatUsageCSVDollarsFromMicros(30_000))
+	assert.Equal(t, "0.00315", formatUsageCSVDollarsFromMicros(3_150))
+	assert.Equal(t, "0.00009", formatUsageCSVDollarsFromMicros(90))
 }
 
 func parseWorkOrderRunUsageCSV(t *testing.T, body string) [][]string {
