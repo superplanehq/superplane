@@ -115,6 +115,7 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -396,6 +397,12 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (template.id === "sentry-exceptions") {
+      if (selectedLine.id) {
+        navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
     if (template.id === "productive-tasks") {
       setProductiveIntakeSetupOpen(true);
       return;
