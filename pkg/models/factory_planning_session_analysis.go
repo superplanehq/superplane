@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -136,8 +137,73 @@ func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 		if err != nil {
 			return err
 		}
-		return upsertPlanningSpecArtifact(inner, order, markdown)
+		stored, err := planningSpecMarkdownForStorage(inner, order, markdown)
+		if err != nil {
+			return err
+		}
+		return upsertPlanningSpecArtifact(inner, order, stored)
 	})
+}
+
+func planningSpecMarkdownForStorage(tx *gorm.DB, order *FactoryWorkOrder, markdown string) (string, error) {
+	restored, err := RestoreFileRefs(tx, order.OrganizationID, order.FactoryID, order.ID, markdown)
+	if err != nil {
+		return "", err
+	}
+	return appendMissingDescriptionFileRefs(tx, order, restored)
+}
+
+func appendMissingDescriptionFileRefs(tx *gorm.DB, order *FactoryWorkOrder, spec string) (string, error) {
+	present := map[uuid.UUID]struct{}{}
+	for _, id := range blob.FileIDsInMarkdown(spec) {
+		present[id] = struct{}{}
+	}
+	var missing []uuid.UUID
+	for _, id := range blob.FileIDsInMarkdown(order.Description) {
+		if _, ok := present[id]; ok {
+			continue
+		}
+		missing = append(missing, id)
+	}
+	if len(missing) == 0 {
+		return spec, nil
+	}
+
+	files, err := ListFilesByIDs(tx, missing)
+	if err != nil {
+		return "", err
+	}
+	byID := map[uuid.UUID]File{}
+	for _, file := range files {
+		byID[file.ID] = file
+	}
+
+	var b strings.Builder
+	b.WriteString(strings.TrimRight(spec, "\n"))
+	appended := false
+	for _, id := range missing {
+		file, ok := byID[id]
+		if !ok || !file.IsDispatchable(order.OrganizationID, order.FactoryID, order.ID) {
+			continue
+		}
+		b.WriteString("\n\n")
+		b.WriteString(markdownFileRef(file))
+		appended = true
+	}
+	if !appended {
+		return spec, nil
+	}
+	b.WriteByte('\n')
+	return b.String(), nil
+}
+
+func markdownFileRef(file File) string {
+	ref := blob.FileRef(file.ID)
+	label := blob.MarkdownLinkLabel(file.Filename)
+	if IsInlineImageContentType(file.ContentType) {
+		return fmt.Sprintf("![%s](%s)", label, ref)
+	}
+	return fmt.Sprintf("[%s](%s)", label, ref)
 }
 
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
