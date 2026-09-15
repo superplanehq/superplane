@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -24,10 +25,12 @@ const (
 )
 
 var (
-	errIntakeNotConnected      = errors.New("intake is not connected")
-	errIntakeItemNotFound      = errors.New("intake item not found")
-	errIntakeSearchUnsupported = errors.New("this intake cannot search items yet")
-	intakeItemSourceByTrigger  = map[string]intakeItemSourceBuilder{}
+	errIntakeNotConnected       = errors.New("intake is not connected")
+	errIntakeItemNotFound       = errors.New("intake item not found")
+	errIntakeItemOutsideScope   = errors.New("intake item is outside source scope")
+	errIntakeSearchUnsupported  = errors.New("this intake cannot search items yet")
+	errIntakeRefreshUnsupported = errors.New("no intake supports backlog refresh")
+	intakeItemSourceByTrigger   = map[string]intakeItemSourceBuilder{}
 )
 
 type intakeItemSourceBuilder func(
@@ -61,6 +64,12 @@ type productiveIntakeItemSource struct {
 }
 
 type unsupportedIntakeItemSource struct{}
+
+type intakeItemAvailabilitySource interface {
+	AvailabilityScope() string
+	ItemIDFromOriginURL(rawURL string) (string, bool)
+	IsItemAvailable(ctx context.Context, id string) (bool, error)
+}
 
 func newLiveIntakeItemSource(
 	ctx context.Context,
@@ -152,6 +161,40 @@ func (s *gitHubIntakeItemSource) Search(ctx context.Context, query string, limit
 	return gitHubIssueItems(result.Issues, limit), nil
 }
 
+func (s *gitHubIntakeItemSource) AvailabilityScope() string {
+	return "github:" + strings.ToLower(s.repository)
+}
+
+func (s *gitHubIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
+	repository, number, ok := parseGitHubIssueURL(rawURL)
+	if !ok || !strings.EqualFold(repository, s.repository) {
+		return "", false
+	}
+	return strconv.Itoa(number), true
+}
+
+func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string) (bool, error) {
+	number, err := strconv.Atoi(id)
+	if err != nil || number <= 0 {
+		return false, errIntakeItemNotFound
+	}
+
+	issue, _, err := s.github.GetIssue(ctx, s.repository, number)
+	if common.IsNotFoundError(err) {
+		if _, repositoryErr := s.github.FindRepository(s.repository); repositoryErr != nil {
+			return false, repositoryErr
+		}
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if issue == nil || issue.IsPullRequest() {
+		return false, nil
+	}
+	return !strings.EqualFold(issue.GetState(), "closed"), nil
+}
+
 func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
 	number, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(id), "#"))
 	if err != nil || number <= 0 {
@@ -202,6 +245,35 @@ func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeI
 
 	item := productiveTaskItem(*task, s.organizationID)
 	return &item, nil
+}
+
+func (s *productiveIntakeItemSource) AvailabilityScope() string {
+	return "productive:" + s.organizationID + ":" + s.projectID
+}
+
+func (s *productiveIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
+	organizationID, taskID, ok := parseProductiveTaskURL(rawURL)
+	if !ok || organizationID != s.organizationID {
+		return "", false
+	}
+	return taskID, true
+}
+
+func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
+	task, err := s.productive.GetTask(strings.TrimSpace(id))
+	if productive.IsNotFoundError(err) {
+		if _, projectErr := s.productive.GetProject(s.projectID); projectErr != nil {
+			return false, projectErr
+		}
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if task.ProjectID != "" && task.ProjectID != s.projectID {
+		return false, errIntakeItemOutsideScope
+	}
+	return !task.Closed, nil
 }
 
 func productiveTaskItem(task productive.Task, organizationID string) IntakeItem {
@@ -276,6 +348,37 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 		Body:  issue.GetBody(),
 		URL:   issue.GetHTMLURL(),
 	}
+}
+
+func parseGitHubIssueURL(rawURL string) (repository string, number int, ok bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+		return "", 0, false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] != "issues" {
+		return "", 0, false
+	}
+
+	number, err = strconv.Atoi(parts[3])
+	if err != nil || number <= 0 {
+		return "", 0, false
+	}
+	return parts[0] + "/" + parts[1], number, true
+}
+
+func parseProductiveTaskURL(rawURL string) (organizationID string, taskID string, ok bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "app.productive.io") {
+		return "", "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] == "" || parts[1] != "tasks" || parts[2] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[2], true
 }
 
 const (

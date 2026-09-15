@@ -364,6 +364,18 @@ service Factories {
     };
   }
 
+  rpc RefreshBacklog(RefreshBacklogRequest) returns (RefreshBacklogResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/backlog/refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Refresh the backlog";
+      description: "Archives backlog work orders whose intake items are closed or no longer available";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -1302,6 +1314,16 @@ message ImportFactoryIntakeItemRequest {
 
 message ImportFactoryIntakeItemResponse {
   WorkOrder order = 1;
+}
+
+message RefreshBacklogRequest {
+  string factory_id = 1;
+}
+
+message RefreshBacklogResponse {
+  int32 archived_count = 1;
+  int32 failed_item_count = 2;
+  int32 failed_source_count = 3;
 }
 
 // Work orders
