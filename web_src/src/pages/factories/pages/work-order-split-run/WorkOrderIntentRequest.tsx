@@ -98,8 +98,9 @@ function AnalysisRequestChat({
     resumeOnBottom: true,
   });
   const showComposerChips = Boolean(
-    analysis.onTogglePlan &&
-      (analysis.latestPlanScore != null || analysis.isAnalyzing || analysis.canTogglePlan),
+    analysis.closedDecision ||
+      (analysis.onTogglePlan &&
+        (analysis.latestPlanScore != null || analysis.isAnalyzing || analysis.canTogglePlan)),
   );
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
