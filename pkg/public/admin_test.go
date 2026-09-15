@@ -896,6 +896,7 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 
 	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactoryCreateWithAgent))
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
@@ -944,6 +945,7 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	})
 
 	t.Run("rolls back task refinement when the Backlog upgrade fails", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
