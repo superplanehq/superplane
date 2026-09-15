@@ -248,7 +248,9 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 	}
 	overlayCreateConfiguration(&config, ctx.Configuration)
 
-	if UseHostedApp() && !config.PrivateApp {
+	metadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if usesHostedSync(config, metadata) {
 		return s.syncHostedApp(ctx, config)
 	}
 
@@ -303,6 +305,21 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 	})
 	ctx.Integration.Error(missingCredentialsMessage(config))
 	return nil
+}
+
+// usesHostedSync is the Cloud public-app path. A hosted install already
+// recorded on the integration stays there. A new install with no personal
+// token also uses it. A personal token or client secret is a legacy Internal
+// Integration and keeps that authentication flow.
+func usesHostedSync(config Configuration, metadata Metadata) bool {
+	if !UseHostedApp() || config.PrivateApp {
+		return false
+	}
+	if metadata.HostedApp {
+		return true
+	}
+	hasPersonalCredential := strings.TrimSpace(config.UserToken) != "" || strings.TrimSpace(config.ClientSecret) != ""
+	return !hasPersonalCredential
 }
 
 func overlayCreateConfiguration(config *Configuration, raw any) {

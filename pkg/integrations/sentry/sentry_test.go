@@ -64,6 +64,55 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Equal(t, "/org-1/workspaces/sp/lines/line-1/setup/sentry", metadata.SetupReturnPath)
 	})
 
+	t.Run("legacy token integration stays on the internal integration path", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"baseUrl":         "https://sentry.io",
+				"integrationName": "SuperPlane",
+				"userToken":       "auth-token",
+				"clientSecret":    "client-secret",
+			},
+			Subscriptions: []contexts.Subscription{
+				{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"1","slug":"example","name":"Example Org"}]`),
+				sentryMockResponse(http.StatusOK, `{"id":"1","slug":"example","name":"Example Org"}`),
+				sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"backend","name":"Backend"}]`),
+				sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+				sentryMockResponse(http.StatusOK, `[{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:read","event:write"],"events":[],"webhookUrl":"","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[]}]`),
+				sentryMockResponse(http.StatusOK, `{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:read","event:write"],"events":["issue"],"webhookUrl":"https://hooks.example.com/api/v1/integrations/8f5fbc57-2738-409a-a6f8-af65c2de733c/events","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[],"clientSecret":"new-rotated-secret"}`),
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			HTTP:            httpContext,
+			Logger:          logrus.NewEntry(logrus.New()),
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.False(t, metadata.HostedApp)
+		require.NotNil(t, metadata.Organization)
+		assert.Equal(t, "example", metadata.Organization.Slug)
+	})
+
 	t.Run("missing credentials -> setup prompt", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",

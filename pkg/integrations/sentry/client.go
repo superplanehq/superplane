@@ -136,6 +136,9 @@ func hostedAccessToken(
 	}
 	metadata.TokenExpiresAt = tokens.ExpiresAt
 	integration.SetMetadata(metadata)
+	if err := persistIntegration(integration); err != nil {
+		return "", fmt.Errorf("failed to persist Sentry installation token: %w", err)
+	}
 	return tokens.Token, nil
 }
 

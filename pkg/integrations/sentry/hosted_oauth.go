@@ -217,12 +217,16 @@ type persistentIntegration interface {
 	Persist() error
 }
 
-func persistIntegrationBeforeRedirect(ctx core.HTTPRequestContext) {
-	persister, ok := ctx.Integration.(persistentIntegration)
+func persistIntegration(integration core.IntegrationContext) error {
+	persister, ok := integration.(persistentIntegration)
 	if !ok {
-		return
+		return nil
 	}
-	if err := persister.Persist(); err != nil {
+	return persister.Persist()
+}
+
+func persistIntegrationBeforeRedirect(ctx core.HTTPRequestContext) {
+	if err := persistIntegration(ctx.Integration); err != nil {
 		ctx.Logger.Errorf("failed to persist Sentry integration before redirect: %v", err)
 	}
 }

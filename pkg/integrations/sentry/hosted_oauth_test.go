@@ -2,9 +2,11 @@ package sentry
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -38,9 +40,13 @@ func Test__afterHostedAppSetup(t *testing.T) {
 		},
 	}
 
+	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			sentryMockResponse(http.StatusCreated, `{"token":"install-token","refreshToken":"refresh-token","expiresAt":"2026-09-11T13:00:00Z"}`),
+			sentryMockResponse(http.StatusCreated, fmt.Sprintf(
+				`{"token":"install-token","refreshToken":"refresh-token","expiresAt":%q}`,
+				expiresAt,
+			)),
 			sentryMockResponse(http.StatusOK, `{"id":"1","slug":"acme","name":"Acme"}`),
 			sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"payments","name":"Payments"}]`),
 			sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
@@ -73,6 +79,7 @@ func Test__afterHostedAppSetup(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, metadata.HostedApp)
 	assert.Equal(t, "install-1", metadata.InstallationUUID)
+	assert.Equal(t, expiresAt, metadata.TokenExpiresAt)
 	require.NotNil(t, metadata.Organization)
 	assert.Equal(t, "acme", metadata.Organization.Slug)
 	require.Len(t, metadata.Projects, 1)
@@ -88,4 +95,58 @@ func Test__afterHostedAppSetup(t *testing.T) {
 	require.NoError(t, json.NewDecoder(httpContext.Requests[0].Body).Decode(&authRequest))
 	assert.Equal(t, "authorization_code", authRequest.GrantType)
 	assert.Equal(t, "oauth-code", authRequest.Code)
+}
+
+type countingPersister struct {
+	*contexts.IntegrationContext
+	count int
+}
+
+func (c *countingPersister) Persist() error {
+	c.count++
+	return nil
+}
+
+func Test__hostedAccessToken_persistsRefreshedExpiry(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+	refreshedExpiry := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	integration := &countingPersister{
+		IntegrationContext: &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Metadata: Metadata{
+				HostedApp:        true,
+				InstallationUUID: "install-1",
+				TokenExpiresAt:   time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
+				Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
+			},
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretAccessToken:  {Name: SecretAccessToken, Value: []byte("expired-token")},
+				SecretRefreshToken: {Name: SecretRefreshToken, Value: []byte("refresh-token")},
+			},
+		},
+	}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusOK, fmt.Sprintf(
+				`{"token":"next-token","refreshToken":"next-refresh","expiresAt":%q}`,
+				refreshedExpiry,
+			)),
+		},
+	}
+
+	client, err := NewClient(httpContext, integration)
+	require.NoError(t, err)
+	assert.Equal(t, "next-token", client.userToken)
+	assert.Equal(t, 1, integration.count)
+
+	metadata, ok := integration.Metadata.(Metadata)
+	require.True(t, ok)
+	assert.Equal(t, refreshedExpiry, metadata.TokenExpiresAt)
+
+	accessToken, err := integration.Secrets().Get(SecretAccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, "next-token", accessToken)
 }

@@ -70,9 +70,11 @@ export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
 function SetupHeader({ step, onBack }: { step: SentrySetupStep; onBack: () => void }) {
   return (
     <header className="text-left">
-      <button
+      <Button
         type="button"
-        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="mb-6 h-auto gap-1.5 px-0 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground"
         onClick={onBack}
         data-testid="sentry-setup-back"
       >
@@ -80,7 +82,7 @@ function SetupHeader({ step, onBack }: { step: SentrySetupStep; onBack: () => vo
         <span>
           {step === "project" ? SENTRY_INTAKE_SETUP_COPY.wizardBack : SENTRY_INTAKE_SETUP_COPY.wizardBackToBoard}
         </span>
-      </button>
+      </Button>
       <h1 className={factoryPageTitleClassName}>
         {step === "connection"
           ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnect
