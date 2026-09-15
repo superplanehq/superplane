@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -970,6 +971,54 @@ func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.
 	url, ok := item["url"].(string)
 	require.True(t, ok)
 	assert.Contains(t, url, "/api/v1/public/files/"+files[0].ID.String())
+}
+
+func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, store, file, bytes.NewReader([]byte("png-bytes"))))
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	sourceKey := loaded.StorageKey
+
+	var jobs []FileBindCleanup
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithFileBindCleanup(func(job FileBindCleanup) {
+		jobs = append(jobs, job)
+	})
+	_, err = ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From workspace file",
+		Description: "See ![bug](" + blob.FileRef(file.ID) + ")",
+	})
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	_, err = store.Head(t.Context(), sourceKey)
+	require.NoError(t, err)
+
+	ApplyFileBindCleanups(jobs, nil)
+	_, err = store.Head(t.Context(), sourceKey)
+	assert.ErrorIs(t, err, blob.ErrNotFound)
 }
 
 func onWorkOrderEventWorkOrder(t *testing.T, event models.CanvasEvent) map[string]any {

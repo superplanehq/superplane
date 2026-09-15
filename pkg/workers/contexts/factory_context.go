@@ -39,6 +39,7 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -75,6 +76,40 @@ func (c *FactoryContext) WithWorkOrderNotification(
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
 	return c
+}
+
+// FileBindCleanup is blob deletion work that must run after the surrounding
+// database transaction commits. Apply it with ApplyFileBindCleanups.
+type FileBindCleanup struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Result         storedfiles.BindResult
+	BindErr        error
+}
+
+func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
+	c.onFileBindCleanup = callback
+	return c
+}
+
+func ApplyFileBindCleanups(jobs []FileBindCleanup, txErr error) {
+	for _, job := range jobs {
+		err := txErr
+		if err == nil {
+			err = job.BindErr
+		}
+		if delErr := storedfiles.ApplyBindResult(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			job.OrganizationID,
+			job.FactoryID,
+			job.Result,
+			err,
+		); delErr != nil {
+			log.WithError(delErr).Warn("Failed to delete file objects after bind")
+		}
+	}
 }
 
 func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
@@ -226,17 +261,17 @@ func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) er
 		order.ID,
 		order.Description,
 	)
-	if applyErr := storedfiles.ApplyBindResult(
-		context.Background(),
-		database.Conn(),
-		blob.Current(),
-		order.OrganizationID,
-		order.FactoryID,
-		result,
-		err,
-	); applyErr != nil {
-		log.WithError(applyErr).Warn("Failed to delete file objects after bind")
+	job := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         result,
+		BindErr:        err,
 	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(job)
+		return err
+	}
+	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
 	return err
 }
 
