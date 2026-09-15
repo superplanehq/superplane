@@ -2150,6 +2150,43 @@ message PlanningSessionMessage {
   string text = 3;
   google.protobuf.Timestamp created_at = 4;
   string user_id = 5;
+  string activity_id = 6;
+}
+
+message PlanningSessionActivityOutput {
+  string stream = 1;
+  string text = 2;
+}
+
+message PlanningSessionActivityItem {
+  string type = 1;
+  string id = 2;
+  string kind = 3;
+  string text = 4;
+  string name = 5;
+  string input = 6;
+  string output = 7;
+  repeated PlanningSessionActivityOutput output_streams = 8;
+  string status = 9;
+  string code = 10;
+  google.protobuf.Timestamp started_at = 11;
+  int64 duration_ms = 12;
+  optional int32 exit_code = 13;
+  string signal = 14;
+  bool truncated = 15;
+}
+
+message PlanningSessionActivity {
+  string id = 1;
+  int32 schema_version = 2;
+  string provider = 3;
+  string status = 4;
+  int64 last_sequence = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  repeated PlanningSessionActivityItem items = 8;
+  bool truncated = 9;
+  int32 turn = 10;
 }
 
 message PlanningSessionSurveyQuestion {
@@ -2177,6 +2214,7 @@ message PlanningSession {
   PlanningSessionSurvey survey = 12;
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
+  repeated PlanningSessionActivity activities = 15;
 }
 
 enum PlanningSessionKind {

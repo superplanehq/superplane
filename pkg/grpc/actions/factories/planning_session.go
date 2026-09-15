@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -296,6 +297,14 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	for _, message := range messages {
 		messagesOut = append(messagesOut, serializePlanningSessionMessage(message))
 	}
+	activities, err := models.ListPlanningSessionActivities(tx, session.ID)
+	if err != nil {
+		return nil, err
+	}
+	activitiesOut := make([]*pb.PlanningSessionActivity, 0, len(activities))
+	for _, activity := range activities {
+		activitiesOut = append(activitiesOut, serializePlanningSessionActivity(activity))
+	}
 
 	out := &pb.PlanningSession{
 		Id:         session.ID.String(),
@@ -306,6 +315,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		Created:    created,
 		WaitState:  session.WaitState,
 		Kind:       planningSessionKindToProto(session.Kind),
+		Activities: activitiesOut,
 	}
 	if session.CanvasID != nil {
 		out.CanvasId = session.CanvasID.String()
@@ -344,6 +354,58 @@ func serializePlanningSessionMessage(message models.PlanningSessionMessage) *pb.
 	}
 	if message.UserID != nil {
 		out.UserId = message.UserID.String()
+	}
+	if message.ActivityID != nil {
+		out.ActivityId = message.ActivityID.String()
+	}
+	return out
+}
+
+func serializePlanningSessionActivity(activity models.PlanningSessionActivity) *pb.PlanningSessionActivity {
+	snapshot := activity.Snapshot.Data()
+	items := make([]*pb.PlanningSessionActivityItem, 0, len(snapshot.Items))
+	for _, item := range snapshot.Items {
+		outputs := make([]*pb.PlanningSessionActivityOutput, 0, len(item.OutputStreams))
+		for _, output := range item.OutputStreams {
+			outputs = append(outputs, &pb.PlanningSessionActivityOutput{Stream: output.Stream, Text: output.Text})
+		}
+		serialized := &pb.PlanningSessionActivityItem{
+			Type:          item.Type,
+			Id:            item.ID,
+			Kind:          item.Kind,
+			Text:          item.Text,
+			Name:          item.Name,
+			Input:         item.Input,
+			Output:        item.Output,
+			OutputStreams: outputs,
+			Status:        item.Status,
+			Code:          item.Code,
+			DurationMs:    item.DurationMs,
+			Signal:        item.Signal,
+			Truncated:     item.Truncated,
+		}
+		if item.StartedAt > 0 {
+			serialized.StartedAt = timestamppb.New(time.UnixMilli(item.StartedAt))
+		}
+		if item.ExitCode != nil {
+			exitCode := int32(*item.ExitCode)
+			serialized.ExitCode = &exitCode
+		}
+		items = append(items, serialized)
+	}
+	out := &pb.PlanningSessionActivity{
+		Id:            activity.ID.String(),
+		SchemaVersion: int32(activity.SchemaVersion),
+		Provider:      activity.Provider,
+		Status:        activity.Status,
+		LastSequence:  activity.LastSequence,
+		StartedAt:     timestamppb.New(activity.StartedAt),
+		Items:         items,
+		Truncated:     snapshot.Truncated,
+		Turn:          int32(snapshot.Turn),
+	}
+	if activity.CompletedAt != nil {
+		out.CompletedAt = timestamppb.New(*activity.CompletedAt)
 	}
 	return out
 }

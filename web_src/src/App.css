@@ -317,9 +317,9 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --stream-gap: 28ms;
-  --stream-fade: 220ms;
-  --stream-blur: 2px;
+  --stream-gap: 60ms;
+  --stream-fade: 350ms;
+  --stream-blur: 1px;
   --stream-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1002,7 +1002,7 @@
 @keyframes sp-tool-enter {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -1011,7 +1011,7 @@
 }
 
 .sp-tool-enter {
-  animation: sp-tool-enter 0.2s ease-out both;
+  animation: sp-tool-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .sp-text-reveal {
@@ -1025,14 +1025,25 @@
 .sp-stream-w {
   opacity: 0;
   filter: blur(var(--stream-blur));
-  transition:
-    opacity var(--stream-fade) var(--stream-ease),
-    filter var(--stream-fade) var(--stream-ease);
 }
 
-.sp-stream-w.is-in {
+.sp-stream-w.is-in,
+.sp-stream-w.is-streaming {
   opacity: 1;
   filter: blur(0);
+}
+
+.sp-running-command {
+  color: var(--foreground);
+  background-image: linear-gradient(90deg, var(--foreground), var(--muted-foreground));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sp-stream-w.is-streaming {
+  animation: sp-stream-word-in var(--stream-fade) var(--stream-ease) both;
+  animation-delay: var(--stream-delay, 0ms);
 }
 
 .sp-reasoning-stream {
@@ -1178,6 +1189,17 @@
   }
 }
 
+@keyframes sp-stream-word-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--stream-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
 @keyframes sp-reasoning-line-in {
   from {
     opacity: 0;
@@ -1318,6 +1340,7 @@
   .workspace-next-steps-reveal,
   .sp-text-reveal,
   .sp-stream-text,
+  .sp-tool-enter,
   .sp-reasoning-stream-line,
   .sp-survey-enter,
   .sp-survey-page,
@@ -1332,9 +1355,15 @@
   }
 
   .sp-stream-w {
-    transition: none !important;
+    animation: none !important;
     filter: none !important;
     opacity: 1 !important;
+  }
+
+  .sp-running-command {
+    color: var(--foreground);
+    background: none;
+    -webkit-text-fill-color: currentColor;
   }
 
   .sp-confidence-why[data-state="open"] {
