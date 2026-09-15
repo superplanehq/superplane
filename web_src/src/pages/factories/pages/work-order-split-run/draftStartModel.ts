@@ -1,10 +1,5 @@
 export const DRAFT_START_MODEL_AUTO = "auto";
 
-export const DRAFT_START_MODEL_HELP = [
-  "Auto uses the default model on each automation.",
-  "Pick a model to overwrite that default for this start.",
-] as const;
-
 export function draftStartModelPayload(selected: string): string | undefined {
   const trimmed = selected.trim();
   if (trimmed === "" || trimmed === DRAFT_START_MODEL_AUTO) {

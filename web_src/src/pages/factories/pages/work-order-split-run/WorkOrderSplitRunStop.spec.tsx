@@ -266,7 +266,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     await user.click(within(note).getByRole("button", { name: "Model" }));
-    await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
+    await user.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });

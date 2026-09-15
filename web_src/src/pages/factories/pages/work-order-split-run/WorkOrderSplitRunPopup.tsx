@@ -243,7 +243,7 @@ function analysisPopupReview(args: {
         hasStart: args.fixture.footer.actions.some((action) => action.kind === "start"),
         value: args.draftModel,
         onChange: args.setDraftModel,
-        disabled: args.isDispatching,
+        disabled: args.isDispatching || !args.canDispatch,
       })}
     />
   );

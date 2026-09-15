@@ -136,7 +136,7 @@ export function ClassicWorkOrderPopup({
               lineName={classicFixture.lineName}
               value={draftModel}
               onChange={setDraftModel}
-              disabled={isDispatching}
+              disabled={isDispatching || !canDispatch}
             />
           ) : undefined
         }
