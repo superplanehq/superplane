@@ -389,7 +389,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	}).Methods("GET")
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
-	s.Router.HandleFunc("/api/v1/runner/planning-sessions/plan", s.handleRunnerPlanningPlan).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
