@@ -21,6 +21,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
 
   const { connectedQuery, sentryIntegrations, sentryDefinition, existingNames } = useSentryConnections(organizationId);
@@ -43,6 +44,20 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     }
   }, [integrationId, sentryIntegrations]);
 
+  useEffect(() => {
+    if (stayOnConnection || step !== "connection") {
+      return;
+    }
+    const readyId = readySentryConnectionId(sentryIntegrations, integrationId);
+    if (!readyId) {
+      return;
+    }
+    setIntegrationId(readyId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [stayOnConnection, step, sentryIntegrations, integrationId, connectedQuery]);
+
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
     setConnectOpen(false);
@@ -50,38 +65,60 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     void connectedQuery.refetch();
   };
 
+  const createNewSentryConnection = async () => {
+    const { result } = await createWithGeneratedName({
+      baseName: "sentry",
+      takenNames: existingNames,
+      create: (name) =>
+        createIntegration.mutateAsync({
+          integrationName: "sentry",
+          name,
+          configuration: { setupReturnPath: `${location.pathname}${location.search}` },
+        }),
+    });
+    return result.data?.integration;
+  };
+
+  const openSentryInstallOrDialog = (integration: Awaited<ReturnType<typeof createNewSentryConnection>>) => {
+    if (integration?.status?.state === "ready" && integration.metadata?.id) {
+      completeConnection(integration.metadata.id);
+      return;
+    }
+
+    const action = integration?.status?.browserAction;
+    rememberIntegrationSetupReturn(organizationId, `${location.pathname}${location.search}`);
+    if (isHostedSentryInstallAction(action?.url)) {
+      followBrowserAction(action);
+      return;
+    }
+
+    setConnectOpen(true);
+    if (integration?.metadata?.id) {
+      setIntegrationId(integration.metadata.id);
+    }
+  };
+
   const connectSentry = async () => {
     setError(undefined);
+    const readyId = readySentryConnectionId(sentryIntegrations, integrationId);
+    if (readyId) {
+      completeConnection(readyId);
+      return;
+    }
+
     setConnecting(true);
     try {
-      const { result } = await createWithGeneratedName({
-        baseName: "sentry",
-        takenNames: existingNames,
-        create: (name) =>
-          createIntegration.mutateAsync({
-            integrationName: "sentry",
-            name,
-            configuration: { setupReturnPath: `${location.pathname}${location.search}` },
-          }),
-      });
-
-      const integration = result.data?.integration;
-      const action = integration?.status?.browserAction;
-      rememberIntegrationSetupReturn(organizationId, `${location.pathname}${location.search}`);
-      if (isHostedSentryInstallAction(action?.url)) {
-        followBrowserAction(action);
-        return;
-      }
-
-      setConnectOpen(true);
-      if (integration?.metadata?.id) {
-        setIntegrationId(integration.metadata.id);
-      }
+      openSentryInstallOrDialog(await createNewSentryConnection());
     } catch (cause) {
       setError(getApiErrorMessage(cause, SENTRY_CONNECT_ERROR));
     } finally {
       setConnecting(false);
     }
+  };
+
+  const returnToConnection = () => {
+    setStayOnConnection(true);
+    setStep("connection");
   };
 
   const createBoundIntake = async () => {
@@ -120,6 +157,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     sentryDefinition,
     existingNames,
     completeConnection,
+    returnToConnection,
     connectSentry,
     createBoundIntake,
   };
@@ -131,6 +169,16 @@ const SENTRY_CREATE_ERROR = "SuperPlane could not create the Sentry intake.";
 export function isHostedSentryInstallAction(url: string | undefined): boolean {
   if (!url) return false;
   return url.includes("/sentry/app/install") || url.includes("/sentry-apps/");
+}
+
+export function readySentryConnectionId(
+  integrations: Array<{ metadata?: { id?: string } }>,
+  selectedId: string,
+): string {
+  if (selectedId && integrations.some((integration) => integration.metadata?.id === selectedId)) {
+    return selectedId;
+  }
+  return integrations[0]?.metadata?.id ?? "";
 }
 
 function useSentryConnections(organizationId: string) {

@@ -44,6 +44,7 @@ import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
@@ -917,6 +918,43 @@ describe("LinesPage board extras", () => {
       factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Sentry setup from the backlog button when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.setupButton }));
+
+    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+  });
+
+  it("hides the backlog Sentry setup button when the feature is off", () => {
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
+  });
+
+  it("hides the backlog Sentry setup button after Sentry intake exists", () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    useFactoryIntakes.mockReturnValue({
+      data: [
+        {
+          id: SENTRY_INTAKE_ID,
+          canvasId: "app-sentry-intake",
+          name: "Sentry exceptions",
+          source: "SOURCE_SENTRY_EXCEPTIONS",
+          healthy: true,
+        },
+      ],
+    });
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
   });
 
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {

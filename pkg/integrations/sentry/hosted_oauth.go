@@ -9,19 +9,30 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const integrationSetupReturnCookie = "sp_integration_setup_return"
 const sentryAppSetupStateCookie = "sentry_app_setup_state"
+const sentryAppJWTGrantType = "urn:sentry:params:oauth:grant-type:jwt-bearer"
 
 type sentryAppAuthorizationRequest struct {
 	GrantType    string `json:"grant_type"`
 	Code         string `json:"code,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
+// InstallationGrant is the one-time install payload Sentry sends on
+// installation.created and on the Redirect URL.
+type InstallationGrant struct {
+	Code    string
+	UUID    string
+	OrgSlug string
 }
 
 type sentryAppAuthorizationResponse struct {
@@ -48,37 +59,71 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	code := strings.TrimSpace(ctx.Request.URL.Query().Get("code"))
-	installationUUID := strings.TrimSpace(ctx.Request.URL.Query().Get("installationId"))
-	orgSlug := strings.TrimSpace(ctx.Request.URL.Query().Get("orgSlug"))
-	if code == "" || installationUUID == "" {
-		http.Error(ctx.Response, "missing installation", http.StatusBadRequest)
+	code, installationUUID, orgSlug := sentryAppSetupQuery(ctx.Request)
+	if installationUUID != "" {
+		app, ok := HostedAppFromEnv()
+		if !ok {
+			http.Error(ctx.Response, "hosted Sentry app is not configured", http.StatusNotFound)
+			return
+		}
+		if err := s.completeHostedAppInstall(ctx, app, metadata, installationUUID, orgSlug, code); err != nil {
+			ctx.Logger.Errorf("failed to complete Sentry app install: %v", err)
+			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		clearSentryAppSetupStateCookie(ctx.Response)
+		redirectToSetupReturn(ctx)
 		return
 	}
 
-	app, ok := HostedAppFromEnv()
-	if !ok {
-		http.Error(ctx.Response, "hosted Sentry app is not configured", http.StatusNotFound)
-		return
-	}
-
-	tokens, err := exchangeSentryAppCode(ctx.HTTP, app, installationUUID, code)
+	bound, err := s.bindReadyHostedInstallIfPresent(core.SyncContext{
+		Logger:          ctx.Logger,
+		HTTP:            ctx.HTTP,
+		Integration:     ctx.Integration,
+		BaseURL:         ctx.BaseURL,
+		WebhooksBaseURL: ctx.WebhooksBaseURL,
+		OrganizationID:  ctx.OrganizationID,
+	}, metadata)
 	if err != nil {
-		ctx.Logger.Errorf("failed to exchange Sentry app code: %v", err)
+		ctx.Logger.Errorf("failed to bind existing Sentry install: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	if err := ctx.Integration.SetSecret(SecretAccessToken, []byte(tokens.Token)); err != nil {
-		ctx.Logger.Errorf("failed to store Sentry access token: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+	if bound {
+		redirectToSetupReturn(ctx)
 		return
+	}
+	http.Error(ctx.Response, "missing installation", http.StatusBadRequest)
+}
+
+func (s *Sentry) completeHostedAppInstall(
+	ctx core.HTTPRequestContext,
+	app HostedApp,
+	metadata Metadata,
+	installationUUID, orgSlug, code string,
+) error {
+	tokens, rememberedOrgSlug, err := resolveHostedAppTokens(ctx.HTTP, app, installationUUID, code)
+	if err != nil {
+		return err
+	}
+	if orgSlug == "" {
+		orgSlug = rememberedOrgSlug
+	}
+	return s.finishHostedInstall(ctx, metadata, tokens, installationUUID, orgSlug)
+}
+
+func (s *Sentry) finishHostedInstall(
+	ctx core.HTTPRequestContext,
+	metadata Metadata,
+	tokens *sentryAppAuthorizationResponse,
+	installationUUID, orgSlug string,
+) error {
+	if err := ctx.Integration.SetSecret(SecretAccessToken, []byte(tokens.Token)); err != nil {
+		return fmt.Errorf("store Sentry access token: %w", err)
 	}
 	if tokens.RefreshToken != "" {
 		if err := ctx.Integration.SetSecret(SecretRefreshToken, []byte(tokens.RefreshToken)); err != nil {
-			ctx.Logger.Errorf("failed to store Sentry refresh token: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
+			return fmt.Errorf("store Sentry refresh token: %w", err)
 		}
 	}
 
@@ -96,10 +141,11 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 
 	if client.orgSlug == "" {
 		organizations, err := client.ListOrganizations()
-		if err != nil || len(organizations) == 0 {
-			ctx.Logger.Errorf("failed to list Sentry organizations after install: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
+		if err != nil {
+			return fmt.Errorf("list Sentry organizations after install: %w", err)
+		}
+		if len(organizations) == 0 {
+			return fmt.Errorf("list Sentry organizations after install: no organizations")
 		}
 		client.orgSlug = organizations[0].Slug
 	}
@@ -112,9 +158,7 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 		WebhooksBaseURL: ctx.WebhooksBaseURL,
 	}
 	if err := s.populateMetadataFromOrg(syncCtx, client); err != nil {
-		ctx.Logger.Errorf("failed to load Sentry organization after install: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("load Sentry organization after install: %w", err)
 	}
 
 	bound := Metadata{}
@@ -128,33 +172,117 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 	ctx.Integration.SetMetadata(bound)
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
-
-	clearSentryAppSetupStateCookie(ctx.Response)
-	redirectToSetupReturn(ctx)
+	return nil
 }
 
 func exchangeSentryAppCode(httpCtx core.HTTPContext, app HostedApp, installationUUID, code string) (*sentryAppAuthorizationResponse, error) {
-	return authorizeSentryApp(httpCtx, installationUUID, sentryAppAuthorizationRequest{
+	return postSentryAppAuthorization(httpCtx, installationUUID, sentryAppAuthorizationRequest{
 		GrantType:    "authorization_code",
 		Code:         code,
 		ClientID:     app.ClientID,
 		ClientSecret: app.ClientSecret,
-	})
+	}, nil)
 }
 
 func refreshSentryAppToken(httpCtx core.HTTPContext, app HostedApp, installationUUID, refreshToken string) (*sentryAppAuthorizationResponse, error) {
-	return authorizeSentryApp(httpCtx, installationUUID, sentryAppAuthorizationRequest{
+	return postSentryAppAuthorization(httpCtx, installationUUID, sentryAppAuthorizationRequest{
 		GrantType:    "refresh_token",
 		RefreshToken: refreshToken,
 		ClientID:     app.ClientID,
 		ClientSecret: app.ClientSecret,
-	})
+	}, nil)
 }
 
-func authorizeSentryApp(
+func mintSentryAppToken(httpCtx core.HTTPContext, app HostedApp, installationUUID string) (*sentryAppAuthorizationResponse, error) {
+	signed, err := sentryAppJWT(app)
+	if err != nil {
+		return nil, err
+	}
+	return postSentryAppAuthorization(
+		httpCtx,
+		installationUUID,
+		sentryAppAuthorizationRequest{GrantType: sentryAppJWTGrantType},
+		map[string]string{"Authorization": "Bearer " + signed},
+	)
+}
+
+func sentryAppJWT(app HostedApp) (string, error) {
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iss": app.ClientID,
+		"sub": app.ClientID,
+		"iat": now.Unix(),
+		"exp": now.Add(time.Minute).Unix(),
+		"jti": uuid.NewString(),
+	})
+	return token.SignedString([]byte(app.ClientSecret))
+}
+
+func resolveHostedAppTokens(
+	httpCtx core.HTTPContext,
+	app HostedApp,
+	installationUUID, code string,
+) (*sentryAppAuthorizationResponse, string, error) {
+	if unclaimed := takeUnclaimedHostedInstall(installationUUID); unclaimed != nil {
+		orgSlug := ""
+		if unclaimed.Organization != nil {
+			orgSlug = unclaimed.Organization.Slug
+		}
+		return &sentryAppAuthorizationResponse{
+			Token:        unclaimed.AccessToken,
+			RefreshToken: unclaimed.RefreshToken,
+			ExpiresAt:    unclaimed.TokenExpiresAt,
+		}, orgSlug, nil
+	}
+	tokens, err := hostedAppTokensFromSentry(httpCtx, app, installationUUID, code)
+	if err != nil {
+		return nil, "", err
+	}
+	return tokens, "", nil
+}
+
+func hostedAppTokensFromSentry(
+	httpCtx core.HTTPContext,
+	app HostedApp,
+	installationUUID, code string,
+) (*sentryAppAuthorizationResponse, error) {
+	if strings.TrimSpace(code) != "" {
+		tokens, err := exchangeSentryAppCode(httpCtx, app, installationUUID, code)
+		if err == nil {
+			return tokens, nil
+		}
+	}
+	return mintSentryAppToken(httpCtx, app, installationUUID)
+}
+
+// RememberHostedInstallGrant exchanges a webhook grant and stores tokens until
+// a pending SuperPlane connection claims the same installation UUID.
+func RememberHostedInstallGrant(httpCtx core.HTTPContext, app HostedApp, grant InstallationGrant) error {
+	if strings.TrimSpace(grant.UUID) == "" {
+		return fmt.Errorf("installation is required")
+	}
+	tokens, err := hostedAppTokensFromSentry(httpCtx, app, grant.UUID, grant.Code)
+	if err != nil {
+		return err
+	}
+	install := hostedSentryInstall{
+		InstallationUUID: grant.UUID,
+		AccessToken:      tokens.Token,
+		RefreshToken:     tokens.RefreshToken,
+		TokenExpiresAt:   tokens.ExpiresAt,
+	}
+	if grant.OrgSlug != "" {
+		install.Organization = &OrganizationSummary{Slug: grant.OrgSlug}
+	}
+	rememberUnclaimedHostedInstall(install)
+	return nil
+}
+
+func postSentryAppAuthorization(
 	httpCtx core.HTTPContext,
 	installationUUID string,
 	request sentryAppAuthorizationRequest,
+	headers map[string]string,
 ) (*sentryAppAuthorizationResponse, error) {
 	if httpCtx == nil {
 		return nil, fmt.Errorf("HTTP context is required")
@@ -179,6 +307,9 @@ func authorizeSentryApp(
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 
 	response, err := httpCtx.Do(req)
 	if err != nil {
@@ -202,6 +333,73 @@ func authorizeSentryApp(
 		return nil, fmt.Errorf("Sentry app authorization returned no token")
 	}
 	return &tokens, nil
+}
+
+func sentryAppSetupQuery(request *http.Request) (code, installationUUID, orgSlug string) {
+	if request == nil {
+		return "", "", ""
+	}
+	query := request.URL.Query()
+	code = strings.TrimSpace(query.Get("code"))
+	installationUUID = firstNonEmpty(
+		strings.TrimSpace(query.Get("installationId")),
+		strings.TrimSpace(query.Get("installation_id")),
+	)
+	orgSlug = firstNonEmpty(
+		strings.TrimSpace(query.Get("orgSlug")),
+		strings.TrimSpace(query.Get("org_slug")),
+	)
+	return code, installationUUID, orgSlug
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+// ParseInstallationCreatedGrant reads the grant Sentry sends on
+// installation.created. SuperPlane uses it when the browser Redirect URL
+// never completed.
+func ParseInstallationCreatedGrant(resource string, body []byte) (InstallationGrant, bool) {
+	if strings.TrimSpace(resource) != "installation" {
+		return InstallationGrant{}, false
+	}
+
+	var payload struct {
+		Action string `json:"action"`
+		Data   struct {
+			Installation struct {
+				Code         string `json:"code"`
+				UUID         string `json:"uuid"`
+				Organization struct {
+					Slug string `json:"slug"`
+				} `json:"organization"`
+			} `json:"installation"`
+		} `json:"data"`
+		Installation struct {
+			UUID string `json:"uuid"`
+		} `json:"installation"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return InstallationGrant{}, false
+	}
+	if strings.TrimSpace(payload.Action) != "created" {
+		return InstallationGrant{}, false
+	}
+
+	grant := InstallationGrant{
+		Code:    strings.TrimSpace(payload.Data.Installation.Code),
+		UUID:    firstNonEmpty(strings.TrimSpace(payload.Data.Installation.UUID), strings.TrimSpace(payload.Installation.UUID)),
+		OrgSlug: strings.TrimSpace(payload.Data.Installation.Organization.Slug),
+	}
+	if grant.UUID == "" {
+		return InstallationGrant{}, false
+	}
+	return grant, true
 }
 
 func decodeHostedMetadata(ctx core.HTTPRequestContext) (Metadata, bool) {

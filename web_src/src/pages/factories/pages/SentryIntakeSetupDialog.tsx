@@ -33,7 +33,7 @@ export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
           step={setup.step}
           onBack={() => {
             if (setup.step === "project") {
-              setup.setStep("connection");
+              setup.returnToConnection();
               return;
             }
             props.onClose();
@@ -170,20 +170,11 @@ function ConnectionStep({
             );
           })}
         </div>
-      ) : null}
-      <Button
-        type="button"
-        variant={integrations.length > 0 ? "outline" : "default"}
-        disabled={connecting}
-        onClick={onConnect}
-        data-testid="sentry-setup-connect"
-      >
-        {connecting
-          ? "Connecting..."
-          : integrations.length > 0
-            ? SENTRY_INTAKE_SETUP_COPY.wizardConnectAnother
-            : SENTRY_INTAKE_SETUP_COPY.wizardConnect}
-      </Button>
+      ) : (
+        <Button type="button" disabled={connecting} onClick={onConnect} data-testid="sentry-setup-connect">
+          {connecting ? "Connecting..." : SENTRY_INTAKE_SETUP_COPY.wizardConnect}
+        </Button>
+      )}
     </div>
   );
 }

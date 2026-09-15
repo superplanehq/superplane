@@ -64,6 +64,60 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Equal(t, "/org-1/workspaces/sp/lines/line-1/setup/sentry", metadata.SetupReturnPath)
 	})
 
+	t.Run("hosted app with an existing SuperPlane install binds without Sentry", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		originalFinder := findReadyHostedSentryInstall
+		findReadyHostedSentryInstall = func(organizationID, excludeID string) (*hostedSentryInstall, error) {
+			assert.Equal(t, "org-1", organizationID)
+			assert.Equal(t, "8f5fbc57-2738-409a-a6f8-af65c2de733c", excludeID)
+			return &hostedSentryInstall{
+				InstallationUUID: "install-uuid",
+				AccessToken:      "access-token",
+				RefreshToken:     "refresh-token",
+				TokenExpiresAt:   "2030-01-01T00:00:00Z",
+				Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
+				Projects:         []ProjectSummary{{ID: "2", Slug: "payments", Name: "Payments"}},
+				Teams:            []TeamSummary{{ID: "3", Slug: "platform", Name: "Platform"}},
+			}, nil
+		}
+		t.Cleanup(func() {
+			findReadyHostedSentryInstall = originalFinder
+		})
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			OrganizationID:  "org-1",
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "access-token", string(integrationCtx.CurrentSecrets[SecretAccessToken].Value))
+		assert.Equal(t, "refresh-token", string(integrationCtx.CurrentSecrets[SecretRefreshToken].Value))
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.True(t, metadata.HostedApp)
+		assert.Equal(t, "install-uuid", metadata.InstallationUUID)
+		require.NotNil(t, metadata.Organization)
+		assert.Equal(t, "acme", metadata.Organization.Slug)
+		assert.Equal(t, "/org-1/workspaces/sp/lines/line-1/setup/sentry", metadata.SetupReturnPath)
+	})
+
 	t.Run("legacy token integration stays on the internal integration path", func(t *testing.T) {
 		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
@@ -114,6 +168,10 @@ func Test__Sentry__Sync(t *testing.T) {
 	})
 
 	t.Run("missing credentials -> setup prompt", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "")
+
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
 			Configuration: map[string]any{},
@@ -145,6 +203,10 @@ func Test__Sentry__Sync(t *testing.T) {
 	})
 
 	t.Run("missing credentials overrides previously ready state", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "")
+
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
 			State:         "ready",

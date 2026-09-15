@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -42,14 +43,14 @@ func (s *Server) HandleSentryAppInstall(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	app, ok := sentry.HostedAppFromEnv()
-	if !ok {
+	if _, ok := sentry.HostedAppFromEnv(); !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
+	sentry.EnableHostedInstallBind(s.encryptor)
 	setSentryAppSetupStateCookie(w, state)
-	http.Redirect(w, r, sentry.HostedAppExternalInstallURL(app.Slug), http.StatusSeeOther)
+	s.dispatchIntegrationRequest(w, r, integration)
 }
 
 // HandleSentryAppSetup finishes a public SuperPlane Sentry app install.
@@ -97,15 +98,16 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	installationUUID := sentryInstallationUUID(body)
-	if installationUUID == "" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	integrations, err := models.ListSentryIntegrationsByInstallationUUID(database.DB(r.Context()), installationUUID)
 	if err != nil {
 		log.WithError(err).Error("failed to list Sentry app integrations")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(integrations) == 0 {
+		s.claimPendingHostedSentryInstall(r, app, body)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -120,6 +122,58 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentry.HostedApp, body []byte) {
+	grant, ok := sentry.ParseInstallationCreatedGrant(r.Header.Get("Sentry-Hook-Resource"), body)
+	if !ok {
+		return
+	}
+
+	pending, err := models.ListPendingHostedSentryIntegrations(database.DB(r.Context()))
+	if err != nil {
+		log.WithError(err).Error("failed to list pending Sentry app integrations")
+		return
+	}
+
+	switch len(pending) {
+	case 0:
+		if err := s.rememberHostedSentryGrant(app, grant); err != nil {
+			log.WithError(err).Error("failed to store unclaimed Sentry app install")
+		}
+	case 1:
+		sentry.EnableHostedInstallBind(s.encryptor)
+		s.dispatchIntegrationRequest(httptest.NewRecorder(), sentryAppSetupRequest(r, grant), &pending[0])
+	default:
+		if err := s.rememberHostedSentryGrant(app, grant); err != nil {
+			log.WithError(err).Error("failed to store unclaimed Sentry app install")
+		}
+	}
+}
+
+func (s *Server) rememberHostedSentryGrant(app sentry.HostedApp, grant sentry.InstallationGrant) error {
+	if s.registry == nil || s.registry.HTTPContext() == nil {
+		return nil
+	}
+	return sentry.RememberHostedInstallGrant(s.registry.HTTPContext(), app, grant)
+}
+
+func sentryAppSetupRequest(r *http.Request, grant sentry.InstallationGrant) *http.Request {
+	query := url.Values{}
+	if grant.Code != "" {
+		query.Set("code", grant.Code)
+	}
+	query.Set("installationId", grant.UUID)
+	if grant.OrgSlug != "" {
+		query.Set("orgSlug", grant.OrgSlug)
+	}
+	setup, _ := http.NewRequestWithContext(
+		r.Context(),
+		http.MethodGet,
+		"/api/v1/sentry/app/setup?"+query.Encode(),
+		nil,
+	)
+	return setup
 }
 
 func findSentryAppSetupIntegration(r *http.Request) (*models.Integration, error) {

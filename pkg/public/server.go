@@ -31,6 +31,7 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -217,6 +218,7 @@ func NewServer(
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
+	sentry.EnableHostedInstallBind(encryptor)
 	server.InitRouter(middlewares...)
 	return server, nil
 }

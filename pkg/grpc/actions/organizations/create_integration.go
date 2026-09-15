@@ -193,6 +193,8 @@ func syncIntegration(
 ) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("syncing integration %s", newIntegration.ID)
 
+	sentry.EnableHostedInstallBind(registry.Encryptor)
+
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,

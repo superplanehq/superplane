@@ -9,6 +9,10 @@ import { SENTRY_INTAKE_SEED_SIZE, SENTRY_INTAKE_SETUP_COPY } from "./sentryIntak
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
   createIntegration: vi.fn(),
+  connected: [] as Array<{
+    metadata: { id: string; name: string; integrationName: string };
+    status: { state: string };
+  }>,
   issues: [] as Array<{ id: string; name: string }>,
 }));
 
@@ -18,12 +22,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: () => ({
-    data: [
-      {
-        metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" },
-        status: { state: "ready" },
-      },
-    ],
+    data: mocks.connected,
     isLoading: false,
     refetch: vi.fn(),
   }),
@@ -81,14 +80,21 @@ describe("SentryIntakeSetupDialog", () => {
       },
     });
     mocks.issues.splice(0);
+    mocks.connected.splice(0, mocks.connected.length, {
+      metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" },
+      status: { state: "ready" },
+    });
   });
 
-  it("shows the 10-issue import and the listener in the wizard", async () => {
-    const user = userEvent.setup();
+  it("opens the project step when a ready Sentry connection already exists", async () => {
     renderDialog();
 
-    expect(screen.getByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepConnect })).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepConnectHelper)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
+      "listens for new issues",
+    );
     expect(screen.getByTestId("sentry-setup-preview-listen")).toHaveTextContent(
       SENTRY_INTAKE_SETUP_COPY.wizardPreviewListening,
     );
@@ -96,16 +102,6 @@ describe("SentryIntakeSetupDialog", () => {
       SENTRY_INTAKE_SETUP_COPY.wizardPreviewCaptionNoProject,
     );
     expect(screen.getAllByText(SENTRY_INTAKE_SETUP_COPY.wizardPreviewImporting)).toHaveLength(SENTRY_INTAKE_SEED_SIZE);
-
-    await waitFor(() => expect(screen.getByTestId("sentry-setup-continue")).toBeEnabled());
-    await user.click(screen.getByTestId("sentry-setup-continue"));
-
-    expect(screen.getByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
-      "listens for new issues",
-    );
   });
 
   it("creates a bound intake after a project is chosen", async () => {
@@ -113,8 +109,7 @@ describe("SentryIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await waitFor(() => expect(screen.getByTestId("sentry-setup-continue")).toBeEnabled());
-    await user.click(screen.getByTestId("sentry-setup-continue"));
+    await screen.findByTestId("sentry-project-payments");
     await user.click(screen.getByTestId("sentry-project-payments"));
     await user.click(screen.getByTestId("sentry-setup-finish"));
 
@@ -135,14 +130,23 @@ describe("SentryIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(screen.getByTestId("sentry-setup-continue"));
+    await screen.findByLabelText("Search projects");
     await user.type(screen.getByLabelText("Search projects"), "grow");
 
     expect(screen.queryByTestId("sentry-project-payments")).not.toBeInTheDocument();
     expect(screen.getByTestId("sentry-project-growth")).toBeInTheDocument();
   });
 
+  it("reuses a ready Sentry connection instead of opening Sentry again", async () => {
+    renderDialog();
+
+    expect(await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
+    expect(screen.queryByTestId("sentry-setup-connect")).not.toBeInTheDocument();
+    expect(mocks.createIntegration).not.toHaveBeenCalled();
+  });
+
   it("opens project selection as soon as a new organization is connected", async () => {
+    mocks.connected.splice(0, mocks.connected.length);
     const user = userEvent.setup();
     renderDialog();
 

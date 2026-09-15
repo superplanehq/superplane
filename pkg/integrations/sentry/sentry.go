@@ -359,8 +359,16 @@ func (s *Sentry) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		return nil
 	}
 
+	existing.SetupReturnPath = returnPath
+	bound, err := s.bindReadyHostedInstallIfPresent(ctx, existing)
+	if err != nil {
+		return err
+	}
+	if bound {
+		return nil
+	}
+
 	if existing.HostedApp && existing.State != "" {
-		existing.SetupReturnPath = returnPath
 		s.refreshHostedPendingAction(ctx, existing)
 		return nil
 	}
@@ -579,6 +587,8 @@ func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
 	switch {
 	case strings.HasSuffix(ctx.Request.URL.Path, "/setup"):
 		s.afterHostedAppSetup(ctx)
+	case strings.HasSuffix(ctx.Request.URL.Path, "/install"):
+		s.redirectHostedAppInstall(ctx)
 	case strings.HasSuffix(ctx.Request.URL.Path, "/events"), strings.HasSuffix(ctx.Request.URL.Path, "/webhook"):
 		s.handleWebhook(ctx)
 	default:
