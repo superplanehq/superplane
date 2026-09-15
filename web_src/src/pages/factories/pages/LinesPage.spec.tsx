@@ -870,6 +870,24 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
+  it("opens the name dialog when Verify only has custom automation left", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+      isPending: false,
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-name-input")).toBeInTheDocument();
+  });
+
   it("creates a custom Verify automation and opens the editor", async () => {
     createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
     const user = userEvent.setup();

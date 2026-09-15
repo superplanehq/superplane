@@ -12,6 +12,7 @@ import {
   columnAutomationsNeedRepair,
   columnTitleForKey,
   isColumnKey,
+  onlyCustomCatalogRemains,
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
@@ -277,6 +278,23 @@ describe("catalogForColumn", () => {
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
     expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom"]);
+  });
+});
+
+describe("onlyCustomCatalogRemains", () => {
+  it("is true when every unique Verify type is taken", () => {
+    const catalog = catalogForColumn("verify");
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(true);
+  });
+
+  it("is false when another unique Verify type is still available", () => {
+    const catalog = catalogForColumn("verify");
+    expect(onlyCustomCatalogRemains(catalog, ["discussion"])).toBe(false);
+    expect(onlyCustomCatalogRemains(catalog, [])).toBe(false);
+  });
+
+  it("is true when Done already has pull request closure", () => {
+    expect(onlyCustomCatalogRemains(catalogForColumn("done"), ["pr-closure"])).toBe(true);
   });
 });
 

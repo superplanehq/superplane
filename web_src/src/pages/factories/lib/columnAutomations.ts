@@ -217,6 +217,15 @@ export function takenCatalogIds(automations: ColumnAutomation[], catalog: Column
   return catalog.filter((entry) => entry.unique && present.has(entry.id)).map((entry) => entry.id);
 }
 
+/** True when every unique catalog type is taken and custom is the only remaining choice. */
+export function onlyCustomCatalogRemains(
+  catalog: ColumnAutomationCatalogEntry[],
+  takenIds: readonly string[],
+): boolean {
+  const remaining = catalog.filter((entry) => !takenIds.includes(entry.id));
+  return remaining.length === 1 && remaining[0]?.kind === "custom";
+}
+
 export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): boolean {
   return automations.some((automation) => automation.health === "needs-repair");
 }

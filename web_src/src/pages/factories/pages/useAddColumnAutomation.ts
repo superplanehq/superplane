@@ -6,6 +6,7 @@ import { useNavigate } from "react-router";
 
 import {
   catalogForColumn,
+  onlyCustomCatalogRemains,
   takenCatalogIds,
   type ColumnAutomation,
   type ColumnAutomationCatalogEntry,
@@ -42,6 +43,13 @@ export function useAddColumnAutomation(args: {
     setNaming(false);
   };
 
+  const openPicker = (key: ColumnKey) => {
+    const nextCatalog = catalogForColumn(key);
+    const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
+    setColumn(key);
+    setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
+  };
+
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
     if (!column) {
       return;
@@ -71,7 +79,7 @@ export function useAddColumnAutomation(args: {
     pickerColumn: column,
     pickerOpen: column !== null && !naming,
     naming,
-    openPicker: setColumn,
+    openPicker,
     closePicker,
     catalog,
     takenIds,
