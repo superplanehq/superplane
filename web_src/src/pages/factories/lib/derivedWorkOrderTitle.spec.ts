@@ -61,6 +61,10 @@ describe("derivedWorkOrderTitle", () => {
     expect(derivedWorkOrderTitle("foo_bar")).toBe("foo_bar");
   });
 
+  it("keeps double underscores between word characters", () => {
+    expect(derivedWorkOrderTitle("foo__bar__baz")).toBe("foo__bar__baz");
+  });
+
   it("strips a heading and then paired emphasis", () => {
     expect(derivedWorkOrderTitle("## **Refunds fail on retry.**")).toBe("Refunds fail on retry.");
   });

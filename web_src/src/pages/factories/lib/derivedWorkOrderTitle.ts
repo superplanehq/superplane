@@ -99,12 +99,24 @@ function isEmphasisDelimiterAt(line: string, index: number, delimiter: string): 
   if (isEscapedAt(line, index) || !line.startsWith(delimiter, index)) {
     return false;
   }
-  if (delimiter !== "_") {
+  if (delimiter !== "_" && delimiter !== "__") {
     return true;
   }
+  return isUnderscoreRunStart(line, index) && !isIntrawordUnderscoreRun(line, index);
+}
+
+function isUnderscoreRunStart(line: string, index: number): boolean {
+  return index === 0 || line[index - 1] !== "_" || isEscapedAt(line, index - 1);
+}
+
+function isIntrawordUnderscoreRun(line: string, index: number): boolean {
   const left = index > 0 ? line[index - 1] : "";
-  const right = index + 1 < line.length ? line[index + 1] : "";
-  return !isWordChar(left) || !isWordChar(right);
+  let runEnd = index;
+  while (runEnd < line.length && line[runEnd] === "_") {
+    runEnd += 1;
+  }
+  const right = runEnd < line.length ? line[runEnd] : "";
+  return isWordChar(left) && isWordChar(right);
 }
 
 function closedInlineCodeSpanEnd(line: string, start: number): number {
