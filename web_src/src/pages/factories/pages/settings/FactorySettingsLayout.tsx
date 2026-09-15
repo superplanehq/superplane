@@ -50,8 +50,15 @@ const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
  */
 function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
-  hiddenNavItemIds: ReadonlySet<string>,
+  hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
+  const hiddenNavItemIds = new Set<string>();
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
+    hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
+    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
+  }
   if (hiddenNavItemIds.size === 0) {
     return groups;
   }
@@ -131,16 +138,9 @@ function FactorySettingsLayoutContent({
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const [navQuery, setNavQuery] = useState("");
-  const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
-    hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
-  }
-  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
-    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
-  }
   const navGroups = visibleFactorySettingsNavGroups(
     filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
-    hiddenNavItemIds,
+    hasExperimentalFeature,
   );
   const searchIndex = useMemo(
     () =>
