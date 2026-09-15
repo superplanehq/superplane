@@ -19,9 +19,10 @@ import {
 import type { SplitRunSource } from "./splitRunSource";
 
 const SESSION_TITLE_FALLBACK = "Task";
+const REQUEST_PANE_BASE_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
 const REQUEST_PANE_SPLIT_CLASS =
   "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[var(--intent-left)] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
-const REQUEST_PANE_SOLO_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
+const REFINE_SPLIT_EASE = "lg:duration-300 lg:ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:lg:transition-none";
 
 export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
 
@@ -71,6 +72,9 @@ export function WorkOrderIntentDocument({
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
   const showPlanPane = !refineOpen || planPaneOpen;
   const chatSolo = refineOpen && !planPaneOpen;
+  const mountPlanPane = !refineOpen ? showPlanPane : true;
+  const planWidth = showPlanPane ? `${100 - split.percent}%` : "0%";
+  const chatWidth = showPlanPane ? `${split.percent}%` : "100%";
   const analysisChat = analysis
     ? {
         ...analysis,
@@ -92,8 +96,21 @@ export function WorkOrderIntentDocument({
     >
       <div ref={split.containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <div
-          className={showPlanPane ? REQUEST_PANE_SPLIT_CLASS : REQUEST_PANE_SOLO_CLASS}
-          style={showPlanPane ? { ["--intent-left" as string]: `${split.percent}%` } : undefined}
+          className={cn(
+            refineOpen
+              ? cn(
+                  REQUEST_PANE_BASE_CLASS,
+                  "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
+                  showPlanPane && "lg:min-w-[14rem]",
+                  !split.isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
+                )
+              : showPlanPane
+                ? REQUEST_PANE_SPLIT_CLASS
+                : REQUEST_PANE_BASE_CLASS,
+          )}
+          style={{
+            ["--intent-left" as string]: refineOpen ? chatWidth : showPlanPane ? `${split.percent}%` : undefined,
+          }}
           data-testid="split-run-intent-request"
         >
           {contextSidebar ? (
@@ -108,7 +125,7 @@ export function WorkOrderIntentDocument({
             />
           )}
         </div>
-        {showPlanPane ? (
+        {mountPlanPane ? (
           <IntentSpecColumn
             title={document.title || INTENT_DOCUMENT_TITLE}
             document={document}
@@ -121,6 +138,9 @@ export function WorkOrderIntentDocument({
             resultFooter={resultFooter}
             confidence={confidence}
             refineOpen={refineOpen}
+            collapsed={chatSolo}
+            planWidth={planWidth}
+            animateSplit={refineOpen && !split.isResizing}
             contextSidebar={contextSidebar}
             isResizing={split.isResizing}
             onResize={split.startResize}
@@ -151,6 +171,9 @@ function IntentSpecColumn({
   resultFooter,
   confidence,
   refineOpen,
+  collapsed = false,
+  planWidth,
+  animateSplit = false,
   contextSidebar,
   isResizing,
   onResize,
@@ -166,6 +189,9 @@ function IntentSpecColumn({
   resultFooter?: ReactNode;
   confidence?: WorkOrderCheckPresentation;
   refineOpen: boolean;
+  collapsed?: boolean;
+  planWidth?: string;
+  animateSplit?: boolean;
   contextSidebar?: ReactNode;
   isResizing: boolean;
   onResize: (event: PointerEvent<HTMLDivElement>) => void;
@@ -178,7 +204,10 @@ function IntentSpecColumn({
         aria-label="Resize the request and plan"
         data-testid="split-run-intent-resize-handle"
         onPointerDown={onResize}
-        className="group relative z-10 hidden w-2 shrink-0 cursor-col-resize bg-transparent lg:block"
+        className={cn(
+          "group relative z-10 hidden w-2 shrink-0 cursor-col-resize bg-transparent lg:block",
+          collapsed && "lg:hidden",
+        )}
       >
         <div
           aria-hidden
@@ -188,7 +217,19 @@ function IntentSpecColumn({
           )}
         />
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:min-w-[16rem]" data-testid="split-run-intent-result">
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 flex-col overflow-hidden",
+          collapsed && "pointer-events-none max-lg:hidden",
+          animateSplit && `lg:w-[var(--intent-plan)] lg:flex-none lg:transition-[width] ${REFINE_SPLIT_EASE}`,
+          !collapsed && !animateSplit && "flex-1 lg:min-w-[16rem]",
+        )}
+        style={animateSplit ? { ["--intent-plan" as string]: planWidth } : undefined}
+        data-testid="split-run-intent-result"
+        data-state={collapsed ? "closed" : "open"}
+        aria-hidden={collapsed || undefined}
+        inert={collapsed || undefined}
+      >
         <header className="flex shrink-0 items-start justify-between gap-3 px-5 pt-5 pb-2">
           <h2 className="min-w-0 text-[17px] leading-6 font-semibold tracking-tight text-foreground">{title}</h2>
         </header>

@@ -184,13 +184,14 @@ describe("WorkOrderIntentDocument", () => {
     );
     expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_THINKING_STATES[0]);
     expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-result")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-resize-handle")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("split-run-intent-resize-handle")).toHaveClass("lg:hidden");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     const columns = screen.getAllByTestId("split-run-intent-chat-column");
     expect(columns.length).toBeGreaterThanOrEqual(2);
     for (const column of columns) {
-      expect(column).toHaveClass("mx-auto", "max-w-3xl", "px-6");
+      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-8");
     }
     expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
     expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
@@ -439,7 +440,7 @@ describe("WorkOrderIntentDocument", () => {
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     const showPlan = within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan });
     expect(within(chips).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
-    expect(screen.queryByTestId("split-run-intent-result")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     expect(within(strip).getByTestId("split-run-review")).toHaveTextContent("Ready");
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
@@ -447,6 +448,10 @@ describe("WorkOrderIntentDocument", () => {
 
     await user.click(showPlan);
     expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
+    for (const column of screen.getAllByTestId("split-run-intent-chat-column")) {
+      expect(column).toHaveClass("px-4");
+      expect(column).not.toHaveClass("px-8");
+    }
     expect(screen.getByTestId("split-run-intent-request").style.getPropertyValue("--intent-left")).toBe("50%");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
     const hidePlan = within(screen.getByTestId("split-run-intent-composer-chips")).getByRole("button", {
@@ -465,7 +470,7 @@ describe("WorkOrderIntentDocument", () => {
     ).toHaveTextContent("Ready");
 
     await user.click(hidePlan);
-    expect(screen.queryByTestId("split-run-intent-result")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
     expect(
       within(screen.getByTestId("split-run-intent-composer-chips")).getByRole("button", {
         name: CREATE_WITH_AGENT_COPY.showPlan,

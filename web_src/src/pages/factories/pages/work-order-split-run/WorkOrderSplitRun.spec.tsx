@@ -230,7 +230,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
     expect(fullPage.className).toContain("w-full");
-    expect(fullPage.className).not.toContain("w-[min(64rem");
+    expect(fullPage.className).not.toContain("w-[min(70rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
     expect(fullPage.parentElement?.className).toContain("left-[var(--workspace-navigation-width)]");
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
@@ -774,9 +774,11 @@ describe("WorkOrderSplitRunPopup", () => {
       note,
     );
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-result")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(64rem");
-    expect(screen.getByTestId("work-order-split-run").className).not.toContain("has-[[data-refine-chat-solo]]");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
+    expect(screen.getByTestId("work-order-split-run").className).toContain(
+      "has-[[data-refine-chat-solo]]:w-[min(48rem",
+    );
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     expect(within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-attention-note")).toBe(note);
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
@@ -879,7 +881,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Show plan" }));
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
     expect(within(tab).getByTestId("split-run-check-comment-check-code-coverage")).not.toHaveAttribute("open");
     expect(within(tab).getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
