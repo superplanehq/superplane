@@ -629,6 +629,9 @@ func (r *CanvasRun) FindOpenWork(tx *gorm.DB) (*OpenCanvasRunWork, error) {
 
 func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	if r.State == CanvasRunStateCancelling {
+		if r.Result == CanvasRunResultPassed {
+			return CanvasRunResultPassed, nil
+		}
 		return CanvasRunResultCancelled, nil
 	}
 
@@ -900,6 +903,20 @@ type RunCancellationResult struct {
 	NewlyCancelling bool
 }
 
+// RequestCompletion stops unfinished work while preserving a successful run result.
+func (r *CanvasRun) RequestCompletion(tx *gorm.DB, completedBy *uuid.UUID) (*RunCancellationResult, error) {
+	result, err := r.RequestCancellation(tx, completedBy)
+	if err != nil || r.State == CanvasRunStateFinished {
+		return result, err
+	}
+
+	if err := r.markCompletionRequested(tx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationResult, error) {
 	locked, err := LockCanvasRunInTransaction(tx, r.ID)
 	if err != nil {
@@ -926,6 +943,22 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 	}
 	result.NewlyCancelling = true
 	return result, nil
+}
+
+func (r *CanvasRun) markCompletionRequested(tx *gorm.DB) error {
+	if r.Result == CanvasRunResultPassed {
+		return nil
+	}
+
+	now := time.Now()
+	r.Result = CanvasRunResultPassed
+	r.UpdatedAt = &now
+	return tx.Model(r).
+		Updates(map[string]any{
+			"result":     CanvasRunResultPassed,
+			"updated_at": &now,
+		}).
+		Error
 }
 
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
