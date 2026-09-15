@@ -62,6 +62,7 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     refinementLoading: refinementFeature.isLoading,
     sessionLoading: analysis.isLoading,
     artifactsLoading: popupData.artifactsLoading,
+    artifactsFailed: Boolean(popupData.artifactsError),
     analysisActive: isAnalyzing,
     hasLookupIdentity,
     isDraft: fixture.footer.kind === "draft",

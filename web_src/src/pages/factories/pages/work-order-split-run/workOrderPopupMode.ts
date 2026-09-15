@@ -1,5 +1,27 @@
 export type WorkOrderPopupMode = "loading" | "classic" | "analysis";
 
+function pinsAnalysisWithoutFlag(hasLookupIdentity: boolean, hasPlanningSession: boolean) {
+  return !hasLookupIdentity || hasPlanningSession;
+}
+
+function refinementUsesAnalysis({
+  hasAnalysisResult,
+  analysisActive,
+  isDraft,
+  artifactsFailed,
+}: {
+  hasAnalysisResult: boolean;
+  analysisActive: boolean;
+  isDraft: boolean;
+  artifactsFailed: boolean;
+}) {
+  return hasAnalysisResult || analysisActive || !isDraft || artifactsFailed;
+}
+
+function draftLookupPending(sessionLoading: boolean, artifactsLoading: boolean) {
+  return sessionLoading || artifactsLoading;
+}
+
 export function workOrderPopupMode({
   hasPlanningSession,
   hasAnalysisResult = false,
@@ -7,6 +29,7 @@ export function workOrderPopupMode({
   refinementLoading = false,
   sessionLoading = false,
   artifactsLoading = false,
+  artifactsFailed = false,
   analysisActive,
   hasLookupIdentity,
   isDraft = true,
@@ -17,11 +40,12 @@ export function workOrderPopupMode({
   refinementLoading?: boolean;
   sessionLoading?: boolean;
   artifactsLoading?: boolean;
+  artifactsFailed?: boolean;
   analysisActive: boolean;
   hasLookupIdentity: boolean;
   isDraft?: boolean;
 }): WorkOrderPopupMode {
-  if (!hasLookupIdentity || hasPlanningSession) {
+  if (pinsAnalysisWithoutFlag(hasLookupIdentity, hasPlanningSession)) {
     return "analysis";
   }
   if (refinementLoading) {
@@ -30,8 +54,8 @@ export function workOrderPopupMode({
   if (!refinementEnabled) {
     return "classic";
   }
-  if (hasAnalysisResult || analysisActive || !isDraft) {
+  if (refinementUsesAnalysis({ hasAnalysisResult, analysisActive, isDraft, artifactsFailed })) {
     return "analysis";
   }
-  return sessionLoading || artifactsLoading ? "loading" : "classic";
+  return draftLookupPending(sessionLoading, artifactsLoading) ? "loading" : "classic";
 }

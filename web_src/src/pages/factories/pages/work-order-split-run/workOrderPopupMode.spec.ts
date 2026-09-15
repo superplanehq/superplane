@@ -114,6 +114,20 @@ describe("workOrderPopupMode", () => {
     ).toBe("loading");
   });
 
+  it("keeps the analysis popup when artifact lookup fails on a draft", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        hasAnalysisResult: false,
+        refinementEnabled: true,
+        artifactsFailed: true,
+        analysisActive: false,
+        hasLookupIdentity: true,
+        isDraft: true,
+      }),
+    ).toBe("analysis");
+  });
+
   it("uses the classic popup when refinement is disabled even if a score exists", () => {
     expect(
       workOrderPopupMode({

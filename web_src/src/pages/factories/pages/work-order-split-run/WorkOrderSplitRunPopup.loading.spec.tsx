@@ -16,6 +16,7 @@ const lookupState = vi.hoisted(() => ({
   featureLoading: false,
   sessionLoading: false,
   artifactsLoading: false,
+  artifactsError: null as Error | null,
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -31,6 +32,9 @@ vi.mock("./useAnalysisPlanningSession", () => ({
     session: null,
     isLoading: lookupState.sessionLoading,
     queryError: null,
+    view: { machineStatus: "waiting", messages: [], executionId: "", canvasId: "" },
+    canSend: false,
+    onSubmitSurvey: () => undefined,
   }),
 }));
 
@@ -41,6 +45,7 @@ vi.mock("./useSplitRunPopupData", () => ({
     sourceDescription: "",
     useLive: true,
     artifactsLoading: lookupState.artifactsLoading,
+    artifactsError: lookupState.artifactsError,
     pullRequestsLoading: false,
     pullRequestsError: null,
   }),
@@ -76,6 +81,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     lookupState.featureLoading = false;
     lookupState.sessionLoading = false;
     lookupState.artifactsLoading = false;
+    lookupState.artifactsError = null;
   });
 
   it("shows a dismissible loading popup while Task Refinement access loads", async () => {
@@ -118,6 +124,16 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(fixture.footer.kind).not.toBe("draft");
 
     renderPopup(undefined, fixture);
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("keeps a draft on the analysis popup when artifact lookup fails", () => {
+    lookupState.artifactsError = new Error("artifacts unavailable");
+
+    renderPopup();
 
     expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
