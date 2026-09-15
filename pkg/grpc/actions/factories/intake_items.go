@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v84/github"
@@ -27,7 +28,6 @@ const (
 var (
 	errIntakeNotConnected       = errors.New("intake is not connected")
 	errIntakeItemNotFound       = errors.New("intake item not found")
-	errIntakeItemOutsideScope   = errors.New("intake item is outside source scope")
 	errIntakeSearchUnsupported  = errors.New("this intake cannot search items yet")
 	errIntakeRefreshUnsupported = errors.New("no intake supports backlog refresh")
 	intakeItemSourceByTrigger   = map[string]intakeItemSourceBuilder{}
@@ -53,14 +53,18 @@ func init() {
 }
 
 type gitHubIntakeItemSource struct {
-	github     *common.Client
-	repository string
+	github                   *common.Client
+	repository               string
+	repositoryProbe          sync.Once
+	repositoryReadabilityErr error
 }
 
 type productiveIntakeItemSource struct {
-	productive     *productive.Client
-	projectID      string
-	organizationID string
+	productive            *productive.Client
+	projectID             string
+	organizationID        string
+	projectProbe          sync.Once
+	projectReadabilityErr error
 }
 
 type unsupportedIntakeItemSource struct{}
@@ -181,8 +185,11 @@ func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string)
 
 	issue, _, err := s.github.GetIssue(ctx, s.repository, number)
 	if common.IsNotFoundError(err) {
-		if _, repositoryErr := s.github.FindRepository(s.repository); repositoryErr != nil {
-			return false, repositoryErr
+		s.repositoryProbe.Do(func() {
+			_, s.repositoryReadabilityErr = s.github.FindRepository(s.repository)
+		})
+		if s.repositoryReadabilityErr != nil {
+			return false, s.repositoryReadabilityErr
 		}
 		return false, nil
 	}
@@ -262,16 +269,16 @@ func (s *productiveIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string,
 func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
 	task, err := s.productive.GetTask(strings.TrimSpace(id))
 	if productive.IsNotFoundError(err) {
-		if _, projectErr := s.productive.GetProject(s.projectID); projectErr != nil {
-			return false, projectErr
+		s.projectProbe.Do(func() {
+			_, s.projectReadabilityErr = s.productive.GetProject(s.projectID)
+		})
+		if s.projectReadabilityErr != nil {
+			return false, s.projectReadabilityErr
 		}
 		return false, nil
 	}
 	if err != nil {
 		return false, err
-	}
-	if task.ProjectID != "" && task.ProjectID != s.projectID {
-		return false, errIntakeItemOutsideScope
 	}
 	return !task.Closed, nil
 }

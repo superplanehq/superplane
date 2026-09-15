@@ -173,10 +173,6 @@ func refreshBacklogOrder(
 		matchedOrigin = true
 
 		available, cached, err := itemAvailableFromSource(ctx, source, itemID, lookups)
-		if errors.Is(err, errIntakeItemOutsideScope) {
-			unavailable = true
-			continue
-		}
 		if err != nil {
 			log.WithError(err).Warnf("failed to refresh backlog item from %s", source.AvailabilityScope())
 			anyFailure = true

@@ -152,29 +152,18 @@ func TestRefreshBacklog(t *testing.T) {
 		assert.Equal(t, 1, source.checks)
 	})
 
-	t.Run("keeps a Productive task available from another configured project", func(t *testing.T) {
+	t.Run("keeps an open Productive task after it moves to another project", func(t *testing.T) {
 		factory := newFactory(t)
 		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
-		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
-		order := createDraft(t, factory, "Task in second project", "https://app.productive.io/123/tasks/91")
-		sources := []intakeItemSource{
-			&stubIntakeItemAvailabilitySource{
-				scope:     "productive:123:first-project",
-				urlPrefix: "https://app.productive.io/123/tasks/",
-				err:       errIntakeItemOutsideScope,
-			},
-			&stubIntakeItemAvailabilitySource{
-				scope:     "productive:123:second-project",
-				urlPrefix: "https://app.productive.io/123/tasks/",
-				available: map[string]bool{"91": true},
-			},
+		order := createDraft(t, factory, "Moved task", "https://app.productive.io/123/tasks/91")
+		source := &stubIntakeItemAvailabilitySource{
+			scope:     "productive:123:original-project",
+			urlPrefix: "https://app.productive.io/123/tasks/",
+			available: map[string]bool{"91": true},
 		}
-		call := 0
 
 		response, err := RefreshBacklog(ctx, IntakeDependencies{
 			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
-				source := sources[call]
-				call++
 				return source, nil
 			},
 		}, orgID, request(factory))
