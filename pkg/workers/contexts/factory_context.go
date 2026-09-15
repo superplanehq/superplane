@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -38,9 +39,12 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
+	// remoteImageFetch, when set, copies remote images without a GitHub client.
+	remoteImageFetch storedfiles.FetchFunc
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -74,9 +78,48 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	return c
 }
 
+// FileBindCleanup is blob deletion work that must run after the surrounding
+// database transaction commits. Apply it with ApplyFileBindCleanups.
+type FileBindCleanup struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Result         storedfiles.BindResult
+	BindErr        error
+}
+
+func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
+	c.onFileBindCleanup = callback
+	return c
+}
+
+func ApplyFileBindCleanups(jobs []FileBindCleanup, txErr error) {
+	for _, job := range jobs {
+		err := txErr
+		if err == nil {
+			err = job.BindErr
+		}
+		if delErr := storedfiles.ApplyBindResult(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			job.OrganizationID,
+			job.FactoryID,
+			job.Result,
+			err,
+		); delErr != nil {
+			log.WithError(delErr).Warn("Failed to delete file objects after bind")
+		}
+	}
+}
+
 func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
 	c.encryptor = encryptor
 	c.registry = registry
+	return c
+}
+
+func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *FactoryContext {
+	c.remoteImageFetch = fetch
 	return c
 }
 
@@ -105,8 +148,10 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, err
 	}
 
+	if err := c.prepareWorkOrderFiles(order); err != nil {
+		return nil, err
+	}
 	EmitWorkOrderCreated(c.tx, f, order)
-	c.ingestGitHubImages(order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
 }
@@ -144,24 +189,27 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	return models.OriginFromIntakeRootEvent(event)
 }
 
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
+	c.ingestGitHubImages(order)
+	return c.bindDescriptionFiles(order)
+}
+
 func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
-	if order == nil || c.registry == nil || c.encryptor == nil {
+	if order == nil {
 		return
 	}
 	if len(blob.HTTPImageURLs(order.Description)) == 0 {
 		return
 	}
-	client := c.githubClientForCanvas()
-	if client == nil {
+	fetch := c.remoteImageFetcher()
+	if fetch == nil {
 		return
 	}
 	next, err := storedfiles.IngestRemoteImages(
 		context.Background(),
 		c.tx,
 		blob.Current(),
-		func(ctx context.Context, req *http.Request) (*http.Response, error) {
-			return client.HTTPDo(req.WithContext(ctx))
-		},
+		fetch,
 		blob.IsGitHubImageURL,
 		order.OrganizationID,
 		order.FactoryID,
@@ -182,6 +230,49 @@ func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
 			next.ObjectKeys,
 		)
 	}
+}
+
+func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
+	if c.remoteImageFetch != nil {
+		return c.remoteImageFetch
+	}
+	if c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client := c.githubClientForCanvas()
+	if client == nil {
+		return nil
+	}
+	return func(ctx context.Context, req *http.Request) (*http.Response, error) {
+		return client.HTTPDo(req.WithContext(ctx))
+	}
+}
+
+func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	result, err := storedfiles.BindDescriptionFiles(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+	)
+	job := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         result,
+		BindErr:        err,
+	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(job)
+		return err
+	}
+	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
+	return err
 }
 
 func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
