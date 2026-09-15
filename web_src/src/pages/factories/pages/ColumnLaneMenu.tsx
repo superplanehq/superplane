@@ -7,12 +7,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
+import {
+  allowedSortsForColumn,
+  DEFAULT_LINE_COLUMN_SORT,
+  LINE_COLUMN_SORT_LABELS,
+  resolveLineColumnSort,
+  type LineColumnKey,
+  type LineColumnSortId,
+} from "../lib/lineColumnSort";
 import { BACKLOG_REFRESH_COPY } from "./backlogRefresh";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
@@ -35,6 +45,9 @@ interface ColumnLaneMenuProps {
   /** Refreshes backlog tasks from readable intake sources. Hidden when unset. */
   onRefreshBacklog?: () => void;
   refreshBacklogPending?: boolean;
+  columnKey?: LineColumnKey;
+  sortId?: LineColumnSortId;
+  onSortChange?: (sortId: LineColumnSortId) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -54,12 +67,17 @@ export function ColumnLaneMenu({
   onAddAutomation,
   onRefreshBacklog,
   refreshBacklogPending = false,
+  columnKey = "phase-0",
+  sortId = DEFAULT_LINE_COLUMN_SORT,
+  onSortChange,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
   const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation || onRefreshBacklog);
+  const sortOptions = allowedSortsForColumn(columnKey);
+  const resolvedSortId = resolveLineColumnSort(columnKey, sortId);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -101,6 +119,13 @@ export function ColumnLaneMenu({
             <DropdownMenuSeparator className="my-0" />
           </>
         ) : null}
+        <ColumnLaneSortPicker
+          testId={testId}
+          sortId={resolvedSortId}
+          sortOptions={sortOptions}
+          onSortChange={onSortChange}
+        />
+        <DropdownMenuSeparator className="my-0" />
         <ColumnLaneColorPicker title={title} testId={testId} colorId={colorId} onColorChange={onColorChange} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -166,6 +191,45 @@ function ColumnLaneMenuActions({
           {BACKLOG_REFRESH_COPY.menu}
         </DropdownMenuItem>
       ) : null}
+    </div>
+  );
+}
+
+function ColumnLaneSortPicker({
+  testId,
+  sortId,
+  sortOptions,
+  onSortChange,
+}: {
+  testId: string;
+  sortId: LineColumnSortId;
+  sortOptions: readonly LineColumnSortId[];
+  onSortChange?: (sortId: LineColumnSortId) => void;
+}) {
+  return (
+    <div className="px-1 pb-1 pt-2" data-testid={`${testId}-sort`}>
+      <DropdownMenuLabel className="px-1 pb-1.5 pt-0 text-[12px] font-medium text-muted-foreground">
+        Sort by
+      </DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={sortId}
+        onValueChange={(value) => {
+          if (onSortChange && (sortOptions as readonly string[]).includes(value)) {
+            onSortChange(value as LineColumnSortId);
+          }
+        }}
+      >
+        {sortOptions.map((option) => (
+          <DropdownMenuRadioItem
+            key={option}
+            value={option}
+            className="py-1 text-[13px]"
+            data-testid={`${testId}-sort-${option}`}
+          >
+            {LINE_COLUMN_SORT_LABELS[option]}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
     </div>
   );
 }

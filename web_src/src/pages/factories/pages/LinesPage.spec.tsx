@@ -240,6 +240,7 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
+  useWorkOrderChecksForOrders: () => [],
   ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
 }));
 
@@ -1480,6 +1481,16 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-create")).not.toBeInTheDocument();
+  });
+
+  it("does not save column sort on the line", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    await user.click(screen.getByTestId("lines-done-menu-sort-created"));
+
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });
 
   it("hides the phase path and shows work-order filters", async () => {
