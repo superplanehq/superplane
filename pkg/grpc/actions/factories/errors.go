@@ -128,6 +128,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
+	case errors.Is(err, errIntakeRefreshUnsupported):
+		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
 	case errors.Is(err, models.ErrFileNotFound):

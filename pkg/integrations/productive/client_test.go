@@ -1,7 +1,9 @@
 package productive
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -174,7 +176,7 @@ func Test__Client__GetTask(t *testing.T) {
 		jsonResponse(`{"data":{
 			"id":"91",
 			"type":"tasks",
-			"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."},
+			"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently.","closed":true},
 			"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
 		}}`),
 	}}
@@ -187,8 +189,20 @@ func Test__Client__GetTask(t *testing.T) {
 		Title:       "Fix payment retries",
 		Description: "Retries fail silently.",
 		ProjectID:   "42",
+		Closed:      true,
 	}, task)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/tasks/91")
+}
+
+func Test__Client__GetTask_NotFound(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Not found"}]}`)),
+	}}}
+
+	_, err := testClient(t, httpContext).GetTask("missing")
+	require.Error(t, err)
+	assert.True(t, IsNotFoundError(err))
 }
 
 func Test__Client__ListChangedTaskDocuments(t *testing.T) {

@@ -2,6 +2,7 @@ package productive
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,6 +34,20 @@ type Client struct {
 	OrganizationID string
 	BaseURL        string
 	http           core.HTTPContext
+}
+
+type responseError struct {
+	statusCode int
+	body       string
+}
+
+func (e *responseError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.statusCode, e.body)
+}
+
+func IsNotFoundError(err error) bool {
+	var responseErr *responseError
+	return errors.As(err, &responseErr) && responseErr.statusCode == http.StatusNotFound
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -94,7 +109,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, &responseError{statusCode: res.StatusCode, body: string(responseBody)}
 	}
 
 	return responseBody, nil
@@ -147,6 +162,7 @@ type Task struct {
 	Title       string
 	Description string
 	ProjectID   string
+	Closed      bool
 }
 
 func projectFromDocument(doc resourceDocument) Project {
@@ -157,6 +173,7 @@ func projectFromDocument(doc resourceDocument) Project {
 func taskFromDocument(doc resourceDocument) Task {
 	title, _ := doc.Attributes["title"].(string)
 	description, _ := doc.Attributes["description"].(string)
+	closed, _ := doc.Attributes["closed"].(bool)
 	projectID := doc.Relationships["project"].Data.ID
 	return Task{
 		ID:          doc.ID,
@@ -164,6 +181,7 @@ func taskFromDocument(doc resourceDocument) Task {
 		Title:       title,
 		Description: description,
 		ProjectID:   projectID,
+		Closed:      closed,
 	}
 }
 

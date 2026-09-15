@@ -94,7 +94,7 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
-const syncClosedGitHubBacklogMutateAsync = vi.fn();
+const refreshBacklogMutateAsync = vi.fn();
 
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
@@ -146,7 +146,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
-  useSyncClosedGitHubBacklog: () => ({ mutateAsync: syncClosedGitHubBacklogMutateAsync, isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -236,7 +236,7 @@ async function resetLinesBoardMocks() {
   useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
-  syncClosedGitHubBacklogMutateAsync.mockReset();
+  refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
   useWorkOrderChecks.mockReset();
   useWorkOrderChecks.mockImplementation(
@@ -852,26 +852,30 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
 
-  it("offers Sync closed GitHub issues when a GitHub intake exists", async () => {
+  it("offers Refresh backlog when a readable intake exists", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    syncClosedGitHubBacklogMutateAsync.mockResolvedValueOnce({ closedCount: 1, failedCount: 0 });
+    refreshBacklogMutateAsync.mockResolvedValueOnce({
+      archivedCount: 1,
+      failedItemCount: 0,
+      failedSourceCount: 0,
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-sync-closed-github-issues"));
+    await user.click(screen.getByTestId("lines-backlog-menu-refresh-backlog"));
 
     await waitFor(() => {
-      expect(syncClosedGitHubBacklogMutateAsync).toHaveBeenCalledTimes(1);
+      expect(refreshBacklogMutateAsync).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("hides Sync closed GitHub issues when GitHub issues are not an intake source", async () => {
+  it("hides Refresh backlog when no readable intake exists", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByTestId("lines-backlog-menu-sync-closed-github-issues")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 
   it("creates a Sentry intake from the overflow menu when the feature is on", async () => {

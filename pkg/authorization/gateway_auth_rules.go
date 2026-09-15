@@ -824,7 +824,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/backlog/sync-closed-github-issues"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/backlog/refresh"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

@@ -3,8 +3,8 @@ import {
   factoriesImportFactoryIntakeItem,
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
+  factoriesRefreshBacklog,
   factoriesSearchFactoryIntakeItems,
-  factoriesSyncClosedGitHubBacklog,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
 import type {
@@ -236,12 +236,18 @@ function upsertImportedWorkOrder(
   return [order, ...current];
 }
 
-export function useSyncClosedGitHubBacklog(organizationId: string, factoryId: string) {
+export type RefreshBacklogResult = {
+  archivedCount: number;
+  failedItemCount: number;
+  failedSourceCount: number;
+};
+
+export function useRefreshBacklog(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (): Promise<{ closedCount: number; failedCount: number }> => {
-      const response = await factoriesSyncClosedGitHubBacklog(
+    mutationFn: async (): Promise<RefreshBacklogResult> => {
+      const response = await factoriesRefreshBacklog(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
@@ -249,8 +255,9 @@ export function useSyncClosedGitHubBacklog(organizationId: string, factoryId: st
         }),
       );
       return {
-        closedCount: response.data?.closedCount ?? 0,
-        failedCount: response.data?.failedCount ?? 0,
+        archivedCount: response.data?.archivedCount ?? 0,
+        failedItemCount: response.data?.failedItemCount ?? 0,
+        failedSourceCount: response.data?.failedSourceCount ?? 0,
       };
     },
     onSuccess: () => {

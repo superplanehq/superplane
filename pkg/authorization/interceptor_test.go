@@ -295,11 +295,11 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
-func TestSyncClosedGitHubBacklogUsesWorkOrderUpdate(t *testing.T) {
+func TestRefreshBacklogUsesWorkOrderUpdate(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	rule, ok := rules[HTTPRoute{
 		Method:  http.MethodPost,
-		Pattern: "/api/v1/factories/{factory_id}/backlog/sync-closed-github-issues",
+		Pattern: "/api/v1/factories/{factory_id}/backlog/refresh",
 	}]
 	require.True(t, ok)
 	assert.Equal(t, "work_orders", rule.Resource)

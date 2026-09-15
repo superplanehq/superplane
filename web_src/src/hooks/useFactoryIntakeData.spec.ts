@@ -3,18 +3,18 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { factoriesCreateFactoryIntake, factoriesSyncClosedGitHubBacklog } = vi.hoisted(() => ({
+const { factoriesCreateFactoryIntake, factoriesRefreshBacklog } = vi.hoisted(() => ({
   factoriesCreateFactoryIntake: vi.fn(),
-  factoriesSyncClosedGitHubBacklog: vi.fn(),
+  factoriesRefreshBacklog: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateFactoryIntake,
-  factoriesSyncClosedGitHubBacklog,
+  factoriesRefreshBacklog,
 }));
 
 import { factoryQueryKeys } from "./useFactoryData";
-import { useCreateFactoryIntake, useSyncClosedGitHubBacklog } from "./useFactoryIntakeData";
+import { useCreateFactoryIntake, useRefreshBacklog } from "./useFactoryIntakeData";
 
 const ORGANIZATION_ID = "org-1";
 const FACTORY_ID = "factory-1";
@@ -28,7 +28,9 @@ function createWrapper(queryClient: QueryClient) {
 beforeEach(() => {
   vi.clearAllMocks();
   factoriesCreateFactoryIntake.mockResolvedValue({ data: { intake: { id: "intake-1" } } });
-  factoriesSyncClosedGitHubBacklog.mockResolvedValue({ data: { closedCount: 2, failedCount: 0 } });
+  factoriesRefreshBacklog.mockResolvedValue({
+    data: { archivedCount: 2, failedItemCount: 0, failedSourceCount: 0 },
+  });
 });
 
 describe("useCreateFactoryIntake", () => {
@@ -52,15 +54,19 @@ describe("useCreateFactoryIntake", () => {
   });
 });
 
-describe("useSyncClosedGitHubBacklog", () => {
-  it("refetches backlog tasks after GitHub issues close", async () => {
+describe("useRefreshBacklog", () => {
+  it("refetches backlog tasks after intake items close", async () => {
     const queryClient = new QueryClient();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-    const { result } = renderHook(() => useSyncClosedGitHubBacklog(ORGANIZATION_ID, FACTORY_ID), {
+    const { result } = renderHook(() => useRefreshBacklog(ORGANIZATION_ID, FACTORY_ID), {
       wrapper: createWrapper(queryClient),
     });
 
-    await expect(result.current.mutateAsync()).resolves.toEqual({ closedCount: 2, failedCount: 0 });
+    await expect(result.current.mutateAsync()).resolves.toEqual({
+      archivedCount: 2,
+      failedItemCount: 0,
+      failedSourceCount: 0,
+    });
 
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({

@@ -342,8 +342,8 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       },
     },
     {
-      pattern: re("/api/v1/factories/([^/]+)/backlog/sync-closed-github-issues"),
-      resolve: () => ({ json: { closedCount: 0, failedCount: 0 } }),
+      pattern: re("/api/v1/factories/([^/]+)/backlog/refresh"),
+      resolve: () => ({ json: { archivedCount: 0, failedItemCount: 0, failedSourceCount: 0 } }),
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),

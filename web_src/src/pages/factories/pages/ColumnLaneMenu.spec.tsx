@@ -216,8 +216,8 @@ describe("ColumnLaneMenu", () => {
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
 
-  it("offers Sync closed GitHub issues when supplied", async () => {
-    const onSyncClosedGitHubIssues = vi.fn();
+  it("offers Refresh backlog when supplied", async () => {
+    const onRefreshBacklog = vi.fn();
     const user = userEvent.setup();
 
     render(
@@ -226,7 +226,7 @@ describe("ColumnLaneMenu", () => {
           title="Backlog"
           testId="lines-backlog-menu"
           onEdit={vi.fn()}
-          onSyncClosedGitHubIssues={onSyncClosedGitHubIssues}
+          onRefreshBacklog={onRefreshBacklog}
           colorId={null}
           onColorChange={vi.fn()}
         />
@@ -234,13 +234,13 @@ describe("ColumnLaneMenu", () => {
     );
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    const sync = screen.getByTestId("lines-backlog-menu-sync-closed-github-issues");
-    expect(sync).toHaveTextContent("Sync closed GitHub issues");
-    await user.click(sync);
-    expect(onSyncClosedGitHubIssues).toHaveBeenCalledTimes(1);
+    const refresh = screen.getByTestId("lines-backlog-menu-refresh-backlog");
+    expect(refresh).toHaveTextContent("Refresh backlog");
+    await user.click(refresh);
+    expect(onRefreshBacklog).toHaveBeenCalledTimes(1);
   });
 
-  it("hides Sync closed GitHub issues when it is not supplied", async () => {
+  it("hides Refresh backlog when it is not supplied", async () => {
     const user = userEvent.setup();
 
     render(
@@ -256,6 +256,6 @@ describe("ColumnLaneMenu", () => {
     );
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByTestId("lines-backlog-menu-sync-closed-github-issues")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 });

@@ -13,7 +13,7 @@ import {
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
-import { BACKLOG_SYNC_GITHUB_COPY } from "./backlogSyncClosedGitHub";
+import { BACKLOG_REFRESH_COPY } from "./backlogRefresh";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
 interface ColumnLaneMenuProps {
@@ -32,9 +32,9 @@ interface ColumnLaneMenuProps {
   onAddIntake?: () => void;
   /** Opens the Add automation picker. */
   onAddAutomation?: () => void;
-  /** Closes backlog tasks whose GitHub issues are closed. Hidden when unset. */
-  onSyncClosedGitHubIssues?: () => void;
-  syncClosedGitHubIssuesPending?: boolean;
+  /** Refreshes backlog tasks from readable intake sources. Hidden when unset. */
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending?: boolean;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -52,14 +52,14 @@ export function ColumnLaneMenu({
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   onAddIntake,
   onAddAutomation,
-  onSyncClosedGitHubIssues,
-  syncClosedGitHubIssuesPending = false,
+  onRefreshBacklog,
+  refreshBacklogPending = false,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation || onSyncClosedGitHubIssues);
+  const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation || onRefreshBacklog);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -95,8 +95,8 @@ export function ColumnLaneMenu({
               parallelism={parallelism}
               onAddIntake={onAddIntake}
               onAddAutomation={onAddAutomation}
-              onSyncClosedGitHubIssues={onSyncClosedGitHubIssues}
-              syncClosedGitHubIssuesPending={syncClosedGitHubIssuesPending}
+              onRefreshBacklog={onRefreshBacklog}
+              refreshBacklogPending={refreshBacklogPending}
             />
             <DropdownMenuSeparator className="my-0" />
           </>
@@ -116,8 +116,8 @@ function ColumnLaneMenuActions({
   parallelism,
   onAddIntake,
   onAddAutomation,
-  onSyncClosedGitHubIssues,
-  syncClosedGitHubIssuesPending,
+  onRefreshBacklog,
+  refreshBacklogPending,
 }: {
   testId: string;
   editLabel: string;
@@ -127,8 +127,8 @@ function ColumnLaneMenuActions({
   parallelism: number;
   onAddIntake?: () => void;
   onAddAutomation?: () => void;
-  onSyncClosedGitHubIssues?: () => void;
-  syncClosedGitHubIssuesPending: boolean;
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending: boolean;
 }) {
   return (
     <div className="p-1">
@@ -156,14 +156,14 @@ function ColumnLaneMenuActions({
           {setParallelismLabel(parallelism)}
         </DropdownMenuItem>
       ) : null}
-      {onSyncClosedGitHubIssues ? (
+      {onRefreshBacklog ? (
         <DropdownMenuItem
-          onSelect={onSyncClosedGitHubIssues}
-          disabled={syncClosedGitHubIssuesPending}
-          data-testid={`${testId}-sync-closed-github-issues`}
+          onSelect={onRefreshBacklog}
+          disabled={refreshBacklogPending}
+          data-testid={`${testId}-refresh-backlog`}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-          {BACKLOG_SYNC_GITHUB_COPY.menu}
+          {BACKLOG_REFRESH_COPY.menu}
         </DropdownMenuItem>
       ) : null}
     </div>

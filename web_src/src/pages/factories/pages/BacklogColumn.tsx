@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryIntakes, useSyncClosedGitHubBacklog } from "@/hooks/useFactoryIntakeData";
+import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
@@ -19,7 +19,7 @@ import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lin
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
-import { BACKLOG_SYNC_GITHUB_COPY, canSyncClosedGitHubIssues, syncClosedGitHubToast } from "./backlogSyncClosedGitHub";
+import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -96,7 +96,7 @@ export function BacklogColumn({
   const { canAct } = usePermissions();
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
-  const syncClosedGitHub = useSyncClosedGitHubBacklog(organizationId, factoryId);
+  const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -129,14 +129,14 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
-            onSyncClosedGitHubIssues={
-              canSyncClosedGitHubIssues(intakesQuery.data, canUpdateWorkOrders)
+            onRefreshBacklog={
+              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
                 ? () => {
-                    void syncClosedGitHubIssues(syncClosedGitHub.mutateAsync);
+                    void runBacklogRefresh(refreshBacklog.mutateAsync);
                   }
                 : undefined
             }
-            syncClosedGitHubIssuesPending={syncClosedGitHub.isPending}
+            refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
@@ -179,8 +179,8 @@ function BacklogColumnHeaderActions({
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
-  onSyncClosedGitHubIssues,
-  syncClosedGitHubIssuesPending,
+  onRefreshBacklog,
+  refreshBacklogPending,
   colorId,
   onColorChange,
 }: Pick<
@@ -195,8 +195,8 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
-  onSyncClosedGitHubIssues?: () => void;
-  syncClosedGitHubIssuesPending?: boolean;
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -214,8 +214,8 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
-        onSyncClosedGitHubIssues={onSyncClosedGitHubIssues}
-        syncClosedGitHubIssuesPending={syncClosedGitHubIssuesPending}
+        onRefreshBacklog={onRefreshBacklog}
+        refreshBacklogPending={refreshBacklogPending}
         colorId={colorId}
         onColorChange={onColorChange}
       />
@@ -268,9 +268,9 @@ function BacklogColumnOrderList({
 
 type BacklogCreatePopoverProps = ReturnType<typeof backlogCreatePopoverProps>;
 
-async function syncClosedGitHubIssues(run: () => Promise<{ closedCount: number; failedCount: number }>): Promise<void> {
+async function runBacklogRefresh(run: () => Promise<RefreshBacklogResult>): Promise<void> {
   try {
-    const toast = syncClosedGitHubToast(await run());
+    const toast = backlogRefreshToast(await run());
     if (toast.kind === "error") {
       showErrorToast(toast.message);
       return;
@@ -281,7 +281,7 @@ async function syncClosedGitHubIssues(run: () => Promise<{ closedCount: number; 
     }
     showInfoToast(toast.message);
   } catch (error) {
-    showErrorToast(getApiErrorMessage(error, BACKLOG_SYNC_GITHUB_COPY.failed));
+    showErrorToast(getApiErrorMessage(error, BACKLOG_REFRESH_COPY.failed));
   }
 }
 
