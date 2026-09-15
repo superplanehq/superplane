@@ -21,6 +21,77 @@ export function isQueuedStepRow(row: WorkOrderStepRow): boolean {
   return row.queuePosition !== undefined;
 }
 
+/** 1 is next to be admitted. Position 0 (or missing) is queued without a place. */
+export function queuePositionLabel(position: number | undefined): string {
+  return (position ?? 0) > 0 ? `Queued #${position}` : "Queued";
+}
+
+/**
+ * True when this dispatch waits to enter the first line step and has not
+ * started a run yet. Those tasks stay in Backlog until a slot is free.
+ */
+export function isFirstStepQueueOnly(dispatch: FactoriesWorkOrderLineDispatch): boolean {
+  if (!dispatch.queueItem) {
+    return false;
+  }
+  if ((dispatch.queueItem.stepIndex ?? 0) !== 0) {
+    return false;
+  }
+  return (dispatch.stepExecutions ?? []).length === 0;
+}
+
+/** Queue item for a task that waits to enter the first line step. */
+export function firstStepQueueItem(order: FactoriesWorkOrder): FactoriesWorkOrderQueueItem | undefined {
+  const queued = (order.lineDispatches ?? []).filter(isFirstStepQueueOnly);
+  if (queued.length === 0) {
+    return undefined;
+  }
+  return queued.reduce((latest, candidate) => {
+    const latestAt = Date.parse(latest.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= latestAt ? candidate : latest;
+  }).queueItem;
+}
+
+export function firstStepQueueLabel(order: FactoriesWorkOrder): string | null {
+  const item = firstStepQueueItem(order);
+  if (!item) {
+    return null;
+  }
+  return queuePositionLabel(item.position);
+}
+
+/** Latest dispatch on this line waits to enter step 0 and has not started. */
+export function isQueuedAtFirstLineStep(order: FactoriesWorkOrder, lineId: string): boolean {
+  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  if (dispatches.length === 0) {
+    return false;
+  }
+  const latest = dispatches.reduce((best, candidate) => {
+    const bestAt = Date.parse(best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= bestAt ? candidate : best;
+  });
+  return isFirstStepQueueOnly(latest);
+}
+
+/** Drafts, plus open tasks that wait to enter the first step of `lineId`. */
+export function isLineBoardBacklogOrder(order: FactoriesWorkOrder, lineId?: string): boolean {
+  if (!order.id) {
+    return false;
+  }
+  if (order.state === "STATE_DRAFT") {
+    return true;
+  }
+  if (order.state !== "STATE_OPEN") {
+    return false;
+  }
+  if (lineId) {
+    return isQueuedAtFirstLineStep(order, lineId);
+  }
+  return (order.lineDispatches ?? []).some(isFirstStepQueueOnly);
+}
+
 export function queueItemToStepRow(item: FactoriesWorkOrderQueueItem): WorkOrderStepRow {
   return {
     id: item.id,

@@ -7,7 +7,13 @@ import type {
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
-import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
+import {
+  dispatchStepRows,
+  isActiveWorkOrderExecution,
+  isFirstStepQueueOnly,
+  isLineBoardBacklogOrder,
+  type WorkOrderStepRow,
+} from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 
 export { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -127,11 +133,12 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft tasks. A draft that already ran on a line still belongs
- * here after To Backlog. Newest updated drafts come first.
+ * Draft tasks, plus open tasks that wait to enter the first line step.
+ * A draft that already ran on a line still belongs here after To Backlog.
+ * Newest updated tasks come first.
  */
-export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[], lineId?: string): FactoriesWorkOrder[] {
+  return workOrders.filter((order) => isLineBoardBacklogOrder(order, lineId)).sort(compareOrdersNewestFirst);
 }
 
 /**
@@ -257,10 +264,6 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
     return false;
   }
   return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
-}
-
-function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
-  return Boolean(order.id) && order.state === "STATE_DRAFT";
 }
 
 // A rejected order that never dispatched to any line was rejected straight
@@ -396,6 +399,9 @@ function appendCurrentRunForOrder(
     return;
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
+  if (isFirstStepQueueOnly(currentDispatch)) {
+    return;
+  }
 
   const lineExecutions = dispatchStepRows(currentDispatch).filter(
     (execution) => liveColumnIndexForExecution(steps, execution) != null,

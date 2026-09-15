@@ -1,12 +1,11 @@
-import { isQueuedStepRow, type WorkOrderStepRow } from "./workOrderExecutions";
+import { isQueuedStepRow, queuePositionLabel, type WorkOrderStepRow } from "./workOrderExecutions";
 
 export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
   kind: "running" | "waiting" | "queued" | "failed" | "idle";
   label: string;
 } {
   if (isQueuedStepRow(execution)) {
-    const position = execution.queuePosition ?? 0;
-    return { kind: "queued", label: position > 0 ? `Queued #${position}` : "Queued" };
+    return { kind: "queued", label: queuePositionLabel(execution.queuePosition) };
   }
   if (execution.state === "STATE_STARTED") {
     return { kind: "running", label: "Executing" };

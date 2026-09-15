@@ -26,12 +26,18 @@ func CreateFactory(ctx context.Context, organizationID string, req *pb.CreateFac
 	// skip and turn into a spurious key-already-exists error.
 	key := models.NormalizeFactoryKey(req.GetKey())
 
-	factory, err := models.CreateFactory(database.DB(ctx), orgID, name, req.GetDescription(), key)
+	db := database.DB(ctx)
+	factory, err := models.CreateFactory(db, orgID, name, req.GetDescription(), key)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory")
 	}
 
+	serialized := serializeFactory(factory)
+	if err := attachFactoryMaxParallelTasks(db, orgID, serialized); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory")
+	}
+
 	return &pb.CreateFactoryResponse{
-		Factory: serializeFactory(factory),
+		Factory: serialized,
 	}, nil
 }

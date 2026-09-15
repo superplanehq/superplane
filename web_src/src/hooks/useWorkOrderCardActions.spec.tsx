@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 
-import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "./useFactoryData";
+import { useDispatchWorkOrder, useUpdateWorkOrderAssignees, useUpdateWorkOrderStatus } from "./useFactoryData";
 import { useWorkOrderCardActions } from "./useWorkOrderCardActions";
 
 vi.mock("./useFactoryData", () => ({
   useDispatchWorkOrder: vi.fn(),
   useUpdateWorkOrderAssignees: vi.fn(),
+  useUpdateWorkOrderStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 type DispatchMutation = ReturnType<typeof useDispatchWorkOrder>;
+type StatusMutation = ReturnType<typeof useUpdateWorkOrderStatus>;
 
 function mockMutations() {
   let resolveDispatch: (() => void) | undefined;
@@ -29,6 +31,10 @@ function mockMutations() {
     mutateAsync: vi.fn(),
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateWorkOrderAssignees>);
+  vi.mocked(useUpdateWorkOrderStatus).mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  } as unknown as StatusMutation);
   return { finishDispatch: () => resolveDispatch?.() };
 }
 
@@ -65,5 +71,34 @@ describe("useWorkOrderCardActions", () => {
     });
 
     expect(result.current.dispatchingOrderIds.has("wo-1")).toBe(false);
+  });
+
+  it("reports only the task that cancels a queue as in flight", async () => {
+    mockMutations();
+    let resolveCancel: (() => void) | undefined;
+    vi.mocked(useUpdateWorkOrderStatus).mockReturnValue({
+      mutateAsync: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveCancel = resolve;
+          }),
+      ),
+    } as unknown as StatusMutation);
+    const { result } = renderHook(() => useWorkOrderCardActions("org-1", "factory-1"));
+
+    let canceled: Promise<void> | undefined;
+    act(() => {
+      canceled = result.current.onCancelQueue("wo-queued");
+    });
+
+    await waitFor(() => expect(result.current.cancelingOrderIds.has("wo-queued")).toBe(true));
+    expect(result.current.dispatchingOrderIds.has("wo-queued")).toBe(false);
+
+    await act(async () => {
+      resolveCancel?.();
+      await canceled;
+    });
+
+    expect(result.current.cancelingOrderIds.has("wo-queued")).toBe(false);
   });
 });

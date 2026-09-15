@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { Forward } from "lucide-react";
+import { Forward, Loader2, X } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
@@ -12,6 +12,8 @@ import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 export interface WorkOrderRowCallbacks {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  /** Returns a first-step queued task to draft. */
+  onCancelQueue?: (orderId: string) => Promise<void>;
 }
 
 interface CardOwnerMarkProps {
@@ -114,12 +116,21 @@ interface StartDraftButtonProps {
   canDispatch: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  /** True when a click would join the first-step queue instead of starting. */
+  willQueueOnStart?: boolean;
+}
+
+function startDraftCopy(willQueueOnStart: boolean): { label: string; loadingText: string } {
+  if (willQueueOnStart) {
+    return { label: "Queue", loadingText: "Queuing..." };
+  }
+  return { label: "Start", loadingText: "Starting..." };
 }
 
 /**
  * Persistent Start control on a draft card. One click sends the task
  * to the preferred line, or opens the line picker when more than one line
- * exists.
+ * exists. The label is Queue when the first step has no free slot.
  */
 export function StartDraftButton({
   entry,
@@ -128,6 +139,7 @@ export function StartDraftButton({
   canDispatch,
   isDispatching,
   onDispatch,
+  willQueueOnStart = false,
 }: StartDraftButtonProps) {
   if (entry.displayStatus !== "draft") {
     return null;
@@ -135,6 +147,7 @@ export function StartDraftButton({
 
   const lineName = resolveStartLineName(lines, preferredLineName);
   const disabled = !canDispatch || lines.length === 0;
+  const copy = startDraftCopy(willQueueOnStart);
 
   const startButton = (
     <LoadingButton
@@ -142,11 +155,11 @@ export function StartDraftButton({
       size="xs"
       disabled={disabled}
       loading={isDispatching}
-      loadingText="Starting..."
+      loadingText={copy.loadingText}
       data-testid={`work-order-card-start-${entry.id}`}
       onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
     >
-      Start
+      {copy.label}
     </LoadingButton>
   );
 
@@ -160,13 +173,65 @@ export function StartDraftButton({
             lines={lines}
             isSaving={isDispatching}
             canDispatch={canDispatch}
-            submitLabel="Start"
+            submitLabel={copy.label}
             onDispatch={(input) => onDispatch(entry.id, input)}
           >
             {startButton}
           </DispatchWorkOrderPopover>
         )}
       </PermissionTooltip>
+    </div>
+  );
+}
+
+interface QueuedFirstStepControlsProps {
+  orderId: string;
+  label: string;
+  canDispatch: boolean;
+  isCanceling: boolean;
+  onCancelQueue?: (orderId: string) => Promise<void>;
+}
+
+/**
+ * Queue place in the Start slot. Uses the same thinking shimmer as
+ * analyzing and planning, plus a small X to return the task to draft.
+ */
+export function QueuedFirstStepControls({
+  orderId,
+  label,
+  canDispatch,
+  isCanceling,
+  onCancelQueue,
+}: QueuedFirstStepControlsProps) {
+  return (
+    <div className="pointer-events-auto flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+      <span
+        className="sp-ai-thinking text-[11px] font-medium leading-none text-muted-foreground"
+        data-text={label}
+        data-testid={`work-order-card-queued-${orderId}`}
+      >
+        {label}
+      </span>
+      {onCancelQueue ? (
+        <PermissionTooltip allowed={canDispatch} message="You don't have permission to cancel this queue.">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="size-6 text-muted-foreground hover:text-foreground"
+            disabled={!canDispatch || isCanceling}
+            aria-label="Remove from the queue"
+            data-testid={`work-order-card-cancel-queue-${orderId}`}
+            onClick={() => void onCancelQueue(orderId)}
+          >
+            {isCanceling ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <X className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        </PermissionTooltip>
+      ) : null}
     </div>
   );
 }

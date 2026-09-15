@@ -893,6 +893,8 @@ CREATE TABLE public.installation_metadata (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
+    max_parallel_factory_tasks integer DEFAULT 50 NOT NULL,
+    CONSTRAINT installation_metadata_max_parallel_factory_tasks_positive CHECK ((max_parallel_factory_tasks >= 1)),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1012,7 +1014,9 @@ CREATE TABLE public.organizations (
     usage_limits_synced_at timestamp with time zone,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
-    created_by_account_id uuid
+    created_by_account_id uuid,
+    max_parallel_factory_tasks integer,
+    CONSTRAINT organizations_max_parallel_factory_tasks_positive CHECK (((max_parallel_factory_tasks IS NULL) OR (max_parallel_factory_tasks >= 1)))
 );
 
 
@@ -2772,6 +2776,13 @@ CREATE INDEX idx_factory_work_order_comments_work_order_created ON public.factor
 --
 
 CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_executions_factory_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_factory_active ON public.factory_work_order_executions USING btree (factory_id) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text]));
 
 
 --
