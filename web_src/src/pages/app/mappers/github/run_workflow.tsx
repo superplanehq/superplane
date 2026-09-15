@@ -115,7 +115,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       iconSrc: githubIcon,
-      iconColor: getColorClass(context.componentDefinition?.color!),
+      iconColor: getColorClass(context.componentDefinition?.color),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       eventSections: runWorkflowEventSections(context.nodes, context.lastExecutions[0]),
@@ -225,7 +225,7 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   //
   if (execution) {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
     sections.push({
       showAutomaticTime: true,

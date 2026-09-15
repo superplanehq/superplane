@@ -97,7 +97,7 @@ function disableImageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, 
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }
