@@ -558,6 +558,94 @@ func TestDescriptionForDispatchSkipsOtherTaskFiles(t *testing.T) {
 	assert.Equal(t, markdown, rewritten)
 }
 
+func TestRestoreFileRefsRewritesHMACAndGCSURLs(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Restore", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		Filename:       "shot.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	hmacURL := "https://app.example/api/v1/public/files/" + file.ID.String() + "?expires=1&sig=abc&sp_file=1"
+	gcsURL := "https://storage.googleapis.com/superplane-prod-global/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/" +
+		r.Organization.ID.String() + "/workspaces/" + factoryModel.ID.String() + "/tasks/" + order.ID.String() + "/" + file.ID.String() +
+		"?X-Goog-Algorithm=GOOG4-RSA-SHA256&sp_file=1"
+	foreign := uuid.New()
+	foreignURL := "https://app.example/api/v1/public/files/" + foreign.String() + "?expires=1&sig=abc&sp_file=1"
+
+	hmacRestored, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![shot.png]("+hmacURL+")")
+	require.NoError(t, err)
+	assert.Equal(t, "![shot.png]("+blob.FileRef(file.ID)+")", hmacRestored)
+
+	gcsRestored, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "See ![shot.png]("+gcsURL+")")
+	require.NoError(t, err)
+	assert.Equal(t, "See ![shot.png]("+blob.FileRef(file.ID)+")", gcsRestored)
+	assert.NotContains(t, gcsRestored, "sp_file=1")
+
+	dropped, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![x]("+foreignURL+")")
+	require.NoError(t, err)
+	assert.NotContains(t, dropped, "sp_file=1")
+	assert.NotContains(t, dropped, blob.FileRef(foreign))
+}
+
+func TestDescriptionForDispatchMintsDescriptionAndSpecRefs(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Dispatch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		Filename:       "shot.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	description := "See ![shot.png](" + blob.FileRef(file.ID) + ")"
+	spec := "# Retry refunds\n\n![shot.png](" + blob.FileRef(file.ID) + ")"
+	combined := description + "\n\nSpec:\n" + spec
+	assert.Contains(t, combined, blob.FileRef(file.ID))
+
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		order.ID,
+		combined,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	assert.Contains(t, rewritten, files[0].URL)
+	assert.Contains(t, files[0].URL, "sp_file=1")
+	assert.NotContains(t, rewritten, blob.FileRef(file.ID))
+}
+
 func TestDescriptionForDispatchLeavesPlainMarkdown(t *testing.T) {
 	markdown := "No files here"
 	rewritten, files, err := storedfiles.DescriptionForDispatch(
