@@ -13,6 +13,11 @@ import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import type { WorkOrderMentionCandidate } from "@/lib/workOrderMentions";
+import {
+  forgetWorkspaceMarkdownImageLoad,
+  rememberWorkspaceMarkdownImageLoad,
+  workspaceMarkdownImageIsLoaded,
+} from "@/lib/workspaceMarkdownImages";
 import { cn } from "@/lib/utils";
 
 import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
@@ -205,7 +210,8 @@ function DefaultMarkdownImage({ node: _node, alt, ...props }: ComponentProps<"im
 
 function WorkspaceMarkdownImage({ node: _node, src, alt, className, ...props }: ComponentProps<"img"> & ExtraProps) {
   const [loadedSrc, setLoadedSrc] = useState<string>();
-  const isLoaded = Boolean(src && loadedSrc === src);
+  const srcString = typeof src === "string" ? src : undefined;
+  const isLoaded = Boolean(srcString && (loadedSrc === srcString || workspaceMarkdownImageIsLoaded(srcString)));
 
   return (
     <img
@@ -213,8 +219,18 @@ function WorkspaceMarkdownImage({ node: _node, src, alt, className, ...props }: 
       src={src}
       alt={alt}
       className={cn(className, !isLoaded && "opacity-0")}
-      onLoad={() => setLoadedSrc(src)}
-      onError={() => setLoadedSrc(undefined)}
+      onLoad={() => {
+        if (srcString) {
+          rememberWorkspaceMarkdownImageLoad(srcString);
+        }
+        setLoadedSrc(srcString);
+      }}
+      onError={() => {
+        if (srcString) {
+          forgetWorkspaceMarkdownImageLoad(srcString);
+        }
+        setLoadedSrc(undefined);
+      }}
     />
   );
 }

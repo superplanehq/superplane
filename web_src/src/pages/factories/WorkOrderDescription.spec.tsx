@@ -1,7 +1,8 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+import { clearWorkspaceMarkdownImageLoadCache } from "@/lib/workspaceMarkdownImages";
 
 import { WorkOrderDescription } from "./WorkOrderDescription";
 
@@ -25,6 +26,7 @@ describe("WorkOrderDescription", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     clearWorkOrderFileDownloadCache();
+    clearWorkspaceMarkdownImageLoadCache();
   });
 
   it("updates the collapse control when the rendered content height changes", () => {
@@ -162,5 +164,19 @@ describe("WorkOrderDescription", () => {
     rerender(<WorkOrderDescription description={description} files={[{ id, downloadUrl: reminted }]} />);
 
     expect(image).toHaveAttribute("src", first);
+  });
+
+  it("keeps a loaded request image visible when the chat wrapper remounts", () => {
+    const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const description = `![Screenshot](sp-file://${id})`;
+    const src = "https://files.example/screenshot.png?expires=9999999999&sig=one";
+    const { rerender } = render(
+      <WorkOrderDescription key="poll-1" description={description} files={[{ id, downloadUrl: src }]} />,
+    );
+
+    fireEvent.load(screen.getByRole("img", { name: "Screenshot" }));
+    rerender(<WorkOrderDescription key="poll-2" description={description} files={[{ id, downloadUrl: src }]} />);
+
+    expect(screen.getByRole("img", { name: "Screenshot" })).not.toHaveClass("opacity-0");
   });
 });

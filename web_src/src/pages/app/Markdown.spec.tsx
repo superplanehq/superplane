@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+import { clearWorkspaceMarkdownImageLoadCache } from "@/lib/workspaceMarkdownImages";
 import { MarkdownContent } from "./Markdown";
 
 vi.mock("@/components/AgentSidebar/widgets/MermaidWidget", () => ({
@@ -312,6 +313,10 @@ describe("MarkdownContent mentions", () => {
 });
 
 describe("MarkdownContent images", () => {
+  afterEach(() => {
+    clearWorkspaceMarkdownImageLoadCache();
+  });
+
   it("hides a workspace image until it loads", () => {
     const { container } = render(
       <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
@@ -346,11 +351,21 @@ describe("MarkdownContent images", () => {
     fireEvent.load(image!);
     rerender(<MarkdownContent content={first} variant="workspace" />);
 
-    expect(image).not.toHaveClass("opacity-0");
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
 
     rerender(<MarkdownContent content="![Architecture](https://files.example/updated.png)" variant="workspace" />);
 
     expect(container.querySelector("img")).toHaveClass("opacity-0");
+  });
+
+  it("keeps a loaded workspace image visible after the markdown remounts", () => {
+    const content = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent key="first" content={content} variant="workspace" />);
+
+    fireEvent.load(container.querySelector("img")!);
+    rerender(<MarkdownContent key="second" content={content} variant="workspace" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
   });
 
   it("keeps default Markdown image behavior", () => {
