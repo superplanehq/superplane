@@ -246,6 +246,7 @@ func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 		"",
 		nil,
 		[]runner.BrokerEnvironmentVariable{{Name: runner.EnvSuperplanePlanningID, Value: "session-1"}},
+		nil,
 	)
 	require.NoError(t, err)
 	assert.True(t, hasTaskFile(files, "planning_session_mcp.js"))

@@ -147,19 +147,46 @@ describe("WorkOrderDescription", () => {
     expect(content).toHaveStyle({ maxHeight: "280px" });
   });
 
+  it("uses the download URL as the image source when files are present", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <WorkOrderDescription
+        description={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(
+      <WorkOrderDescription
+        description="See ![bug](sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)"
+        collapsible={false}
+      />,
+    );
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+
   it("keeps the image source when a file URL is reminted", () => {
     const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     const description = `![Screenshot](sp-file://${id})`;
     const first = "https://files.example/screenshot.png?expires=9999999999&sig=one";
     const reminted = "https://files.example/screenshot.png?expires=9999999999&sig=two";
     const { rerender } = render(
-      <WorkOrderDescription description={description} files={[{ id, downloadUrl: first }]} />,
+      <WorkOrderDescription description={description} files={[{ id, downloadUrl: first }]} collapsible={false} />,
     );
     const image = screen.getByRole("img", { name: "Screenshot" });
 
     expect(image).toHaveAttribute("src", first);
 
-    rerender(<WorkOrderDescription description={description} files={[{ id, downloadUrl: reminted }]} />);
+    rerender(
+      <WorkOrderDescription description={description} files={[{ id, downloadUrl: reminted }]} collapsible={false} />,
+    );
 
     expect(image).toHaveAttribute("src", first);
   });
