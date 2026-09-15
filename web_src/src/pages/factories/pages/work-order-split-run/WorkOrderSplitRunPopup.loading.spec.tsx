@@ -1,8 +1,13 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { TooltipProvider } from "@/ui/tooltip";
+
+import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -10,6 +15,7 @@ const lookupState = vi.hoisted(() => ({
   featureEnabled: true,
   featureLoading: false,
   sessionLoading: false,
+  artifactsLoading: false,
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -29,18 +35,38 @@ vi.mock("./useAnalysisPlanningSession", () => ({
 }));
 
 vi.mock("./useSplitRunPopupData", () => ({
-  useSplitRunPopupData: () => ({ artifacts: [] }),
+  useSplitRunPopupData: () => ({
+    artifacts: [],
+    pullRequests: [],
+    sourceDescription: "",
+    useLive: true,
+    artifactsLoading: lookupState.artifactsLoading,
+    pullRequestsLoading: false,
+    pullRequestsError: null,
+  }),
 }));
 
-function renderPopup(onClose?: () => void) {
+vi.mock("./ClassicWorkOrderPopup", () => ({
+  ClassicWorkOrderPopup: () => <div data-testid="classic-work-order-popup" />,
+}));
+
+function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)) {
   render(
-    <WorkOrderSplitRunPopup
-      organizationId="organization-1"
-      factoryId="factory-1"
-      orderId="work-order-1"
-      fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
-      onClose={onClose}
-    />,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <TooltipProvider>
+            <WorkOrderSplitRunPopup
+              organizationId="organization-1"
+              factoryId="factory-1"
+              orderId="work-order-1"
+              fixture={fixture}
+              onClose={onClose}
+            />
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -49,6 +75,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     lookupState.featureEnabled = true;
     lookupState.featureLoading = false;
     lookupState.sessionLoading = false;
+    lookupState.artifactsLoading = false;
   });
 
   it("shows a dismissible loading popup while Task Refinement access loads", async () => {
@@ -73,5 +100,27 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading popup instead of the classic popup while draft artifacts load", () => {
+    lookupState.artifactsLoading = true;
+
+    renderPopup();
+
+    expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+  });
+
+  it("keeps a started task on the analysis popup while artifacts load", () => {
+    lookupState.artifactsLoading = true;
+    const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
+    expect(fixture.footer.kind).not.toBe("draft");
+
+    renderPopup(undefined, fixture);
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 });
