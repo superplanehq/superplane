@@ -629,6 +629,9 @@ func (r *CanvasRun) FindOpenWork(tx *gorm.DB) (*OpenCanvasRunWork, error) {
 
 func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	if r.State == CanvasRunStateCancelling {
+		if r.Result == CanvasRunResultPassed {
+			return CanvasRunResultPassed, nil
+		}
 		return CanvasRunResultCancelled, nil
 	}
 
@@ -900,7 +903,16 @@ type RunCancellationResult struct {
 	NewlyCancelling bool
 }
 
+// RequestCompletion stops unfinished work while preserving a successful run result.
+func (r *CanvasRun) RequestCompletion(tx *gorm.DB, completedBy *uuid.UUID) (*RunCancellationResult, error) {
+	return r.requestTermination(tx, completedBy, CanvasRunResultPassed)
+}
+
 func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationResult, error) {
+	return r.requestTermination(tx, cancelledBy, "")
+}
+
+func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
 	locked, err := LockCanvasRunInTransaction(tx, r.ID)
 	if err != nil {
 		return nil, err
@@ -911,21 +923,39 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 		return &RunCancellationResult{Run: r}, nil
 	}
 
-	drain, err := r.DrainForCancellation(tx, cancelledBy)
+	drain, err := r.DrainForCancellation(tx, stoppedBy)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &RunCancellationResult{Run: r, Drain: drain}
-	if r.State == CanvasRunStateCancelling {
-		return result, nil
+	if r.State != CanvasRunStateCancelling {
+		if err := r.MarkAsCancelling(tx, stoppedBy); err != nil {
+			return nil, err
+		}
+		result.NewlyCancelling = true
 	}
 
-	if err := r.MarkAsCancelling(tx, cancelledBy); err != nil {
+	if err := r.setRequestedResult(tx, requestedResult); err != nil {
 		return nil, err
 	}
-	result.NewlyCancelling = true
 	return result, nil
+}
+
+func (r *CanvasRun) setRequestedResult(tx *gorm.DB, requestedResult string) error {
+	if r.Result == requestedResult {
+		return nil
+	}
+
+	now := time.Now()
+	r.Result = requestedResult
+	r.UpdatedAt = &now
+	return tx.Model(r).
+		Updates(map[string]any{
+			"result":     requestedResult,
+			"updated_at": &now,
+		}).
+		Error
 }
 
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
