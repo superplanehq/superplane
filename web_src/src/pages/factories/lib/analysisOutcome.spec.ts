@@ -5,6 +5,7 @@ import {
   analysisFirstResultDelivered,
   hasAnalysisPlan,
   hasAnalysisScore,
+  statusForAnalysisRun,
 } from "./analysisOutcome";
 
 describe("analysisFirstResultDelivered", () => {
@@ -57,5 +58,39 @@ describe("analysisFinishedStatus", () => {
 
   it("does not change a running analysis", () => {
     expect(analysisFinishedStatus("running", true)).toBe("running");
+  });
+});
+
+describe("statusForAnalysisRun", () => {
+  it("keeps a cancelled run running when no first result exists", () => {
+    expect(statusForAnalysisRun({ result: "RESULT_CANCELLED" }, "failed", false)).toBe("running");
+  });
+
+  it("keeps a failed run failed when no first result exists", () => {
+    expect(statusForAnalysisRun({ result: "RESULT_FAILED" }, "failed", false)).toBe("failed");
+  });
+
+  it("marks a cancelled run passed when a first result exists", () => {
+    expect(statusForAnalysisRun({ result: "RESULT_CANCELLED" }, "failed", true)).toBe("passed");
+  });
+
+  it("does not change a started analysis", () => {
+    expect(statusForAnalysisRun({ state: "STATE_STARTED" }, "running", false)).toBe("running");
+  });
+
+  it("keeps a cancelling timeout running when no first result exists", () => {
+    expect(statusForAnalysisRun({ state: "STATE_CANCELLING" }, "failed", false)).toBe("running");
+  });
+
+  it("keeps an explicitly stopped run failed when no first result exists", () => {
+    expect(statusForAnalysisRun({ result: "RESULT_CANCELLED", cancelledBy: { id: "user-1" } }, "failed", false)).toBe(
+      "failed",
+    );
+  });
+
+  it("keeps an explicitly stopping run failed when no first result exists", () => {
+    expect(statusForAnalysisRun({ state: "STATE_CANCELLING", cancelledBy: { id: "user-1" } }, "failed", false)).toBe(
+      "failed",
+    );
   });
 });
