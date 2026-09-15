@@ -161,6 +161,7 @@ blocks:
     task:
       secrets:
         - name: ghcr-push-token
+        - name: r2-static-assets
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
@@ -170,13 +171,7 @@ blocks:
       jobs:
         - name: Build image
           commands:
-            - make image.build
-            - |
-              set -euo pipefail
-              if [ "${SEMAPHORE_GIT_REF_TYPE}" = "branch" ] && [ "${SEMAPHORE_GIT_BRANCH}" = "main" ]; then
-                make image.auth
-                make image.push
-              fi
+            - bash scripts/build-image
 
 after_pipeline:
   task:
