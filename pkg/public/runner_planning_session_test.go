@@ -38,7 +38,7 @@ func TestRunnerPlanningSessionDraftRouteIsRemoved(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, draftRec.Code, draftRec.Body.String())
 }
 
-func TestRunnerPlanningSessionPlan(t *testing.T) {
+func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
@@ -46,13 +46,21 @@ func TestRunnerPlanningSessionPlan(t *testing.T) {
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/plan", bytes.NewReader([]byte(
-		`{"body":"# Retry refunds\n\n## Executive summary\n\nStop double charges.\n","score":4,"summary":"This issue is a good fit for an agent."}`,
+	spec := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
+		`{"body":"# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"}`,
 	)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	spec.Header.Set("Authorization", "Bearer "+token)
+	specRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(specRec, spec)
+	require.Equal(t, http.StatusOK, specRec.Code, specRec.Body.String())
+
+	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
+	)))
+	confidence.Header.Set("Authorization", "Bearer "+token)
+	confidenceRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(confidenceRec, confidence)
+	require.Equal(t, http.StatusOK, confidenceRec.Code, confidenceRec.Body.String())
 
 	artifacts, err := order.ListArtifacts(db)
 	require.NoError(t, err)
@@ -64,32 +72,33 @@ func TestRunnerPlanningSessionPlan(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
 	assert.Equal(t, 4.0, checks[0].Score)
-
-	messages, err := models.ListPlanningSessionMessages(db, session.ID)
-	require.NoError(t, err)
-	require.Len(t, messages, 1)
-	assert.Equal(t, models.PlanningSessionMessageRolePlan, messages[0].Role)
 }
 
-func TestRunnerPlanningSessionOldPublishRoutesReturnMigrateError(t *testing.T) {
+func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
-	server, _, _, token := mustPlanningRunnerSession(t, r)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
 
-	requests := []struct {
-		path string
-		body string
-	}{
-		{path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Retry refunds"}`},
-		{path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
-	}
-	for _, request := range requests {
-		req := httptest.NewRequest(http.MethodPost, request.path, bytes.NewBufferString(request.body))
-		req.Header.Set("Authorization", "Bearer "+token)
-		rec := httptest.NewRecorder()
-		server.Router.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-		assert.Contains(t, rec.Body.String(), "use propose_plan")
-	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+		`{"score":2,"summary":"The request is still missing the failing path."}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, 2.0, checks[0].Score)
+	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
@@ -175,7 +184,8 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 		body   string
 	}{
 		{name: "wait", method: http.MethodGet, path: "/api/v1/runner/planning-sessions/wait?hold_seconds=1"},
-		{name: "plan", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/plan", body: `{"body":"# Plan","score":4,"summary":"Clear"}`},
+		{name: "spec", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Plan"}`},
+		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
 	}
@@ -220,7 +230,7 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 		path string
 		body string
 	}{
-		{path: "/api/v1/runner/planning-sessions/plan", body: `{"body":"# Retry refunds","score":4,"summary":"Clear"}`},
+		{path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Retry refunds"}`},
 		{path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
 	}
 	for _, request := range requests {

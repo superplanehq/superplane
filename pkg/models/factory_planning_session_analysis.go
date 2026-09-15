@@ -222,32 +222,6 @@ func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, s
 	})
 }
 
-func (s *FactoryPlanningSession) ProposePlan(tx *gorm.DB, body string, score float64, summary string) error {
-	markdown := strings.TrimSpace(body)
-	if markdown == "" {
-		return fmt.Errorf("%w: spec body is required", ErrFactoryPlanningSessionInvalid)
-	}
-	if err := validatePlanningConfidenceScore(score); err != nil {
-		return err
-	}
-	return s.withLockedSession(tx, func(inner *gorm.DB) error {
-		if err := s.guardOpen(); err != nil {
-			return err
-		}
-		order, err := s.analysisWorkOrder(inner)
-		if err != nil {
-			return err
-		}
-		if err := upsertPlanningSpecArtifact(inner, order, markdown); err != nil {
-			return err
-		}
-		if err := reportPlanningConfidence(inner, s, order, score, summary); err != nil {
-			return err
-		}
-		return s.recordPlanMessage(inner, score, summary)
-	})
-}
-
 func validatePlanningConfidenceScore(score float64) error {
 	if !isFiniteCheckNumber(score) || score < 0 || score > PlanningConfidenceScoreMax {
 		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
@@ -271,33 +245,6 @@ func reportPlanningConfidence(tx *gorm.DB, session *FactoryPlanningSession, orde
 		Run:      run,
 	})
 	return err
-}
-
-type planningPlanMessagePayload struct {
-	Score   float64 `json:"score"`
-	Summary string  `json:"summary,omitempty"`
-}
-
-func (s *FactoryPlanningSession) recordPlanMessage(tx *gorm.DB, score float64, summary string) error {
-	payload, err := json.Marshal(planningPlanMessagePayload{
-		Score:   score,
-		Summary: strings.TrimSpace(summary),
-	})
-	if err != nil {
-		return err
-	}
-	message := PlanningSessionMessage{
-		ID:        uuid.New(),
-		SessionID: s.ID,
-		Role:      PlanningSessionMessageRolePlan,
-		Text:      string(payload),
-		Delivered: true,
-		CreatedAt: time.Now(),
-	}
-	if err := tx.Create(&message).Error; err != nil {
-		return err
-	}
-	return s.reloadMessages(tx)
 }
 
 func (s *FactoryPlanningSession) analysisWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
@@ -367,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the current specification and the score when the new context changes them.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
