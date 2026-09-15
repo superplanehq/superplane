@@ -1,60 +1,61 @@
 import type { AgentActivityItem, AgentToolItem } from "./agentActivity";
 
-export type RunningCommandGroup = {
-  type: "running_command_group";
+export type ToolActivityGroup = {
+  type: "tool_activity_group";
   id: string;
   tools: AgentToolItem[];
 };
 
-export type ActivityEntry = AgentActivityItem | RunningCommandGroup;
+export type ActivityEntry = Exclude<AgentActivityItem, AgentToolItem> | ToolActivityGroup;
 
-export function completedActivityLabel(tools: AgentToolItem[]): string {
-  const counts = {
-    commands: 0,
-    mcpCalls: 0,
-    fileReads: 0,
-    searches: 0,
-    webRequests: 0,
-    fileChanges: 0,
-    toolCalls: 0,
-  };
+type ActivityCount = {
+  count: number;
+  running: boolean;
+};
 
-  for (const tool of tools) {
-    const kind = tool.kind.toLowerCase();
-    if (isCommandTool(tool)) counts.commands += 1;
-    else if (isMCPTool(tool)) counts.mcpCalls += 1;
-    else if (kind === "read") counts.fileReads += 1;
-    else if (["search", "grep", "glob", "web_search"].includes(kind)) counts.searches += 1;
-    else if (kind === "web_fetch") counts.webRequests += 1;
-    else if (["edit", "write"].includes(kind)) counts.fileChanges += 1;
-    else counts.toolCalls += 1;
-  }
+type ActivityCounts = {
+  fileChanges: ActivityCount;
+  fileReads: ActivityCount;
+  searches: ActivityCount;
+  repositoryExplorations: ActivityCount;
+  sources: ActivityCount;
+  gitInspections: ActivityCount;
+  checks: ActivityCount;
+  specifications: ActivityCount;
+  taskScores: ActivityCount;
+  questions: ActivityCount;
+  toolCalls: ActivityCount;
+  terminalUses: ActivityCount;
+};
 
+export function activitySummaryLabel(tools: AgentToolItem[]): string {
+  const counts = countActivities(tools);
   const parts = [
-    countLabel(counts.commands, "command"),
-    countLabel(counts.mcpCalls, "MCP call"),
-    countLabel(counts.fileReads, "file read"),
-    countLabel(counts.searches, "search", "searches"),
-    countLabel(counts.webRequests, "web request"),
-    countLabel(counts.fileChanges, "file change"),
-    countLabel(counts.toolCalls, "other tool call"),
+    actionCountLabel(counts.fileChanges, "editing", "edited", "file"),
+    actionCountLabel(counts.fileReads, "exploring", "explored", "file"),
+    repeatedActionLabel(counts.searches, "searching code", "searched code"),
+    repeatedActionLabel(counts.repositoryExplorations, "exploring repository", "explored repository"),
+    actionCountLabel(counts.sources, "researching", "researched", "source"),
+    repeatedActionLabel(counts.gitInspections, "inspecting Git", "inspected Git"),
+    actionCountLabel(counts.checks, "running", "ran", "check"),
+    repeatedActionLabel(counts.specifications, "preparing specification", "prepared specification"),
+    repeatedActionLabel(counts.taskScores, "scoring task", "scored task"),
+    repeatedActionLabel(counts.questions, "preparing questions", "prepared questions"),
+    actionCountLabel(counts.toolCalls, "using", "used", "tool"),
+    repeatedActionLabel(counts.terminalUses, "using terminal", "used terminal"),
   ].filter((part): part is string => Boolean(part));
 
-  return `Ran ${joinSummaryParts(parts)}`;
+  const label = parts.join(", ") || "Activity";
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function isCommandTool(item: AgentActivityItem): item is AgentToolItem {
-  if (item.type !== "tool") return false;
-  return ["bash", "command_execution"].includes(item.kind.toLowerCase());
-}
-
-export function groupConcurrentCommands(entries: AgentActivityItem[]): ActivityEntry[] {
+export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
   const grouped: ActivityEntry[] = [];
   let index = 0;
 
   while (index < entries.length) {
     const entry = entries[index];
-    if (!isRunningCommand(entry)) {
+    if (entry.type !== "tool") {
       grouped.push(entry);
       index += 1;
       continue;
@@ -62,61 +63,25 @@ export function groupConcurrentCommands(entries: AgentActivityItem[]): ActivityE
 
     const tools: AgentToolItem[] = [entry];
     let nextIndex = index + 1;
-    while (nextIndex < entries.length && isRunningCommand(entries[nextIndex])) {
+    while (nextIndex < entries.length && entries[nextIndex].type === "tool") {
       tools.push(entries[nextIndex] as AgentToolItem);
       nextIndex += 1;
     }
 
-    grouped.push(
-      tools.length === 1 ? entry : { type: "running_command_group", id: `running-commands-${entry.id}`, tools },
-    );
+    grouped.push({ type: "tool_activity_group", id: `tool-group-${entry.id}`, tools });
     index = nextIndex;
   }
 
   return grouped;
 }
 
-export function runningCommandPreview(tool: AgentToolItem): string | undefined {
-  if (tool.status !== "running" || !isCommandTool(tool)) return undefined;
-  return commandPreview(tool.input);
+export function isCommandTool(item: AgentActivityItem): boolean {
+  return item.type === "tool" && ["bash", "command_execution"].includes(item.kind.toLowerCase());
 }
 
-export function commandPreview(input: string): string | undefined {
-  const command = firstNonEmptyLine(commandText(input));
-  if (!command) return undefined;
-
-  const separator = command.indexOf("&&");
-  if (separator < 0 || !/^cd(?:\s|$)/.test(command.slice(0, separator).trim())) return command;
-  return command.slice(separator + 2).trim() || command;
-}
-
-function countLabel(count: number, singular: string, plural = `${singular}s`): string | undefined {
-  if (count === 0) return undefined;
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function joinSummaryParts(parts: string[]): string {
-  if (parts.length <= 1) return parts[0] ?? "activity";
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
-}
-
-function isMCPTool(tool: AgentToolItem): boolean {
-  return [tool.kind, tool.name].some((value) => {
-    const normalized = value.toLowerCase();
-    return normalized === "mcp" || normalized === "mcp_tool_call" || normalized.startsWith("mcp__");
-  });
-}
-
-function isRunningCommand(item: AgentActivityItem | undefined): item is AgentToolItem {
-  return Boolean(item && isCommandTool(item) && item.status === "running");
-}
-
-function firstNonEmptyLine(value: string): string | undefined {
-  return value
-    .split(/\r?\n/)
-    .find((line) => line.trim())
-    ?.trim();
+export function commandDisplayText(input: string): string | undefined {
+  const command = commandText(input).trim().replace(/\r?\n/g, " ");
+  return command || undefined;
 }
 
 export function commandText(input: string): string {
@@ -136,6 +101,208 @@ export function commandText(input: string): string {
   return commandFromPartialJSON(trimmed) ?? input;
 }
 
+export function toolFilePaths(input: string): string[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  const jsonPaths = pathsFromJSON(trimmed);
+  if (jsonPaths.length > 0) return unique(jsonPaths);
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return [];
+
+  return unique(
+    trimmed
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(looksLikeFilePath),
+  );
+}
+
+function countActivities(tools: AgentToolItem[]): ActivityCounts {
+  const counts = emptyActivityCounts();
+  for (const tool of tools) {
+    const kind = tool.kind.toLowerCase();
+    if (isCommandTool(tool)) countShellActivity(counts, tool);
+    else if (isMCPTool(tool)) countMCPActivity(counts, tool);
+    else if (kind === "read") increment(counts.fileReads, tool, fileCount(tool));
+    else if (["search", "grep", "glob"].includes(kind)) increment(counts.searches, tool);
+    else if (["web_search", "web_fetch"].includes(kind)) increment(counts.sources, tool);
+    else if (["edit", "write"].includes(kind)) increment(counts.fileChanges, tool, fileCount(tool));
+    else increment(counts.toolCalls, tool);
+  }
+  return counts;
+}
+
+function emptyActivityCounts(): ActivityCounts {
+  const count = (): ActivityCount => ({ count: 0, running: false });
+  return {
+    fileChanges: count(),
+    fileReads: count(),
+    searches: count(),
+    repositoryExplorations: count(),
+    sources: count(),
+    gitInspections: count(),
+    checks: count(),
+    specifications: count(),
+    taskScores: count(),
+    questions: count(),
+    toolCalls: count(),
+    terminalUses: count(),
+  };
+}
+
+function countShellActivity(counts: ActivityCounts, tool: AgentToolItem): void {
+  const command = commandText(tool.input);
+  let classified = false;
+
+  const fileReadCount = shellFileReadCount(command);
+  if (fileReadCount > 0) {
+    increment(counts.fileReads, tool, fileReadCount);
+    classified = true;
+  }
+  classified = countShellExecutables(command, ["grep", "rg"], counts.searches, tool) || classified;
+  classified =
+    countShellExecutables(command, ["fd", "find", "ls", "tree"], counts.repositoryExplorations, tool) || classified;
+  classified = countShellExecutables(command, ["curl", "wget"], counts.sources, tool) || classified;
+  classified = countShellExecutables(command, ["git"], counts.gitInspections, tool) || classified;
+  if (isCheckCommand(command)) {
+    increment(counts.checks, tool);
+    classified = true;
+  }
+  if (!classified) increment(counts.terminalUses, tool);
+}
+
+function shellFileReadCount(command: string): number {
+  const pattern = new RegExp(
+    `${shellCommandBoundary()}${shellCommandWrappers()}(?:\\S*/)?cat(?=\\s|$)([^\\n;&|]*)`,
+    "gi",
+  );
+  return [...command.matchAll(pattern)].reduce((total, match) => total + shellFileArgumentCount(match[1]), 0);
+}
+
+function shellFileArgumentCount(argumentsText: string): number {
+  const argumentsList = argumentsText.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? [];
+  return argumentsList.filter((argument) => {
+    const value = argument.replace(/^['"]|['"]$/g, "");
+    return value && !value.startsWith("-") && !value.includes(">") && value !== "/dev/null";
+  }).length;
+}
+
+function countMCPActivity(counts: ActivityCounts, tool: AgentToolItem): void {
+  const identifier = `${tool.kind} ${tool.name}`.toLowerCase();
+  if (identifier.includes("propose_spec")) {
+    increment(counts.specifications, tool);
+    return;
+  }
+  if (identifier.includes("confidence")) {
+    increment(counts.taskScores, tool);
+    return;
+  }
+  if (identifier.includes("survey")) {
+    increment(counts.questions, tool);
+    return;
+  }
+  increment(counts.toolCalls, tool);
+}
+
+function countShellExecutables(
+  command: string,
+  executables: string[],
+  count: ActivityCount,
+  tool: AgentToolItem,
+): boolean {
+  const names = executables.join("|");
+  const pattern = new RegExp(`${shellCommandBoundary()}${shellCommandWrappers()}(?:\\S*/)?(?:${names})(?=\\s|$)`, "i");
+  if (!pattern.test(command)) return false;
+  increment(count, tool);
+  return true;
+}
+
+function shellCommandBoundary(): string {
+  return String.raw`(?:^|[\n;&|()]|\b(?:do|then)\b)\s*`;
+}
+
+function shellCommandWrappers(): string {
+  return String.raw`(?:sudo\s+)?(?:env\s+)?(?:[\w.-]+=\S+\s+)*`;
+}
+
+function isCheckCommand(command: string): boolean {
+  return /\b(?:make\s+\S*(?:test|lint|check|build)|go\s+test|pytest|cargo\s+test|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|lint|check|build))\b/i.test(
+    command,
+  );
+}
+
+function increment(count: ActivityCount, tool: AgentToolItem, amount = 1): void {
+  count.count += amount;
+  count.running ||= tool.status === "running";
+}
+
+function fileCount(tool: AgentToolItem): number {
+  return Math.max(1, toolFilePaths(tool.input).length);
+}
+
+function actionCountLabel(
+  activity: ActivityCount,
+  runningVerb: string,
+  completedVerb: string,
+  noun: string,
+): string | undefined {
+  if (activity.count === 0) return undefined;
+  const verb = activity.running ? runningVerb : completedVerb;
+  return `${verb} ${activity.count} ${activity.count === 1 ? noun : `${noun}s`}`;
+}
+
+function repeatedActionLabel(
+  activity: ActivityCount,
+  runningPhrase: string,
+  completedPhrase: string,
+): string | undefined {
+  if (activity.count === 0) return undefined;
+  const phrase = activity.running ? runningPhrase : completedPhrase;
+  return activity.count === 1 ? phrase : `${phrase} ${activity.count} times`;
+}
+
+function isMCPTool(tool: AgentToolItem): boolean {
+  return [tool.kind, tool.name].some((value) => {
+    const normalized = value.toLowerCase();
+    return normalized === "mcp" || normalized === "mcp_tool_call" || normalized.startsWith("mcp__");
+  });
+}
+
+function pathsFromJSON(input: string): string[] {
+  if (!input.startsWith("{") && !input.startsWith("[")) return [];
+  try {
+    const paths: string[] = [];
+    collectJSONPaths(JSON.parse(input) as unknown, paths);
+    return paths;
+  } catch {
+    return [];
+  }
+}
+
+function collectJSONPaths(value: unknown, paths: string[]): void {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectJSONPaths(entry, paths));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (["path", "file", "file_path", "filename"].includes(key) && typeof entry === "string") {
+      paths.push(entry);
+      continue;
+    }
+    if (["changes", "files"].includes(key)) collectJSONPaths(entry, paths);
+  }
+}
+
+function looksLikeFilePath(value: string): boolean {
+  if (!value || value.length > 2048 || /[|;&`]/.test(value)) return false;
+  return value.includes("/") || /^\.?[\w -]+\.[a-z0-9]{1,12}$/i.test(value);
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
 function commandFromPartialJSON(input: string): string | undefined {
   const property = /"command"\s*:\s*"/g.exec(input);
   if (!property) return undefined;
@@ -151,8 +318,7 @@ function commandFromPartialJSON(input: string): string | undefined {
 
     const escaped = input[index + 1];
     if (escaped === undefined) return command;
-    const decoded = decodeJSONEscape(escaped);
-    command += decoded;
+    command += decodeJSONEscape(escaped);
     index += 1;
   }
   return command;

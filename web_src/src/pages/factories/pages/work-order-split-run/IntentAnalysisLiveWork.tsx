@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { AgentActivityView } from "./AgentActivityView";
-import { currentLiveActivity, type AgentActivity } from "./agentActivity";
+import { AnimatedThinkingState } from "./AnimatedThinkingState";
+import { currentLiveActivity, type AgentActivity, type AgentActivityItem, type AgentToolItem } from "./agentActivity";
+import { activitySummaryLabel } from "./agentActivitySummary";
 import { useAgentActivityStream } from "./useAgentActivityStream";
 
 const STALE_ACTIVITY_MS = 15_000;
@@ -24,24 +26,21 @@ export function AnalysisLiveWork({
   const stream = useAgentActivityStream({ organizationId, canvasId, executionId, active });
   const activity = currentLiveActivity(activities, stream.activities);
   const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
-  const status = liveStatus(activity?.items.length ?? 0, elapsedMs, stream.hasConnectedOnce ? stream.error : undefined);
+  const status = liveStatus(activity, elapsedMs, stream.hasConnectedOnce ? stream.error : undefined);
 
   if (!active) return null;
   return (
     <div data-testid="split-run-intent-live-work">
       {activity ? <AgentActivityView activity={activity} live /> : null}
-      {status ? (
-        <p
-          role="status"
-          aria-live="polite"
-          className="px-2 py-1.5 text-[13px] leading-5 text-muted-foreground"
-          data-testid="split-run-intent-thinking"
-        >
-          <span className="sp-ai-thinking" data-text={status}>
-            {status}
-          </span>
-        </p>
-      ) : null}
+      <p
+        role="status"
+        aria-label={status}
+        aria-live="polite"
+        className="px-2 py-1.5 text-[13px] leading-5 text-muted-foreground"
+        data-testid="split-run-intent-thinking"
+      >
+        <AnimatedThinkingState text={status} />
+      </p>
     </div>
   );
 }
@@ -58,11 +57,30 @@ function useActivityElapsed(sequence: number, active: boolean): number {
   return elapsedMs;
 }
 
-function liveStatus(itemCount: number, elapsedMs: number, error?: string): string | undefined {
+function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): string {
   if (error) return "Live activity disconnected. Reconnecting…";
   if (elapsedMs >= STALE_ACTIVITY_MS) {
     return `Still working · ${Math.floor(elapsedMs / 1000)}s`;
   }
-  if (itemCount === 0) return "Starting analysis…";
+  if (!activity || activity.items.length === 0) return "Starting analysis…";
+
+  const latestRunningItem = findLatestRunningItem(activity.items);
+  if (latestRunningItem?.type === "content") {
+    return latestRunningItem.kind === "reasoning" ? "Thinking…" : "Writing response…";
+  }
+  if (latestRunningItem?.type === "tool") {
+    const runningTools = activity.items.filter(
+      (item): item is AgentToolItem => item.type === "tool" && item.status === "running",
+    );
+    return `${activitySummaryLabel(runningTools)}…`;
+  }
+  return "Planning next step…";
+}
+
+function findLatestRunningItem(items: AgentActivityItem[]): AgentActivityItem | undefined {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item.type !== "notice" && item.status === "running") return item;
+  }
   return undefined;
 }

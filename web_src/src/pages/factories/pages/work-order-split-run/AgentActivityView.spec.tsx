@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -90,98 +90,69 @@ describe("AgentActivityView", () => {
     expect(screen.queryByRole("button", { name: /refined plan/i })).not.toBeInTheDocument();
   });
 
-  it("renders live commands directly and keeps completed command details unmounted", async () => {
+  it("shows completed commands as plain one-line entries without output", async () => {
     const user = userEvent.setup();
     render(
       <AgentActivityView
         live
         activity={activityWithItems([
           {
-            type: "tool",
-            id: "command-1",
-            kind: "bash",
-            name: "Bash",
-            input: "printf 'first line\\nsecond line'",
+            ...completedTool("command-1", "bash", "Bash"),
+            input: "printf 'first line\nsecond line'",
             output: "first line\nsecond line",
-            outputStreams: [],
-            status: "passed",
-            truncated: false,
           },
           {
-            type: "content",
-            id: "reasoning-empty",
-            kind: "reasoning",
-            text: "",
-            status: "passed",
-            durationMs: 500,
-            truncated: false,
-          },
-          {
-            type: "tool",
-            id: "command-2",
-            kind: "command_execution",
-            name: "Shell",
+            ...completedTool("command-2", "command_execution", "Shell"),
             input: "pwd && find . -type f",
             output: "/repo",
-            outputStreams: [],
-            status: "passed",
-            truncated: false,
           },
         ])}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Ran 2 commands" })).not.toBeInTheDocument();
-    const tool = screen.getByTestId("agent-tool-command-1");
-    const summary = within(tool).getByRole("button", { name: "Ran command" });
+    const summary = screen.getByRole("button", { name: "Explored repository, used terminal" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getAllByRole("button", { name: "Ran command" })).toHaveLength(2);
-    expect(within(tool).getByTestId("agent-tool-summary-command-1")).toHaveClass("truncate", "whitespace-nowrap");
-    expect(tool.querySelector("pre")).not.toBeInTheDocument();
+    expect(summary.querySelector("svg")).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(summary.querySelector("span")).toHaveClass("whitespace-normal", "break-words");
+    expect(screen.queryByText("pwd && find . -type f")).not.toBeInTheDocument();
 
     await user.click(summary);
-    expect(tool.querySelectorAll("pre")).toHaveLength(2);
-    expect(within(tool).getByTestId("agent-tool-details-command-1")).toHaveClass("ml-6");
-    const command = within(tool).getByTestId("agent-detail-command-1-command");
-    const output = within(tool).getByTestId("agent-detail-command-1-output");
-    expect(command).not.toHaveClass("border-l", "border-l-2");
-    expect(output).toHaveClass("border-l", "text-muted-foreground");
-    expect(within(command).getByText("Command")).toHaveClass("sr-only");
-    expect(within(output).getByText("Output")).toHaveClass("sr-only");
+
+    const first = screen.getByTestId("agent-tool-command-1");
+    expect(first).toHaveTextContent("printf 'first line second line'");
+    expect(first).toHaveClass("truncate", "whitespace-nowrap");
+    expect(screen.getByText("pwd && find . -type f")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ran command" })).not.toBeInTheDocument();
+    expect(document.querySelector("pre")).not.toBeInTheDocument();
+    expect(screen.queryByText("/repo")).not.toBeInTheDocument();
   });
 
-  it("groups concurrent running commands and keeps their details collapsed", () => {
+  it("groups one or more running commands behind a text-only summary", async () => {
+    const user = userEvent.setup();
     render(
       <AgentActivityView
         live
         activity={activityWithItems([
-          {
-            ...completedTool("command-1", "bash", "Bash"),
-            input: "cat README.md",
-            status: "running",
-          },
-          {
-            ...completedTool("command-2", "bash", "Bash"),
-            input: "rg --files",
-            status: "running",
-          },
+          { ...completedTool("command-1", "bash", "Bash"), input: "cat README.md", status: "running" },
+          { ...completedTool("command-2", "bash", "Bash"), input: "rg --files", status: "running" },
         ])}
       />,
     );
 
-    const group = screen.getByRole("button", { name: "Running 2 commands" });
-    expect(group).toHaveAttribute("aria-expanded", "true");
+    const summary = screen.getByRole("button", { name: "Exploring 1 file, searching code" });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(summary.querySelector("svg")).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(screen.queryByText("cat README.md")).not.toBeInTheDocument();
 
-    const commands = [
-      screen.getByRole("button", { name: "Running cat README.md" }),
-      screen.getByRole("button", { name: "Running rg --files" }),
-    ];
-    expect(commands.every((command) => command.getAttribute("aria-expanded") === "false")).toBe(true);
+    await user.click(summary);
+
+    expect(screen.getByText("cat README.md")).toBeInTheDocument();
+    expect(screen.getByText("rg --files")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-tool-details-command-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("agent-tool-command-1")).toHaveClass("sp-tool-enter");
   });
 
-  it("shows one running command directly with a distinct command gradient", () => {
+  it("keeps one running command inside the same summary pattern", async () => {
+    const user = userEvent.setup();
     render(
       <AgentActivityView
         live
@@ -193,178 +164,97 @@ describe("AgentActivityView", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Running 1 command" })).not.toBeInTheDocument();
-    const command = screen.getByRole("button", { name: "Running grep -n retry pkg" });
-    expect(command).toHaveAttribute("aria-expanded", "false");
-    expect(within(command).getByText("Running")).toHaveClass("sp-ai-thinking");
-    expect(within(command).getByText("grep -n retry pkg")).toHaveClass("sp-running-command");
+    const summary = screen.getByRole("button", { name: "Searching code" });
+    await user.click(summary);
+
+    expect(screen.getByTestId("agent-tool-command-1")).toHaveTextContent("cd /repo && grep -n retry pkg");
+    expect(screen.queryByText("Running", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("extracts the command from structured live Bash input", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          input: JSON.stringify({ command: "cd /repo && rg -n retry pkg", timeout: 30_000 }),
-          status: "running",
-        })}
-      />,
-    );
-
-    const command = screen.getByRole("button", { name: "Running rg -n retry pkg" });
-    expect(within(command).getByText("rg -n retry pkg")).toBeInTheDocument();
-    expect(command).not.toHaveTextContent('{"command"');
-  });
-
-  it("extracts the available command from partial live Bash JSON", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          input: String.raw`{"command":"cd /repo && grep -n \"retry`,
-          status: "running",
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: 'Running grep -n "retry' })).toBeInTheDocument();
-  });
-
-  it("summarizes a completed structured Bash input as a command", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          input: JSON.stringify({ command: "git status" }),
-        })}
-      />,
-    );
-
-    const tool = screen.getByTestId("agent-tool-command-1");
-    expect(within(tool).getByTestId("agent-tool-summary-command-1")).toHaveTextContent("git status");
-    expect(tool).not.toHaveTextContent('{"command"');
-  });
-
-  it("shows the command instead of its structured wrapper in details", async () => {
+  it.each([
+    [JSON.stringify({ command: "cd /repo && rg -n retry pkg", timeout: 30_000 }), "cd /repo && rg -n retry pkg"],
+    [String.raw`{"command":"cd /repo && grep -n \"retry`, 'cd /repo && grep -n "retry'],
+  ])("extracts a Bash command from provider input", async (input, command) => {
     const user = userEvent.setup();
     render(
       <AgentActivityView
         live
         activity={activityWith({
           ...completedTool("command-1", "bash", "Bash"),
-          input: JSON.stringify({ command: "printf 'ok'", timeout: 30_000 }),
-        })}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Ran command" }));
-
-    const details = screen.getByTestId("agent-detail-command-1-command");
-    expect(details).toHaveTextContent("printf 'ok'");
-    expect(details).not.toHaveTextContent('{"command"');
-  });
-
-  it("keeps a running MCP call collapsed", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          ...completedTool("mcp-1", "mcp", "mcp__superplane__propose_spec"),
-          input: JSON.stringify({ body: "A long specification body" }),
+          input,
           status: "running",
         })}
       />,
     );
 
-    const mcp = screen.getByRole("button", { name: "Running mcp__superplane__propose_spec" });
-    expect(mcp).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByTestId("agent-tool-details-mcp-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("agent-tool-summary-mcp-1")).toHaveClass("truncate", "whitespace-nowrap");
+    await user.click(screen.getByRole("button", { name: "Searching code" }));
+
+    expect(screen.getByTestId("agent-tool-command-1")).toHaveTextContent(command);
+    expect(screen.getByTestId("agent-tool-command-1")).not.toHaveTextContent('{"command"');
   });
 
-  it("reveals copy actions on block interaction and temporarily shows success", async () => {
-    vi.useFakeTimers();
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    try {
-      render(
-        <AgentActivityView
-          live
-          activity={activityWith({
-            type: "tool",
-            id: "command-1",
-            kind: "bash",
-            name: "Bash",
-            input: "pwd",
-            output: "",
-            outputStreams: [],
-            status: "running",
-            truncated: false,
-          })}
-        />,
-      );
-
-      fireEvent.click(screen.getByRole("button", { name: "Running pwd" }));
-      const copyButton = screen.getByRole("button", { name: "Copy command" });
-      expect(copyButton).toHaveClass(
-        "opacity-0",
-        "group-hover:opacity-100",
-        "focus-visible:opacity-100",
-        "data-[copied=true]:opacity-100",
-      );
-
-      fireEvent.click(copyButton);
-      await act(async () => Promise.resolve());
-
-      expect(writeText).toHaveBeenCalledWith("pwd");
-      expect(screen.getByRole("button", { name: "Command copied" })).toHaveAttribute("data-copied", "true");
-
-      act(() => {
-        vi.advanceTimersByTime(2000);
-      });
-
-      expect(screen.getByRole("button", { name: "Copy command" })).not.toHaveAttribute("data-copied");
-    } finally {
-      vi.useRealTimers();
-      vi.restoreAllMocks();
-    }
-  });
-
-  it("renders one completed live command without a group wrapper", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          type: "tool",
-          id: "command-1",
-          kind: "bash",
-          name: "Bash",
-          input: "pwd",
-          output: "/repo",
-          outputStreams: [],
-          status: "passed",
-          truncated: false,
-        })}
-      />,
-    );
-
-    expect(screen.queryByRole("button", { name: "Ran 1 command" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ran command" }).getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("keeps intermediate provider updates between completed tools", async () => {
-    const user = userEvent.setup();
+  it("summarizes mixed tool activity like Cursor", () => {
     render(
       <AgentActivityView
         activity={activityWithItems([
           completedTool("command-1", "bash", "Bash"),
+          completedTool("command-2", "command_execution", "Shell"),
+          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
+          completedTool("mcp-2", "propose_confidence", "mcp_tool_call"),
+          { ...completedTool("read-1", "read", "Read"), input: JSON.stringify({ path: "src/index.ts" }) },
+          { ...completedTool("search-1", "grep", "Grep"), input: "planning session" },
+          { ...completedTool("web-1", "web_search", "WebSearch"), input: "streaming UI" },
+        ])}
+      />,
+    );
+
+    const summary = screen.getByRole("button", {
+      name: "Explored 1 file, searched code, researched 1 source, prepared specification, scored task, used terminal 2 times",
+    });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(summary.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("collapses a completed turn into one summary without nested command disclosures", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        activity={activityWithItems([
+          { ...completedTool("search-1", "bash", "Bash"), input: "rg retry" },
+          {
+            type: "content",
+            id: "thought-1",
+            kind: "reasoning",
+            text: "The retry path needs another check.",
+            status: "passed",
+            durationMs: 2_000,
+            truncated: false,
+          },
+          { ...completedTool("read-1", "bash", "Bash"), input: "cat retry.go" },
+        ])}
+      />,
+    );
+
+    const summary = screen.getByRole("button", { name: "Explored 1 file, searched code" });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("rg retry")).not.toBeInTheDocument();
+
+    await user.click(summary);
+
+    expect(screen.getByText("rg retry")).toBeInTheDocument();
+    expect(screen.getByText("cat retry.go")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thought briefly" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Searched code" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explored 1 file" })).not.toBeInTheDocument();
+  });
+
+  it("keeps tool batches around intermediate provider updates", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          { ...completedTool("command-1", "bash", "Bash"), input: "rg retry" },
           {
             type: "content",
             id: "update-1",
@@ -373,7 +263,7 @@ describe("AgentActivityView", () => {
             status: "passed",
             truncated: false,
           },
-          completedTool("command-2", "bash", "Bash"),
+          { ...completedTool("command-2", "bash", "Bash"), input: "cat retry.go" },
           {
             type: "content",
             id: "final-answer",
@@ -386,128 +276,116 @@ describe("AgentActivityView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Ran 2 commands" }));
-
-    const details = screen.getByTestId("agent-activity-details-activity-1");
-    const orderedEntries = Array.from(details.children);
-    expect(orderedEntries[0]).toHaveAttribute("data-testid", "agent-tool-command-1");
-    expect(orderedEntries[1]).toHaveAttribute("data-testid", "agent-assistant-update-1");
-    expect(orderedEntries[2]).toHaveAttribute("data-testid", "agent-tool-command-2");
+    const summaries = [
+      screen.getByRole("button", { name: "Searched code" }),
+      screen.getByRole("button", { name: "Explored 1 file" }),
+    ];
+    expect(summaries).toHaveLength(2);
     expect(screen.getByText("I will inspect the source files next.")).toBeInTheDocument();
-    expect(screen.queryByText("The analysis is complete.")).not.toBeInTheDocument();
+    expect(screen.getByText("The analysis is complete.")).toBeInTheDocument();
+
+    await user.click(summaries[0]);
+    await user.click(summaries[1]);
+    expect(screen.getByText("rg retry")).toBeInTheDocument();
+    expect(screen.getByText("cat retry.go")).toBeInTheDocument();
   });
 
-  it("summarizes all tool activity above a completed turn", async () => {
+  it("keeps failed commands non-expandable and marks only their line", async () => {
     const user = userEvent.setup();
     render(
       <AgentActivityView
+        live
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "false",
+          status: "failed",
+          exitCode: 1,
+        })}
+      />,
+    );
+
+    const summary = screen.getByRole("button", { name: "Used terminal" });
+    expect(summary.querySelector(".text-destructive")).not.toBeInTheDocument();
+    await user.click(summary);
+
+    expect(screen.getByTestId("agent-tool-command-1")).toHaveClass("text-destructive");
+    expect(screen.queryByTestId("agent-tool-details-command-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Exit code 1")).not.toBeInTheDocument();
+  });
+
+  it("reveals command copy on hover and temporarily shows success", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    try {
+      render(
+        <AgentActivityView
+          live
+          activity={activityWith({
+            ...completedTool("command-1", "bash", "Bash"),
+            input: "pwd",
+            status: "running",
+          })}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Using terminal" }));
+      const copyButton = screen.getByRole("button", { name: "Copy command" });
+      expect(copyButton).toHaveClass("opacity-0", "group-hover:opacity-100", "data-[copied=true]:opacity-100");
+
+      fireEvent.click(copyButton);
+      await act(async () => Promise.resolve());
+      expect(writeText).toHaveBeenCalledWith("pwd");
+      expect(screen.getByRole("button", { name: "Command copied" })).toHaveAttribute("data-copied", "true");
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.getByRole("button", { name: "Copy command" })).not.toHaveAttribute("data-copied");
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("counts all files in multi-file activity summaries", () => {
+    render(
+      <AgentActivityView
+        live
         activity={activityWithItems([
-          completedTool("command-1", "bash", "Bash"),
-          completedTool("command-2", "command_execution", "Shell"),
-          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
-          completedTool("mcp-2", "propose_confidence", "mcp_tool_call"),
-          completedTool("read-1", "read", "Read"),
+          {
+            ...completedTool("edit-1", "edit", "file_change"),
+            input: "src/one.ts\nsrc/two.ts\nsrc/three.ts",
+          },
+          {
+            ...completedTool("read-1", "read", "Read"),
+            input: JSON.stringify({ files: [{ path: "src/four.ts" }, { path: "src/five.ts" }] }),
+          },
         ])}
       />,
     );
 
-    const summary = screen.getByRole("button", {
-      name: "Ran 2 commands, 2 MCP calls, and 1 file read",
-    });
-    expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "Ran 2 commands" })).not.toBeInTheDocument();
-
-    await user.click(summary);
-
-    expect(screen.getByTestId("agent-activity-details-activity-1")).toHaveClass("ml-1", "pl-1.5");
-    expect(screen.getByTestId("agent-activity-details-activity-1")).not.toHaveClass("ml-1.5");
-    expect(screen.queryByRole("button", { name: "Ran 2 commands" })).not.toBeInTheDocument();
-    const commands = screen.getAllByRole("button", { name: "Ran command" });
-    expect(commands).toHaveLength(2);
-    expect(commands.every((command) => command.getAttribute("aria-expanded") === "false")).toBe(true);
-    expect(screen.getByRole("button", { name: "Ran mcp__superplane__propose_spec" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Read file" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edited 3 files, explored 2 files" })).toBeInTheDocument();
   });
 
-  it("keeps a failed activity summary and its failed child collapsed", async () => {
-    const user = userEvent.setup();
+  it("uses factual names for common shell activity", () => {
     render(
       <AgentActivityView
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          status: "failed",
-          exitCode: 1,
-        })}
+        activity={activityWithItems([
+          { ...completedTool("read-1", "bash", "Bash"), input: "cat README.md setup.py" },
+          { ...completedTool("search-1", "bash", "Bash"), input: "rg -n retry pkg" },
+          { ...completedTool("explore-1", "bash", "Bash"), input: "find src -type f" },
+          { ...completedTool("git-1", "bash", "Bash"), input: "git status --short" },
+          { ...completedTool("check-1", "bash", "Bash"), input: "make test" },
+          { ...completedTool("web-1", "bash", "Bash"), input: "curl https://example.com" },
+        ])}
       />,
     );
 
-    const summary = screen.getByTestId("agent-activity-summary-activity-1");
-    expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(summary.querySelector(".text-destructive")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Ran command" })).not.toBeInTheDocument();
-
-    await user.click(summary);
-
-    expect(screen.getByRole("button", { name: "Ran command" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByTestId("agent-tool-details-command-1")).not.toBeInTheDocument();
-  });
-
-  it("keeps a standalone failed tool collapsed", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          status: "failed",
-          exitCode: 1,
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Ran command" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByTestId("agent-tool-details-command-1")).not.toBeInTheDocument();
-  });
-
-  it("summarizes multi-file edits factually", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          type: "tool",
-          id: "edit-1",
-          kind: "edit",
-          name: "file_change",
-          input: "src/one.ts\nsrc/two.ts\nsrc/three.ts\nsrc/four.ts\nsrc/five.ts",
-          output: "",
-          outputStreams: [],
-          status: "passed",
-          truncated: false,
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Edited 5 files" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("summarizes multi-file reads factually", () => {
-    render(
-      <AgentActivityView
-        live
-        activity={activityWith({
-          type: "tool",
-          id: "read-1",
-          kind: "read",
-          name: "Read",
-          input: JSON.stringify({ files: [{ path: "src/one.ts" }, { path: "src/two.ts" }] }),
-          output: "",
-          outputStreams: [],
-          status: "passed",
-          truncated: false,
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Read 2 files" })).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", {
+        name: "Explored 2 files, searched code, explored repository, researched 1 source, inspected Git, ran 1 check",
+      }),
+    ).toBeInTheDocument();
   });
 });
 

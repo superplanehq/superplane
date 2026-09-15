@@ -79,8 +79,8 @@ describe("AnalysisLiveWork", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Running rg -n survey pkg" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Searching code" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Searching code…");
   });
 
   it("shows an honest starting state before the first provider event", () => {
@@ -139,7 +139,8 @@ describe("AnalysisLiveWork", () => {
 
     render(<AnalysisLiveWork machineStatus="running" />);
     expect(screen.getByText("I need to inspect the retry path.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Running rg -n retry pkg" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Searching code" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Searching code…");
   });
 
   it("keeps successful and failed live commands collapsed", async () => {
@@ -184,12 +185,14 @@ describe("AnalysisLiveWork", () => {
     });
 
     render(<AnalysisLiveWork machineStatus="running" />);
-    const commands = screen.getAllByRole("button", { name: "Ran command" });
-    expect(commands[0]).toHaveAttribute("aria-expanded", "false");
-    expect(commands[1]).toHaveAttribute("aria-expanded", "false");
+    const summary = screen.getByRole("button", { name: "Used terminal 2 times" });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("failed")).not.toBeInTheDocument();
-    await user.click(commands[1]);
-    expect(screen.getByText("failed")).toBeInTheDocument();
+    await user.click(summary);
+    expect(screen.getByTestId("agent-tool-passed")).toHaveTextContent("true");
+    expect(screen.getByTestId("agent-tool-failed")).toHaveTextContent("false");
+    expect(screen.getByTestId("agent-tool-failed")).toHaveClass("text-destructive");
+    expect(screen.queryByText("failed")).not.toBeInTheDocument();
   });
 
   it("hides after the machine waits", () => {
@@ -224,5 +227,92 @@ describe("AnalysisLiveWork", () => {
     expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent(
       "Live activity disconnected. Reconnecting…",
     );
+  });
+
+  it("moves the animated tail status through real activity phases", () => {
+    const activity = {
+      id: "activity-1",
+      provider: "codex",
+      status: "running" as const,
+      sequence: 1,
+      truncated: false,
+      items: [
+        {
+          type: "content" as const,
+          id: "thought-1",
+          kind: "reasoning" as const,
+          text: "Inspecting the request.",
+          status: "running" as const,
+          truncated: false,
+        },
+      ],
+    };
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      activities: [activity],
+      isConnected: true,
+      hasConnectedOnce: true,
+    });
+
+    const { rerender } = render(<AnalysisLiveWork machineStatus="running" />);
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Thinking…");
+
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      activities: [
+        {
+          ...activity,
+          sequence: 2,
+          items: [
+            { ...activity.items[0], status: "passed" as const },
+            {
+              type: "tool",
+              id: "search-1",
+              kind: "bash",
+              name: "Bash",
+              input: "rg -n activity web_src",
+              output: "",
+              outputStreams: [],
+              status: "running",
+              truncated: false,
+            },
+          ],
+        },
+      ],
+      isConnected: true,
+      hasConnectedOnce: true,
+    });
+    rerender(<AnalysisLiveWork machineStatus="running" />);
+
+    const status = screen.getByTestId("split-run-intent-thinking");
+    expect(status).toHaveTextContent("Searching code…");
+    expect(status.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
+    expect(status.querySelector(".sp-thinking-state-outgoing")).toBeInTheDocument();
+
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      activities: [
+        {
+          ...activity,
+          sequence: 3,
+          items: [
+            { ...activity.items[0], status: "passed" as const },
+            {
+              type: "tool",
+              id: "search-1",
+              kind: "bash",
+              name: "Bash",
+              input: "rg -n activity web_src",
+              output: "",
+              outputStreams: [],
+              status: "passed",
+              truncated: false,
+            },
+          ],
+        },
+      ],
+      isConnected: true,
+      hasConnectedOnce: true,
+    });
+    rerender(<AnalysisLiveWork machineStatus="running" />);
+
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Planning next step…");
   });
 });
