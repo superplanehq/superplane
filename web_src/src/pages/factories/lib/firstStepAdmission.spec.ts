@@ -132,9 +132,7 @@ describe("willQueueFirstStepStart", () => {
   });
 
   it("returns true when factory-wide in-flight work fills the factory cap", () => {
-    expect(
-      willQueue([runningAtFirstStep("wo-running")], { line: ROOMY, factoryMaxParallelTasks: 1 }),
-    ).toBe(true);
+    expect(willQueue([runningAtFirstStep("wo-running")], { line: ROOMY, factoryMaxParallelTasks: 1 })).toBe(true);
   });
 
   it("returns true when a Start in flight fills the last factory slot", () => {

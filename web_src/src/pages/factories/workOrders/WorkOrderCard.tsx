@@ -119,7 +119,7 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
-  willQueueOnStart = false,
+  willQueueOnStart,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
@@ -310,7 +310,7 @@ function WorkOrderCardMetaRow({
   createdAt: Date | null;
   showStart: boolean;
   queueLabel: string | null;
-  willQueueOnStart: boolean;
+  willQueueOnStart?: boolean;
   confidenceScore?: number;
   isAnalyzing: boolean;
 }) {

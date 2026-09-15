@@ -60,7 +60,10 @@ function mergePreviousOrder<T>(
 
   const newcomers = items.filter((item) => {
     const id = idOf(item);
-    return Boolean(id) && !seen.has(id);
+    if (!id) {
+      return false;
+    }
+    return !seen.has(id);
   });
   return [...newcomers, ...kept];
 }

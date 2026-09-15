@@ -88,10 +88,7 @@ function orderHasInFlightExecution(order: FactoriesWorkOrder): boolean {
 }
 
 /** Starts whose cards are busy and do not already occupy an execution slot. */
-export function reservedStartCount(
-  workOrders: FactoriesWorkOrder[],
-  dispatchingOrderIds: ReadonlySet<string>,
-): number {
+export function reservedStartCount(workOrders: FactoriesWorkOrder[], dispatchingOrderIds: ReadonlySet<string>): number {
   if (dispatchingOrderIds.size === 0) {
     return 0;
   }
