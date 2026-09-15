@@ -826,9 +826,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-intent-plan-analyzing"),
-    ).toBeInTheDocument();
+    const analyzing = within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId(
+      "split-run-intent-plan-analyzing",
+    );
+    expect(analyzing.querySelector(".t-matrix")).not.toBeNull();
+    expect(analyzing).not.toHaveTextContent("Refining");
+    expect(analyzing).not.toHaveTextContent("Planning");
+    expect(analyzing).not.toHaveTextContent("Checking");
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();

@@ -15,7 +15,7 @@ export function CountButton({ children, count, countClassName, className, ...pro
       {children}
       <span
         className={cn(
-          "text-muted-foreground before:bg-border relative ms-1 px-2 text-xs font-medium before:absolute before:inset-0 before:left-0 before:w-px",
+          "text-muted-foreground before:bg-border relative ms-1 inline-flex items-center justify-center px-2 text-xs font-medium before:absolute before:inset-0 before:left-0 before:w-px",
           countClassName,
         )}
       >
