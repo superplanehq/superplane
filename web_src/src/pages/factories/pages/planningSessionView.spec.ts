@@ -290,6 +290,33 @@ describe("createWithAgentViewFromSession", () => {
     ]);
   });
 
+  it("passes the sender user id onto user messages", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "note", role: "user", text: "Keep the current form.", userId: "user-ada" },
+          { id: "reply", role: "user", text: "What is the priority? High", userId: "user-alan" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "note", kind: "text", role: "user", text: "Keep the current form.", userId: "user-ada" },
+      {
+        id: "reply",
+        kind: "text",
+        role: "user",
+        text: "What is the priority? High",
+        origin: "survey",
+        userId: "user-alan",
+      },
+    ]);
+  });
+
   it("keeps the work area empty after create so the session list can sit above it", () => {
     const view = createWithAgentViewFromSession(
       {
