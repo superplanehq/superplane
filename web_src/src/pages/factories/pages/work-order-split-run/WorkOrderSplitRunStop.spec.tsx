@@ -48,7 +48,7 @@ beforeAll(() => {
 });
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -105,7 +105,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
   });
 
-  it("hides the draft model select when the feature is off", async () => {
+  it("hides the draft model chevron on classic Start when Task Refinement is off", async () => {
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -114,6 +114,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
+                factoryId="factory-1"
+                orderId={DRAFT_WORK_ORDER.id}
                 fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
                 onDispatch={onDispatch}
                 canDispatch
@@ -126,6 +128,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Model" })).not.toBeInTheDocument();
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
@@ -147,7 +150,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   });
 
   it("starts and archives a draft from the note", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -170,7 +173,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
+    expect(within(note).getByRole("button", { name: "Model" })).toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
@@ -242,7 +246,6 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   });
 
   it("starts a draft with the listed model", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -262,8 +265,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const note = screen.getByTestId("split-run-attention-note");
-    await user.click(within(note).getByRole("combobox", { name: "Model" }));
-    await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
+    await user.click(within(note).getByRole("button", { name: "Model" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
