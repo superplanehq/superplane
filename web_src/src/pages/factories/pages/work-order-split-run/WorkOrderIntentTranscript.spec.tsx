@@ -37,6 +37,12 @@ function renderTranscript(messages: CreateWithAgentMessage[], extras: { streamin
   return render(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={extras.streaming} />);
 }
 
+function expectAvatarBeforeGivenName(container: HTMLElement, avatarName: string, givenName: string) {
+  const avatar = within(container).getByRole("img", { name: avatarName });
+  const name = within(container).getByText(givenName);
+  expect(avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("WorkOrderIntentTranscript", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
@@ -83,6 +89,7 @@ describe("WorkOrderIntentTranscript", () => {
     const answer = screen.getByTestId("split-run-intent-survey-answer");
     expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.answeredBy);
     expect(answer).toHaveTextContent("Ada");
+    expectAvatarBeforeGivenName(answer, "Ada Lovelace", "Ada");
     expect(answer).toHaveTextContent("What should the agent build?");
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
@@ -105,6 +112,7 @@ describe("WorkOrderIntentTranscript", () => {
       "src",
       "https://example.com/ada.png",
     );
+    expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
     expect(note.parentElement).toHaveClass("justify-end");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
