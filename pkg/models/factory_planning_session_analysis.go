@@ -314,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification. If the score is below 5, the summary must tell the user how to raise Clarity.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification. If the score is below 5, the summary must say why Clarity is not 5 and what the user must add, decide, or answer. Write chat, survey, and the Clarity summary in short direct sentences. Use I and you. Do not name files.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
