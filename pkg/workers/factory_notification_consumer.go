@@ -387,7 +387,7 @@ func buildWorkOrderNotificationContent(
 		content.Data.Detail = truncateNotificationDetail(message.CommentBody)
 	case factory.EventTypeOrderStatusUpdated:
 		verb := statusChangeDescription(message)
-		content.Subject = fmt.Sprintf("[%s] Work order %s", orderKey, verb)
+		content.Subject = fmt.Sprintf("[%s] Task %s", orderKey, verb)
 		content.Data.Summary = fmt.Sprintf("%s %s %s.", actorName, verb, orderKey)
 	case factory.EventTypeOrderArtifactAdded:
 		content.Subject = fmt.Sprintf("[%s] New artifact", orderKey)
@@ -399,7 +399,7 @@ func buildWorkOrderNotificationContent(
 		content.Data.DetailCtaLabel = message.StatusNoteCtaLabel
 		content.Data.DetailCtaURL = message.StatusNoteCtaURL
 	default:
-		content.Subject = fmt.Sprintf("[%s] Work order update", orderKey)
+		content.Subject = fmt.Sprintf("[%s] Task update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)
 	}
 
