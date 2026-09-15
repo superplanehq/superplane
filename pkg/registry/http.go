@@ -40,6 +40,10 @@ type HTTPContext struct {
 	policyMu                    sync.RWMutex
 	policy                      compiledHTTPPolicy
 	policyExpiresAt             time.Time
+	txPolicyMu                  sync.Mutex
+	txPolicyTx                  *gorm.DB
+	txPolicy                    compiledHTTPPolicy
+	txPolicyErr                 error
 }
 
 type HTTPOptions struct {
@@ -380,12 +384,7 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 	}
 
 	if tx != nil && c.policyResolverInTransaction != nil {
-		policy, err := c.policyResolverInTransaction(tx)
-		if err != nil {
-			return compiledHTTPPolicy{}, err
-		}
-
-		return compileHTTPPolicy(policy)
+		return c.policyForTransaction(tx)
 	}
 
 	now := time.Now()
@@ -428,6 +427,34 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 	}
 
 	return c.policy, nil
+}
+
+// policyForTransaction resolves SSRF policy through the caller's GORM
+// transaction. GORM transactions are not goroutine-safe, so concurrent HTTP
+// (check-run listing, metric fan-out) must share one serialized lookup per tx.
+func (c *HTTPContext) policyForTransaction(tx *gorm.DB) (compiledHTTPPolicy, error) {
+	c.txPolicyMu.Lock()
+	defer c.txPolicyMu.Unlock()
+
+	if c.txPolicyTx == tx {
+		return c.txPolicy, c.txPolicyErr
+	}
+
+	policy, err := c.policyResolverInTransaction(tx)
+	if err != nil {
+		c.storeTxPolicy(tx, compiledHTTPPolicy{}, err)
+		return compiledHTTPPolicy{}, err
+	}
+
+	compiledPolicy, err := compileHTTPPolicy(policy)
+	c.storeTxPolicy(tx, compiledPolicy, err)
+	return compiledPolicy, err
+}
+
+func (c *HTTPContext) storeTxPolicy(tx *gorm.DB, policy compiledHTTPPolicy, err error) {
+	c.txPolicyTx = tx
+	c.txPolicy = policy
+	c.txPolicyErr = err
 }
 
 func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {
