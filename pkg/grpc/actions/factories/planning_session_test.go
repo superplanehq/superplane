@@ -88,6 +88,42 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	assert.Equal(t, refinementExecution.ID.String(), found.Session.ExecutionId)
 }
 
+func Test__EndPlanningSession__OverridesPendingCompletionWithCancellation(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.RequestCompletion(tx, &r.User)
+		return err
+	}))
+
+	response, err := EndPlanningSession(ctx, r.Organization.ID.String(), &pb.EndPlanningSessionRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: session.ID.String(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, response.Session.State)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
+}
+
 func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

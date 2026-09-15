@@ -1031,6 +1031,28 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
+  it("shows a requested analysis completion as passed while the run stops", () => {
+    const fixture = splitRunFixtureForWorkOrder(order({ state: "STATE_OPEN" }), {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: "wo-1",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_CANCELLING",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            updatedAt: "2026-08-28T12:00:05Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("passed");
+  });
+
   // A freshly created draft is known to be analyzing before its run appears in
   // the polled list. The optimistic flag keeps the popup in step with the board.
   it("shows the analyzing state from the pending flag before a run appears", () => {
