@@ -52,7 +52,7 @@ func FindPlanningSessionByWorkOrder(ctx context.Context, organizationID string, 
 }
 
 func DescribePlanningSession(ctx context.Context, organizationID string, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, _, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, _, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 }
 
 func SendPlanningSessionMessage(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 				return err
 			}
 		}
-		if err := session.SendUserMessage(tx, req.GetText()); err != nil {
+		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
 			return err
 		}
 		if !restartAnalysis {
@@ -227,25 +227,25 @@ func parseOptionalPlanningWorkOrderID(workOrderID string) (uuid.UUID, error) {
 func loadPlanningSession(
 	ctx context.Context,
 	organizationID, factoryID, sessionID string,
-) (*models.FactoryPlanningSession, *models.Factory, error) {
-	orgID, parsedFactoryID, _, err := planningSessionActor(ctx, organizationID, factoryID)
+) (*models.FactoryPlanningSession, *models.Factory, uuid.UUID, error) {
+	orgID, parsedFactoryID, userID, err := planningSessionActor(ctx, organizationID, factoryID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, uuid.Nil, err
 	}
 	parsedSessionID, err := parseSessionID(sessionID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
 	db := database.DB(ctx)
 	factoryModel, err := models.FindFactory(db, orgID, parsedFactoryID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
 	session, err := models.FindPlanningSession(db, orgID, parsedFactoryID, parsedSessionID)
 	if err != nil {
-		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to load planning session")
 	}
-	return session, factoryModel, nil
+	return session, factoryModel, userID, nil
 }
 
 func requireAnalysisPlanningSession(session *models.FactoryPlanningSession) error {
@@ -294,12 +294,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	}
 	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(messages))
 	for _, message := range messages {
-		messagesOut = append(messagesOut, &pb.PlanningSessionMessage{
-			Id:        message.ID.String(),
-			Role:      message.Role,
-			Text:      message.Text,
-			CreatedAt: timestamppb.New(message.CreatedAt),
-		})
+		messagesOut = append(messagesOut, serializePlanningSessionMessage(message))
 	}
 
 	out := &pb.PlanningSession{
@@ -338,6 +333,19 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		}
 	}
 	return out, nil
+}
+
+func serializePlanningSessionMessage(message models.PlanningSessionMessage) *pb.PlanningSessionMessage {
+	out := &pb.PlanningSessionMessage{
+		Id:        message.ID.String(),
+		Role:      message.Role,
+		Text:      message.Text,
+		CreatedAt: timestamppb.New(message.CreatedAt),
+	}
+	if message.UserID != nil {
+		out.UserId = message.UserID.String()
+	}
+	return out
 }
 
 func planningSessionKindToProto(kind string) pb.PlanningSessionKind {

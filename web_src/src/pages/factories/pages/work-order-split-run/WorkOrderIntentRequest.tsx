@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
@@ -15,8 +14,10 @@ import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
+import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
+import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 export type IntentAnalysisChat = {
   organizationId: string;
@@ -34,11 +35,14 @@ type WorkOrderIntentRequestProps = {
   description: string;
   files?: FilesFile[];
   analysis?: IntentAnalysisChat;
+  source?: SplitRunSource;
 };
 
-export function WorkOrderIntentRequest({ title, description, files, analysis }: WorkOrderIntentRequestProps) {
+export function WorkOrderIntentRequest({ title, description, files, analysis, source }: WorkOrderIntentRequestProps) {
   if (analysis) {
-    return <AnalysisRequestChat title={title} description={description} files={files} analysis={analysis} />;
+    return (
+      <AnalysisRequestChat title={title} description={description} files={files} analysis={analysis} source={source} />
+    );
   }
   return (
     <>
@@ -72,6 +76,7 @@ function AnalysisRequestChat({
   description,
   files,
   analysis,
+  source,
 }: WorkOrderIntentRequestProps & { analysis: IntentAnalysisChat }) {
   const state = analysisRequestChatState(analysis);
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
@@ -93,8 +98,13 @@ function AnalysisRequestChat({
           className="absolute inset-0 overflow-y-auto px-3 py-3"
           data-testid="split-run-intent-chat-log"
         >
-          <RequestMessage description={description} files={files} asChat />
-          <WorkOrderIntentTranscript messages={analysis.view.messages} streaming={state.active} files={files} />
+          <RequestMessage description={description} files={files} source={source} asChat />
+          <WorkOrderIntentTranscript
+            messages={analysis.view.messages}
+            organizationId={analysis.organizationId}
+            streaming={state.active}
+            files={files}
+          />
           {state.active ? (
             <AnalysisLiveWork
               machineStatus={analysis.view.machineStatus}
@@ -163,10 +173,12 @@ function AnalysisRequestChat({
 function RequestMessage({
   description,
   files,
+  source,
   asChat = false,
 }: {
   description: string;
   files?: FilesFile[];
+  source?: SplitRunSource;
   asChat?: boolean;
 }) {
   const body = description.trim() ? (
@@ -197,11 +209,13 @@ function RequestMessage({
   }
 
   return (
-    <div className="mb-4 flex w-full justify-start" data-testid="split-run-description" aria-label="Request">
+    <div className="mb-4 flex w-full justify-end" data-testid="split-run-description">
       <div className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5">
-        <span className="sp-user-note-label mb-1 block font-sans text-[11px] font-medium leading-none">
-          {CREATE_WITH_AGENT_COPY.request}
-        </span>
+        {source ? (
+          <div className="mb-1">
+            <WorkOrderSplitRunSource source={source} compact />
+          </div>
+        ) : null}
         {body}
       </div>
     </div>

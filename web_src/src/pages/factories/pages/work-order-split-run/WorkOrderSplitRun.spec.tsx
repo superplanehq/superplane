@@ -737,7 +737,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-source")).not.toBeInTheDocument();
+    const description = screen.getByTestId("split-run-description");
+    expect(description).toHaveClass("justify-end");
+    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
+    expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
