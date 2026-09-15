@@ -176,6 +176,37 @@ export const ChecksPassedLongTitle: Story = {
 };
 
 /**
+ * Task that waits for a free slot at the first step. The footer shows
+ * the queue place with a thinking shimmer, and a ghost icon button
+ * returns the task to draft.
+ */
+export const QueuedFirstStep: Story = {
+  name: "Queued at the first step",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-queued",
+        title: "Retry failed refund webhooks",
+        statusNotes: [],
+        lineDispatches: [
+          {
+            id: "dispatch-queued",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_ACTIVE",
+            createdAt: "2026-09-01T10:00:00Z",
+            stepExecutions: [],
+            queueItem: { id: "queue-1", stepName: "hotfix", stepIndex: 0, position: 2 },
+          },
+        ],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    onCancelQueue: async () => {},
+  },
+};
+
+/**
  * Open task with no pull request and no attention chip. The footer
  * keeps created time on the left and the owner given name plus avatar
  * on the right.
