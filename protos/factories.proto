@@ -135,15 +135,38 @@ service Factories {
     };
   }
 
-  // Factory app APIs
+  // Factory automation APIs
 
-  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+  rpc ListFactoryAutomations(ListFactoryAutomationsRequest) returns (ListFactoryAutomationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/apps"
+      get: "/api/v1/factories/{factory_id}/automations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory apps";
+      summary: "List factory automations";
       description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryAutomation(CreateFactoryAutomationRequest) returns (CreateFactoryAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory automation";
+      description: "Creates a blank factory canvas and optionally attaches it to Verify or Done";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryAutomation(DeleteFactoryAutomationRequest) returns (DeleteFactoryAutomationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory automation";
+      description: "Deletes a factory canvas";
       tags: "Factory";
     };
   }
@@ -160,14 +183,14 @@ service Factories {
     };
   }
 
-  rpc MaterializeFactoryAppDefaults(MaterializeFactoryAppDefaultsRequest) returns (MaterializeFactoryAppDefaultsResponse) {
+  rpc MaterializeFactoryAutomationDefaults(MaterializeFactoryAutomationDefaultsRequest) returns (MaterializeFactoryAutomationDefaultsResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"
+      post: "/api/v1/factories/{factory_id}/automations/{automation_id}:defaults"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Materialize factory app defaults";
-      description: "Builds the bundled defaults for an installed factory app and preserves its connections";
+      summary: "Materialize factory automation defaults";
+      description: "Builds the bundled defaults for an installed factory automation and preserves its connections";
       tags: "Factory";
     };
   }
@@ -791,12 +814,16 @@ message FactoryOnboarding {
 }
 
 message Factory {
-  message App {
+  message Automation {
     string id = 1;
     string name = 2;
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
+    // Board column this event automation is shown on. Empty when the
+    // automation is not attached to Verify or Done. Allowed values:
+    // "verify", "done".
+    string column_key = 6;
   }
 
   string id = 1;
@@ -862,13 +889,32 @@ message UpdateFactoryLineResponse {
   FactoryLine line = 1;
 }
 
-message ListFactoryAppsRequest {
+message ListFactoryAutomationsRequest {
   string factory_id = 1;
 }
 
-message ListFactoryAppsResponse {
-  repeated Factory.App apps = 1;
+message ListFactoryAutomationsResponse {
+  repeated Factory.Automation automations = 1;
 }
+
+message CreateFactoryAutomationRequest {
+  string factory_id = 1;
+  // Defaults to "Custom automation" when empty.
+  string name = 2;
+  // Attach the canvas to Verify or Done. Empty leaves it off the board.
+  string column_key = 3;
+}
+
+message CreateFactoryAutomationResponse {
+  Factory.Automation automation = 1;
+}
+
+message DeleteFactoryAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DeleteFactoryAutomationResponse {}
 
 message FactoryAppTemplateIntegration {
   string type = 1;
@@ -899,12 +945,12 @@ message MaterializeFactoryAppTemplateResponse {
   string console_yaml = 3;
 }
 
-message MaterializeFactoryAppDefaultsRequest {
+message MaterializeFactoryAutomationDefaultsRequest {
   string factory_id = 1;
-  string app_id = 2;
+  string automation_id = 2;
 }
 
-message MaterializeFactoryAppDefaultsResponse {
+message MaterializeFactoryAutomationDefaultsResponse {
   string template_id = 1;
   string canvas_yaml = 2;
   string console_yaml = 3;

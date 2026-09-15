@@ -30,13 +30,15 @@ const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }))
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => ({ data: [] }),
+  useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
+  useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -61,6 +63,10 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
   }),
+}));
+
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({

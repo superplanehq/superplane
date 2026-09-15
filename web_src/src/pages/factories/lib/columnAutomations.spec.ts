@@ -220,6 +220,31 @@ describe("buildColumnAutomations", () => {
       }),
     ]);
   });
+
+  it("appends custom canvases attached to Verify or Done", () => {
+    const verify = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+    });
+    const done = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [
+        { id: "app-pr-closure", name: "PR Closure" },
+        { id: "app-destroy-env", name: "Destroy env", columnKey: "done" },
+      ],
+    });
+
+    expect(verify).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "Create env",
+        trigger: "On a trigger you choose",
+        canvasId: "app-create-env",
+      }),
+    ]);
+    expect(done.map((automation) => automation.kind)).toEqual(["pr-closure", "custom"]);
+    expect(done[1]).toMatchObject({ name: "Destroy env", canvasId: "app-destroy-env" });
+  });
 });
 
 describe("catalogForColumn", () => {
@@ -236,7 +261,11 @@ describe("catalogForColumn", () => {
   });
 
   it("offers discussion and status-check setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks", "custom"]);
+  });
+
+  it("offers pull request closure and a custom canvas in the done catalog", () => {
+    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure", "custom"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {

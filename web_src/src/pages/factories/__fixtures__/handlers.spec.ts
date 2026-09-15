@@ -82,10 +82,33 @@ describe("matchFactoryPageFixture", () => {
     });
   });
 
-  it("returns factory apps for the populated factory", async () => {
-    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
+  it("deletes a factory automation by id", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      { method: "POST", body: JSON.stringify({ name: "Create env", columnKey: "verify" }) },
+      fixture,
+    );
+    const createdBody = (await created.json()) as { automation?: { id?: string } };
+    const automationId = createdBody.automation?.id;
+    expect(automationId).toBeTruthy();
+
+    const deleted = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations/${automationId}`,
+      { method: "DELETE" },
+      fixture,
+    );
+    expect(deleted.status).toBe(200);
+
+    const list = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`, undefined, fixture);
+    const body = (await list.json()) as { automations?: Array<{ id?: string }> };
+    expect(body.automations?.some((entry) => entry.id === automationId)).toBe(false);
+  });
+
+  it("returns factory automations for the populated factory", async () => {
+    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`);
     await expect(apps.json()).resolves.toMatchObject({
-      apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+      automations: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
 

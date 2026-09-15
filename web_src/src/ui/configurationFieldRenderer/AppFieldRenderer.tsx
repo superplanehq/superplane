@@ -4,7 +4,7 @@ import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCo
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ConfigurationField } from "@/api-client";
 import { useCanvas, useCanvases } from "@/hooks/useCanvasData";
-import { useFactoryApps } from "@/hooks/useFactoryData";
+import { useFactoryAutomations } from "@/hooks/useFactoryData";
 import { toTestId } from "@/lib/testID";
 
 interface AppFieldRendererProps {
@@ -87,7 +87,7 @@ function useAppFieldSources(organizationId: string, currentAppId: string | undef
   const isFactoryContext = Boolean(factoryId);
 
   const orgCanvasesQuery = useCanvases(organizationId);
-  const factoryAppsQuery = useFactoryApps(organizationId, factoryId ?? "");
+  const factoryAppsQuery = useFactoryAutomations(organizationId, factoryId ?? "");
 
   if (needsCanvasContext && canvasQuery.isLoading) {
     return {

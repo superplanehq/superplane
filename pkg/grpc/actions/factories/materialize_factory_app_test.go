@@ -20,7 +20,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
-func Test__MaterializeFactoryAppDefaults(t *testing.T) {
+func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
@@ -58,9 +58,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 
 		backlog := liveBacklogCanvas(t, factoryModel)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "backlog", response.GetTemplateId())
@@ -78,7 +78,7 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
 			FactoryId:  factoryModel.ID.String(),
 			TemplateId: "line-implementation",
-			AppId:      canvas.ID.String(),
+			AppId:         canvas.ID.String(),
 			InstallParams: map[string]string{
 				"appRepository": "acme/app",
 				"defaultBranch": "main",
@@ -95,9 +95,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		other := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, other.ID, support.RandomName("Plan"))
 
-		_, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		_, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
@@ -112,9 +112,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     intake.GetIntake().GetCanvasId(),
+			AutomationId: intake.GetIntake().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "intake:"+models.FactoryIntakeSourceGitHubIssues, response.GetTemplateId())
@@ -130,9 +130,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "line-implementation", response.GetTemplateId())
@@ -146,9 +146,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -173,9 +173,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		backlog := liveBacklogCanvas(t, factoryModel)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -193,9 +193,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		backlog := liveBacklogCanvas(t, factoryModel)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -219,9 +219,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     handler.GetHandler().GetCanvasId(),
+			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, prFeedbackDiscussionTemplateID, response.GetTemplateId())
@@ -253,9 +253,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
 			FactoryId: factoryModel.ID.String(),
-			AppId:     handler.GetHandler().GetCanvasId(),
+			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, prFeedbackChecksTemplateID, response.GetTemplateId())

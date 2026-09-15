@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -35,7 +35,7 @@ function renderLinesBoard(
 }
 
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
+const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
@@ -74,13 +74,15 @@ async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => useFactoryApps(),
+  useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
+  useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -105,6 +107,10 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
   }),
+}));
+
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -165,7 +171,7 @@ describe("LinesPage backlog create", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
-    useFactoryApps.mockReturnValue({ data: [] });
+    useFactoryAutomations.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
