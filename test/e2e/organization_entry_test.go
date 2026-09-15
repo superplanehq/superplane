@@ -20,7 +20,7 @@ func TestOrganizationEntry(t *testing.T) {
 
 		require.NoError(t, models.EnableExperimentalFeature(session.OrgID, features.FeatureFactories))
 		session.Visit("/?select=true")
-		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
+		waitForWorkspaceSetup(t, session)
 	})
 
 	t.Run("opens workspaces when factories are enabled and the org home is requested", func(t *testing.T) {
@@ -28,7 +28,7 @@ func TestOrganizationEntry(t *testing.T) {
 
 		require.NoError(t, models.EnableExperimentalFeature(session.OrgID, features.FeatureFactories))
 		session.Visit("/" + session.OrgSlug)
-		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
+		waitForWorkspaceSetup(t, session)
 	})
 
 	t.Run("opens the legacy organization when factories are disabled", func(t *testing.T) {
@@ -97,6 +97,16 @@ func TestOrganizationEntry(t *testing.T) {
 		session.AssertVisible(q.TestID("first-run-log-out"))
 		session.AssertVisible(q.TestID("first-run-organization-switch"))
 	})
+}
+
+func waitForWorkspaceSetup(t *testing.T, session *session.TestSession) {
+	t.Helper()
+
+	waitErr := session.Page().WaitForURL("**/"+session.OrgSlug+"/workspaces/**/setup", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(30000),
+	})
+	require.NoError(t, waitErr)
+	session.AssertVisible(q.TestID("workspace-setup"))
 }
 
 func newLoggedInSession(t *testing.T) *session.TestSession {
