@@ -86,7 +86,7 @@ export function statusForCanvasRun(run: CanvasesCanvasRunRef | undefined): "pass
     return "running";
   }
   if (run?.state === "STATE_CANCELLING") {
-    return "failed";
+    return run.result === "RESULT_PASSED" ? "passed" : "failed";
   }
   if (run?.state === "STATE_FINISHED") {
     if (run.result === "RESULT_PASSED") {
