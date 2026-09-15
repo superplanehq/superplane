@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.feedback.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  {{- $discordWebhookUrl := "" }}
+  {{- if and .Values.feedback .Values.feedback.discordWebhookUrl }}
+  {{- $discordWebhookUrl = .Values.feedback.discordWebhookUrl }}
+  {{- end }}
+  DISCORD_FEEDBACK_WEBHOOK_URL: {{ $discordWebhookUrl | b64enc }}

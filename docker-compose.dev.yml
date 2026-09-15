@@ -115,6 +115,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
+      DISCORD_FEEDBACK_WEBHOOK_URL: ${DISCORD_FEEDBACK_WEBHOOK_URL:-}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-yes}
       ENABLE_PASSWORD_LOGIN: "yes"
       OTEL_ENABLED: "yes"

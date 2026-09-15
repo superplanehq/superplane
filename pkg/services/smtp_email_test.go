@@ -92,11 +92,13 @@ func (c *fakeSMTPClient) Close() error {
 func TestBuildMultipartEmail(t *testing.T) {
 	msg, err := buildMultipartEmail(
 		"Sender <sender@example.com>",
-		[]string{"to@example.com"},
-		[]string{"bcc@example.com"},
-		"Subject line",
-		"plain body",
-		"<p>html body</p>",
+		outgoingMail{
+			to:       []string{"to@example.com"},
+			bcc:      []string{"bcc@example.com"},
+			subject:  "Subject line",
+			textBody: "plain body",
+			htmlBody: "<p>html body</p>",
+		},
 	)
 	require.NoError(t, err)
 
@@ -113,11 +115,12 @@ func TestBuildMultipartEmail(t *testing.T) {
 func TestBuildMultipartEmail_StripsCRLFFromHeaders(t *testing.T) {
 	msg, err := buildMultipartEmail(
 		"Sender\r\nBcc: evil@external.com <sender@example.com>",
-		[]string{"to@example.com\r\nCc: attacker@external.com"},
-		nil,
-		"Urgent\r\nFrom: ceo@victim.com\r\nBcc: attacker@external.com",
-		"plain body",
-		"<p>html body</p>",
+		outgoingMail{
+			to:       []string{"to@example.com\r\nCc: attacker@external.com"},
+			subject:  "Urgent\r\nFrom: ceo@victim.com\r\nBcc: attacker@external.com",
+			textBody: "plain body",
+			htmlBody: "<p>html body</p>",
+		},
 	)
 	require.NoError(t, err)
 
@@ -191,6 +194,53 @@ func TestSMTPEmailService_SendMagicCodeEmail(t *testing.T) {
 	assert.True(t, strings.Contains(message, "Code 123456"))
 	assert.True(t, strings.Contains(message, "https://example.com/login?token=a&next=b"))
 	assert.True(t, strings.Contains(message, "<p>Code 123456</p>"))
+}
+
+func TestSMTPEmailService_SendSupportFeedbackEmail(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeSupportFeedbackTemplates(t, tmpDir)
+
+	settings := &SMTPSettings{
+		Host:      "smtp.example.com",
+		Port:      587,
+		Username:  "user",
+		Password:  "pass",
+		FromName:  "SuperPlane",
+		FromEmail: "noreply@example.com",
+		UseTLS:    true,
+	}
+
+	provider := &fakeSettingsProvider{settings: settings}
+	service := NewSMTPEmailService(provider, tmpDir)
+
+	fakeClient := &fakeSMTPClient{extensions: map[string]bool{"STARTTLS": true}}
+	originalDial := smtpDial
+	smtpDial = func(addr string) (smtpClient, error) {
+		return fakeClient, nil
+	}
+	t.Cleanup(func() {
+		smtpDial = originalDial
+	})
+
+	err := service.SendSupportFeedbackEmail("support@superplane.com", SupportFeedback{
+		Category:  FeedbackCategoryBug,
+		Details:   "The canvas did not load.",
+		UserName:  "Ada",
+		UserEmail: "ada@example.com",
+		Attachment: &SupportFeedbackAttachment{
+			Filename:    "shot.png",
+			ContentType: "image/png",
+			Content:     []byte("png-bytes"),
+		},
+	})
+	require.NoError(t, err)
+
+	message := fakeClient.message.String()
+	assert.Contains(t, message, "Subject: [SuperPlane] Bug report from ada@example.com")
+	assert.Contains(t, message, "Reply-To: ada@example.com")
+	assert.Contains(t, message, "Content-Type: multipart/mixed")
+	assert.Contains(t, message, "filename=shot.png")
+	assert.Contains(t, message, "The canvas did not load.")
 }
 
 func TestSMTPEmailService_SendWorkOrderNotificationEmail(t *testing.T) {
@@ -403,4 +453,39 @@ func writeWorkOrderNotificationTemplates(t *testing.T, root string) {
 	require.NoError(t, os.MkdirAll(templateDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.txt"), []byte("{{.Summary}}\n{{.Detail}}"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.html"), []byte("<p>{{.Summary}}</p><p>{{.Detail}}</p>"), 0o644))
+}
+
+func TestSupportFeedbackTemplates_FromLineEscapes(t *testing.T) {
+	templateRoot := filepath.Join("..", "..", "templates")
+	data := SupportFeedback{
+		Category:         FeedbackCategoryBug,
+		Details:          "The canvas did not load.",
+		UserName:         "Ada Lovelace",
+		UserEmail:        "ada@example.com",
+		OrganizationName: "Acme",
+		OrganizationID:   "org-1",
+		PagePath:         "/acme/apps/deploy",
+		Attachment:       &SupportFeedbackAttachment{Filename: "shot.png"},
+	}.TemplateData()
+
+	text, err := renderEmailTemplate(templateRoot, "support_feedback.txt", data)
+	require.NoError(t, err)
+	assert.Contains(t, text, "From: Ada Lovelace <ada@example.com>")
+	assert.Contains(t, text, "The canvas did not load.")
+
+	html, err := renderEmailTemplate(templateRoot, "support_feedback.html", data)
+	require.NoError(t, err)
+	assert.Contains(t, html, "ada@example.com")
+	assert.Contains(t, html, "The canvas did not load.")
+	assert.Contains(t, html, "Bug report")
+	assert.NotRegexp(t, `<ada@example.com>`, html)
+}
+
+func writeSupportFeedbackTemplates(t *testing.T, root string) {
+	t.Helper()
+
+	templateDir := filepath.Join(root, "email")
+	require.NoError(t, os.MkdirAll(templateDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "support_feedback.txt"), []byte("{{.CategoryLabel}}\n{{.Details}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "support_feedback.html"), []byte("<p>{{.CategoryLabel}}</p><p>{{.Details}}</p>"), 0o644))
 }
