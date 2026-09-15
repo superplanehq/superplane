@@ -68,7 +68,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   className?: string;
   /** True when this card is the active item in a list. */
   selected?: boolean;
-  /** True when the draft analysis session waits for a multiple-choice answer. */
+  /** True when the draft still has an unanswered agent survey. */
   hasAgentQuestion?: boolean;
 }
 

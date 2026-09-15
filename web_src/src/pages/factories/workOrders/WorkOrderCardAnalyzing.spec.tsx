@@ -127,6 +127,15 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 
+  it("shows Agent question after analysis ends while a survey is still pending", () => {
+    renderCard({ isAnalyzing: false, hasAgentQuestion: true, confidenceScore: 4 });
+
+    expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+  });
+
   it("hides Agent question after the task leaves the backlog", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
