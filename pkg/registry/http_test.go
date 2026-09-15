@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -430,6 +431,54 @@ func Test__HTTPContext__PolicyResolverInTransactionDoesNotUpdateSharedCache(t *t
 	require.ErrorContains(t, ctx.validateURLWithPolicy(policy, parsed), "access to example.com is not allowed")
 
 	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContext__PolicyResolverInTransactionSerializesLookupsForSameTx(t *testing.T) {
+	var (
+		inFlight    atomic.Int32
+		maxInFlight atomic.Int32
+		calls       atomic.Int32
+	)
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			calls.Add(1)
+			current := inFlight.Add(1)
+			for {
+				max := maxInFlight.Load()
+				if current <= max || maxInFlight.CompareAndSwap(max, current) {
+					break
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+			inFlight.Add(-1)
+			return HTTPPolicy{}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	tx := &gorm.DB{}
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			_, lookupErr := ctx.activePolicy(tx)
+			errCh <- lookupErr
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for lookupErr := range errCh {
+		require.NoError(t, lookupErr)
+	}
+	assert.Equal(t, int32(1), maxInFlight.Load())
+	assert.Equal(t, int32(1), calls.Load())
 }
 
 func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {
