@@ -1,19 +1,23 @@
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
+import { Alert, AlertAction, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
+import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
+import { useFactoryPreviewFlag } from "../factoryPreviewFlagsContext";
 import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
-import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
+import { SPLIT_RUN_CHAT_COLUMN_CLASSNAME, SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
@@ -28,7 +32,10 @@ export type IntentAnalysisChat = {
   onComposerChange: (value: string) => void;
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
-  onOpenPlan?: () => void;
+  planPaneOpen?: boolean;
+  onTogglePlan?: () => void;
+  latestPlanScore?: number;
+  closedDecision?: ReactNode;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -96,78 +103,92 @@ function AnalysisRequestChat({
         <div
           ref={follow.scrollRef}
           onScroll={follow.onScroll}
-          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          className="absolute inset-0 overflow-y-auto"
           data-testid="split-run-intent-chat-log"
         >
-          <RequestMessage description={description} files={files} source={source} asChat />
-          <WorkOrderIntentTranscript
-            messages={analysis.view.messages}
-            organizationId={analysis.organizationId}
-            streaming={state.active}
-            files={files}
-            onOpenPlan={analysis.onOpenPlan}
-          />
-          {state.active ? (
-            <AnalysisLiveWork
-              machineStatus={analysis.view.machineStatus}
+          <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "py-6")} data-testid="split-run-intent-chat-column">
+            <RequestMessage description={description} files={files} source={source} asChat />
+            <WorkOrderIntentTranscript
+              messages={analysis.view.messages}
               organizationId={analysis.organizationId}
-              canvasId={analysis.view.canvasId}
-              executionId={analysis.view.executionId}
-              waitingForAgent={waitingForAgentReply(analysis.view.messages)}
-              previousAgentText={previousAgentStreamText(analysis.view.messages)}
+              streaming={state.active}
+              files={files}
             />
-          ) : null}
-          {state.showSurvey && analysis.view.survey ? (
-            <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
-          ) : null}
+            {state.active ? (
+              <AnalysisLiveWork
+                machineStatus={analysis.view.machineStatus}
+                organizationId={analysis.organizationId}
+                canvasId={analysis.view.canvasId}
+                executionId={analysis.view.executionId}
+                waitingForAgent={waitingForAgentReply(analysis.view.messages)}
+                previousAgentText={previousAgentStreamText(analysis.view.messages)}
+              />
+            ) : null}
+            {state.showSurvey && analysis.view.survey ? (
+              <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
+            ) : null}
+          </div>
         </div>
         {follow.following ? null : (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         )}
       </div>
-      <form
-        className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "w-full flex-col items-stretch justify-center")}
-        onSubmit={handleSubmit}
-      >
-        <label htmlFor="split-run-intent-composer" className="sr-only">
-          {ANALYSIS_PLANNING_COPY.composerPlaceholder}
-        </label>
-        <div className="sp-user-note flex min-h-[3.5rem] w-full items-center gap-2 rounded-2xl border">
-          <Textarea
-            id="split-run-intent-composer"
-            data-testid="split-run-intent-composer"
-            value={analysis.composer}
-            placeholder={state.placeholder}
-            disabled={!analysis.canSend}
-            onChange={(event) => analysis.onComposerChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (analysis.canSend) {
-                  analysis.onSend();
-                }
-              }
-            }}
-            className="min-h-[3.5rem] flex-1 resize-none rounded-2xl border-0 bg-transparent px-3.5 py-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
-            rows={2}
+      <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "shrink-0 pb-4")} data-testid="split-run-intent-chat-column">
+        {analysis.onTogglePlan ? (
+          <PlanToggleAlert
+            open={Boolean(analysis.planPaneOpen)}
+            score={analysis.latestPlanScore}
+            onToggle={analysis.onTogglePlan}
+            actions={analysis.planPaneOpen ? undefined : analysis.closedDecision}
           />
-          <Button
-            type="submit"
-            size="icon"
-            className="mr-2 size-8 shrink-0 rounded-full"
-            disabled={!analysis.canSend || !analysis.composer.trim()}
-            aria-label={ANALYSIS_PLANNING_COPY.send}
-          >
-            <ArrowUp className="size-4" aria-hidden />
-            <span className="sr-only">{ANALYSIS_PLANNING_COPY.send}</span>
-          </Button>
-        </div>
-        {analysis.composerError ? (
-          <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
-            {analysis.composerError}
-          </p>
         ) : null}
-      </form>
+        <form
+          className={cn(
+            SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
+            "w-full flex-col items-stretch justify-center border-0 px-0",
+          )}
+          onSubmit={handleSubmit}
+        >
+          <label htmlFor="split-run-intent-composer" className="sr-only">
+            {ANALYSIS_PLANNING_COPY.composerPlaceholder}
+          </label>
+          <div className="sp-user-note flex min-h-[3.5rem] w-full items-center gap-2 rounded-2xl border">
+            <Textarea
+              id="split-run-intent-composer"
+              data-testid="split-run-intent-composer"
+              value={analysis.composer}
+              placeholder={state.placeholder}
+              disabled={!analysis.canSend}
+              onChange={(event) => analysis.onComposerChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  if (analysis.canSend) {
+                    analysis.onSend();
+                  }
+                }
+              }}
+              className="min-h-[3.5rem] flex-1 resize-none rounded-2xl border-0 bg-transparent px-3.5 py-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
+              rows={2}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              className="mr-2 size-8 shrink-0 rounded-full"
+              disabled={!analysis.canSend || !analysis.composer.trim()}
+              aria-label={ANALYSIS_PLANNING_COPY.send}
+            >
+              <ArrowUp className="size-4" aria-hidden />
+              <span className="sr-only">{ANALYSIS_PLANNING_COPY.send}</span>
+            </Button>
+          </div>
+          {analysis.composerError ? (
+            <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
+              {analysis.composerError}
+            </p>
+          ) : null}
+        </form>
+      </div>
     </div>
   );
 }
@@ -220,6 +241,48 @@ function RequestMessage({
         ) : null}
         {body}
       </div>
+    </div>
+  );
+}
+
+function PlanToggleAlert({
+  open,
+  score,
+  onToggle,
+  actions,
+}: {
+  open: boolean;
+  score?: number;
+  onToggle: () => void;
+  actions?: ReactNode;
+}) {
+  const oneBar = useFactoryPreviewFlag("oneBarPlanStrip");
+  const label = open ? CREATE_WITH_AGENT_COPY.hidePlan : CREATE_WITH_AGENT_COPY.showPlan;
+
+  return (
+    <div className={cn("flex shrink-0 flex-col bg-background py-2", oneBar ? undefined : "gap-2")}>
+      <Alert className="grid-cols-[minmax(0,1fr)_auto] items-center" data-testid="split-run-intent-plan-updated">
+        <div className="flex min-w-0 items-center gap-3">
+          <AlertTitle className="col-start-1">{score == null ? label : CREATE_WITH_AGENT_COPY.planUpdated}</AlertTitle>
+          {score == null ? null : <ConfidenceMeter score={score} showTooltip={false} />}
+        </div>
+        <AlertAction className="col-start-2 max-sm:mt-0 max-sm:justify-end">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-expanded={open}
+              aria-pressed={open}
+              onClick={onToggle}
+            >
+              {label}
+            </Button>
+            {oneBar ? actions : null}
+          </div>
+        </AlertAction>
+      </Alert>
+      {oneBar ? null : actions}
     </div>
   );
 }
