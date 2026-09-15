@@ -1,9 +1,35 @@
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 
 import type { CanvasSpecNode } from "../lib/columnCanvasAgent";
-import { persistColumnAgent } from "./useColumnCanvasAgentEditor";
+import { persistColumnAgent, useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
+
+const hookState = vi.hoisted(() => ({
+  canvas: { current: undefined as CanvasesCanvas | undefined },
+  feature: {
+    current: {
+      has: (_featureId: string): boolean => false,
+      enabledExperimentalFeatures: [] as string[],
+      isLoading: false,
+    },
+  },
+}));
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  canvasKeys: { detail: (organizationId: string, canvasId: string) => ["canvas", organizationId, canvasId] },
+  useCanvas: () => ({ data: hookState.canvas.current, isPending: false }),
+  useCommitCanvasStaging: () => ({ mutateAsync: vi.fn() }),
+  useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn() }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => hookState.feature.current,
+}));
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
@@ -28,6 +54,17 @@ const canvas: CanvasesCanvas = {
   spec: { nodes: [implementerNode], edges: [] },
 };
 
+const backlogCanvas: CanvasesCanvas = {
+  metadata: { id: "backlog", liveVersionId: "version-live" },
+  spec: {
+    nodes: [
+      { ...implementerNode, id: "analyze", name: "Analyze intake" },
+      { ...implementerNode, id: "refine-task", name: "Refine Task" },
+    ],
+    edges: [],
+  },
+};
+
 const draft: PlanningReviewDraft = {
   title: "Implement From Task Description",
   components: [
@@ -41,6 +78,53 @@ const draft: PlanningReviewDraft = {
     },
   ],
 };
+
+function createWrapper() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: queryClient }, children);
+  };
+}
+
+describe("useColumnCanvasAgentEditor", () => {
+  beforeEach(() => {
+    hookState.canvas.current = backlogCanvas;
+    hookState.feature.current = {
+      has: (_featureId: string): boolean => false,
+      enabledExperimentalFeatures: [],
+      isLoading: false,
+    };
+  });
+
+  it("selects the refinement agent when Task Refinement is enabled", () => {
+    hookState.feature.current.has = (featureId: string) => featureId === FEATURE_FACTORY_CREATE_WITH_AGENT;
+
+    const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.agentNode?.id).toBe("refine-task");
+    expect(result.current.draft?.title).toBe("Refine Task");
+  });
+
+  it("selects the first agent when Task Refinement is disabled", () => {
+    const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.agentNode?.id).toBe("analyze");
+  });
+
+  it("stays loading while Task Refinement access resolves", () => {
+    hookState.feature.current.isLoading = true;
+
+    const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
+});
 
 describe("persistColumnAgent", () => {
   it("stages the patched canvas yaml and commits", async () => {

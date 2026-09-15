@@ -59,7 +59,10 @@ describe("createHomeFixtureFetch", () => {
   it("exposes the managed-agents experimental feature", async () => {
     const features = await fetchFixture("/account/experimental-features");
     await expect(features.json()).resolves.toMatchObject({
-      features: expect.arrayContaining([expect.objectContaining({ id: "claude_managed_agents", released: true })]),
+      features: expect.arrayContaining([
+        expect.objectContaining({ id: "claude_managed_agents", released: true }),
+        expect.objectContaining({ id: "factory_create_with_agent" }),
+      ]),
     });
   });
 });

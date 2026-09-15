@@ -62,11 +62,12 @@ func TestOpencodeRunArgsContinuesSession(t *testing.T) {
 	assert.Contains(t, args, "openrouter/anthropic/claude-sonnet-4-6")
 }
 
-func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
+func TestBuildOpenCodeConfigWritesBaseURLAndAnalysisMCP(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{
-		"OPENROUTER_API_KEY":             "sk-or",
-		"OPENROUTER_BASE_URL":            "https://proxy.example/openrouter",
-		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"OPENROUTER_API_KEY":               "sk-or",
+		"OPENROUTER_BASE_URL":              "https://proxy.example/openrouter",
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	provider, _ := config["provider"].(map[string]any)
 	openrouter, _ := provider["openrouter"].(map[string]any)
@@ -84,6 +85,40 @@ func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
 	require.Equal(t, 2, len(command))
 	assert.Equal(t, "node", command[0])
 	assert.Equal(t, "/task/planning_session_mcp.js", command[1])
+	assert.NotNil(t, config["instructions"])
+}
+
+func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	})
+	instructions, _ := config["instructions"].([]any)
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
+}
+
+func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, string(protocol)+"\n\nTask:\nFix retries.")
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, config["instructions"])
+}
+
+func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "anthropic/claude-sonnet-4-6",
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
+		spawns: []spawnScript{successSpawn("I found the retry seam.")},
+	})
+
+	require.Equal(t, 0, result.exitCode, result.output)
+	assert.Equal(t, []string{"I found the retry seam."}, result.agentMessages)
 }
 
 func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
@@ -359,7 +394,10 @@ func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -579,7 +617,10 @@ db.close();
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -628,7 +669,10 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *tes
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -648,6 +692,7 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.
 	require.True(t, ok)
 	assert.Equal(t, float64(10), usage["input_tokens"])
 	assert.Equal(t, float64(8), usage["output_tokens"])
+	assert.Equal(t, []string{"I found a few files to inspect"}, result.agentMessages)
 }
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
@@ -892,12 +937,13 @@ type promptHarness struct {
 }
 
 type openRouterPromptResult struct {
-	exitCode   int
-	output     string
-	resultFile string
-	taskDir    string
-	spawns     [][]string
-	sleeps     []float64
+	exitCode      int
+	output        string
+	resultFile    string
+	taskDir       string
+	spawns        [][]string
+	sleeps        []float64
+	agentMessages []string
 }
 
 func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptResult {
@@ -951,6 +997,7 @@ const nowValues = %s;
 const sessionReads = %s;
 const calls = [];
 const sleeps = [];
+const agentMessages = [];
 let index = 0;
 let nowIndex = 0;
 let sessionReadIndex = 0;
@@ -999,6 +1046,10 @@ const helpers = {
     sleeps.push(ms);
     return Promise.resolve();
   },
+  recordAgentMessage(text) {
+    agentMessages.push(text);
+    return Promise.resolve();
+  },
   now: nowValues.length
     ? () => nowValues[Math.min(nowIndex++, nowValues.length - 1)]
     : undefined,
@@ -1013,11 +1064,11 @@ if (Array.isArray(sessionReads)) {
 }
 runPrompt(%q, %q, helpers)
   .then((code) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
     process.exit(code);
   })
   .catch((err) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
@@ -1049,19 +1100,21 @@ runPrompt(%q, %q, helpers)
 		exitCode = exitErr.ExitCode()
 	}
 	recorded := struct {
-		Calls  [][]string `json:"calls"`
-		Sleeps []float64  `json:"sleeps"`
+		Calls         [][]string `json:"calls"`
+		Sleeps        []float64  `json:"sleeps"`
+		AgentMessages []string   `json:"agentMessages"`
 	}{}
 	raw, readErr := os.ReadFile(spawnsFile)
 	require.NoError(t, readErr)
 	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
-		exitCode:   exitCode,
-		output:     stdout.String(),
-		resultFile: resultFile,
-		taskDir:    dir,
-		spawns:     recorded.Calls,
-		sleeps:     recorded.Sleeps,
+		exitCode:      exitCode,
+		output:        stdout.String(),
+		resultFile:    resultFile,
+		taskDir:       dir,
+		spawns:        recorded.Calls,
+		sleeps:        recorded.Sleeps,
+		agentMessages: recorded.AgentMessages,
 	}
 }
 
@@ -1142,10 +1195,19 @@ func jsOpencodeArgs(t *testing.T, input map[string]any) []string {
 }
 
 func jsBuildConfig(t *testing.T, taskDir string, env map[string]string) map[string]any {
+	return jsBuildConfigWithPrompt(t, taskDir, env, "")
+}
+
+func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string, prompt string) map[string]any {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	payload, err := json.Marshal(map[string]any{"taskDir": taskDir, "env": env, "planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != ""})
+	payload, err := json.Marshal(map[string]any{
+		"taskDir":  taskDir,
+		"env":      env,
+		"planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != "",
+		"prompt":   prompt,
+	})
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
 	out, err := cmd.CombinedOutput()

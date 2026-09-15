@@ -1,11 +1,14 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
-import { useMemo } from "react";
+import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { useWorkOrderPlanningActivity } from "./useWorkOrderPlanningSurvey";
 
 export function LineBoardOrderCard({
   order,
@@ -44,21 +47,46 @@ export function LineBoardWorkOrderCard({
   isAnalyzing?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
+  const refinementEnabled = useExperimentalFeature(workOrderCardContext.organizationId).has(
+    FEATURE_FACTORY_CREATE_WITH_AGENT,
+  );
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const { data: checks = [] } = useWorkOrderChecks(
+  const isDraft = entry.displayStatus === "draft";
+  const watchSession = refinementEnabled && isDraft && showConfidence;
+  const session = useWorkOrderPlanningActivity(
     workOrderCardContext.organizationId,
     workOrderCardContext.factoryId ?? "",
     order.id ?? "",
-    { enabled: showConfidence },
+    watchSession,
+    isAnalyzing,
   );
+  const agentWorking = session.isAgentWorking;
+  const showAnalysisActivity = watchSession && agentWorking;
+  const { data: checks = [], refetch } = useWorkOrderChecks(
+    workOrderCardContext.organizationId,
+    workOrderCardContext.factoryId ?? "",
+    order.id ?? "",
+    {
+      enabled: showConfidence,
+      refetchInterval: showAnalysisActivity ? ANALYZING_WORK_ORDER_CHECKS_POLL_MS : false,
+    },
+  );
+  const wasAnalyzing = useRef(showAnalysisActivity);
+  useEffect(() => {
+    if (wasAnalyzing.current && !showAnalysisActivity && showConfidence) {
+      void refetch?.();
+    }
+    wasAnalyzing.current = showAnalysisActivity;
+  }, [refetch, showAnalysisActivity, showConfidence]);
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
-      isAnalyzing={showConfidence && isAnalyzing}
+      isAnalyzing={showConfidence && agentWorking}
+      hasAgentQuestion={session.hasAgentQuestion}
       onOpen={onOpen}
     />
   );

@@ -39,6 +39,38 @@ func TestGetAccount_ListsProviders(t *testing.T) {
 	assert.False(t, resp.HasPassword)
 }
 
+func TestGetAccount_ListsOrganizationsPendingDeletion(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+
+	req, _ := http.NewRequest(http.MethodGet, "/account", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	var resp AccountResponse
+	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &resp))
+	require.Len(t, resp.OrganizationsPendingDeletion, 1)
+	assert.Equal(t, r.Organization.ID.String(), resp.OrganizationsPendingDeletion[0].ID)
+	assert.Equal(t, r.Organization.Name, resp.OrganizationsPendingDeletion[0].Name)
+
+	otherAccount, err := models.CreateAccount("Other Owner", "other-owner-get@example.com")
+	require.NoError(t, err)
+	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+	require.NoError(t, err)
+	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
+
+	req, _ = http.NewRequest(http.MethodGet, "/account", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res = httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &resp))
+	assert.Empty(t, resp.OrganizationsPendingDeletion)
+}
+
 func TestUpdateAccount_UpdatesName(t *testing.T) {
 	r := support.Setup(t)
 	server, account, token := setupTestServer(r, t)
@@ -276,6 +308,41 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	assert.Equal(t, originalEmail, replacement.Email)
 }
 
+func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
+
+	otherAccount, err := models.CreateAccount("Other Owner", "other-created-owner@example.com")
+	require.NoError(t, err)
+	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+	require.NoError(t, err)
+	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
+
+	server, account, token := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+
+	_, err = models.FindAccountByID(account.ID.String())
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+
+	_, err = models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), r.Organization.ID, account.ID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	ownerIDs, err := models.ListOrganizationOwnerIDs(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	assert.NotContains(t, ownerIDs, r.User.String())
+	assert.Contains(t, ownerIDs, otherUser.ID.String())
+}
+
 func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
@@ -288,7 +355,7 @@ func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, ownerIDs, r.User.String())
 
-	server, _, token := setupTestServer(r, t)
+	server, account, token := setupTestServer(r, t)
 	body, err := json.Marshal(map[string]string{"email": r.Account.Email})
 	require.NoError(t, err)
 	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
@@ -296,11 +363,14 @@ func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
 	res := httptest.NewRecorder()
 	server.Router.ServeHTTP(res, req)
 
-	require.Equal(t, http.StatusConflict, res.Code)
-	assert.Contains(t, res.Body.String(), "Transfer ownership")
+	require.Equal(t, http.StatusNoContent, res.Code)
+	assert.NotContains(t, res.Body.String(), "Transfer ownership")
+
+	_, err = models.FindAccountByID(account.ID.String())
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
-	require.NoError(t, err)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func TestDeleteAccount_RefusesLastInstallationAdmin(t *testing.T) {
@@ -380,6 +450,9 @@ func TestDeleteAccount_RefusesLastLivingOwnerAfterDeletedOwner(t *testing.T) {
 	firstServer.Router.ServeHTTP(res, req)
 	require.Equal(t, http.StatusNoContent, res.Code)
 
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+
 	otherToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), otherAccount.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 	body, err = json.Marshal(map[string]string{"email": otherAccount.Email})
@@ -388,8 +461,14 @@ func TestDeleteAccount_RefusesLastLivingOwnerAfterDeletedOwner(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: otherToken})
 	res = httptest.NewRecorder()
 	firstServer.Router.ServeHTTP(res, req)
-	require.Equal(t, http.StatusConflict, res.Code)
-	assert.Contains(t, res.Body.String(), "Transfer ownership")
+	require.Equal(t, http.StatusNoContent, res.Code)
+	assert.NotContains(t, res.Body.String(), "Transfer ownership")
+
+	_, err = models.FindAccountByID(otherAccount.ID.String())
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func TestDeleteAccount_RefusesWhenOnlyOtherAdminIsBlocked(t *testing.T) {

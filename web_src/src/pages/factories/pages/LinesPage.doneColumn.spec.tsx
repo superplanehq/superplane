@@ -77,7 +77,30 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
+  useWorkOrderPlanningActivity: (
+    _organizationId: string,
+    _factoryId: string,
+    _workOrderId: string,
+    enabled: boolean,
+    backlogAnalyzing = false,
+  ) => ({
+    hasAgentQuestion: false,
+    isWaiting: false,
+    isWorking: false,
+    isAgentWorking: Boolean(enabled && backlogAnalyzing),
+  }),
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Hot-reload stack for local development (run via `make dev.server`).
-# Install JS deps with `make dev.setup` first so `npm run dev` can start quickly.
+# Install JS deps with `make dev.setup` first so Vite can start quickly.
 #
 set -euo pipefail
 

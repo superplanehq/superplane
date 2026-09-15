@@ -118,7 +118,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec, "", nil)
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
@@ -164,7 +164,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "stream-json")
 	assert.Contains(t, runScript, "--append-system-prompt")
 	assert.Contains(t, runScript, "plain terminal text")
-	assert.Contains(t, runScript, "--continue")
+	assert.Contains(t, runScript, "--resume")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
@@ -175,7 +175,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "bypassPermissions")
 	assert.Contains(t, runScript, "--mcp-config")
 	assert.Contains(t, runScript, "planning_session_mcp.js")
-	assert.Contains(t, runScript, "mcp__superplane__propose_draft")
+	assert.NotContains(t, runScript, "mcp__superplane__propose_draft")
+	assert.Contains(t, runScript, "mcp__superplane__propose_spec")
+	assert.Contains(t, runScript, "mcp__superplane__propose_confidence")
 	assert.Contains(t, runScript, "mcp__superplane__survey")
 	assert.NotContains(t, runScript, "mcp__superplane__say")
 	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
@@ -194,7 +196,7 @@ func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) 
 
 	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
 		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
-	})
+	}, nil)
 	require.Len(t, task.Commands, 3)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, "Set up Semaphore", task.Commands[1].Name)
@@ -233,7 +235,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil)
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -249,7 +251,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil)
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",

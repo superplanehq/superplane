@@ -19,10 +19,14 @@ type AgentBrokerTaskInput struct {
 	RunScript        string
 	WorkingDirectory string
 	Steps            []AgentStep
-	Usage            string
-	Setups           []IntegrationSetup
-	Model            string
-	PromptCommand    AgentPromptCommand
+	// DispatchedSteps, when set to the same length as Steps, supply minted
+	// prompt/command text for task files and attachment fetches. Preview
+	// text stays on Steps.
+	DispatchedSteps []AgentStep
+	Usage           string
+	Setups          []IntegrationSetup
+	Model           string
+	PromptCommand   AgentPromptCommand
 }
 
 type TaskAttachment struct {
@@ -47,17 +51,31 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
 	})
-	if fetch := AttachmentFetchCommand(CollectTaskAttachmentsFromSteps(input.Steps)); fetch != nil {
+	if fetch := AttachmentFetchCommand(CollectTaskAttachmentsFromSteps(AgentStepsForDispatch(input.Steps, input.DispatchedSteps))); fetch != nil {
 		commands = append(commands, *fetch)
 	}
 	commands = append(commands, setupCommands...)
 
 	for i, step := range input.Steps {
-		file, command := buildAgentStep(i+1, step, input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand)
+		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
 	return commands, files
+}
+
+func AgentStepsForDispatch(original, dispatched []AgentStep) []AgentStep {
+	if len(dispatched) == len(original) {
+		return dispatched
+	}
+	return original
+}
+
+func AgentStepForDispatch(original, dispatched []AgentStep, i int) AgentStep {
+	if i >= 0 && i < len(dispatched) && len(dispatched) == len(original) {
+		return dispatched[i]
+	}
+	return original[i]
 }
 
 func ApplyIntegrationUsage(prompt, usage string) string {
@@ -102,43 +120,44 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
-	stepSlug := AgentStepSlug(stepNumber, step.Name)
-	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
-	switch NormalizeAgentStepType(step.Type) {
+func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
+	stepSlug := AgentStepSlug(stepNumber, original.Name)
+	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
+	switch NormalizeAgentStepType(original.Type) {
 	case AgentStepBash:
-		command := ""
-		if step.Command != nil {
-			command = *step.Command
-		}
+		command := stringPtrValue(original.Command)
 		scriptName := stepSlug + ".sh"
 		return BrokerTaskFile{
 				Path:    "steps/" + scriptName,
-				Content: command,
+				Content: stringPtrValue(dispatched.Command),
 				Mode:    "0644",
 			}, BrokerCommand{
-				Name:    AgentStepLabel(step.Name, scriptName),
+				Name:    AgentStepLabel(original.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 				Kind:    LiveLogKindBash,
 				Preview: LiveLogText(command),
 			}
 	default:
-		prompt := ""
-		if step.Prompt != nil {
-			prompt = *step.Prompt
-		}
+		prompt := stringPtrValue(original.Prompt)
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: ApplyIntegrationUsage(prompt, usage),
+				Content: ApplyIntegrationUsage(stringPtrValue(dispatched.Prompt), usage),
 				Mode:    "0644",
 			}, BrokerCommand{
-				Name:    AgentStepLabel(step.Name, promptName),
+				Name:    AgentStepLabel(original.Name, promptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
 				Preview: LiveLogText(prompt),
 			}
 	}
+}
+
+func stringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // EffectiveWorkingDirectory returns the per-step directory when set,

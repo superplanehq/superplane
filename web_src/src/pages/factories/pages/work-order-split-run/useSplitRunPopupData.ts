@@ -53,6 +53,7 @@ export function useSplitRunPopupData(args: {
     sourceDescription,
     useLive,
     artifactsLoading: useLive && liveArtifactsQuery.isLoading,
+    artifactsError: useLive ? (liveArtifactsQuery.error ?? null) : null,
     pullRequestsLoading: useLive && livePullRequestsQuery.isLoading,
     pullRequestsError: useLive ? (livePullRequestsQuery.error ?? null) : null,
   };

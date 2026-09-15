@@ -49,6 +49,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
 	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
+	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
 	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
 
@@ -154,33 +155,6 @@ func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown factory app template")
-}
-
-func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
-	result, err := materializeFactoryTemplate("create-with-agent", factoryTemplateInput{
-		appID:   "app-1",
-		appName: "Create with an Agent",
-		installParams: map[string]string{
-			"appRepository": "acme/app",
-		},
-		agent: &factoryTemplateAgent{
-			component:        "runnerClaudeCode",
-			model:            "claude-sonnet-4-6",
-			planningModel:    "claude-opus-4-6",
-			credentialSource: "hosted",
-		},
-	})
-	require.NoError(t, err)
-	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-	require.NoError(t, err)
-	assert.Equal(t, "Create with an Agent", canvas.Metadata.Name)
-	agent := findYAMLNode(t, canvas, "planning-agent")
-	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
-	assert.Nil(t, agent.Configuration["model"])
-	assert.Nil(t, agent.Configuration["credentials"])
-	require.NotNil(t, agent.Concurrency)
-	require.NotNil(t, agent.Concurrency.Max)
-	assert.Equal(t, 10, *agent.Concurrency.Max)
 }
 
 func TestDeriveFactoryInstallParamsSkipsRuntimeExpressions(t *testing.T) {
@@ -303,12 +277,16 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	assert.Equal(t, canvasID.String(), defaults.Metadata.ID)
 	assert.Equal(t, "Backlog scoring", defaults.Metadata.Name)
 	analysis := findYAMLNode(t, defaults, intakeAnalysisNodeID)
+	refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
 	assert.Equal(t, "runnerOpenRouter", analysis.Component)
+	assert.Equal(t, analysis.Component, refinement.Component)
 	assert.Equal(t, "anthropic/claude-opus-4-6", analysis.Configuration["model"])
 	assert.Equal(t, map[string]any{
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, analysis.Configuration["credentials"])
+	assert.Equal(t, analysis.Configuration["credentials"], refinement.Configuration["credentials"])
+	assert.Equal(t, analysis.Configuration["model"], refinement.Configuration["model"])
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

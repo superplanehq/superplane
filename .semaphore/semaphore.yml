@@ -27,12 +27,6 @@ global_job_config:
     commands:
       - checkout
       - mkdir -p tmp/go tmp/go-build
-      # Only main stores these caches, so the keys carry no branch name.
-      # See scripts/ci_cache_store_go.sh.
-      - "cache restore go-mod-$(checksum go.sum),go-mod"
-      - "cache restore go-build-$(checksum go.sum),go-build"
-      - make dev.up
-      - make dev.setup
 
 auto_cancel:
   running:
@@ -45,6 +39,14 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          # Only main stores these caches, so the keys carry no branch name.
+          # See scripts/ci_cache_store_go.sh.
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
         - name: Lint
           commands:
@@ -85,6 +87,9 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - make dev.up
       jobs:
         - name: Tool configs
           commands:
@@ -111,19 +116,20 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
-        - name: Check Build
-          commands:
-            - make check.tool.configs
-            - make check.build.ui
-
         - name: Storybook Build
           commands:
             - make check.tool.configs
             - make check.build.storybook
 
         - name: Unit Tests
-          parallelism: 4
+          parallelism: 2
           commands:
             - make check.tool.configs
             - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
@@ -142,6 +148,30 @@ blocks:
           commands:
             - make check.tool.configs
             - make check.lint.ui.knip
+
+      epilogue:
+        always:
+          commands:
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
+
+  - name: "Build Image"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      secrets:
+        - name: ghcr-push-token
+        - name: r2-static-assets
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup.npm
+      jobs:
+        - name: Build image
+          commands:
+            - bash scripts/build-image
 
 after_pipeline:
   task:

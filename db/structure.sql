@@ -444,7 +444,8 @@ CREATE TABLE public.factory_planning_session_messages (
     role text NOT NULL,
     text text NOT NULL,
     delivered boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid
 );
 
 
@@ -467,7 +468,7 @@ CREATE TABLE public.factory_planning_sessions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     factory_id uuid NOT NULL,
-    created_by_user_id uuid NOT NULL,
+    created_by_user_id uuid,
     repository text NOT NULL,
     state text NOT NULL,
     canvas_id uuid,
@@ -486,7 +487,10 @@ CREATE TABLE public.factory_planning_sessions (
     ended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    selectable_model_key text DEFAULT ''::text NOT NULL
+    selectable_model_key text DEFAULT ''::text NOT NULL,
+    kind text NOT NULL,
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text]))),
+    CONSTRAINT factory_planning_sessions_task_creation_creator_check CHECK (((kind <> 'task_creation'::text) OR (created_by_user_id IS NOT NULL)))
 );
 
 
@@ -908,6 +912,8 @@ CREATE TABLE public.organization_billing_plans (
     trial_started_at timestamp with time zone,
     trial_ends_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancel_at_period_end boolean DEFAULT false NOT NULL,
+    polar_modified_at timestamp with time zone,
     CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
@@ -1110,7 +1116,8 @@ CREATE TABLE public.usage_price_book_rates (
 CREATE TABLE public.usage_price_books (
     version text NOT NULL,
     effective_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_current boolean DEFAULT false NOT NULL
 );
 
 
@@ -2551,6 +2558,13 @@ CREATE INDEX idx_factory_planning_session_messages_session ON public.factory_pla
 
 
 --
+-- Name: idx_factory_planning_sessions_analysis_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_sessions_analysis_work_order ON public.factory_planning_sessions USING btree (organization_id, factory_id, draft_work_order_id) WHERE ((kind = 'work_order_analysis'::text) AND (draft_work_order_id IS NOT NULL));
+
+
+--
 -- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3300,6 +3314,13 @@ CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btre
 
 
 --
+-- Name: usage_price_books_one_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX usage_price_books_one_current ON public.usage_price_books USING btree ((true)) WHERE is_current;
+
+
+--
 -- Name: workflows_factory_id_name_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3487,6 +3508,14 @@ ALTER TABLE ONLY public.factory_lines
 
 ALTER TABLE ONLY public.factory_planning_session_messages
     ADD CONSTRAINT factory_planning_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -4409,7 +4438,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260911070308	f
+20260915064721	f
 \.
 
 

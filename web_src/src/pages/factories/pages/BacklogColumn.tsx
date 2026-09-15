@@ -38,7 +38,6 @@ export type BacklogColumnProps = {
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
@@ -79,7 +78,6 @@ export function BacklogColumn({
   canRename,
   onRename,
   onCreateWorkOrder,
-  onCreateWithAgent,
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
@@ -102,7 +100,6 @@ export function BacklogColumn({
     atCapacity,
     createMenu,
     onCreateWorkOrder,
-    onCreateWithAgent,
   });
 
   return (
@@ -290,7 +287,6 @@ function backlogCreatePopoverProps(args: {
   atCapacity: boolean;
   createMenu: ReturnType<typeof useBacklogCreateMenu>;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent?: () => void;
 }) {
   return {
     canAdd: args.canAdd,
@@ -302,7 +298,6 @@ function backlogCreatePopoverProps(args: {
     onQueryChange: args.createMenu.setQuery,
     onFocusedIntakeChange: args.createMenu.setFocusedIntake,
     onCreateManually: args.onCreateWorkOrder,
-    onCreateWithAgent: args.onCreateWithAgent,
     onImportItem: args.createMenu.importItem,
     isLoading: args.createMenu.isLoading,
     isLoadingMore: args.createMenu.isLoadingMore,

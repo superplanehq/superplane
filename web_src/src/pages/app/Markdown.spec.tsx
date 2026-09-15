@@ -1,6 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+import { clearWorkspaceMarkdownImageLoadCache } from "@/lib/workspaceMarkdownImages";
+
 import { MarkdownContent } from "./Markdown";
 
 vi.mock("@/components/AgentSidebar/widgets/MermaidWidget", () => ({
@@ -308,5 +312,110 @@ describe("MarkdownContent mentions", () => {
     const card = await screen.findByTestId("work-order-mention-tooltip");
     expect(card).toHaveTextContent("test test");
     expect(card).toHaveTextContent("test@test.com");
+  });
+});
+
+describe("MarkdownContent work order files", () => {
+  const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+  afterEach(() => {
+    clearWorkOrderFileDownloadCache();
+  });
+
+  it("uses the download URL as the image source when files are present", () => {
+    render(
+      <MarkdownContent
+        content={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(<MarkdownContent content={`See ![bug](sp-file://${fileId})`} />);
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+
+  it("does not change the image source when the download URL is reminted", () => {
+    const first = "https://files.example/bug.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/bug.png?expires=9999999999&sig=two";
+    const { rerender } = render(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: first }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+
+    rerender(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: reminted }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+  });
+});
+
+describe("MarkdownContent images", () => {
+  afterEach(() => {
+    clearWorkspaceMarkdownImageLoadCache();
+  });
+
+  it("hides a workspace image until it loads", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    expect(image).not.toBeNull();
+    expect(image).toHaveClass("opacity-0");
+
+    fireEvent.load(image!);
+
+    expect(image).not.toHaveClass("opacity-0");
+  });
+
+  it("keeps a failed workspace image hidden and accessible", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    fireEvent.error(image!);
+
+    expect(image).toHaveClass("opacity-0");
+    expect(image).toHaveAttribute("alt", "Architecture");
+  });
+
+  it("hides a workspace image again only when its source changes", () => {
+    const first = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent content={first} variant="workspace" />);
+    const image = container.querySelector("img");
+
+    fireEvent.load(image!);
+    rerender(<MarkdownContent content={first} variant="workspace" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+
+    rerender(<MarkdownContent content="![Architecture](https://files.example/updated.png)" variant="workspace" />);
+
+    expect(container.querySelector("img")).toHaveClass("opacity-0");
+  });
+
+  it("keeps a loaded workspace image visible after the markdown remounts", () => {
+    const content = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent key="first" content={content} variant="workspace" />);
+
+    fireEvent.load(container.querySelector("img")!);
+    rerender(<MarkdownContent key="second" content={content} variant="workspace" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+  });
+
+  it("keeps default Markdown image behavior", () => {
+    const { container } = render(<MarkdownContent content="![Architecture](https://files.example/architecture.png)" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
   });
 });

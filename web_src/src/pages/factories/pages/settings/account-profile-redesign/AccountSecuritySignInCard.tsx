@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FactorySettingsCard } from "../FactorySettingsCard";
 import type { AccountRedesignSsoAccount } from "./accountProfileRedesignMocks";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
-import { SSO_PROVIDERS, type SsoProviderItem } from "./accountSecuritySso";
+import { SSO_PROVIDERS, ssoProviderDescription, type SsoProviderItem } from "./accountSecuritySso";
 
 export function AccountSecuritySignInCard({
   passwordSet,
@@ -52,7 +52,7 @@ export function AccountSecuritySignInCard({
                     {item.label}
                   </span>
                 }
-                description={identity ? `Connected as ${identity}` : "Not connected"}
+                description={ssoProviderDescription(item.provider, identity)}
                 testId={`account-redesign-sso-${item.provider}`}
                 action={
                   identity ? (

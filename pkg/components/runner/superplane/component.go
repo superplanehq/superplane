@@ -163,10 +163,15 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment)
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched)
+	if err != nil {
+		return err
+	}
+	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)
@@ -281,6 +286,7 @@ func buildSuperPlaneBrokerTask(
 	usage string,
 	setups []runner.IntegrationSetup,
 	environment []runner.BrokerEnvironmentVariable,
+	dispatched []runner.AgentStep,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
@@ -291,7 +297,7 @@ func buildSuperPlaneBrokerTask(
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
-		task := claude.ApplyPlanningFollowUp(claude.BuildBrokerTask(claudeSpec, usage, setups), environment, claudeSpec)
+		task := claude.ApplyPlanningFollowUp(claude.BuildDispatchedBrokerTask(claudeSpec, usage, setups, dispatched), environment, claudeSpec)
 		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
 	case models.UsageProviderOpenAI:
 		codexSpec := codex.RunCodexSpec{
@@ -301,7 +307,7 @@ func buildSuperPlaneBrokerTask(
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
-		task := codex.ApplyPlanningFollowUp(codex.BuildBrokerTask(codexSpec, usage, setups), environment, codexSpec)
+		task := codex.ApplyPlanningFollowUp(codex.BuildDispatchedBrokerTask(codexSpec, usage, setups, dispatched), environment, codexSpec)
 		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
 	case models.UsageProviderOpenRouter:
 		openRouterSpec := openrouter.RunOpenRouterSpec{
@@ -312,7 +318,7 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := openrouter.ApplyPlanningFollowUp(
-			openrouter.BuildBrokerTask(openRouterSpec, usage, setups),
+			openrouter.BuildDispatchedBrokerTask(openRouterSpec, usage, setups, dispatched),
 			environment,
 			openRouterSpec,
 		)

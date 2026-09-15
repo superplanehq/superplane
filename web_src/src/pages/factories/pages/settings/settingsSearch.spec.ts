@@ -79,6 +79,12 @@ describe("searchFactorySettings", () => {
     expect(titles).toContain("Security");
     expect(titles).toContain("Sign in methods");
   });
+
+  it("sends a velocity query to Sign in methods", () => {
+    const results = searchFactorySettings(index, "velocity");
+    expect(results.some((result) => result.title === "Sign in methods")).toBe(true);
+    expect(results.map((result) => result.title)).not.toContain("GitHub for Velocity");
+  });
 });
 
 describe("factorySettingsIntegrationSearchEntries", () => {

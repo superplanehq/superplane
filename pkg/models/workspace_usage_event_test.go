@@ -30,6 +30,15 @@ func Test__UsageTotalsAdd(t *testing.T) {
 	assert.Equal(t, int64(8), combined.CostCents())
 }
 
+func Test__WorkOrderRunUsage__ComputeCostMicrosKeepsSubCent(t *testing.T) {
+	row := models.WorkOrderRunUsage{
+		CostMicros:       183_150,
+		HostedCostMicros: 180_000,
+	}
+	assert.Equal(t, int64(3_150), row.ComputeCostMicros())
+	assert.Zero(t, row.CostCents()-row.HostedCostCents())
+}
+
 func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
