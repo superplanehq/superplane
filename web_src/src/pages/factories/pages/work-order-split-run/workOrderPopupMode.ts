@@ -6,16 +6,20 @@ export function workOrderPopupMode({
   refinementEnabled,
   refinementLoading = false,
   sessionLoading = false,
+  artifactsLoading = false,
   analysisActive,
   hasLookupIdentity,
+  isDraft = true,
 }: {
   hasPlanningSession: boolean;
   hasAnalysisResult?: boolean;
   refinementEnabled: boolean;
   refinementLoading?: boolean;
   sessionLoading?: boolean;
+  artifactsLoading?: boolean;
   analysisActive: boolean;
   hasLookupIdentity: boolean;
+  isDraft?: boolean;
 }): WorkOrderPopupMode {
   if (!hasLookupIdentity || hasPlanningSession) {
     return "analysis";
@@ -26,8 +30,8 @@ export function workOrderPopupMode({
   if (!refinementEnabled) {
     return "classic";
   }
-  if (hasAnalysisResult || analysisActive) {
+  if (hasAnalysisResult || analysisActive || !isDraft) {
     return "analysis";
   }
-  return sessionLoading ? "loading" : "classic";
+  return sessionLoading || artifactsLoading ? "loading" : "classic";
 }

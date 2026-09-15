@@ -61,8 +61,10 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     refinementEnabled,
     refinementLoading: refinementFeature.isLoading,
     sessionLoading: analysis.isLoading,
+    artifactsLoading: popupData.artifactsLoading,
     analysisActive: isAnalyzing,
     hasLookupIdentity,
+    isDraft: fixture.footer.kind === "draft",
   });
 
   if (mode === "loading") {
