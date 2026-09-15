@@ -1,9 +1,12 @@
+import { useMemo } from "react";
 import { groupWorkOrderEntriesByLane, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import {
   WORK_ORDER_BOARD_LANES,
   type WorkOrderBoardLaneDefinition,
   type WorkOrderBoardLaneId,
 } from "../lib/workOrderProgress";
+import { KanbanCardMotionItem } from "./KanbanCardMotionItem";
+import { tasksBoardCardPlacements, useKanbanDisplayedBoard } from "./kanbanCardMotion";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -18,11 +21,13 @@ interface WorkOrdersBoardViewProps extends WorkOrderCardContext {
 
 /** Four-lane Kanban-style board mapping to the shared display statuses. */
 export function WorkOrdersBoardView(props: WorkOrdersBoardViewProps) {
-  const grouped = groupWorkOrderEntriesByLane(props.entries);
+  const incomingPlacements = useMemo(() => tasksBoardCardPlacements(props.entries), [props.entries]);
+  const entries = useKanbanDisplayedBoard(props.entries, incomingPlacements);
+  const grouped = groupWorkOrderEntriesByLane(entries);
   return (
     <WorkOrderKanbanBoard testId="work-orders-board">
       {WORK_ORDER_BOARD_LANES.map((lane) => (
-        <BoardLane key={lane.id} {...props} lane={lane} entries={grouped.get(lane.id) ?? []} />
+        <BoardLane key={lane.id} {...props} entries={grouped.get(lane.id) ?? []} lane={lane} />
       ))}
     </WorkOrderKanbanBoard>
   );
@@ -44,9 +49,9 @@ function BoardLane({ lane, entries, ...rest }: BoardLaneProps) {
     >
       <ul className={workOrderKanbanLaneScrollClassName}>
         {entries.map((entry) => (
-          <li key={entry.id}>
+          <KanbanCardMotionItem key={entry.id} id={entry.id}>
             <WorkOrderCard entry={entry} {...rest} />
-          </li>
+          </KanbanCardMotionItem>
         ))}
       </ul>
     </WorkOrderBoardLane>

@@ -4,6 +4,7 @@ import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from 
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
+import { KanbanCardMotionItem } from "../workOrders/KanbanCardMotionItem";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
@@ -245,14 +246,14 @@ function BacklogColumnOrderList({
   return (
     <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
       {orders.map((order) => (
-        <li key={order.id}>
+        <KanbanCardMotionItem key={order.id} id={order.id}>
           <LineBoardOrderCard
             order={order}
             workOrderCardContext={workOrderCardContext}
             onOpenWorkOrder={onOpenWorkOrder}
             isAnalyzing={Boolean(order.id && analyzingOrderIds?.has(order.id))}
           />
-        </li>
+        </KanbanCardMotionItem>
       ))}
       {atCapacity ? null : (
         <li data-testid="lines-backlog-create-ghost-item">
