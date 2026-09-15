@@ -922,6 +922,11 @@ func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, reques
 	if r.State == CanvasRunStateFinished {
 		return &RunCancellationResult{Run: r}, nil
 	}
+	// Explicit cancellation has precedence once the run starts stopping.
+	cancellationHasPrecedence := r.State == CanvasRunStateCancelling && r.Result != CanvasRunResultPassed
+	if cancellationHasPrecedence && requestedResult == CanvasRunResultPassed {
+		requestedResult = ""
+	}
 
 	drain, err := r.DrainForCancellation(tx, stoppedBy)
 	if err != nil {

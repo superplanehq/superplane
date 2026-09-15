@@ -178,7 +178,8 @@ func Test__CanvasRun__CalculateResult__Cancelled(t *testing.T) {
 
 func Test__CanvasRun__CalculateResult__CompletionRequested(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
-	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultCancelled,
 		"updated_at": time.Now(),
@@ -193,20 +194,21 @@ func Test__CanvasRun__CalculateResult__CompletionRequested(t *testing.T) {
 
 func Test__CanvasRun__RequestCompletion__StopsRunAndIsIdempotent(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
 
 	for range 2 {
-		require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 			_, err := run.RequestCompletion(tx, nil)
 			return err
 		}))
 	}
 
-	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
 
-	updatedExecution, err := models.FindNodeExecutionInTransaction(database.DB(t.Context()), run.WorkflowID, execution.ID)
+	updatedExecution, err := models.FindNodeExecutionInTransaction(db, run.WorkflowID, execution.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
 }
@@ -221,13 +223,14 @@ func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T)
 		[]models.Edge{},
 	)
 	run := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, models.CanvasRunResultCancelled)
+	db := database.DB(t.Context())
 
-	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, err := run.RequestCompletion(tx, nil)
 		return err
 	}))
 
-	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
@@ -235,8 +238,9 @@ func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T)
 
 func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing.T) {
 	run, _ := setupRunWithExecution(t)
+	db := database.DB(t.Context())
 
-	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		if _, err := run.RequestCompletion(tx, nil); err != nil {
 			return err
 		}
@@ -244,12 +248,34 @@ func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing
 		return err
 	}))
 
-	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
 	assert.Empty(t, updatedRun.Result)
 
-	result, err := updatedRun.CalculateResult(database.DB(t.Context()))
+	result, err := updatedRun.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CanvasRun__RequestCompletion__DoesNotOverrideCancellationRequest(t *testing.T) {
+	run, _ := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if _, err := run.RequestCancellation(tx, nil); err != nil {
+			return err
+		}
+		_, err := run.RequestCompletion(tx, nil)
+		return err
+	}))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
+
+	result, err := updatedRun.CalculateResult(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
