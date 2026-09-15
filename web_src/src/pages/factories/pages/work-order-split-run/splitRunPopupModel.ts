@@ -38,6 +38,9 @@ export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
 /** Refine chat column. Chat-only uses wider side padding. */
 export const SPLIT_RUN_CHAT_COLUMN_CLASSNAME = "mx-auto w-full max-w-5xl";
 
+/** Reserve the scrollbar lane on the log and the composer so their right edges stay aligned. */
+export const SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME = "overflow-y-auto [scrollbar-gutter:stable]";
+
 export function splitRunChatColumnClassName(chatSolo: boolean): string {
   return `${SPLIT_RUN_CHAT_COLUMN_CLASSNAME} ${chatSolo ? "px-8" : "px-4"}`;
 }

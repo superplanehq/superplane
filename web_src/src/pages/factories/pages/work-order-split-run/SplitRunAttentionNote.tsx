@@ -211,6 +211,15 @@ function CompactAttentionNote({
   actionsOnly: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
+  // Temporary: keep Archive, Start, and the model pick off the refine composer.
+  const rowActions = actionsOnly
+    ? actions.filter((action) => action.kind !== "archive" && action.kind !== "start")
+    : actions;
+  const rowModel = actionsOnly ? undefined : modelSelect;
+  if (actionsOnly && rowActions.length === 0 && !rowModel) {
+    return null;
+  }
+
   return (
     <div
       className={cn("flex items-center gap-3", actionsOnly ? "shrink-0" : "min-w-0 flex-1")}
@@ -228,12 +237,12 @@ function CompactAttentionNote({
       )}
       <NoteActionRow
         note={note}
-        actions={actions}
+        actions={rowActions}
         runHref={runHref}
         actionBusy={actionBusy}
         startBusy={startBusy}
         startDisabled={startDisabled}
-        modelSelect={modelSelect}
+        modelSelect={rowModel}
         onAction={onAction}
       />
     </div>
