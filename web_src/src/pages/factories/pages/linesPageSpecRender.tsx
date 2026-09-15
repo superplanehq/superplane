@@ -65,6 +65,10 @@ export function LinesBoardSpecHarness({
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/checks"
                     element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
                   />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
+                    element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
+                  />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
                 <LocationProbe />

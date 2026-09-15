@@ -474,3 +474,63 @@ func ListGitHubIntegrationsByInstallationID(tx *gorm.DB, installationID string) 
 	}
 	return integrations, nil
 }
+
+// FindSentryIntegrationByAppState finds the pending Sentry connection that
+// started an install with this CSRF state.
+func FindSentryIntegrationByAppState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "sentry", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// FindPendingHostedSentryIntegration finds the newest unbound hosted Sentry
+// connection started by this SuperPlane user.
+func FindPendingHostedSentryIntegration(tx *gorm.DB, startedByUserID string) (*Integration, error) {
+	if startedByUserID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where(
+			"app_name = ? AND metadata->>'hostedApp' = ? AND metadata->>'startedByUserID' = ? AND COALESCE(metadata->>'installationUUID', '') = ''",
+			"sentry",
+			"true",
+			startedByUserID,
+		).
+		Order("created_at DESC").
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ListSentryIntegrationsByInstallationUUID finds Sentry connections bound to
+// a public Sentry app installation.
+func ListSentryIntegrationsByInstallationUUID(tx *gorm.DB, installationUUID string) ([]Integration, error) {
+	if installationUUID == "" {
+		return nil, nil
+	}
+
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'installationUUID' = ?", "sentry", installationUUID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}
