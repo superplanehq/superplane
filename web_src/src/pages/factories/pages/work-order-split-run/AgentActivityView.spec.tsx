@@ -215,7 +215,7 @@ describe("AgentActivityView", () => {
     expect(summary.querySelector("svg")).toBeInTheDocument();
   });
 
-  it("collapses a completed turn into one summary without nested command disclosures", async () => {
+  it("keeps chronological tool batches collapsed inside a completed turn", async () => {
     const user = userEvent.setup();
     render(
       <AgentActivityView
@@ -223,29 +223,39 @@ describe("AgentActivityView", () => {
           { ...completedTool("search-1", "bash", "Bash"), input: "rg retry" },
           {
             type: "content",
-            id: "thought-1",
-            kind: "reasoning",
-            text: "The retry path needs another check.",
+            id: "update-1",
+            kind: "assistant",
+            text: "I will inspect the source files next.",
             status: "passed",
-            durationMs: 2_000,
             truncated: false,
           },
           { ...completedTool("read-1", "bash", "Bash"), input: "cat retry.go" },
+          { ...completedTool("find-1", "bash", "Bash"), input: "find . -type f" },
         ])}
       />,
     );
 
-    const summary = screen.getByRole("button", { name: "Explored 1 file, searched code" });
+    const summary = screen.getByRole("button", { name: "Explored 1 file, searched code, explored repository" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("rg retry")).not.toBeInTheDocument();
 
     await user.click(summary);
 
+    const searchBatch = screen.getByRole("button", { name: "Searched code" });
+    const explorationBatch = screen.getByRole("button", { name: "Explored 1 file, explored repository" });
+    expect(searchBatch).toHaveAttribute("aria-expanded", "false");
+    expect(explorationBatch).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("I will inspect the source files next.")).toBeInTheDocument();
+    expect(screen.queryByText("rg retry")).not.toBeInTheDocument();
+    expect(screen.queryByText("cat retry.go")).not.toBeInTheDocument();
+
+    await user.click(searchBatch);
     expect(screen.getByText("rg retry")).toBeInTheDocument();
+    expect(screen.queryByText("cat retry.go")).not.toBeInTheDocument();
+
+    await user.click(explorationBatch);
     expect(screen.getByText("cat retry.go")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Thought briefly" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Searched code" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Explored 1 file" })).not.toBeInTheDocument();
+    expect(screen.getByText("find . -type f")).toBeInTheDocument();
   });
 
   it("keeps tool batches around intermediate provider updates", async () => {

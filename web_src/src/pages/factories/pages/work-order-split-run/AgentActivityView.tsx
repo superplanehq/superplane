@@ -56,7 +56,7 @@ function CompletedActivity({
           className="ml-1 space-y-0.5 border-l border-border/70 pl-2"
           data-testid={`agent-activity-details-${activity.id}`}
         >
-          <ActivityEntries entries={entries} truncated={activity.truncated} groupTools={false} />
+          <ActivityEntries entries={entries} truncated={activity.truncated} />
         </div>
       ) : null}
     </div>
