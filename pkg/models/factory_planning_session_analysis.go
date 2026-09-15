@@ -207,8 +207,8 @@ func markdownFileRef(file File) string {
 }
 
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
-	if score < 0 || score > PlanningConfidenceScoreMax {
-		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
+	if err := validatePlanningConfidenceScore(score); err != nil {
+		return err
 	}
 	return s.withLockedSession(tx, func(inner *gorm.DB) error {
 		if err := s.guardOpen(); err != nil {
@@ -218,22 +218,86 @@ func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, s
 		if err != nil {
 			return err
 		}
-		var run *factory.RunRef
-		if s.CanvasRunID != nil {
-			run = &factory.RunRef{ID: *s.CanvasRunID}
-		}
-		_, err = order.ReportCheck(inner, FactoryWorkOrderCheckParams{
-			Key:      PlanningConfidenceCheckKey,
-			Name:     PlanningConfidenceCheckName,
-			Score:    score,
-			MaxScore: PlanningConfidenceScoreMax,
-			Format:   FactoryWorkOrderCheckFormatFraction,
-			Level:    planningConfidenceLevel(score),
-			Summary:  strings.TrimSpace(summary),
-			Run:      run,
-		})
-		return err
+		return reportPlanningConfidence(inner, s, order, score, summary)
 	})
+}
+
+func (s *FactoryPlanningSession) ProposePlan(tx *gorm.DB, body string, score float64, summary string) error {
+	markdown := strings.TrimSpace(body)
+	if markdown == "" {
+		return fmt.Errorf("%w: spec body is required", ErrFactoryPlanningSessionInvalid)
+	}
+	if err := validatePlanningConfidenceScore(score); err != nil {
+		return err
+	}
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		order, err := s.analysisWorkOrder(inner)
+		if err != nil {
+			return err
+		}
+		if err := upsertPlanningSpecArtifact(inner, order, markdown); err != nil {
+			return err
+		}
+		if err := reportPlanningConfidence(inner, s, order, score, summary); err != nil {
+			return err
+		}
+		return s.recordPlanMessage(inner, score, summary)
+	})
+}
+
+func validatePlanningConfidenceScore(score float64) error {
+	if !isFiniteCheckNumber(score) || score < 0 || score > PlanningConfidenceScoreMax {
+		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
+	}
+	return nil
+}
+
+func reportPlanningConfidence(tx *gorm.DB, session *FactoryPlanningSession, order *FactoryWorkOrder, score float64, summary string) error {
+	var run *factory.RunRef
+	if session.CanvasRunID != nil {
+		run = &factory.RunRef{ID: *session.CanvasRunID}
+	}
+	_, err := order.ReportCheck(tx, FactoryWorkOrderCheckParams{
+		Key:      PlanningConfidenceCheckKey,
+		Name:     PlanningConfidenceCheckName,
+		Score:    score,
+		MaxScore: PlanningConfidenceScoreMax,
+		Format:   FactoryWorkOrderCheckFormatFraction,
+		Level:    planningConfidenceLevel(score),
+		Summary:  strings.TrimSpace(summary),
+		Run:      run,
+	})
+	return err
+}
+
+type planningPlanMessagePayload struct {
+	Score   float64 `json:"score"`
+	Summary string  `json:"summary,omitempty"`
+}
+
+func (s *FactoryPlanningSession) recordPlanMessage(tx *gorm.DB, score float64, summary string) error {
+	payload, err := json.Marshal(planningPlanMessagePayload{
+		Score:   score,
+		Summary: strings.TrimSpace(summary),
+	})
+	if err != nil {
+		return err
+	}
+	message := PlanningSessionMessage{
+		ID:        uuid.New(),
+		SessionID: s.ID,
+		Role:      PlanningSessionMessageRolePlan,
+		Text:      string(payload),
+		Delivered: true,
+		CreatedAt: time.Now(),
+	}
+	if err := tx.Create(&message).Error; err != nil {
+		return err
+	}
+	return s.reloadMessages(tx)
 }
 
 func (s *FactoryPlanningSession) analysisWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
@@ -340,6 +404,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 }
 
 func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
+	messages = filterPlanningRewindMessages(messages)
 	if len(messages) == 0 || hardLimit <= 0 {
 		return analysisMessageWindow{Omitted: len(messages)}
 	}
@@ -368,6 +433,17 @@ func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int
 	}
 	reversePlanningMessages(selected)
 	return analysisMessageWindow{Messages: selected}
+}
+
+func filterPlanningRewindMessages(messages []PlanningSessionMessage) []PlanningSessionMessage {
+	filtered := make([]PlanningSessionMessage, 0, len(messages))
+	for _, message := range messages {
+		if message.Role == PlanningSessionMessageRolePlan {
+			continue
+		}
+		filtered = append(filtered, message)
+	}
+	return filtered
 }
 
 func analysisMessagesContextCharacters(messages []PlanningSessionMessage) int {

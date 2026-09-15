@@ -98,27 +98,25 @@ function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
   }
 }
 
-async function proposeSpec(input) {
+async function proposePlan(input) {
   const body = String((input && input.body) || "").trim();
   if (!body) {
     throw new Error("body is required");
   }
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
-  writeAnalysisOutputs({ spec: body });
-  return result;
-}
-
-async function proposeConfidence(input) {
   const score = Number(input && input.score);
   if (!Number.isFinite(score)) {
     throw new Error("score is required");
   }
   const summary = String((input && input.summary) || "").trim();
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
+  if (!summary) {
+    throw new Error("summary is required");
+  }
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/plan", {
+    body,
     score,
     summary,
   });
-  writeAnalysisOutputs({ score, summary });
+  writeAnalysisOutputs({ spec: body, score, summary });
   return result;
 }
 
@@ -132,23 +130,13 @@ async function recordAgentMessage(text) {
 
 const TOOLS = [
   {
-    name: "propose_spec",
-    description: "Publish the full spec.md markdown for the open task. Include the title, Executive summary, and plan. Do not change the original request. Call this after you write the specification.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        body: { type: "string" },
-      },
-      required: ["body"],
-    },
-  },
-  {
-    name: "propose_confidence",
+    name: "propose_plan",
     description:
-      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check.",
+      "Publish the full spec.md markdown, the 0 through 5 confidence score, and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check. Call this after you write the specification.",
     inputSchema: {
       type: "object",
       properties: {
+        body: { type: "string", description: "Full specification markdown." },
         score: {
           type: "number",
           description: "Confidence from 0 through 5.",
@@ -159,7 +147,7 @@ const TOOLS = [
             "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
         },
       },
-      required: ["score", "summary"],
+      required: ["body", "score", "summary"],
     },
   },
   {
@@ -233,10 +221,8 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "propose_spec") {
-        result = await proposeSpec(args);
-      } else if (name === "propose_confidence") {
-        result = await proposeConfidence(args);
+      if (name === "propose_plan") {
+        result = await proposePlan(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
       } else {
@@ -365,8 +351,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  proposeSpec,
-  proposeConfidence,
+  proposePlan,
   proposeSurvey,
   recordAgentMessage,
   surveyQuestions,

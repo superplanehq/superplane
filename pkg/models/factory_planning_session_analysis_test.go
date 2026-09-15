@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -307,6 +309,111 @@ func TestFactory_AttachAnalysisSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, session.ID, again.ID)
+}
+
+func TestFactoryPlanningSession_ProposePlanWritesSpecCheckAndBanner(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-propose-plan")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	body := "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"
+	require.NoError(t, session.ProposePlan(db, body, 4, "This issue is a good fit for an agent."))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, planningSpecArtifactKey(order.ID), *artifacts[0].Key)
+	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, PlanningConfidenceCheckKey, checks[0].Key)
+	assert.Equal(t, 4.0, checks[0].Score)
+	assert.Equal(t, FactoryWorkOrderCheckLevelPositive, checks[0].Level)
+	assert.Equal(t, "This issue is a good fit for an agent.", checks[0].Summary)
+
+	messages, err := ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	assert.Equal(t, PlanningSessionMessageRolePlan, messages[0].Role)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(messages[0].Text), &payload))
+	assert.Equal(t, 4.0, payload["score"])
+	assert.Equal(t, "This issue is a good fit for an agent.", payload["summary"])
+	assert.NotContains(t, messages[0].Text, "Retry refunds")
+
+	found, err := FindPlanningSessionByDraftWorkOrder(db, org.ID, factoryModel.ID, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, session.ID, found.ID)
+}
+
+func TestFactoryPlanningSession_ProposePlanRollsBackSpecWhenCheckFails(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-propose-plan-rollback")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	const hook = "test_fail_confidence_check"
+	db.Callback().Create().Before("gorm:create").Register(hook, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factory_work_order_checks" {
+			_ = tx.AddError(errors.New("check write failed"))
+		}
+	})
+	t.Cleanup(func() {
+		db.Callback().Create().Remove(hook)
+	})
+
+	err = session.ProposePlan(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n", 4, "Clear")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "check write failed")
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	assert.Empty(t, checks)
+	messages, err := ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	assert.Empty(t, messages)
+}
+
+func TestAnalysisConversationWindowSkipsPlanBanners(t *testing.T) {
+	messages := []PlanningSessionMessage{
+		{Role: PlanningSessionMessageRoleUser, Text: "Add refund retries."},
+		{Role: PlanningSessionMessageRolePlan, Text: `{"score":4,"summary":"Clear"}`},
+		{Role: PlanningSessionMessageRoleAgent, Text: "I updated the plan."},
+	}
+
+	window := analysisConversationWindow(messages, analysisMessagesContextCharacters(messages))
+
+	assert.Equal(t, []PlanningSessionMessage{messages[0], messages[2]}, window.Messages)
+	assert.Zero(t, window.Omitted)
+	assert.NotContains(t, window.Messages, messages[1])
 }
 
 func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {

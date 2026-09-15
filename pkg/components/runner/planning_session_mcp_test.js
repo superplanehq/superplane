@@ -8,12 +8,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
-const { recordAgentMessage, writeAnalysisOutputs } = require("./planning_session_mcp");
+const { proposePlan, recordAgentMessage, writeAnalysisOutputs } = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
-  assert.match(pack, /propose_spec/);
-  assert.match(pack, /propose_confidence/);
+  assert.match(pack, /propose_plan/);
+  assert.doesNotMatch(pack, /propose_spec/);
+  assert.doesNotMatch(pack, /propose_confidence/);
   assert.match(pack, /how suitable the work is for an agent/);
   assert.match(pack, /Do not write a test or an acceptance check/);
   assert.match(pack, /Use only the analysis tools/);
@@ -22,7 +23,7 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /If the score is 0 through 3/);
   assert.match(pack, /this is a continuation/);
   assert.match(pack, /does not publish the specification or the score/);
-  assert.match(pack, /only after those calls/);
+  assert.match(pack, /only after that call/);
   assert.doesNotMatch(pack, /check copy/);
   assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
 });
@@ -58,6 +59,42 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
     summary: "The CRUD files already exist.",
     reasons: [],
   });
+});
+
+test("proposePlan publishes spec and score together", async () => {
+  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
+  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousFetch = global.fetch;
+  const calls = [];
+  process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
+  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => '{"status":"shown"}' };
+  };
+
+  try {
+    const result = await proposePlan({
+      body: "# Retry refunds\n",
+      score: 4,
+      summary: "This issue is a good fit for an agent.",
+    });
+    assert.deepEqual(result, { status: "shown" });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/plan");
+    assert.equal(calls[0].options.method, "POST");
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      body: "# Retry refunds",
+      score: 4,
+      summary: "This issue is a good fit for an agent.",
+    });
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
+    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
+    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
+    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+  }
 });
 
 test("recordAgentMessage publishes the final reply outside the MCP tool list", async () => {
@@ -103,13 +140,13 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.equal(replies[0].result.serverInfo.name, "superplane");
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey"],
+    ["propose_plan", "survey"],
   );
-  assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["body"]);
-  assert.match(replies[1].result.tools[1].description, /how suitable the work is for an agent/);
-  assert.match(replies[1].result.tools[2].description, /two valid readings exist/);
-  assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /explains the score/);
-  assert.doesNotMatch(replies[1].result.tools[1].description, /check copy/);
+  assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["body", "score", "summary"]);
+  assert.match(replies[1].result.tools[0].description, /how suitable the work is for an agent/);
+  assert.match(replies[1].result.tools[1].description, /two valid readings exist/);
+  assert.match(replies[1].result.tools[0].inputSchema.properties.summary.description, /explains the score/);
+  assert.doesNotMatch(replies[1].result.tools[0].description, /check copy/);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -119,7 +156,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey"],
+    ["propose_plan", "survey"],
   );
 });
 

@@ -27,11 +27,8 @@ type planningSurveyRequest struct {
 	Questions []models.PlanningSessionSurveyQuestion `json:"questions"`
 }
 
-type planningSpecRequest struct {
-	Body string `json:"body"`
-}
-
-type planningConfidenceRequest struct {
+type planningPlanRequest struct {
+	Body    string  `json:"body"`
 	Score   float64 `json:"score"`
 	Summary string  `json:"summary"`
 }
@@ -148,33 +145,25 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
-	if !ok {
+	if _, ok := s.authenticatePlanningSessionRunner(w, r); !ok {
 		return
 	}
-	var req planningSpecRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
-	if err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	if err := session.ProposeSpec(database.DB(r.Context()), req.Body); err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	http.Error(w, "use propose_plan", http.StatusBadRequest)
 }
 
 func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.authenticatePlanningSessionRunner(w, r); !ok {
+		return
+	}
+	http.Error(w, "use propose_plan", http.StatusBadRequest)
+}
+
+func (s *Server) handleRunnerPlanningPlan(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
 		return
 	}
-	var req planningConfidenceRequest
+	var req planningPlanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -184,7 +173,7 @@ func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.R
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	if err := session.ProposeConfidence(database.DB(r.Context()), req.Score, req.Summary); err != nil {
+	if err := session.ProposePlan(database.DB(r.Context()), req.Body, req.Score, req.Summary); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}
