@@ -347,6 +347,10 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       },
     },
     {
+      pattern: re("/api/v1/factories/([^/]+)/backlog/refresh"),
+      resolve: () => ({ json: { archivedCount: 0, failedItemCount: 0, failedSourceCount: 0 } }),
+    },
+    {
       pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),
       resolve: () => ({
         json: {
