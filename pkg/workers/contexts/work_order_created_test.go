@@ -99,9 +99,9 @@ func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 	assert.Equal(t, true, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
 }
 
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {

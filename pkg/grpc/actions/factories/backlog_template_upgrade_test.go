@@ -19,6 +19,7 @@ import (
 
 func Test__UpgradeDefaultBacklogTemplates(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
