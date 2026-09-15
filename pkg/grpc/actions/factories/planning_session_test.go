@@ -88,7 +88,7 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	assert.Equal(t, refinementExecution.ID.String(), found.Session.ExecutionId)
 }
 
-func Test__EndPlanningSession__KeepsCancellationResult(t *testing.T) {
+func Test__EndPlanningSession__OverridesPendingCompletionWithCancellation(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
@@ -106,6 +106,10 @@ func Test__EndPlanningSession__KeepsCancellationResult(t *testing.T) {
 		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.RequestCompletion(tx, &r.User)
+		return err
+	}))
 
 	response, err := EndPlanningSession(ctx, r.Organization.ID.String(), &pb.EndPlanningSessionRequest{
 		FactoryId: factoryModel.ID.String(),

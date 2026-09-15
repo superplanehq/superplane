@@ -233,6 +233,27 @@ func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T)
 	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
 }
 
+func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing.T) {
+	run, _ := setupRunWithExecution(t)
+
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		if _, err := run.RequestCompletion(tx, nil); err != nil {
+			return err
+		}
+		_, err := run.RequestCancellation(tx, nil)
+		return err
+	}))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
+
+	result, err := updatedRun.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
 func Test__CanvasRun__CalculateResult__Passed(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
