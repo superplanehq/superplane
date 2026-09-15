@@ -104,7 +104,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit while the report revalidates", async () => {
-    vi.setSystemTime(new Date("2026-09-03T12:00:30.000Z"));
+    vi.setSystemTime(new Date());
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
