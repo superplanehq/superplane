@@ -1,3 +1,5 @@
+import { workOrderFileDownloadUrlIsFresh } from "./workOrderFiles";
+
 const loadedSrcs = new Set<string>();
 const LOADED_SRC_LIMIT = 200;
 
@@ -6,7 +8,14 @@ export function clearWorkspaceMarkdownImageLoadCache() {
 }
 
 export function workspaceMarkdownImageIsLoaded(src: string | undefined): boolean {
-  return Boolean(src && loadedSrcs.has(src));
+  if (!src || !loadedSrcs.has(src)) {
+    return false;
+  }
+  if (workOrderFileDownloadUrlIsFresh(src)) {
+    return true;
+  }
+  loadedSrcs.delete(src);
+  return false;
 }
 
 export function rememberWorkspaceMarkdownImageLoad(src: string) {

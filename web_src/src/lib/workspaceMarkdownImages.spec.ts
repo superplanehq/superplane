@@ -22,6 +22,13 @@ describe("workspaceMarkdownImages", () => {
     expect(workspaceMarkdownImageIsLoaded("https://files.example/a.png")).toBe(false);
   });
 
+  it("does not treat a near-expiry signed URL as loaded", () => {
+    const expiring = `https://files.example/a.png?expires=${Math.floor(Date.now() / 1000) + 10}&sig=old`;
+    rememberWorkspaceMarkdownImageLoad(expiring);
+
+    expect(workspaceMarkdownImageIsLoaded(expiring)).toBe(false);
+  });
+
   it("evicts the oldest source after 200 loads", () => {
     for (let index = 0; index < 200; index += 1) {
       rememberWorkspaceMarkdownImageLoad(`https://files.example/${index}.png`);
