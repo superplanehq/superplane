@@ -17,7 +17,7 @@ export type CreateWithAgentRightPane =
   | { kind: "draft"; draft: CreateWithAgentDraft }
   | { kind: "preview"; order: CreateWithAgentCreatedOrder };
 
-export type CreateWithAgentMessage = {
+export type CreateWithAgentTextMessage = {
   id: string;
   kind: "text";
   role: "user" | "agent";
@@ -31,6 +31,16 @@ export type CreateWithAgentMessage = {
    */
   createdAtMs?: number;
 };
+
+export type CreateWithAgentPlanMessage = {
+  id: string;
+  kind: "plan";
+  role: "plan";
+  score: number;
+  createdAtMs?: number;
+};
+
+export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentPlanMessage;
 
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;

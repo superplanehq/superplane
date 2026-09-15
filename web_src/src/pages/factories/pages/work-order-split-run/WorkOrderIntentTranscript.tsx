@@ -26,16 +26,17 @@ export function WorkOrderIntentTranscript({
   files?: FilesFile[];
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const visible = messages.filter((message) => message.kind !== "plan");
 
-  if (messages.length === 0) {
+  if (visible.length === 0) {
     return null;
   }
 
-  const last = messages.at(-1);
+  const last = visible.at(-1);
 
   return (
-    <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
-      {messages.map((message) => (
+    <div className="mb-3 space-y-3" data-testid="split-run-intent-transcript">
+      {visible.map((message) => (
         <TranscriptMessage
           key={message.id}
           message={message}
@@ -59,6 +60,9 @@ function TranscriptMessage({
   streaming: boolean;
   files?: FilesFile[];
 }) {
+  if (message.kind === "plan") {
+    return null;
+  }
   if (message.role === "user") {
     if (message.origin === "survey") {
       return <SurveyAnswerBubble text={message.text} userId={message.userId} resolveUser={resolveUser} />;

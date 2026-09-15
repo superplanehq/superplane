@@ -309,6 +309,63 @@ func TestFactory_AttachAnalysisSession(t *testing.T) {
 	assert.Equal(t, session.ID, again.ID)
 }
 
+func TestFactoryPlanningSession_ProposeConfidenceWithoutSpec(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-score-only")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeConfidence(db, 2, "The request is still missing the failing path."))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, PlanningConfidenceCheckKey, checks[0].Key)
+	assert.Equal(t, 2.0, checks[0].Score)
+	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
+}
+
+func TestValidatePlanningConfidenceScoreRejectsZero(t *testing.T) {
+	err := validatePlanningConfidenceScore(0)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "1 through 5")
+}
+
+func TestValidatePlanningConfidenceScoreAcceptsOneAndFive(t *testing.T) {
+	require.NoError(t, validatePlanningConfidenceScore(1))
+	require.NoError(t, validatePlanningConfidenceScore(5))
+}
+
+func TestAnalysisConversationWindowSkipsPlanBanners(t *testing.T) {
+	messages := []PlanningSessionMessage{
+		{Role: PlanningSessionMessageRoleUser, Text: "Add refund retries."},
+		{Role: PlanningSessionMessageRolePlan, Text: `{"score":4,"summary":"Clear"}`},
+		{Role: PlanningSessionMessageRoleAgent, Text: "I updated the plan."},
+	}
+
+	window := analysisConversationWindow(messages, analysisMessagesContextCharacters(messages))
+
+	assert.Equal(t, []PlanningSessionMessage{messages[0], messages[2]}, window.Messages)
+	assert.Zero(t, window.Omitted)
+	assert.NotContains(t, window.Messages, messages[1])
+}
+
 func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-propose")
