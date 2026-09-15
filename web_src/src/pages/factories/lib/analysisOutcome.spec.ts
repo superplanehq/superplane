@@ -81,4 +81,16 @@ describe("statusForAnalysisRun", () => {
   it("keeps a cancelling timeout running when no first result exists", () => {
     expect(statusForAnalysisRun({ state: "STATE_CANCELLING" }, "failed", false)).toBe("running");
   });
+
+  it("keeps an explicitly stopped run failed when no first result exists", () => {
+    expect(statusForAnalysisRun({ result: "RESULT_CANCELLED", cancelledBy: { id: "user-1" } }, "failed", false)).toBe(
+      "failed",
+    );
+  });
+
+  it("keeps an explicitly stopping run failed when no first result exists", () => {
+    expect(statusForAnalysisRun({ state: "STATE_CANCELLING", cancelledBy: { id: "user-1" } }, "failed", false)).toBe(
+      "failed",
+    );
+  });
 });

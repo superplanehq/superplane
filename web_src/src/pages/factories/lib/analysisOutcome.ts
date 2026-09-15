@@ -43,9 +43,10 @@ export function analysisFinishedStatus<T extends string>(status: T, delivered: b
 type AnalysisCanvasRun = {
   result?: string;
   state?: string;
+  cancelledBy?: { id?: string } | null;
 };
 
-/** Timed-out analysis stays running until a score and plan exist. A crash stays failed. */
+/** Timed-out analysis stays running until a score and plan exist. A crash or user stop stays failed. */
 export function statusForAnalysisRun<T extends string>(
   run: AnalysisCanvasRun,
   status: T,
@@ -60,9 +61,20 @@ export function statusForAnalysisRun<T extends string>(
   return status;
 }
 
-export function isUnfinishedCancelledAnalysis(run: AnalysisCanvasRun): boolean {
+export function isUnfinishedCancelledAnalysis(run: AnalysisCanvasRun, delivered = false): boolean {
+  if (delivered || hasExplicitAnalysisCancellation(run)) {
+    return false;
+  }
+  return isCancelledAnalysis(run);
+}
+
+export function isCancelledAnalysis(run: AnalysisCanvasRun): boolean {
   if (run.result === "RESULT_CANCELLED") {
     return true;
   }
   return run.state === "STATE_CANCELLING" && run.result !== "RESULT_PASSED" && run.result !== "RESULT_FAILED";
+}
+
+function hasExplicitAnalysisCancellation(run: AnalysisCanvasRun): boolean {
+  return Boolean(run.cancelledBy?.id);
 }

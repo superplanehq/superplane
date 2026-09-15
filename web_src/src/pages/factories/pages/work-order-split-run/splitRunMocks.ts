@@ -41,6 +41,7 @@ import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } fro
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import {
   analysisFirstResultDelivered,
+  isCancelledAnalysis,
   isUnfinishedCancelledAnalysis,
   statusForAnalysisRun,
 } from "../../lib/analysisOutcome";
@@ -645,22 +646,35 @@ function phasesForAnalysisRuns(
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
   const delivered = analysisFirstResultDelivered({ checks: apiChecks, artifacts });
-  const visible = visibleAnalysisRuns(ordered);
+  const visible = visibleAnalysisRuns(ordered, delivered);
 
-  return visible.map((entry, index) =>
-    analysisRunToPhase(
+  return visible.map((entry, index) => {
+    const isLast = index === visible.length - 1;
+    return analysisRunToPhase(
       entry,
-      index === visible.length - 1 ? confidenceChecks(apiChecks) : undefined,
-      index === visible.length - 1 && delivered,
-    ),
-  );
+      isLast ? confidenceChecks(apiChecks) : undefined,
+      analysisPhaseDelivered(entry.run, isLast, delivered),
+    );
+  });
 }
 
-function visibleAnalysisRuns(ordered: BacklogAnalysisRun[]): BacklogAnalysisRun[] {
+function visibleAnalysisRuns(ordered: BacklogAnalysisRun[], delivered: boolean): BacklogAnalysisRun[] {
   if (ordered.length <= 1) {
     return ordered;
   }
-  return ordered.filter((entry, index) => index === ordered.length - 1 || !isUnfinishedCancelledAnalysis(entry.run));
+  return ordered.filter(
+    (entry, index) => index === ordered.length - 1 || !isUnfinishedCancelledAnalysis(entry.run, delivered),
+  );
+}
+
+function analysisPhaseDelivered(run: BacklogAnalysisRun["run"], isLast: boolean, delivered: boolean): boolean {
+  if (!delivered) {
+    return false;
+  }
+  if (isLast) {
+    return true;
+  }
+  return isCancelledAnalysis(run);
 }
 
 function analysisRunToPhase(
