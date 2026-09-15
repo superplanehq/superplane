@@ -97,19 +97,41 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 }
 
 func Test__BuildBacklogCanvas(t *testing.T) {
-	t.Run("the item flows from a new work order to the confidence check", func(t *testing.T) {
+	t.Run("the item follows the refinement feature snapshot", func(t *testing.T) {
 		canvas := buildBacklogCanvas(backlogCanvasRequest{})
 
 		assert.Equal(t, backlogDefaultName, canvas.Metadata.Name)
 		assert.Equal(t, []yaml.Edge{
-			{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: backlogRefinementFilterNodeID},
+			{Channel: "false", SourceID: backlogRefinementFilterNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "true", SourceID: backlogRefinementFilterNodeID, TargetID: backlogRefinementNodeID},
 			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
 			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: "attach-intent"},
 			{Channel: "failed", SourceID: intakeAnalysisNodeID, TargetID: intakeAddRunErrorNodeID},
+			{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
 		}, canvas.Spec.Edges)
 
 		trigger := findSpecNode(t, canvas, backlogTriggerNodeID)
 		assert.Equal(t, factory.OnWorkOrderTriggerName, trigger.Component)
+		assert.Equal(t, map[string]any{
+			"id":      models.FactoryAppTemplateBacklogID,
+			"version": backlogTemplateVersion,
+		}, trigger.Metadata[factoryTemplateMetadataKey])
+
+		filter := findSpecNode(t, canvas, backlogRefinementFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "{{ root().data.taskRefinementEnabled == true }}", filter.Configuration["expression"])
+
+		refinement := findSpecNode(t, canvas, backlogRefinementNodeID)
+		assert.Equal(t, "Refine Task", refinement.Name)
+		steps, ok := refinement.Configuration["steps"].([]any)
+		require.True(t, ok)
+		require.Len(t, steps, 2)
+		prompt, ok := steps[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Refine Task", prompt["name"])
+		assert.Contains(t, prompt["prompt"], runner.PlanningSessionProtocolMarkdown())
+		assert.Contains(t, prompt["prompt"], "{{ root().data.workOrder }}")
 
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
 		assert.Equal(t, intakeReportConfidenceComponent, report.Component)
@@ -141,12 +163,16 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		})
 
 		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		refinement := findSpecNode(t, canvas, backlogRefinementNodeID)
 		assert.Equal(t, "runnerCodex", analysis.Component)
+		assert.Equal(t, analysis.Component, refinement.Component)
 		assert.Equal(t, map[string]any{
 			"source":      runner.CredentialsSourceIntegration,
 			"integration": map[string]any{"name": "acme-openai"},
 		}, analysis.Configuration["credentials"])
 		assert.Equal(t, "gpt-5", analysis.Configuration["model"])
+		assert.Equal(t, analysis.Configuration["credentials"], refinement.Configuration["credentials"])
+		assert.Equal(t, analysis.Configuration["model"], refinement.Configuration["model"])
 		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
 		assert.Equal(t, []any{
 			map[string]any{
@@ -193,6 +219,52 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.Contains(t, prompt["prompt"], "If confidence is 0 or 1")
 		assert.Contains(t, prompt["prompt"], "Do not add an Open questions section.")
 		assert.NotContains(t, prompt["prompt"], "Proposed outcome")
+	})
+}
+
+func Test__IsDefaultLegacyBacklog(t *testing.T) {
+	t.Run("accepts the generated version 1 behavior with moved nodes", func(t *testing.T) {
+		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
+		nodes := legacy.Nodes()
+		nodes[0].Position = models.Position{X: 900, Y: 700}
+
+		assert.True(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+	})
+
+	t.Run("rejects a customized prompt", func(t *testing.T) {
+		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
+		nodes := legacy.Nodes()
+		analysis := findModelNode(t, nodes, intakeAnalysisNodeID)
+		steps := analysis.Configuration["steps"].([]any)
+		steps[1].(map[string]any)["prompt"] = "Use the team's custom scoring rules."
+
+		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+	})
+
+	t.Run("rejects a customized component", func(t *testing.T) {
+		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
+		nodes := legacy.Nodes()
+		for i := range nodes {
+			if nodes[i].ID == intakeReportConfidenceNodeID {
+				nodes[i].Ref.Component.Name = "customReporter"
+			}
+		}
+
+		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+	})
+
+	t.Run("rejects customized edges", func(t *testing.T) {
+		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
+		edges := legacy.Edges()
+		edges[0].TargetID = intakeReportConfidenceNodeID
+
+		assert.False(t, isDefaultLegacyBacklog(legacy.Nodes(), edges))
+	})
+
+	t.Run("rejects version 2", func(t *testing.T) {
+		current := buildBacklogCanvas(backlogCanvasRequest{})
+
+		assert.False(t, isDefaultLegacyBacklog(current.Nodes(), current.Edges()))
 	})
 }
 

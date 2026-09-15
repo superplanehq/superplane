@@ -10,6 +10,7 @@ import {
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
+import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 import {
   analysisSessionPollInterval,
   analysisWorkOrderRefreshKey,
@@ -120,6 +121,76 @@ describe("useAnalysisPlanningSession", () => {
         queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
       });
     });
+  });
+
+  it("does not refresh work-order queries after an unchanged session poll", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue({
+      id: "session-1",
+      state: "running",
+      messages: [{ id: "user-1", role: "user", text: "Add a screenshot." }],
+    });
+
+    renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+        }),
+      { wrapper: wrapperWithClient(queryClient) },
+    );
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    invalidateQueries.mockClear();
+
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: workOrderPlanningSessionQueryKey("org-1", "factory-1", "order-1"),
+      });
+    });
+
+    expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it("uses one work-order refresh batch after a message mutation", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    const stopped = {
+      id: "session-1",
+      state: "ended",
+      messages: [{ id: "user-1", role: "user", text: "Add a screenshot." }],
+    };
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(stopped);
+    vi.mocked(sendPlanningSessionMessage).mockResolvedValue({
+      ...stopped,
+      state: "running",
+      messages: [...stopped.messages, { id: "user-2", role: "user", text: "Use this image." }],
+    });
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+          analysisDelivered: true,
+        }),
+      { wrapper: wrapperWithClient(queryClient) },
+    );
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    invalidateQueries.mockClear();
+
+    act(() => result.current.onComposerChange("Use this image."));
+    act(() => result.current.onSend());
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
   });
 
   it("lets the user send after analysis stops so a new run can continue the chat", async () => {
@@ -254,7 +325,7 @@ describe("useAnalysisPlanningSession", () => {
 });
 
 describe("analysisWorkOrderRefreshKey", () => {
-  it("stays the same when only the query timestamp would change", () => {
+  it("stays stable for an unchanged session", () => {
     const session = {
       id: "session-1",
       state: "running",
@@ -264,7 +335,7 @@ describe("analysisWorkOrderRefreshKey", () => {
     expect(analysisWorkOrderRefreshKey(session)).toBe(analysisWorkOrderRefreshKey({ ...session }));
   });
 
-  it("changes when the agent adds a message", () => {
+  it("changes when the session receives a message", () => {
     const session = {
       id: "session-1",
       state: "running",
@@ -277,6 +348,16 @@ describe("analysisWorkOrderRefreshKey", () => {
         messages: [...session.messages, { id: "agent-1", role: "agent", text: "I see the image." }],
       }),
     ).not.toBe(analysisWorkOrderRefreshKey(session));
+  });
+
+  it.each([
+    ["state", { state: "ended" }],
+    ["draft", { draft: { workOrderId: "order-1", title: "Updated", description: "New plan" } }],
+    ["created orders", { created: [{ id: "order-2", key: "TASK-2", title: "Follow-up" }] }],
+  ])("changes with updated %s", (_field, changes) => {
+    const session = { id: "session-1", state: "running" };
+
+    expect(analysisWorkOrderRefreshKey({ ...session, ...changes })).not.toBe(analysisWorkOrderRefreshKey(session));
   });
 });
 

@@ -145,22 +145,19 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows a status dot, title, task ID below the title, created time, and owner", () => {
+  it("shows a status dot, title, created time, and owner", () => {
     const { row } = renderView(WorkOrdersBoardView);
-    const title = within(row).getByText(entry.title);
-    const displayKey = within(row).getByTestId(`work-order-card-display-key-${entry.id}`);
 
     expect(within(row).getByLabelText("Running")).toBeInTheDocument();
     expect(within(row).queryByText("Running")).not.toBeInTheDocument();
-    expect(title).toBeInTheDocument();
-    expect(displayKey).toHaveTextContent(entry.displayKey);
-    expect(title.compareDocumentPosition(displayKey) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(row).getByText(entry.title)).toBeInTheDocument();
     expect(within(row).getByText(formatRelative(new Date(entry.createdAtMs)))).toBeInTheDocument();
     const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
     expect(owner).toBeInTheDocument();
     expect(within(owner).getByText("Ada")).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
     expect(effectivePointerEvents(owner)).toBe("none");
+    expect(within(row).queryByText(entry.displayKey)).not.toBeInTheDocument();
     expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
   });
 

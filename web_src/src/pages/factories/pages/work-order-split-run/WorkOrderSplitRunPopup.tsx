@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
@@ -23,7 +24,6 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import {
   draftStartAction,
   footerMutationHandlers,
-  popupWorkOrderDisplayKey,
   popupWorkOrderUrl,
   returnToBacklogAction,
 } from "./workOrderPopupActions";
@@ -36,8 +36,9 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  * The automation canvas lives on the full run page, not here.
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
-  const { organizationId, factoryId, orderId, fixture, canUpdate = true } = props;
-  const refinementEnabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
+  const refinementFeature = useExperimentalFeature(organizationId);
+  const refinementEnabled = refinementFeature.has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -58,14 +59,31 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     hasPlanningSession: Boolean(analysis.session),
     hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
     refinementEnabled,
+    refinementLoading: refinementFeature.isLoading,
+    sessionLoading: analysis.isLoading,
     analysisActive: isAnalyzing,
     hasLookupIdentity,
   });
 
+  if (mode === "loading") {
+    return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
+  }
   if (mode === "analysis") {
     return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
   }
   return <ClassicWorkOrderPopup {...props} popupData={popupData} sessionLookupError={analysis.queryError} />;
+}
+
+function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
+  return (
+    <PopupShell testId="work-order-split-run-loading" fixed={fixed} onDismiss={onClose}>
+      <PopupHeader title={title} onClose={onClose} />
+      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        Loading task…
+      </div>
+    </PopupShell>
+  );
 }
 
 function AnalysisWorkOrderPopup({
@@ -155,7 +173,6 @@ function AnalysisWorkOrderPopup({
         header={(views) => (
           <PopupHeader
             title={edits.title}
-            displayKey={popupWorkOrderDisplayKey({ key: fixture.key, number: orderNumber, id: orderId }, factoryKey)}
             onClose={onClose}
             canEditTitle={edits.canEdit}
             titleBusy={edits.titleBusy}

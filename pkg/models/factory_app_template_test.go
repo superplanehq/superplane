@@ -37,6 +37,39 @@ func TestIsBacklogFactoryApp(t *testing.T) {
 		assert.True(t, IsBacklogFactoryApp(nodes, edges))
 	})
 
+	t.Run("accepts a customized legacy graph by its stable nodes", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("analyze", "runnerCodex"),
+			componentNode("report-confidence", "customReporter"),
+			componentNode("attach-intent", "customArtifact"),
+			componentNode("add-run-error", "customError"),
+		}
+		assert.True(t, IsBacklogFactoryApp(nodes, nil))
+	})
+
+	t.Run("accepts the exact version 2 graph", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("task-refinement-enabled", "if"),
+			componentNode("analyze", "runnerClaudeCode"),
+			componentNode("refine-task", "runnerClaudeCode"),
+			componentNode("report-confidence", "reportWorkOrderCheck"),
+			componentNode("attach-intent", "addWorkOrderArtifact"),
+			componentNode("add-run-error", "addRunError"),
+		}
+		edges := []Edge{
+			{SourceID: "trigger", TargetID: "task-refinement-enabled", Channel: "default"},
+			{SourceID: "task-refinement-enabled", TargetID: "analyze", Channel: "false"},
+			{SourceID: "task-refinement-enabled", TargetID: "refine-task", Channel: "true"},
+			{SourceID: "analyze", TargetID: "report-confidence", Channel: "passed"},
+			{SourceID: "analyze", TargetID: "attach-intent", Channel: "passed"},
+			{SourceID: "analyze", TargetID: "add-run-error", Channel: "failed"},
+			{SourceID: "refine-task", TargetID: "add-run-error", Channel: "failed"},
+		}
+		assert.True(t, IsBacklogFactoryApp(nodes, edges))
+	})
+
 	t.Run("rejects a custom on-work-order canvas", func(t *testing.T) {
 		assert.False(t, IsBacklogFactoryApp([]Node{triggerNode("trigger", "onWorkOrder")}, nil))
 	})

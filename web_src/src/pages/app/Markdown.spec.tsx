@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
@@ -353,5 +353,54 @@ describe("MarkdownContent work order files", () => {
     );
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+  });
+});
+
+describe("MarkdownContent images", () => {
+  it("hides a workspace image until it loads", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    expect(image).not.toBeNull();
+    expect(image).toHaveClass("opacity-0");
+
+    fireEvent.load(image!);
+
+    expect(image).not.toHaveClass("opacity-0");
+  });
+
+  it("keeps a failed workspace image hidden and accessible", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    fireEvent.error(image!);
+
+    expect(image).toHaveClass("opacity-0");
+    expect(image).toHaveAttribute("alt", "Architecture");
+  });
+
+  it("hides a workspace image again only when its source changes", () => {
+    const first = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent content={first} variant="workspace" />);
+    const image = container.querySelector("img");
+
+    fireEvent.load(image!);
+    rerender(<MarkdownContent content={first} variant="workspace" />);
+
+    expect(image).not.toHaveClass("opacity-0");
+
+    rerender(<MarkdownContent content="![Architecture](https://files.example/updated.png)" variant="workspace" />);
+
+    expect(container.querySelector("img")).toHaveClass("opacity-0");
+  });
+
+  it("keeps default Markdown image behavior", () => {
+    const { container } = render(<MarkdownContent content="![Architecture](https://files.example/architecture.png)" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
   });
 });

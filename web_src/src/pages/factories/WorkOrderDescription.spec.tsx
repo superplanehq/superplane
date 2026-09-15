@@ -171,4 +171,23 @@ describe("WorkOrderDescription", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText("bug")).toBeInTheDocument();
   });
+
+  it("keeps the image source when a file URL is reminted", () => {
+    const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const description = `![Screenshot](sp-file://${id})`;
+    const first = "https://files.example/screenshot.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/screenshot.png?expires=9999999999&sig=two";
+    const { rerender } = render(
+      <WorkOrderDescription description={description} files={[{ id, downloadUrl: first }]} collapsible={false} />,
+    );
+    const image = screen.getByRole("img", { name: "Screenshot" });
+
+    expect(image).toHaveAttribute("src", first);
+
+    rerender(
+      <WorkOrderDescription description={description} files={[{ id, downloadUrl: reminted }]} collapsible={false} />,
+    );
+
+    expect(image).toHaveAttribute("src", first);
+  });
 });

@@ -215,7 +215,7 @@ describe("AutomationDetail tabs", () => {
     const card = screen.getByTestId("work-order-card-wo-1");
     expect(card).toHaveTextContent("Add refund reconciliation test");
     expect(within(card).getByLabelText("Running")).toBeInTheDocument();
-    expect(within(card).getByTestId("work-order-card-display-key-wo-1")).toHaveTextContent("SP-103");
+    expect(card).not.toHaveTextContent("SP-103");
     expect(screen.getByTestId("work-order-row-assignees-wo-1")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-row-dispatch-wo-1")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Add refund reconciliation test" })).toHaveAttribute(

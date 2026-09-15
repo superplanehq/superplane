@@ -147,8 +147,6 @@ export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
   title: string;
-  /** Workspace-scoped ticket key, for example RF-105. */
-  key?: string;
   /** Work-order description field. Artifact markdown is a fallback. */
   descriptionText?: string;
   owner: OrgUserDisplay;
@@ -364,7 +362,6 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
-    key: order.key,
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order, options?.resolveUser),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),

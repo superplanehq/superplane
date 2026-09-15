@@ -15,8 +15,9 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
 ] as const;
 
 const previewUrls = new Map<string, string>();
-const stableDownloadUrls = new Map<string, string>();
-const STABLE_DOWNLOAD_MIN_REMAINING_SECONDS = 60;
+const downloadUrls = new Map<string, string>();
+const DOWNLOAD_URL_REFRESH_WINDOW_MS = 60_000;
+const DOWNLOAD_URL_CACHE_LIMIT = 200;
 
 export type WorkOrderFileRef = Pick<FilesFile, "id" | "downloadUrl" | "filename" | "contentType">;
 
@@ -64,77 +65,17 @@ export function setWorkOrderFilePreviewUrl(id: string, url: string): void {
 }
 
 export function clearWorkOrderFileDownloadCache(): void {
-  stableDownloadUrls.clear();
+  downloadUrls.clear();
 }
 
 export function workOrderFileDownloadMap(files: WorkOrderFileRef[] | undefined): Record<string, string> {
   const urls: Record<string, string> = {};
   for (const file of files ?? []) {
     if (file.id && file.downloadUrl) {
-      urls[file.id] = stableWorkOrderDownloadUrl(file.id, file.downloadUrl);
+      urls[file.id] = stableWorkOrderFileDownloadUrl(file.id, file.downloadUrl);
     }
   }
   return urls;
-}
-
-function stableWorkOrderDownloadUrl(id: string, nextUrl: string): string {
-  const current = stableDownloadUrls.get(id);
-  if (!current || current === nextUrl) {
-    stableDownloadUrls.set(id, nextUrl);
-    return nextUrl;
-  }
-  if (fileResourceKey(current) !== fileResourceKey(nextUrl)) {
-    stableDownloadUrls.set(id, nextUrl);
-    return nextUrl;
-  }
-  const remaining = signedUrlRemainingSeconds(current);
-  if (remaining != null && remaining < STABLE_DOWNLOAD_MIN_REMAINING_SECONDS) {
-    stableDownloadUrls.set(id, nextUrl);
-    return nextUrl;
-  }
-  return current;
-}
-
-function fileResourceKey(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    return url;
-  }
-}
-
-function signedUrlRemainingSeconds(url: string): number | null {
-  try {
-    const parsed = new URL(url);
-    const expires = parsed.searchParams.get("expires");
-    if (expires) {
-      const unix = Number(expires);
-      return Number.isFinite(unix) ? unix - Date.now() / 1000 : null;
-    }
-    const googDate = parsed.searchParams.get("X-Goog-Date");
-    const googExpires = parsed.searchParams.get("X-Goog-Expires");
-    if (!googDate || !googExpires) {
-      return null;
-    }
-    const startedAt = parseGoogleSignedUrlDate(googDate);
-    const ttlSeconds = Number(googExpires);
-    if (startedAt == null || !Number.isFinite(ttlSeconds)) {
-      return null;
-    }
-    return (startedAt + ttlSeconds * 1000 - Date.now()) / 1000;
-  } catch {
-    return null;
-  }
-}
-
-function parseGoogleSignedUrlDate(value: string): number | null {
-  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
-  if (!match) {
-    return null;
-  }
-  const ms = Date.parse(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`);
-  return Number.isNaN(ms) ? null : ms;
 }
 
 export function resolveWorkOrderFileSrc(src: string | undefined, downloadUrls?: Record<string, string>): string {
@@ -157,10 +98,81 @@ export function rewriteWorkOrderFileRefs(markdown: string, files: WorkOrderFileR
   if (!markdown || !files?.length) {
     return markdown;
   }
-  const urls = workOrderFileDownloadMap(files);
+  const fileDownloadUrls = workOrderFileDownloadMap(files);
   let next = markdown;
-  for (const [id, downloadUrl] of Object.entries(urls)) {
+  for (const [id, downloadUrl] of Object.entries(fileDownloadUrls)) {
     next = next.split(workOrderFileRef(id)).join(downloadUrl);
   }
   return next;
+}
+
+function stableWorkOrderFileDownloadUrl(id: string, nextUrl: string): string {
+  const currentUrl = downloadUrls.get(id);
+  if (!currentUrl || currentUrl === nextUrl || downloadUrlResource(currentUrl) !== downloadUrlResource(nextUrl)) {
+    return rememberWorkOrderFileDownloadUrl(id, nextUrl);
+  }
+
+  const expiresAt = signedDownloadUrlExpiresAt(currentUrl);
+  if (expiresAt !== undefined && expiresAt - Date.now() < DOWNLOAD_URL_REFRESH_WINDOW_MS) {
+    return rememberWorkOrderFileDownloadUrl(id, nextUrl);
+  }
+
+  return rememberWorkOrderFileDownloadUrl(id, currentUrl);
+}
+
+function rememberWorkOrderFileDownloadUrl(id: string, url: string): string {
+  downloadUrls.delete(id);
+  downloadUrls.set(id, url);
+  if (downloadUrls.size > DOWNLOAD_URL_CACHE_LIMIT) {
+    const oldestId = downloadUrls.keys().next().value;
+    if (oldestId !== undefined) {
+      downloadUrls.delete(oldestId);
+    }
+  }
+  return url;
+}
+
+function downloadUrlResource(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl, "http://localhost");
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return rawUrl.split("?")[0] ?? rawUrl;
+  }
+}
+
+function signedDownloadUrlExpiresAt(rawUrl: string): number | undefined {
+  try {
+    const url = new URL(rawUrl, "http://localhost");
+    const superPlaneExpires = Number(url.searchParams.get("expires"));
+    if (Number.isFinite(superPlaneExpires) && superPlaneExpires > 0) {
+      return superPlaneExpires * 1_000;
+    }
+
+    const signedAt = parseGcsSigningTime(url.searchParams.get("X-Goog-Date"));
+    const lifetimeSeconds = Number(url.searchParams.get("X-Goog-Expires"));
+    if (signedAt !== undefined && Number.isFinite(lifetimeSeconds) && lifetimeSeconds >= 0) {
+      return signedAt + lifetimeSeconds * 1_000;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function parseGcsSigningTime(value: string | null): number | undefined {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value ?? "");
+  if (!match) {
+    return undefined;
+  }
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  return Number.isNaN(timestamp) ? undefined : timestamp;
 }

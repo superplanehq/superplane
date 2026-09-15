@@ -1,4 +1,4 @@
-import { Children, isValidElement } from "react";
+import { Children, isValidElement, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { defaultUrlTransform } from "react-markdown";
@@ -197,7 +197,9 @@ export function MarkdownContent({
               {children}
             </MarkdownLink>
           ),
-          img: ({ node: _node, ...props }) => <MarkdownImage fileUrls={fileUrls} {...props} />,
+          img: ({ node: _node, ...props }) => (
+            <MarkdownImage fileUrls={fileUrls} hideUntilLoaded={variant === "workspace"} {...props} />
+          ),
           blockquote: MarkdownBlockquote,
           code: MarkdownCodeWithDiagrams,
           pre: MarkdownPre,
@@ -207,6 +209,22 @@ export function MarkdownContent({
         {normalized}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function WorkspaceMarkdownImage({ src, alt, className, ...props }: ComponentProps<"img">) {
+  const [loadedSrc, setLoadedSrc] = useState<string>();
+  const isLoaded = Boolean(src && loadedSrc === src);
+
+  return (
+    <img
+      {...props}
+      src={src}
+      alt={alt}
+      className={cn(className, !isLoaded && "opacity-0")}
+      onLoad={() => setLoadedSrc(src)}
+      onError={() => setLoadedSrc(undefined)}
+    />
   );
 }
 
@@ -301,16 +319,20 @@ function MarkdownLink({
 function MarkdownImage({
   src,
   alt,
+  className,
   fileUrls,
+  hideUntilLoaded,
   node: _node,
   ...props
-}: ComponentProps<"img"> & ExtraProps & { fileUrls?: Record<string, string> }) {
+}: ComponentProps<"img"> & ExtraProps & { fileUrls?: Record<string, string>; hideUntilLoaded?: boolean }) {
   const resolved = resolveWorkOrderFileSrc(src, fileUrls);
-  if (isReachableWorkOrderFileUrl(resolved)) {
-    return <img src={resolved} alt={alt} {...props} />;
+  if (!isReachableWorkOrderFileUrl(resolved)) {
+    return <span>{alt?.trim() || "image"}</span>;
   }
-  const label = alt?.trim() || "image";
-  return <span>{label}</span>;
+  if (hideUntilLoaded) {
+    return <WorkspaceMarkdownImage src={resolved} alt={alt} className={className} {...props} />;
+  }
+  return <img src={resolved} alt={alt} className={className} {...props} />;
 }
 
 function markdownUrlTransform(url: string, fileUrls: Record<string, string>): string {

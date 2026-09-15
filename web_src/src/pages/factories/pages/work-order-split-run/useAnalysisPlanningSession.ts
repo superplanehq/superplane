@@ -112,25 +112,14 @@ export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | nu
   if (!session?.id) {
     return "";
   }
-  return JSON.stringify(analysisWorkOrderRefreshFields(session));
-}
-
-function analysisWorkOrderRefreshFields(session: PlanningSessionPayload) {
-  const messages = session.messages || [];
-  const last = messages[messages.length - 1] || {};
-  const draft = session.draft || {};
-  const created = session.created || [];
-  return {
+  return JSON.stringify({
     id: session.id,
-    state: session.state || "",
-    workOrderId: draft.workOrderId || "",
-    title: draft.title || "",
-    description: draft.description || "",
-    messageCount: messages.length,
-    lastId: last.id || "",
-    lastText: last.text || "",
-    created: created.map((item) => item.id || ""),
-  };
+    state: session.state,
+    waitState: session.waitState,
+    messages: session.messages?.map(({ id, role, text, createdAt }) => ({ id, role, text, createdAt })),
+    draft: session.draft,
+    created: session.created,
+  });
 }
 
 function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
@@ -187,13 +176,12 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     session,
   });
 
-  const onMutationSuccess = async (next: PlanningSessionPayload) => {
+  const onMutationSuccess = (next: PlanningSessionPayload) => {
     queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
       mergePlanningSessionHistory(previous, next),
     );
     setComposer("");
     setComposerError("");
-    await refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
   };
   const onMutationError = (error: Error) => {
     setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
