@@ -23,6 +23,7 @@ export type PlanningSessionMessagePayload = {
   id?: string;
   role?: string;
   text?: string;
+  userId?: string;
   /** When the server persisted the message (ISO 8601). Both roles carry this. */
   createdAt?: string;
 };
@@ -246,6 +247,7 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
         text: message.text,
         ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
         ...(createdAtMs === undefined ? {} : { createdAtMs }),
+        ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
       },
     ];
   }

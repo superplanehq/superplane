@@ -19,6 +19,23 @@ import {
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
+import type { SplitRunSource } from "./splitRunSource";
+
+vi.mock("@/hooks/useOrgUserLookup", () => ({
+  useOrgUserLookup: () => ({
+    resolveUser: (id: string | undefined, name?: string) =>
+      id ? { id, name: name ?? "Ada Lovelace", initials: "AL" } : null,
+    isLoading: false,
+  }),
+}));
+
+const GITHUB_SOURCE: SplitRunSource = {
+  kind: "intake",
+  name: "GitHub issues",
+  iconSrc: "/github.svg",
+  iconAlt: "GitHub",
+  ticket: { label: "acme/payments-service#842", href: "https://github.com/acme/payments-service/issues/842" },
+};
 
 describe("WorkOrderIntentDocument", () => {
   beforeEach(() => {
@@ -143,11 +160,12 @@ describe("WorkOrderIntentDocument", () => {
     expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
   });
 
-  it("shows the request as the first chat message on the left", () => {
+  it("shows the request as the first chat message on the right", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
+        source={GITHUB_SOURCE}
         analysis={analysisChat({ composer: "Need the existing empty-state component." })}
       />,
     );
@@ -155,7 +173,9 @@ describe("WorkOrderIntentDocument", () => {
     const chat = within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-intent-chat");
     expect(chat).toBeInTheDocument();
     expect(within(chat).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
-    expect(within(chat).getByText(CREATE_WITH_AGENT_COPY.request)).toHaveClass("sp-user-note-label");
+    expect(within(chat).getByTestId("split-run-description")).toHaveClass("justify-end");
+    expect(within(chat).getByTestId("split-run-source")).toHaveTextContent("acme/payments-service#842");
+    expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
     expect(screen.getByTestId("split-run-intent-composer").closest(".sp-user-note")).not.toBeNull();
@@ -263,7 +283,8 @@ describe("WorkOrderIntentDocument", () => {
     const transcript = screen.getByTestId("split-run-intent-transcript");
     expect(within(transcript).getByText("Use the current empty-state component.")).toBeInTheDocument();
     expect(within(transcript).getByText("I updated the plan with that constraint.")).toBeInTheDocument();
-    expect(within(transcript).getByText(CREATE_WITH_AGENT_COPY.youSurvey)).toBeInTheDocument();
+    expect(within(transcript).getByText("What is the priority?")).toBeInTheDocument();
+    expect(within(transcript).queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
     expect(screen.getAllByText("Use the current empty-state component.")).toHaveLength(1);
     expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
