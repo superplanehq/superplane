@@ -825,10 +825,6 @@
   font-weight: inherit;
 }
 
-.theme-factories [data-slot="button"]:not([data-size^="icon"]) {
-  border-radius: calc(var(--radius) - 2px);
-}
-
 .theme-factories .factory-sidebar,
 .theme-factories .factory-sidebar button,
 .theme-factories .factory-sidebar textarea,
