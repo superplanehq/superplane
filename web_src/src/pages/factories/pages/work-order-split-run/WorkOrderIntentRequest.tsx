@@ -148,7 +148,7 @@ function AnalysisRequestChat({
         <form
           className={cn(
             SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
-            "w-full flex-col items-stretch justify-center border-0 px-0 pt-0",
+            "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0",
           )}
           onSubmit={handleSubmit}
         >
