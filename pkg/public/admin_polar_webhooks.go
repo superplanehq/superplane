@@ -17,14 +17,15 @@ const (
 )
 
 type adminPolarWebhookDelivery struct {
-	ID        string `json:"id"`
-	CreatedAt string `json:"created_at"`
-	Succeeded bool   `json:"succeeded"`
-	HTTPCode  *int   `json:"http_code"`
-	Response  string `json:"response"`
-	EventType string `json:"event_type"`
-	EventID   string `json:"event_id"`
-	Payload   string `json:"payload"`
+	ID             string `json:"id"`
+	CreatedAt      string `json:"created_at"`
+	Succeeded      bool   `json:"succeeded"`
+	HTTPCode       *int   `json:"http_code"`
+	Response       string `json:"response"`
+	EventType      string `json:"event_type"`
+	EventID        string `json:"event_id"`
+	EventSucceeded *bool  `json:"event_succeeded"`
+	Payload        string `json:"payload"`
 }
 
 type adminPolarWebhooksResponse struct {
@@ -111,14 +112,15 @@ func (s *Server) adminRedeliverPolarWebhook(w http.ResponseWriter, r *http.Reque
 
 func toAdminPolarWebhookDelivery(item polar.WebhookDelivery) adminPolarWebhookDelivery {
 	return adminPolarWebhookDelivery{
-		ID:        item.ID,
-		CreatedAt: item.CreatedAt,
-		Succeeded: item.Succeeded,
-		HTTPCode:  item.HTTPCode,
-		Response:  item.Response,
-		EventType: item.EventType,
-		EventID:   item.EventID,
-		Payload:   item.Payload,
+		ID:             item.ID,
+		CreatedAt:      item.CreatedAt,
+		Succeeded:      item.Succeeded,
+		HTTPCode:       item.HTTPCode,
+		Response:       item.Response,
+		EventType:      item.EventType,
+		EventID:        item.EventID,
+		EventSucceeded: item.EventSucceeded,
+		Payload:        item.Payload,
 	}
 }
 

@@ -114,25 +114,25 @@ function PolarWebhooksBody({
         onStatusChange={pageState.changeStatusFilter}
         onEventTypeChange={pageState.changeEventType}
       />
-      {pageState.items.length === 0 ? (
+      {pageState.eventGroups.length === 0 ? (
         <PolarWebhooksNotice message={POLAR_WEBHOOKS_EMPTY} dashed={false} />
       ) : (
-        <>
-          <PolarWebhooksTable
-            items={pageState.items}
-            expandedIds={expandedIds}
-            redelivering={pageState.redelivering}
-            onToggle={onToggle}
-            onRedeliver={(eventId) => void pageState.handleRedeliver(eventId)}
-          />
-          <AdminPagination
-            offset={(pageState.page - 1) * POLAR_WEBHOOK_PAGE_SIZE}
-            total={pageState.total}
-            pageSize={POLAR_WEBHOOK_PAGE_SIZE}
-            onPageChange={(offset) => pageState.setPage(Math.floor(offset / POLAR_WEBHOOK_PAGE_SIZE) + 1)}
-          />
-        </>
+        <PolarWebhooksTable
+          groups={pageState.eventGroups}
+          expandedIds={expandedIds}
+          redelivering={pageState.redelivering}
+          onToggle={onToggle}
+          onRedeliver={(eventId) => void pageState.handleRedeliver(eventId)}
+        />
       )}
+      {pageState.eventGroups.length > 0 || pageState.total > 0 ? (
+        <AdminPagination
+          offset={(pageState.page - 1) * POLAR_WEBHOOK_PAGE_SIZE}
+          total={pageState.total}
+          pageSize={POLAR_WEBHOOK_PAGE_SIZE}
+          onPageChange={(offset) => pageState.setPage(Math.floor(offset / POLAR_WEBHOOK_PAGE_SIZE) + 1)}
+        />
+      ) : null}
     </>
   );
 }
