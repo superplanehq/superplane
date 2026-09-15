@@ -3515,7 +3515,7 @@ ALTER TABLE ONLY public.factory_planning_session_messages
 --
 
 ALTER TABLE ONLY public.factory_planning_session_messages
-    ADD CONSTRAINT factory_planning_session_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+    ADD CONSTRAINT factory_planning_session_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --

@@ -671,6 +671,26 @@ func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	assert.NotEqual(t, fresh.ID, stale[0].ID)
 }
 
+func TestPlanningSessionMessage_ClearsUserIDOnUserDelete(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-msg-user-delete")
+	db := database.DB(t.Context())
+	sender := createOrgUser(t, session.OrganizationID, "plan-msg-sender")
+
+	require.NoError(t, session.SendUserMessage(db, "Keep the current retry form.", sender.ID))
+	require.Len(t, session.Messages, 1)
+	require.NotNil(t, session.Messages[0].UserID)
+	assert.Equal(t, sender.ID, *session.Messages[0].UserID)
+
+	require.NoError(t, db.Unscoped().Delete(&User{}, "id = ?", sender.ID).Error)
+
+	messages, err := ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	assert.Equal(t, "Keep the current retry form.", messages[0].Text)
+	assert.Nil(t, messages[0].UserID)
+}
+
 func startTestPlanningSession(t *testing.T, prefix string) *FactoryPlanningSession {
 	t.Helper()
 	org, userID, factoryModel := setupFactoryWithUser(t, prefix)
