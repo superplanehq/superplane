@@ -37,6 +37,10 @@ const FeatureFactoryProductiveIntake = "factory_productive_intake"
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
 
+// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// until the BYOK UX is ready for general use.
+const FeatureOrganizationBYOK = "organization_byok"
+
 // FeatureFactoryDraftStartModel gates the model selector next to Start on
 // a draft task until the flow is generally available.
 const FeatureFactoryDraftStartModel = "factory_draft_start_model"
@@ -57,6 +61,7 @@ var registry = []Feature{
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
 	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
 }

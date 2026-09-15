@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -191,7 +191,6 @@ describe("FactorySettingsLayout sidebar", () => {
   it.each([
     ["API keys", "api-keys", "factory-settings-api-keys"],
     ["Secrets", "secrets", "factory-settings-secrets"],
-    ["LLM Models", "models", "factory-settings-llm-models"],
     ["Billing", "billing", "billing-credit-balance"],
   ])(
     "renders the Organization %s page in the factory settings shell",
@@ -362,7 +361,6 @@ describe("FactorySettingsLayout sidebar", () => {
 
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
-      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
     }, 10000);
 
     it("shows the Models nav item when the feature is on", async () => {
@@ -403,6 +401,61 @@ describe("FactorySettingsLayout sidebar", () => {
 
       await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Models");
+    }, 10000);
+  });
+
+  describe("organization-byok experimental feature", () => {
+    it("hides the LLM Models nav item when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).queryByTestId("factory-settings-nav-organization-models")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("shows the LLM Models nav item when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
+    }, 10000);
+
+    it("redirects away from the LLM Models route when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("factory-settings-llm-models")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("renders the LLM Models page when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+        />,
+      );
+
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(await screen.findByTestId("factory-settings-llm-models")).toBeInTheDocument();
+      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("LLM Models");
     }, 10000);
   });
 
