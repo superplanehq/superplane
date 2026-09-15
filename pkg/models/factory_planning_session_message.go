@@ -17,6 +17,7 @@ type PlanningSessionMessage struct {
 	Role      string
 	Text      string
 	Delivered bool
+	UserID    *uuid.UUID
 	CreatedAt time.Time
 }
 
@@ -54,7 +55,7 @@ func (s *FactoryPlanningSession) ProposeSurvey(tx *gorm.DB, survey PlanningSessi
 	})
 }
 
-func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error {
+func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string, userID uuid.UUID) error {
 	return tx.Transaction(func(inner *gorm.DB) error {
 		if err := s.lockAndReload(inner); err != nil {
 			return err
@@ -72,6 +73,9 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 			Role:      PlanningSessionMessageRoleUser,
 			Text:      body,
 			CreatedAt: time.Now(),
+		}
+		if userID != uuid.Nil {
+			message.UserID = &userID
 		}
 		s.clearSurvey()
 		refined, err := s.applyRefineNote(inner, body)

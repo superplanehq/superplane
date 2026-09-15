@@ -92,6 +92,7 @@ export function WorkOrderSplitRunOverview({
         }
         resultFooter={resultFooter}
         analysis={analysis && organizationId ? { ...analysis, organizationId } : analysis}
+        source={source}
         contextSidebar={
           showContextSidebar ? (
             <WorkOrderSplitRunOverviewSidebar

@@ -10,6 +10,7 @@ import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFoot
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
 import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
 import { DEFAULT_INTENT_LEFT_PERCENT, useSplitRunPanePercent } from "./useSplitRunPanePercent";
+import type { SplitRunSource } from "./splitRunSource";
 
 const SESSION_TITLE_FALLBACK = "Task";
 
@@ -33,6 +34,7 @@ export function WorkOrderIntentDocument({
   contextSidebar,
   streamKey,
   streamReady = true,
+  source,
 }: {
   title: string;
   description: string;
@@ -46,6 +48,7 @@ export function WorkOrderIntentDocument({
   contextSidebar?: ReactNode;
   streamKey?: string;
   streamReady?: boolean;
+  source?: SplitRunSource;
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
@@ -64,7 +67,13 @@ export function WorkOrderIntentDocument({
           {contextSidebar ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
           ) : (
-            <WorkOrderIntentRequest title={sessionTitle} description={description} files={files} analysis={analysis} />
+            <WorkOrderIntentRequest
+              title={sessionTitle}
+              description={description}
+              files={files}
+              analysis={analysis}
+              source={source}
+            />
           )}
         </div>
 
