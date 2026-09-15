@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { Clock, Forward } from "lucide-react";
+import { Forward, Loader2, X } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
@@ -193,7 +193,8 @@ interface QueuedFirstStepControlsProps {
 }
 
 /**
- * Queue place in the Start slot, plus Cancel to return the task to draft.
+ * Queue place in the Start slot. Uses the same thinking shimmer as
+ * analyzing and planning, plus a small X to return the task to draft.
  */
 export function QueuedFirstStepControls({
   orderId,
@@ -203,28 +204,30 @@ export function QueuedFirstStepControls({
   onCancelQueue,
 }: QueuedFirstStepControlsProps) {
   return (
-    <div className="pointer-events-auto flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+    <div className="pointer-events-auto flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
       <span
-        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
+        className="sp-ai-thinking text-[11px] font-medium leading-none text-muted-foreground"
+        data-text={label}
         data-testid={`work-order-card-queued-${orderId}`}
       >
-        <Clock className="size-3 shrink-0" aria-hidden />
         {label}
       </span>
       {onCancelQueue ? (
         <PermissionTooltip allowed={canDispatch} message="You don't have permission to cancel this queue.">
-          <LoadingButton
+          <button
             type="button"
-            size="xs"
-            variant="outline"
-            disabled={!canDispatch}
-            loading={isCanceling}
-            loadingText="Canceling..."
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-50"
+            disabled={!canDispatch || isCanceling}
+            aria-label="Remove from the queue"
             data-testid={`work-order-card-cancel-queue-${orderId}`}
             onClick={() => void onCancelQueue(orderId)}
           >
-            Cancel
-          </LoadingButton>
+            {isCanceling ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+            ) : (
+              <X className="size-3" aria-hidden />
+            )}
+          </button>
         </PermissionTooltip>
       ) : null}
     </div>

@@ -156,15 +156,18 @@ describe("Queued first-step cards", () => {
     renderQueuedBoard();
 
     expect(screen.queryByTestId("work-order-card-start-wo-queued")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-queued-wo-queued")).toHaveTextContent("Queued #1");
-    expect(screen.getByTestId("work-order-card-cancel-queue-wo-queued")).toHaveTextContent("Cancel");
+    const queued = screen.getByTestId("work-order-card-queued-wo-queued");
+    expect(queued).toHaveTextContent("Queued #1");
+    expect(queued).toHaveClass("sp-ai-thinking");
+    expect(queued).toHaveAttribute("data-text", "Queued #1");
+    expect(screen.getByTestId("work-order-card-cancel-queue-wo-queued")).toHaveAccessibleName("Remove from the queue");
     expect(screen.getByTestId("work-order-card-wo-queued").querySelector("[data-status-mark]")).toHaveAttribute(
       "data-status-mark",
       "queued",
     );
   });
 
-  it("calls onCancelQueue from Cancel", async () => {
+  it("calls onCancelQueue from the remove control", async () => {
     const onCancelQueue = vi.fn().mockResolvedValue(undefined);
     renderQueuedBoard({ onCancelQueue });
 
@@ -172,11 +175,10 @@ describe("Queued first-step cards", () => {
     expect(onCancelQueue).toHaveBeenCalledWith("wo-queued");
   });
 
-  it("shows the busy state on Cancel while the request is in flight", () => {
+  it("disables the remove control while the request is in flight", () => {
     renderQueuedBoard({ cancelingOrderIds: new Set(["wo-queued"]) });
 
     const cancel = screen.getByTestId("work-order-card-cancel-queue-wo-queued");
-    expect(cancel).toHaveTextContent("Canceling...");
     expect(cancel).toBeDisabled();
   });
 });

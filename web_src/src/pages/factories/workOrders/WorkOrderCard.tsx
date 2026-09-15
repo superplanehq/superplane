@@ -91,7 +91,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * footer shows when the task was created on the left, and the owner
  * given name plus avatar on the right (except on drafts). Drafts show
  * Start, or Queue when the first step has no free slot. A task that
- * waits in that queue shows Queued #N and Cancel. Reviewed drafts also
+ * waits in that queue shows Queued #N with a thinking shimmer and a
+ * small remove control. Reviewed drafts also
  * show a score to the left of Start. The owner is display-only on the card.
  */
 export function WorkOrderCard({
