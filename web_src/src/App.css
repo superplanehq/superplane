@@ -829,6 +829,20 @@
   border-radius: calc(var(--radius) - 2px);
 }
 
+.theme-factories [data-slot="button-group"] [data-slot="button"] {
+  border-radius: 0.375rem;
+}
+
+.theme-factories [data-slot="button-group"] > [data-slot="button"]:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.theme-factories [data-slot="button-group"] [data-testid="split-run-draft-model"] {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .theme-factories .factory-sidebar,
 .theme-factories .factory-sidebar button,
 .theme-factories .factory-sidebar textarea,

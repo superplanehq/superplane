@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import {
   Bug,
   CheckCircle2,
@@ -18,6 +18,7 @@ import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ButtonGroup, ButtonGroupSeparator } from "@/ui/buttonGroup";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
@@ -256,18 +257,34 @@ function NoteActionRow({
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-      {modelSelect}
       {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} icon={note.cta.icon} /> : null}
-      {actions.map((action) => (
-        <NoteAction
-          key={action.id}
-          action={action}
-          actionBusy={actionBusy}
-          startBusy={startBusy}
-          startDisabled={startDisabled}
-          onClick={() => onAction?.(action)}
-        />
-      ))}
+      {actions.map((action) => {
+        const groupedStart = action.kind === "start" && Boolean(modelSelect);
+        const startLocked = startDisabled || startBusy || Boolean(action.disabled);
+        const noteAction = (
+          <NoteAction
+            action={action}
+            actionBusy={actionBusy}
+            startBusy={startBusy}
+            startDisabled={startDisabled}
+            grouped={groupedStart}
+            onClick={() => onAction?.(action)}
+          />
+        );
+        if (!groupedStart) {
+          return <Fragment key={action.id}>{noteAction}</Fragment>;
+        }
+        const select = isValidElement(modelSelect)
+          ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
+          : modelSelect;
+        return (
+          <ButtonGroup key={action.id} aria-label="Start">
+            {noteAction}
+            <ButtonGroupSeparator className="bg-primary-foreground/25" />
+            {select}
+          </ButtonGroup>
+        );
+      })}
     </div>
   );
 }
@@ -308,12 +325,14 @@ function NoteAction({
   actionBusy,
   startBusy,
   startDisabled,
+  grouped = false,
   onClick,
 }: {
   action: SplitRunFooterAction;
   actionBusy: boolean;
   startBusy: boolean;
   startDisabled: boolean;
+  grouped?: boolean;
   onClick: () => void;
 }) {
   const primary = action.emphasis === "primary";
@@ -327,13 +346,14 @@ function NoteAction({
       variant={primary ? "default" : "outline"}
       disabled={disabled}
       onClick={onClick}
+      className={grouped ? "rounded-md rounded-r-none" : undefined}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
       {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
       {action.label}
     </Button>
   );
-  if (!action.tooltip) {
+  if (grouped || !action.tooltip) {
     return button;
   }
   return (
