@@ -1,5 +1,6 @@
 import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import {
+  Archive,
   Bug,
   CheckCircle2,
   CircleAlert,
@@ -8,6 +9,7 @@ import {
   FileText,
   Hourglass,
   Loader2,
+  Play,
   RotateCcw,
   Sparkles,
   TriangleAlert,
@@ -16,9 +18,9 @@ import {
 
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ButtonGroup, ButtonGroupSeparator } from "@/ui/buttonGroup";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
@@ -211,15 +213,6 @@ function CompactAttentionNote({
   actionsOnly: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  // Temporary: keep Archive, Start, and the model pick off the refine composer.
-  const rowActions = actionsOnly
-    ? actions.filter((action) => action.kind !== "archive" && action.kind !== "start")
-    : actions;
-  const rowModel = actionsOnly ? undefined : modelSelect;
-  if (actionsOnly && rowActions.length === 0 && !rowModel) {
-    return null;
-  }
-
   return (
     <div
       className={cn("flex items-center gap-3", actionsOnly ? "shrink-0" : "min-w-0 flex-1")}
@@ -237,12 +230,13 @@ function CompactAttentionNote({
       )}
       <NoteActionRow
         note={note}
-        actions={rowActions}
+        actions={actions}
         runHref={runHref}
         actionBusy={actionBusy}
         startBusy={startBusy}
         startDisabled={startDisabled}
-        modelSelect={rowModel}
+        modelSelect={modelSelect}
+        capsule={actionsOnly}
         onAction={onAction}
       />
     </div>
@@ -257,6 +251,7 @@ function NoteActionRow({
   startBusy,
   startDisabled,
   modelSelect,
+  capsule = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -266,12 +261,26 @@ function NoteActionRow({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
+  capsule?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const href = note.cta?.href ?? runHref ?? undefined;
   const showCta = Boolean(note.cta && href);
   if (!showCta && actions.length === 0 && !modelSelect) {
     return null;
+  }
+
+  if (capsule) {
+    return (
+      <DraftActionCapsule
+        actions={actions}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        modelSelect={modelSelect}
+        onAction={onAction}
+      />
+    );
   }
 
   return (
@@ -308,6 +317,82 @@ function NoteActionRow({
   );
 }
 
+function DraftActionCapsule({
+  actions,
+  actionBusy,
+  startBusy,
+  startDisabled,
+  modelSelect,
+  onAction,
+}: {
+  actions: SplitRunFooterAction[];
+  actionBusy: boolean;
+  startBusy: boolean;
+  startDisabled: boolean;
+  modelSelect?: ReactNode;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  const archive = actions.find((action) => action.kind === "archive");
+  const start = actions.find((action) => action.kind === "start");
+  const rest = actions.filter((action) => action.kind !== "archive" && action.kind !== "start");
+  const startLocked = Boolean(start && (startDisabled || startBusy || start.disabled));
+  const select = isValidElement(modelSelect)
+    ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
+    : modelSelect;
+
+  return (
+    <ButtonGroup
+      className="overflow-hidden rounded-md border border-input"
+      aria-label="Draft actions"
+      data-testid="split-run-draft-action-group"
+    >
+      {archive ? (
+        <NoteAction
+          action={archive}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          grouped
+          capsule
+          capsulePosition="first"
+          onClick={() => onAction?.(archive)}
+        />
+      ) : null}
+      {select ? (
+        <>
+          <ButtonGroupSeparator />
+          {select}
+        </>
+      ) : null}
+      {rest.map((action) => (
+        <NoteAction
+          key={action.id}
+          action={action}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          grouped
+          capsule
+          capsulePosition="middle"
+          onClick={() => onAction?.(action)}
+        />
+      ))}
+      {start ? (
+        <NoteAction
+          action={start}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          grouped
+          capsule
+          capsulePosition="last"
+          onClick={() => onAction?.(start)}
+        />
+      ) : null}
+    </ButtonGroup>
+  );
+}
+
 function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "bug" }) {
   const external = href.startsWith("http");
   const mark = icon === "bug" ? <Bug className="size-3.5" aria-hidden /> : null;
@@ -329,12 +414,26 @@ function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "b
   );
 }
 
-function ActionIcon({ icon }: { icon?: SplitRunFooterAction["icon"] }) {
+function ActionIcon({
+  icon,
+  kind,
+  capsule,
+}: {
+  icon?: SplitRunFooterAction["icon"];
+  kind?: SplitRunFooterAction["kind"];
+  capsule?: boolean;
+}) {
   if (icon === "undo-2") {
     return <Undo2 className="size-3.5" aria-hidden />;
   }
   if (icon === "sparkles") {
     return <Sparkles className="size-3.5" aria-hidden />;
+  }
+  if (capsule && kind === "archive") {
+    return <Archive className="size-3.5 opacity-60" aria-hidden />;
+  }
+  if (capsule && kind === "start") {
+    return <Play className="size-3.5" aria-hidden />;
   }
   return null;
 }
@@ -345,6 +444,8 @@ function NoteAction({
   startBusy,
   startDisabled,
   grouped = false,
+  capsule = false,
+  capsulePosition,
   onClick,
 }: {
   action: SplitRunFooterAction;
@@ -352,6 +453,8 @@ function NoteAction({
   startBusy: boolean;
   startDisabled: boolean;
   grouped?: boolean;
+  capsule?: boolean;
+  capsulePosition?: "first" | "middle" | "last";
   onClick: () => void;
 }) {
   const primary = action.emphasis === "primary";
@@ -365,10 +468,20 @@ function NoteAction({
       variant={primary ? "default" : "outline"}
       disabled={disabled}
       onClick={onClick}
-      className={grouped ? "rounded-md rounded-r-none" : undefined}
+      className={
+        capsule
+          ? cn("!rounded-none h-7 border-0 shadow-none", !primary && "bg-background")
+          : grouped
+            ? "rounded-md rounded-r-none"
+            : undefined
+      }
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
-      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
+      {busy ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      ) : (
+        <ActionIcon icon={action.icon} kind={action.kind} capsule={capsule} />
+      )}
       {action.label}
     </Button>
   );

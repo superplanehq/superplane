@@ -761,19 +761,37 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    const start = within(note).getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
+    const group = within(note).getByTestId("split-run-draft-action-group");
+    expect(group).toContainElement(start);
+    const grouped = within(group).getAllByRole("button");
+    expect(grouped.map((button) => button.getAttribute("aria-label") || button.textContent?.trim())).toEqual([
+      "Archive",
+      "Model: Auto",
+      "Start",
+    ]);
+    expect(start).toHaveClass("bg-primary");
+    expect(start.closest(".shrink-0")).not.toBeNull();
+    expect(start.parentElement).not.toHaveClass("mt-3");
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-attention-note")).toBe(
+      note,
+    );
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
     expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
     expect(screen.getByTestId("work-order-split-run").className).toContain(
       "has-[[data-refine-chat-solo]]:w-[min(48rem",
     );
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
-    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-attention-note")).toBe(note);
+    expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show plan" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
@@ -785,7 +803,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
-  it("tells a draft is under analysis without Archive or Start", () => {
+  it("tells a draft is under analysis and keeps Archive", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -811,9 +829,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-intent-plan-analyzing"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("replaces chat with source, artifacts, and pull requests after Start", () => {
@@ -869,7 +888,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Show plan" }));
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);

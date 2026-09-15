@@ -270,6 +270,7 @@ function analysisDraftStartModelSelect(args: {
       value={args.value}
       onChange={args.onChange}
       disabled={args.disabled}
+      appearance="labeled"
     />
   );
 }
