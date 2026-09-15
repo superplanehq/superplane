@@ -1,7 +1,15 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 
@@ -27,10 +35,7 @@ export function DraftStartModelSelect({
   const [helpOpen, setHelpOpen] = useState(false);
 
   return (
-    <Select
-      value={value}
-      onValueChange={onChange}
-      disabled={disabled}
+    <DropdownMenu
       open={pickerOpen}
       onOpenChange={(open) => {
         setPickerOpen(open);
@@ -50,10 +55,20 @@ export function DraftStartModelSelect({
         closeDelay={100}
       >
         <HoverCardTrigger asChild>
-          <div className="inline-flex" data-testid="split-run-draft-model-wrap">
-            <SelectTrigger size="sm" className="w-[11.5rem]" aria-label="Model" data-testid="split-run-draft-model">
-              <SelectValue placeholder="Auto" />
-            </SelectTrigger>
+          <div className="inline-flex h-full" data-testid="split-run-draft-model-wrap">
+            <DropdownMenuTrigger asChild disabled={disabled}>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="default"
+                aria-label="Model"
+                data-testid="split-run-draft-model"
+                disabled={disabled}
+                className="rounded-l-none border-l border-primary-foreground/25"
+              >
+                <ChevronDown className="size-3.5" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
           </div>
         </HoverCardTrigger>
         <HoverCardContent side="top" align="end" className="pointer-events-none w-64 space-y-1 p-3 text-sm">
@@ -61,20 +76,22 @@ export function DraftStartModelSelect({
           <p>{DRAFT_START_MODEL_HELP[1]}</p>
         </HoverCardContent>
       </HoverCard>
-      <SelectContent position="popper" className="max-h-60">
-        <SelectItem value={DRAFT_START_MODEL_AUTO}>Auto</SelectItem>
-        {(models.data ?? []).map((model) => {
-          const id = model.id ?? "";
-          if (id === "") {
-            return null;
-          }
-          return (
-            <SelectItem key={id} value={id}>
-              {model.name || id}
-            </SelectItem>
-          );
-        })}
-      </SelectContent>
-    </Select>
+      <DropdownMenuContent align="end" className="max-h-60">
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+          <DropdownMenuRadioItem value={DRAFT_START_MODEL_AUTO}>Auto</DropdownMenuRadioItem>
+          {(models.data ?? []).map((model) => {
+            const id = model.id ?? "";
+            if (id === "") {
+              return null;
+            }
+            return (
+              <DropdownMenuRadioItem key={id} value={id}>
+                {model.name || id}
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -45,11 +45,12 @@ function renderDraftFooter(onStart: () => void, selectedModel = DRAFT_START_MODE
 }
 
 describe("SplitRunReview draft model select", () => {
-  it("shows Auto on the draft footer", () => {
+  it("shows a Start plus model chevron on the draft footer", () => {
     renderDraftFooter(vi.fn());
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
+    expect(within(note).getByRole("button", { name: "Model" })).toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
@@ -75,8 +76,8 @@ describe("SplitRunReview draft model select", () => {
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
-    await user.click(screen.getByRole("combobox", { name: "Model" }));
-    await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
     expect(onChange).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
@@ -97,8 +98,8 @@ describe("SplitRunReview draft model select", () => {
     await user.hover(screen.getByTestId("split-run-draft-model-wrap"));
     expect(await screen.findByTestId("split-run-draft-model-help")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("combobox", { name: "Model" }));
-    const option = await screen.findByRole("option", { name: "claude-opus-4-6" });
+    await user.click(screen.getByRole("button", { name: "Model" }));
+    const option = await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" });
     await user.hover(option);
     expect(screen.queryByTestId("split-run-draft-model-help")).not.toBeInTheDocument();
   });

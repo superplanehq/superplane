@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
@@ -109,7 +109,6 @@ function AnalysisWorkOrderPopup({
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
-  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const modelLabel = useImplementationRunnerModel(organizationId, fixture.phases);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -144,7 +143,6 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    canPickDraftStartModel,
     draftModel,
     setDraftModel,
   });
@@ -218,7 +216,6 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  canPickDraftStartModel: boolean;
   draftModel: string;
   setDraftModel: (value: string) => void;
 }) {
@@ -244,7 +241,6 @@ function analysisPopupReview(args: {
         lineName: args.fixture.lineName,
         footerKind: args.fixture.footer.kind,
         hasStart: args.fixture.footer.actions.some((action) => action.kind === "start"),
-        canPick: args.canPickDraftStartModel,
         value: args.draftModel,
         onChange: args.setDraftModel,
         disabled: args.isDispatching,
@@ -259,12 +255,11 @@ function analysisDraftStartModelSelect(args: {
   lineName: string;
   footerKind: string;
   hasStart: boolean;
-  canPick: boolean;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
 }) {
-  if (args.footerKind !== "draft" || !args.canPick || !args.hasStart) {
+  if (args.footerKind !== "draft" || !args.hasStart) {
     return undefined;
   }
   return (

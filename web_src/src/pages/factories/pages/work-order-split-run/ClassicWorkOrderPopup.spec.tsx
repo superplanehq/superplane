@@ -61,6 +61,8 @@ describe("ClassicWorkOrderPopup", () => {
     expect(within(dialog).getByText("This task is ready to start")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Model" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Add context for this plan")).not.toBeInTheDocument();
   });
