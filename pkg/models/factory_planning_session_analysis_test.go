@@ -120,11 +120,12 @@ func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
 
 func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		state  string
-		result string
+		name              string
+		state             string
+		result            string
+		expectedRunResult string
 	}{
-		{name: "start", state: FactoryWorkOrderStateOpen},
+		{name: "start", state: FactoryWorkOrderStateOpen, expectedRunResult: CanvasRunResultPassed},
 		{name: "archive", state: FactoryWorkOrderStateClosed, result: FactoryWorkOrderResultRejected},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -158,6 +159,7 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			run, err = FindUnscopedCanvasRun(db, run.ID)
 			require.NoError(t, err)
 			assert.Equal(t, CanvasRunStateCancelling, run.State)
+			assert.Equal(t, test.expectedRunResult, run.Result)
 		})
 	}
 }
