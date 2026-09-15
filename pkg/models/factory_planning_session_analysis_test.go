@@ -340,6 +340,18 @@ func TestFactoryPlanningSession_ProposeConfidenceWithoutSpec(t *testing.T) {
 	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
 }
 
+func TestValidatePlanningConfidenceScoreRejectsZero(t *testing.T) {
+	err := validatePlanningConfidenceScore(0)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "1 through 5")
+}
+
+func TestValidatePlanningConfidenceScoreAcceptsOneAndFive(t *testing.T) {
+	require.NoError(t, validatePlanningConfidenceScore(1))
+	require.NoError(t, validatePlanningConfidenceScore(5))
+}
+
 func TestAnalysisConversationWindowSkipsPlanBanners(t *testing.T) {
 	messages := []PlanningSessionMessage{
 		{Role: PlanningSessionMessageRoleUser, Text: "Add refund retries."},

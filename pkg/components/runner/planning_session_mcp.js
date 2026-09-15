@@ -145,18 +145,18 @@ const TOOLS = [
   {
     name: "propose_confidence",
     description:
-      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Clarity score and a short summary. The score is how well you understand the task and how likely implementation is to succeed if it starts now. Score 5: say the task is clear enough to implement. Below 5: tell the user how to raise Clarity and encourage that action. If you also call survey, tell the user to answer the questions and name what is still unclear. Do not write a test or an acceptance check. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
         score: {
           type: "number",
-          description: "Confidence from 0 through 5.",
+          description: "Clarity from 1 through 5.",
         },
         summary: {
           type: "string",
           description:
-            "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+            "For score 5, say the task is clear enough to implement. Below 5, tell the user how to raise Clarity. If you ask a survey, tell the user to answer those questions. Example: Answer the questions in this session. These points are still unclear: the target page and the error you want to fix.",
         },
       },
       required: ["score", "summary"],
