@@ -481,6 +481,50 @@ func Test__HTTPContext__PolicyResolverInTransactionSerializesLookupsForSameTx(t 
 	assert.Equal(t, int32(1), calls.Load())
 }
 
+func Test__HTTPContext__PolicyResolverInTransactionDoesNotBlockOtherTransactions(t *testing.T) {
+	tx1 := &gorm.DB{}
+	tx2 := &gorm.DB{}
+	tx1Started := make(chan struct{})
+	tx1Release := make(chan struct{})
+	tx1Done := make(chan error, 1)
+	tx2Done := make(chan error, 1)
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			if tx == tx1 {
+				close(tx1Started)
+				<-tx1Release
+			}
+			return HTTPPolicy{}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	go func() {
+		_, lookupErr := ctx.activePolicy(tx1)
+		tx1Done <- lookupErr
+	}()
+	<-tx1Started
+
+	go func() {
+		_, lookupErr := ctx.activePolicy(tx2)
+		tx2Done <- lookupErr
+	}()
+
+	select {
+	case lookupErr := <-tx2Done:
+		require.NoError(t, lookupErr)
+	case <-time.After(time.Second):
+		t.Fatal("lookup for a second transaction blocked on the first")
+	}
+
+	close(tx1Release)
+	require.NoError(t, <-tx1Done)
+}
+
 func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {
 	ctx, err := NewHTTPContext(HTTPOptions{
 		PolicyResolver: func() (HTTPPolicy, error) {

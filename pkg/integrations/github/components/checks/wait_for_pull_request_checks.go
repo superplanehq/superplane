@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v84/github"
@@ -399,20 +400,35 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 }
 
 func fetchPullRequestCheckSources(client *common.Client, repository, ref string) (*github.ListCheckRunsResults, *github.CombinedStatus, error) {
-	checkRuns, err := listAllCheckRunsForRef(client, ListCheckRunsForRefConfiguration{
-		Repository: repository,
-		Ref:        ref,
-		Filter:     "latest",
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list check runs for ref: %w", err)
-	}
+	var (
+		checkRuns *github.ListCheckRunsResults
+		combined  *github.CombinedStatus
+		checkErr  error
+		statusErr error
+		wg        sync.WaitGroup
+	)
 
-	combined, err := listCombinedCommitStatus(client, repository, ref)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get combined commit status: %w", err)
-	}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		checkRuns, checkErr = listAllCheckRunsForRef(client, ListCheckRunsForRefConfiguration{
+			Repository: repository,
+			Ref:        ref,
+			Filter:     "latest",
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		combined, statusErr = listCombinedCommitStatus(client, repository, ref)
+	}()
+	wg.Wait()
 
+	if checkErr != nil {
+		return nil, nil, fmt.Errorf("failed to list check runs for ref: %w", checkErr)
+	}
+	if statusErr != nil {
+		return nil, nil, fmt.Errorf("failed to get combined commit status: %w", statusErr)
+	}
 	return checkRuns, combined, nil
 }
 
