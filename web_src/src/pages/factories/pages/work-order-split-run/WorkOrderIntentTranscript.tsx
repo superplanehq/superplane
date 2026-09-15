@@ -7,7 +7,6 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { OrgUserReference } from "../../OrgUserReference";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
@@ -20,32 +19,30 @@ export function WorkOrderIntentTranscript({
   organizationId,
   streaming = false,
   files,
-  onOpenPlan,
 }: {
   messages: CreateWithAgentMessage[];
   organizationId: string;
   streaming?: boolean;
   files?: FilesFile[];
-  onOpenPlan?: () => void;
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const visible = messages.filter((message) => message.kind !== "plan");
 
-  if (messages.length === 0) {
+  if (visible.length === 0) {
     return null;
   }
 
-  const last = messages.at(-1);
+  const last = visible.at(-1);
 
   return (
     <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
-      {messages.map((message) => (
+      {visible.map((message) => (
         <TranscriptMessage
           key={message.id}
           message={message}
           resolveUser={resolveUser}
           streaming={streaming && last?.role === "agent" && message.id === last.id}
           files={files}
-          onOpenPlan={onOpenPlan}
         />
       ))}
     </div>
@@ -57,16 +54,14 @@ function TranscriptMessage({
   resolveUser,
   streaming,
   files,
-  onOpenPlan,
 }: {
   message: CreateWithAgentMessage;
   resolveUser: OrgUserDisplayLookup;
   streaming: boolean;
   files?: FilesFile[];
-  onOpenPlan?: () => void;
 }) {
   if (message.kind === "plan") {
-    return <PlanUpdatedBanner score={message.score} onOpenPlan={onOpenPlan} />;
+    return null;
   }
   if (message.role === "user") {
     if (message.origin === "survey") {
@@ -83,21 +78,6 @@ function TranscriptMessage({
         <MarkdownContent content={message.text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>
     </div>
-  );
-}
-
-function PlanUpdatedBanner({ score, onOpenPlan }: { score: number; onOpenPlan?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpenPlan}
-      aria-label={CREATE_WITH_AGENT_COPY.planUpdated}
-      className="flex w-full items-center justify-between gap-3 rounded-2xl border px-3.5 py-2 text-left"
-      data-testid="split-run-intent-plan-updated"
-    >
-      <span className="text-[13px] font-medium leading-5 text-foreground">{CREATE_WITH_AGENT_COPY.planUpdated}</span>
-      <ConfidenceMeter score={score} showTooltip={false} />
-    </button>
   );
 }
 

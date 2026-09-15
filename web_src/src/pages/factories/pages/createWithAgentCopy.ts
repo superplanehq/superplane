@@ -42,6 +42,8 @@ export const CREATE_WITH_AGENT_COPY = {
   refineFurther: "Refine further",
   openTask: "Open task",
   planUpdated: "Plan updated",
+  showPlan: "Show plan",
+  hidePlan: "Hide plan",
   greeting: "The repository is ready. What do you want to do?",
   afterCreate: "The task is created. Tell me if you want to do something else.",
   afterSkip: "Skipped that draft. Tell me if you want to do something else.",

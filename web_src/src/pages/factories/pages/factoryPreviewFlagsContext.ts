@@ -18,6 +18,11 @@ export interface FactoryPreviewFlags {
    * switches back to the title icons. On by default.
    */
   columnAutomationRows?: boolean;
+  /**
+   * Storybook-only: put Show plan, Archive, and Start on one Plan updated
+   * row. The live popup keeps two bars until a look is chosen.
+   */
+  oneBarPlanStrip?: boolean;
 }
 
 export const FactoryPreviewFlagsContext = createContext<FactoryPreviewFlags | null>(null);

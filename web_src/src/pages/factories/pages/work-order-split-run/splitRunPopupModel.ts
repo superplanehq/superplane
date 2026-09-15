@@ -31,9 +31,12 @@ export function refinePopupShowsAutomations(args: {
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
-/** Task popup size. Wider than the default overlay so Summary and Plan have room. */
+/** Task popup size. Same width with the plan closed or open so Show plan does not resize the dialog. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
-  "max-h-[min(56rem,calc(100vh-4rem))] h-[min(50rem,calc(100vh-4rem))] w-[min(80rem,calc(100vw-4rem))]";
+  "max-h-[min(56rem,calc(100vh-4rem))] h-[min(50rem,calc(100vh-4rem))] w-[min(64rem,calc(100vw-4rem))]";
+
+/** Cursor-style reading column for refine chat. */
+export const SPLIT_RUN_CHAT_COLUMN_CLASSNAME = "mx-auto w-full max-w-3xl px-6";
 
 /** Shared height for the chat composer and the spec decision row. */
 export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =

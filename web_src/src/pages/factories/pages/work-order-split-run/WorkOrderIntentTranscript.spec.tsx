@@ -183,22 +183,14 @@ describe("WorkOrderIntentTranscript", () => {
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
   });
 
-  it("shows a plan-updated banner with the score and opens the plan on click", async () => {
-    const user = userEvent.setup();
-    const onOpenPlan = vi.fn();
-    render(
-      <WorkOrderIntentTranscript
-        onOpenPlan={onOpenPlan}
-        messages={[{ id: "plan-1", kind: "plan", role: "plan", score: 4 }]}
-      />,
-    );
+  it("hides plan-updated rows so the sticky control can own the latest plan", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I published the spec." },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+    ]);
 
-    const banner = screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated });
-    expect(banner).toHaveTextContent(CREATE_WITH_AGENT_COPY.planUpdated);
-    expect(within(banner).getByRole("meter")).toHaveAttribute("aria-valuenow", "4");
-    expect(banner).not.toHaveTextContent("This issue is a good fit");
-
-    await user.click(banner);
-    expect(onOpenPlan).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated })).not.toBeInTheDocument();
+    expect(screen.getByText("I published the spec.")).toBeInTheDocument();
   });
 });
