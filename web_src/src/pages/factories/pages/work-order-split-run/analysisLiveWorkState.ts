@@ -44,11 +44,15 @@ export function hasAgentReasoning(items: ReasoningItem[]): boolean {
 }
 
 export function waitingForAgentReply(messages: { role: string }[]): boolean {
-  return messages.at(-1)?.role !== "agent";
+  return lastTalkMessage(messages)?.role !== "agent";
 }
 
 export function hidePreviousAgentStream(messages: { role: string }[]): boolean {
-  return messages.at(-1)?.role === "user";
+  return lastTalkMessage(messages)?.role === "user";
+}
+
+function lastTalkMessage(messages: { role: string }[]) {
+  return [...messages].reverse().find((message) => message.role === "user" || message.role === "agent");
 }
 
 export function previousAgentStreamText(messages: { role: string; text?: string }[]): string | undefined {

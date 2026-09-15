@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from "rea
 
 export const DEFAULT_LOG_PERCENT = 65;
 export const DEFAULT_INTENT_LEFT_PERCENT = 40;
+export const DEFAULT_REFINE_INTENT_LEFT_PERCENT = 50;
 const MIN_LOG_PERCENT = 22;
 const MAX_LOG_PERCENT = 72;
 

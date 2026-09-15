@@ -31,9 +31,19 @@ export function refinePopupShowsAutomations(args: {
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
-/** Task popup size. Wider than the default overlay so Summary and Plan have room. */
+/** Refine overlay size. Show plan uses the classic 70rem task dialog. Chat-only is 48rem. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
-  "max-h-[min(56rem,calc(100vh-4rem))] h-[min(50rem,calc(100vh-4rem))] w-[min(80rem,calc(100vw-4rem))]";
+  "has-[[data-refine-chat-solo]]:w-[min(48rem,calc(100vw-5rem))] transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+
+/** Refine chat column. Chat-only uses wider side padding. */
+export const SPLIT_RUN_CHAT_COLUMN_CLASSNAME = "mx-auto w-full max-w-5xl";
+
+/** Reserve the scrollbar lane on the log and the composer so their right edges stay aligned. */
+export const SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME = "overflow-y-auto [scrollbar-gutter:stable]";
+
+export function splitRunChatColumnClassName(chatSolo: boolean): string {
+  return `${SPLIT_RUN_CHAT_COLUMN_CLASSNAME} ${chatSolo ? "px-8" : "px-4"}`;
+}
 
 /** Shared height for the chat composer and the spec decision row. */
 export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =

@@ -2,6 +2,7 @@ import { BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReport
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
+import { factoryPlanningSessionRoutes } from "./factoryPlanningSessionHandlers";
 import { factoryPRFeedbackRoutes } from "./factoryPRFeedbackHandlers";
 import {
   defaultFactoriesFixture,
@@ -318,6 +319,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
     ...factoryIntakeRoutes(fixture),
+    ...factoryPlanningSessionRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
     ...usageHistoryRoutes(fixture),
     {

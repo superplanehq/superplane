@@ -18,6 +18,7 @@ import {
   renderIntentDocument,
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 import type { SplitRunSource } from "./splitRunSource";
 
@@ -178,19 +179,37 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
-    expect(screen.getByTestId("split-run-intent-composer").closest(".sp-user-note")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "frame");
+    expect(screen.getByTestId("split-run-intent-composer-card").className).not.toContain("focus-within:ring");
+    expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
     expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_THINKING_STATES[0]);
     expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show full plan" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-decision")).toHaveClass("min-h-[5.5rem]");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("split-run-intent-resize-handle")).toHaveClass("lg:hidden");
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
+    const columns = screen.getAllByTestId("split-run-intent-chat-column");
+    expect(columns.length).toBeGreaterThanOrEqual(2);
+    for (const column of columns) {
+      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-8");
+    }
+    expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
+    expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(chips.closest("[data-slot=frame-panel-header]")).not.toBeNull();
+    expect(chips.closest("[data-slot=frame-panel]")).toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=frame-panel]")).not.toBeNull();
+    expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
     expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
-    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+    expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
+    const send = screen.getByTestId("split-run-intent-composer-send");
+    expect(send).toHaveAttribute("data-size", "icon-sm");
+    expect(send).toHaveAttribute("aria-label", ANALYSIS_PLANNING_COPY.send);
+    expect(send.children).toHaveLength(1);
   });
 
   it("streams the summary when the spec updates after open", () => {
@@ -402,5 +421,121 @@ describe("WorkOrderIntentDocument", () => {
     await user.click(screen.getByRole("button", { name: /show more/i }));
     expect(screen.getByRole("button", { name: /show less/i })).toBeInTheDocument();
     expect(content).not.toHaveStyle({ maxHeight: "220px" });
+  });
+
+  it("keeps the latest plan sticky and toggles the spec column", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={HIGH_CONFIDENCE}
+        resultFooter={<div data-testid="split-run-review">Ready</div>}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [
+              { id: "agent-1", kind: "text", role: "agent", text: "I published the spec." },
+              { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const strip = screen.getByTestId("split-run-intent-plan-updated");
+    expect(
+      within(screen.getByTestId("split-run-intent-transcript")).queryByTestId("split-run-intent-plan-updated"),
+    ).toBeNull();
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    const showPlan = within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan });
+    expect(within(chips).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
+    expect(within(strip).getByTestId("split-run-review")).toHaveTextContent("Ready");
+    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-decision")).not.toBeInTheDocument();
+
+    await user.click(showPlan);
+    expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
+    for (const column of screen.getAllByTestId("split-run-intent-chat-column")) {
+      expect(column).toHaveClass("px-4");
+      expect(column).not.toHaveClass("px-8");
+    }
+    expect(screen.getByTestId("split-run-intent-request").style.getPropertyValue("--intent-left")).toBe("50%");
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
+    const hidePlan = within(screen.getByTestId("split-run-intent-composer-chips")).getByRole("button", {
+      name: CREATE_WITH_AGENT_COPY.hidePlan,
+    });
+    expect(hidePlan).toHaveAttribute("aria-expanded", "true");
+    expect(hidePlan).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(screen.getByTestId("split-run-intent-result")).queryByRole("button", {
+        name: CREATE_WITH_AGENT_COPY.hidePlan,
+      }),
+    ).toBeNull();
+    expect(screen.queryByTestId("split-run-intent-decision")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId("split-run-review"),
+    ).toHaveTextContent("Ready");
+
+    await user.click(hidePlan);
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(
+      within(screen.getByTestId("split-run-intent-composer-chips")).getByRole("button", {
+        name: CREATE_WITH_AGENT_COPY.showPlan,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the plan toggle until a spec exists", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        confidence={HIGH_CONFIDENCE}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.hidePlan })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
+  });
+
+  it("opens the Clarity summary in a popover", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={HIGH_CONFIDENCE}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("split-run-intent-composer-score"));
+    expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+      "This issue is a good fit for an agent on this factory line.",
+    );
   });
 });

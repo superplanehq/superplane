@@ -145,18 +145,18 @@ const TOOLS = [
   {
     name: "propose_confidence",
     description:
-      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check.",
+      "Publish the 1 through 5 Clarity score and a short summary. The score is how well you understand the task and how likely implementation is to succeed if it starts now. Write to the user in two short sentences or fewer. Use you. Do not name files. Do not describe agent fit. Score 5: The task is clear enough to implement. Below 5: sentence 1 says why Clarity is not 5. Sentence 2 says what the user must add, decide, or answer. If you also call survey, start with: Answer the questions in this session. Do not write a test or an acceptance check. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
         score: {
           type: "number",
-          description: "Confidence from 0 through 5.",
+          description: "Clarity from 1 through 5.",
         },
         summary: {
           type: "string",
           description:
-            "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+            "Write to the user. Use you. Two sentences or fewer. Score 5: The task is clear enough to implement. Below 5: why Clarity is not 5, then what to add, decide, or answer. If you ask a survey, start with: Answer the questions in this session. Good: Clarity is 2 because a different prompt and the copy scope are not defined. Answer the questions in this session so I know what to duplicate and what the new agent setup must cover.",
         },
       },
       required: ["score", "summary"],
@@ -165,7 +165,7 @@ const TOOLS = [
   {
     name: "survey",
     description:
-      "Ask the person a multiple-choice question when the task is unclear or two valid readings exist. Use 2 to 4 options. Then stop. Do not ask the same question in chat.",
+      "Ask one plain question when the task is unclear or two valid readings exist. Use 2 to 4 short everyday options. Then stop. Do not ask the same question in chat. Do not mention files, protos, or reuse paths. Good option: Title and description only. Bad option: Only a different model, chosen at Start (reuse the existing model override).",
     inputSchema: {
       type: "object",
       properties: {
@@ -174,8 +174,12 @@ const TOOLS = [
           items: {
             type: "object",
             properties: {
-              prompt: { type: "string" },
-              options: { type: "array", items: { type: "string" } },
+              prompt: { type: "string", description: "One plain question." },
+              options: {
+                type: "array",
+                items: { type: "string" },
+                description: "Short everyday options. Under 12 words each.",
+              },
             },
             required: ["prompt", "options"],
           },
