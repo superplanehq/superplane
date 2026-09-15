@@ -325,7 +325,7 @@ func TestRunnerPlanningWaitCancelDoesNotConsumeUserMessage(t *testing.T) {
 	server, session, _, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "hello"))
+	require.NoError(t, session.SendUserMessage(db, "hello", uuid.Nil))
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -361,7 +361,7 @@ func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	server, session, _, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "hello"))
+	require.NoError(t, session.SendUserMessage(db, "hello", uuid.Nil))
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
@@ -429,7 +429,7 @@ func mustPlanningRunnerToken(t *testing.T, signer *jwt.Signer, session *models.F
 func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {
 	t.Helper()
 	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "Add refund retries."))
+	require.NoError(t, session.SendUserMessage(db, "Add refund retries.", uuid.Nil))
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
 }
 

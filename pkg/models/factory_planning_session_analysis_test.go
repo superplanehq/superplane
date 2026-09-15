@@ -31,7 +31,7 @@ func TestFactory_AttachAnalysisSessionReusesEndedSession(t *testing.T) {
 		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
-	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
+	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts.", uuid.Nil))
 	require.NoError(t, session.End(db))
 
 	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
@@ -66,7 +66,7 @@ func TestFactory_AttachAnalysisSessionReconnectsRunningSessionWithoutRun(t *test
 		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
-	require.NoError(t, session.SendUserMessage(db, "Use the existing retry helper."))
+	require.NoError(t, session.SendUserMessage(db, "Use the existing retry helper.", uuid.Nil))
 	require.NoError(t, session.DetachAgentRun(db))
 
 	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
@@ -183,7 +183,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
 	require.NoError(t, session.ProposeConfidence(db, 4, "This issue is a good fit for an agent."))
 	require.NoError(t, session.RecordAgentMessage(db, "I found the retry seam in billing/retry.go."))
-	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper."))
+	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper.", uuid.Nil))
 
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestAnalysisContinuationTextBoundsRewindWithoutDeletingHistory(t *testing.T
 	for index := range 30 {
 		message := fmt.Sprintf("message-%02d %s", index, strings.Repeat("context ", 300))
 		if index%2 == 0 {
-			require.NoError(t, session.SendUserMessage(db, message))
+			require.NoError(t, session.SendUserMessage(db, message, uuid.Nil))
 			continue
 		}
 		require.NoError(t, session.RecordAgentMessage(db, message))
@@ -522,7 +522,7 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts."))
+	require.NoError(t, session.SendUserMessage(db, "The retry lives in billing/retry.ts.", uuid.Nil))
 
 	assert.Equal(t, "The retry lives in billing/retry.ts.", session.Wait().Text)
 	assert.NotContains(t, session.Wait().Text, "propose_spec")
