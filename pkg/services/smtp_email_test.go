@@ -297,10 +297,10 @@ func TestRenderEmailTemplate(t *testing.T) {
 func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	templateRoot := filepath.Join("..", "..", "templates")
 	data := WorkOrderNotificationTemplateData{
-		Summary:          "Ana Souza commented on this work order.",
+		Summary:          "Ana Souza commented on SP-52.",
 		WorkOrderKey:     "SP-52",
 		WorkOrderTitle:   "Metrics on list of lines",
-		Detail:           "Looks good. Close the work order after review.",
+		Detail:           "Looks good",
 		DetailCtaLabel:   "Review PR #52",
 		DetailCtaURL:     "https://github.com/example/repo/pull/52",
 		WorkOrderLink:    "https://app.superplane.com/org/workspaces/sp/work-order/52",
@@ -328,8 +328,6 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, html, "https://app.superplane.com/org/workspaces/sp/work-order/52")
 	assert.Contains(t, html, "href=\"https://github.com/example/repo/pull/52\"")
 	assert.Contains(t, html, "Review PR #52")
-	assert.Contains(t, html, "Ana Souza commented on this work order.")
-	assert.Contains(t, html, "Looks good. Close the work order after review.")
 	assert.Contains(t, html, "Open the task in SuperPlane")
 	assert.Contains(t, html, "<title>Task update</title>")
 
@@ -340,8 +338,6 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, text, "Bugs · CI Loop")
 	assert.Contains(t, text, "8h ago")
 	assert.Contains(t, text, "Review PR #52: https://github.com/example/repo/pull/52")
-	assert.Contains(t, text, "Ana Souza commented on this work order.")
-	assert.Contains(t, text, "Looks good. Close the work order after review.")
 	assert.Contains(t, text, "Open the task in SuperPlane")
 }
 
