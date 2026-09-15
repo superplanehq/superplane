@@ -151,7 +151,11 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups)
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	if err != nil {
+		return err
+	}
+	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)

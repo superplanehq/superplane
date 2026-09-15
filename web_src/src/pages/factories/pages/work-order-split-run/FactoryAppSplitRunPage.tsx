@@ -114,6 +114,7 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   onSelectNode={model.setNodeId}
                   organizationId={model.organizationId}
                   canvasId={model.phase.appId}
+                  files={model.files}
                 />
               </li>
             </ol>
