@@ -35,7 +35,7 @@ export function WorkOrderIntentTranscript({
   const last = visible.at(-1);
 
   return (
-    <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
+    <div className="mb-3 space-y-3" data-testid="split-run-intent-transcript">
       {visible.map((message) => (
         <TranscriptMessage
           key={message.id}

@@ -14,7 +14,7 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
-import { SPLIT_RUN_CHAT_COLUMN_CLASSNAME, SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
+import { splitRunChatColumnClassName, SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
@@ -87,6 +87,8 @@ function AnalysisRequestChat({
   source,
 }: WorkOrderIntentRequestProps & { analysis: IntentAnalysisChat }) {
   const state = analysisRequestChatState(analysis);
+  const chatSolo = !analysis.planPaneOpen;
+  const chatColumnClass = splitRunChatColumnClassName(chatSolo);
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
     resumeOnBottom: true,
   });
@@ -106,7 +108,7 @@ function AnalysisRequestChat({
           className="absolute inset-0 overflow-y-auto"
           data-testid="split-run-intent-chat-log"
         >
-          <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "py-6")} data-testid="split-run-intent-chat-column">
+          <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
             <RequestMessage description={description} files={files} source={source} asChat />
             <WorkOrderIntentTranscript
               messages={analysis.view.messages}
@@ -133,7 +135,10 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         )}
       </div>
-      <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "shrink-0 pb-4")} data-testid="split-run-intent-chat-column">
+      <div
+        className={cn(chatColumnClass, "shrink-0", chatSolo ? "pb-6" : "pb-3")}
+        data-testid="split-run-intent-chat-column"
+      >
         {analysis.onTogglePlan ? (
           <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
@@ -235,7 +240,7 @@ function RequestMessage({
   }
 
   return (
-    <div className="mb-4 flex w-full justify-end" data-testid="split-run-description">
+    <div className="mb-3 flex w-full justify-end" data-testid="split-run-description">
       <div className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5">
         {source ? (
           <div className="mb-1">

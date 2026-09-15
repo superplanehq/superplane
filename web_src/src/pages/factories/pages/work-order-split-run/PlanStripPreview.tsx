@@ -32,7 +32,7 @@ export function PlanStripPreview({ look }: { look: PlanStripLook }) {
         </p>
         <p>I scored this 2. Prompt, harness, and a second run still need a decision.</p>
       </div>
-      <div className="mx-auto w-full max-w-3xl shrink-0 px-6 pb-4">
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-4 pb-3">
         <PreviewStrip look={look} />
         <FakeComposer />
       </div>
@@ -53,7 +53,7 @@ export function PlanStripPreviewToggle({ look = "oneBar" }: { look?: "oneBar" | 
       <div className="min-h-0 flex-1 px-6 py-6 text-[14px] leading-6 text-muted-foreground">
         Click Show plan or Hide plan.
       </div>
-      <div className="mx-auto w-full max-w-3xl shrink-0 px-6 pb-4">
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-4 pb-3">
         {look === "chips" ? (
           <ChipStrip open={open} onToggle={() => setOpen((current) => !current)} />
         ) : (
