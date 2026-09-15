@@ -93,11 +93,7 @@ func SignedFileURLs(text string) []string {
 	seen := map[string]struct{}{}
 	var urls []string
 	for _, match := range httpURLPattern.FindAllString(text, -1) {
-		parsed, err := url.Parse(match)
-		if err != nil {
-			continue
-		}
-		if parsed.Query().Get(SignedURLMarkerParam) != SignedURLMarkerValue {
+		if _, ok := FileIDFromSignedURL(match); !ok {
 			continue
 		}
 		if _, exists := seen[match]; exists {
@@ -114,7 +110,34 @@ func FileIDFromSignedURL(raw string) (uuid.UUID, bool) {
 	if err != nil {
 		return uuid.Nil, false
 	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return uuid.Nil, false
+	}
 	if parsed.Query().Get(SignedURLMarkerParam) != SignedURLMarkerValue {
+		return uuid.Nil, false
+	}
+	if id, ok := fileIDFromHMACSignedURL(parsed); ok {
+		return id, true
+	}
+	return fileIDFromGCSSignedURL(parsed)
+}
+
+func fileIDFromHMACSignedURL(parsed *url.URL) (uuid.UUID, bool) {
+	trimmed := strings.Trim(parsed.Path, "/")
+	prefix := "api/v1/public/files/"
+	if !strings.HasPrefix(trimmed, prefix) {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(strings.TrimPrefix(trimmed, prefix))
+	if err != nil || id == uuid.Nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func fileIDFromGCSSignedURL(parsed *url.URL) (uuid.UUID, bool) {
+	host := strings.ToLower(parsed.Hostname())
+	if host != "storage.googleapis.com" && !strings.HasSuffix(host, ".storage.googleapis.com") {
 		return uuid.Nil, false
 	}
 	base := path.Base(strings.Trim(parsed.Path, "/"))

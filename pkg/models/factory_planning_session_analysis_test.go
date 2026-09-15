@@ -483,6 +483,36 @@ func TestFactoryPlanningSession_ProposeSpecAppendsMissingDescriptionFileRefs(t *
 	assert.Equal(t, description, reloaded.Description)
 }
 
+func TestFactoryPlanningSession_ProposeSpecEscapesMarkdownFilenames(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-escape")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	file := mustReadyTaskFile(t, db, org.ID, factoryModel.ID, order.ID, userID, "shot](evil.com", "image/png")
+	description := "See ![orig](" + blob.FileRef(file.ID) + ")"
+	require.NoError(t, order.UpdateContent(db, nil, &description))
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	stored := string(artifacts[0].Data)
+	assert.Contains(t, stored, "![shot__evil.com]("+blob.FileRef(file.ID)+")")
+	assert.NotContains(t, stored, "shot](evil.com")
+}
+
 func TestFactoryPlanningSession_ProposeSpecDropsForeignSignedURLs(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-drop")

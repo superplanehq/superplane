@@ -600,6 +600,12 @@ func TestRestoreFileRefsRewritesHMACAndGCSURLs(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, dropped, "sp_file=1")
 	assert.NotContains(t, dropped, blob.FileRef(foreign))
+
+	foreignHost := "https://example.test/" + file.ID.String() + "?sp_file=1"
+	unchanged, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![shot.png]("+foreignHost+")")
+	require.NoError(t, err)
+	assert.Equal(t, "![shot.png]("+foreignHost+")", unchanged)
+	assert.NotContains(t, unchanged, blob.FileRef(file.ID))
 }
 
 func TestDescriptionForDispatchMintsDescriptionAndSpecRefs(t *testing.T) {

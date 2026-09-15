@@ -60,7 +60,15 @@ func TestFileIDFromSignedURLReadsHMACAndGCSPaths(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, fileID, id)
 
+	virtualHost := "https://superplane-prod-global.storage.googleapis.com/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/9155053b-45c3-4a96-b4bc-63820b0f9a98/tasks/" + workOrderID.String() + "/" + fileID.String() + "?sp_file=1"
+	id, ok = FileIDFromSignedURL(virtualHost)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
 	_, ok = FileIDFromSignedURL("https://example.com/" + fileID.String())
+	assert.False(t, ok)
+
+	_, ok = FileIDFromSignedURL("https://example.test/" + fileID.String() + "?sp_file=1")
 	assert.False(t, ok)
 }
 

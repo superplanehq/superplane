@@ -199,10 +199,11 @@ func appendMissingDescriptionFileRefs(tx *gorm.DB, order *FactoryWorkOrder, spec
 
 func markdownFileRef(file File) string {
 	ref := blob.FileRef(file.ID)
+	label := blob.MarkdownLinkLabel(file.Filename)
 	if IsInlineImageContentType(file.ContentType) {
-		return fmt.Sprintf("![%s](%s)", file.Filename, ref)
+		return fmt.Sprintf("![%s](%s)", label, ref)
 	}
-	return fmt.Sprintf("[%s](%s)", file.Filename, ref)
+	return fmt.Sprintf("[%s](%s)", label, ref)
 }
 
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
