@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { findPlanningSessionByWorkOrder } from "./planningSessionClient";
 import {
@@ -43,13 +44,22 @@ export function useWorkOrderPlanningActivity(
   enabled: boolean,
   backlogAnalyzing = false,
 ): { hasAgentQuestion: boolean; isWaiting: boolean; isWorking: boolean; isAgentWorking: boolean } {
-  const { data } = useQuery({
+  const queryEnabled = enabled && Boolean(organizationId && factoryId && workOrderId);
+  const { data, refetch } = useQuery({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
-    enabled: enabled && Boolean(organizationId && factoryId && workOrderId),
+    enabled: queryEnabled,
     refetchInterval: (query) =>
       planningActivityPollInterval(enabled, query.state.data as PlanningSessionPayload | null, backlogAnalyzing),
   });
+  const wasBacklogAnalyzing = useRef(backlogAnalyzing);
+  useEffect(() => {
+    const analysisStopped = wasBacklogAnalyzing.current && !backlogAnalyzing;
+    wasBacklogAnalyzing.current = backlogAnalyzing;
+    if (queryEnabled && analysisStopped) {
+      void refetch();
+    }
+  }, [backlogAnalyzing, queryEnabled, refetch]);
   if (!enabled) {
     return { hasAgentQuestion: false, isWaiting: false, isWorking: false, isAgentWorking: backlogAnalyzing };
   }
