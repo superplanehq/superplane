@@ -4,10 +4,13 @@ import { PanelRight, PanelRightClose, Sparkle } from "lucide-react";
 import { CountButton } from "@/components/examples/c-button-38";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import { CONFIDENCE_SCORE_MAX, confidenceBandForScore, type ConfidenceBand } from "../../lib/confidenceScore";
-import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
+import { CONFIDENCE_ANALYZING_TOOLTIP, ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+
+const FALLBACK_WHY = "The analysis scored how clear this work is.";
 
 const SCORE_TONE: Record<ConfidenceBand, string> = {
   High: "text-success",
@@ -18,6 +21,7 @@ const SCORE_TONE: Record<ConfidenceBand, string> = {
 export function ComposerPlanStack({
   open,
   score,
+  scoreSummary,
   isAnalyzing = false,
   canTogglePlan = true,
   onToggle,
@@ -25,6 +29,7 @@ export function ComposerPlanStack({
 }: {
   open: boolean;
   score?: number;
+  scoreSummary?: string;
   isAnalyzing?: boolean;
   canTogglePlan?: boolean;
   onToggle?: () => void;
@@ -33,7 +38,7 @@ export function ComposerPlanStack({
   return (
     <div className="flex shrink-0 flex-col bg-background pb-1 pt-1" data-testid="split-run-intent-plan-updated">
       <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
-        <ScoreChip score={score} isAnalyzing={isAnalyzing} />
+        <ScoreChip score={score} scoreSummary={scoreSummary} isAnalyzing={isAnalyzing} />
         {canTogglePlan ? <PlanToggle open={open} onToggle={onToggle} /> : null}
         {actions ? (
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
@@ -77,7 +82,15 @@ function PlanToggle({ open, onToggle }: { open: boolean; onToggle?: () => void }
   );
 }
 
-function ScoreChip({ score, isAnalyzing }: { score?: number; isAnalyzing: boolean }) {
+function ScoreChip({
+  score,
+  scoreSummary,
+  isAnalyzing,
+}: {
+  score?: number;
+  scoreSummary?: string;
+  isAnalyzing: boolean;
+}) {
   if (score == null && !isAnalyzing) {
     return null;
   }
@@ -86,31 +99,47 @@ function ScoreChip({ score, isAnalyzing }: { score?: number; isAnalyzing: boolea
     score == null
       ? CREATE_WITH_AGENT_COPY.clarity
       : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
+  const why = score == null ? CONFIDENCE_ANALYZING_TOOLTIP : scoreSummary?.trim() || FALLBACK_WHY;
 
   return (
-    <CountButton
-      type="button"
-      size="sm"
-      tabIndex={-1}
-      aria-label={label}
-      data-testid={score == null ? undefined : "split-run-intent-composer-score"}
-      className="pointer-events-none"
-      countClassName={score == null ? undefined : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)])}
-      count={
-        score == null ? (
-          <ConfidenceAnalyzingIndicator
-            testId="split-run-intent-plan-analyzing"
-            showTooltip={false}
-            decorative
-            className="shrink-0"
-          />
-        ) : (
-          `${score}/${CONFIDENCE_SCORE_MAX}`
-        )
-      }
-    >
-      <Sparkle aria-hidden="true" />
-      {CREATE_WITH_AGENT_COPY.clarity}
-    </CountButton>
+    <Popover>
+      <PopoverTrigger asChild>
+        <CountButton
+          type="button"
+          size="sm"
+          aria-label={label}
+          data-testid={score == null ? undefined : "split-run-intent-composer-score"}
+          countClassName={score == null ? undefined : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)])}
+          count={
+            score == null ? (
+              <ConfidenceAnalyzingIndicator
+                testId="split-run-intent-plan-analyzing"
+                showTooltip={false}
+                decorative
+                className="shrink-0"
+              />
+            ) : (
+              `${score}/${CONFIDENCE_SCORE_MAX}`
+            )
+          }
+        >
+          <Sparkle aria-hidden="true" />
+          {CREATE_WITH_AGENT_COPY.clarity}
+        </CountButton>
+      </PopoverTrigger>
+      <PopoverContent className="z-[80] w-80 gap-0 overflow-hidden p-0" align="start" side="top">
+        <div className="border-b border-primary/10 bg-primary/5 p-2">
+          <div className="flex items-center gap-2 font-semibold text-primary">
+            <Sparkle className="size-4" aria-hidden="true" />
+            <span>{CREATE_WITH_AGENT_COPY.clarity}</span>
+          </div>
+        </div>
+        <div className="space-y-3 p-2">
+          <p className="leading-relaxed text-muted-foreground" data-testid="split-run-intent-confidence-copy">
+            {why}
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
