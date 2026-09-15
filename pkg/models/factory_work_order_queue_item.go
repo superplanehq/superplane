@@ -258,9 +258,14 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 // as cancelled) without using a slot. Returns one result per admitted
 // dispatch, oldest first; empty when nothing was admitted.
 func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*FactoryLineStepResult, error) {
-	line, err := lockFactoryAndLineForAdmission(tx, lineID)
+	factory, line, err := lockFactoryAndLineForAdmission(tx, lineID)
 	if err != nil {
 		return nil, err
+	}
+	// A deleted factory must not start more work. Its leftover queue
+	// items wait for the cleanup worker.
+	if factory == nil {
+		return nil, nil
 	}
 
 	var admitted []*FactoryLineStepResult

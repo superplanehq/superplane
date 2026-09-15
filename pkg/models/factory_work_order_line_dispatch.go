@@ -124,7 +124,8 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 // newcomer joins the back of the queue even if a slot is free (a raised
 // maxParallelism can leave free slots behind queued work). It takes the
 // factory lock and then the line's admission lock, so concurrent decisions
-// cannot both see the last free factory or step slot.
+// cannot both see the last free factory or step slot. A deleted factory
+// admits nothing, so the call fails with ErrFactoryNotFound.
 func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
@@ -134,6 +135,12 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	factory, err := lockFactoryForAdmission(tx, l.FactoryID)
 	if err != nil {
 		return nil, err
+	}
+	// A deleted factory must not start or queue more work. Its lines and
+	// work orders stay until the cleanup worker removes them, so a
+	// traversal can reach this point after the delete commits.
+	if factory == nil {
+		return nil, ErrFactoryNotFound
 	}
 
 	line, err := lockFactoryLineForStepAdmission(tx, l.LineID)
@@ -158,16 +165,12 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 
-	// Without a factory row there is no cap to read and no lock to hold,
-	// so only the step's own parallelism applies.
-	if factory != nil {
-		atFactoryCap, err := factoryAtParallelCapacity(tx, l.OrganizationID, l.FactoryID)
-		if err != nil {
-			return nil, err
-		}
-		if atFactoryCap {
-			return l.enqueueStep(tx, order, stepIndex)
-		}
+	atFactoryCap, err := factoryAtParallelCapacity(tx, l.OrganizationID, l.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	if atFactoryCap {
+		return l.enqueueStep(tx, order, stepIndex)
 	}
 
 	return l.StartStep(tx, order, stepIndex)

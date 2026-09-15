@@ -633,3 +633,41 @@ func Test__StepQueue_DeletedFactoryDoesNotBlockOrganizationAdmission(t *testing.
 	assert.NotNil(t, queueItemForDispatch(t, deletedDispatch.ID))
 	assert.Empty(t, executionsForOrder(t, deletedWaiter.ID))
 }
+
+// Free capacity in a deleted factory must stay unused. Its queue items
+// wait for the cleanup worker, and the step admission pass leaves them
+// alone instead of starting a run for a factory that no longer exists.
+func Test__StepQueue_DeletedFactoryAdmitsNoQueuedStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &one))
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	softDeleteFactory(t, fixture.factory)
+
+	two := 2
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(database.Conn(), r.Organization.ID, &two))
+
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		admitted, err = models.AdmitQueuedForStep(tx, fixture.line.ID, 0)
+		return err
+	}))
+
+	assert.Empty(t, admitted)
+	assert.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
+	assert.Empty(t, executionsForOrder(t, second.ID))
+}

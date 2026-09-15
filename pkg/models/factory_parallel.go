@@ -69,8 +69,9 @@ func ResolveOrganizationFactoryMaxParallelTasks(tx *gorm.DB, orgID uuid.UUID) (i
 // lockFactoryForAdmission takes the factory's admission lock and returns
 // a nil factory when the row is gone. Deleting a factory only soft
 // deletes it, and its lines and queue items stay until the cleanup worker
-// removes them. A missing factory holds no cap, so callers skip it
-// instead of failing the whole admission pass.
+// removes them. A nil factory means "not admissible": no caller starts
+// work for it, and a batch pass skips it instead of failing for every
+// live factory beside it.
 func lockFactoryForAdmission(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
 	var factory Factory
 	err := tx.
@@ -87,21 +88,30 @@ func lockFactoryForAdmission(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error)
 	return &factory, nil
 }
 
-func lockFactoryAndLineForAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
+// lockFactoryAndLineForAdmission takes the factory's admission lock and
+// then the line's, the order every admission path uses. The factory is
+// nil when its row is gone, which makes the line non-admissible.
+func lockFactoryAndLineForAdmission(tx *gorm.DB, lineID uuid.UUID) (*Factory, *FactoryLine, error) {
 	var line FactoryLine
 	err := tx.Where("id = ?", lineID).First(&line).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryLineNotFound
+			return nil, nil, ErrFactoryLineNotFound
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	if _, err := lockFactoryForAdmission(tx, line.FactoryID); err != nil {
-		return nil, err
+	factory, err := lockFactoryForAdmission(tx, line.FactoryID)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return lockFactoryLineForStepAdmission(tx, lineID)
+	locked, err := lockFactoryLineForStepAdmission(tx, lineID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return factory, locked, nil
 }
 
 func countActiveFactoryExecutions(tx *gorm.DB, factoryID uuid.UUID) (int64, error) {

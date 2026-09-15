@@ -280,6 +280,54 @@ func Test__FactoryLine__Dispatch__RejectsLineWithNoSteps(t *testing.T) {
 	assert.ErrorIs(t, err, models.ErrFactoryLineHasNoSteps)
 }
 
+// Deleting a factory only soft deletes it: its lines, work orders and
+// traversals stay until the cleanup worker removes them. A traversal can
+// therefore reach the next step after the delete commits, and it must
+// not start a run for a factory that no longer exists.
+func Test__FactoryWorkOrderLineDispatch__EnqueueOrStartStep__RejectsDeletedFactory(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, _, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	require.NoError(t, factory.SoftDelete(db))
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		_, startErr := dispatch.EnqueueOrStartStep(tx, order, 1)
+		return startErr
+	})
+	assert.ErrorIs(t, err, models.ErrFactoryNotFound)
+
+	executions, err := models.ListFactoryWorkOrderExecutionsByLineDispatchIDs(db, []uuid.UUID{dispatch.ID})
+	require.NoError(t, err)
+	for _, execution := range executions[dispatch.ID] {
+		assert.NotEqual(t, 1, execution.StepIndex, "the deleted factory must start no further step")
+	}
+
+	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{dispatch.ID})
+	require.NoError(t, err)
+	assert.NotContains(t, byDispatch, dispatch.ID, "a rejected step must not leave a queue item behind")
+}
+
 // Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine
 // covers acceptance criterion 3 at the model layer (see also the
 // run_finalizer advancement tests for the end-to-end path): once a
