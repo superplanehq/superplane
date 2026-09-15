@@ -30,6 +30,19 @@ describe("calculateDropdownPosition", () => {
 });
 
 describe("AutoCompleteInput preview toggle", () => {
+  it("normalizes non-string values before measuring the cursor", () => {
+    render(
+      <AutoCompleteInput
+        exampleObj={null}
+        value={42 as unknown as string}
+        onChange={vi.fn()}
+        placeholder="Type here"
+      />,
+    );
+
+    expect(screen.getByRole("textbox")).toHaveValue("42");
+  });
+
   it("shows preview for blank inputs when value preview is enabled", () => {
     render(
       <AutoCompleteInput
