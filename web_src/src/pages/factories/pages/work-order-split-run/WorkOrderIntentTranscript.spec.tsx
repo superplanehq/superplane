@@ -127,7 +127,7 @@ describe("WorkOrderIntentTranscript", () => {
     expect(answer).toHaveTextContent("Reviewer approves by taste");
     expect(answer).toHaveClass("sp-survey-card");
     expect(answer.className).toContain("border");
-    expect(answer.parentElement).toHaveClass("justify-end");
+    expect(answer.parentElement).toHaveClass("justify-end", "py-1.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe("WorkOrderIntentTranscript", () => {
     );
     expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
-    expect(note.parentElement).toHaveClass("justify-end");
+    expect(note.parentElement).toHaveClass("justify-end", "py-1.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
