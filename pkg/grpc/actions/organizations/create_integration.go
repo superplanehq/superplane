@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -129,6 +130,9 @@ func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName st
 	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
 		return false
 	}
+	if sentry.PreferHostedInstall(integrationName, config) {
+		return false
+	}
 	return reg.UseNewSetupFlow(orgID, integrationName)
 }
 
@@ -188,6 +192,8 @@ func syncIntegration(
 	actorUserID string,
 ) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("syncing integration %s", newIntegration.ID)
+
+	sentry.EnableHostedInstallBind(registry.Encryptor)
 
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),

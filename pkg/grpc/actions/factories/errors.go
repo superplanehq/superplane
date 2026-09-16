@@ -9,6 +9,10 @@ import (
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
+	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+		return err
+	}
+
 	switch {
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")

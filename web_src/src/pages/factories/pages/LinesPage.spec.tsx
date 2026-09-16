@@ -25,6 +25,7 @@ import {
   factoryColumnAutomationViewPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -45,6 +46,7 @@ import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
@@ -1027,9 +1029,8 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 
-  it("creates a Sentry intake from the overflow menu when the feature is on", async () => {
+  it("opens guided Sentry setup from the overflow menu when the feature is on", async () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
-    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -1044,14 +1045,48 @@ describe("LinesPage board extras", () => {
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
-    await waitFor(() => {
-      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_SENTRY_EXCEPTIONS" });
+    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Sentry setup from the backlog button when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.setupButton }));
+
+    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+  });
+
+  it("hides the backlog Sentry setup button when the feature is off", () => {
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
+  });
+
+  it("hides the backlog Sentry setup button after Sentry intake exists", () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    useFactoryIntakes.mockReturnValue({
+      data: [
+        {
+          id: SENTRY_INTAKE_ID,
+          canvasId: "app-sentry-intake",
+          name: "Sentry exceptions",
+          source: "SOURCE_SENTRY_EXCEPTIONS",
+          healthy: true,
+        },
+      ],
     });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-new`,
-      );
-    });
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
   });
 
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {

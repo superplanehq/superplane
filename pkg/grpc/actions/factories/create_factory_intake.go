@@ -211,7 +211,7 @@ func createIntakeCanvas(
 		nil,
 	)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
 	canvasID, err := uuid.Parse(response.GetCanvas().GetMetadata().GetId())
