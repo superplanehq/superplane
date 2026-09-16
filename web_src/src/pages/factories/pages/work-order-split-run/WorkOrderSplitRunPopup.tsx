@@ -4,12 +4,12 @@ import { Loader2 } from "lucide-react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
@@ -20,6 +20,7 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import {
   draftStartAction,
@@ -126,7 +127,7 @@ function AnalysisWorkOrderPopup({
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
-  const [fullPage, setFullPage] = useState(false);
+  const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
@@ -179,13 +180,12 @@ function AnalysisWorkOrderPopup({
             titleBusy={edits.titleBusy}
             onTitleSave={(next) => void edits.saveTitle(next)}
             expanded={fullPage}
-            onToggleExpanded={() => setFullPage((current) => !current)}
+            onToggleExpanded={toggleFullPage}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <PopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                onArchive={fixture.footer.kind === "draft" ? mutations.onArchive : undefined}
+                archiveBusy={footerActions.busy}
               />
             }
             accessory={views}
@@ -235,6 +235,7 @@ function analysisPopupReview(args: {
       actionBusy={args.footerBusy}
       startDisabled={!args.canDispatch}
       compact={args.fixture.footer.kind === "draft"}
+      confirmUnclearStart
       modelSelect={analysisDraftStartModelSelect({
         organizationId: args.organizationId,
         factoryId: args.factoryId,
@@ -270,6 +271,7 @@ function analysisDraftStartModelSelect(args: {
       value={args.value}
       onChange={args.onChange}
       disabled={args.disabled}
+      appearance="labeled"
     />
   );
 }

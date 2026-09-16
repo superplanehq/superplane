@@ -17,6 +17,7 @@ import {
   renderIntentDocument,
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 import type { SplitRunSource } from "./splitRunSource";
 
@@ -38,10 +39,12 @@ const GITHUB_SOURCE: SplitRunSource = {
 
 describe("WorkOrderIntentDocument", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     vi.unstubAllGlobals();
     resetStreamMemoryForTests();
   });
@@ -59,11 +62,10 @@ describe("WorkOrderIntentDocument", () => {
     const summary = screen.getByTestId("split-run-intent-summary");
     expect(summary.parentElement).not.toHaveAttribute("data-streaming");
     expect(summary).toHaveTextContent("A person can add a payment method from the empty billing page.");
-    expect(within(summary).getByRole("heading", { name: "Goal" })).toBeInTheDocument();
-    expect(within(summary).getByRole("heading", { name: "Done when" })).toBeInTheDocument();
-    expect(within(summary).getByRole("heading", { name: "Out of scope" })).toBeInTheDocument();
-    expect(within(summary).getByRole("heading", { name: "Key architecture decisions" })).toBeInTheDocument();
-    expect(within(summary).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(summary).getByRole("heading", { name: "Problem" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Proposed outcome" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
+    expect(within(summary).queryByRole("heading", { name: "Scope" })).not.toBeInTheDocument();
     const result = screen.getByTestId("split-run-intent-result");
     const chip = within(result).getByTestId("split-run-intent-confidence-chip");
     expect(chip).toHaveAccessibleName(`${CONFIDENCE_CHECK_NAME} 4/5`);
@@ -72,7 +74,6 @@ describe("WorkOrderIntentDocument", () => {
     expect(
       within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-overview-checks"),
     ).toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
   });
 
   it("reveals the confidence why when the chip is opened", async () => {
@@ -120,15 +121,15 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-review")).toBeNull();
   });
 
-  it("switches to the full plan", async () => {
-    const user = userEvent.setup();
+  it("shows the summary and the full plan", () => {
     renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
 
     expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show full plan" }));
     expect(screen.getByTestId("split-run-intent-plan")).toHaveTextContent("The empty state tells the user");
-    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show full plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide full plan" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-body").querySelector('[data-slot="separator"]')).not.toBeNull();
   });
 
   it("starts the request pane at two fifths width and lets the reader drag the split", () => {
@@ -159,7 +160,8 @@ describe("WorkOrderIntentDocument", () => {
     expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
   });
 
-  it("shows the request as the first chat message on the right", () => {
+  it("shows the request as the first chat message on the right", async () => {
+    const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -177,19 +179,49 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
-    expect(screen.getByTestId("split-run-intent-composer").closest(".sp-user-note")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
+    const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
+    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
+    expect(
+      within(pendingChips).getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix"),
+    ).not.toBeNull();
+    expect(
+      within(pendingChips).getByTestId("split-run-intent-plan-chip-analyzing").querySelector(".t-matrix"),
+    ).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    await user.click(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
+    expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
     expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
     expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show full plan" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-decision")).toHaveClass("min-h-[5.5rem]");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("split-run-intent-resize-handle")).toHaveClass("lg:hidden");
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
+    const columns = screen.getAllByTestId("split-run-intent-chat-column");
+    expect(columns.length).toBeGreaterThanOrEqual(2);
+    for (const column of columns) {
+      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-4");
+    }
+    expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
+    expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
+    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=input-group]")).not.toBeNull();
+    expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
     expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
-    expect(within(screen.getByTestId("split-run-intent-result")).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+    expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
+    const send = screen.getByTestId("split-run-intent-composer-send");
+    expect(send).toHaveAttribute("data-size", "icon-sm");
+    expect(send).toHaveAttribute("aria-label", ANALYSIS_PLANNING_COPY.send);
+    expect(send.children).toHaveLength(1);
   });
 
   it("streams the summary when the spec updates after open", () => {
@@ -214,8 +246,8 @@ describe("WorkOrderIntentDocument", () => {
     );
 
     expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
-    expect(screen.getByRole("heading", { name: "Goal" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Out of scope" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-summary")).toHaveTextContent("A");
+    expect(screen.queryByRole("heading", { name: "Constraints" })).not.toBeInTheDocument();
   });
 
   it("streams the first spec that arrives while the card is open", () => {
@@ -236,7 +268,7 @@ describe("WorkOrderIntentDocument", () => {
     );
 
     expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
-    expect(screen.queryByRole("heading", { name: "Out of scope" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Constraints" })).not.toBeInTheDocument();
   });
 
   it("does not stream when artifacts load after the card opens", () => {
@@ -255,7 +287,7 @@ describe("WorkOrderIntentDocument", () => {
     );
 
     expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
-    expect(screen.getByRole("heading", { name: "Out of scope" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
   });
 
   it("keeps the stored transcript outside the current run activity", () => {

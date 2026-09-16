@@ -26,7 +26,7 @@ export function AgentActivityView({ activity, live = false }: { activity: AgentA
   }
 
   return (
-    <div className="space-y-1 py-1.5" data-testid={`agent-activity-${activity.id}`}>
+    <div className="space-y-0 px-2" data-testid={`agent-activity-${activity.id}`}>
       <ActivityEntries entries={entries} truncated={activity.truncated} />
     </div>
   );
@@ -45,7 +45,7 @@ function CompletedActivity({
   const label = completedActivitySummaryLabel(tools);
 
   return (
-    <div className="space-y-1 py-1.5" data-testid={`agent-activity-${activity.id}`}>
+    <div className="space-y-0 px-2" data-testid={`agent-activity-${activity.id}`}>
       <ActivitySummaryButton
         label={label}
         open={open}
@@ -143,7 +143,7 @@ function ActivitySummaryButton({
       aria-label={label}
       onClick={onToggle}
       data-testid={testId}
-      className="sp-tool-enter flex w-full items-center gap-1 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
+      className="sp-tool-enter flex w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
     >
       <span className="min-w-0 whitespace-normal break-words">
         {running ? <AnimatedThinkingState text={label} /> : label}

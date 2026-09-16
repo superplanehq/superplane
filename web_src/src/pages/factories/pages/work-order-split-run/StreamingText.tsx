@@ -1,9 +1,11 @@
 import { memo, useEffect, useLayoutEffect, useState, type HTMLAttributes, type ReactNode } from "react";
 
-import { prefersReducedMotion, streamGapMs, streamUnits, visibleGeneratedMarkdown } from "@/lib/streamWords";
+import { prefersReducedMotion, streamUnits, visibleGeneratedMarkdown } from "@/lib/streamWords";
 import { cn } from "@/lib/utils";
 
 import { useStreamOnUpdate } from "./useStreamOnUpdate";
+
+export const PLAN_STREAM_GAP_MS = 20;
 
 type StreamingTextProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
   content: string;
@@ -45,7 +47,6 @@ export const StreamingText = memo(function StreamingText({
       return;
     }
     const total = streamUnits(content).length;
-    const gap = streamGapMs();
     const timer = window.setInterval(() => {
       setRevealed((current) => {
         const next = (Number.isFinite(current) ? current : 0) + 1;
@@ -55,7 +56,7 @@ export const StreamingText = memo(function StreamingText({
         }
         return next;
       });
-    }, gap);
+    }, PLAN_STREAM_GAP_MS);
     return () => window.clearInterval(timer);
   }, [content, contentKey, pass]);
 

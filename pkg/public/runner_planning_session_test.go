@@ -41,30 +41,10 @@ func TestRunnerPlanningSessionDraftRouteIsRemoved(t *testing.T) {
 
 func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	r := support.Setup(t)
-	server, signer := mustRunnerLiveLogServer(t, r)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
-
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
-	require.NoError(t, err)
-	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
-		Repository:  "acme/payments",
-		CanvasID:    canvas.ID,
-		CanvasRunID: run.ID,
-		WorkOrderID: order.ID,
-	})
-	require.NoError(t, err)
-
-	token, err := runneraction.MintPlanningSessionToken(signer, runneraction.PlanningSessionScope{
-		OrganizationID: session.OrganizationID,
-		FactoryID:      session.FactoryID,
-		SessionID:      session.ID,
-		CanvasRunID:    *session.CanvasRunID,
-	}, time.Hour)
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
 	spec := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
@@ -93,6 +73,33 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
 	assert.Equal(t, 4.0, checks[0].Score)
+}
+
+func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
+	r := support.Setup(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+		`{"score":2,"summary":"The request is still missing the failing path."}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, 2.0, checks[0].Score)
+	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {

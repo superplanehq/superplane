@@ -1,8 +1,7 @@
 import { memo } from "react";
-import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { ChevronDown } from "lucide-react";
 
 import type { IntentDocument } from "../../lib/intentDocument";
 import { StreamingText } from "./StreamingText";
@@ -15,8 +14,6 @@ type WorkOrderIntentPlanProps = {
   document: IntentDocument;
   streamKey?: string;
   streamReady?: boolean;
-  expanded: boolean;
-  onToggle: () => void;
   isAnalyzing?: boolean;
 };
 
@@ -28,12 +25,11 @@ export function WorkOrderIntentPlan({
   document,
   streamKey,
   streamReady = true,
-  expanded,
-  onToggle,
   isAnalyzing = false,
 }: WorkOrderIntentPlanProps) {
-  const hasPlan = Boolean(document.plan.trim());
-  if (!document.summary.trim() && !hasPlan) {
+  const summary = document.summary.trim();
+  const plan = document.plan.trim();
+  if (!summary && !plan) {
     return (
       <StreamingText content="" memoryKey={streamKey ? `${streamKey}:summary` : undefined} ready={streamReady}>
         {() => (
@@ -50,7 +46,7 @@ export function WorkOrderIntentPlan({
 
   return (
     <div>
-      {document.summary.trim() ? (
+      {summary ? (
         <StreamingText
           content={document.summary}
           memoryKey={streamKey ? `${streamKey}:summary` : undefined}
@@ -61,31 +57,16 @@ export function WorkOrderIntentPlan({
       ) : (
         <p className="text-[13px] text-muted-foreground">{EMPTY_SUMMARY}</p>
       )}
-      {hasPlan ? (
-        <div className="mt-6">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-[13px] text-muted-foreground"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            data-testid="split-run-intent-plan-toggle"
-          >
-            <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} aria-hidden />
-            {expanded ? "Hide full plan" : "Show full plan"}
-          </Button>
-          {expanded ? (
-            <StreamingText
-              content={document.plan}
-              memoryKey={streamKey ? `${streamKey}:plan` : undefined}
-              ready={streamReady}
-              data-testid="split-run-intent-plan-panel"
-            >
-              {(visible) => <SpecMarkdown content={visible} testId="split-run-intent-plan" />}
-            </StreamingText>
-          ) : null}
-        </div>
+      {summary && plan ? <Separator className="my-6" /> : null}
+      {plan ? (
+        <StreamingText
+          content={document.plan}
+          memoryKey={streamKey ? `${streamKey}:plan` : undefined}
+          ready={streamReady}
+          data-testid="split-run-intent-plan-panel"
+        >
+          {(visible) => <SpecMarkdown content={visible} testId="split-run-intent-plan" />}
+        </StreamingText>
       ) : null}
     </div>
   );
