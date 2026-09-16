@@ -70,6 +70,27 @@ test("emits ordered records with stable activity metadata", () => {
   assert.equal(records[8].tool_id, "tool-a");
 });
 
+test("uses provider content timestamps when they are available", () => {
+  const records = [];
+  const stream = createActivityStream({
+    provider: "openrouter",
+    activityId: "provider-timestamps",
+    env: analysisEnvironment(),
+    now: () => 20_000,
+    writeRecord: (record) => records.push(record),
+  });
+
+  stream.startContent("reasoning", "reasoning-1", { startedAt: 5_000 });
+  stream.appendContent("reasoning", "reasoning-1", "Inspecting files");
+  stream.endContent("reasoning-1", { endedAt: 17_500 });
+
+  const start = records.find((record) => record.type === "content_start");
+  const end = records.find((record) => record.type === "content_end");
+  assert.equal(start.started_at, 5_000);
+  assert.equal(end.duration_ms, 12_500);
+  assert.equal(stream.snapshot().items[0].duration_ms, 12_500);
+});
+
 test("normalizes terminal control sequences and carriage-return progress", () => {
   assert.equal(normalizeTerminalText("\u001b[31mfailed\u001b[0m\rworking\rdone\n"), "done\n");
 });
