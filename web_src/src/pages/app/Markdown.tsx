@@ -14,8 +14,10 @@ import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import {
   isReachableWorkOrderFileUrl,
+  isWorkOrderVideoSource,
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
+  workOrderFileContentTypeForSrc,
   workOrderFileDownloadMap,
   type WorkOrderFileRef,
 } from "@/lib/workOrderFiles";
@@ -203,7 +205,7 @@ export function MarkdownContent({
             </MarkdownLink>
           ),
           img: ({ node: _node, ...props }) => (
-            <MarkdownImage fileUrls={fileUrls} hideUntilLoaded={variant === "workspace"} {...props} />
+            <MarkdownImage files={files} fileUrls={fileUrls} hideUntilLoaded={variant === "workspace"} {...props} />
           ),
           blockquote: MarkdownBlockquote,
           code: MarkdownCodeWithDiagrams,
@@ -336,14 +338,24 @@ function MarkdownImage({
   src,
   alt,
   className,
+  files,
   fileUrls,
   hideUntilLoaded,
   node: _node,
   ...props
-}: ComponentProps<"img"> & ExtraProps & { fileUrls?: Record<string, string>; hideUntilLoaded?: boolean }) {
+}: ComponentProps<"img"> &
+  ExtraProps & {
+    files?: WorkOrderFileRef[];
+    fileUrls?: Record<string, string>;
+    hideUntilLoaded?: boolean;
+  }) {
   const resolved = resolveWorkOrderFileSrc(src, fileUrls);
   if (!isReachableWorkOrderFileUrl(resolved)) {
     return <span>{alt?.trim() || "image"}</span>;
+  }
+  const contentType = workOrderFileContentTypeForSrc(src, files) ?? workOrderFileContentTypeForSrc(resolved, files);
+  if (isWorkOrderVideoSource({ contentType, src: resolved, alt })) {
+    return <video src={resolved} className={className} controls playsInline aria-label={alt} />;
   }
   if (hideUntilLoaded) {
     return <WorkspaceMarkdownImage src={resolved} alt={alt} className={className} {...props} />;

@@ -26,6 +26,7 @@ interface WorkOrderDescriptionEditorProps {
   className?: string;
   placeholder?: string;
   fileUrls?: Record<string, string>;
+  fileContentTypes?: Record<string, string>;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   isUploading?: boolean;
   canRemoveImages?: boolean;
@@ -62,6 +63,7 @@ export function WorkOrderDescriptionEditor({
   className,
   placeholder = "Add description…",
   fileUrls,
+  fileContentTypes,
   onUploadFiles,
   isUploading = false,
   canRemoveImages = false,
@@ -191,6 +193,7 @@ export function WorkOrderDescriptionEditor({
     editor.storage.image = {
       ...(editor.storage.image ?? {}),
       downloadUrls: urls,
+      contentTypes: { ...(editor.storage.image?.contentTypes ?? {}), ...(fileContentTypes ?? {}) },
     };
     const isNewEditor = editor !== lastEditorRef.current;
     const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
@@ -219,7 +222,7 @@ export function WorkOrderDescriptionEditor({
     if (tr.docChanged) {
       view.dispatch(tr);
     }
-  }, [editor, fileUrls]);
+  }, [editor, fileUrls, fileContentTypes]);
 
   useEffect(() => {
     if (!editor) {

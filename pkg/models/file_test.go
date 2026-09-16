@@ -22,11 +22,28 @@ func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
+		Filename:       "payload.zip",
+		ContentType:    "application/zip",
+		CreatedByID:    userID,
+	})
+	assert.ErrorIs(t, err, ErrFileContentType)
+}
+
+func TestCreatePendingFileAcceptsVideoContentType(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-video")
+
+	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
 		Filename:       "clip.mp4",
 		ContentType:    "video/mp4",
 		CreatedByID:    userID,
 	})
-	assert.ErrorIs(t, err, ErrFileContentType)
+	require.NoError(t, err)
+	assert.Equal(t, "video/mp4", file.ContentType)
+	assert.True(t, IsInlineVideoContentType(file.ContentType))
 }
 
 func TestCreatePendingFileStoresWorkspaceScope(t *testing.T) {

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { workOrderFileDownloadMap } from "@/lib/workOrderFiles";
+import { workOrderFileContentTypeMap, workOrderFileDownloadMap } from "@/lib/workOrderFiles";
 
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { WorkOrderDescriptionEditor } from "../../WorkOrderDescriptionEditor";
@@ -40,6 +40,7 @@ export function WorkOrderSplitRunDescription({
   const [draft, setDraft] = useState(description);
   const canUpload = Boolean(organizationId && factoryId);
   const fileUrls = useMemo(() => workOrderFileDownloadMap(files), [files]);
+  const fileContentTypes = useMemo(() => workOrderFileContentTypeMap(files), [files]);
   const fileUpload = useWorkOrderFileUpload({
     organizationId: organizationId ?? "",
     factoryId: factoryId ?? "",
@@ -120,6 +121,7 @@ export function WorkOrderSplitRunDescription({
             className="min-h-32 pr-28 text-[13px] leading-[1.625] [&>p:first-child]:mt-0"
             onChange={setDraft}
             fileUrls={fileUrls}
+            fileContentTypes={fileContentTypes}
             onUploadFiles={canUpload ? fileUpload.uploadFiles : undefined}
             isUploading={fileUpload.isUploading}
           />

@@ -20,7 +20,7 @@ const (
 	FileStateReady   = "ready"
 	FileStateFailed  = "failed"
 
-	MaxFileBytes             = 10 << 20
+	MaxFileBytes             = 50 << 20
 	MaxFilesPerWorkOrder     = 20
 	MaxOrganizationFileBytes = 10 << 30
 	MaxFileNameBytes         = 255
@@ -44,6 +44,12 @@ var allowedFileContentTypes = []string{
 	"application/pdf",
 	"text/plain",
 	"text/markdown",
+	"video/mp4",
+	"video/webm",
+	"video/quicktime",
+	"video/ogg",
+	"video/x-m4v",
+	"video/x-matroska",
 }
 
 type File struct {
@@ -115,6 +121,19 @@ func IsInlineImageContentType(contentType string) bool {
 	default:
 		return false
 	}
+}
+
+func IsInlineVideoContentType(contentType string) bool {
+	switch normalizeContentType(contentType) {
+	case "video/mp4", "video/webm", "video/quicktime", "video/ogg", "video/x-m4v", "video/x-matroska":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsInlineMediaContentType(contentType string) bool {
+	return IsInlineImageContentType(contentType) || IsInlineVideoContentType(contentType)
 }
 
 func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {

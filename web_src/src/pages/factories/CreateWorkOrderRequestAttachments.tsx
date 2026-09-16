@@ -71,7 +71,7 @@ export function CreateWorkOrderRequestAttachments({ images, onRemove }: CreateWo
             data-testid={`create-work-order-request-attachment-${image.id}`}
             onClick={() => setExpanded(image)}
           >
-            <img src={image.src} alt="" />
+            {image.isVideo ? <video src={image.src} muted playsInline /> : <img src={image.src} alt="" />}
           </button>
         ))}
       </div>
@@ -182,7 +182,11 @@ function RequestImageExpand({
               <X className="size-3.5" aria-hidden />
             </button>
           </div>
-          <img className="t-resize-img" src={image.src} alt={image.alt} />
+          {image.isVideo ? (
+            <video className="t-resize-img" src={image.src} controls playsInline aria-label={image.alt} />
+          ) : (
+            <img className="t-resize-img" src={image.src} alt={image.alt} />
+          )}
         </div>
       </div>
     </div>,

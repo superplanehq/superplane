@@ -1,18 +1,53 @@
 import type { FilesFile } from "@/api-client";
 
 export const FILE_REF_SCHEME = "sp-file";
-export const MAX_WORK_ORDER_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_WORK_ORDER_FILE_BYTES = 50 * 1024 * 1024;
 export const MAX_WORK_ORDER_FILES = 20;
 
+export const ALLOWED_WORK_ORDER_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+
+export const ALLOWED_WORK_ORDER_VIDEO_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/ogg",
+  "video/x-m4v",
+  "video/x-matroska",
+] as const;
+
 export const ALLOWED_WORK_ORDER_FILE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
+  ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
   "application/pdf",
   "text/plain",
   "text/markdown",
+  ...ALLOWED_WORK_ORDER_VIDEO_TYPES,
 ] as const;
+
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"] as const;
+
+export const WORK_ORDER_FILE_ACCEPT = [
+  ...ALLOWED_WORK_ORDER_FILE_TYPES,
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".pdf",
+  ".txt",
+  ".md",
+  ...VIDEO_EXTENSIONS,
+].join(",");
+
+export const WORK_ORDER_VISUAL_FILE_ACCEPT = [
+  ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
+  ...ALLOWED_WORK_ORDER_VIDEO_TYPES,
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ...VIDEO_EXTENSIONS,
+].join(",");
 
 const previewUrls = new Map<string, string>();
 const downloadUrls = new Map<string, string>();
@@ -36,8 +71,7 @@ export function workOrderFileRef(id: string): string {
 }
 
 export function isAllowedWorkOrderFile(file: File): boolean {
-  const type = normalizeWorkOrderFileType(file.type);
-  return (ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(type) && file.size > 0;
+  return Boolean(workOrderUploadContentType(file)) && file.size > 0;
 }
 
 export function isInlineWorkOrderImage(contentType: string | undefined): boolean {
@@ -52,12 +86,96 @@ export function isInlineWorkOrderImage(contentType: string | undefined): boolean
   }
 }
 
+export function isInlineWorkOrderVideo(contentType: string | undefined): boolean {
+  return (ALLOWED_WORK_ORDER_VIDEO_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
+}
+
+export function isInlineWorkOrderMedia(contentType: string | undefined): boolean {
+  return isInlineWorkOrderImage(contentType) || isInlineWorkOrderVideo(contentType);
+}
+
+export function looksLikeWorkOrderVideoName(name: string | undefined): boolean {
+  const value = (name ?? "").split("?")[0]?.toLowerCase() ?? "";
+  return VIDEO_EXTENSIONS.some((extension) => value.endsWith(extension));
+}
+
+export function isWorkOrderVideoSource(args: { contentType?: string; src?: string; alt?: string }): boolean {
+  if (isInlineWorkOrderVideo(args.contentType)) {
+    return true;
+  }
+  return looksLikeWorkOrderVideoName(args.alt) || looksLikeWorkOrderVideoName(args.src);
+}
+
+export function workOrderUploadContentType(file: File): string {
+  const type = normalizeWorkOrderFileType(file.type);
+  if ((ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(type)) {
+    return type;
+  }
+  return contentTypeFromFilename(file.name);
+}
+
+export function workOrderFileContentTypeMap(files: WorkOrderFileRef[] | undefined): Record<string, string> {
+  const types: Record<string, string> = {};
+  for (const file of files ?? []) {
+    if (file.id && file.contentType) {
+      types[file.id] = file.contentType;
+    }
+  }
+  return types;
+}
+
+export function workOrderFileContentTypeForSrc(
+  src: string | undefined,
+  files?: WorkOrderFileRef[],
+  contentTypes?: Record<string, string>,
+): string | undefined {
+  const id = parseWorkOrderFileId(src);
+  if (id) {
+    return contentTypes?.[id] ?? files?.find((file) => file.id === id)?.contentType;
+  }
+  if (!src) {
+    return undefined;
+  }
+  for (const file of files ?? []) {
+    if (file.downloadUrl && (file.downloadUrl === src || src.startsWith(file.downloadUrl.split("?")[0] ?? ""))) {
+      return file.contentType;
+    }
+  }
+  for (const [fileId, type] of Object.entries(contentTypes ?? {})) {
+    if (src.includes(fileId)) {
+      return type;
+    }
+  }
+  return undefined;
+}
+
 export function normalizeWorkOrderFileType(contentType: string | undefined): string {
   const value = (contentType ?? "").toLowerCase().split(";")[0]?.trim() ?? "";
   if (value === "image/jpg") {
     return "image/jpeg";
   }
+  if (value === "video/x-mp4") {
+    return "video/mp4";
+  }
   return value;
+}
+
+function contentTypeFromFilename(filename: string): string {
+  const name = filename.toLowerCase();
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".gif")) return "image/gif";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".txt")) return "text/plain";
+  if (name.endsWith(".md") || name.endsWith(".markdown")) return "text/markdown";
+  if (name.endsWith(".mp4")) return "video/mp4";
+  if (name.endsWith(".webm")) return "video/webm";
+  if (name.endsWith(".mov")) return "video/quicktime";
+  if (name.endsWith(".ogv") || name.endsWith(".ogg")) return "video/ogg";
+  if (name.endsWith(".m4v")) return "video/x-m4v";
+  if (name.endsWith(".mkv")) return "video/x-matroska";
+  return "";
 }
 
 export function setWorkOrderFilePreviewUrl(id: string, url: string): void {

@@ -91,14 +91,16 @@ States: `pending` → `ready` or `failed`.
 
 Limits:
 
-- Max file size: 10 MiB
+- Max file size: 50 MiB
 - Max files per task: 20 (`pending` plus `ready` on create)
 - Max ready bytes per organization: 10 GiB
 - Max filename: 255 runes
 - Stale pending or failed age: 1 hour
 
 Allowed content types: `image/png`, `image/jpeg`, `image/gif`,
-`image/webp`, `application/pdf`, `text/plain`, `text/markdown`.
+`image/webp`, `application/pdf`, `text/plain`, `text/markdown`,
+`video/mp4`, `video/webm`, `video/quicktime`, `video/ogg`,
+`video/x-m4v`, `video/x-matroska`.
 
 ### APIs
 
@@ -189,6 +191,17 @@ At broker-task build, SuperPlane curls each signed file URL into
 `$SUPERPLANE_TASK_DIR/attachments/` before the model starts. See
 [pkg/components/runner/agent_task.go](../../pkg/components/runner/agent_task.go).
 
+When a task file is a video, SuperPlane then runs two setup steps on the
+runner:
+
+1. **Process video attachments** — `ffmpeg` extracts still frames.
+2. **Transcribe video attachments** — `ffmpeg` extracts audio. `whisper`
+   or `whisper.cpp` writes a transcript when present.
+
+The agent reads frames and the transcript. SuperPlane does not send the
+raw video into the model. The original file stays in `attachments/` and
+stays an `sp-file://` ref for the UI.
+
 Do not inline bytes in `BrokerTaskFile`.
 
 ### Lifecycle
@@ -251,7 +264,7 @@ Keep the schema ready. Do not block these with a new key layout.
 
 - Installation and organization file RPCs and UI
 - `run` scope for canvas-run recordings
-- Video MIME types and direct-to-GCS resumable upload
+- Direct-to-GCS resumable upload
 - Signed PUT from the browser
 - Delete-file RPC
 - Unbind when the user removes a ref from markdown

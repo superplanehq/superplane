@@ -525,6 +525,18 @@ func filenameFromURL(rawURL, contentType string) string {
 			base += ".webp"
 		case "application/pdf":
 			base += ".pdf"
+		case "video/mp4":
+			base += ".mp4"
+		case "video/webm":
+			base += ".webm"
+		case "video/quicktime":
+			base += ".mov"
+		case "video/ogg":
+			base += ".ogv"
+		case "video/x-m4v":
+			base += ".m4v"
+		case "video/x-matroska":
+			base += ".mkv"
 		}
 	}
 	return base
@@ -549,6 +561,18 @@ func normalizeFetchedContentType(header, rawURL string) string {
 		return "image/webp"
 	case ".pdf":
 		return "application/pdf"
+	case ".mp4":
+		return "video/mp4"
+	case ".webm":
+		return "video/webm"
+	case ".mov":
+		return "video/quicktime"
+	case ".ogv", ".ogg":
+		return "video/ogg"
+	case ".m4v":
+		return "video/x-m4v"
+	case ".mkv":
+		return "video/x-matroska"
 	default:
 		return value
 	}
