@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -450,6 +451,70 @@ func FindGitHubIntegrationByAppState(tx *gorm.DB, state string) (*Integration, e
 		Where("app_name = ? AND metadata->>'state' = ?", "github", state).
 		First(&integration).
 		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// FindJiraIntegrationByOAuthState finds the pending Jira connection that
+// started authorization with this CSRF state.
+func FindJiraIntegrationByOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "jira", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ClaimHostedJiraOAuthState finds the pending hosted Jira connection for this
+// CSRF state and removes that state in the same transaction. A later callback
+// with the same state then fails to find the connection. The returned
+// integration still holds the claimed state in memory so this request can
+// finish authorization.
+func ClaimHostedJiraOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("app_name = ? AND metadata->>'state' = ?", "jira", state).
+			First(&integration).Error; err != nil {
+			return err
+		}
+
+		data := maps.Clone(integration.Metadata.Data())
+		if data == nil {
+			return gorm.ErrRecordNotFound
+		}
+		hosted, _ := data["hostedOAuth"].(bool)
+		current, _ := data["state"].(string)
+		if !hosted || current == "" || current != state {
+			return gorm.ErrRecordNotFound
+		}
+
+		persisted := maps.Clone(data)
+		delete(persisted, "state")
+		integration.Metadata = datatypes.NewJSONType(persisted)
+		if err := inner.Save(&integration).Error; err != nil {
+			return err
+		}
+
+		data["state"] = state
+		integration.Metadata = datatypes.NewJSONType(data)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

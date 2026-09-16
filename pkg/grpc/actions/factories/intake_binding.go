@@ -11,6 +11,7 @@ import (
 )
 
 const intakeGitHubAppName = "github"
+const intakeJiraAppName = "jira"
 const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
 
@@ -65,6 +66,9 @@ func resolveIntakeBinding(
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return resolveSentryIntakeBinding(tx, factory, integrationID, resourceID)
 	}
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
+	}
 	if source != models.FactoryIntakeSourceGitHubIssues {
 		return nil, nil
 	}
@@ -85,6 +89,47 @@ func resolveIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"repository": config.BacklogRepository},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveJiraIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	projectKey string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	projectKey = strings.TrimSpace(projectKey)
+	if integrationID == "" && projectKey == "" {
+		return nil, nil
+	}
+	if integrationID == "" || projectKey == "" {
+		return nil, invalidArgument("Jira integration and project are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Jira integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Jira integration was not found")
+	}
+	if integration.AppName != intakeJiraAppName {
+		return nil, invalidArgument("selected integration is not Jira")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Jira integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"project": projectKey},
 		Installation:  integration,
 	}, nil
 }

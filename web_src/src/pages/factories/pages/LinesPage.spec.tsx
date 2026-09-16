@@ -11,7 +11,11 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CREATE_WITH_AGENT,
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_JIRA_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -264,6 +268,10 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
 vi.mock("./ProductiveIntakeSetupDialog", () => ({
   ProductiveIntakeSetupDialog: ({ open }: { open: boolean }) =>
     open ? <div data-testid="productive-intake-setup" /> : null,
+}));
+
+vi.mock("./JiraIntakeSetupDialog", () => ({
+  JiraIntakeSetupDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="jira-intake-setup" /> : null),
 }));
 
 async function resetLinesBoardMocks() {
@@ -1039,6 +1047,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
@@ -1089,6 +1098,24 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
   });
 
+  it("opens guided Jira setup from the overflow menu when the feature is on", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
+    expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {
     enabledExperimentalFeatures.add("factory_productive_intake");
     const user = userEvent.setup();
@@ -1100,14 +1127,16 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     expect(screen.getByTestId("productive-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("offers both extra sources when the Sentry and Productive.io features are on", async () => {
+  it("offers extra sources when the Sentry, Jira, and Productive.io features are on", async () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     enabledExperimentalFeatures.add("factory_productive_intake");
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
@@ -1116,6 +1145,7 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
   });
