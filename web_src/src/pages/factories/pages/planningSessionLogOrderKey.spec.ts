@@ -382,4 +382,28 @@ describe("mergePlanningSessionNotes ordering by orderKey", () => {
 
     expect(merged.map((line) => line.id)).toEqual(["wait", "error", "user-1"]);
   });
+
+  it("collapses propose_plan tool output", () => {
+    const groups = groupPlanningSessionLog([
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: "Analyze and score",
+      }),
+      note({
+        id: "plan",
+        noteParentId: "agent-step-1",
+        componentType: "mcp__superplane__propose_plan",
+        componentName: '{"body":"# Retry refunds","score":4,"summary":"Clear"}',
+      }),
+    ]);
+
+    expect(groups[0]?.events.map((event) => event.kind)).toEqual(["tools"]);
+    expect(groups[0]?.events[0]).toEqual(
+      expect.objectContaining({
+        kind: "tools",
+        tools: [expect.objectContaining({ id: "plan" })],
+      }),
+    );
+  });
 });
