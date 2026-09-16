@@ -101,6 +101,7 @@ describe("FactoriesHarness tasks", () => {
     expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("factory-app-more-options")).toBeInTheDocument();
     expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
   }, 15000);
 
   it("opens an edit session in factory Configure", async () => {
