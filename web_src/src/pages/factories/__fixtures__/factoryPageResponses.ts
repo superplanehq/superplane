@@ -18,6 +18,7 @@ import type {
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
@@ -357,6 +358,8 @@ export interface FactoriesFixture {
   pullRequestsByOrderId?: Record<string, FactoriesFactoryPullRequest[]>;
   /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
+  /** Storybook-only refine-chat sessions for `GET …/work-orders/{id}/planning-session`. */
+  planningSessionsByWorkOrderId?: Record<string, PlanningSessionPayload>;
   /** Storybook-only intake items for the Backlog create search. */
   intakeItemCatalog?: BacklogIntakeItemCatalog;
 }
