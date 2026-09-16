@@ -1489,6 +1489,8 @@ describe("LinesPage board editing", () => {
 
     await user.click(screen.getByTestId("lines-done-menu"));
     await user.click(screen.getByTestId("lines-done-menu-sort-created"));
+    await user.click(screen.getByTestId("lines-done-menu-sort-direction-asc"));
+    await user.click(screen.getByTestId("lines-done-menu-filter-completed"));
 
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });

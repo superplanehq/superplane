@@ -270,17 +270,22 @@ describe("ColumnLaneMenu", () => {
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     expect(screen.getByText("Sort by")).toBeInTheDocument();
+    expect(screen.getByText("Order")).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-menu-0-sort-updated")).toHaveTextContent("Newest activity");
     expect(screen.getByTestId("lines-phase-menu-0-sort-created")).toHaveTextContent("Created time");
+    expect(screen.getByTestId("lines-phase-menu-0-sort-direction-desc")).toHaveTextContent("Newest first");
+    expect(screen.getByTestId("lines-phase-menu-0-sort-direction-asc")).toHaveTextContent("Oldest first");
     expect(screen.queryByTestId("lines-phase-menu-0-sort-result")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-phase-menu-0-sort-confidence")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-menu-0-filter-completed")).not.toBeInTheDocument();
   });
 
   it("offers Backlog and Done options only on those columns", async () => {
     const onSortChange = vi.fn();
+    const onSortDirectionChange = vi.fn();
     const user = userEvent.setup();
 
-    const { rerender } = render(
+    render(
       <MemoryRouter>
         <ColumnLaneMenu
           title="Backlog"
@@ -289,25 +294,46 @@ describe("ColumnLaneMenu", () => {
           colorId={null}
           onColorChange={vi.fn()}
           onSortChange={onSortChange}
+          onSortDirectionChange={onSortDirectionChange}
         />
       </MemoryRouter>,
     );
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.getByTestId("lines-backlog-menu-sort-confidence")).toHaveTextContent("Confidence score");
+    expect(screen.getByTestId("lines-backlog-menu-sort-direction-desc")).toHaveTextContent("Newest first");
     expect(screen.queryByTestId("lines-backlog-menu-sort-completed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-filter-completed")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("lines-backlog-menu-sort-created"));
     expect(onSortChange).toHaveBeenCalledWith("created");
+    await user.click(screen.getByTestId("lines-backlog-menu-sort-direction-asc"));
+    expect(onSortDirectionChange).toHaveBeenCalledWith("asc");
+  });
 
-    rerender(
+  it("offers Done result filters", async () => {
+    const onFilterChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
       <MemoryRouter>
-        <ColumnLaneMenu title="Done" testId="lines-done-menu" columnKey="done" colorId={null} onColorChange={vi.fn()} />
+        <ColumnLaneMenu
+          title="Done"
+          testId="lines-done-menu"
+          columnKey="done"
+          colorId={null}
+          onColorChange={vi.fn()}
+          onFilterChange={onFilterChange}
+        />
       </MemoryRouter>,
     );
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.getByTestId("lines-done-menu-sort-completed")).toHaveTextContent("Completed time");
     expect(screen.getByTestId("lines-done-menu-sort-result")).toHaveTextContent("Result");
+    expect(screen.getByTestId("lines-done-menu-filter-completed")).toHaveTextContent("Completed");
+    expect(screen.getByTestId("lines-done-menu-filter-failed")).toHaveTextContent("Failed");
     expect(screen.queryByTestId("lines-done-menu-sort-confidence")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-done-menu-filter-completed"));
+    expect(onFilterChange).toHaveBeenCalledWith("completed");
   });
 });

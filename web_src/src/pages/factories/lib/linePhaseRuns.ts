@@ -6,7 +6,13 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
-import { compareLineOrders, compareLinePhaseRuns, type LineColumnSortId } from "./lineColumnSort";
+import {
+  compareLineOrders,
+  compareLinePhaseRuns,
+  type LineColumnSortDirection,
+  type LineColumnSortId,
+  type LinePhaseColumnSort,
+} from "./lineColumnSort";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -92,7 +98,7 @@ export function buildLinePhaseBoard(
   line: FactoriesFactoryLine,
   workOrders: FactoriesWorkOrder[],
   apps: Array<{ id?: string; name?: string }> = [],
-  phaseSorts: Readonly<Record<number, LineColumnSortId>> = {},
+  phaseSorts: Readonly<Record<number, LineColumnSortId | LinePhaseColumnSort>> = {},
 ): LinePhaseColumn[] {
   const lineId = line.id;
   const steps = line.steps ?? [];
@@ -136,10 +142,11 @@ export function collectLineBacklogOrders(
   workOrders: FactoriesWorkOrder[],
   sort: LineColumnSortId = "updated",
   confidenceByOrderId?: ReadonlyMap<string, number | undefined>,
+  direction: LineColumnSortDirection = "desc",
 ): FactoriesWorkOrder[] {
   return workOrders
     .filter(isLineBacklogOrder)
-    .sort((left, right) => compareLineOrders(sort, left, right, confidenceByOrderId));
+    .sort((left, right) => compareLineOrders(sort, left, right, confidenceByOrderId, direction));
 }
 
 /**
@@ -154,6 +161,7 @@ export function collectLineDoneOrders(
   line: FactoriesFactoryLine,
   board: LinePhaseColumn[] = [],
   sort: LineColumnSortId = "updated",
+  direction: LineColumnSortDirection = "desc",
 ): FactoriesWorkOrder[] {
   const doneById = new Map<string, FactoriesWorkOrder>();
 
@@ -178,13 +186,14 @@ export function collectLineDoneOrders(
     }
   }
 
-  return [...doneById.values()].sort((left, right) => compareLineOrders(sort, left, right));
+  return [...doneById.values()].sort((left, right) => compareLineOrders(sort, left, right, undefined, direction));
 }
 
 /** Open work that waits for review after the last stage passed. Newest first. */
 export function collectLineVerifyOrders(
   board: LinePhaseColumn[],
   sort: LineColumnSortId = "updated",
+  direction: LineColumnSortDirection = "desc",
 ): FactoriesWorkOrder[] {
   const lastStage = lineStageColumns(board).at(-1);
   if (!lastStage) {
@@ -199,7 +208,7 @@ export function collectLineVerifyOrders(
     verifyById.set(run.order.id, run.order);
   }
 
-  return [...verifyById.values()].sort((left, right) => compareLineOrders(sort, left, right));
+  return [...verifyById.values()].sort((left, right) => compareLineOrders(sort, left, right, undefined, direction));
 }
 
 function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
@@ -318,17 +327,24 @@ function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
-  phaseSorts: Readonly<Record<number, LineColumnSortId>>,
+  phaseSorts: Readonly<Record<number, LineColumnSortId | LinePhaseColumnSort>>,
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
     appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
   for (const [stepIndex, runs] of runsByStep.entries()) {
-    const sort = phaseSorts[stepIndex] ?? "updated";
-    runs.sort((left, right) => compareLinePhaseRuns(sort, left, right));
+    const spec = resolvePhaseColumnSort(phaseSorts[stepIndex]);
+    runs.sort((left, right) => compareLinePhaseRuns(spec.sort, left, right, spec.direction));
   }
   return runsByStep;
+}
+
+function resolvePhaseColumnSort(value: LineColumnSortId | LinePhaseColumnSort | undefined): LinePhaseColumnSort {
+  if (typeof value === "string") {
+    return { sort: value, direction: "desc" };
+  }
+  return { sort: value?.sort ?? "updated", direction: value?.direction ?? "desc" };
 }
 
 function executionStepIndex(execution: FactoriesWorkOrderExecution): number | undefined {

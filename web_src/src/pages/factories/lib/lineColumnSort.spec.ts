@@ -3,14 +3,19 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import {
+  LINE_COLUMN_FILTER_LABELS,
   LINE_COLUMN_SORT_LABELS,
   LINE_COLUMN_SORT_STORAGE_KEY,
   LINE_COLUMN_SORTS,
+  allowedFiltersForColumn,
   allowedSortsForColumn,
   compareLineOrders,
   compareLinePhaseRuns,
   confidenceScoresFromCheckQueries,
+  filterLineColumnOrders,
+  lineColumnSortDirectionLabels,
   readStoredLineColumnSorts,
+  resolveLineColumnFilter,
   resolveLineColumnSort,
   useLineColumnSortPreference,
 } from "./lineColumnSort";
@@ -35,6 +40,11 @@ describe("lineColumnSort", () => {
     expect(allowedSortsForColumn("phase-0")).toEqual(LINE_COLUMN_SORTS.phase);
     expect(allowedSortsForColumn("phase-2")).toEqual(["updated", "created"]);
     expect(LINE_COLUMN_SORT_LABELS.updated).toBe("Newest activity");
+    expect(allowedFiltersForColumn("done")).toEqual(["all", "completed", "failed", "rejected"]);
+    expect(allowedFiltersForColumn("backlog")).toEqual(["all"]);
+    expect(LINE_COLUMN_FILTER_LABELS.completed).toBe("Completed");
+    expect(lineColumnSortDirectionLabels("created")).toEqual({ desc: "Newest first", asc: "Oldest first" });
+    expect(lineColumnSortDirectionLabels("confidence")).toEqual({ desc: "High to low", asc: "Low to high" });
   });
 
   it("falls back to newest activity for unknown or disallowed ids", () => {
@@ -43,6 +53,9 @@ describe("lineColumnSort", () => {
     expect(resolveLineColumnSort("done", "confidence")).toBe("updated");
     expect(resolveLineColumnSort("phase-1", "result")).toBe("updated");
     expect(resolveLineColumnSort("backlog", "confidence")).toBe("confidence");
+    expect(resolveLineColumnFilter("done", "completed")).toBe("completed");
+    expect(resolveLineColumnFilter("backlog", "completed")).toBe("all");
+    expect(resolveLineColumnFilter("done", "compact")).toBe("all");
   });
 
   it("sorts created time from work order createdAt newest first", () => {
@@ -59,6 +72,7 @@ describe("lineColumnSort", () => {
 
     expect(compareLineOrders("created", older, newer)).toBeGreaterThan(0);
     expect(compareLineOrders("updated", older, newer)).toBeLessThan(0);
+    expect(compareLineOrders("created", older, newer, undefined, "asc")).toBeLessThan(0);
   });
 
   it("sorts completed time from closed updatedAt newest first", () => {
@@ -83,6 +97,26 @@ describe("lineColumnSort", () => {
 
     const sorted = [completed, failed, rejected].sort((left, right) => compareLineOrders("result", left, right));
     expect(sorted.map((entry) => entry.id)).toEqual(["wo-failed", "wo-rejected", "wo-completed"]);
+
+    const reversed = [completed, failed, rejected].sort((left, right) =>
+      compareLineOrders("result", left, right, undefined, "asc"),
+    );
+    expect(reversed.map((entry) => entry.id)).toEqual(["wo-completed", "wo-rejected", "wo-failed"]);
+  });
+
+  it("filters Done orders by result", () => {
+    const failed = order({ id: "wo-failed", state: "STATE_CLOSED", result: "RESULT_FAILED" });
+    const rejected = order({ id: "wo-rejected", state: "STATE_CLOSED", result: "RESULT_REJECTED" });
+    const completed = order({ id: "wo-completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" });
+
+    expect(filterLineColumnOrders([failed, rejected, completed], "all").map((entry) => entry.id)).toEqual([
+      "wo-failed",
+      "wo-rejected",
+      "wo-completed",
+    ]);
+    expect(filterLineColumnOrders([failed, rejected, completed], "completed").map((entry) => entry.id)).toEqual([
+      "wo-completed",
+    ]);
   });
 
   it("sorts confidence high to low and puts missing scores last", () => {
@@ -97,6 +131,11 @@ describe("lineColumnSort", () => {
 
     const sorted = [missing, low, high].sort((left, right) => compareLineOrders("confidence", left, right, scores));
     expect(sorted.map((entry) => entry.id)).toEqual(["wo-high", "wo-low", "wo-missing"]);
+
+    const lowFirst = [missing, high, low].sort((left, right) =>
+      compareLineOrders("confidence", left, right, scores, "asc"),
+    );
+    expect(lowFirst.map((entry) => entry.id)).toEqual(["wo-low", "wo-high", "wo-missing"]);
   });
 
   it("sorts phase created time from the work order, not the execution", () => {
@@ -113,6 +152,7 @@ describe("lineColumnSort", () => {
 
     expect(compareLinePhaseRuns("created", olderOrder, newerOrder)).toBeGreaterThan(0);
     expect(compareLinePhaseRuns("updated", olderOrder, newerOrder)).toBeLessThan(0);
+    expect(compareLinePhaseRuns("created", olderOrder, newerOrder, "asc")).toBeLessThan(0);
   });
 
   it("keeps updated order while confidence queries are pending", () => {
@@ -135,13 +175,16 @@ describe("lineColumnSort", () => {
       LINE_COLUMN_SORT_STORAGE_KEY,
       JSON.stringify({ "line-1": { backlog: "created", done: "updated", verify: "confidence" } }),
     );
-    expect(readStoredLineColumnSorts("line-1")).toEqual({ backlog: "created" });
+    expect(readStoredLineColumnSorts("line-1")).toEqual({
+      backlog: { sort: "created", direction: "desc", filter: "all" },
+    });
   });
 
   it("stores non-default sorts per line and column", () => {
     const { result } = renderHook(() => useLineColumnSortPreference("line-1"));
 
     expect(result.current.sortFor("backlog")).toBe("updated");
+    expect(result.current.viewFor("backlog")).toEqual({ sort: "updated", direction: "desc", filter: "all" });
     expect(window.localStorage.getItem(LINE_COLUMN_SORT_STORAGE_KEY)).toBeNull();
 
     act(() => {
@@ -151,15 +194,18 @@ describe("lineColumnSort", () => {
     expect(result.current.sortFor("backlog")).toBe("confidence");
     expect(result.current.sortFor("done")).toBe("result");
     expect(JSON.parse(window.localStorage.getItem(LINE_COLUMN_SORT_STORAGE_KEY) ?? "{}")).toEqual({
-      "line-1": { backlog: "confidence", done: "result" },
+      "line-1": { backlog: { sort: "confidence" }, done: { sort: "result" } },
     });
 
     act(() => {
       result.current.setSort("backlog", "updated");
+      result.current.setDirection("done", "asc");
+      result.current.setFilter("done", "completed");
     });
     expect(result.current.sortFor("backlog")).toBe("updated");
+    expect(result.current.viewFor("done")).toEqual({ sort: "result", direction: "asc", filter: "completed" });
     expect(JSON.parse(window.localStorage.getItem(LINE_COLUMN_SORT_STORAGE_KEY) ?? "{}")).toEqual({
-      "line-1": { done: "result" },
+      "line-1": { done: { sort: "result", direction: "asc", filter: "completed" } },
     });
   });
 });

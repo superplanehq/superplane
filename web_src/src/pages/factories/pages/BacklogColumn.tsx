@@ -16,7 +16,7 @@ import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
-import type { LineColumnSortId } from "../lib/lineColumnSort";
+import type { LineColumnSortDirection, LineColumnSortId } from "../lib/lineColumnSort";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -42,6 +42,8 @@ export type BacklogColumnProps = {
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   sortId?: LineColumnSortId;
   onSortChange?: (sortId: LineColumnSortId) => void;
+  sortDirection?: LineColumnSortDirection;
+  onSortDirectionChange?: (direction: LineColumnSortDirection) => void;
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -88,6 +90,8 @@ export function BacklogColumn({
   onColorChange,
   sortId,
   onSortChange,
+  sortDirection,
+  onSortDirectionChange,
   canCreateWorkOrder,
   canRename,
   onRename,
@@ -154,6 +158,8 @@ export function BacklogColumn({
             onColorChange={onColorChange}
             sortId={sortId}
             onSortChange={onSortChange}
+            sortDirection={sortDirection}
+            onSortDirectionChange={onSortDirectionChange}
           />
         }
         subheader={columnAutomationRowsSubheader({
@@ -200,6 +206,8 @@ function BacklogColumnHeaderActions({
   onColorChange,
   sortId,
   onSortChange,
+  sortDirection,
+  onSortDirectionChange,
 }: Pick<
   BacklogColumnProps,
   | "title"
@@ -212,6 +220,8 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
   | "sortId"
   | "onSortChange"
+  | "sortDirection"
+  | "onSortDirectionChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
   onRefreshBacklog?: () => void;
@@ -240,6 +250,8 @@ function BacklogColumnHeaderActions({
         onColorChange={onColorChange}
         sortId={sortId}
         onSortChange={onSortChange}
+        sortDirection={sortDirection}
+        onSortDirectionChange={onSortDirectionChange}
       />
     </div>
   );

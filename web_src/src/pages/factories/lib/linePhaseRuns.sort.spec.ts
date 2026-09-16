@@ -77,6 +77,10 @@ describe("linePhaseRuns column sort", () => {
 
     const byCreated = buildLinePhaseBoard(LINE, [olderCreated, newerCreated], APPS, { 0: "created" });
     expect(byCreated[0].runs.map((run) => run.workOrderId)).toEqual(["wo-new", "wo-old"]);
+    const byOldestCreated = buildLinePhaseBoard(LINE, [olderCreated, newerCreated], APPS, {
+      0: { sort: "created", direction: "asc" },
+    });
+    expect(byOldestCreated[0].runs.map((run) => run.workOrderId)).toEqual(["wo-old", "wo-new"]);
     expect(byCreated[1].runs).toEqual([]);
   });
 
@@ -100,6 +104,10 @@ describe("linePhaseRuns column sort", () => {
     expect(collectLineBacklogOrders([older, newer], "created").map((entry) => entry.id)).toEqual([
       "wo-newer",
       "wo-older",
+    ]);
+    expect(collectLineBacklogOrders([older, newer], "created", undefined, "asc").map((entry) => entry.id)).toEqual([
+      "wo-older",
+      "wo-newer",
     ]);
   });
 
