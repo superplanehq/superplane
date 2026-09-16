@@ -149,6 +149,18 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
+	models.FactoryIntakeSourceJiraIssues: {
+		name:             "Jira issues",
+		description:      "Create a work order when a Jira issue is created or updated.",
+		triggerComponent: "jira.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"events": intakeTriggerEventsFor(defaultJiraIntakeSettings()),
+		},
+		analysisSubject:   "Jira issue",
+		createTitle:       `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
+		createDescription: `{{ root().data.issue.fields.description }}`,
+	},
 }
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {
@@ -197,14 +209,18 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	edges := []yaml.Edge{}
 	createY := 260
 
-	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+	if intakeSourceHasFilterNode(request.Source) {
+		settings := defaultIntakeSettings()
+		if request.Source == models.FactoryIntakeSourceJiraIssues {
+			settings = defaultJiraIntakeSettings()
+		}
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
 			Type:      yaml.NodeTypeAction,
 			Component: intakeFilterComponent,
 			Configuration: map[string]any{
-				"expression": intakeFilterExpressionFor(request.Source, defaultIntakeSettings()),
+				"expression": intakeFilterExpressionFor(request.Source, settings),
 			},
 			Concurrency: intakeConcurrency(),
 			Position:    yaml.Position{X: 160, Y: 260},

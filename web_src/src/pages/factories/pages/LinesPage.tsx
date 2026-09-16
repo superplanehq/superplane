@@ -145,6 +145,7 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
   ADD_INTAKE_TEMPLATES,
@@ -248,7 +249,7 @@ export function LinesPage() {
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
   const addIntakeTemplates = useMemo(() => {
-    const allowedIds = new Set(["github-issues"]);
+    const allowedIds = new Set(["github-issues", "jira-issues"]);
     if (canAddSentryIntake) {
       allowedIds.add("sentry-exceptions");
     }
@@ -257,10 +258,10 @@ export function LinesPage() {
     }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
   }, [canAddSentryIntake, canAddProductiveIntake]);
-  // The menu entry only pays off once a source beyond the default GitHub issues is available.
-  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake;
+  const canAddIntakeFromMenu = true;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
+  const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -401,6 +402,10 @@ export function LinesPage() {
       setProductiveIntakeSetupOpen(true);
       return;
     }
+    if (template.id === "jira-issues") {
+      setJiraIntakeSetupOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -467,6 +472,12 @@ export function LinesPage() {
         organizationId={organizationId}
         factoryId={factoryId}
         onClose={() => setProductiveIntakeSetupOpen(false)}
+      />
+      <JiraIntakeSetupDialog
+        open={jiraIntakeSetupOpen}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        onClose={() => setJiraIntakeSetupOpen(false)}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -26,6 +28,9 @@ const (
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
+
+	// intakeJiraIssuePayloadType is the payload type the Jira trigger emits.
+	intakeJiraIssuePayloadType = jira.IssueEventPayloadType
 )
 
 type intakeSeedResult struct {
@@ -56,6 +61,8 @@ func seedIntake(
 		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceProductiveTasks:
 		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceJiraIssues:
+		return seedJiraIssues(deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -171,6 +178,30 @@ func seedGitHubIssues(
 	return intakeSeedResult{itemCount: len(payloads)}, nil
 }
 
+func seedJiraIssues(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeJiraClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	projectKey, _ := binding.Configuration["project"].(string)
+	payloads, err := newestJiraIssueEvents(client, projectKey, intakeSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	if err := emitIntakeEvents(tx, canvasID, intakeJiraIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
 func seedProductiveTasks(
 	deps IntakeDependencies,
 	tx *gorm.DB,
@@ -224,6 +255,28 @@ func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *mo
 	client, err := common.NewClient(integrationContext, deps.Registry.HTTPContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to build GitHub client: %w", err)
+	}
+
+	return client, nil
+}
+
+func newIntakeJiraClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*jira.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := jira.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Jira client: %w", err)
 	}
 
 	return client, nil
@@ -290,6 +343,64 @@ func gitHubIssueEvents(issues []*github.Issue, repository string) ([]map[string]
 // gitHubIssueEvent converts an issue from the API into the body of an "issues"
 // webhook. The generated graph reads titles, bodies, labels, and assignees out
 // of that shape.
+func newestJiraIssueEvents(client *jira.Client, projectKey string, limit int) ([]map[string]any, error) {
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		return nil, fmt.Errorf("project is required")
+	}
+
+	jql := fmt.Sprintf(`project = "%s" AND resolution = Unresolved ORDER BY created DESC`, jiraQuotedProjectKey(projectKey))
+	hits, err := client.SearchIssues(jql, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list the issues of project %s: %w", projectKey, err)
+	}
+
+	return jiraIssueEvents(client, hits)
+}
+
+func jiraIssueEvents(client *jira.Client, hits []jira.IssueSearchHit) ([]map[string]any, error) {
+	events := make([]map[string]any, 0, len(hits))
+	for _, hit := range hits {
+		event, err := jiraIssueEvent(client, hit.Key)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	slices.Reverse(events)
+	return events, nil
+}
+
+func jiraIssueEvent(client *jira.Client, issueKey string) (map[string]any, error) {
+	issue, err := client.GetIssue(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
+	}
+
+	event := jira.IssueEvent{
+		Action: "created",
+		Issue:  issue,
+	}
+
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode issue event: %w", err)
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return nil, fmt.Errorf("failed to read issue event: %w", err)
+	}
+
+	return payload, nil
+}
+
+func jiraQuotedProjectKey(projectKey string) string {
+	escaped := strings.ReplaceAll(projectKey, `\`, `\\`)
+	return strings.ReplaceAll(escaped, `"`, `\"`)
+}
+
 func gitHubIssueEvent(issue *github.Issue, repository string) (map[string]any, error) {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
