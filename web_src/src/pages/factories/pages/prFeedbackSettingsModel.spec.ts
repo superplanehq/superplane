@@ -118,6 +118,51 @@ describe("activePRFeedbackWorkOrderIds", () => {
     ).toEqual(new Set());
   });
 
+  it("labels concurrent custom automation activity with its description", () => {
+    const pullRequests: FactoriesFactoryPullRequest[] = [
+      {
+        workOrderId: "wo-custom",
+        activities: [
+          {
+            access: "concurrent",
+            state: "active",
+            description: "Creating an ephemeral environment",
+            run: run({ id: "r-custom", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+    ];
+
+    expect(waitingOnChecksWorkOrderIds(pullRequests)).toEqual(new Set());
+    expect(addressingFeedbackWorkOrderIds(pullRequests)).toEqual(new Set(["wo-custom"]));
+    expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-custom")).toBe(
+      "Creating an ephemeral environment",
+    );
+    expect(checksPassedWorkOrderIds(pullRequests)).toEqual(new Set());
+    expect(fixesPausedWorkOrderIds(pullRequests)).toEqual(new Set());
+  });
+
+  it("labels exclusive custom automation activity with its description", () => {
+    expect(
+      addressingFeedbackLabelsByWorkOrder(
+        [
+          {
+            workOrderId: "wo-custom",
+            activities: [
+              {
+                access: "exclusive",
+                state: "active",
+                description: "Deploying preview changes",
+                run: run({ id: "r-custom", state: "STATE_STARTED", canvasId: "app-custom" }),
+              },
+            ],
+          },
+        ],
+        new Set(),
+      ).get("wo-custom"),
+    ).toBe("Deploying preview changes");
+  });
+
   it("does not treat a concurrent check wait as addressing feedback", () => {
     const pullRequests: FactoriesFactoryPullRequest[] = [
       {

@@ -12,6 +12,7 @@ import {
   columnAutomationsNeedRepair,
   columnTitleForKey,
   isColumnKey,
+  onlyCustomCatalogRemains,
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
@@ -220,6 +221,46 @@ describe("buildColumnAutomations", () => {
       }),
     ]);
   });
+
+  it("appends custom canvases attached to Verify or Done", () => {
+    const verify = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+    });
+    const done = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [
+        { id: "app-pr-closure", name: "PR Closure" },
+        { id: "app-destroy-env", name: "Destroy env", columnKey: "done" },
+      ],
+    });
+
+    expect(verify).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "Create env",
+        trigger: "On a trigger you choose",
+        canvasId: "app-create-env",
+      }),
+    ]);
+    expect(done.map((automation) => automation.kind)).toEqual(["pr-closure", "custom"]);
+    expect(done[1]).toMatchObject({ name: "Destroy env", canvasId: "app-destroy-env" });
+  });
+
+  it("keeps a custom Done canvas named PR Closure off the built-in type", () => {
+    const automations = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [{ id: "app-custom-close", name: "PR Closure", columnKey: "done" }],
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "PR Closure",
+        canvasId: "app-custom-close",
+      }),
+    ]);
+  });
 });
 
 describe("catalogForColumn", () => {
@@ -236,7 +277,11 @@ describe("catalogForColumn", () => {
   });
 
   it("offers discussion and status-check setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks", "custom"]);
+  });
+
+  it("offers pull request closure and a custom canvas in the done catalog", () => {
+    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure", "custom"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {
@@ -248,6 +293,23 @@ describe("catalogForColumn", () => {
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
     expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom"]);
+  });
+});
+
+describe("onlyCustomCatalogRemains", () => {
+  it("is true when every unique Verify type is taken", () => {
+    const catalog = catalogForColumn("verify");
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(true);
+  });
+
+  it("is false when another unique Verify type is still available", () => {
+    const catalog = catalogForColumn("verify");
+    expect(onlyCustomCatalogRemains(catalog, ["discussion"])).toBe(false);
+    expect(onlyCustomCatalogRemains(catalog, [])).toBe(false);
+  });
+
+  it("is true when Done already has pull request closure", () => {
+    expect(onlyCustomCatalogRemains(catalogForColumn("done"), ["pr-closure"])).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryAutomations, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useMemo, useState } from "react";
@@ -12,7 +12,7 @@ export function useAutomationsPageModel() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { appId: routeAppId } = useParams<{ appId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: apps = [], isLoading: appsLoading } = useFactoryApps(organizationId, factoryId);
+  const { data: apps = [], isLoading: appsLoading } = useFactoryAutomations(organizationId, factoryId);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const canCreateApp = canAct("canvases", "create");
   const canUpdateApp = canAct("canvases", "update");

@@ -314,8 +314,36 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       },
     },
     {
-      pattern: re("/api/v1/factories/([^/]+)/apps"),
-      resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
+      pattern: re("/api/v1/factories/([^/]+)/automations/([^/:]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") {
+          return { json: {} };
+        }
+        const factoryId = match[1];
+        const automationId = match[2];
+        fixture.appsByFactoryId[factoryId] = (fixture.appsByFactoryId[factoryId] ?? []).filter(
+          (app) => app.id !== automationId,
+        );
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/automations"),
+      resolve: (match, method, body) => {
+        const factoryId = match[1];
+        if (method === "POST") {
+          const request = (body ?? {}) as { name?: string; columnKey?: string };
+          const id = `app-custom-${(fixture.appsByFactoryId[factoryId] ?? []).length + 1}`;
+          const automation = {
+            id,
+            name: request.name?.trim() || "Custom automation",
+            columnKey: request.columnKey,
+          };
+          fixture.appsByFactoryId[factoryId] = [...(fixture.appsByFactoryId[factoryId] ?? []), automation];
+          return { json: { automation } };
+        }
+        return { json: { automations: fixture.appsByFactoryId[factoryId] ?? [] } };
+      },
     },
     ...factoryIntakeRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),

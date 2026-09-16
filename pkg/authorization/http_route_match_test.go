@@ -42,8 +42,8 @@ func TestMatchHTTPRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodPost,
-			path:   "/api/v1/factories/factory-123/apps/app-456:defaults",
-			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"},
+			path:   "/api/v1/factories/factory-123/automations/app-456:defaults",
+			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/automations/{automation_id}:defaults"},
 			wantOK: true,
 		},
 		{
@@ -54,7 +54,7 @@ func TestMatchHTTPRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodPost,
-			path:   "/api/v1/factories/factory-123/apps/app-456:unknown",
+			path:   "/api/v1/factories/factory-123/automations/app-456:unknown",
 			wantOK: false,
 		},
 		{

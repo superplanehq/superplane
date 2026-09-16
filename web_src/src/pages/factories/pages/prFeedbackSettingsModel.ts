@@ -261,15 +261,12 @@ export function isActivePRFeedbackActivity(activity: FactoriesFactoryPullRequest
 const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for checks\b/i;
 const CHECKS_PASSED_DESCRIPTION = /^Checks passed\b/i;
 
-/** Concurrent check-wait: SuperPlane watches CI and does not address comments yet. */
+/**
+ * Built-in checks wait. Custom canvases also use concurrent access when they
+ * add pull request activity, so access alone is not enough.
+ */
 export function isWaitingOnChecksActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
   if (!activity || !isActivePRFeedbackActivity(activity)) {
-    return false;
-  }
-  if (activity.access === "concurrent") {
-    return true;
-  }
-  if (activity.access === "exclusive" || activity.access === "waiting") {
     return false;
   }
   return WAITING_ON_CHECKS_DESCRIPTION.test(activity.description ?? "");
@@ -287,6 +284,7 @@ const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
 
 export function addressingFeedbackLabelsByWorkOrder(
   pullRequests: FactoriesFactoryPullRequest[],
+  builtInCanvasIds?: ReadonlySet<string>,
 ): ReadonlyMap<string, string> {
   const labels = new Map<string, string>();
   for (const pullRequest of pullRequests) {
@@ -296,7 +294,7 @@ export function addressingFeedbackLabelsByWorkOrder(
     }
     const activity = latestAddressingActivity(pullRequest);
     if (activity) {
-      labels.set(workOrderId, addressingFeedbackCardLabel(activity));
+      labels.set(workOrderId, addressingFeedbackCardLabel(activity, builtInCanvasIds));
       continue;
     }
     if (
@@ -321,12 +319,29 @@ function latestAddressingActivity(
   )[0];
 }
 
-function addressingFeedbackCardLabel(activity: FactoriesFactoryPullRequestActivity): string {
+function addressingFeedbackCardLabel(
+  activity: FactoriesFactoryPullRequestActivity,
+  builtInCanvasIds?: ReadonlySet<string>,
+): string {
   const description = activity.description?.trim() ?? "";
+  if (isCustomPRActivityLabel(activity, builtInCanvasIds) && description) {
+    return description;
+  }
   if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(description)) {
     return prFeedbackActivityLabel(activity);
   }
   return "Addressing user feedback";
+}
+
+function isCustomPRActivityLabel(
+  activity: FactoriesFactoryPullRequestActivity,
+  builtInCanvasIds?: ReadonlySet<string>,
+): boolean {
+  const canvasId = activity.run?.canvasId?.trim();
+  if (builtInCanvasIds && canvasId && !builtInCanvasIds.has(canvasId)) {
+    return true;
+  }
+  return activity.access === "concurrent";
 }
 
 export function waitingOnChecksWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
