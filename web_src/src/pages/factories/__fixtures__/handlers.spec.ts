@@ -100,7 +100,11 @@ describe("matchFactoryPageFixture", () => {
     );
     expect(deleted.status).toBe(200);
 
-    const list = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`, undefined, fixture);
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      undefined,
+      fixture,
+    );
     const body = (await list.json()) as { automations?: Array<{ id?: string }> };
     expect(body.automations?.some((entry) => entry.id === automationId)).toBe(false);
   });

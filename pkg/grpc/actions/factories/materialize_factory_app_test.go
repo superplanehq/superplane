@@ -59,7 +59,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		backlog := liveBacklogCanvas(t, factoryModel)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
@@ -78,7 +78,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
 			FactoryId:  factoryModel.ID.String(),
 			TemplateId: "line-implementation",
-			AppId:         canvas.ID.String(),
+			AppId:      canvas.ID.String(),
 			InstallParams: map[string]string{
 				"appRepository": "acme/app",
 				"defaultBranch": "main",
@@ -96,7 +96,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		canvas := support.CreateFactoryCanvas(t, r, other.ID, support.RandomName("Plan"))
 
 		_, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: canvas.ID.String(),
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)
@@ -113,7 +113,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: intake.GetIntake().GetCanvasId(),
 		})
 		require.NoError(t, err)
@@ -131,7 +131,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		enableInstanceSuperPlaneDefault(t)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
@@ -147,7 +147,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
@@ -174,7 +174,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		enableInstanceSuperPlaneDefault(t)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
@@ -194,7 +194,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		backlog := liveBacklogCanvas(t, factoryModel)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
@@ -220,7 +220,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		enableInstanceSuperPlaneDefault(t)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)
@@ -254,7 +254,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		enableInstanceSuperPlaneDefault(t)
 
 		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
+			FactoryId:    factoryModel.ID.String(),
 			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)

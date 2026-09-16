@@ -246,6 +246,21 @@ describe("buildColumnAutomations", () => {
     expect(done.map((automation) => automation.kind)).toEqual(["pr-closure", "custom"]);
     expect(done[1]).toMatchObject({ name: "Destroy env", canvasId: "app-destroy-env" });
   });
+
+  it("keeps a custom Done canvas named PR Closure off the built-in type", () => {
+    const automations = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [{ id: "app-custom-close", name: "PR Closure", columnKey: "done" }],
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "PR Closure",
+        canvasId: "app-custom-close",
+      }),
+    ]);
+  });
 });
 
 describe("catalogForColumn", () => {

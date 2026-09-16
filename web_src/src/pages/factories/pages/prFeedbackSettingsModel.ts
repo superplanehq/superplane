@@ -284,6 +284,7 @@ const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
 
 export function addressingFeedbackLabelsByWorkOrder(
   pullRequests: FactoriesFactoryPullRequest[],
+  builtInCanvasIds?: ReadonlySet<string>,
 ): ReadonlyMap<string, string> {
   const labels = new Map<string, string>();
   for (const pullRequest of pullRequests) {
@@ -293,7 +294,7 @@ export function addressingFeedbackLabelsByWorkOrder(
     }
     const activity = latestAddressingActivity(pullRequest);
     if (activity) {
-      labels.set(workOrderId, addressingFeedbackCardLabel(activity));
+      labels.set(workOrderId, addressingFeedbackCardLabel(activity, builtInCanvasIds));
       continue;
     }
     if (
@@ -318,15 +319,29 @@ function latestAddressingActivity(
   )[0];
 }
 
-function addressingFeedbackCardLabel(activity: FactoriesFactoryPullRequestActivity): string {
+function addressingFeedbackCardLabel(
+  activity: FactoriesFactoryPullRequestActivity,
+  builtInCanvasIds?: ReadonlySet<string>,
+): string {
   const description = activity.description?.trim() ?? "";
-  if (activity.access === "concurrent" && description) {
+  if (isCustomPRActivityLabel(activity, builtInCanvasIds) && description) {
     return description;
   }
   if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(description)) {
     return prFeedbackActivityLabel(activity);
   }
   return "Addressing user feedback";
+}
+
+function isCustomPRActivityLabel(
+  activity: FactoriesFactoryPullRequestActivity,
+  builtInCanvasIds?: ReadonlySet<string>,
+): boolean {
+  const canvasId = activity.run?.canvasId?.trim();
+  if (builtInCanvasIds && canvasId && !builtInCanvasIds.has(canvasId)) {
+    return true;
+  }
+  return activity.access === "concurrent";
 }
 
 export function waitingOnChecksWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {

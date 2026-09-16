@@ -158,7 +158,9 @@ function presentNames(items: { name?: string }[]): string[] {
  */
 async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient, workspaceFactoryId?: string) {
   if (workspaceFactoryId) {
-    const cachedApps = queryClient.getQueryData<FactoryAutomation[]>(factoryAppsKey(organizationId, workspaceFactoryId));
+    const cachedApps = queryClient.getQueryData<FactoryAutomation[]>(
+      factoryAppsKey(organizationId, workspaceFactoryId),
+    );
     if (cachedApps) {
       return presentNames(cachedApps);
     }

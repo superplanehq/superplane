@@ -10,14 +10,13 @@ import {
   pendingBacklogAnalysisIds,
 } from "@/pages/factories/lib/backlogAnalysis";
 
-const { canvasesListRuns, factoriesListFactoryAutomations, factoriesListFactoryIntakes, factoriesListWorkOrders } = vi.hoisted(
-  () => ({
+const { canvasesListRuns, factoriesListFactoryAutomations, factoriesListFactoryIntakes, factoriesListWorkOrders } =
+  vi.hoisted(() => ({
     canvasesListRuns: vi.fn(),
     factoriesListFactoryAutomations: vi.fn(),
     factoriesListFactoryIntakes: vi.fn(),
     factoriesListWorkOrders: vi.fn(),
-  }),
-);
+  }));
 
 vi.mock("@/api-client", () => ({
   canvasesListRuns,

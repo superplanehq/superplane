@@ -318,7 +318,9 @@ describe("factorySettingsSectionPath", () => {
 
 describe("factoryAppConfigurePath", () => {
   it("adds configure=1, opens the agent panel, and keeps the components panel closed", () => {
-    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/sp/automations/app-1?configure=1&agent=1");
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe(
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1",
+    );
   });
 
   it("keeps the run when entering edit from a run page", () => {
@@ -347,7 +349,9 @@ describe("factoryAppConfigurePath", () => {
         runId: "run-9",
         nodeId: "create-pr",
       }),
-    ).toBe("/org-1/workspaces/sp/automations/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1");
+    ).toBe(
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1",
+    );
   });
 });
 

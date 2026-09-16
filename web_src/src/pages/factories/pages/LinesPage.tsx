@@ -284,7 +284,7 @@ export function LinesPage() {
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
     fixesPausedOrderIds,
-  } = usePRFeedbackWorkOrderAttention(pullRequests);
+  } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
   const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
     organizationId,

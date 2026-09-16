@@ -221,11 +221,12 @@ export function findBacklogAutomationApp(
 
 /** Factory-level PR Closure automation. It is not a line step. */
 export function findClosureAutomationApp(
-  apps: Array<{ id?: string; name?: string }>,
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
 ): { id: string; name: string } | undefined {
   const match = apps.find(
     (app) =>
       Boolean(app.id) &&
+      !app.columnKey?.trim() &&
       (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
   );
   if (!match?.id) {

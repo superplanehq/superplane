@@ -142,6 +142,27 @@ describe("activePRFeedbackWorkOrderIds", () => {
     expect(fixesPausedWorkOrderIds(pullRequests)).toEqual(new Set());
   });
 
+  it("labels exclusive custom automation activity with its description", () => {
+    expect(
+      addressingFeedbackLabelsByWorkOrder(
+        [
+          {
+            workOrderId: "wo-custom",
+            activities: [
+              {
+                access: "exclusive",
+                state: "active",
+                description: "Deploying preview changes",
+                run: run({ id: "r-custom", state: "STATE_STARTED", canvasId: "app-custom" }),
+              },
+            ],
+          },
+        ],
+        new Set(),
+      ).get("wo-custom"),
+    ).toBe("Deploying preview changes");
+  });
+
   it("does not treat a concurrent check wait as addressing feedback", () => {
     const pullRequests: FactoriesFactoryPullRequest[] = [
       {

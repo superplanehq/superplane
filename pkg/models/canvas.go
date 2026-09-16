@@ -23,14 +23,19 @@ var canvasNameUniqueConstraints = []string{
 	"workflows_factory_id_name_active_key",
 }
 
+const (
+	CanvasColumnKeyVerify = "verify"
+	CanvasColumnKeyDone   = "done"
+)
+
 type Canvas struct {
-	ID                          uuid.UUID
-	OrganizationID              uuid.UUID
-	FactoryID                   *uuid.UUID
-	LiveVersionID               *uuid.UUID
-	CanvasFolderID              *uuid.UUID `gorm:"column:folder_id"`
-	Name                        string
-	Description                 string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	FactoryID      *uuid.UUID
+	LiveVersionID  *uuid.UUID
+	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
+	Name           string
+	Description    string
 	// ColumnKey is the line-board column this factory event automation is
 	// shown on. Empty when the canvas is not attached to Verify or Done.
 	ColumnKey                   *string
@@ -177,11 +182,6 @@ func FindCanvasNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]
 func (c *Canvas) SoftDelete() error {
 	return c.SoftDeleteInTransaction(database.Conn())
 }
-
-const (
-	CanvasColumnKeyVerify = "verify"
-	CanvasColumnKeyDone   = "done"
-)
 
 func ValidCanvasColumnKey(key string) bool {
 	return key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone

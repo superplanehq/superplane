@@ -1,6 +1,6 @@
 import type { FactoryAutomation } from "@/api-client";
 import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
-import { factoryAppsKey } from "@/hooks/useFactoryData";
+import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,6 +42,7 @@ async function runDuplicateAutomation(args: {
   factoryKey: string;
   organizationId: string;
   createCanvas: ReturnType<typeof useCreateCanvas>["mutateAsync"];
+  createAttachedAutomation: ReturnType<typeof useCreateFactoryAutomation>["mutateAsync"];
   queryClient: ReturnType<typeof useQueryClient>;
   pendingDuplicateCanvases: Map<string, PendingDuplicateCanvas>;
   sessionDuplicateNames: Set<string>;
@@ -57,6 +58,7 @@ async function runDuplicateAutomation(args: {
     factoryId: args.factoryId,
     app,
     createCanvas: args.createCanvas,
+    createAttachedAutomation: args.createAttachedAutomation,
     existingCanvasNames: collectExistingCanvasNames(
       args.queryClient,
       args.organizationId,
@@ -93,6 +95,7 @@ export function useAutomationCardMutations(args: {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createCanvas = useCreateCanvas(organizationId);
+  const createAttachedAutomation = useCreateFactoryAutomation(organizationId, factoryId);
   const deleteCanvas = useDeleteCanvas(organizationId);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const pendingDuplicateCanvases = useRef(new Map<string, PendingDuplicateCanvas>());
@@ -125,6 +128,7 @@ export function useAutomationCardMutations(args: {
           factoryKey,
           organizationId,
           createCanvas: createCanvas.mutateAsync,
+          createAttachedAutomation: createAttachedAutomation.mutateAsync,
           queryClient,
           pendingDuplicateCanvases: pendingDuplicateCanvases.current,
           sessionDuplicateNames: sessionDuplicateNames.current,
@@ -138,6 +142,7 @@ export function useAutomationCardMutations(args: {
       }
     },
     [
+      createAttachedAutomation.mutateAsync,
       createCanvas.mutateAsync,
       factoryId,
       factoryKey,

@@ -299,4 +299,21 @@ describe("duplicateAutomationCanvas", () => {
       method: "ui",
     });
   });
+
+  it("keeps a Verify automation on Verify when duplicated", async () => {
+    const createAttachedAutomation = vi.fn().mockResolvedValue({ id: "canvas-copy", name: "Create env copy" });
+    const deps = baseDeps({
+      app: { id: "canvas-source", name: "Create env", columnKey: "verify" },
+      createAttachedAutomation,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { spec: { nodes: [], edges: [] } } },
+      }),
+    });
+
+    const canvasId = await duplicateAutomationCanvas(deps);
+
+    expect(canvasId).toBe("canvas-copy");
+    expect(createAttachedAutomation).toHaveBeenCalledWith({ name: "Create env copy", columnKey: "verify" });
+    expect(deps.createCanvas).not.toHaveBeenCalled();
+  });
 });
