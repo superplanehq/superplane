@@ -5,7 +5,11 @@ import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
+import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
+import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
+import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
@@ -13,6 +17,7 @@ import { ComposerPlanStack } from "./ComposerPlanControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
+import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -31,8 +36,10 @@ export type IntentAnalysisChat = {
   composer: string;
   composerError?: string;
   canSend: boolean;
+  isUploading?: boolean;
   onComposerChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (text?: string) => void | Promise<boolean>;
+  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   onSubmitSurvey: (text: string) => void;
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
@@ -106,6 +113,11 @@ function AnalysisRequestChat({
     score: analysis.latestPlanScore,
     machineStatus: analysis.view.machineStatus,
   });
+  const images = useAnalysisComposerImages({
+    disabled: !analysis.canSend,
+    onUploadFiles: analysis.onUploadFiles,
+  });
+  const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -122,7 +134,7 @@ function AnalysisRequestChat({
               messages={analysis.view.messages}
               organizationId={analysis.organizationId}
               streaming={state.active}
-              files={files}
+              files={transcriptFiles}
               activities={analysis.view.activities}
             />
             {state.active ? (
@@ -145,6 +157,7 @@ function AnalysisRequestChat({
       </div>
       <AnalysisComposer
         analysis={analysis}
+        images={images}
         placeholder={state.placeholder}
         chipsWorking={chipsWorking}
         chatSolo={chatSolo}
@@ -156,22 +169,33 @@ function AnalysisRequestChat({
 
 function AnalysisComposer({
   analysis,
+  images,
   placeholder,
   chipsWorking,
   chatSolo,
   chatColumnClass,
 }: {
   analysis: IntentAnalysisChat;
+  images: ReturnType<typeof useAnalysisComposerImages>;
   placeholder: string;
   chipsWorking: boolean;
   chatSolo: boolean;
   chatColumnClass: string;
 }) {
+  const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
+  const send = async () => {
+    if (!canSubmit) {
+      return;
+    }
+    const pending = images.takePending();
+    const result = await analysis.onSend(appendUploadedWorkOrderImages(analysis.composer, pending));
+    if (result === false) {
+      images.restorePending(pending);
+    }
+  };
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (analysis.canSend) {
-      analysis.onSend();
-    }
+    void send();
   };
 
   return (
@@ -202,7 +226,7 @@ function AnalysisComposer({
             onToggleSummary={analysis.onToggleClarity}
             actions={analysis.closedDecision}
           />
-          <InputGroup className="h-auto rounded-xl" data-testid="split-run-intent-composer-card">
+          <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
             <InputGroupTextarea
               id="split-run-intent-composer"
               data-testid="split-run-intent-composer"
@@ -210,19 +234,29 @@ function AnalysisComposer({
               placeholder={placeholder}
               disabled={!analysis.canSend}
               onChange={(event) => analysis.onComposerChange(event.target.value)}
+              onPaste={images.handlePaste}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  if (analysis.canSend) {
-                    analysis.onSend();
-                  }
+                  void send();
                 }
               }}
               className="min-h-[4.2rem] py-2 text-[13px]"
               rows={2}
             />
-            <InputGroupAddon align="block-end" className="pb-1.5">
-              <div className="ms-auto flex items-center gap-1.5">
+            <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
+              <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+                {analysis.onUploadFiles ? (
+                  <CreateWorkOrderRequestAttachButton
+                    disabled={!images.canAttach}
+                    onAttach={(files) => void images.attach(files)}
+                  />
+                ) : null}
+                {images.previewImages.length > 0 ? (
+                  <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1.5">
                 <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
                   {ANALYSIS_PLANNING_COPY.sendShortcut}
                 </Kbd>
@@ -231,7 +265,7 @@ function AnalysisComposer({
                   variant="default"
                   size="icon-sm"
                   className="rounded-full"
-                  disabled={!analysis.canSend || !analysis.composer.trim()}
+                  disabled={!canSubmit}
                   aria-label={ANALYSIS_PLANNING_COPY.send}
                   data-testid="split-run-intent-composer-send"
                 >

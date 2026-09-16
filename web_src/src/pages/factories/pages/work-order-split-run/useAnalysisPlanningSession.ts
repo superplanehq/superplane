@@ -1,4 +1,5 @@
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -36,6 +37,8 @@ type AnalysisPlanningSessionArgs = {
   pollForSession?: boolean;
   canUpdate: boolean;
   analysisDelivered?: boolean;
+  isUploading?: boolean;
+  uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 };
 
 export function analysisSessionPollInterval(
@@ -140,11 +143,12 @@ function analysisSendState(
   machineStatus: string,
   canUpdate: boolean,
   sendPending: boolean,
+  isUploading = false,
 ) {
   const stopped = machineStatus === "failed" || machineStatus === "passed";
   const isLive = Boolean(session?.id && session.state !== "ended" && !stopped);
   const canRestart = Boolean(session?.id && (session.state === "ended" || stopped));
-  return { isLive, canSend: canUpdate && !sendPending && (isLive || canRestart) };
+  return { isLive, canSend: canUpdate && !sendPending && !isUploading && (isLive || canRestart) };
 }
 
 export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
@@ -156,6 +160,8 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     pollForSession = false,
     canUpdate,
     analysisDelivered = false,
+    isUploading = false,
+    uploadFiles,
   } = args;
   const queryClient = useQueryClient();
   const [composer, setComposer] = useState("");
@@ -209,14 +215,41 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     view.machineStatus,
     canUpdate,
     sendMessage.isPending || answerSurvey.isPending,
+    isUploading,
   );
   const submit = (text: string, send: (body: string) => void) => {
     const trimmed = text.trim();
     if (!trimmed || !canSend) {
-      return;
+      return false;
     }
     setComposerError("");
     send(trimmed);
+    return true;
+  };
+  const onSend = async (text?: string) => {
+    const trimmed = (text ?? composer).trim();
+    if (!trimmed || !canSend) {
+      return false;
+    }
+    setComposerError("");
+    try {
+      await sendMessage.mutateAsync(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const onUploadFiles = async (files: FileList | File[]) => {
+    if (!uploadFiles) {
+      return [];
+    }
+    const uploaded = await uploadFiles(files);
+    if (uploaded.length > 0) {
+      await queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
+      });
+    }
+    return uploaded;
   };
 
   return {
@@ -229,10 +262,14 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     composer,
     composerError,
     canSend,
+    isUploading,
     isLive,
     showChat: Boolean(session?.id),
     onComposerChange: setComposer,
-    onSend: () => submit(composer, sendMessage.mutate),
-    onSubmitSurvey: (text: string) => submit(text, answerSurvey.mutate),
+    onSend,
+    onUploadFiles: uploadFiles ? onUploadFiles : undefined,
+    onSubmitSurvey: (text: string) => {
+      submit(text, answerSurvey.mutate);
+    },
   };
 }
