@@ -1,8 +1,4 @@
-import type {
-  FactoriesFactoryAgentResource,
-  FactoryAgentResourceAuth,
-  FactoryAgentResourceOAuthStatus,
-} from "@/api-client";
+import type { FactoriesFactoryAgentResource, FactoryAgentResourceAuth } from "@/api-client";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 

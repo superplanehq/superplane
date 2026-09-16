@@ -27,10 +27,7 @@ func ValidatePublicHTTPSURL(raw string) error {
 	if host == "" {
 		return fmt.Errorf("MCP URL must have a host")
 	}
-	if err := rejectPrivateHost(host); err != nil {
-		return err
-	}
-	return nil
+	return rejectPrivateHost(host)
 }
 
 func rejectPrivateHost(host string) error {

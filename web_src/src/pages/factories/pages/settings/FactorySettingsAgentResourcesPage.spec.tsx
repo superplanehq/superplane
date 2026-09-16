@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
@@ -19,6 +19,42 @@ describe("FactorySettingsAgentResourcesPage", () => {
     client.setConfig({ baseUrl: "http://localhost" });
     Element.prototype.scrollIntoView ??= vi.fn();
   });
+
+  it("hides the nav item when the feature is off", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent-resources")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows the nav item when the feature is on", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent-resources")).toHaveTextContent(
+      "Agent resources",
+    );
+  }, 10000);
+
+  it("redirects away from the route when the feature is off", async () => {
+    render(<FactoriesHarness pathSuffix={connectionsPath} factoriesFixture={defaultFactoriesFixture} />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("factory-settings-agent-resources")).not.toBeInTheDocument();
+  }, 10000);
 
   it("shows the connections empty state", async () => {
     render(

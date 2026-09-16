@@ -1,29 +1,16 @@
-import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { useSearchParams } from "react-router";
 
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { usePermissions } from "@/contexts/usePermissions";
-import {
-  useCreateFactoryAgentResource,
-  useDeleteFactoryAgentResource,
-  useDisconnectFactoryAgentResourceOAuth,
-  useFactoryAgentResources,
-  useStartFactoryAgentResourceOAuth,
-  useUpdateFactoryAgentResource,
-} from "@/hooks/useFactoryAgentResources";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Switch } from "@/ui/switch";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { AgentResourceConnectionDialog, type AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
+import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import {
   connectionAuthLabel,
@@ -32,113 +19,11 @@ import {
   skillSourceLabel,
 } from "./agentResourceDisplay";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-
-type AgentResourcesTab = "connections" | "skills";
-
-function readTab(searchParams: URLSearchParams): AgentResourcesTab {
-  return searchParams.get("tab") === "skills" ? "skills" : "connections";
-}
+import { useAgentResourcesPage } from "./useAgentResourcesPage";
 
 export function FactorySettingsAgentResourcesPage() {
-  const { organizationId, factoryId, factory } = useFactorySettingsLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const canUpdate = canAct("factories", "update") && !permissionsLoading;
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = readTab(searchParams);
-  const addDialogOpen = searchParams.get("dialog") === "add";
-  const [editResource, setEditResource] = useState<FactoriesFactoryAgentResource | undefined>();
-  const [pendingDelete, setPendingDelete] = useState<FactoriesFactoryAgentResource | undefined>();
-
-  const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
-  const skills = useFactoryAgentResources(organizationId, factoryId, "KIND_SKILL");
-  const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
-  const updateResource = useUpdateFactoryAgentResource(organizationId, factoryId);
-  const deleteResource = useDeleteFactoryAgentResource(organizationId, factoryId);
-  const startOAuth = useStartFactoryAgentResourceOAuth(organizationId, factoryId);
-  const disconnectOAuth = useDisconnectFactoryAgentResourceOAuth(organizationId, factoryId);
-
-  usePageTitle([AGENT_RESOURCES_COPY.title, "Settings", factory.name ?? "Workspace"]);
-
-  const setTab = (nextTab: string) => {
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (nextTab === "skills") {
-          next.set("tab", "skills");
-        } else {
-          next.delete("tab");
-        }
-        next.delete("dialog");
-        return next;
-      },
-      { replace: true },
-    );
-  };
-
-  const setAddDialogOpen = (open: boolean) => {
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (open) {
-          next.set("dialog", "add");
-        } else {
-          next.delete("dialog");
-        }
-        return next;
-      },
-      { replace: true },
-    );
-  };
-
-  const startOAuthRedirect = async (resource: FactoriesFactoryAgentResource) => {
-    if (!resource.id) {
-      return;
-    }
-    try {
-      const result = await startOAuth.mutateAsync(resource.id);
-      if (result.authorizationUrl) {
-        window.location.assign(result.authorizationUrl);
-      }
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.connectFailed));
-    }
-  };
-
-  const saveConnection = async (draft: AgentResourceConnectionDraft) => {
-    try {
-      if (editResource?.id) {
-        await updateResource.mutateAsync({
-          resourceId: editResource.id,
-          name: draft.name,
-          url: draft.url,
-          auth: draft.auth,
-          headers: draft.headers,
-        });
-        showSuccessToast(AGENT_RESOURCES_COPY.updated);
-        setEditResource(undefined);
-        return;
-      }
-      await createResource.mutateAsync({
-        kind: "KIND_MCP_SERVER",
-        name: draft.name,
-        enabled: true,
-        url: draft.url,
-        auth: draft.auth,
-        headers: draft.headers,
-      });
-      showSuccessToast(AGENT_RESOURCES_COPY.created);
-      setAddDialogOpen(false);
-    } catch (error) {
-      showErrorToast(
-        getApiErrorMessage(error, editResource ? AGENT_RESOURCES_COPY.updateFailed : AGENT_RESOURCES_COPY.createFailed),
-      );
-      throw error;
-    }
-  };
-
-  const connectionDialogOpen = addDialogOpen || Boolean(editResource);
-  const isSaving = createResource.isPending || updateResource.isPending;
+  const page = useAgentResourcesPage();
+  usePageTitle([AGENT_RESOURCES_COPY.title, "Settings", page.factory.name ?? "Workspace"]);
 
   return (
     <FactorySettingsPageFrame
@@ -150,31 +35,9 @@ export function FactorySettingsAgentResourcesPage() {
         </span>
       }
       wide
-      actions={
-        tab === "skills" ? (
-          <Button
-            type="button"
-            disabled
-            title={AGENT_RESOURCES_COPY.skillsUnavailable}
-            data-testid="agent-resources-add-skill"
-          >
-            {AGENT_RESOURCES_COPY.addSkill}
-          </Button>
-        ) : (
-          <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
-            <Button
-              type="button"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={!canUpdate}
-              data-testid="agent-resources-add-connection"
-            >
-              {AGENT_RESOURCES_COPY.addConnection}
-            </Button>
-          </PermissionTooltip>
-        )
-      }
+      actions={<AgentResourcesActions page={page} />}
     >
-      <Tabs value={tab} onValueChange={setTab} data-testid="factory-settings-agent-resources">
+      <Tabs value={page.tab} onValueChange={page.setTab} data-testid="factory-settings-agent-resources">
         <TabsList>
           <TabsTrigger value="connections" data-testid="agent-resources-tab-connections">
             {AGENT_RESOURCES_COPY.connectionsTab}
@@ -185,79 +48,86 @@ export function FactorySettingsAgentResourcesPage() {
         </TabsList>
         <TabsContent value="connections" className="mt-4">
           <ConnectionsPanel
-            canUpdate={canUpdate}
-            isLoading={connections.isLoading}
-            isError={connections.isError}
-            resources={connections.data ?? []}
-            onAdd={() => setAddDialogOpen(true)}
-            onEdit={setEditResource}
-            onDelete={setPendingDelete}
-            onDisconnect={(resource) => {
-              if (!resource.id) {
-                return;
-              }
-              void disconnectOAuth.mutateAsync(resource.id).then(
-                () => showSuccessToast(AGENT_RESOURCES_COPY.disconnected),
-                (error) => showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.disconnectFailed)),
-              );
-            }}
-            onToggleEnabled={(resource, enabled) => {
-              if (!resource.id) {
-                return;
-              }
-              void updateResource.mutateAsync({ resourceId: resource.id, enabled }).catch((error) => {
-                showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.updateFailed));
-              });
-            }}
-            onConnect={(resource) => void startOAuthRedirect(resource)}
+            canUpdate={page.canUpdate}
+            isLoading={page.connections.isLoading}
+            isError={page.connections.isError}
+            resources={page.connections.data ?? []}
+            onAdd={() => page.setAddDialogOpen(true)}
+            onEdit={page.setEditResource}
+            onDelete={page.setPendingDelete}
+            onDisconnect={page.disconnectResource}
+            onToggleEnabled={page.toggleEnabled}
+            onConnect={(resource) => void page.startOAuthRedirect(resource)}
           />
         </TabsContent>
         <TabsContent value="skills" className="mt-4">
           <SkillsPanel
-            canUpdate={canUpdate}
-            isLoading={skills.isLoading}
-            isError={skills.isError}
-            resources={skills.data ?? []}
+            canUpdate={page.canUpdate}
+            isLoading={page.skills.isLoading}
+            isError={page.skills.isError}
+            resources={page.skills.data ?? []}
           />
         </TabsContent>
       </Tabs>
-
-      <AgentResourceConnectionDialog
-        open={connectionDialogOpen}
-        organizationId={organizationId}
-        resource={editResource}
-        isSaving={isSaving}
-        onClose={() => {
-          setEditResource(undefined);
-          if (addDialogOpen) {
-            setAddDialogOpen(false);
-          }
-        }}
-        onSave={saveConnection}
-      />
-
-      <FactoryDeleteDialog
-        open={Boolean(pendingDelete)}
-        factoryName={pendingDelete?.name ?? ""}
-        title={`Delete "${pendingDelete?.name ?? "connection"}"?`}
-        description="This removes the connection for every agent in this workspace."
-        canDelete={canUpdate}
-        isDeleting={deleteResource.isPending}
-        onClose={() => setPendingDelete(undefined)}
-        onConfirm={async () => {
-          if (!pendingDelete?.id) {
-            return;
-          }
-          try {
-            await deleteResource.mutateAsync(pendingDelete.id);
-            showSuccessToast(AGENT_RESOURCES_COPY.deleted);
-          } catch (error) {
-            showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.deleteFailed));
-            throw error;
-          }
-        }}
-      />
+      <AgentResourcePageDialogs page={page} />
     </FactorySettingsPageFrame>
+  );
+}
+
+function AgentResourcesActions({ page }: { page: ReturnType<typeof useAgentResourcesPage> }) {
+  if (page.tab === "skills") {
+    return (
+      <Button
+        type="button"
+        disabled
+        title={AGENT_RESOURCES_COPY.skillsUnavailable}
+        data-testid="agent-resources-add-skill"
+      >
+        {AGENT_RESOURCES_COPY.addSkill}
+      </Button>
+    );
+  }
+  return (
+    <PermissionTooltip allowed={page.canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
+      <Button
+        type="button"
+        onClick={() => page.setAddDialogOpen(true)}
+        disabled={!page.canUpdate}
+        data-testid="agent-resources-add-connection"
+      >
+        {AGENT_RESOURCES_COPY.addConnection}
+      </Button>
+    </PermissionTooltip>
+  );
+}
+
+function AgentResourcePageDialogs({ page }: { page: ReturnType<typeof useAgentResourcesPage> }) {
+  return (
+    <>
+      <AgentResourceConnectionDialog
+        open={page.addDialogOpen || Boolean(page.editResource)}
+        organizationId={page.organizationId}
+        resource={page.editResource}
+        isSaving={page.isSaving}
+        onClose={() => {
+          page.setEditResource(undefined);
+          if (page.addDialogOpen) {
+            page.setAddDialogOpen(false);
+          }
+        }}
+        onSave={page.saveConnection}
+      />
+      <FactoryDeleteDialog
+        open={Boolean(page.pendingDelete)}
+        factoryName={page.pendingDelete?.name ?? ""}
+        title={`Delete "${page.pendingDelete?.name ?? "connection"}"?`}
+        description="This removes the connection for every agent in this workspace."
+        canDelete={page.canUpdate}
+        isDeleting={page.isDeleting}
+        onClose={() => page.setPendingDelete(undefined)}
+        onConfirm={page.confirmDelete}
+      />
+    </>
   );
 }
 
