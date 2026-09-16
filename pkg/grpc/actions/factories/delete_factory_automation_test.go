@@ -120,4 +120,24 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 	})
+
+	t.Run("rejects a PR feedback canvas", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		response, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+
+		_, err = DeleteFactoryAutomation(ctx, orgID, &pb.DeleteFactoryAutomationRequest{
+			FactoryId:    factory.ID.String(),
+			AutomationId: response.GetHandler().GetCanvasId(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+	})
 }

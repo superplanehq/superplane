@@ -59,10 +59,12 @@ func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canva
 		return err
 	}
 
-	if _, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID); err == nil {
-		return errFactoryAutomationReserved
-	} else if !errors.Is(err, models.ErrFactoryPRFeedbackHandlerNotFound) {
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID)
+	if err != nil {
 		return err
+	}
+	if handler != nil {
+		return errFactoryAutomationReserved
 	}
 
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
