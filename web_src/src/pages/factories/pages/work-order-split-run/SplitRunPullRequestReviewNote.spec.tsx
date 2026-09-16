@@ -1,7 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -75,34 +74,17 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
   });
 
-  it("keeps the close actions behind a More menu", async () => {
-    const user = userEvent.setup();
-    const onAction = vi.fn();
-    renderNote({ onAction });
+  it("does not show a More menu or close actions on the strip", () => {
+    renderNote();
 
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    const menu = await screen.findByRole("menu");
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent),
-    ).toEqual(["To Backlog", "Reject", "Approve"]);
-
-    await user.click(within(menu).getByRole("menuitem", { name: "Approve" }));
-    expect(onAction).toHaveBeenCalledWith(ACTIONS[2]);
-  });
-
-  it("hides the More menu when there are no actions", () => {
-    renderNote({ actions: [] });
-
-    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-more-actions")).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-pull-request-cta")).toBeInTheDocument();
-  });
-
-  it("disables the More menu while an action is in flight", () => {
-    renderNote({ actionBusy: true });
-
-    expect(screen.getByRole("button", { name: "More actions" })).toBeDisabled();
   });
 
   it("keeps the standard note for a link that is not a pull request", () => {
@@ -115,5 +97,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).not.toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
   });
 });
