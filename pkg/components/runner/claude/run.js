@@ -16,6 +16,36 @@ const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const SESSION_FILE = "claude_session";
 
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    updateToolInput: noop,
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
+
 const SYSTEM_PROMPT =
   "Write all assistant messages as plain terminal text. " +
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
@@ -217,7 +247,9 @@ async function runPrompt(promptFile, model) {
     args = ["-oL", "-eL", "claude", ...claudeArgs];
   }
 
-  const formatter = createFormatter(promptFile, (id) => writeSessionID(sp, id));
+  const activity = loadActivityStreamModule().createActivityStream({ provider: "claude", turn: promptCount + 1 });
+  activity.start();
+  const formatter = createFormatter(promptFile, (id) => writeSessionID(sp, id), activity);
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -241,6 +273,8 @@ async function runPrompt(promptFile, model) {
   // everything downstream that reads it — actually fails.
   const failed = exitCode !== 0 || formatter.resultFailed();
   formatter.flush(failed);
+  activity.end(failed ? "failed" : "passed");
+  await activity.flush();
   const resultJSON = formatter.resultWithTelemetry();
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
@@ -306,7 +340,7 @@ function promptSeriesName(promptFile) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
-function createFormatter(promptFile, onSession) {
+function createFormatter(promptFile, onSession, activityOverride) {
   let streamedText = false;
   let inText = false;
   let textBuf = "";
@@ -316,6 +350,8 @@ function createFormatter(promptFile, onSession) {
   let resultFailed = false;
   const telemetry = loadTurnTelemetry();
   const tools = createToolTracker(telemetry);
+  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "claude" });
+  const activityBlocks = new Map();
 
   return {
     handleLine(raw) {
@@ -343,10 +379,14 @@ function createFormatter(promptFile, onSession) {
       switch (event.type) {
         case "system":
           formatSystem(event);
+          if (event.subtype === "api_retry") {
+            activity.notice("retry", "Claude API request retry");
+          }
           break;
         case "stream_event": {
           streamMessageId = applyStreamTelemetry(event, telemetry, streamMessageId);
-          const next = formatStreamEvent(event, streamedText, inText, textBuf);
+          handleClaudeActivityEvent(event.event, activity, activityBlocks, streamMessageId);
+          const next = formatStreamEvent(event, streamedText, inText, textBuf, activity.enabled);
           streamedText = next.streamedText;
           inText = next.inText;
           textBuf = next.textBuf;
@@ -363,7 +403,7 @@ function createFormatter(promptFile, onSession) {
             hasTools:
               Array.isArray(message.content) && message.content.some((block) => block && block.type === "tool_use"),
           });
-          formatAssistant(event, streamedText, tools);
+          formatAssistant(event, streamedText, tools, activity);
           streamedText = false;
           break;
         }
@@ -371,7 +411,7 @@ function createFormatter(promptFile, onSession) {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
-          formatUser(event, tools);
+          formatUser(event, tools, activity);
           break;
         }
         case "result": {
@@ -385,6 +425,7 @@ function createFormatter(promptFile, onSession) {
           break;
         }
         case "rate_limit_event":
+          activity.notice("rate_limit", "Claude rate limit notice");
           println("Rate limit notice — waiting to continue…");
           break;
       }
@@ -565,7 +606,7 @@ function applyStreamTelemetry(event, telemetry, streamMessageId) {
   return streamMessageId;
 }
 
-function formatStreamEvent(event, streamedText, inText, textBuf) {
+function formatStreamEvent(event, streamedText, inText, textBuf, structuredActivity = false) {
   const payload = event.event;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return { streamedText, inText, textBuf };
@@ -575,7 +616,7 @@ function formatStreamEvent(event, streamedText, inText, textBuf) {
   if (kind === "content_block_start") {
     const block = payload.content_block;
     if (block && typeof block === "object" && block.type === "text") {
-      return { streamedText, inText: true, textBuf };
+      return { streamedText, inText: !structuredActivity, textBuf };
     }
     return { streamedText, inText, textBuf };
   }
@@ -585,6 +626,9 @@ function formatStreamEvent(event, streamedText, inText, textBuf) {
     if (delta && typeof delta === "object" && delta.type === "text_delta") {
       const text = delta.text;
       if (typeof text === "string" && text) {
+        if (structuredActivity) {
+          return { streamedText: true, inText: false, textBuf };
+        }
         // Buffer until newline or block end so live logs (one CloudWatch
         // event per flush chunk) do not show mid-word line breaks.
         return {
@@ -604,6 +648,117 @@ function formatStreamEvent(event, streamedText, inText, textBuf) {
   }
 
   return { streamedText, inText, textBuf };
+}
+
+function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
+  if (!activity.enabled || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return;
+  }
+  const index = Number.isFinite(Number(payload.index)) ? Number(payload.index) : blocks.size;
+  if (payload.type === "content_block_start") {
+    const block = payload.content_block && typeof payload.content_block === "object" ? payload.content_block : {};
+    const id = String(block.id || `${messageId || activity.activityId}-block-${index}`);
+    if (block.type === "text" || block.type === "thinking") {
+      const kind = block.type === "thinking" ? "reasoning" : "assistant";
+      blocks.set(index, { id, kind });
+      activity.startContent(kind, id);
+      return;
+    }
+    if (block.type === "tool_use") {
+      const name = String(block.name || "tool");
+      blocks.set(index, { id, kind: "tool", name, partialInput: "" });
+      activity.startTool({
+        id,
+        kind: normalizeClaudeToolKind(name),
+        name,
+        input: activityToolInputDetail(name, block.input),
+      });
+    }
+    return;
+  }
+  const tracked = blocks.get(index);
+  if (!tracked) {
+    return;
+  }
+  if (payload.type === "content_block_delta") {
+    const delta = payload.delta && typeof payload.delta === "object" ? payload.delta : {};
+    if (delta.type === "text_delta" && tracked.kind === "assistant") {
+      activity.appendContent("assistant", tracked.id, delta.text || "");
+    } else if (delta.type === "thinking_delta" && tracked.kind === "reasoning") {
+      activity.appendContent("reasoning", tracked.id, delta.thinking || "");
+    } else if (delta.type === "input_json_delta" && tracked.kind === "tool") {
+      tracked.partialInput += String(delta.partial_json || "");
+      activity.updateToolInput(tracked.id, tracked.partialInput, false);
+    }
+    return;
+  }
+  if (payload.type !== "content_block_stop") {
+    return;
+  }
+  if (tracked.kind === "tool") {
+    if (tracked.partialInput && !validJSONObject(tracked.partialInput)) {
+      activity.notice("malformed_tool_input", `Claude returned malformed input for ${tracked.name}.`);
+    }
+    activity.updateToolInput(tracked.id, normalizedToolInput(tracked.partialInput, tracked.name), true);
+  } else {
+    activity.endContent(tracked.id);
+  }
+}
+
+function validJSONObject(text) {
+  try {
+    const value = JSON.parse(text);
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  } catch (_err) {
+    return false;
+  }
+}
+
+function normalizedToolInput(partialInput, name) {
+  const text = String(partialInput || "");
+  if (!text) {
+    return "";
+  }
+  try {
+    const value = JSON.parse(text);
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return activityToolInputDetail(name, value) || JSON.stringify(value);
+    }
+  } catch (_err) {
+    // Keep malformed provider input visible for diagnosis.
+  }
+  return text;
+}
+
+function normalizeClaudeToolKind(name) {
+  const kind = String(name || "tool").toLowerCase();
+  if (kind === "bash") return "bash";
+  if (kind === "read") return "read";
+  if (["edit", "multiedit", "notebookedit"].includes(kind)) return "edit";
+  if (kind === "write") return "write";
+  if (kind === "websearch") return "web_search";
+  if (kind === "webfetch") return "web_fetch";
+  if (kind.includes("search") || kind === "grep" || kind === "glob") return "search";
+  return kind;
+}
+
+function activityToolInputDetail(name, input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input == null ? "" : String(input);
+  }
+  if (Object.keys(input).length === 0) {
+    return "";
+  }
+  const lowered = String(name || "").toLowerCase();
+  if (lowered === "bash" && typeof input.command === "string") {
+    return input.command;
+  }
+  for (const key of ["file_path", "path", "pattern", "query", "command"]) {
+    if (typeof input[key] === "string" && input[key].trim()) {
+      return input[key];
+    }
+  }
+  return JSON.stringify(input);
 }
 
 function emitCompleteLines(buf) {
@@ -638,7 +793,7 @@ function assistantTextFromMessage(message) {
     .join("\n\n");
 }
 
-function formatAssistant(event, streamedText, tools) {
+function formatAssistant(event, streamedText, tools, activity = createDisabledActivityStream()) {
   const message = event.message;
   if (!message || typeof message !== "object") {
     return;
@@ -662,7 +817,7 @@ function formatAssistant(event, streamedText, tools) {
       formatToolUse(block, tools);
     } else if (block.type === "thinking") {
       const thinking = block.thinking;
-      if (typeof thinking === "string" && thinking.trim()) {
+      if (!activity.enabled && typeof thinking === "string" && thinking.trim()) {
         println("Thinking");
         println(truncateText(thinking.trim()));
         println();
@@ -671,7 +826,7 @@ function formatAssistant(event, streamedText, tools) {
   }
 }
 
-function formatUser(event, tools) {
+function formatUser(event, tools, activity = createDisabledActivityStream()) {
   const message = event.message;
   if (!message || typeof message !== "object") {
     return;
@@ -688,8 +843,13 @@ function formatUser(event, tools) {
     const body = toolResultText(block.content);
     tools.emitStart(block.tool_use_id);
     if (body.trim()) {
-      println(truncateText(body.replace(/\s+$/, "")));
+      if (activity.enabled) {
+        activity.appendToolOutput(block.tool_use_id, body.replace(/\s+$/, ""), block.is_error ? "stderr" : "stdout");
+      } else {
+        println(truncateText(body.replace(/\s+$/, "")));
+      }
     }
+    activity.endTool(block.tool_use_id, { status: block.is_error ? "failed" : "passed" });
     tools.end(Boolean(block.is_error), block.tool_use_id);
   }
 }

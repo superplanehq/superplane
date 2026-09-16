@@ -424,4 +424,47 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.selectableModelKey).toBe("hosted::anthropic::claude-sonnet-4-6");
   });
+
+  it("maps persisted activity and links it to the agent message", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        messages: [{ id: "answer", role: "agent", text: "Ready.", activityId: "activity-1" }],
+        activities: [
+          {
+            id: "activity-1",
+            schemaVersion: 2,
+            provider: "codex",
+            status: "passed",
+            lastSequence: "4",
+            startedAt: "2026-09-15T10:00:00Z",
+            completedAt: "2026-09-15T10:00:02Z",
+            items: [
+              {
+                type: "tool",
+                id: "tool-1",
+                kind: "bash",
+                name: "Bash",
+                input: "rg retry pkg",
+                status: "passed",
+                durationMs: "120",
+              },
+            ],
+          },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages[0]?.activityId).toBe("activity-1");
+    expect(view.activities).toMatchObject([
+      {
+        id: "activity-1",
+        provider: "codex",
+        status: "passed",
+        sequence: 4,
+        items: [{ id: "tool-1", input: "rg retry pkg", status: "passed", durationMs: 120 }],
+      },
+    ]);
+  });
 });
