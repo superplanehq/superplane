@@ -18,7 +18,7 @@ export const SENTRY_EXCEPTIONS_INTAKE: FactoriesFactoryIntake = {
   id: SENTRY_EXCEPTIONS_INTAKE_ID,
   canvasId: "app-sentry-intake",
   name: "Sentry exceptions",
-  description: "Unresolved errors from production.",
+  description: "Adds the 10 newest unresolved issues. New issues become tasks.",
   source: "SOURCE_SENTRY_EXCEPTIONS",
   healthy: true,
 };

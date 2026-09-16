@@ -30,7 +30,265 @@ func sentryMockResponse(status int, body string) *http.Response {
 func Test__Sentry__Sync(t *testing.T) {
 	impl := &Sentry{}
 
+	t.Run("hosted app without install -> install prompt", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "GET", integrationCtx.BrowserAction.Method)
+		assert.Contains(t, integrationCtx.BrowserAction.URL, "/api/v1/sentry/app/install?state=")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "Install the SuperPlane Sentry app")
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.True(t, metadata.HostedApp)
+		assert.NotEmpty(t, metadata.State)
+		assert.Equal(t, "user-1", metadata.StartedByUserID)
+		assert.Equal(t, "/org-1/workspaces/sp/lines/line-1/setup/sentry", metadata.SetupReturnPath)
+	})
+
+	t.Run("hosted app with an existing SuperPlane install binds without Sentry", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		originalFinder := findReadyHostedSentryInstall
+		findReadyHostedSentryInstall = func(organizationID, excludeID string) (*hostedSentryInstall, error) {
+			assert.Equal(t, "org-1", organizationID)
+			assert.Equal(t, "8f5fbc57-2738-409a-a6f8-af65c2de733c", excludeID)
+			return &hostedSentryInstall{
+				InstallationUUID: "install-uuid",
+				AccessToken:      "access-token",
+				RefreshToken:     "refresh-token",
+				TokenExpiresAt:   "2030-01-01T00:00:00Z",
+				Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
+				Projects:         []ProjectSummary{{ID: "2", Slug: "payments", Name: "Payments"}},
+				Teams:            []TeamSummary{{ID: "3", Slug: "platform", Name: "Platform"}},
+			}, nil
+		}
+		t.Cleanup(func() {
+			findReadyHostedSentryInstall = originalFinder
+		})
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			OrganizationID:  "org-1",
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "access-token", string(integrationCtx.CurrentSecrets[SecretAccessToken].Value))
+		assert.Equal(t, "refresh-token", string(integrationCtx.CurrentSecrets[SecretRefreshToken].Value))
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.True(t, metadata.HostedApp)
+		assert.Equal(t, "install-uuid", metadata.InstallationUUID)
+		require.NotNil(t, metadata.Organization)
+		assert.Equal(t, "acme", metadata.Organization.Slug)
+		assert.Equal(t, "/org-1/workspaces/sp/lines/line-1/setup/sentry", metadata.SetupReturnPath)
+	})
+
+	t.Run("hosted app does not bind an unclaimed Sentry grant during sync", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+		grants := useFakeHostedInstallGrants(t)
+
+		require.NoError(t, grants.Remember(hostedSentryInstall{
+			InstallationUUID: "install-uuid",
+			AccessToken:      "install-token",
+			RefreshToken:     "refresh-token",
+			TokenExpiresAt:   "2030-01-01T00:00:00Z",
+			Organization:     &OrganizationSummary{Slug: "acme"},
+			Code:             "grant-code",
+		}))
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			OrganizationID:  "org-1",
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.NotEqual(t, "ready", integrationCtx.State)
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Contains(t, integrationCtx.BrowserAction.URL, "/api/v1/sentry/app/install?state=")
+	})
+
+	t.Run("hosted app does not mint a token from a known installation UUID during sync", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+		grants := useFakeHostedInstallGrants(t)
+
+		require.NoError(t, grants.Remember(hostedSentryInstall{
+			InstallationUUID: "install-uuid",
+			Code:             "grant-code",
+			Organization:     &OrganizationSummary{Slug: "acme"},
+		}))
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusCreated, `{"token":"jwt-token","refreshToken":"refresh-token"}`),
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			HTTP:            httpContext,
+			Logger:          logrus.NewEntry(logrus.New()),
+			OrganizationID:  "org-1",
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.NotEqual(t, "ready", integrationCtx.State)
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("hosted app with several unclaimed Sentry grants still asks Sentry", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+		grants := useFakeHostedInstallGrants(t)
+
+		require.NoError(t, grants.Remember(hostedSentryInstall{
+			InstallationUUID: "install-1",
+			Code:             "grant-1",
+			Organization:     &OrganizationSummary{Slug: "acme"},
+		}))
+		require.NoError(t, grants.Remember(hostedSentryInstall{
+			InstallationUUID: "install-2",
+			Code:             "grant-2",
+			Organization:     &OrganizationSummary{Slug: "other"},
+		}))
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"setupReturnPath": "/org-1/workspaces/sp/lines/line-1/setup/sentry",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			OrganizationID:  "org-1",
+			ActorUserID:     "user-1",
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.NotEqual(t, "ready", integrationCtx.State)
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Contains(t, integrationCtx.BrowserAction.URL, "/api/v1/sentry/app/install?state=")
+	})
+
+	t.Run("legacy token integration stays on the internal integration path", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"baseUrl":         "https://sentry.io",
+				"integrationName": "SuperPlane",
+				"userToken":       "auth-token",
+				"clientSecret":    "client-secret",
+			},
+			Subscriptions: []contexts.Subscription{
+				{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"1","slug":"example","name":"Example Org"}]`),
+				sentryMockResponse(http.StatusOK, `{"id":"1","slug":"example","name":"Example Org"}`),
+				sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"backend","name":"Backend"}]`),
+				sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+				sentryMockResponse(http.StatusOK, `[{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:read","event:write"],"events":[],"webhookUrl":"","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[]}]`),
+				sentryMockResponse(http.StatusOK, `{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:read","event:write"],"events":["issue"],"webhookUrl":"https://hooks.example.com/api/v1/integrations/8f5fbc57-2738-409a-a6f8-af65c2de733c/events","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[],"clientSecret":"new-rotated-secret"}`),
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			HTTP:            httpContext,
+			Logger:          logrus.NewEntry(logrus.New()),
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.False(t, metadata.HostedApp)
+		require.NotNil(t, metadata.Organization)
+		assert.Equal(t, "example", metadata.Organization.Slug)
+	})
+
 	t.Run("missing credentials -> setup prompt", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "")
+
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
 			Configuration: map[string]any{},
@@ -62,6 +320,10 @@ func Test__Sentry__Sync(t *testing.T) {
 	})
 
 	t.Run("missing credentials overrides previously ready state", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "")
+
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
 			State:         "ready",
@@ -519,6 +781,68 @@ func Test__Sentry__HandleWebhook(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 }
 
+func Test__Sentry__HandleWebhook__HostedInstallMustMatch(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+	impl := &Sentry{}
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	signature := computeWebhookSignature("csecret", body)
+
+	t.Run("matching installation is accepted", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				HostedApp:        true,
+				InstallationUUID: "install-123",
+			},
+			Subscriptions: []contexts.Subscription{
+				{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+			},
+		}
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+		request.Header.Set("Sentry-Hook-Resource", "issue")
+		request.Header.Set("Sentry-Hook-Signature", signature)
+		response := httptest.NewRecorder()
+
+		impl.HandleRequest(core.HTTPRequestContext{
+			Logger:      logrus.NewEntry(logrus.New()),
+			Request:     request,
+			Response:    response,
+			HTTP:        &contexts.HTTPContext{},
+			Integration: integrationCtx,
+		})
+
+		require.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("foreign installation is rejected", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				HostedApp:        true,
+				InstallationUUID: "install-other",
+			},
+			Subscriptions: []contexts.Subscription{
+				{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+			},
+		}
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+		request.Header.Set("Sentry-Hook-Resource", "issue")
+		request.Header.Set("Sentry-Hook-Signature", signature)
+		response := httptest.NewRecorder()
+
+		impl.HandleRequest(core.HTTPRequestContext{
+			Logger:      logrus.NewEntry(logrus.New()),
+			Request:     request,
+			Response:    response,
+			HTTP:        &contexts.HTTPContext{},
+			Integration: integrationCtx,
+		})
+
+		require.Equal(t, http.StatusForbidden, response.Code)
+	})
+}
+
 func Test__Sentry__HandleWebhook__MissingClientSecret(t *testing.T) {
 	impl := &Sentry{}
 	integrationCtx := &contexts.IntegrationContext{
@@ -855,7 +1179,7 @@ func Test__Sentry__Configuration(t *testing.T) {
 	assert.Equal(t, "userToken", fields[1].Name)
 	assert.Equal(t, "User Token", fields[1].Label)
 	assert.Equal(t, "integrationName", fields[2].Name)
-	assert.Equal(t, "Personal auth token from Sentry. Include `project:releases` if you use release actions.", fields[1].Description)
+	assert.Equal(t, "Personal auth token from Sentry. Include `project:releases` if you use release actions. Leave empty when SuperPlane installs the public Sentry app.", fields[1].Description)
 }
 
 func Test__Sentry__Instructions(t *testing.T) {
