@@ -63,6 +63,7 @@ import type {
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 import { withNotifyImplementLog } from "./splitRunNotifyFixture";
+import { PULL_REQUEST_FIXES_PAUSED_HEADLINE } from "./splitRunPullRequestReview";
 
 export type SplitRunPhaseId = string;
 
@@ -221,11 +222,9 @@ const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   text: SPLIT_RUN_WAITING_NOTE.text ?? "",
 };
 
-const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
-
 const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "check-fixes-paused",
-  headline: FIXES_PAUSED_HEADLINE,
+  headline: PULL_REQUEST_FIXES_PAUSED_HEADLINE,
   text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
 };
 
@@ -540,7 +539,7 @@ function waitingReviewSurface(
 }
 
 function pauseFooterNote(notes: WorkOrderStatusNotePresentation[]): WorkOrderStatusNotePresentation {
-  const written = notes.find((note) => note.headline === FIXES_PAUSED_HEADLINE);
+  const written = notes.find((note) => note.headline === PULL_REQUEST_FIXES_PAUSED_HEADLINE);
   if (written) {
     return written;
   }

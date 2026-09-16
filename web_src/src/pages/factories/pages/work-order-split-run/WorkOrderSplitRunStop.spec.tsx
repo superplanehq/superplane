@@ -90,17 +90,52 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
-  it("rejects and approves a waiting pull request task from the More menu", async () => {
-    const user = userEvent.setup();
+  it("does not reject or approve a waiting pull request task from the strip", () => {
     renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
     const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Reject" }));
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(handleRejectMock).not.toHaveBeenCalled();
+    expect(handleStopMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects and approves a waiting task that is not a pull request", async () => {
+    const user = userEvent.setup();
+    renderPopup(
+      splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "dasdas",
+        statusNotes: [],
+        assignees: [{ id: "user-1", name: "test test" }],
+        lineDispatches: [
+          {
+            id: "dispatch-wait",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-1",
+                step: "dasdasdas",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).not.toHaveAttribute("data-variant", "pull-request");
+    await user.click(within(note).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Approve" }));
+    await user.click(within(note).getByRole("button", { name: "Approve" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "completed",
       expect.objectContaining({ kind: "waiting", status: "waiting" }),

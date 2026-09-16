@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { pullRequestReviewNote } from "./splitRunPullRequestReview";
+import { PULL_REQUEST_FIXES_PAUSED_HEADLINE, pullRequestReviewNote } from "./splitRunPullRequestReview";
 
 describe("pullRequestReviewNote", () => {
   it("recognizes a note whose call to action opens a GitHub pull request", () => {
@@ -24,6 +24,16 @@ describe("pullRequestReviewNote", () => {
   it("ignores notes without a link", () => {
     expect(pullRequestReviewNote({ headline: "Implement did not pass", cta: { label: "Debug" } })).toBeUndefined();
     expect(pullRequestReviewNote({ headline: "This task needs a decision" })).toBeUndefined();
+  });
+
+  it("ignores a paused-fixes note that links the pull request", () => {
+    expect(
+      pullRequestReviewNote({
+        headline: PULL_REQUEST_FIXES_PAUSED_HEADLINE,
+        text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
+        cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+      }),
+    ).toBeUndefined();
   });
 
   it("ignores links that are not pull requests", () => {
