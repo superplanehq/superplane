@@ -14,15 +14,16 @@ import (
 // accepts the install code one time only, so the process that answers the
 // callback must read the result of that exchange from here.
 type SentryAppInstallGrant struct {
-	InstallationUUID string `gorm:"primaryKey"`
-	CodeDigest       string
-	OrganizationSlug string
-	AccessToken      []byte
-	RefreshToken     []byte
-	TokenExpiresAt   string
-	ExpiresAt        time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	InstallationUUID     string `gorm:"primaryKey"`
+	CodeDigest           string
+	OrganizationSlug     string
+	AccessToken          []byte
+	RefreshToken         []byte
+	TokenExpiresAt       string
+	ClaimedIntegrationID *string
+	ExpiresAt            time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 func (SentryAppInstallGrant) TableName() string {
@@ -42,7 +43,7 @@ func UpsertSentryAppInstallGrant(tx *gorm.DB, grant SentryAppInstallGrant) error
 		Columns: []clause.Column{{Name: "installation_uuid"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"code_digest", "organization_slug", "access_token", "refresh_token",
-			"token_expires_at", "expires_at", "updated_at",
+			"token_expires_at", "claimed_integration_id", "expires_at", "updated_at",
 		}),
 	}).Create(&grant).Error
 }
@@ -75,6 +76,42 @@ func FindSentryAppInstallGrant(tx *gorm.DB, installationUUID, codeDigest string,
 		return nil, err
 	}
 	return &grant, nil
+}
+
+// ClaimSentryAppInstallGrant assigns an unexpired grant to one integration.
+// The first caller with the matching code wins. The same integration can
+// claim again after a failed bind. A different integration cannot.
+func ClaimSentryAppInstallGrant(tx *gorm.DB, installationUUID, codeDigest, integrationID string, now time.Time) (*SentryAppInstallGrant, error) {
+	installationUUID = strings.TrimSpace(installationUUID)
+	codeDigest = strings.TrimSpace(codeDigest)
+	integrationID = strings.TrimSpace(integrationID)
+	if installationUUID == "" || codeDigest == "" || integrationID == "" {
+		return nil, nil
+	}
+
+	grants := []SentryAppInstallGrant{}
+	err := tx.Raw(
+		`UPDATE sentry_app_install_grants
+		 SET claimed_integration_id = ?, updated_at = ?
+		 WHERE installation_uuid = ?
+		   AND code_digest = ?
+		   AND expires_at > ?
+		   AND (claimed_integration_id IS NULL OR claimed_integration_id = ?)
+		 RETURNING *`,
+		integrationID,
+		now,
+		installationUUID,
+		codeDigest,
+		now,
+		integrationID,
+	).Scan(&grants).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(grants) == 0 {
+		return nil, nil
+	}
+	return &grants[0], nil
 }
 
 // DeleteSentryAppInstallGrant drops the grant of an installation, for example

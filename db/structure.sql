@@ -1121,7 +1121,8 @@ CREATE TABLE public.sentry_app_install_grants (
     token_expires_at text DEFAULT ''::text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_integration_id text
 );
 
 
@@ -4529,7 +4530,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260916135643	f
+20260916172910	f
 \.
 
 

@@ -23,7 +23,7 @@ const hostedInstallGrantTTL = 20 * time.Minute
 // SuperPlane process, so every process reads the grants from one place.
 type hostedInstallGrantStore interface {
 	Remember(install hostedSentryInstall) error
-	Take(installationUUID, code string) (*hostedSentryInstall, error)
+	Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error)
 	Forget(installationUUID string) error
 }
 
@@ -78,10 +78,11 @@ func (databaseHostedInstallGrants) Remember(install hostedSentryInstall) error {
 	})
 }
 
-func (databaseHostedInstallGrants) Take(installationUUID, code string) (*hostedSentryInstall, error) {
+func (databaseHostedInstallGrants) Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error) {
 	installationUUID = strings.TrimSpace(installationUUID)
 	code = strings.TrimSpace(code)
-	if installationUUID == "" || code == "" {
+	integrationID = strings.TrimSpace(integrationID)
+	if installationUUID == "" || code == "" || integrationID == "" {
 		return nil, nil
 	}
 
@@ -90,10 +91,11 @@ func (databaseHostedInstallGrants) Take(installationUUID, code string) (*hostedS
 		return nil, err
 	}
 
-	grant, err := models.FindSentryAppInstallGrant(
+	grant, err := models.ClaimSentryAppInstallGrant(
 		database.Conn(),
 		installationUUID,
 		hostedInstallCodeDigest(code),
+		integrationID,
 		time.Now(),
 	)
 	if err != nil || grant == nil {

@@ -11,14 +11,18 @@ import (
 // tests need no database. The stored behavior of a grant has its own test in
 // pkg/models.
 type fakeHostedInstallGrants struct {
-	mu     sync.Mutex
-	grants map[string]hostedSentryInstall
+	mu        sync.Mutex
+	grants    map[string]hostedSentryInstall
+	claimedBy map[string]string
 }
 
 func useFakeHostedInstallGrants(t *testing.T) *fakeHostedInstallGrants {
 	t.Helper()
 
-	fake := &fakeHostedInstallGrants{grants: map[string]hostedSentryInstall{}}
+	fake := &fakeHostedInstallGrants{
+		grants:    map[string]hostedSentryInstall{},
+		claimedBy: map[string]string{},
+	}
 	previous := hostedInstallGrants
 	hostedInstallGrants = fake
 	t.Cleanup(func() {
@@ -40,13 +44,15 @@ func (f *fakeHostedInstallGrants) Remember(install hostedSentryInstall) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.grants[install.InstallationUUID] = install
+	delete(f.claimedBy, install.InstallationUUID)
 	return nil
 }
 
-func (f *fakeHostedInstallGrants) Take(installationUUID, code string) (*hostedSentryInstall, error) {
+func (f *fakeHostedInstallGrants) Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error) {
 	installationUUID = strings.TrimSpace(installationUUID)
 	code = strings.TrimSpace(code)
-	if installationUUID == "" || code == "" {
+	integrationID = strings.TrimSpace(integrationID)
+	if installationUUID == "" || code == "" || integrationID == "" {
 		return nil, nil
 	}
 
@@ -56,6 +62,10 @@ func (f *fakeHostedInstallGrants) Take(installationUUID, code string) (*hostedSe
 	if !ok || install.Code != code || !install.ExpiresAt.After(time.Now()) {
 		return nil, nil
 	}
+	if claimed, exists := f.claimedBy[installationUUID]; exists && claimed != integrationID {
+		return nil, nil
+	}
+	f.claimedBy[installationUUID] = integrationID
 	copied := install
 	return &copied, nil
 }
@@ -63,6 +73,8 @@ func (f *fakeHostedInstallGrants) Take(installationUUID, code string) (*hostedSe
 func (f *fakeHostedInstallGrants) Forget(installationUUID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	delete(f.grants, strings.TrimSpace(installationUUID))
+	installationUUID = strings.TrimSpace(installationUUID)
+	delete(f.grants, installationUUID)
+	delete(f.claimedBy, installationUUID)
 	return nil
 }

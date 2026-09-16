@@ -281,7 +281,7 @@ func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
 		assert.NotContains(t, request.URL.String(), "/authorizations/")
 	}
 
-	taken, err := grants.Take("install-1", "grant-code")
+	taken, err := grants.Take("install-1", "grant-code", pendingHostedIntegration().ID().String())
 	require.NoError(t, err)
 	assert.Nil(t, taken)
 }
@@ -317,10 +317,14 @@ func Test__afterHostedAppSetup_failedOrgLoad_keepsGrant(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 	assert.NotEqual(t, "ready", integrationCtx.State)
 
-	taken, err := grants.Take("install-1", "grant-code")
+	taken, err := grants.Take("install-1", "grant-code", pendingHostedIntegration().ID().String())
 	require.NoError(t, err)
 	require.NotNil(t, taken)
 	assert.Equal(t, "webhook-token", taken.AccessToken)
+
+	stolen, err := grants.Take("install-1", "grant-code", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	require.NoError(t, err)
+	assert.Nil(t, stolen)
 }
 
 func Test__ParseInstallationCreatedGrant(t *testing.T) {
@@ -357,7 +361,7 @@ func Test__ForgetKnownHostedInstallation_dropsUnclaimedGrant(t *testing.T) {
 	}))
 	require.NoError(t, ForgetKnownHostedInstallation("install-1"))
 
-	taken, err := grants.Take("install-1", "grant-code")
+	taken, err := grants.Take("install-1", "grant-code", pendingHostedIntegration().ID().String())
 	require.NoError(t, err)
 	assert.Nil(t, taken)
 }
@@ -424,7 +428,7 @@ func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 		OrgSlug: "acme",
 	}))
 
-	unclaimed, err := grants.Take("install-1", "grant-code")
+	unclaimed, err := grants.Take("install-1", "grant-code", pendingHostedIntegration().ID().String())
 	require.NoError(t, err)
 	require.NotNil(t, unclaimed)
 	assert.Equal(t, "webhook-token", unclaimed.AccessToken)

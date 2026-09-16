@@ -109,4 +109,39 @@ func Test__SentryAppInstallGrant(t *testing.T) {
 		require.NoError(t, db.Model(&models.SentryAppInstallGrant{}).Count(&count).Error)
 		assert.Equal(t, int64(1), count)
 	})
+
+	t.Run("a grant is claimed by one integration only", func(t *testing.T) {
+		require.NoError(t, models.UpsertSentryAppInstallGrant(db, grant))
+
+		first, err := models.ClaimSentryAppInstallGrant(db, "install-1", "digest-1", "integration-a", now)
+		require.NoError(t, err)
+		require.NotNil(t, first)
+		require.NotNil(t, first.ClaimedIntegrationID)
+		assert.Equal(t, "integration-a", *first.ClaimedIntegrationID)
+
+		retry, err := models.ClaimSentryAppInstallGrant(db, "install-1", "digest-1", "integration-a", now)
+		require.NoError(t, err)
+		require.NotNil(t, retry)
+
+		stolen, err := models.ClaimSentryAppInstallGrant(db, "install-1", "digest-1", "integration-b", now)
+		require.NoError(t, err)
+		assert.Nil(t, stolen)
+	})
+
+	t.Run("a reinstall clears the previous claimant", func(t *testing.T) {
+		require.NoError(t, models.UpsertSentryAppInstallGrant(db, grant))
+		claimed, err := models.ClaimSentryAppInstallGrant(db, "install-1", "digest-1", "integration-a", now)
+		require.NoError(t, err)
+		require.NotNil(t, claimed)
+
+		next := grant
+		next.CodeDigest = "digest-3"
+		require.NoError(t, models.UpsertSentryAppInstallGrant(db, next))
+
+		stolen, err := models.ClaimSentryAppInstallGrant(db, "install-1", "digest-3", "integration-b", now)
+		require.NoError(t, err)
+		require.NotNil(t, stolen)
+		require.NotNil(t, stolen.ClaimedIntegrationID)
+		assert.Equal(t, "integration-b", *stolen.ClaimedIntegrationID)
+	})
 }

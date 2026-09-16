@@ -110,7 +110,18 @@ func (s *Sentry) completeHostedAppInstall(
 	metadata Metadata,
 	installationUUID, orgSlug, code string,
 ) error {
-	tokens, rememberedOrgSlug, err := resolveHostedAppTokens(ctx.HTTP, app, installationUUID, code, metadata.InstallationUUID)
+	integrationID := ""
+	if ctx.Integration != nil {
+		integrationID = ctx.Integration.ID().String()
+	}
+	tokens, rememberedOrgSlug, err := resolveHostedAppTokens(
+		ctx.HTTP,
+		app,
+		installationUUID,
+		code,
+		metadata.InstallationUUID,
+		integrationID,
+	)
 	if err != nil {
 		return err
 	}
@@ -121,8 +132,6 @@ func (s *Sentry) completeHostedAppInstall(
 		return err
 	}
 
-	// Binding succeeded. Drop the grant now. A failed bind still finds
-	// it on retry because Take does not consume the row.
 	if err := hostedInstallGrants.Forget(installationUUID); err != nil {
 		ctx.Logger.Errorf("failed to drop Sentry install grant: %v", err)
 	}
@@ -258,9 +267,9 @@ func sentryAppJWT(app HostedApp) (string, error) {
 func resolveHostedAppTokens(
 	httpCtx core.HTTPContext,
 	app HostedApp,
-	installationUUID, code, knownInstallationUUID string,
+	installationUUID, code, knownInstallationUUID, integrationID string,
 ) (*sentryAppAuthorizationResponse, string, error) {
-	unclaimed, err := hostedInstallGrants.Take(installationUUID, code)
+	unclaimed, err := hostedInstallGrants.Take(installationUUID, code, integrationID)
 	if err != nil {
 		return nil, "", fmt.Errorf("read Sentry install grant: %w", err)
 	}
