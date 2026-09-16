@@ -176,6 +176,51 @@ func Test__afterHostedAppSetup_codeExchangeFailed_doesNotMint(t *testing.T) {
 	assert.Equal(t, "authorization_code", decodeGrantType(t, httpContext.Requests[0]))
 }
 
+func Test__afterHostedAppSetup_finishesInterruptedInstall(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	useFakeHostedInstallGrants(t)
+
+	impl := &Sentry{}
+	integrationCtx := pendingHostedIntegration()
+	metadata, ok := integrationCtx.Metadata.(Metadata)
+	require.True(t, ok)
+	metadata.InstallationUUID = "install-1"
+	integrationCtx.Metadata = metadata
+
+	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusCreated, fmt.Sprintf(
+				`{"token":"minted-token","refreshToken":"refresh-token","expiresAt":%q}`,
+				expiresAt,
+			)),
+			sentryMockResponse(http.StatusOK, `[{"id":"1","slug":"acme","name":"Acme"}]`),
+			sentryMockResponse(http.StatusOK, `{"id":"1","slug":"acme","name":"Acme"}`),
+			sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"payments","name":"Payments"}]`),
+			sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	req := hostedSetupRequest("/api/v1/sentry/app/setup", "csrf-state")
+
+	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
+
+	assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	assert.Equal(t, "ready", integrationCtx.State)
+
+	metadata, ok = integrationCtx.Metadata.(Metadata)
+	require.True(t, ok)
+	assert.Equal(t, "install-1", metadata.InstallationUUID)
+	require.NotNil(t, metadata.Organization)
+	assert.Equal(t, "acme", metadata.Organization.Slug)
+
+	require.GreaterOrEqual(t, len(httpContext.Requests), 1)
+	assert.Equal(t, sentryAppJWTGrantType, decodeGrantType(t, httpContext.Requests[0]))
+}
+
 func Test__afterHostedAppSetup_mismatchedState_rejects(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")

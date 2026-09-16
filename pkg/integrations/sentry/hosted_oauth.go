@@ -48,7 +48,7 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationUUID != "" {
+	if hostedInstallFinished(metadata) {
 		redirectToSetupReturn(ctx)
 		return
 	}
@@ -65,6 +65,9 @@ func (s *Sentry) afterHostedAppSetup(ctx core.HTTPRequestContext) {
 	}
 
 	code, installationUUID, orgSlug := sentryAppSetupQuery(ctx.Request)
+	if installationUUID == "" {
+		installationUUID = strings.TrimSpace(metadata.InstallationUUID)
+	}
 	if installationUUID != "" {
 		app, ok := HostedAppFromEnv()
 		if !ok {
@@ -506,6 +509,17 @@ func ParseInstallationDeletedUUID(resource string, body []byte) (string, bool) {
 		return "", false
 	}
 	return uuid, true
+}
+
+// hostedInstallFinished reports whether an earlier callback stored the
+// installation and the organization the connection reads from. A callback that
+// stopped between the two must run again instead of redirecting to a
+// connection that never became ready.
+func hostedInstallFinished(metadata Metadata) bool {
+	if strings.TrimSpace(metadata.InstallationUUID) == "" {
+		return false
+	}
+	return metadata.Organization != nil && strings.TrimSpace(metadata.Organization.Slug) != ""
 }
 
 func decodeHostedMetadata(ctx core.HTTPRequestContext) (Metadata, bool) {
