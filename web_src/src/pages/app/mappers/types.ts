@@ -127,6 +127,8 @@ export type ComponentBaseContext = {
   currentUser: User | undefined;
   actions: ActionContext;
   canvasMode?: "live" | "edit";
+  organizationId?: string;
+  canvasId?: string;
 };
 
 export type ActionContext = {
