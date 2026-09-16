@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { AgentActivityView } from "./AgentActivityView";
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
-import { currentLiveActivity, type AgentActivity, type AgentActivityItem, type AgentToolItem } from "./agentActivity";
-import { activitySummaryLabel } from "./agentActivitySummary";
+import { currentLiveActivity, type AgentActivity, type AgentActivityItem } from "./agentActivity";
 import { useAgentActivityStream } from "./useAgentActivityStream";
 
 const STALE_ACTIVITY_MS = 15_000;
@@ -32,15 +31,17 @@ export function AnalysisLiveWork({
   return (
     <div data-testid="split-run-intent-live-work">
       {activity ? <AgentActivityView activity={activity} live /> : null}
-      <p
-        role="status"
-        aria-label={status}
-        aria-live="polite"
-        className="px-2 py-1.5 text-[13px] leading-5 text-muted-foreground"
-        data-testid="split-run-intent-thinking"
-      >
-        <AnimatedThinkingState text={status} />
-      </p>
+      {status ? (
+        <p
+          role="status"
+          aria-label={status}
+          aria-live="polite"
+          className="px-2 py-1.5 text-[13px] leading-5 text-muted-foreground"
+          data-testid="split-run-intent-thinking"
+        >
+          <AnimatedThinkingState text={status} />
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -57,7 +58,7 @@ function useActivityElapsed(sequence: number, active: boolean): number {
   return elapsedMs;
 }
 
-function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): string {
+function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): string | undefined {
   if (error) return "Live activity disconnected. Reconnecting…";
   if (elapsedMs >= STALE_ACTIVITY_MS) {
     return `Still working · ${Math.floor(elapsedMs / 1000)}s`;
@@ -66,14 +67,10 @@ function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, erro
 
   const latestRunningItem = findLatestRunningItem(activity.items);
   if (latestRunningItem?.type === "content") {
-    return latestRunningItem.kind === "reasoning" ? "Thinking…" : "Writing response…";
+    if (latestRunningItem.kind === "reasoning" || latestRunningItem.text.trim()) return undefined;
+    return "Writing response…";
   }
-  if (latestRunningItem?.type === "tool") {
-    const runningTools = activity.items.filter(
-      (item): item is AgentToolItem => item.type === "tool" && item.status === "running",
-    );
-    return `${activitySummaryLabel(runningTools)}…`;
-  }
+  if (latestRunningItem?.type === "tool") return undefined;
   return "Planning next step…";
 }
 

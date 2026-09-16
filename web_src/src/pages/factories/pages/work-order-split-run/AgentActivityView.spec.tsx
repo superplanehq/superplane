@@ -141,6 +141,7 @@ describe("AgentActivityView", () => {
 
     const summary = screen.getByRole("button", { name: "Exploring 1 file, searching code" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(summary.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
     expect(summary.querySelector("svg")).toHaveClass("opacity-0", "group-hover:opacity-100");
     expect(screen.queryByText("cat README.md")).not.toBeInTheDocument();
 
@@ -149,6 +150,27 @@ describe("AgentActivityView", () => {
     expect(screen.getByText("cat README.md")).toBeInTheDocument();
     expect(screen.getByText("rg --files")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-tool-details-command-1")).not.toBeInTheDocument();
+  });
+
+  it("animates a running tool group when its factual summary changes", () => {
+    const firstTool = { ...completedTool("command-1", "bash", "Bash"), input: "rg retry", status: "running" as const };
+    const { rerender } = render(<AgentActivityView live activity={activityWith(firstTool)} />);
+
+    expect(screen.getByRole("button", { name: "Searching code" })).toBeInTheDocument();
+
+    rerender(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          firstTool,
+          { ...completedTool("command-2", "bash", "Bash"), input: "cat retry.go", status: "running" },
+        ])}
+      />,
+    );
+
+    const summary = screen.getByRole("button", { name: "Exploring 1 file, searching code" });
+    expect(summary.querySelector(".sp-thinking-state-current")).toHaveTextContent("Exploring 1 file, searching code");
+    expect(summary.querySelector(".sp-thinking-state-outgoing")).toHaveTextContent("Searching code");
   });
 
   it("keeps one running command inside the same summary pattern", async () => {

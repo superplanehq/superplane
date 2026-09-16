@@ -28,8 +28,12 @@ export function AnimatedThinkingState({ text }: { text: string }) {
   return (
     <span className="sp-thinking-state" aria-hidden>
       <span className="sp-thinking-state-sizer" data-text={sizerText} />
-      {frame.outgoing ? <span className="sp-thinking-state-outgoing">{frame.outgoing}</span> : null}
-      <span className="sp-ai-thinking sp-thinking-state-current" data-text={frame.current}>
+      {frame.outgoing ? (
+        <span key={frame.outgoing} className="sp-ai-thinking sp-thinking-state-outgoing" data-text={frame.outgoing}>
+          {frame.outgoing}
+        </span>
+      ) : null}
+      <span key={frame.current} className="sp-ai-thinking sp-thinking-state-current" data-text={frame.current}>
         {frame.current}
       </span>
     </span>

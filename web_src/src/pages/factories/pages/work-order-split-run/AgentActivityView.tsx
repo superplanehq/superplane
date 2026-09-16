@@ -6,6 +6,7 @@ import { CopyButton } from "@/ui/CopyButton";
 import { ChevronRight } from "lucide-react";
 
 import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem } from "./agentActivity";
+import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
   activitySummaryLabel,
   commandDisplayText,
@@ -147,11 +148,8 @@ function ActivitySummaryButton({
       data-testid={testId}
       className="group sp-tool-enter flex w-full items-start gap-2 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
     >
-      <span
-        className={cn("min-w-0 flex-1 whitespace-normal break-words", running && "sp-ai-thinking")}
-        data-text={running ? label : undefined}
-      >
-        {label}
+      <span className="min-w-0 flex-1 whitespace-normal break-words">
+        {running ? <AnimatedThinkingState text={label} /> : label}
       </span>
       <ChevronRight
         className={cn(

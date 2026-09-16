@@ -79,8 +79,10 @@ describe("AnalysisLiveWork", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Searching code" })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Searching code…");
+    const activity = screen.getByRole("button", { name: "Searching code" });
+    expect(activity).toBeInTheDocument();
+    expect(activity.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
   });
 
   it("shows an honest starting state before the first provider event", () => {
@@ -140,7 +142,39 @@ describe("AnalysisLiveWork", () => {
     render(<AnalysisLiveWork machineStatus="running" />);
     expect(screen.getByText("I need to inspect the retry path.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Searching code" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Searching code…");
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+  });
+
+  it("keeps an animated writing status until assistant text arrives", () => {
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      isConnected: true,
+      hasConnectedOnce: true,
+      activities: [
+        {
+          id: "activity-1",
+          provider: "claude",
+          status: "running",
+          sequence: 1,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "assistant-1",
+              kind: "assistant",
+              text: "",
+              status: "running",
+              truncated: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AnalysisLiveWork machineStatus="running" />);
+
+    const status = screen.getByTestId("split-run-intent-thinking");
+    expect(status).toHaveAccessibleName("Writing response…");
+    expect(status.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
   });
 
   it("keeps successful and failed live commands collapsed", async () => {
@@ -229,7 +263,7 @@ describe("AnalysisLiveWork", () => {
     );
   });
 
-  it("moves the animated tail status through real activity phases", () => {
+  it("shows one animated status for active work and resumes the tail after it completes", () => {
     const activity = {
       id: "activity-1",
       provider: "codex",
@@ -254,7 +288,8 @@ describe("AnalysisLiveWork", () => {
     });
 
     const { rerender } = render(<AnalysisLiveWork machineStatus="running" />);
-    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Thinking…");
+    expect(screen.getByRole("status", { name: "Thinking" })).toHaveClass("sp-ai-thinking");
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
 
     vi.mocked(useAgentActivityStream).mockReturnValue({
       activities: [
@@ -282,10 +317,9 @@ describe("AnalysisLiveWork", () => {
     });
     rerender(<AnalysisLiveWork machineStatus="running" />);
 
-    const status = screen.getByTestId("split-run-intent-thinking");
-    expect(status).toHaveTextContent("Searching code…");
-    expect(status.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
-    expect(status.querySelector(".sp-thinking-state-outgoing")).toBeInTheDocument();
+    const activityStatus = screen.getByRole("button", { name: "Searching code" });
+    expect(activityStatus.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
 
     vi.mocked(useAgentActivityStream).mockReturnValue({
       activities: [
