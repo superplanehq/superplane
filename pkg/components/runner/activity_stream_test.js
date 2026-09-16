@@ -86,7 +86,7 @@ test("redacts credentials from activity text", () => {
 });
 
 test("redacts the planning session runner token from activity text", () => {
-  const token = "eyJhbGciOiJIUzI1NiJ9.eyJwdXJwb3NlIjoicGxhbm5pbmdfc2Vzc2lvbiJ9.signature";
+  const token = "runner-token-value-for-redaction-test";
   const output = redactSensitiveText(`SUPERPLANE_RUN_TOKEN=${token}\n${token}`, {
     SUPERPLANE_RUN_TOKEN: token,
   });
