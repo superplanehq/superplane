@@ -629,6 +629,85 @@ func TestAgentStreamWorker_MarksFailedOnSessionError(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status)
 }
 
+func TestAgentStreamWorker_MarksFailedWhenTurnDeadlineExpires(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		err:  context.DeadlineExceeded,
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{
+		SessionID: session.ID.String(),
+	})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status,
+		"a deadline error from the provider must fail the session, not read as a completed turn")
+}
+
+func TestAgentStreamWorker_LeavesSessionStreamingOnWorkerShutdown(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		// release is never closed, so StreamEvents blocks until the
+		// worker's context ends and then returns ctx.Err().
+		release: make(chan struct{}),
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{
+		SessionID: session.ID.String(),
+	})
+
+	// Production rows always carry a heartbeat (dispatch starts one before
+	// handling); seed it so the reclaim assertion below exercises the
+	// heartbeat branch of FailStuckStreamingSessions, not the legacy one.
+	require.NoError(t, models.TouchAgentSessionHeartbeat(session.ID))
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- w.Handle(parentCtx, body)
+	}()
+	select {
+	case <-provider.streamReady:
+	case <-time.After(10 * time.Second):
+		t.Fatal("worker never reached StreamEvents")
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Handle did not return after parent context cancel")
+	}
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status,
+		"a turn interrupted by worker shutdown has no outcome; the row must stay streaming so cleanup can reclaim it")
+
+	// The abandoned row must be reclaimable through the heartbeat branch.
+	reclaimed, err := models.FailStuckStreamingSessions(time.Now().Add(time.Minute), time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	require.Len(t, reclaimed, 1)
+	assert.Equal(t, session.ID, reclaimed[0].ID)
+}
+
 func TestAgentStreamWorker_SkipsUnknownProvider(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
