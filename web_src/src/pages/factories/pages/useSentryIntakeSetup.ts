@@ -15,12 +15,10 @@ import { useLocation } from "react-router";
 export type SentrySetupStep = "connection" | "project";
 
 export function useSentryIntakeSetup(organizationId: string, factoryId: string) {
-  const location = useLocation();
   const [step, setStep] = useState<SentrySetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -65,56 +63,17 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     void connectedQuery.refetch();
   };
 
-  const createNewSentryConnection = async () => {
-    const { result } = await createWithGeneratedName({
-      baseName: "sentry",
-      takenNames: existingNames,
-      create: (name) =>
-        createIntegration.mutateAsync({
-          integrationName: "sentry",
-          name,
-          configuration: { setupReturnPath: `${location.pathname}${location.search}` },
-        }),
-    });
-    return result.data?.integration;
-  };
-
-  const openSentryInstallOrDialog = (integration: Awaited<ReturnType<typeof createNewSentryConnection>>) => {
-    if (integration?.status?.state === "ready" && integration.metadata?.id) {
-      completeConnection(integration.metadata.id);
-      return;
-    }
-
-    const action = integration?.status?.browserAction;
-    rememberIntegrationSetupReturn(organizationId, `${location.pathname}${location.search}`);
-    if (isHostedSentryInstallAction(action?.url)) {
-      followBrowserAction(action);
-      return;
-    }
-
-    setConnectOpen(true);
-    if (integration?.metadata?.id) {
-      setIntegrationId(integration.metadata.id);
-    }
-  };
-
-  const connectSentry = async () => {
-    setError(undefined);
-    const readyId = readySentryConnectionId(sentryIntegrations, integrationId);
-    if (readyId) {
-      completeConnection(readyId);
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      openSentryInstallOrDialog(await createNewSentryConnection());
-    } catch (cause) {
-      setError(getApiErrorMessage(cause, SENTRY_CONNECT_ERROR));
-    } finally {
-      setConnecting(false);
-    }
-  };
+  const { connecting, connectSentry } = useSentryConnect({
+    organizationId,
+    integrations: sentryIntegrations,
+    integrationId,
+    existingNames,
+    createIntegration,
+    completeConnection,
+    setIntegrationId,
+    setConnectOpen,
+    setError,
+  });
 
   const returnToConnection = () => {
     setStayOnConnection(true);
@@ -165,6 +124,80 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
 
 const SENTRY_CONNECT_ERROR = "SuperPlane could not open the Sentry install page.";
 const SENTRY_CREATE_ERROR = "SuperPlane could not create the Sentry intake.";
+
+type SentryConnectParams = {
+  organizationId: string;
+  integrations: Array<{ metadata?: { id?: string } }>;
+  integrationId: string;
+  existingNames: Set<string>;
+  createIntegration: ReturnType<typeof useCreateIntegration>;
+  completeConnection: (integrationId: string) => void;
+  setIntegrationId: (integrationId: string) => void;
+  setConnectOpen: (open: boolean) => void;
+  setError: (message?: string) => void;
+};
+
+// useSentryConnect opens a new Sentry connection. SuperPlane Cloud sends the
+// browser to the public Sentry app, and a private app collects a token in the
+// connect dialog.
+function useSentryConnect(params: SentryConnectParams) {
+  const location = useLocation();
+  const [connecting, setConnecting] = useState(false);
+  const returnPath = `${location.pathname}${location.search}`;
+
+  const createConnection = async () => {
+    const { result } = await createWithGeneratedName({
+      baseName: "sentry",
+      takenNames: params.existingNames,
+      create: (name) =>
+        params.createIntegration.mutateAsync({
+          integrationName: "sentry",
+          name,
+          configuration: { setupReturnPath: returnPath },
+        }),
+    });
+    return result.data?.integration;
+  };
+
+  const openInstallOrDialog = (integration: Awaited<ReturnType<typeof createConnection>>) => {
+    if (integration?.status?.state === "ready" && integration.metadata?.id) {
+      params.completeConnection(integration.metadata.id);
+      return;
+    }
+
+    const action = integration?.status?.browserAction;
+    rememberIntegrationSetupReturn(params.organizationId, returnPath);
+    if (isHostedSentryInstallAction(action?.url)) {
+      followBrowserAction(action);
+      return;
+    }
+
+    params.setConnectOpen(true);
+    if (integration?.metadata?.id) {
+      params.setIntegrationId(integration.metadata.id);
+    }
+  };
+
+  const connectSentry = async () => {
+    params.setError(undefined);
+    const readyId = readySentryConnectionId(params.integrations, params.integrationId);
+    if (readyId) {
+      params.completeConnection(readyId);
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      openInstallOrDialog(await createConnection());
+    } catch (cause) {
+      params.setError(getApiErrorMessage(cause, SENTRY_CONNECT_ERROR));
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  return { connecting, connectSentry };
+}
 
 export function isHostedSentryInstallAction(url: string | undefined): boolean {
   if (!url) return false;
