@@ -29,6 +29,12 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /2 to 4 short sentences/);
   assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /call survey with 2 to 4 options/);
+  assert.match(
+    pack,
+    /\{"questions":\[\{"prompt":"Your question","options":\["First option","Second option"\]\}\]\}/,
+  );
+  assert.match(pack, /Do not use XML tags/);
+  assert.match(pack, /If the survey tool is unavailable or fails, do not put the questions in chat/);
   assert.match(pack, /If the score is 1 or 2/);
   assert.match(pack, /do not have enough Clarity to write a plan/);
   assert.match(pack, /Keep asking until Clarity is 5/);
@@ -50,19 +56,34 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
 
 test("embedded analysis protocol is removed from the task prompt", () => {
   const protocol = analysisProtocol();
-  assert.equal(withoutEmbeddedAnalysisProtocol(`${protocol}\n\nTask:\nFix retries.`), "Task:\nFix retries.");
-  assert.equal(withoutEmbeddedAnalysisProtocol("Legacy analysis prompt."), "Legacy analysis prompt.");
+  assert.equal(
+    withoutEmbeddedAnalysisProtocol(`${protocol}\n\nTask:\nFix retries.`),
+    "Task:\nFix retries.",
+  );
+  assert.equal(
+    withoutEmbeddedAnalysisProtocol("Legacy analysis prompt."),
+    "Legacy analysis prompt.",
+  );
 });
 
 test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "analysis-continuation-"));
-  fs.writeFileSync(path.join(dir, "analysis_continuation.md"), "Continue this SuperPlane analysis session.\n");
+  fs.writeFileSync(
+    path.join(dir, "analysis_continuation.md"),
+    "Continue this SuperPlane analysis session.\n",
+  );
   assert.equal(
     withAnalysisContinuation(dir, 0, "Analyze the task."),
     "Continue this SuperPlane analysis session.\n\nAnalyze the task.",
   );
-  assert.equal(withAnalysisContinuation(dir, 1, "Analyze the task."), "Analyze the task.");
-  assert.equal(withAnalysisContinuation(path.join(dir, "missing"), 0, "Analyze the task."), "Analyze the task.");
+  assert.equal(
+    withAnalysisContinuation(dir, 1, "Analyze the task."),
+    "Analyze the task.",
+  );
+  assert.equal(
+    withAnalysisContinuation(path.join(dir, "missing"), 0, "Analyze the task."),
+    "Analyze the task.",
+  );
 });
 
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {
@@ -70,8 +91,15 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
   const spec = path.join(dir, "spec.md");
   const score = path.join(dir, "score.json");
   writeAnalysisOutputs(
-    { spec: "# Add breed\n", score: 4, summary: "The CRUD files already exist." },
-    { SUPERPLANE_ANALYSIS_SPEC_FILE: spec, SUPERPLANE_ANALYSIS_SCORE_FILE: score },
+    {
+      spec: "# Add breed\n",
+      score: 4,
+      summary: "The CRUD files already exist.",
+    },
+    {
+      SUPERPLANE_ANALYSIS_SPEC_FILE: spec,
+      SUPERPLANE_ANALYSIS_SCORE_FILE: score,
+    },
   );
   assert.equal(fs.readFileSync(spec, "utf8"), "# Add breed\n");
   assert.deepEqual(JSON.parse(fs.readFileSync(score, "utf8")), {
@@ -121,10 +149,12 @@ test("proposeSpec and proposeConfidence publish on separate routes", async () =>
 test("recordAgentMessage publishes the final reply outside the MCP tool list", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
   const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousActivityID = process.env.SUPERPLANE_ACTIVITY_ID;
   const previousFetch = global.fetch;
   const calls = [];
   process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
   process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  process.env.SUPERPLANE_ACTIVITY_ID = "activity-1";
   global.fetch = async (url, options) => {
     calls.push({ url, options });
     return { ok: true, text: async () => '{"status":"shown"}' };
@@ -134,16 +164,25 @@ test("recordAgentMessage publishes the final reply outside the MCP tool list", a
     const result = await recordAgentMessage("  I found the retry seam.  ");
     assert.deepEqual(result, { status: "shown" });
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/agent-messages");
+    assert.equal(
+      calls[0].url,
+      "https://superplane.example/api/v1/runner/planning-sessions/agent-messages",
+    );
     assert.equal(calls[0].options.method, "POST");
     assert.equal(calls[0].options.headers.Authorization, "Bearer runner-token");
-    assert.deepEqual(JSON.parse(calls[0].options.body), { text: "I found the retry seam." });
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      text: "I found the retry seam.",
+      activity_id: "activity-1",
+    });
   } finally {
     global.fetch = previousFetch;
     if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
     else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
     if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
     else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+    if (previousActivityID === undefined)
+      delete process.env.SUPERPLANE_ACTIVITY_ID;
+    else process.env.SUPERPLANE_ACTIVITY_ID = previousActivityID;
   }
 });
 
@@ -153,7 +192,11 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
-      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" },
+      },
     },
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
   ]);
@@ -173,12 +216,31 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.match(replies[1].result.tools[1].description, /Keep asking until Clarity is 5/);
   assert.match(replies[1].result.tools[1].description, /Review it and start if you are happy/);
   assert.match(replies[1].result.tools[2].description, /Clarity is below 5/);
+  assert.match(replies[1].result.tools[2].description, /two valid readings exist/);
+  assert.match(
+    replies[1].result.tools[2].inputSchema.properties.questions.description,
+    /JSON array/,
+  );
+  assert.equal(replies[1].result.tools[2].inputSchema.additionalProperties, undefined);
+  assert.equal(
+    replies[1].result.tools[2].inputSchema.properties.questions.items.additionalProperties,
+    undefined,
+  );
+  assert.equal(
+    replies[1].result.tools[2].inputSchema.properties.questions.items.properties.options.minItems,
+    undefined,
+  );
   assert.doesNotMatch(replies[1].result.tools[1].description, /check copy/);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
   const replies = await exchangeMCP("lsp", [
-    { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {} } },
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2024-11-05", capabilities: {} },
+    },
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
   ]);
   assert.deepEqual(
@@ -188,10 +250,14 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
 });
 
 async function exchangeMCP(format, messages) {
-  const child = spawn(process.execPath, [path.join(__dirname, "planning_session_mcp.js")], {
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env },
-  });
+  const child = spawn(
+    process.execPath,
+    [path.join(__dirname, "planning_session_mcp.js")],
+    {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env },
+    },
+  );
   const replies = [];
   let buf = Buffer.alloc(0);
   child.stdout.on("data", (chunk) => {
@@ -208,7 +274,11 @@ async function exchangeMCP(format, messages) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   child.kill();
-  assert.equal(replies.length, messages.length, `expected ${messages.length} ${format} replies, got ${replies.length}`);
+  assert.equal(
+    replies.length,
+    messages.length,
+    `expected ${messages.length} ${format} replies, got ${replies.length}`,
+  );
   return replies;
 }
 
@@ -239,7 +309,9 @@ function drainReplies(buffer, format) {
       if (rest.length < bodyStart + length) {
         return { messages, rest };
       }
-      messages.push(JSON.parse(rest.slice(bodyStart, bodyStart + length).toString("utf8")));
+      messages.push(
+        JSON.parse(rest.slice(bodyStart, bodyStart + length).toString("utf8")),
+      );
       rest = rest.slice(bodyStart + length);
     }
   }

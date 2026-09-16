@@ -16,6 +16,35 @@ const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
 const SESSION_FILE = "opencode_session";
+
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
 const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
@@ -369,6 +398,8 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const recordAgentMessage =
     helpers.recordAgentMessage || ((text) => require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(text));
   const planning = planningEnabled(env);
+  const activity = loadActivityStreamModule().createActivityStream({ provider: "openrouter", env, turn: promptCount + 1 });
+  activity.start();
   if (planning) {
     printLiveLogLine("Planning session tools enabled");
   }
@@ -400,7 +431,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const formatter = createOpenCodeFormatter(telemetry, (id) => {
     sessionID = id || sessionID;
     writeSessionID(sp, sessionID);
-  });
+  }, activity);
   const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
   const sessionUsageBefore = loadSessionUsage(sp);
   const sessionStepsBefore = readSessionStepUsages(sp);
@@ -469,11 +500,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
       break;
     }
     printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    activity.notice("retry", `OpenRouter request retry ${attempt + 1}`);
     await sleep(waitMs);
     attempt += 1;
   }
 
   formatter.flush(failed);
+  activity.end(failed ? "failed" : "passed");
+  await activity.flush();
   const sessionSteps = newSessionStepUsages(readSessionStepUsages(sp), sessionStepsBefore);
   const recorded = preferRecordedUsage(
     usageWithCost(lastUsage, lastCost),
@@ -1165,9 +1199,12 @@ function println(text = "") {
   writeStdout(`${text}\n`);
 }
 
-function createOpenCodeFormatter(telemetry, onSession) {
+function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
+  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "openrouter" });
   const tools = createToolTracker(tracker);
+  const contentText = new Map();
+  const toolOutputText = new Map();
   let sessionID = "";
   let resultFailed = false;
   let errorText = "";
@@ -1242,16 +1279,22 @@ function createOpenCodeFormatter(telemetry, onSession) {
             if (!roundOpen) {
               beginRound(undefined, { message: lastText });
             }
-            println(lastText);
+            emitOpenCodeContent(activity, contentText, "assistant", part, lastText);
+            if (!activity.enabled) {
+              println(lastText);
+            }
           }
           break;
         }
         case "reasoning": {
           const thinking = typeof part.text === "string" ? part.text : "";
           if (thinking.trim()) {
-            println("Thinking");
-            println(truncateText(thinking.trim()));
-            println();
+            emitOpenCodeContent(activity, contentText, "reasoning", part, thinking);
+            if (!activity.enabled) {
+              println("Thinking");
+              println(truncateText(thinking.trim()));
+              println();
+            }
           }
           break;
         }
@@ -1259,7 +1302,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
           if (!roundOpen) {
             beginRound(undefined, { hasTools: true });
           }
-          formatToolUse(part, tools);
+          formatToolUse(part, tools, activity, toolOutputText);
           break;
         case "step_finish":
         case "step-finish": {
@@ -1290,6 +1333,9 @@ function createOpenCodeFormatter(telemetry, onSession) {
     },
     flush(failed) {
       tools.flush(Boolean(failed));
+      for (const [id] of contentText) {
+        activity.endContent(id);
+      }
     },
     snapshot() {
       return {
@@ -1309,6 +1355,18 @@ function createOpenCodeFormatter(telemetry, onSession) {
       return resultFailed;
     },
   };
+}
+
+function emitOpenCodeContent(activity, seenText, kind, part, nextText) {
+  if (!activity.enabled) {
+    return;
+  }
+  const id = String(part.id || part.partID || `${kind}-${seenText.size + 1}`);
+  const previous = seenText.get(id) || "";
+  const delta = nextText.startsWith(previous) ? nextText.slice(previous.length) : nextText;
+  activity.startContent(kind, id);
+  activity.appendContent(kind, id, delta);
+  seenText.set(id, nextText);
 }
 
 function createToolTracker(telemetry) {
@@ -1333,6 +1391,9 @@ function createToolTracker(telemetry) {
   return {
     start(kind, text, id) {
       const key = resolveKey(id, true);
+      if (openTools.has(key)) {
+        return key;
+      }
       const startedAt = Date.now();
       openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
       return key;
@@ -1391,24 +1452,61 @@ function createToolTracker(telemetry) {
   };
 }
 
-function formatToolUse(part, tools) {
+function formatToolUse(part, tools, activity = createDisabledActivityStream(), seenOutput = new Map()) {
   const name = String(part.tool || part.name || "tool");
   const kind = name.toLowerCase();
   const state = part.state && typeof part.state === "object" ? part.state : {};
   const id = part.callID || part.id || "";
   const started = tools.start(kind, toolInputDetail(name, state.input) || kind, id);
   tools.emitStart(started);
+  activity.startTool({ id: started, kind: normalizeOpenCodeToolKind(kind), name, input: toolInputDetail(name, state.input) });
   const output = typeof state.output === "string" ? state.output : "";
   if (output.trim()) {
-    println(truncateText(output.replace(/\s+$/, "")));
+    const previous = seenOutput.get(started) || "";
+    const outputDelta = output.startsWith(previous) ? output.slice(previous.length) : output;
+    seenOutput.set(started, output);
+    if (activity.enabled) {
+      activity.appendToolOutput(started, outputDelta, "stdout");
+    } else {
+      println(truncateText(output.replace(/\s+$/, "")));
+    }
   } else if (state.error) {
     const errText = typeof state.error === "string" ? state.error : JSON.stringify(state.error);
     if (errText.trim()) {
-      println(truncateText(errText));
+      const previous = seenOutput.get(started) || "";
+      const outputDelta = errText.startsWith(previous) ? errText.slice(previous.length) : errText;
+      seenOutput.set(started, errText);
+      if (activity.enabled) {
+        activity.appendToolOutput(started, outputDelta, "stderr");
+      } else {
+        println(truncateText(errText));
+      }
     }
   }
-  const failed = state.status === "error" || Boolean(state.error);
+  const stateStatus = String(state.status || "").toLowerCase();
+  if (["pending", "running"].includes(stateStatus)) {
+    return;
+  }
+  const failed = stateStatus === "error" || Boolean(state.error);
+  activity.endTool(started, { status: openCodeToolStatus(stateStatus, failed) });
   tools.end(failed, started);
+  seenOutput.delete(started);
+}
+
+function normalizeOpenCodeToolKind(kind) {
+  const normalized = String(kind || "tool").toLowerCase();
+  if (normalized === "grep" || normalized === "glob") return "search";
+  if (normalized === "notebookedit") return "edit";
+  if (normalized === "websearch" || normalized === "web_search") return "web_search";
+  if (normalized === "webfetch" || normalized === "web_fetch") return "web_fetch";
+  return normalized;
+}
+
+function openCodeToolStatus(status, failed) {
+  if (status === "cancelled" || status === "canceled") return "cancelled";
+  if (status === "timed_out" || status === "timeout") return "timed_out";
+  if (status === "interrupted") return "interrupted";
+  return failed ? "failed" : "passed";
 }
 
 function toolInputDetail(name, rawInput) {
@@ -1422,7 +1520,7 @@ function toolInputDetail(name, rawInput) {
   if (lowered === "bash") {
     const command = rawInput.command;
     if (typeof command === "string" && command.trim()) {
-      return command.trim().split(/\r?\n/).join(" ");
+      return command;
     }
   }
   if (["read", "write", "edit", "notebookedit"].includes(lowered)) {

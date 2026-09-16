@@ -39,7 +39,8 @@ async function requestJSON(method, path, body) {
     }
   }
   if (!response.ok) {
-    const message = parsed.message || parsed.error || text || `HTTP ${response.status}`;
+    const message =
+      parsed.message || parsed.error || text || `HTTP ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
     throw error;
@@ -52,7 +53,9 @@ function surveyQuestions(input) {
   return raw.map((question) => ({
     prompt: String((question && question.prompt) || "").trim(),
     options: Array.isArray(question && question.options)
-      ? question.options.map((option) => String(option || "").trim()).filter(Boolean)
+      ? question.options
+          .map((option) => String(option || "").trim())
+          .filter(Boolean)
       : [],
   }));
 }
@@ -66,7 +69,9 @@ async function proposeSurvey(input) {
 function analysisOutputPaths(env = process.env) {
   return {
     spec: String(env.SUPERPLANE_ANALYSIS_SPEC_FILE || "/tmp/spec.md"),
-    score: String(env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json"),
+    score: String(
+      env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json",
+    ),
   };
 }
 
@@ -88,7 +93,8 @@ function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
         paths.score,
         `${JSON.stringify({
           score: Math.round(Number(score) * 20),
-          summary: summary != null ? String(summary) : String(existing.summary || ""),
+          summary:
+            summary != null ? String(summary) : String(existing.summary || ""),
           reasons,
         })}\n`,
       );
@@ -103,7 +109,11 @@ async function proposeSpec(input) {
   if (!body) {
     throw new Error("body is required");
   }
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+  const result = await requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/specs",
+    { body },
+  );
   writeAnalysisOutputs({ spec: body });
   return result;
 }
@@ -114,10 +124,14 @@ async function proposeConfidence(input) {
     throw new Error("score is required");
   }
   const summary = String((input && input.summary) || "").trim();
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
-    score,
-    summary,
-  });
+  const result = await requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/confidence",
+    {
+      score,
+      summary,
+    },
+  );
   writeAnalysisOutputs({ score, summary });
   return result;
 }
@@ -127,7 +141,15 @@ async function recordAgentMessage(text) {
   if (!body) {
     return { status: "ignored" };
   }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/agent-messages", { text: body });
+  return requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/agent-messages",
+    {
+      text: body,
+      activity_id:
+        String(process.env.SUPERPLANE_ACTIVITY_ID || "").trim() || undefined,
+    },
+  );
 }
 
 const TOOLS = [
@@ -171,6 +193,8 @@ const TOOLS = [
       properties: {
         questions: {
           type: "array",
+          description:
+            "A JSON array of question objects. Do not pass XML or a JSON-encoded string.",
           items: {
             type: "object",
             properties: {
@@ -221,7 +245,10 @@ async function handleRequest(message) {
     });
     return;
   }
-  if (method === "notifications/initialized" || method === "notifications/cancelled") {
+  if (
+    method === "notifications/initialized" ||
+    method === "notifications/cancelled"
+  ) {
     return;
   }
   if (method === "ping") {
@@ -253,7 +280,12 @@ async function handleRequest(message) {
       });
     } catch (err) {
       sendResult(id, {
-        content: [{ type: "text", text: err && err.message ? err.message : String(err) }],
+        content: [
+          {
+            type: "text",
+            text: err && err.message ? err.message : String(err),
+          },
+        ],
         isError: true,
       });
     }
@@ -300,7 +332,13 @@ function parseFrames(buffer) {
 
 function skipASCIIWhitespace(buffer) {
   let index = 0;
-  while (index < buffer.length && (buffer[index] === 0x09 || buffer[index] === 0x0a || buffer[index] === 0x0d || buffer[index] === 0x20)) {
+  while (
+    index < buffer.length &&
+    (buffer[index] === 0x09 ||
+      buffer[index] === 0x0a ||
+      buffer[index] === 0x0d ||
+      buffer[index] === 0x20)
+  ) {
     index += 1;
   }
   return index === 0 ? buffer : buffer.slice(index);
@@ -357,7 +395,11 @@ async function main() {
     for (const message of parsed.messages) {
       Promise.resolve(handleRequest(message)).catch((err) => {
         if (message && message.id != null) {
-          sendError(message.id, -32603, err && err.message ? err.message : String(err));
+          sendError(
+            message.id,
+            -32603,
+            err && err.message ? err.message : String(err),
+          );
         }
       });
     }

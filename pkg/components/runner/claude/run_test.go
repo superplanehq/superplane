@@ -278,6 +278,49 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Equal(t, float64(1), records[1]["turn"])
 }
 
+func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Inspect the repository."}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"printf ok\"}"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":1}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-a","content":"ok"}]}}`,
+	})
+
+	records := activityRecords(t, output)
+	require.NotEmpty(t, records)
+	assert.Equal(t, "activity_start", records[0]["type"])
+	assert.Equal(t, "reasoning", records[1]["channel"])
+	toolStart := typedActivityRecord(t, records, "tool_start")
+	assert.Equal(t, "tool-a", toolStart["id"])
+	var input map[string]any
+	for _, record := range records {
+		if record["type"] == "tool_input_delta" && record["complete"] == true {
+			input = record
+			break
+		}
+	}
+	require.NotNil(t, input)
+	assert.Equal(t, "printf ok", input["partial_json"])
+	toolEnd := typedActivityRecord(t, records, "tool_end")
+	assert.Equal(t, "passed", toolEnd["status"])
+}
+
+func TestFormatStreamJsonLinesReportsMalformedPartialToolInput(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{broken"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`,
+	})
+
+	notice := typedActivityRecord(t, activityRecords(t, output), "activity_notice")
+	assert.Equal(t, "malformed_tool_input", notice["code"])
+}
+
 func TestFormatStreamJsonLinesEmitsTurnUsageAndStampsTools(t *testing.T) {
 	output := runClaudeFormatter(t, []string{
 		`{"type":"assistant","message":{"usage":{"input_tokens":100,"output_tokens":20},"content":[{"type":"text","text":"I will generate protobufs."},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"make pb.gen"}}]}}`,
@@ -491,6 +534,45 @@ func runClaudeFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func runClaudeFormatterWithActivity(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatStreamJsonLines } = require(process.argv[1]); formatStreamJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func activityRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["schema_version"] == float64(2) {
+			records = append(records, record)
+		}
+	}
+	return records
+}
+
+func typedActivityRecord(t *testing.T, records []map[string]any, recordType string) map[string]any {
+	t.Helper()
+	for _, record := range records {
+		if record["type"] == recordType {
+			return record
+		}
+	}
+	require.FailNow(t, "activity record not found", recordType)
+	return nil
 }
 
 // formatStreamJSONLinesFailed runs the formatter and reports the "failed"

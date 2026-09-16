@@ -9,11 +9,10 @@ import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
 import { ComposerPlanStack } from "./ComposerPlanControls";
-import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
+import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -78,10 +77,11 @@ function RequestHeader({ title }: { title: string }) {
 function analysisRequestChatState(analysis: IntentAnalysisChat) {
   const stopped = analysis.view.machineStatus === "failed" || analysis.view.machineStatus === "passed";
   const active = analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running";
+  const latestMessage = analysis.view.messages.at(-1);
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: Boolean(analysis.view.survey && analysis.canSend),
+    showSurvey: Boolean(analysis.view.survey && analysis.canSend && !active && latestMessage?.role === "agent"),
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -126,6 +126,7 @@ function AnalysisRequestChat({
               organizationId={analysis.organizationId}
               streaming={state.active}
               files={files}
+              activities={analysis.view.activities}
             />
             {state.active ? (
               <AnalysisLiveWork
@@ -133,8 +134,7 @@ function AnalysisRequestChat({
                 organizationId={analysis.organizationId}
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}
-                waitingForAgent={waitingForAgentReply(analysis.view.messages)}
-                previousAgentText={previousAgentStreamText(analysis.view.messages)}
+                activities={analysis.view.activities}
               />
             ) : null}
             {state.showSurvey && analysis.view.survey ? (
