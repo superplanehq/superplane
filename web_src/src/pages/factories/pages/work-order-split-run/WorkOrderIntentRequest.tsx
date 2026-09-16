@@ -3,6 +3,7 @@ import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
@@ -185,9 +186,9 @@ function AnalysisComposer({
         )}
         onSubmit={handleSubmit}
       >
-        <label htmlFor="split-run-intent-composer" className="sr-only">
+        <Label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
-        </label>
+        </Label>
         <div className="flex flex-col gap-2">
           <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
