@@ -139,6 +139,7 @@ function isBenignBrokerError(message: string): boolean {
 
 type StreamHandlerContext = {
   reconnecting: boolean;
+  resetParsedLogs: boolean;
   replayLineSkip: Map<number, number>;
   setState: Dispatch<SetStateAction<LogState>>;
   setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>;
@@ -147,16 +148,20 @@ type StreamHandlerContext = {
 };
 
 function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers {
-  const { reconnecting, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
+  const { reconnecting, resetParsedLogs, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
   return {
-    onOpen: () =>
+    onOpen: () => {
+      if (resetParsedLogs) {
+        setUsage(emptyPromptUsageState());
+      }
       setState((prev) => ({
-        ...prev,
+        ...(resetParsedLogs ? initialLogState : prev),
         ...(reconnecting ? { pendingRecords: [], orphanLines: [] } : {}),
         error: null,
         isLoading: false,
         isStreaming: true,
-      })),
+      }));
+    },
     onLogLine: (text, commandIndex) => {
       const index = commandIndex ?? commandCursor.index;
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
@@ -287,6 +292,7 @@ type LiveLogSessionParams = {
   executionInFlight: boolean;
   terminalCommandStatus: "passed" | "failed" | null;
   terminalAtMs: number | null;
+  resetParsedLogs: boolean;
   sessionAbort: AbortController;
   setState: Dispatch<SetStateAction<LogState>>;
   setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>;
@@ -343,6 +349,7 @@ async function pumpLiveLogConnection(
     await stream.pump(
       createStreamHandlers({
         reconnecting,
+        resetParsedLogs: !reconnecting && params.resetParsedLogs,
         replayLineSkip: new Map<number, number>(),
         setState,
         setUsage,
@@ -470,14 +477,11 @@ export function useLiveLogStream(
     const resetParsedLogs = sessionKeyRef.current !== sessionKey;
     sessionKeyRef.current = sessionKey;
     setState((prev) => ({
-      ...(resetParsedLogs ? initialLogState : prev),
+      ...prev,
       error: null,
       isLoading: true,
       isStreaming: true,
     }));
-    if (resetParsedLogs) {
-      setUsage(emptyPromptUsageState());
-    }
 
     void runLiveLogSession({
       organizationId,
@@ -486,6 +490,7 @@ export function useLiveLogStream(
       executionInFlight,
       terminalCommandStatus,
       terminalAtMs,
+      resetParsedLogs,
       sessionAbort,
       setState,
       setUsage,

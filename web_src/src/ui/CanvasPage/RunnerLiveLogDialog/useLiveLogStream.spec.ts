@@ -394,6 +394,40 @@ describe("useLiveLogStream", () => {
     });
   });
 
+  it("keeps parsed logs when a terminal session fails to open", async () => {
+    pumpMock.mockImplementationOnce(
+      async (handlers: {
+        onOpen?: () => void;
+        onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
+        onLogLine: (line: string, commandIndex?: number) => void;
+      }) => {
+        handlers.onOpen?.();
+        handlers.onCmdStart?.(0, "Clone Repo", 1, "bash", "git clone");
+        handlers.onLogLine("Cloning into 'repo'...", 0);
+        return new Promise(() => undefined);
+      },
+    );
+    pumpMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+
+    const session = { organizationId: "organization-1", canvasId: "canvas-1" };
+    const { result, rerender } = renderHook(
+      ({ inFlight, status }: { inFlight: boolean; status: "passed" | "failed" | null }) =>
+        useLiveLogStream("execution-1", inFlight, status, status ? 9_000 : null, session),
+      { initialProps: { inFlight: true, status: null as "passed" | "failed" | null } },
+    );
+
+    await waitFor(() => expect(result.current.sections[0]?.lines).toEqual(["Cloning into 'repo'..."]));
+
+    rerender({ inFlight: false, status: "passed" });
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    expect(result.current.sections).toHaveLength(1);
+    expect(result.current.sections[0]).toMatchObject({
+      text: "Clone Repo",
+      lines: ["Cloning into 'repo'..."],
+    });
+  });
+
   it("does not duplicate finished section lines on in-flight reconnect", async () => {
     pumpMock.mockImplementationOnce(
       async (handlers: {

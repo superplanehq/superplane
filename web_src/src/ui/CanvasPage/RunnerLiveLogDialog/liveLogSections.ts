@@ -74,15 +74,15 @@ export function appendLineToLatestSection(
   if (isRawAgentTurnLiveLogText(text)) {
     return state;
   }
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
     return bufferPendingRecord(state, { type: "line", text, commandIndex });
   }
-
-  const section = state.sections[sectionPos];
-  if (section.status !== "running") {
+  if (destination.kind === "drop") {
     return state;
   }
+
+  const section = state.sections[destination.pos];
   const skipLeft = replayLineSkip?.get(section.index) ?? 0;
   if (skipLeft > 0) {
     replayLineSkip?.set(section.index, skipLeft - 1);
@@ -90,7 +90,7 @@ export function appendLineToLatestSection(
   }
 
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = appendLineToSection(section, text);
+  nextSections[destination.pos] = appendLineToSection(section, text);
   return {
     ...state,
     sections: nextSections,
@@ -104,19 +104,19 @@ export function startToolOnLatestSection(
   sourceId?: string,
   commandIndex?: number,
 ): LogState {
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
     return bufferPendingRecord(state, { type: "tool_start", kind, text, sourceId, commandIndex });
   }
-  const section = state.sections[sectionPos];
-  if (section.status !== "running") {
+  if (destination.kind === "drop") {
     return state;
   }
+  const section = state.sections[destination.pos];
   if (sourceId && state.sections.some((candidate) => findToolInSection(candidate, sourceId))) {
     return state;
   }
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = startToolOnSection(section, kind, text, sourceId);
+  nextSections[destination.pos] = startToolOnSection(section, kind, text, sourceId);
   return { ...state, sections: nextSections };
 }
 
@@ -127,11 +127,14 @@ export function endToolOnLatestSection(
   sourceId?: string,
   commandIndex?: number,
 ): LogState {
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
     return bufferPendingRecord(state, { type: "tool_end", status, durationMs, sourceId, commandIndex });
   }
-  const section = state.sections[sectionPos];
+  if (destination.kind === "drop") {
+    return state;
+  }
+  const section = state.sections[destination.pos];
   if (sourceId) {
     const existing = findToolInSection(section, sourceId);
     if (existing && existing.status !== "running") {
@@ -139,7 +142,7 @@ export function endToolOnLatestSection(
     }
   }
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = endOpenTool(section, status, durationMs, sourceId);
+  nextSections[destination.pos] = endOpenTool(section, status, durationMs, sourceId);
   return { ...state, sections: nextSections };
 }
 
@@ -156,6 +159,23 @@ function commandSectionPosition(state: LogState, commandIndex?: number): number 
     return state.sections.length - 1;
   }
   return state.sections.findIndex((section) => section.index === commandIndex);
+}
+
+function liveLogRecordDestination(
+  state: LogState,
+  commandIndex?: number,
+): { kind: "buffer" } | { kind: "drop" } | { kind: "section"; pos: number } {
+  const sectionPos = commandSectionPosition(state, commandIndex);
+  if (sectionPos < 0) {
+    return { kind: "buffer" };
+  }
+  if (state.sections[sectionPos].status === "running") {
+    return { kind: "section", pos: sectionPos };
+  }
+  if (commandIndex === undefined) {
+    return { kind: "buffer" };
+  }
+  return { kind: "drop" };
 }
 
 function pendingRecordsOf(state: LogState): PendingLiveLogRecord[] {
@@ -175,11 +195,8 @@ function bufferPendingRecord(state: LogState, record: PendingLiveLogRecord): Log
   };
 }
 
-function recordBelongsToCommand(record: PendingLiveLogRecord, commandIndex: number, attachUnindexed: boolean): boolean {
-  if (record.commandIndex === undefined) {
-    return attachUnindexed;
-  }
-  return record.commandIndex === commandIndex;
+function recordBelongsToCommand(record: PendingLiveLogRecord, commandIndex: number): boolean {
+  return record.commandIndex === undefined || record.commandIndex === commandIndex;
 }
 
 function attachPendingRecords(state: LogState, commandIndex: number): LogState {
@@ -187,11 +204,10 @@ function attachPendingRecords(state: LogState, commandIndex: number): LogState {
   if (pendingRecords.length === 0) {
     return state;
   }
-  const attachUnindexed = state.sections.length === 1;
   const taken: PendingLiveLogRecord[] = [];
   const remaining: PendingLiveLogRecord[] = [];
   for (const record of pendingRecords) {
-    if (recordBelongsToCommand(record, commandIndex, attachUnindexed)) {
+    if (recordBelongsToCommand(record, commandIndex)) {
       taken.push(record);
     } else {
       remaining.push(record);
