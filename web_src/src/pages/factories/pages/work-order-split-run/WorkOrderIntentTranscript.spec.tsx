@@ -174,7 +174,9 @@ describe("WorkOrderIntentTranscript", () => {
     render(
       <WorkOrderIntentTranscript
         organizationId="org-1"
-        messages={[{ id: "agent-1", kind: "text", role: "agent", text: "I updated the plan.", activityId: "activity-1" }]}
+        messages={[
+          { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan.", activityId: "activity-1" },
+        ]}
         activities={[
           {
             id: "activity-1",
@@ -204,7 +206,8 @@ describe("WorkOrderIntentTranscript", () => {
     expect(agent).toHaveTextContent("I updated the plan.");
     expect(agent).toHaveClass("px-2");
     expect(agent.closest(".justify-end")).toBeNull();
-    expect(screen.getByTestId("agent-activity-activity-1")).toHaveClass("px-2");
+    expect(screen.getByTestId("split-run-intent-transcript")).toHaveClass("space-y-1");
+    expect(screen.getByTestId("agent-activity-activity-1")).toHaveClass("px-2", "py-0.5");
     expect(screen.getByRole("button", { name: "Explored codebase" })).toBeInTheDocument();
   });
 

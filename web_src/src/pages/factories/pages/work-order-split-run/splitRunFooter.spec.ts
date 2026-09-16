@@ -44,7 +44,7 @@ const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet
 const ARCHIVE = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
-const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
+const START = { id: "start", kind: "start", label: "Build", emphasis: "primary" };
 const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 
 describe("buildSplitRunFooter", () => {
@@ -66,7 +66,7 @@ describe("buildSplitRunFooter", () => {
       sentence: "SuperPlane is analyzing this task.",
       note: {
         headline: "SuperPlane is currently analyzing this task",
-        text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
+        text: "Wait for the analysis to finish. Or click Build to send this task to the line now.",
       },
       attentionCard: true,
       actions: [ARCHIVE, START],
@@ -80,7 +80,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
     expect(footer.actions.find((action) => action.kind === "start")).toMatchObject({
       disabled: true,
-      tooltip: "Confidence is too low to start.",
+      tooltip: "Confidence is too low to build.",
     });
     expect(footer.confidenceScore).toBe(1);
   });

@@ -306,7 +306,7 @@ function NoteActionRow({
           ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
           : modelSelect;
         return (
-          <ButtonGroup key={action.id} aria-label="Start">
+          <ButtonGroup key={action.id} aria-label="Build">
             {noteAction}
             <ButtonGroupSeparator className="bg-primary-foreground/25" />
             {select}

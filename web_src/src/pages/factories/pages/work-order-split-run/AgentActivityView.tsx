@@ -26,7 +26,7 @@ export function AgentActivityView({ activity, live = false }: { activity: AgentA
   }
 
   return (
-    <div className="space-y-1 px-2 py-1.5" data-testid={`agent-activity-${activity.id}`}>
+    <div className="space-y-1 px-2 py-0.5" data-testid={`agent-activity-${activity.id}`}>
       <ActivityEntries entries={entries} truncated={activity.truncated} />
     </div>
   );
@@ -45,7 +45,7 @@ function CompletedActivity({
   const label = completedActivitySummaryLabel(tools);
 
   return (
-    <div className="space-y-1 px-2 py-1.5" data-testid={`agent-activity-${activity.id}`}>
+    <div className="space-y-1 px-2 py-0.5" data-testid={`agent-activity-${activity.id}`}>
       <ActivitySummaryButton
         label={label}
         open={open}

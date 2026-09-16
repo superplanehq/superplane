@@ -143,7 +143,7 @@ function DraftActions() {
         Archive
       </Button>
       <Button type="button" size="sm">
-        Start
+        Build
       </Button>
     </>
   );

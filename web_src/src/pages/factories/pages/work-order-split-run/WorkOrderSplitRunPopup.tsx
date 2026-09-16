@@ -4,12 +4,12 @@ import { Loader2 } from "lucide-react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
@@ -181,11 +181,10 @@ function AnalysisWorkOrderPopup({
             expanded={fullPage}
             onToggleExpanded={() => setFullPage((current) => !current)}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <PopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                onArchive={fixture.footer.kind === "draft" ? mutations.onArchive : undefined}
+                archiveBusy={footerActions.busy}
               />
             }
             accessory={views}

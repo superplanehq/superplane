@@ -666,8 +666,12 @@ describe("WorkOrderIntentDocument", () => {
 
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
-    expect(within(card).getByTestId("split-run-intent-composer-chips").closest("[data-slot=frame-panel-header]")).not.toBeNull();
-    expect(within(card).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]")).not.toBeNull();
+    expect(
+      within(card).getByTestId("split-run-intent-composer-chips").closest("[data-slot=frame-panel-header]"),
+    ).not.toBeNull();
+    expect(
+      within(card).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
+    ).not.toBeNull();
     expect(within(card).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
       "This issue is a good fit for an agent on this factory line.",
     );

@@ -29,22 +29,22 @@ const LOOKS: { look: PlanStripLook; label: string; note: string }[] = [
   {
     look: "oneBar",
     label: "One bar",
-    note: "Score bars, Plan updated, Show plan, Archive, and Start.",
+    note: "Score bars, Plan updated, Show plan, Archive, and Build.",
   },
   {
     look: "oneBarOpen",
     label: "One bar, plan open",
-    note: "Score bars, Hide plan, Archive, and Start. No Plan updated title.",
+    note: "Score bars, Hide plan, Archive, and Build. No Plan updated title.",
   },
   {
     look: "chips",
     label: "Chips",
-    note: "Clarity, Show plan, Archive, and Start chips.",
+    note: "Clarity, Show plan, Archive, and Build chips.",
   },
   {
     look: "chipsOpen",
     label: "Chips, plan open",
-    note: "Hide plan stays on the chips. Clarity, Archive, and Start stay.",
+    note: "Hide plan stays on the chips. Clarity, Archive, and Build stay.",
   },
 ];
 

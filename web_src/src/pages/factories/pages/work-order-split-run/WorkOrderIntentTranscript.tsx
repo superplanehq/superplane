@@ -59,7 +59,7 @@ export function WorkOrderIntentTranscript({
   );
 
   return (
-    <div className="mb-3 space-y-3" data-testid="split-run-intent-transcript">
+    <div className="mb-1 space-y-1" data-testid="split-run-intent-transcript">
       {visible.map((message) => {
         const activity = message.activityId ? activitiesByID.get(message.activityId) : undefined;
         return (
