@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, vi } from "bun:test";
 
 const { organizationsDescribeOrganizationSpendingReport } = vi.hoisted(() => ({
   organizationsDescribeOrganizationSpendingReport: vi.fn(),
@@ -78,7 +78,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
   });
 
   afterEach(() => {
-    vi.setSystemTime();
+    setSystemTime();
   });
 
   it("shows the full-page loading state on the very first visit", async () => {
@@ -104,7 +104,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit while the report revalidates", async () => {
-    vi.setSystemTime(new Date());
+    setSystemTime(new Date());
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
