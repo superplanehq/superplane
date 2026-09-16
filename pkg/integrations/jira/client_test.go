@@ -337,6 +337,95 @@ func Test__Client__GetIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__SearchIssues(t *testing.T) {
+	t.Run("posts to the enhanced search/jql API", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"100","key":"ENG-1","fields":{"summary":"First"}}],"isLast":true}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		hits, err := client.SearchIssues(`project = "ENG"`, 10)
+		require.NoError(t, err)
+		require.Len(t, hits, 1)
+		assert.Equal(t, "ENG-1", hits[0].Key)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), `"jql":"project = \"ENG\""`)
+		assert.NotContains(t, string(body), "startAt")
+		assert.NotContains(t, string(body), "nextPageToken")
+	})
+
+	t.Run("removed search API returns an error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusGone,
+					Body: io.NopCloser(strings.NewReader(
+						`{"errorMessages":["The requested API has been removed. Please migrate to the /rest/api/3/search/jql API."]}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.SearchIssues(`project = "ENG"`, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "410")
+	})
+}
+
+func Test__Client__SearchIssuesUpTo(t *testing.T) {
+	t.Run("follows nextPageToken until the last page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"1","key":"ENG-1","fields":{"summary":"One"}}],"nextPageToken":"page-2","isLast":false}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"2","key":"ENG-2","fields":{"summary":"Two"}}],"isLast":true}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		hits, err := client.SearchIssuesUpTo(`project = "ENG"`, 50)
+		require.NoError(t, err)
+		require.Len(t, hits, 2)
+		assert.Equal(t, "ENG-1", hits[0].Key)
+		assert.Equal(t, "ENG-2", hits[1].Key)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+		assert.Contains(t, httpContext.Requests[1].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+
+		secondBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(secondBody), `"nextPageToken":"page-2"`)
+	})
+}
+
 func Test__Client__CreateIssue(t *testing.T) {
 	t.Run("successful issue creation", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
