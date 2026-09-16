@@ -170,11 +170,45 @@ describe("WorkOrderIntentTranscript", () => {
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
   });
 
-  it("keeps agent lines on the left", () => {
-    renderTranscript([{ id: "agent-1", kind: "text", role: "agent", text: "I updated the plan." }]);
+  it("keeps agent lines on the left with a little side padding", () => {
+    render(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        messages={[
+          { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan.", activityId: "activity-1" },
+        ]}
+        activities={[
+          {
+            id: "activity-1",
+            provider: "codex",
+            status: "passed",
+            sequence: 1,
+            items: [
+              {
+                type: "tool",
+                id: "command-1",
+                kind: "bash",
+                name: "Bash",
+                input: "ls",
+                output: "",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ]}
+      />,
+    );
 
-    const agent = screen.getByText("I updated the plan.");
+    const agent = screen.getByTestId("split-run-intent-agent-message");
+    expect(agent).toHaveTextContent("I updated the plan.");
+    expect(agent).toHaveClass("px-2");
     expect(agent.closest(".justify-end")).toBeNull();
+    expect(screen.getByTestId("split-run-intent-transcript")).toHaveClass("space-y-1");
+    expect(screen.getByTestId("agent-activity-activity-1")).toHaveClass("px-2", "py-0.5");
+    expect(screen.getByRole("button", { name: "Explored codebase" })).toBeInTheDocument();
   });
 
   it("collapses a long composer note and expands it on Show more", async () => {
@@ -212,5 +246,16 @@ describe("WorkOrderIntentTranscript", () => {
     );
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("hides plan-updated rows so the sticky control can own the latest plan", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I published the spec." },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+    ]);
+
+    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated })).not.toBeInTheDocument();
+    expect(screen.getByText("I published the spec.")).toBeInTheDocument();
   });
 });

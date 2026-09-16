@@ -10,6 +10,7 @@ import {
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
+import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 import {
   analysisSessionPollInterval,
@@ -22,6 +23,10 @@ vi.mock("../planningSessionClient", () => ({
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
 }));
+
+function planningTalk(message: CreateWithAgentMessage) {
+  return { role: message.role, text: message.kind === "text" ? message.text : undefined };
+}
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -230,9 +235,7 @@ describe("useAnalysisPlanningSession", () => {
       expect(result.current.canSend).toBe(true);
       expect(result.current.isLive).toBe(false);
     });
-    expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual([
-      { role: "user", text: "Add a breed field." },
-    ]);
+    expect(result.current.view.messages.map(planningTalk)).toEqual([{ role: "user", text: "Add a breed field." }]);
 
     act(() => {
       result.current.onComposerChange("Use the existing puppy form.");
@@ -249,7 +252,7 @@ describe("useAnalysisPlanningSession", () => {
     );
     expect(result.current.view.machineStatus).toBe("starting");
     expect(result.current.showChat).toBe(true);
-    expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual(continued.messages);
+    expect(result.current.view.messages.map(planningTalk)).toEqual(continued.messages);
   });
 
   it("keeps prior messages when a restart response contains only the new turn", async () => {
@@ -285,7 +288,7 @@ describe("useAnalysisPlanningSession", () => {
     act(() => result.current.onSend());
 
     await waitFor(() => {
-      expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual([
+      expect(result.current.view.messages.map(planningTalk)).toEqual([
         { role: "user", text: "Use the current form." },
         { role: "agent", text: "I updated the plan." },
         { role: "user", text: "Also cover errors." },

@@ -192,6 +192,7 @@ function isCollapsedTool(line: SplitRunStreamLine): boolean {
     type.endsWith("propose_draft") ||
     type.endsWith("propose_spec") ||
     type.endsWith("propose_confidence") ||
+    type.endsWith("propose_plan") ||
     type.endsWith("survey") ||
     type.endsWith("say")
   );

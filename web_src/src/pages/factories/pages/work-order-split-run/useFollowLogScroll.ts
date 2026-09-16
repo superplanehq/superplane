@@ -9,7 +9,8 @@ export type FollowLogScrollOptions = {
 /**
  * Follow pins the log scroller to the bottom. Live runner notes grow
  * inside the phase card, so the hook watches the scroller DOM rather
- * than only a parent stream-length tick.
+ * than only a parent stream-length tick. A layout resize (plan pane
+ * open or wrap) must not look like the user scrolled away.
  */
 export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   runningPhaseId: string | null,
@@ -87,6 +88,30 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     observer.observe(el, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [following, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const ignoreLayoutScroll = () => {
+      ignoreScrollRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          ignoreScrollRef.current = false;
+        });
+      });
+    };
+    const observer = new ResizeObserver(() => {
+      if (followingRef.current) {
+        scrollToBottom();
+        return;
+      }
+      ignoreLayoutScroll();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
 
   const onScroll = useCallback(() => {
     if (ignoreScrollRef.current) {

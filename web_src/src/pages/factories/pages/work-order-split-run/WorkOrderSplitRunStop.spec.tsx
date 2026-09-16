@@ -129,7 +129,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "Start" }));
+    await user.click(within(note).getByRole("button", { name: "Build" }));
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
@@ -175,11 +175,11 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
-    await user.click(within(note).getByRole("button", { name: "Start" }));
+    await user.click(within(note).getByRole("button", { name: "Build" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
   });
 
@@ -188,7 +188,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const onClose = vi.fn();
     renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
 
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -223,7 +223,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
     const view = render(popup("order-a", firstClose));
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
     view.rerender(popup("order-b", secondClose));
     await act(async () => {
       resolveArchive?.(true);
@@ -239,7 +239,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const onClose = vi.fn();
     renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
 
-    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Archive" }));
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
 
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
@@ -267,7 +267,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const note = screen.getByTestId("split-run-attention-note");
     await user.click(within(note).getByRole("button", { name: "Model: Auto" }));
     await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
-    await user.click(within(note).getByRole("button", { name: "Start" }));
+    await user.click(within(note).getByRole("button", { name: "Build" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
