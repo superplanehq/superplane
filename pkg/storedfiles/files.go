@@ -336,7 +336,7 @@ func DescriptionForDispatch(
 	dispatched := make([]DispatchFile, 0, len(ids))
 	for _, id := range ids {
 		file, ok := byID[id]
-		if !ok || !dispatchableFile(file, organizationID, factoryID, workOrderID) {
+		if !ok || !file.IsDispatchable(organizationID, factoryID, workOrderID) {
 			continue
 		}
 		downloadURL, err := DownloadURL(ctx, provider, &file, ttl)
@@ -355,30 +355,12 @@ func DescriptionForDispatch(
 	return blob.RewriteFileRefs(markdown, urls), dispatched, nil
 }
 
-func dispatchableFile(file models.File, organizationID, factoryID, workOrderID uuid.UUID) bool {
-	if file.State != models.FileStateReady {
-		return false
-	}
-	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
-		return false
-	}
-	if file.FactoryID == nil || *file.FactoryID != factoryID {
-		return false
-	}
-	switch file.Scope {
-	case blob.ScopeWorkspace:
-		return true
-	case blob.ScopeTask:
-		if file.WorkOrderID == nil {
-			return false
-		}
-		if workOrderID == uuid.Nil {
-			return true
-		}
-		return *file.WorkOrderID == workOrderID
-	default:
-		return false
-	}
+func RestoreFileRefs(
+	tx *gorm.DB,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	markdown string,
+) (string, error) {
+	return models.RestoreFileRefs(tx, organizationID, factoryID, workOrderID, markdown)
 }
 
 func ContentUploadURL(fileID uuid.UUID) string {

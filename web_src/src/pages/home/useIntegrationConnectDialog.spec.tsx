@@ -6,7 +6,7 @@ import type * as StartDirectGitHubConnectModule from "@/lib/startDirectGitHubCon
 import type * as ReactRouterModule from "react-router";
 import { unmockedPackage, unmockedSrc } from "@/test/unmockedModule";
 
-import { useHostedGitHubConnect } from "./useIntegrationConnectDialog";
+import { selectReadyIntegrationInstance, useHostedGitHubConnect } from "./useIntegrationConnectDialog";
 
 const startDirectGitHubConnect = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 
@@ -77,5 +77,20 @@ describe("useHostedGitHubConnect", () => {
 
     await expect(navigation).resolves.toBe(false);
     expect(startDirectGitHubConnect).not.toHaveBeenCalled();
+  });
+});
+
+describe("selectReadyIntegrationInstance", () => {
+  it("selects an existing ready provider when no instance id is specified", () => {
+    const connected = [
+      {
+        metadata: { id: "openrouter-1", name: "openrouter", integrationName: "openrouter" },
+        status: { state: "ready" },
+      },
+    ];
+
+    expect(selectReadyIntegrationInstance(connected, {}, "openrouter")).toEqual({
+      openrouter: { id: "openrouter-1", name: "openrouter", ready: true },
+    });
   });
 });

@@ -19,6 +19,13 @@ func TestFileIDsAndRewrite(t *testing.T) {
 	assert.NotContains(t, rewritten, FileRefScheme)
 }
 
+func TestMarkdownLinkLabelEscapesDelimiters(t *testing.T) {
+	assert.Equal(t, "shot.png", MarkdownLinkLabel("shot.png"))
+	assert.Equal(t, "shot__evil.com", MarkdownLinkLabel("shot](evil.com"))
+	assert.Equal(t, "attachment", MarkdownLinkLabel("\n\t"))
+	assert.Equal(t, "notes.pdf", MarkdownLinkLabel("notes.pdf\x00\n"))
+}
+
 func TestGitHubImageURLDetection(t *testing.T) {
 	assert.True(t, IsGitHubImageURL("https://private-user-images.githubusercontent.com/1/2.png?jwt=abc"))
 	assert.True(t, IsGitHubImageURL("https://github.com/acme/app/assets/1/2"))
