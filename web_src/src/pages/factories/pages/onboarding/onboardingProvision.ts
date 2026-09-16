@@ -4,7 +4,7 @@ import type {
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -102,7 +102,7 @@ async function provisionLineApps(args: {
   return steps;
 }
 
-export type ListFactoryApps = () => Promise<FactoryApp[]>;
+export type ListFactoryApps = () => Promise<FactoryAutomation[]>;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

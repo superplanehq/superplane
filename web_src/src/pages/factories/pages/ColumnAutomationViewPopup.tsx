@@ -33,6 +33,8 @@ interface ColumnAutomationViewPopupProps {
   general?: ReactNode;
   agent?: PlanningReviewAgentSlot;
   initialTab?: ColumnAutomationViewTab;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
 }
 
 /** Read-only automation canvas in the board popup. Edit opens the full editor. */
@@ -49,6 +51,8 @@ export function ColumnAutomationViewPopup({
   general,
   agent,
   initialTab,
+  onDelete,
+  deletePending = false,
 }: ColumnAutomationViewPopupProps) {
   const hasGeneral = Boolean(general);
   const hasAgent = Boolean(agent);
@@ -56,6 +60,7 @@ export function ColumnAutomationViewPopup({
   const [userTab, setUserTab] = useState<ColumnAutomationViewTab | undefined>(() =>
     initialTab && tabs.includes(initialTab) ? initialTab : undefined,
   );
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const tab = userTab && tabs.includes(userTab) ? userTab : (tabs[0] ?? "automation");
 
   return (
@@ -77,7 +82,66 @@ export function ColumnAutomationViewPopup({
         general={general}
         agent={agent}
       />
+      {onDelete ? (
+        <ColumnAutomationViewFooter
+          confirmDelete={confirmDelete}
+          deletePending={deletePending}
+          onDelete={onDelete}
+          onConfirmDelete={setConfirmDelete}
+        />
+      ) : null}
     </PopupShell>
+  );
+}
+
+function ColumnAutomationViewFooter({
+  confirmDelete,
+  deletePending,
+  onDelete,
+  onConfirmDelete,
+}: {
+  confirmDelete: boolean;
+  deletePending: boolean;
+  onDelete: () => Promise<void> | void;
+  onConfirmDelete: (next: boolean) => void;
+}) {
+  if (confirmDelete) {
+    return (
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <p className="workspace-body-text text-destructive" role="alert">
+          {COLUMN_AUTOMATIONS_COPY.confirmDelete}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
+            {COLUMN_AUTOMATIONS_COPY.keepLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={deletePending}
+            onClick={() => void onDelete()}
+            data-testid="column-automation-view-delete-confirm"
+          >
+            {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
+          </Button>
+        </div>
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onConfirmDelete(true)}
+        data-testid="column-automation-view-delete"
+      >
+        {COLUMN_AUTOMATIONS_COPY.deleteLabel}
+      </Button>
+    </footer>
   );
 }
 
@@ -178,6 +242,8 @@ export function ColumnAutomationViewHost({
   onClose,
   general,
   initialTab,
+  onDelete,
+  deletePending,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -187,6 +253,8 @@ export function ColumnAutomationViewHost({
   onClose: () => void;
   general?: ReactNode;
   initialTab?: ColumnAutomationViewTab;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
@@ -213,6 +281,8 @@ export function ColumnAutomationViewHost({
           : undefined
       }
       initialTab={initialTab}
+      onDelete={onDelete}
+      deletePending={deletePending}
     />
   );
 }

@@ -130,6 +130,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, models.ErrFileQuotaExceeded):
 		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, errCustomAutomationsDisabled):
+		return grpcerrors.FailedPrecondition(err, "Custom automations are not enabled for this organization.")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -140,6 +142,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 }
 
 var errInvalidArgument = errors.New("invalid argument")
+var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

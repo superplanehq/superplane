@@ -14,7 +14,7 @@ export function columnAutomationHeadline(automation: ColumnAutomation): string {
     return `Runs the ${automation.name} agent`;
   }
   if (automation.kind === "custom") {
-    return `Runs the ${automation.name} automation`;
+    return automation.name;
   }
   return FIXED_HEADLINES[automation.kind];
 }

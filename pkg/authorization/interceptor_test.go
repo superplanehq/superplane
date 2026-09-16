@@ -295,6 +295,16 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestCreateFactoryAutomationRequiresCustomAutomationsFeature(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	rule, ok := rules[HTTPRoute{
+		Method:  http.MethodPost,
+		Pattern: "/api/v1/factories/{factory_id}/automations",
+	}]
+	require.True(t, ok)
+	assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCustomAutomations}, rule.RequiredExperimentalFeatures)
+}
+
 func TestRefreshBacklogUsesWorkOrderUpdate(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	rule, ok := rules[HTTPRoute{
