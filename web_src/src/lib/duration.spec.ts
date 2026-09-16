@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import {
+  durationLabelMs,
   formatClockDuration,
   formatClockDurationLabel,
   formatDuration,
@@ -100,6 +101,31 @@ describe("formatClockDurationLabel", () => {
     expect(formatClockDurationLabel("—")).toBe("—");
     expect(formatClockDurationLabel("Running")).toBe("Running");
     expect(formatClockDurationLabel("")).toBe("—");
+  });
+});
+
+describe("durationLabelMs", () => {
+  it("parses spoken duration labels into milliseconds", () => {
+    expect(durationLabelMs("2s")).toBe(2_000);
+    expect(durationLabelMs("1m")).toBe(60_000);
+    expect(durationLabelMs("1m 12s")).toBe(72_000);
+    expect(durationLabelMs("2m 59s so far")).toBe(179_000);
+    expect(durationLabelMs("1h 30m")).toBe(5_400_000);
+  });
+
+  it("parses clock labels into milliseconds", () => {
+    expect(durationLabelMs("02:59")).toBe(179_000);
+    expect(durationLabelMs("1:10:22")).toBe(4_222_000);
+  });
+
+  it("returns 0 for empty, unknown, or sub-second labels", () => {
+    expect(durationLabelMs("")).toBe(0);
+    expect(durationLabelMs("—")).toBe(0);
+    expect(durationLabelMs("-")).toBe(0);
+    expect(durationLabelMs("Running")).toBe(0);
+    expect(durationLabelMs("Waiting")).toBe(0);
+    expect(durationLabelMs("Pending")).toBe(0);
+    expect(durationLabelMs("< 1s")).toBe(0);
   });
 });
 
