@@ -267,7 +267,6 @@ export function LinesPage() {
     }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
   }, [canAddJiraIntake, canAddSentryIntake, canAddProductiveIntake]);
-  const canAddIntakeFromMenu = true;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
@@ -575,9 +574,7 @@ export function LinesPage() {
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
-            onAddIntake={
-              showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
-            }
+            onAddIntake={showColumnAutomations ? undefined : () => setAddIntakeOpen(true)}
             onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={

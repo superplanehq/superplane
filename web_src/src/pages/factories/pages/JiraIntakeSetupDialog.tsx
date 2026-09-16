@@ -61,14 +61,15 @@ function SetupHeader({ step, onBack }: { step: JiraSetupStep; onBack: () => void
     <DialogHeader className="border-b border-border px-5 py-4 text-left">
       <div className="flex items-center gap-2">
         {step === "project" ? (
-          <button
+          <Button
             type="button"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            variant="ghost"
+            className="size-7 rounded-md p-1 text-muted-foreground hover:text-foreground"
             onClick={onBack}
             aria-label="Back to connection"
           >
             <ArrowLeft className="size-4" />
-          </button>
+          </Button>
         ) : null}
         <IntegrationIcon integrationName="jira" className="size-5" size={20} />
         <DialogTitle className="text-[15px] font-semibold">Add Jira intake</DialogTitle>

@@ -53,17 +53,19 @@ function ConnectionOptions({
         const id = integration.metadata?.id ?? "";
         const selected = id === selectedId;
         return (
-          <button
+          <Button
             key={id}
             type="button"
+            variant="ghost"
             onClick={() => onSelect(id)}
-            className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left ${
-              selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30"
-            }`}
+            className={cn(
+              "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left",
+              selected ? "border-foreground bg-accent/40 hover:bg-accent/40" : "border-border hover:bg-accent/30",
+            )}
           >
             <span className="text-[13px] font-medium">{integration.metadata?.name || "Jira"}</span>
             {selected ? <Check className="size-4" aria-hidden /> : null}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -166,20 +168,21 @@ function ProjectOption({
   const id = project.id ?? "";
   return (
     <li>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         role="option"
         aria-selected={selected}
         onClick={() => onSelect(id)}
         data-testid={`jira-project-${id}`}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-          selected ? "bg-accent/50" : "hover:bg-accent/30",
+          "h-auto w-full justify-start gap-3 rounded-none px-3 py-2.5 text-left",
+          selected ? "bg-accent/50 hover:bg-accent/50" : "hover:bg-accent/30",
         )}
       >
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{project.name || "Untitled project"}</span>
         {selected ? <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
-      </button>
+      </Button>
     </li>
   );
 }
