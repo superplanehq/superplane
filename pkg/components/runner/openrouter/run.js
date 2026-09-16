@@ -254,7 +254,7 @@ function writeSessionID(taskDir, sessionID) {
 }
 
 function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
-  const args = ["--pure", "run", "--format", "json", "--auto"];
+  const args = ["--pure", "run", "--format", "json", "--thinking", "--auto"];
   const prefixed = openRouterModelId(model);
   if (prefixed) {
     args.push("-m", prefixed);
@@ -1289,7 +1289,8 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         case "reasoning": {
           const thinking = typeof part.text === "string" ? part.text : "";
           if (thinking.trim()) {
-            emitOpenCodeContent(activity, contentText, "reasoning", part, thinking);
+            const contentID = emitOpenCodeContent(activity, contentText, "reasoning", part, thinking);
+            activity.endContent(contentID, { endedAt: openCodePartTime(part, "end") });
             if (!activity.enabled) {
               println("Thinking");
               println(truncateText(thinking.trim()));
@@ -1358,15 +1359,21 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
 }
 
 function emitOpenCodeContent(activity, seenText, kind, part, nextText) {
-  if (!activity.enabled) {
-    return;
-  }
   const id = String(part.id || part.partID || `${kind}-${seenText.size + 1}`);
+  if (!activity.enabled) {
+    return id;
+  }
   const previous = seenText.get(id) || "";
   const delta = nextText.startsWith(previous) ? nextText.slice(previous.length) : nextText;
-  activity.startContent(kind, id);
+  activity.startContent(kind, id, { startedAt: openCodePartTime(part, "start") });
   activity.appendContent(kind, id, delta);
   seenText.set(id, nextText);
+  return id;
+}
+
+function openCodePartTime(part, key) {
+  const value = Number(part && part.time && part.time[key]);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function createToolTracker(telemetry) {
@@ -1495,6 +1502,7 @@ function formatToolUse(part, tools, activity = createDisabledActivityStream(), s
 
 function normalizeOpenCodeToolKind(kind) {
   const normalized = String(kind || "tool").toLowerCase();
+  if (normalized.startsWith("superplane_")) return "mcp";
   if (normalized === "grep" || normalized === "glob") return "search";
   if (normalized === "notebookedit") return "edit";
   if (normalized === "websearch" || normalized === "web_search") return "web_search";
@@ -1524,7 +1532,7 @@ function toolInputDetail(name, rawInput) {
     }
   }
   if (["read", "write", "edit", "notebookedit"].includes(lowered)) {
-    for (const key of ["file_path", "path", "notebook_path"]) {
+    for (const key of ["filePath", "file_path", "path", "notebookPath", "notebook_path"]) {
       const value = rawInput[key];
       if (typeof value === "string" && value.trim()) {
         let detail = value.trim();

@@ -208,12 +208,14 @@ function createActivityStream(options = {}) {
     }
   }
 
-  function startContent(kind, id) {
+  function startContent(kind, id, options = {}) {
     if (!enabled || contents.has(id)) {
       return;
     }
     ensureStarted();
-    const item = { type: "content", id, kind, text: "", status: "running", started_at: now(), truncated: false };
+    const providerStartedAt = Number(options.startedAt);
+    const startedAt = Number.isFinite(providerStartedAt) ? providerStartedAt : now();
+    const item = { type: "content", id, kind, text: "", status: "running", started_at: startedAt, truncated: false };
     contents.set(id, item);
     items.push(item);
     emit({ type: "content_start", id, channel: kind, started_at: item.started_at }, true);
@@ -245,14 +247,16 @@ function createActivityStream(options = {}) {
     }
   }
 
-  function endContent(id) {
+  function endContent(id, options = {}) {
     const item = contents.get(id);
     if (!item || item.status !== "running") {
       return;
     }
     flushLine(`content:${id}`);
     item.status = "passed";
-    item.duration_ms = Math.max(0, now() - item.started_at);
+    const providerEndedAt = Number(options.endedAt);
+    const endedAt = Number.isFinite(providerEndedAt) ? providerEndedAt : now();
+    item.duration_ms = Math.max(0, endedAt - item.started_at);
     emit({ type: "content_end", id, channel: item.kind, duration_ms: item.duration_ms, truncated: item.truncated }, true);
   }
 

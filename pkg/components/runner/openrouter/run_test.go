@@ -40,7 +40,7 @@ func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
 		"session": "",
 	})
 	assert.Equal(t, []string{
-		"--pure", "run", "--format", "json", "--auto",
+		"--pure", "run", "--format", "json", "--thinking", "--auto",
 		"-m", "openrouter/x-ai/grok-4.6",
 		"--dir", "/tmp/repo",
 		"do the work",
@@ -185,7 +185,7 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 
 func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	output := runOpenCodeFormatterWithActivity(t, []string{
-		`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":"Inspect the repository."}}`,
+		`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":"Inspect the repository.","time":{"start":1000,"end":13500}}}`,
 		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"running","input":{"command":"printf first\nprintf second"},"output":"fir"}}}`,
 		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":"printf first\nprintf second"},"output":"first"}}}`,
 	})
@@ -194,8 +194,11 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	require.NotEmpty(t, records)
 	assert.Equal(t, "activity_start", records[0]["type"])
 	assert.Equal(t, "reasoning", records[1]["channel"])
+	reasoningEnd := findActivityRecord(t, records, "content_end")
+	assert.Equal(t, float64(12500), reasoningEnd["duration_ms"])
 	toolStart := findActivityRecord(t, records, "tool_start")
 	assert.Equal(t, "tool_start", toolStart["type"])
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
 	assert.Equal(t, "printf first\nprintf second", toolStart["input"])
 	var outputText string
 	for _, record := range records {
@@ -205,6 +208,27 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	}
 	assert.Equal(t, "first", outputText)
 	assert.Equal(t, "passed", findActivityRecord(t, records, "tool_end")["status"])
+}
+
+func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"read-1","tool":"read","state":{"status":"completed","input":{"filePath":"/repo/README.md"},"output":"contents"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"edit-1","tool":"edit","state":{"status":"completed","input":{"filePath":"/repo/src/main.ts","oldString":"old","newString":"new"},"output":"done"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"mcp-1","tool":"superplane_propose_spec","state":{"status":"completed","input":{"body":"Plan"},"output":"saved"}}}`,
+	})
+
+	records := activityRecords(t, output)
+	var starts []map[string]any
+	for _, record := range records {
+		if record["type"] == "tool_start" {
+			starts = append(starts, record)
+		}
+	}
+	require.Len(t, starts, 3)
+	assert.Equal(t, "/repo/README.md", starts[0]["input"])
+	assert.Equal(t, "/repo/src/main.ts", starts[1]["input"])
+	assert.Equal(t, "mcp", starts[2]["kind"])
+	assert.Equal(t, "superplane_propose_spec", starts[2]["name"])
 }
 
 func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
@@ -1290,6 +1314,15 @@ func findActivityRecord(t *testing.T, records []map[string]any, recordType strin
 	}
 	require.FailNow(t, "activity record not found", recordType)
 	return nil
+}
+
+func activityRecordIndex(records []map[string]any, recordType string) int {
+	for index, record := range records {
+		if record["type"] == recordType {
+			return index
+		}
+	}
+	return -1
 }
 
 func formatOpenCodeJSONLinesFailed(t *testing.T, lines []string) bool {
