@@ -22,6 +22,7 @@ function FollowLog({
   return (
     <>
       <span data-testid="following">{follow.following ? "on" : "off"}</span>
+      <span data-testid="jump">{follow.showJumpToLatest ? "on" : "off"}</span>
       <button type="button" onClick={() => follow.setFollowing(false)}>
         Stop follow
       </button>
@@ -95,16 +96,30 @@ describe("useFollowLogScroll", () => {
     expect(scroller.scrollTop).toBe(40);
   });
 
-  it("keeps following when the user stays within 144 pixels of the bottom", async () => {
+  it("stops following on an upward scroll inside the leave band", async () => {
     const box = { height: 400, view: 100 };
     render(<FollowLog tick={1} resumeOnBottom />);
     const scroller = screen.getByTestId("log-scroller");
     mockOverflow(scroller, box);
+    scroller.scrollTop = 300;
     await settleScrollIgnore();
 
-    scroller.scrollTop = 156;
+    scroller.scrollTop = 220;
     fireEvent.scroll(scroller);
-    expect(screen.getByTestId("following")).toHaveTextContent("on");
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+    expect(screen.getByTestId("jump")).toHaveTextContent("off");
+  });
+
+  it("stops following on an upward wheel at the bottom", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} resumeOnBottom />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 300;
+    await settleScrollIgnore();
+
+    fireEvent.wheel(scroller, { deltaY: -40 });
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
   });
 
   it("turns Follow back on at the bottom when resumeOnBottom is on", async () => {
@@ -117,10 +132,12 @@ describe("useFollowLogScroll", () => {
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
     expect(screen.getByTestId("following")).toHaveTextContent("off");
+    expect(screen.getByTestId("jump")).toHaveTextContent("on");
 
     scroller.scrollTop = 300;
     fireEvent.scroll(scroller);
     expect(screen.getByTestId("following")).toHaveTextContent("on");
+    expect(screen.getByTestId("jump")).toHaveTextContent("off");
   });
 
   it("does not turn Follow back on at the bottom by default", async () => {
@@ -174,7 +191,7 @@ describe("useFollowLogScroll", () => {
 
       resize.notifyResize();
       scroller.scrollTop = 155;
-      fireEvent.wheel(scroller);
+      fireEvent.wheel(scroller, { deltaY: -20 });
       expect(screen.getByTestId("following")).toHaveTextContent("off");
     } finally {
       resize.restore();

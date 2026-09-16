@@ -139,9 +139,9 @@ function AnalysisRequestChat({
             ) : null}
           </div>
         </div>
-        {follow.following ? null : (
+        {follow.showJumpToLatest ? (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
-        )}
+        ) : null}
       </div>
       <AnalysisComposer
         analysis={analysis}
