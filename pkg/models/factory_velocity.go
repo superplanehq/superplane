@@ -23,8 +23,8 @@ type FactoryVelocityPullRequest struct {
 	ClosedAt    *time.Time
 	// Member who opened the work order. Nil when an automation opened it.
 	CreatedByID *uuid.UUID
-	// Members assigned to the work order, earliest assignment first. Matches
-	// the order FactoryWorkOrder.ListAssignees returns.
+	// Members assigned to the work order, earliest assignment first. Tied
+	// assignments sort by user ID so the credited member stays stable.
 	AssigneeIDs []uuid.UUID
 	// Source of the intake that opened the work order (for example
 	// `github-issues`). Empty when the order did not come from an intake.
@@ -35,67 +35,6 @@ type FactoryVelocityPullRequest struct {
 	// Hours from the first execution start to the close event. Nil when the
 	// order never ran or is still open.
 	CycleHours *float64
-}
-
-type factoryVelocityPullRequestScan struct {
-	WorkOrderID  uuid.UUID
-	Repository   string
-	URL          string
-	Number       int64
-	MergedAt     *time.Time
-	ClosedAt     *time.Time
-	CreatedByID  *uuid.UUID
-	AssigneeIDs  string
-	IntakeSource string
-	OriginURL    string
-	CycleHours   *float64
-}
-
-func (s factoryVelocityPullRequestScan) asPullRequest() (FactoryVelocityPullRequest, error) {
-	assigneeIDs, err := parseUUIDArray(s.AssigneeIDs)
-	if err != nil {
-		return FactoryVelocityPullRequest{}, err
-	}
-	return FactoryVelocityPullRequest{
-		WorkOrderID:  s.WorkOrderID,
-		Repository:   s.Repository,
-		URL:          s.URL,
-		Number:       s.Number,
-		MergedAt:     s.MergedAt,
-		ClosedAt:     s.ClosedAt,
-		CreatedByID:  s.CreatedByID,
-		AssigneeIDs:  assigneeIDs,
-		IntakeSource: s.IntakeSource,
-		OriginURL:    s.OriginURL,
-		CycleHours:   s.CycleHours,
-	}, nil
-}
-
-func parseUUIDArray(raw string) ([]uuid.UUID, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || raw == "{}" {
-		return nil, nil
-	}
-	raw = strings.TrimPrefix(raw, "{")
-	raw = strings.TrimSuffix(raw, "}")
-	if raw == "" {
-		return nil, nil
-	}
-
-	parts := strings.Split(raw, ",")
-	out := make([]uuid.UUID, 0, len(parts))
-	for _, part := range parts {
-		part = strings.Trim(strings.TrimSpace(part), `"`)
-		if part == "" || strings.EqualFold(part, "null") {
-			continue
-		}
-		id, err := uuid.Parse(part)
-		if err != nil {
-			return nil, fmt.Errorf("parse assignee id %q: %w", part, err)
-		}
-		out = append(out, id)
-	}
-	return out, nil
 }
 
 // Merged reports whether the pull request landed. A pull request that carries
@@ -184,7 +123,7 @@ latest_close AS (
 assignees AS (
 	SELECT
 		a.work_order_id,
-		array_agg(a.user_id ORDER BY a.created_at ASC) AS ids
+		array_agg(a.user_id ORDER BY a.created_at ASC, a.user_id ASC) AS ids
 	FROM factory_work_order_assignees a
 	INNER JOIN factory_work_orders wo ON wo.id = a.work_order_id
 	WHERE wo.factory_id = ?
@@ -256,3 +195,64 @@ WHERE u.organization_id = ?
 	AND u.deleted_at IS NULL
 ORDER BY u.id, l.linked_at DESC NULLS LAST, p.updated_at DESC NULLS LAST
 `
+
+type factoryVelocityPullRequestScan struct {
+	WorkOrderID  uuid.UUID
+	Repository   string
+	URL          string
+	Number       int64
+	MergedAt     *time.Time
+	ClosedAt     *time.Time
+	CreatedByID  *uuid.UUID
+	AssigneeIDs  string
+	IntakeSource string
+	OriginURL    string
+	CycleHours   *float64
+}
+
+func (s factoryVelocityPullRequestScan) asPullRequest() (FactoryVelocityPullRequest, error) {
+	assigneeIDs, err := parseUUIDArray(s.AssigneeIDs)
+	if err != nil {
+		return FactoryVelocityPullRequest{}, err
+	}
+	return FactoryVelocityPullRequest{
+		WorkOrderID:  s.WorkOrderID,
+		Repository:   s.Repository,
+		URL:          s.URL,
+		Number:       s.Number,
+		MergedAt:     s.MergedAt,
+		ClosedAt:     s.ClosedAt,
+		CreatedByID:  s.CreatedByID,
+		AssigneeIDs:  assigneeIDs,
+		IntakeSource: s.IntakeSource,
+		OriginURL:    s.OriginURL,
+		CycleHours:   s.CycleHours,
+	}, nil
+}
+
+func parseUUIDArray(raw string) ([]uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "{}" {
+		return nil, nil
+	}
+	raw = strings.TrimPrefix(raw, "{")
+	raw = strings.TrimSuffix(raw, "}")
+	if raw == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]uuid.UUID, 0, len(parts))
+	for _, part := range parts {
+		part = strings.Trim(strings.TrimSpace(part), `"`)
+		if part == "" || strings.EqualFold(part, "null") {
+			continue
+		}
+		id, err := uuid.Parse(part)
+		if err != nil {
+			return nil, fmt.Errorf("parse assignee id %q: %w", part, err)
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
