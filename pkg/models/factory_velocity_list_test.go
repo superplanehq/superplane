@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__ListFactoryVelocityPullRequests__LoadsAssigneesInAssignmentOrder(t *testing.T) {
+func Test__ListFactoryVelocityPullRequests__LoadsAssigneesByAssignmentTime(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 

@@ -304,10 +304,11 @@ func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRe
 	row.authoredMerged++
 }
 
-// addFactoryOrder credits a work order to the first assigned member who still
-// belongs to the organization. When nobody is assigned, or none of the
-// assignees resolve, it credits the member who opened the order. An order with
-// neither stays out of the table.
+// addFactoryOrder credits a work order to the first loaded assignee who still
+// belongs to the organization. Loaded IDs are ordered by assignment time, then
+// by user ID when several members are assigned together. When nobody is
+// assigned, or none of the assignees resolve, it credits the member who opened
+// the order. An order with neither stays out of the table.
 func (b *velocityPeopleBuilder) addFactoryOrder(order *velocityOrder) {
 	member := b.creditedMember(order)
 	if member == nil {
