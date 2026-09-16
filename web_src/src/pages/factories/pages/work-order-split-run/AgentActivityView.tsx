@@ -143,12 +143,12 @@ function ActivitySummaryButton({
       aria-label={label}
       onClick={onToggle}
       data-testid={testId}
-      className="sp-tool-enter flex w-full items-start gap-1 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
+      className="sp-tool-enter flex w-full items-center gap-1 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
     >
       <span className="min-w-0 whitespace-normal break-words">
         {running ? <AnimatedThinkingState text={label} /> : label}
       </span>
-      <ChevronRight className={cn("mt-0.5 size-3.5 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
+      <ChevronRight className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
     </button>
   );
 }

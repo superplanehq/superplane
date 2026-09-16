@@ -112,7 +112,9 @@ describe("AgentActivityView", () => {
 
     const summary = screen.getByRole("button", { name: "Explored repository, used terminal" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(summary).toHaveClass("items-center");
     expect(summary.querySelector("svg")).not.toHaveClass("opacity-0");
+    expect(summary.querySelector("svg")).not.toHaveClass("mt-0.5");
     expect(summary.querySelector("span")).toHaveClass("whitespace-normal", "break-words");
     expect(summary.querySelector("span")).not.toHaveClass("flex-1");
     expect(screen.queryByText("pwd && find . -type f")).not.toBeInTheDocument();
