@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -141,7 +140,7 @@ func assembleWorkspaceMCPServer(
 			}
 			return workspaceMCPServer{}, false
 		}
-		token, err := factories.MintFactoryAgentResourceAccessToken(context.Background(), encryptor, httpClient, db, resource)
+		token, err := mcp.MintFactoryAgentResourceAccessToken(context.Background(), encryptor, httpClient, db, resource)
 		if err != nil || strings.TrimSpace(token) == "" {
 			if ctx.Logger != nil {
 				ctx.Logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")

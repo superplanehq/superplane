@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -282,16 +281,4 @@ func modelOAuthStatusToProto(status string) pb.FactoryAgentResource_OAuthStatus 
 	default:
 		return pb.FactoryAgentResource_OAUTH_STATUS_UNSPECIFIED
 	}
-}
-
-func encryptResourceSecret(ctx context.Context, encryptor crypto.Encryptor, resourceID uuid.UUID, plaintext string) ([]byte, error) {
-	return encryptor.Encrypt(ctx, []byte(plaintext), []byte(resourceID.String()))
-}
-
-func decryptResourceSecret(ctx context.Context, encryptor crypto.Encryptor, resourceID uuid.UUID, value []byte) (string, error) {
-	plain, err := encryptor.Decrypt(ctx, value, []byte(resourceID.String()))
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
 }

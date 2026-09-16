@@ -2,10 +2,7 @@ package factories
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,24 +63,24 @@ func StartFactoryAgentResourceOAuth(
 
 	discovery, err := mcp.Discover(oauthCtx, httpClient, resource.Config.Data().URL)
 	if err != nil {
-		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, userFacingOAuthError(err), nil)
-		return nil, factoryErrorToStatus(invalidArgument(userFacingOAuthError(err)), "failed to start MCP OAuth")
+		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, mcp.UserFacingOAuthError(err), nil)
+		return nil, factoryErrorToStatus(invalidArgument(mcp.UserFacingOAuthError(err)), "failed to start MCP OAuth")
 	}
 
 	redirectURI := mcp.CallbackURL(baseURL)
 	clientMetadataURL := mcp.ClientMetadataURL(baseURL)
 	clientID, useDCR, err := discovery.SelectClientID(clientMetadataURL)
 	if err != nil {
-		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, userFacingOAuthError(err), nil)
-		return nil, factoryErrorToStatus(invalidArgument(userFacingOAuthError(err)), "failed to start MCP OAuth")
+		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, mcp.UserFacingOAuthError(err), nil)
+		return nil, factoryErrorToStatus(invalidArgument(mcp.UserFacingOAuthError(err)), "failed to start MCP OAuth")
 	}
 
 	var clientSecret string
 	if useDCR {
 		registration, err := mcp.RegisterClient(oauthCtx, httpClient, discovery.AuthServer.RegistrationEndpoint, redirectURI, clientMetadataURL)
 		if err != nil {
-			_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, userFacingOAuthError(err), nil)
-			return nil, factoryErrorToStatus(invalidArgument(userFacingOAuthError(err)), "failed to start MCP OAuth")
+			_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthVendorRejected, mcp.UserFacingOAuthError(err), nil)
+			return nil, factoryErrorToStatus(invalidArgument(mcp.UserFacingOAuthError(err)), "failed to start MCP OAuth")
 		}
 		clientID = registration.ClientID
 		clientSecret = registration.ClientSecret
@@ -182,7 +179,7 @@ func persistOAuthStart(
 	if err := resource.SetOAuthPending(db, state, time.Now().Add(10*time.Minute)); err != nil {
 		return err
 	}
-	encryptedVerifier, err := encryptResourceSecret(ctx, encryptor, resource.ID, verifier)
+	encryptedVerifier, err := mcp.EncryptResourceSecret(ctx, encryptor, resource.ID, verifier)
 	if err != nil {
 		return err
 	}
@@ -190,7 +187,7 @@ func persistOAuthStart(
 		return err
 	}
 	if clientSecret != "" {
-		encryptedSecret, err := encryptResourceSecret(ctx, encryptor, resource.ID, clientSecret)
+		encryptedSecret, err := mcp.EncryptResourceSecret(ctx, encryptor, resource.ID, clientSecret)
 		if err != nil {
 			return err
 		}
@@ -240,12 +237,12 @@ func CompleteFactoryAgentResourceOAuth(
 		return redirectPath, 302, ""
 	}
 
-	verifier, err := decryptedSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretCodeVerifier)
+	verifier, err := mcp.DecryptedResourceSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretCodeVerifier)
 	if err != nil || verifier == "" {
 		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, "the sign-in session expired", nil)
 		return redirectPath, 302, ""
 	}
-	clientSecret, _ := decryptedSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretClientSecret)
+	clientSecret, _ := mcp.DecryptedResourceSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretClientSecret)
 	metadata := resource.OAuthMetadata.Data()
 	oauthCtx, cancel := mcp.TimeoutContext(ctx)
 	defer cancel()
@@ -262,10 +259,10 @@ func CompleteFactoryAgentResourceOAuth(
 	)
 	if err != nil {
 		_ = resource.ClearOAuthPending(db)
-		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, userFacingOAuthError(err), nil)
+		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, mcp.UserFacingOAuthError(err), nil)
 		return redirectPath, 302, ""
 	}
-	if err := storeOAuthTokens(ctx, encryptor, db, resource, tokens); err != nil {
+	if err := mcp.StoreOAuthTokens(ctx, encryptor, db, resource, tokens); err != nil {
 		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, "SuperPlane could not store the access token", nil)
 		return redirectPath, 302, ""
 	}
@@ -273,91 +270,6 @@ func CompleteFactoryAgentResourceOAuth(
 	_ = resource.ClearOAuthPending(db)
 	_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
 	return redirectPath, 302, ""
-}
-
-func storeOAuthTokens(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-	tokens *mcp.TokenResponse,
-) error {
-	access, err := encryptResourceSecret(ctx, encryptor, resource.ID, tokens.AccessToken)
-	if err != nil {
-		return err
-	}
-	if err := resource.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, access); err != nil {
-		return err
-	}
-	if strings.TrimSpace(tokens.RefreshToken) == "" {
-		return nil
-	}
-	refresh, err := encryptResourceSecret(ctx, encryptor, resource.ID, tokens.RefreshToken)
-	if err != nil {
-		return err
-	}
-	return resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, refresh)
-}
-
-func MintFactoryAgentResourceAccessToken(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	httpClient mcp.HTTPDoer,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-) (string, error) {
-	if resource.Config.Data().MCPAuth() != models.FactoryAgentResourceAuthOAuth {
-		return "", nil
-	}
-	unlock := lockFactoryAgentResourceRefresh(resource.ID)
-	defer unlock()
-
-	refresh, err := decryptedSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken)
-	if err != nil {
-		return "", err
-	}
-	if refresh == "" {
-		if err := resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, "sign in again", nil); err != nil {
-			return "", err
-		}
-		return "", fmt.Errorf("MCP connection %s is not signed in", resource.Name)
-	}
-	metadata := resource.OAuthMetadata.Data()
-	clientSecret, _ := decryptedSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretClientSecret)
-	oauthCtx, cancel := mcp.TimeoutContext(ctx)
-	defer cancel()
-	tokens, err := mcp.RefreshAccessToken(oauthCtx, httpClient, metadata.TokenEndpoint, metadata.ClientID, clientSecret, refresh, metadata.Resource)
-	if err != nil {
-		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, userFacingOAuthError(err), nil)
-		return "", err
-	}
-	if err := storeOAuthTokens(ctx, encryptor, db, resource, tokens); err != nil {
-		return "", err
-	}
-	if resource.OAuthStatus != models.FactoryAgentResourceOAuthConnected {
-		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
-	}
-	return tokens.AccessToken, nil
-}
-
-func userFacingOAuthError(err error) string {
-	if err == nil {
-		return "the MCP server refused the SuperPlane OAuth client"
-	}
-	message := strings.TrimSpace(err.Error())
-	if message == "" {
-		return "the MCP server refused the SuperPlane OAuth client"
-	}
-	return message
-}
-
-var factoryAgentResourceRefreshLocks sync.Map
-
-func lockFactoryAgentResourceRefresh(id uuid.UUID) func() {
-	value, _ := factoryAgentResourceRefreshLocks.LoadOrStore(id.String(), &sync.Mutex{})
-	lock := value.(*sync.Mutex)
-	lock.Lock()
-	return lock.Unlock
 }
 
 func revokeStoredOAuthTokens(
@@ -371,25 +283,8 @@ func revokeStoredOAuthTokens(
 	if metadata.RevocationEndpoint == "" {
 		return
 	}
-	refresh, _ := decryptedSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken)
+	refresh, _ := mcp.DecryptedResourceSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken)
 	if refresh != "" {
 		mcp.RevokeToken(ctx, httpClient, metadata.RevocationEndpoint, metadata.ClientID, refresh)
 	}
-}
-
-func decryptedSecret(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-	name string,
-) (string, error) {
-	secret, err := resource.FindSecret(db, name)
-	if err != nil {
-		if errors.Is(err, models.ErrFactoryAgentResourceSecretNotFound) {
-			return "", nil
-		}
-		return "", err
-	}
-	return decryptResourceSecret(ctx, encryptor, resource.ID, secret.Value)
 }
