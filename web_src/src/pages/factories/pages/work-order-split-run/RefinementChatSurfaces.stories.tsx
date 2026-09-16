@@ -1,12 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 
 import { ComponentStoryShell } from "../../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { PlanningSessionSurveyForm } from "../PlanningSessionSurveyForm";
 
 const meta = {
   title: "Factories/Pages/Task Split Run/Refinement chat",
@@ -61,47 +60,13 @@ function RefinementChatSurfaces() {
         </div>
       </div>
 
-      <SurveyFormCard />
+      <PlanningSessionSurveyForm
+        survey={{ questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] }}
+        onSubmit={(text) => {
+          console.log("survey submit", text);
+        }}
+      />
     </div>
-  );
-}
-
-function SurveyFormCard() {
-  return (
-    <div className="sp-survey-card rounded-2xl border px-3 py-3">
-      <p className="sp-survey-accent text-[11px] font-medium">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
-      <p className="mt-2 text-[14px] font-medium leading-5 text-foreground">What is the priority?</p>
-      <div className="mt-3 flex flex-col gap-1">
-        <SurveyOption label="High" keyLabel="A" selected />
-        <SurveyOption label="Low" keyLabel="B" selected={false} />
-      </div>
-    </div>
-  );
-}
-
-function SurveyOption({ label, keyLabel, selected }: { label: string; keyLabel: string; selected: boolean }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      aria-pressed={selected}
-      className={cn(
-        "h-auto justify-start gap-2.5 whitespace-normal rounded-lg px-2 py-2 text-left text-[13px]",
-        selected ? "sp-survey-option-selected text-foreground" : "text-muted-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold",
-          selected ? "sp-survey-pick" : "border-border bg-background text-muted-foreground",
-        )}
-        aria-hidden
-      >
-        {keyLabel}
-      </span>
-      {label}
-    </Button>
   );
 }
 
