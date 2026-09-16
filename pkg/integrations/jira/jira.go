@@ -360,8 +360,9 @@ Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**
 `, apis, callbackURL)
 }
 
-// requestAuthorization sends the user to Atlassian to approve the OAuth app, using a CSRF state
-// that persists across Syncs until the callback consumes it.
+// requestAuthorization sends the user to Atlassian to approve the OAuth app.
+// The CSRF state is reused across Syncs until a callback consumes it. A failed
+// or denied callback also consumes it, so the next Sync issues a new state.
 func (j *Jira) requestAuthorization(ctx core.SyncContext, app oauthApp, callbackURL string) error {
 	metadata := readMetadata(ctx.Integration)
 	rememberSetupReturnPath(ctx, &metadata)
@@ -436,6 +437,8 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	expectedState := consumeMatchingOAuthState(ctx.Integration, ctx.Request.URL.Query().Get("state"))
+
 	app := resolveOAuthApp(ctx.Integration)
 	if app.ClientID == "" || app.ClientSecret == "" {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -443,11 +446,6 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	metadata := readMetadata(ctx.Integration)
-	expectedState := ""
-	if metadata.State != nil {
-		expectedState = *metadata.State
-	}
-
 	settingsURL := fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID())
 	redirectURL := callbackRedirectURL(ctx, settingsURL)
 	redirectURI := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
@@ -559,6 +557,26 @@ func readMetadata(integration core.IntegrationContext) Metadata {
 	metadata := Metadata{}
 	_ = mapstructure.Decode(integration.GetMetadata(), &metadata)
 	return metadata
+}
+
+// consumeMatchingOAuthState clears the stored CSRF state when this callback
+// carries it, including denied or failed attempts. A mismatched state is left
+// in place so a probe cannot force a reconnect. The returned value is the
+// state that was stored before this call, so HandleCallback can still
+// validate the request.
+func consumeMatchingOAuthState(integration core.IntegrationContext, incomingState string) string {
+	metadata := readMetadata(integration)
+	expectedState := ""
+	if metadata.State != nil {
+		expectedState = *metadata.State
+	}
+	if expectedState == "" || incomingState != expectedState {
+		return expectedState
+	}
+
+	metadata.State = nil
+	integration.SetMetadata(metadata)
+	return expectedState
 }
 
 func findSecret(integration core.IntegrationContext, name string) (string, error) {

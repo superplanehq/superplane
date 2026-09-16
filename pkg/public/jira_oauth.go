@@ -11,7 +11,7 @@ import (
 
 // HandleJiraOAuthCallback finishes SuperPlane's hosted Atlassian OAuth app.
 // Atlassian sends every grant to this one callback. The CSRF state finds
-// the pending SuperPlane connection.
+// the pending SuperPlane connection and is consumed on this first attempt.
 func (s *Server) HandleJiraOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	if state == "" {
@@ -19,13 +19,8 @@ func (s *Server) HandleJiraOAuthCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	integration, err := models.FindJiraIntegrationByOAuthState(database.DB(r.Context()), state)
+	integration, err := models.ClaimHostedJiraOAuthState(database.DB(r.Context()), state)
 	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
-		return
-	}
-
-	if !isHostedJiraOAuth(integration) {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
