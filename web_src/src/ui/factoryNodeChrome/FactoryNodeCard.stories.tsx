@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Button } from "@/components/ui/button";
 import { Logs } from "lucide-react";
 import { FactoryNodeCard } from "./FactoryNodeCard";
 
@@ -126,14 +127,10 @@ export const SeeLogs: Story = {
     iconSlug: "terminal",
     canvasMode: "live",
     eventSections: [{ eventId: "logs-1", eventState: "failed", eventTitle: "Failed", eventSubtitle: "12m ago" }],
-    customField: (
-      <button
-        type="button"
-        aria-label="See logs"
-        className="flex size-6 items-center justify-center rounded-md text-muted-foreground"
-      >
+    headerAction: (
+      <Button type="button" variant="ghost" size="icon-xs" aria-label="See logs" className="text-muted-foreground">
         <Logs className="size-3.5" aria-hidden />
-      </button>
+      </Button>
     ),
   },
 };

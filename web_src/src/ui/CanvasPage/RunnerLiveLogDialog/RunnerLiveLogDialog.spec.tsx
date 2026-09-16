@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
+import { formatClockDuration } from "@/lib/duration";
 import type { ExecutionInfo } from "@/pages/app/mappers/types";
 import { RunnerLiveLogDialog } from "./RunnerLiveLogDialog";
 
@@ -23,9 +24,12 @@ vi.mock("@/pages/factories/pages/work-order-split-run/PhaseLogCard", () => ({
   }) => phaseLogCardMock(props),
 }));
 
+const startedAt = Date.now() - 90_000;
 const execution = {
   id: "execution-1",
   state: "STATE_FINISHED",
+  createdAt: new Date(startedAt).toISOString(),
+  updatedAt: new Date(startedAt + 90_000).toISOString(),
 } as ExecutionInfo;
 
 describe("RunnerLiveLogDialog", () => {
@@ -70,6 +74,7 @@ describe("RunnerLiveLogDialog", () => {
         collapsible: false,
         phase: expect.objectContaining({
           name: "Run Shell Command",
+          duration: formatClockDuration(90_000),
           stream: [
             expect.objectContaining({
               component: "runnerBash",

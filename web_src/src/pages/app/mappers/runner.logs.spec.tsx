@@ -73,7 +73,7 @@ function makeContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseCo
 describe("runner factory logs", () => {
   it("passes canvas session ids so the logs dialog can fetch", () => {
     const props = runnerMapper.props(makeContext());
-    const field = props.customField as React.ReactElement<RunnerLiveLogDialogProps>;
+    const field = props.headerAction as React.ReactElement<RunnerLiveLogDialogProps>;
 
     expect(field.props.session).toEqual({
       organizationId: "org-1",

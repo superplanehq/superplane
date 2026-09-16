@@ -1,5 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatClockDuration } from "@/lib/duration";
 import type {
   SplitRunPhase,
   SplitRunPhaseStatus,
@@ -52,16 +54,18 @@ export function RunnerLiveLogDialog({
     <>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             aria-label={SEE_LOGS_LABEL}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
             onClick={handleOpen}
             onMouseDown={stopCanvasInteraction}
             onPointerDown={stopCanvasInteraction}
           >
             <Logs className="size-3.5" aria-hidden />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent side="top">{SEE_LOGS_LABEL}</TooltipContent>
       </Tooltip>
@@ -125,12 +129,23 @@ function phaseForRunnerExecution({
     id: execution.id,
     name: title,
     status,
-    duration: "",
+    duration: durationForRunnerExecution(execution),
     componentName: title,
     artifacts: [],
     stream: [streamLine],
     canvasSteps: [],
   };
+}
+
+function durationForRunnerExecution(execution: ExecutionInfo): string {
+  const startedAt = Date.parse(execution.createdAt);
+  if (!Number.isFinite(startedAt)) {
+    return "";
+  }
+
+  const finishedAt = Date.parse(execution.updatedAt);
+  const endedAt = isExecutionInFlight(execution) || !Number.isFinite(finishedAt) ? Date.now() : finishedAt;
+  return formatClockDuration(Math.max(0, endedAt - startedAt));
 }
 
 function statusForRunnerExecution(execution: ExecutionInfo): SplitRunPhaseStatus {

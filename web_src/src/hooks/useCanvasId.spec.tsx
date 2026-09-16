@@ -20,7 +20,7 @@ describe("useCanvasId", () => {
   it("reads the factory automation id", () => {
     const { result } = renderCanvasId(
       "/org-1/workspaces/acme/automations/auto-1",
-      "/:organizationId/workspaces/:factoryKey/automations/:automationId",
+      "/:organizationId/workspaces/:factoryKey/automations/:appId",
     );
 
     expect(result.current).toBe("auto-1");

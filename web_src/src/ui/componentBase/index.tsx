@@ -65,6 +65,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
   customField?: React.ReactNode | (() => React.ReactNode);
+  /** Compact factory header action, such as the runner logs icon. */
+  headerAction?: React.ReactNode;
   /** Extra body content for the larger factory node card. */
   factoryBody?: React.ReactNode;
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
@@ -163,6 +165,7 @@ const FactoryComponentBase: React.FC<ComponentBaseProps> = (props) => {
       eventStateMap={props.eventStateMap}
       body={props.factoryBody}
       customField={customField}
+      headerAction={props.headerAction}
     />
   );
 };

@@ -56,8 +56,10 @@ export type FactoryNodeCardProps = {
   eventStateMap?: EventStateMap;
   /** Optional content between the node header and status footer. */
   body?: React.ReactNode;
-  /** Extra header action such as the See logs icon. Does not widen the card. */
+  /** Body custom field. Setup panels stay here so they do not shrink the header. */
   customField?: React.ReactNode;
+  /** Compact header action such as the See logs icon. Does not widen the card. */
+  headerAction?: React.ReactNode;
 };
 
 function useFactoryNodeMetrics(
@@ -147,6 +149,7 @@ export function FactoryNodeCard({
   eventStateMap,
   body,
   customField,
+  headerAction,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const runtimeStatus = resolveFactoryRuntimeStatus({
@@ -199,6 +202,7 @@ export function FactoryNodeCard({
         showStatusFooter={footer.showStatusFooter}
         body={body}
         customField={customField}
+        headerAction={headerAction}
       />
     </div>
   );

@@ -30,13 +30,13 @@ describe("FactoryNodeCard", () => {
     expect(screen.getByTestId("factory-node-run-bash")).toHaveStyle({ width: "280px" });
   });
 
-  it("shows a custom field at the top right of the card without widening it", () => {
+  it("shows a compact header action at the top right without widening the card", () => {
     render(
       <FactoryNodeCard
         title="Run Bash"
         componentLabel="Run Bash"
         nodeName="Build Storybook"
-        customField={<button type="button">See logs</button>}
+        headerAction={<button type="button">See logs</button>}
       />,
     );
 
@@ -45,6 +45,19 @@ describe("FactoryNodeCard", () => {
     expect(action).toContainElement(screen.getByRole("button", { name: "See logs" }));
     expect(card).toContainElement(action);
     expect(card).toHaveStyle({ width: "280px" });
+  });
+
+  it("keeps body custom fields out of the header", () => {
+    render(
+      <FactoryNodeCard
+        title="Prometheus"
+        componentLabel="Query Prometheus"
+        customField={<div>Paste the webhook URL in this panel.</div>}
+      />,
+    );
+
+    expect(screen.queryByTestId("factory-node-header-action")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factory-node-custom-field")).toHaveTextContent("Paste the webhook URL in this panel.");
   });
 
   it("uses the same blue selection ring as the run canvas", () => {

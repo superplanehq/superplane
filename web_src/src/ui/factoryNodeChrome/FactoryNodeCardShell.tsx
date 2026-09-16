@@ -23,6 +23,7 @@ type FactoryNodeCardShellProps = {
   statusLabel?: string;
   body?: React.ReactNode;
   customField?: React.ReactNode;
+  headerAction?: React.ReactNode;
 };
 
 /** Monochrome logos (github / SuperPlane) need invert on dark card chrome. */
@@ -40,13 +41,25 @@ function FactoryNodeBody({ body, isCompactView }: { body: React.ReactNode; isCom
   return body && !isCompactView ? body : null;
 }
 
-function FactoryNodeHeaderAction({ customField }: { customField?: React.ReactNode }) {
-  if (!customField) {
+function FactoryNodeHeaderAction({ headerAction }: { headerAction?: React.ReactNode }) {
+  if (!headerAction) {
     return null;
   }
 
   return (
     <div className="nodrag shrink-0" data-testid="factory-node-header-action">
+      {headerAction}
+    </div>
+  );
+}
+
+function FactoryNodeCustomField({ customField }: { customField?: React.ReactNode }) {
+  if (!customField) {
+    return null;
+  }
+
+  return (
+    <div className="px-3.5 pb-3" data-testid="factory-node-custom-field">
       {customField}
     </div>
   );
@@ -68,6 +81,7 @@ export function FactoryNodeCardShell({
   statusLabel,
   body,
   customField,
+  headerAction,
 }: FactoryNodeCardShellProps) {
   const Icon = React.useMemo(() => resolveIcon(iconSlug), [iconSlug]);
   const invertMonoIcon = shouldInvertMonoFactoryIcon(iconSrc);
@@ -108,10 +122,11 @@ export function FactoryNodeCardShell({
               <p className="mt-0.5 text-left text-[12px] leading-snug text-muted-foreground">{subtitle}</p>
             ) : null}
           </div>
-          <FactoryNodeHeaderAction customField={customField} />
+          <FactoryNodeHeaderAction headerAction={headerAction} />
         </div>
       </div>
       <FactoryNodeBody body={body} isCompactView={isCompactView} />
+      <FactoryNodeCustomField customField={customField} />
       {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} label={statusLabel} /> : null}
     </div>
   );
