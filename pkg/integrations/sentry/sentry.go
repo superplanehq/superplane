@@ -643,6 +643,12 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	if !hostedWebhookInstallationAllowed(ctx.Integration, payload.Installation.UUID) {
+		ctx.Logger.Warn("sentry webhook installation does not match this connection")
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
 	message := WebhookMessage{
 		Resource:     resource,
 		Action:       payload.Action,
@@ -1088,6 +1094,22 @@ func webhookSecretFor(integration core.IntegrationContext, config Configuration)
 		}
 	}
 	return config.ClientSecret
+}
+
+func hostedWebhookInstallationAllowed(integration core.IntegrationContext, payloadUUID string) bool {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+	if !metadata.HostedApp {
+		return true
+	}
+
+	expected := strings.TrimSpace(metadata.InstallationUUID)
+	if expected == "" {
+		return false
+	}
+	return strings.TrimSpace(payloadUUID) == expected
 }
 
 func (s *Sentry) loadConfiguration(integration core.IntegrationContext) (Configuration, error) {

@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"net/url"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,10 +55,9 @@ func Test__afterHostedAppSetup(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
+	req := hostedSetupRequest(
 		"/api/v1/sentry/app/setup?code=oauth-code&installationId=install-1&orgSlug=acme",
-		nil,
+		"csrf-state",
 	)
 
 	impl.afterHostedAppSetup(core.HTTPRequestContext{
@@ -110,10 +108,9 @@ func Test__afterHostedAppSetup_installationIdAlias(t *testing.T) {
 	httpContext := hostedInstallHTTPContext(expiresAt, "install-token")
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
+	req := hostedSetupRequest(
 		"/api/v1/sentry/app/setup?code=oauth-code&installation_id=install-1&org_slug=acme",
-		nil,
+		"csrf-state",
 	)
 
 	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
@@ -125,7 +122,7 @@ func Test__afterHostedAppSetup_installationIdAlias(t *testing.T) {
 	assert.Equal(t, "install-1", metadata.InstallationUUID)
 }
 
-func Test__afterHostedAppSetup_missingCode_mintsJWTForInstallation(t *testing.T) {
+func Test__afterHostedAppSetup_missingCode_rejectsUnknownInstallation(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
@@ -133,31 +130,22 @@ func Test__afterHostedAppSetup_missingCode_mintsJWTForInstallation(t *testing.T)
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
-	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
-	httpContext := hostedInstallHTTPContext(expiresAt, "jwt-token")
+	httpContext := hostedInstallHTTPContext(time.Now().Add(time.Hour).UTC().Format(time.RFC3339), "jwt-token")
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
+	req := hostedSetupRequest(
 		"/api/v1/sentry/app/setup?installationId=install-1&orgSlug=acme",
-		nil,
+		"csrf-state",
 	)
 
 	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
 
-	assert.Equal(t, http.StatusSeeOther, recorder.Code)
-	assert.Equal(t, "ready", integrationCtx.State)
-
-	accessToken, err := integrationCtx.Secrets().Get(SecretAccessToken)
-	require.NoError(t, err)
-	assert.Equal(t, "jwt-token", accessToken)
-
-	require.NotEmpty(t, httpContext.Requests)
-	assert.Equal(t, sentryAppJWTGrantType, decodeGrantType(t, httpContext.Requests[0]))
-	assertSentryAppJWT(t, httpContext.Requests[0].Header.Get("Authorization"), "cid", "csecret")
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	assert.Empty(t, httpContext.Requests)
 }
 
-func Test__afterHostedAppSetup_codeExchangeFailed_mintsJWT(t *testing.T) {
+func Test__afterHostedAppSetup_codeExchangeFailed_doesNotMint(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
@@ -165,34 +153,46 @@ func Test__afterHostedAppSetup_codeExchangeFailed_mintsJWT(t *testing.T) {
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
-	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			sentryMockResponse(http.StatusBadRequest, `{"detail":"invalid grant"}`),
-			sentryMockResponse(http.StatusCreated, fmt.Sprintf(
-				`{"token":"jwt-token","refreshToken":"refresh-token","expiresAt":%q}`,
-				expiresAt,
-			)),
-			sentryMockResponse(http.StatusOK, `{"id":"1","slug":"acme","name":"Acme"}`),
-			sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"payments","name":"Payments"}]`),
-			sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+			sentryMockResponse(http.StatusCreated, `{"token":"jwt-token","refreshToken":"refresh-token"}`),
 		},
 	}
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
+	req := hostedSetupRequest(
 		"/api/v1/sentry/app/setup?code=stale-code&installationId=install-1&orgSlug=acme",
-		nil,
+		"csrf-state",
 	)
 
 	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
 
-	assert.Equal(t, http.StatusSeeOther, recorder.Code)
-	assert.Equal(t, "ready", integrationCtx.State)
-	require.GreaterOrEqual(t, len(httpContext.Requests), 2)
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, "authorization_code", decodeGrantType(t, httpContext.Requests[0]))
-	assert.Equal(t, sentryAppJWTGrantType, decodeGrantType(t, httpContext.Requests[1]))
+}
+
+func Test__afterHostedAppSetup_mismatchedState_rejects(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+	impl := &Sentry{}
+	integrationCtx := pendingHostedIntegration()
+	httpContext := hostedInstallHTTPContext(time.Now().Add(time.Hour).UTC().Format(time.RFC3339), "install-token")
+	recorder := httptest.NewRecorder()
+	req := hostedSetupRequest(
+		"/api/v1/sentry/app/setup?code=oauth-code&installationId=install-1&orgSlug=acme",
+		"other-state",
+	)
+
+	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
+
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	assert.Empty(t, httpContext.Requests)
 }
 
 func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
@@ -207,6 +207,7 @@ func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
 		RefreshToken:     "webhook-refresh",
 		TokenExpiresAt:   time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
 		Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
+		Code:             "grant-code",
 	})
 
 	impl := &Sentry{}
@@ -220,7 +221,7 @@ func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sentry/app/setup?installationId=install-1", nil)
+	req := hostedSetupRequest("/api/v1/sentry/app/setup?code=grant-code&installationId=install-1", "csrf-state")
 
 	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
 
@@ -258,6 +259,86 @@ func Test__ParseInstallationCreatedGrant(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func Test__takeUnclaimedHostedInstall_requiresMatchingCode(t *testing.T) {
+	t.Cleanup(resetUnclaimedHostedInstalls)
+
+	rememberUnclaimedHostedInstall(hostedSentryInstall{
+		InstallationUUID: "install-1",
+		AccessToken:      "webhook-token",
+		Code:             "grant-code",
+	})
+
+	assert.Nil(t, takeUnclaimedHostedInstall("install-1", ""))
+	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "other-code"))
+	taken := takeUnclaimedHostedInstall("install-1", "grant-code")
+	require.NotNil(t, taken)
+	assert.Equal(t, "webhook-token", taken.AccessToken)
+	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
+}
+
+func Test__takeUnclaimedHostedInstall_ignoresExpiredGrant(t *testing.T) {
+	t.Cleanup(resetUnclaimedHostedInstalls)
+
+	rememberUnclaimedHostedInstall(hostedSentryInstall{
+		InstallationUUID: "install-1",
+		AccessToken:      "webhook-token",
+		Code:             "grant-code",
+		ExpiresAt:        time.Now().Add(-time.Minute),
+	})
+
+	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
+}
+
+func Test__ForgetKnownHostedInstallation_dropsUnclaimedGrant(t *testing.T) {
+	t.Cleanup(resetUnclaimedHostedInstalls)
+
+	rememberUnclaimedHostedInstall(hostedSentryInstall{
+		InstallationUUID: "install-1",
+		AccessToken:      "webhook-token",
+		Code:             "grant-code",
+	})
+	ForgetKnownHostedInstallation("install-1")
+	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
+}
+
+func Test__ParseInstallationDeletedUUID(t *testing.T) {
+	uuid, ok := ParseInstallationDeletedUUID("installation", []byte(`{
+		"action": "deleted",
+		"installation": {"uuid": "install-uuid"}
+	}`))
+	require.True(t, ok)
+	assert.Equal(t, "install-uuid", uuid)
+
+	_, ok = ParseInstallationDeletedUUID("installation", []byte(`{"action":"created","installation":{"uuid":"install-uuid"}}`))
+	assert.False(t, ok)
+}
+
+func Test__redirectHostedAppInstall_doesNotBindUnclaimedGrant(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	t.Cleanup(resetUnclaimedHostedInstalls)
+
+	rememberUnclaimedHostedInstall(hostedSentryInstall{
+		InstallationUUID: "install-1",
+		AccessToken:      "install-token",
+		Organization:     &OrganizationSummary{Slug: "acme"},
+		Code:             "grant-code",
+	})
+
+	impl := &Sentry{}
+	integrationCtx := pendingHostedIntegration()
+	httpContext := &contexts.HTTPContext{}
+	recorder := httptest.NewRecorder()
+	req := hostedSetupRequest("/api/v1/sentry/app/install?state=csrf-state", "csrf-state")
+
+	impl.redirectHostedAppInstall(hostedSetupContext(req, recorder, httpContext, integrationCtx))
+
+	assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	assert.Equal(t, HostedAppExternalInstallURL("superplane"), recorder.Header().Get("Location"))
+	assert.NotEqual(t, "ready", integrationCtx.State)
+}
+
 func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
@@ -282,7 +363,7 @@ func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 		OrgSlug: "acme",
 	}))
 
-	unclaimed := takeUnclaimedHostedInstall("install-1")
+	unclaimed := takeUnclaimedHostedInstall("install-1", "grant-code")
 	require.NotNil(t, unclaimed)
 	assert.Equal(t, "webhook-token", unclaimed.AccessToken)
 	assert.Equal(t, "acme", unclaimed.Organization.Slug)
@@ -317,7 +398,7 @@ func Test__afterHostedAppSetup_missingCode_bindsExistingSuperPlaneInstall(t *tes
 	}
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sentry/app/setup", nil)
+	req := hostedSetupRequest("/api/v1/sentry/app/setup", "csrf-state")
 
 	impl.afterHostedAppSetup(core.HTTPRequestContext{
 		Request:         req,
@@ -417,6 +498,15 @@ func hostedInstallHTTPContext(expiresAt, token string) *contexts.HTTPContext {
 	}
 }
 
+func hostedSetupRequest(target, state string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req.AddCookie(&http.Cookie{
+		Name:  sentryAppSetupStateCookie,
+		Value: url.QueryEscape(state),
+	})
+	return req
+}
+
 func hostedSetupContext(
 	req *http.Request,
 	recorder *httptest.ResponseRecorder,
@@ -440,18 +530,4 @@ func decodeGrantType(t *testing.T, request *http.Request) string {
 	var authRequest sentryAppAuthorizationRequest
 	require.NoError(t, json.NewDecoder(request.Body).Decode(&authRequest))
 	return authRequest.GrantType
-}
-
-func assertSentryAppJWT(t *testing.T, authorization, clientID, clientSecret string) {
-	t.Helper()
-	require.True(t, strings.HasPrefix(authorization, "Bearer "))
-	parsed, err := jwt.Parse(strings.TrimPrefix(authorization, "Bearer "), func(token *jwt.Token) (any, error) {
-		return []byte(clientSecret), nil
-	})
-	require.NoError(t, err)
-	require.True(t, parsed.Valid)
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	require.True(t, ok)
-	assert.Equal(t, clientID, claims["iss"])
-	assert.Equal(t, clientID, claims["sub"])
 }

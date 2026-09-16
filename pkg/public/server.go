@@ -826,6 +826,10 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		writeHostedGitHubAppAuthError(w, status)
 		return
 	}
+	if status := hostedSentryAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
+		writeHostedGitHubAppAuthError(w, status)
+		return
+	}
 
 	s.dispatchIntegrationRequest(w, r, integrationInstance)
 }

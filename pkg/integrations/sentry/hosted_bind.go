@@ -3,9 +3,11 @@ package sentry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -16,9 +18,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const unclaimedHostedInstallTTL = 20 * time.Minute
+
 // hostedSentryInstall is a SuperPlane-side copy of a public Sentry app
-// install. Sentry does not mint tokens from the app credentials, so a new
-// connection reuses tokens that SuperPlane already stored.
+// install. SuperPlane reuses a ready connection in the same organization,
+// or a webhook grant that the authenticated setup callback later claims.
 type hostedSentryInstall struct {
 	InstallationUUID string
 	AccessToken      string
@@ -27,6 +31,11 @@ type hostedSentryInstall struct {
 	Organization     *OrganizationSummary
 	Projects         []ProjectSummary
 	Teams            []TeamSummary
+	// Code is the one-time Sentry grant from installation.created or the
+	// Redirect URL. Claiming this row requires the same code, so a known
+	// installation UUID is not enough to steal the tokens.
+	Code      string
+	ExpiresAt time.Time
 }
 
 type hostedSentryInstallFinder func(organizationID, excludeID string) (*hostedSentryInstall, error)
@@ -87,22 +96,53 @@ func (s *Sentry) redirectHostedAppInstall(ctx core.HTTPRequestContext) {
 }
 
 func (s *Sentry) bindReadyHostedInstallIfPresent(ctx core.SyncContext, pending Metadata) (bool, error) {
-	if ctx.OrganizationID == "" {
+	install, err := s.findBindableHostedInstall(ctx)
+	if err != nil {
+		return false, err
+	}
+	if install == nil {
 		return false, nil
+	}
+
+	if canCopyHostedInstall(*install, ctx.HTTP != nil) {
+		if err := s.bindHostedInstallation(ctx, pending, *install); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	if err := s.adoptKnownHostedInstall(ctx, pending, *install); err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to adopt known Sentry install: %v", err)
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *Sentry) findBindableHostedInstall(ctx core.SyncContext) (*hostedSentryInstall, error) {
+	if ctx.OrganizationID == "" {
+		return nil, nil
 	}
 
 	install, err := findReadyHostedSentryInstall(ctx.OrganizationID, ctx.Integration.ID().String())
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if install == nil || strings.TrimSpace(install.InstallationUUID) == "" || strings.TrimSpace(install.AccessToken) == "" {
-		return false, nil
+		return nil, nil
 	}
+	return install, nil
+}
 
-	if err := s.bindHostedInstallation(ctx, pending, *install); err != nil {
-		return false, err
+func canCopyHostedInstall(install hostedSentryInstall, hasHTTP bool) bool {
+	if strings.TrimSpace(install.AccessToken) == "" {
+		return false
 	}
-	return true, nil
+	if install.Organization == nil || strings.TrimSpace(install.Organization.Slug) == "" {
+		return false
+	}
+	return len(install.Projects) > 0 || !hasHTTP
 }
 
 func (s *Sentry) bindHostedInstallation(ctx core.SyncContext, pending Metadata, install hostedSentryInstall) error {
@@ -127,31 +167,86 @@ func (s *Sentry) bindHostedInstallation(ctx core.SyncContext, pending Metadata, 
 	return nil
 }
 
+func (s *Sentry) adoptKnownHostedInstall(ctx core.SyncContext, pending Metadata, install hostedSentryInstall) error {
+	app, ok := HostedAppFromEnv()
+	if !ok {
+		return fmt.Errorf("hosted Sentry app is not configured")
+	}
+
+	orgSlug := ""
+	if install.Organization != nil {
+		orgSlug = install.Organization.Slug
+	}
+	tokens, err := tokensForKnownHostedInstall(ctx.HTTP, app, install)
+	if err != nil {
+		return err
+	}
+	return s.adoptHostedInstall(ctx, pending, tokens, install.InstallationUUID, orgSlug)
+}
+
 func rememberUnclaimedHostedInstall(install hostedSentryInstall) {
-	if strings.TrimSpace(install.InstallationUUID) == "" || strings.TrimSpace(install.AccessToken) == "" {
+	install.InstallationUUID = strings.TrimSpace(install.InstallationUUID)
+	install.Code = strings.TrimSpace(install.Code)
+	if install.InstallationUUID == "" || install.Code == "" {
+		return
+	}
+	if install.ExpiresAt.IsZero() {
+		install.ExpiresAt = time.Now().Add(unclaimedHostedInstallTTL)
+	}
+
+	unclaimedHostedMu.Lock()
+	defer unclaimedHostedMu.Unlock()
+	purgeExpiredUnclaimedHostedInstallsLocked(time.Now())
+	unclaimedHostedInstalls[install.InstallationUUID] = install
+}
+
+// ForgetKnownHostedInstallation drops a Sentry install after Sentry reports
+// that the organization uninstalled the app.
+func ForgetKnownHostedInstallation(installationUUID string) {
+	installationUUID = strings.TrimSpace(installationUUID)
+	if installationUUID == "" {
 		return
 	}
 
 	unclaimedHostedMu.Lock()
 	defer unclaimedHostedMu.Unlock()
-	unclaimedHostedInstalls[install.InstallationUUID] = install
+	delete(unclaimedHostedInstalls, installationUUID)
 }
 
-func takeUnclaimedHostedInstall(installationUUID string) *hostedSentryInstall {
+func takeUnclaimedHostedInstall(installationUUID, code string) *hostedSentryInstall {
 	installationUUID = strings.TrimSpace(installationUUID)
-	if installationUUID == "" {
+	code = strings.TrimSpace(code)
+	if installationUUID == "" || code == "" {
 		return nil
 	}
 
 	unclaimedHostedMu.Lock()
 	defer unclaimedHostedMu.Unlock()
+	now := time.Now()
+	purgeExpiredUnclaimedHostedInstallsLocked(now)
+
 	install, ok := unclaimedHostedInstalls[installationUUID]
 	if !ok {
+		return nil
+	}
+	if !install.ExpiresAt.IsZero() && !install.ExpiresAt.After(now) {
+		delete(unclaimedHostedInstalls, installationUUID)
+		return nil
+	}
+	if strings.TrimSpace(install.Code) != code {
 		return nil
 	}
 	delete(unclaimedHostedInstalls, installationUUID)
 	copied := install
 	return &copied
+}
+
+func purgeExpiredUnclaimedHostedInstallsLocked(now time.Time) {
+	for uuid, install := range unclaimedHostedInstalls {
+		if !install.ExpiresAt.IsZero() && !install.ExpiresAt.After(now) {
+			delete(unclaimedHostedInstalls, uuid)
+		}
+	}
 }
 
 func resetUnclaimedHostedInstalls() {
