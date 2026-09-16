@@ -14,7 +14,10 @@ import {
 } from "./prFeedbackSettingsModel";
 import { prFeedbackRunTitle } from "../lib/workOrderPullRequest";
 
-export function usePRFeedbackWorkOrderAttention(pullRequests: FactoriesFactoryPullRequest[]): {
+export function usePRFeedbackWorkOrderAttention(
+  pullRequests: FactoriesFactoryPullRequest[],
+  handlers?: FactoriesFactoryPrFeedbackHandler[],
+): {
   addressingFeedbackOrderIds: ReadonlySet<string>;
   addressingFeedbackLabels: ReadonlyMap<string, string>;
   waitingOnChecksOrderIds: ReadonlySet<string>;
@@ -22,7 +25,11 @@ export function usePRFeedbackWorkOrderAttention(pullRequests: FactoriesFactoryPu
   fixesPausedOrderIds: ReadonlySet<string>;
 } {
   return useMemo(() => {
-    const addressingFeedbackLabels = addressingFeedbackLabelsByWorkOrder(pullRequests);
+    const builtInCanvasIds =
+      handlers === undefined
+        ? undefined
+        : new Set(handlers.flatMap((handler) => (handler.canvasId?.trim() ? [handler.canvasId.trim()] : [])));
+    const addressingFeedbackLabels = addressingFeedbackLabelsByWorkOrder(pullRequests, builtInCanvasIds);
     return {
       addressingFeedbackOrderIds: new Set(addressingFeedbackLabels.keys()),
       addressingFeedbackLabels,
@@ -30,7 +37,7 @@ export function usePRFeedbackWorkOrderAttention(pullRequests: FactoriesFactoryPu
       checksPassedOrderIds: checksPassedWorkOrderIds(pullRequests),
       fixesPausedOrderIds: fixesPausedWorkOrderIds(pullRequests),
     };
-  }, [pullRequests]);
+  }, [handlers, pullRequests]);
 }
 
 export function useActivePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {

@@ -40,10 +40,8 @@ describe("columnAutomationHeadline", () => {
     );
   });
 
-  it("names a custom automation", () => {
-    expect(columnAutomationHeadline(automation({ kind: "custom", name: "Notify QA" }))).toBe(
-      "Runs the Notify QA automation",
-    );
+  it("uses the custom automation name as the label", () => {
+    expect(columnAutomationHeadline(automation({ kind: "custom", name: "Notify QA" }))).toBe("Notify QA");
   });
 
   it("describes the pull request listeners", () => {
