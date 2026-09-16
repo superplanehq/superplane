@@ -186,7 +186,10 @@ func (s *jiraIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, e
 	if err != nil {
 		return nil, err
 	}
-	if issue == nil {
+	// A Jira site holds every project the connection can read, so an issue
+	// key alone does not say that the issue belongs to this intake. Without
+	// this check a caller could import an issue from another project.
+	if issue == nil || !s.ownsIssue(issue.Fields) {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -194,12 +197,29 @@ func (s *jiraIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, e
 	return &item, nil
 }
 
+// ownsIssue reports whether the issue belongs to the project this intake
+// listens on. An issue without a readable project key is rejected, so a
+// missing field cannot widen the boundary.
+func (s *jiraIntakeItemSource) ownsIssue(fields map[string]any) bool {
+	project, _ := fields["project"].(map[string]any)
+	key, _ := project["key"].(string)
+	return key != "" && strings.EqualFold(strings.TrimSpace(key), s.projectKey)
+}
+
 func (s *jiraIntakeItemSource) AvailabilityScope() string {
 	return "jira:" + strings.ToUpper(s.projectKey)
 }
 
 func (s *jiraIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
-	return parseJiraIssueURL(rawURL, s.siteURL)
+	issueKey, ok := parseJiraIssueURL(rawURL, s.siteURL)
+	// Every project of the site shares one browse path, so the host match
+	// alone would let a backlog item of another project look like it came
+	// from this intake.
+	if !ok || !strings.EqualFold(jiraIssueProjectKey(issueKey), s.projectKey) {
+		return "", false
+	}
+
+	return issueKey, true
 }
 
 func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
@@ -208,7 +228,7 @@ func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bo
 		return false, errIntakeItemNotFound
 	}
 
-	issue, err := s.jira.GetIssueWithOptions(issueKey, jira.GetIssueOptions{Fields: "status"})
+	issue, err := s.jira.GetIssueWithOptions(issueKey, jira.GetIssueOptions{Fields: "status,project"})
 	if err != nil {
 		s.projectProbe.Do(func() {
 			_, s.projectReadableErr = s.jira.SearchIssues(
@@ -221,7 +241,7 @@ func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bo
 		}
 		return false, nil
 	}
-	if issue == nil || issue.Fields == nil {
+	if issue == nil || !s.ownsIssue(issue.Fields) {
 		return false, nil
 	}
 
@@ -232,6 +252,17 @@ func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bo
 	category, _ := status["statusCategory"].(map[string]any)
 	key, _ := category["key"].(string)
 	return !strings.EqualFold(key, "done"), nil
+}
+
+// jiraIssueProjectKey reads the project of an issue key such as ENG-42. A key
+// without the "<project>-<number>" shape reports an empty project.
+func jiraIssueProjectKey(issueKey string) string {
+	separator := strings.LastIndex(issueKey, "-")
+	if separator <= 0 {
+		return ""
+	}
+
+	return issueKey[:separator]
 }
 
 func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
@@ -245,12 +276,11 @@ func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
 }
 
 func jiraIssueFromFullIssue(issue *jira.Issue, siteURL string) IntakeItem {
-	description, _ := issue.Fields["description"].(string)
 	return IntakeItem{
 		ID:    issue.Key,
 		Key:   issue.Key,
 		Title: jiraIssueSummary(issue.Fields),
-		Body:  description,
+		Body:  jira.IssueDescriptionText(issue),
 		URL:   jiraIssueURL(siteURL, issue.Key),
 	}
 }
