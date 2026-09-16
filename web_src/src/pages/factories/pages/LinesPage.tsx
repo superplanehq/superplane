@@ -27,7 +27,11 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -247,9 +251,14 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
+  const canAddJiraIntake = hasExperimentalFeature(FEATURE_FACTORY_JIRA_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const hasJiraIntake = configuredIntakes.some((intake) => intake.source.id === "jira-issues");
   const addIntakeTemplates = useMemo(() => {
-    const allowedIds = new Set(["github-issues", "jira-issues"]);
+    const allowedIds = new Set(["github-issues"]);
+    if (canAddJiraIntake) {
+      allowedIds.add("jira-issues");
+    }
     if (canAddSentryIntake) {
       allowedIds.add("sentry-exceptions");
     }
@@ -257,7 +266,7 @@ export function LinesPage() {
       allowedIds.add("productive-tasks");
     }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddSentryIntake, canAddProductiveIntake]);
+  }, [canAddJiraIntake, canAddSentryIntake, canAddProductiveIntake]);
   const canAddIntakeFromMenu = true;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
@@ -289,6 +298,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const canSetupJira = canUpdate && canAddJiraIntake && !hasJiraIntake;
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -568,6 +578,7 @@ export function LinesPage() {
             onAddIntake={
               showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
             }
+            onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
@@ -715,6 +726,7 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   factoryIntakes,
@@ -737,6 +749,7 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   factoryIntakes: FactoriesFactoryIntake[];
@@ -823,6 +836,7 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupJira={onSetupJira}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
@@ -1047,6 +1061,7 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -1070,6 +1085,7 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1208,6 +1224,7 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupJira={onSetupJira}
           automations={backlogAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}
