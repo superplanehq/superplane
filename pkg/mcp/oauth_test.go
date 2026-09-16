@@ -98,8 +98,10 @@ func TestExchangeCodePostsVerifier(t *testing.T) {
 
 func TestResourceMetadataFromWWWAuthenticate(t *testing.T) {
 	t.Parallel()
-	got := resourceMetadataFromWWWAuthenticate(`Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="https://api.mobbin.com/.well-known/oauth-protected-resource"`)
-	assert.Equal(t, "https://api.mobbin.com/.well-known/oauth-protected-resource", got)
+	metadataURL := "https://api.mobbin.com/.well-known/oauth-protected-resource"
+	header := "Bearer realm=" + `"mcp"` + ", resource_metadata=" + `"` + metadataURL + `"`
+	got := resourceMetadataFromWWWAuthenticate(header)
+	assert.Equal(t, metadataURL, got)
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

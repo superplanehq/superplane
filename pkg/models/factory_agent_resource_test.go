@@ -130,7 +130,8 @@ func Test__FactoryAgentResource(t *testing.T) {
 	})
 
 	t.Run("returns nil factory id for a non-factory canvas", func(t *testing.T) {
-		id, err := models.FindFactoryIDForCanvas(db, r.Organization.ID, r.Canvas.ID)
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		id, err := models.FindFactoryIDForCanvas(db, r.Organization.ID, canvas.ID)
 		require.NoError(t, err)
 		assert.Nil(t, id)
 	})

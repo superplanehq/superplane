@@ -16,9 +16,10 @@ import (
 
 func TestAttachWorkspaceAgentResourcesSkipsNonFactoryCanvas(t *testing.T) {
 	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
-		WorkflowID:     r.Canvas.ID.String(),
+		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
 	assert.Empty(t, environment)
 	assert.Empty(t, files)

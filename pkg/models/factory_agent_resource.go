@@ -63,13 +63,13 @@ type FactoryAgentResource struct {
 	Name               string
 	Enabled            bool
 	Config             datatypes.JSONType[FactoryAgentResourceConfig]
-	OAuthStatus        string
-	OAuthError         string
-	OAuthConnectedBy   *uuid.UUID
-	OAuthConnectedAt   *time.Time
-	OAuthMetadata      datatypes.JSONType[FactoryAgentResourceOAuthMetadata]
-	OAuthPendingState  string
-	OAuthPendingExpiry *time.Time
+	OAuthStatus        string                                                `gorm:"column:oauth_status"`
+	OAuthError         string                                                `gorm:"column:oauth_error"`
+	OAuthConnectedBy   *uuid.UUID                                            `gorm:"column:oauth_connected_by"`
+	OAuthConnectedAt   *time.Time                                            `gorm:"column:oauth_connected_at"`
+	OAuthMetadata      datatypes.JSONType[FactoryAgentResourceOAuthMetadata] `gorm:"column:oauth_metadata"`
+	OAuthPendingState  string                                                `gorm:"column:oauth_pending_state"`
+	OAuthPendingExpiry *time.Time                                            `gorm:"column:oauth_pending_expiry"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
