@@ -792,7 +792,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCustomAutomations},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/intakes"}: {
 			Resource:                     "factories",

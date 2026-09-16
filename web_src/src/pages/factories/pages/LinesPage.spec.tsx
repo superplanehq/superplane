@@ -11,7 +11,7 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -499,6 +499,7 @@ describe("LinesPage board", () => {
   });
 
   it("shows the automations menu on every column and hides lane banners", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
@@ -856,6 +857,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("hides Add automation on Backlog and shows it on Verify and Done", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
       isPending: false,
@@ -875,7 +877,29 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
+  it("hides Add automation when custom automations are off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Verify plus when custom automations are off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+  });
+
   it("opens the name dialog when Verify only has custom automation left", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
@@ -894,6 +918,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("creates a custom Verify automation and opens the editor", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
     const user = userEvent.setup();
     renderLinesBoard();

@@ -1,4 +1,6 @@
 import { useCreateFactoryAutomation } from "@/hooks/useFactoryData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useState } from "react";
@@ -34,8 +36,10 @@ export function useAddColumnAutomation(args: {
   const navigate = useNavigate();
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
+  const allowCustom = useExperimentalFeature(args.organizationId).has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+  const catalogOptions = { allowCustom };
 
-  const catalog = column ? catalogForColumn(column) : [];
+  const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
 
   const closePicker = () => {
@@ -44,7 +48,7 @@ export function useAddColumnAutomation(args: {
   };
 
   const openPicker = (key: ColumnKey) => {
-    const nextCatalog = catalogForColumn(key);
+    const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     setColumn(key);
     setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
@@ -83,6 +87,7 @@ export function useAddColumnAutomation(args: {
   };
 
   return {
+    allowCustom,
     pickerColumn: column,
     pickerOpen: column !== null && !naming,
     naming,

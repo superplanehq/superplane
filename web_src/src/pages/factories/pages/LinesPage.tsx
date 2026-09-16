@@ -28,7 +28,11 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -253,6 +257,7 @@ export function LinesPage() {
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const addIntakeTemplates = useMemo(() => {
     const allowedIds = new Set(["github-issues"]);
     if (canAddSentryIntake) {
@@ -585,7 +590,11 @@ export function LinesPage() {
             }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
+              showColumnAutomations && customAutomationsEnabled
+                ? undefined
+                : canAddPRFeedback
+                  ? () => setAddPRFeedbackOpen(true)
+                  : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
@@ -818,7 +827,7 @@ function LineDetail({
     githubIntegrationId,
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
-  const canAddColumnAutomation = showColumnAutomations && canUpdate;
+  const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -24,12 +25,20 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 
+	db := database.DB(ctx)
+	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory automation")
+	}
+	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
+	}
+
 	columnKey := strings.TrimSpace(req.GetColumnKey())
 	if columnKey != "" && !models.ValidCanvasColumnKey(columnKey) {
 		return nil, factoryErrorToStatus(invalidArgument("column key must be verify or done"), "failed to create factory automation")
 	}
 
-	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")

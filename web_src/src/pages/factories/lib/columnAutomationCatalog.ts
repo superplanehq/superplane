@@ -74,7 +74,8 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
-export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[] {
+export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boolean }): ColumnAutomationCatalogEntry[] {
+  const allowCustom = options?.allowCustom === true;
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -107,13 +108,13 @@ export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[]
           unique: true,
         };
       }),
-      EVENT_CUSTOM_ENTRY,
+      ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }
   if (key === "done") {
-    return [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY];
+    return allowCustom ? [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY] : [PR_CLOSURE_ENTRY];
   }
-  return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
+  return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
 }
 
 export function takenCatalogIds(automations: ColumnAutomation[], catalog: ColumnAutomationCatalogEntry[]): string[] {
