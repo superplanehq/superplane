@@ -3,10 +3,10 @@ import { useMemo, useState } from "react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { classicSplitRunFooter } from "./splitRunFooter";
@@ -97,11 +97,10 @@ export function ClassicWorkOrderPopup({
             expanded={fullPage}
             onToggleExpanded={() => setFullPage((current) => !current)}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <PopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                onArchive={classicFixture.footer.kind === "draft" ? mutations.onArchive : undefined}
+                archiveBusy={footerActions.busy}
               />
             }
             accessory={views}
