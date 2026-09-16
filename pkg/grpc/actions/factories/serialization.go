@@ -110,25 +110,30 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, 0, len(canvases))
+func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automation {
+	result := make([]*pb.Factory_Automation, 0, len(canvases))
 	for _, canvas := range canvases {
-		name := canvas.Name
-		description := canvas.Description
-		app := &pb.Factory_App{
-			Id:          canvas.ID.String(),
-			Name:        name,
-			Description: description,
-		}
-		if canvas.CreatedAt != nil {
-			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
-		}
-		if canvas.UpdatedAt != nil {
-			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
-		}
-		result = append(result, app)
+		result = append(result, serializeFactoryAutomation(canvas))
 	}
 	return result
+}
+
+func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
+	automation := &pb.Factory_Automation{
+		Id:          canvas.ID.String(),
+		Name:        canvas.Name,
+		Description: canvas.Description,
+	}
+	if canvas.ColumnKey != nil {
+		automation.ColumnKey = *canvas.ColumnKey
+	}
+	if canvas.CreatedAt != nil {
+		automation.CreatedAt = timestamppb.New(*canvas.CreatedAt)
+	}
+	if canvas.UpdatedAt != nil {
+		automation.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
+	}
+	return automation
 }
 
 func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {

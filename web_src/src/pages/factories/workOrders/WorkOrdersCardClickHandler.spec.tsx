@@ -430,7 +430,7 @@ describe("WorkOrderCard scores", () => {
     await user.hover(score);
 
     const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("Clarity score");
     expect(tip).toHaveTextContent("4/5");
   });
 });

@@ -49,7 +49,7 @@ const KINDS: { kind: DecisionFooterKind; label: string; note: string }[] = [
   {
     kind: "draft",
     label: "Draft",
-    note: "Archive and Start in the note.",
+    note: "Archive and Build in the note.",
   },
   {
     kind: "completed",

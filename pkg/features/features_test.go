@@ -63,6 +63,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
 	})
 
+	t.Run("known id returns custom automations feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCustomAutomations)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
+		assert.Equal(t, "Custom Automations", f.Label)
+		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -84,6 +93,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
+	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

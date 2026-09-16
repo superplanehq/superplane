@@ -10,6 +10,7 @@ import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 
 function renderClassicPopup() {
   const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
@@ -48,7 +49,8 @@ describe("ClassicWorkOrderPopup", () => {
     renderClassicPopup();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).not.toContain("w-[min(80rem");
+    expect(dialog.className).toContain("w-[min(70rem");
+    expect(dialog.className).not.toContain("has-[[data-refine-chat-solo]]");
     for (const className of SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)) {
       expect(dialog).not.toHaveClass(className);
     }
@@ -59,12 +61,15 @@ describe("ClassicWorkOrderPopup", () => {
     expect(within(dialog).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
     expect(within(dialog).getByText("This task is ready to start")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Archive" }),
+    ).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Add context for this plan")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(ANALYSIS_PLANNING_COPY.composerPlaceholder)).not.toBeInTheDocument();
   });
 
   it("does not show a copyable task ID in the header", () => {

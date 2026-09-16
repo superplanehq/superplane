@@ -21,30 +21,23 @@ export const INTENT = {
     title: "intent.md",
     body: `# Clearer empty state
 
-## Executive summary
-
-### Goal
-
 A person can add a payment method from the empty billing page.
-
-The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
-
-### Done when
-
-- The empty view names the next action.
-- The action opens add-payment-method.
-
-### Out of scope
-
-- The page after a card exists.
-
-### Key architecture decisions
-
-- Reuse the current empty view. Do not add a new page.
 
 ## Problem
 
-The empty view only shows a title.
+The empty view only shows a title. It does not name the next action.
+
+## Proposed outcome
+
+The empty view names the next action. The action opens add-payment-method.
+
+## Constraints
+
+Do not build a new billing flow. Do not change the page after a card exists.
+
+## Scope
+
+Copy and an action on the current empty view.
 
 ## Outcome
 

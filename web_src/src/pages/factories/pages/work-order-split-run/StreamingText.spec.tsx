@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { StreamingText } from "./StreamingText";
+import { PLAN_STREAM_GAP_MS, StreamingText } from "./StreamingText";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 
 function renderStream(content: string, extra: { contentKey?: string; memoryKey?: string; ready?: boolean } = {}) {
@@ -57,7 +57,7 @@ describe("StreamingText", () => {
 
     rerender(<StrictMode>{renderStream("four five six")}</StrictMode>);
     act(() => {
-      vi.advanceTimersByTime(90);
+      vi.advanceTimersByTime(PLAN_STREAM_GAP_MS);
     });
     expect(screen.getByTestId("stream-visible")).toHaveTextContent("four five");
     expect(screen.getByTestId("stream-visible")).not.toHaveTextContent("six");

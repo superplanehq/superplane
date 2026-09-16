@@ -291,22 +291,65 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
   if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
     return [];
   }
+  if (message.role === "plan") {
+    return planningPlanMessageFromPayload(message);
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
-    const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
-    return [
-      {
-        id: message.id ?? message.text,
-        kind: "text",
-        role: message.role,
-        text: message.text,
-        ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
-        ...(createdAtMs === undefined ? {} : { createdAtMs }),
-        ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
-        ...(message.activityId?.trim() ? { activityId: message.activityId.trim() } : {}),
-      },
-    ];
+    return planningTextMessageFromPayload(message);
   }
   return [];
+}
+
+function planningTextMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const text = message.text;
+  if (!text) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? text,
+      kind: "text",
+      role: message.role === "agent" ? "agent" : "user",
+      text,
+      ...(message.role === "user" && isPlanningSurveyReply(text) ? { origin: "survey" as const } : {}),
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+      ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
+      ...(message.activityId?.trim() ? { activityId: message.activityId.trim() } : {}),
+    },
+  ];
+}
+
+function planningPlanMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const score = planningPlanScoreFromPayload(message.text);
+  if (score === undefined) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? message.text ?? "plan",
+      kind: "plan",
+      role: "plan",
+      score,
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+    },
+  ];
+}
+
+function planningPlanScoreFromPayload(text: string | undefined): number | undefined {
+  if (!text?.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(text) as { score?: unknown };
+    if (typeof parsed.score === "number" && Number.isFinite(parsed.score)) {
+      return parsed.score;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function agentActivityFromPayload(payload: PlanningSessionActivityPayload): AgentActivity[] {

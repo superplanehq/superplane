@@ -24,3 +24,6 @@ export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
 /** Organization experimental feature: live agent refinement for draft work orders. */
 export const FEATURE_FACTORY_CREATE_WITH_AGENT = "factory_create_with_agent";
+
+/** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
+export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";

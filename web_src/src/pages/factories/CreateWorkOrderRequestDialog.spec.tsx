@@ -43,6 +43,7 @@ describe("CreateWorkOrderRequestDialog", () => {
   afterEach(async () => {
     cleanup();
     showErrorToast.mockReset();
+    vi.unstubAllGlobals();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -71,6 +72,20 @@ describe("CreateWorkOrderRequestDialog", () => {
     );
     expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toContain("image/png");
     expect(screen.getByTestId("create-work-order-request-create")).toBeDisabled();
+  });
+
+  it("shows Command plus Enter on Mac", () => {
+    vi.stubGlobal("navigator", { platform: "MacIntel" });
+    renderRequestDialog();
+
+    expect(screen.getByTestId("create-work-order-request-create-kbd")).toHaveTextContent("⌘Enter");
+  });
+
+  it("shows Control plus Enter on Windows", () => {
+    vi.stubGlobal("navigator", { platform: "Win32" });
+    renderRequestDialog();
+
+    expect(screen.getByTestId("create-work-order-request-create-kbd")).toHaveTextContent("Ctrl+Enter");
   });
 
   it("creates the task with Command+Enter", async () => {
