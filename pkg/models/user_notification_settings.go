@@ -16,6 +16,9 @@ const (
 	NotificationWorkspaceScopeFiltered = "filtered"
 	NotificationWorkspaceScopeNone     = "none"
 
+	NotificationChannelEmail   = "email"
+	NotificationChannelBrowser = "browser"
+
 	NotificationTypeWorkOrderAssigned        = "work_order_assigned"
 	NotificationTypeWorkOrderCommentOwned    = "work_order_comment_owned"
 	NotificationTypeWorkOrderCommentCreated  = "work_order_comment_created"
@@ -45,34 +48,44 @@ type NotificationWorkspaceFilter struct {
 	EventTypes  []string `json:"event_types"`
 }
 
-// UserNotificationSettings holds a user's organization-wide email
+// UserNotificationSettings holds a user's organization-wide
 // notification configuration for workspace work order activity. A user
-// without a row uses DefaultUserNotificationSettings: all events from
-// all workspaces.
+// without a row uses DefaultUserNotificationSettings: email for all
+// events from all workspaces, and the browser channel off.
 type UserNotificationSettings struct {
-	ID               uuid.UUID
-	OrganizationID   uuid.UUID
-	UserID           uuid.UUID
-	WorkspaceScope   string
-	WorkspaceFilters datatypes.JSONType[[]NotificationWorkspaceFilter]
-	EventTypes       datatypes.JSONType[[]string]
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                      uuid.UUID
+	OrganizationID          uuid.UUID
+	UserID                  uuid.UUID
+	WorkspaceScope          string
+	WorkspaceFilters        datatypes.JSONType[[]NotificationWorkspaceFilter]
+	EventTypes              datatypes.JSONType[[]string]
+	BrowserWorkspaceScope   string
+	BrowserWorkspaceFilters datatypes.JSONType[[]NotificationWorkspaceFilter]
+	BrowserEventTypes       datatypes.JSONType[[]string]
+	BrowserShowWhileViewing bool
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 // UserNotificationSettingsParams carries the caller-editable fields for
 // UpsertUserNotificationSettings.
 type UserNotificationSettingsParams struct {
-	WorkspaceScope   string
-	WorkspaceFilters []NotificationWorkspaceFilter
-	EventTypes       []string
+	WorkspaceScope          string
+	WorkspaceFilters        []NotificationWorkspaceFilter
+	EventTypes              []string
+	BrowserWorkspaceScope   string
+	BrowserWorkspaceFilters []NotificationWorkspaceFilter
+	BrowserEventTypes       []string
+	BrowserShowWhileViewing *bool
 }
 
 // DefaultUserNotificationSettings is the configuration SuperPlane uses
 // when the user has not saved settings yet.
 func DefaultUserNotificationSettings() UserNotificationSettings {
 	return UserNotificationSettings{
-		WorkspaceScope: NotificationWorkspaceScopeAll,
+		WorkspaceScope:          NotificationWorkspaceScopeAll,
+		BrowserWorkspaceScope:   NotificationWorkspaceScopeNone,
+		BrowserShowWhileViewing: true,
 	}
 }
 
@@ -83,20 +96,14 @@ func (UserNotificationSettings) TableName() string {
 // Notifies reports whether the settings allow an email for the given
 // workspace and notification type.
 func (s *UserNotificationSettings) Notifies(workspaceID uuid.UUID, notificationType string) bool {
-	switch s.WorkspaceScope {
-	case NotificationWorkspaceScopeNone:
-		return false
-	case NotificationWorkspaceScopeFiltered:
-		for _, filter := range s.WorkspaceFilters.Data() {
-			if filter.WorkspaceID != workspaceID.String() {
-				continue
-			}
-			return slices.Contains(filter.EventTypes, notificationType)
-		}
-		return false
-	default:
-		return notifiesAllScopeType(s.EventTypes.Data(), notificationType)
-	}
+	return s.NotifiesChannel(NotificationChannelEmail, workspaceID, notificationType)
+}
+
+// NotifiesChannel reports whether the settings allow a notification on
+// the given channel for the workspace and notification type.
+func (s *UserNotificationSettings) NotifiesChannel(channel string, workspaceID uuid.UUID, notificationType string) bool {
+	scope, filters, eventTypes := s.channelSettings(channel)
+	return notifiesByScope(scope, filters, eventTypes, workspaceID, notificationType)
 }
 
 func IsValidNotificationWorkspaceScope(scope string) bool {
@@ -158,6 +165,14 @@ func UpsertUserNotificationSettings(
 		return nil, ErrNotificationWorkspaceScopeInvalid
 	}
 
+	browserScope := params.BrowserWorkspaceScope
+	if browserScope == "" {
+		browserScope = NotificationWorkspaceScopeNone
+	}
+	if !IsValidNotificationWorkspaceScope(browserScope) {
+		return nil, ErrNotificationWorkspaceScopeInvalid
+	}
+
 	filters := params.WorkspaceFilters
 	if filters == nil {
 		filters = []NotificationWorkspaceFilter{}
@@ -166,17 +181,33 @@ func UpsertUserNotificationSettings(
 	if eventTypes == nil {
 		eventTypes = []string{}
 	}
+	browserFilters := params.BrowserWorkspaceFilters
+	if browserFilters == nil {
+		browserFilters = []NotificationWorkspaceFilter{}
+	}
+	browserEventTypes := params.BrowserEventTypes
+	if browserEventTypes == nil {
+		browserEventTypes = []string{}
+	}
+	showWhileViewing := true
+	if params.BrowserShowWhileViewing != nil {
+		showWhileViewing = *params.BrowserShowWhileViewing
+	}
 
 	now := time.Now()
 	settings := &UserNotificationSettings{
-		ID:               uuid.New(),
-		OrganizationID:   organizationID,
-		UserID:           userID,
-		WorkspaceScope:   params.WorkspaceScope,
-		WorkspaceFilters: datatypes.NewJSONType(filters),
-		EventTypes:       datatypes.NewJSONType(eventTypes),
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:                      uuid.New(),
+		OrganizationID:          organizationID,
+		UserID:                  userID,
+		WorkspaceScope:          params.WorkspaceScope,
+		WorkspaceFilters:        datatypes.NewJSONType(filters),
+		EventTypes:              datatypes.NewJSONType(eventTypes),
+		BrowserWorkspaceScope:   browserScope,
+		BrowserWorkspaceFilters: datatypes.NewJSONType(browserFilters),
+		BrowserEventTypes:       datatypes.NewJSONType(browserEventTypes),
+		BrowserShowWhileViewing: showWhileViewing,
+		CreatedAt:               now,
+		UpdatedAt:               now,
 	}
 
 	err := tx.
@@ -186,6 +217,10 @@ func UpsertUserNotificationSettings(
 				"workspace_scope",
 				"workspace_filters",
 				"event_types",
+				"browser_workspace_scope",
+				"browser_workspace_filters",
+				"browser_event_types",
+				"browser_show_while_viewing",
 				"updated_at",
 			}),
 		}).
@@ -196,6 +231,41 @@ func UpsertUserNotificationSettings(
 	}
 
 	return FindUserNotificationSettings(tx, organizationID, userID)
+}
+
+func (s *UserNotificationSettings) channelSettings(channel string) (string, []NotificationWorkspaceFilter, []string) {
+	if channel == NotificationChannelBrowser {
+		scope := s.BrowserWorkspaceScope
+		if scope == "" {
+			scope = NotificationWorkspaceScopeNone
+		}
+		return scope, s.BrowserWorkspaceFilters.Data(), s.BrowserEventTypes.Data()
+	}
+
+	return s.WorkspaceScope, s.WorkspaceFilters.Data(), s.EventTypes.Data()
+}
+
+func notifiesByScope(
+	scope string,
+	filters []NotificationWorkspaceFilter,
+	eventTypes []string,
+	workspaceID uuid.UUID,
+	notificationType string,
+) bool {
+	switch scope {
+	case NotificationWorkspaceScopeNone:
+		return false
+	case NotificationWorkspaceScopeFiltered:
+		for _, filter := range filters {
+			if filter.WorkspaceID != workspaceID.String() {
+				continue
+			}
+			return slices.Contains(filter.EventTypes, notificationType)
+		}
+		return false
+	default:
+		return notifiesAllScopeType(eventTypes, notificationType)
+	}
 }
 
 func notifiesAllScopeType(eventTypes []string, notificationType string) bool {

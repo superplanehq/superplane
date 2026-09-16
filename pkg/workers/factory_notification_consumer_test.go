@@ -352,6 +352,81 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
 	})
+
+	t.Run("browser channel publishes title body and task path", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+		require.Len(t, *published, 1)
+		assert.Equal(t, owner.ID.String(), (*published)[0].UserID)
+		assert.Contains(t, (*published)[0].Title, "New comment")
+		assert.Contains(t, (*published)[0].Body, factoryModel.WorkOrderKey(order.Number))
+		assert.Equal(t, order.URLPath(factoryModel.Key), (*published)[0].URLPath)
+		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), (*published)[0].OrderKey)
+		assert.Equal(t, factoryModel.Key, (*published)[0].FactoryKey)
+	})
+
+	t.Run("browser channel excludes the actor", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		require.Len(t, *published, 1)
+		assert.Equal(t, owner.ID.String(), (*published)[0].UserID)
+	})
+
+	t.Run("email channel stays unaffected when browser is off", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
+		assert.Empty(t, *published)
+	})
+
+	t.Run("browser channel off publishes nothing", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		assert.Empty(t, *published)
+	})
+}
+
+func capturingConsumer(consumer *FactoryNotificationConsumer) (*FactoryNotificationConsumer, *[]messages.UserNotificationMessage) {
+	published := []messages.UserNotificationMessage{}
+	consumer.publishUserNotification = func(message messages.UserNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	}
+	return consumer, &published
 }
 
 func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messages.FactoryWorkOrderNotificationMessage) {
