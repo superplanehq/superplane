@@ -116,7 +116,6 @@ func (s *accountBlockingSteps) promoteAdminAndLogin() {
 
 func (s *accountBlockingSteps) visitAccountsPage() {
 	s.session.Visit("/admin/accounts")
-	s.session.Sleep(500)
 	s.session.AssertText(s.targetEmail)
 }
 
@@ -124,20 +123,19 @@ func (s *accountBlockingSteps) blockTargetAccount() {
 	s.clickAccountAction("Block")
 	s.session.AssertText("Block Account")
 	s.session.Click(q.Locator(`button:has-text("Block Account")`))
-	s.session.Sleep(1000)
+	s.session.AssertHidden(q.Text("Block Account"))
 }
 
 func (s *accountBlockingSteps) unblockTargetAccount() {
 	s.clickAccountAction("Unblock")
 	s.session.AssertText("Unblock Account")
 	s.session.Click(q.Locator(`button:has-text("Unblock Account")`))
-	s.session.Sleep(1000)
+	s.session.AssertHidden(q.Text("Unblock Account"))
 }
 
 func (s *accountBlockingSteps) clickAccountAction(label string) {
 	selector := `tr:has-text("` + s.targetEmail + `") button:has-text("` + label + `")`
 	s.session.Click(q.Locator(selector))
-	s.session.Sleep(300)
 }
 
 func (s *accountBlockingSteps) assertTargetAccountIsBlocked() {
@@ -171,22 +169,20 @@ func (s *accountBlockingSteps) clearCookies() {
 
 func (s *accountBlockingSteps) visitLoginPage() {
 	s.session.Visit("/login")
-	s.session.Sleep(500)
+	s.session.AssertVisible(q.Text("Welcome to SuperPlane"))
 }
 
 func (s *accountBlockingSteps) signInWithPassword(email, password string) {
 	s.session.Click(q.Text("Sign in with password instead"))
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.Locator(`input[type="password"]`))
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[type="password"]`), password)
 	s.session.Click(q.Text("Login"))
-	s.session.Sleep(1000)
 }
 
 func (s *accountBlockingSteps) requestMagicCode(email string) {
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.Click(q.Text("Continue with email"))
-	s.session.Sleep(500)
 }
 
 func (s *accountBlockingSteps) assertMagicCodeStepVisible() {
@@ -209,7 +205,6 @@ func (s *accountBlockingSteps) insertKnownMagicCode(email, code string) {
 func (s *accountBlockingSteps) enterMagicCodeAndSubmit(code string) {
 	s.session.FillIn(q.Locator(`input[name="code"]`), code)
 	s.session.Click(q.Text("Sign in"))
-	s.session.Sleep(1000)
 }
 
 func (s *accountBlockingSteps) assertAccountBlockedMessageVisible() {

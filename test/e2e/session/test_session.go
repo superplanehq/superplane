@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -117,10 +118,31 @@ func (s *TestSession) TakeScreenshot() {
 	}
 }
 
-func (s *TestSession) Sleep(ms int) {
-	s.t.Logf("Sleeping for %d ms", ms)
-	time.Sleep(time.Duration(ms) * time.Millisecond)
-	s.t.Logf("Woke up after %d ms", ms)
+// WaitUntil polls condition until it is true or the session timeout expires.
+func (s *TestSession) WaitUntil(condition func() bool, message string) {
+	require.Eventually(s.t, condition, time.Duration(s.timeoutMs)*time.Millisecond, 100*time.Millisecond, message)
+}
+
+// WaitForEnabled waits until the locator is visible and not disabled.
+func (s *TestSession) WaitForEnabled(q queries.Query) {
+	s.t.Logf("Waiting for %q to be enabled", q.Describe())
+	loc := q.Run(s)
+	s.WaitUntil(func() bool {
+		visible, err := loc.IsVisible()
+		if err != nil || !visible {
+			return false
+		}
+		disabled, err := loc.IsDisabled()
+		return err == nil && !disabled
+	}, fmt.Sprintf("%s did not become enabled", q.Describe()))
+}
+
+// WaitForURL waits until the current page URL matches a Playwright glob.
+func (s *TestSession) WaitForURL(glob string) {
+	s.t.Logf("Waiting for URL %q", glob)
+	if err := s.page.WaitForURL(glob, pw.PageWaitForURLOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("wait for URL %q: %v (last URL %q)", glob, err, s.page.URL())
+	}
 }
 
 func (s *TestSession) resetDatabase() {
@@ -323,15 +345,11 @@ func (s *TestSession) AssertHidden(q queries.Query) {
 
 func (s *TestSession) AssertDisabled(q queries.Query) {
 	s.t.Logf("Asserting %q is disabled", q.Describe())
-
-	el := q.Run(s)
-	disabled, err := el.IsDisabled()
-	if err != nil {
-		s.t.Fatalf("checking if %q is disabled: %v", q.Describe(), err)
-	}
-	if !disabled {
-		s.t.Fatalf("expected %q to be disabled", q.Describe())
-	}
+	loc := q.Run(s)
+	s.WaitUntil(func() bool {
+		disabled, err := loc.IsDisabled()
+		return err == nil && disabled
+	}, fmt.Sprintf("expected %q to be disabled", q.Describe()))
 }
 
 func (s *TestSession) PressKey(key string) {
@@ -395,29 +413,17 @@ func (s *TestSession) HoverOver(q queries.Query) {
 }
 
 func (s *TestSession) WaitUntilURLDoesNotContain(part string) {
-	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if !strings.Contains(s.page.URL(), part) {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	s.t.Fatalf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL())
+	s.t.Logf("Waiting for URL to drop %q", part)
+	s.WaitUntil(func() bool {
+		return !strings.Contains(s.page.URL(), part)
+	}, fmt.Sprintf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL()))
 }
 
-// WaitUntilURLContains polls until the current URL contains part. Use this
+// WaitUntilURLContains waits until the current URL contains part. Use this
 // for redirects that a single-page app resolves after several async requests
-// (for example, the post-login redirect into an organization), where a fixed
-// sleep is not enough.
+// (for example, the post-login redirect into an organization).
 func (s *TestSession) WaitUntilURLContains(part string) {
-	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if strings.Contains(s.page.URL(), part) {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	s.t.Fatalf("timed out waiting for URL to contain %q, last URL was %q", part, s.page.URL())
+	s.WaitForURL("**" + part + "**")
 }
 
 func (s *TestSession) AssertURLContains(part string) {
@@ -433,19 +439,37 @@ func (s *TestSession) AssertURLContains(part string) {
 // "/<orgID>/apps/<appID>" (not including the origin or query string).
 func (s *TestSession) WaitForBrowserPath(expectedPath string) {
 	want := normalizeE2EBrowserPath(expectedPath)
+	s.t.Logf("Waiting for browser path %q", want)
+	last := s.page.URL()
 	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
-
 	for time.Now().Before(deadline) {
-		u, err := url.Parse(s.page.URL())
-		if err == nil {
-			if normalizeE2EBrowserPath(u.Path) == want {
-				return
-			}
+		last = s.page.URL()
+		u, err := url.Parse(last)
+		if err == nil && normalizeE2EBrowserPath(u.Path) == want {
+			return
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
+	s.t.Fatalf("timed out waiting for browser path %q, last URL was %q", want, last)
+}
 
-	s.t.Fatalf("timed out waiting for browser path %q, last URL was %q", want, s.page.URL())
+// WaitForBrowserPathPrefix polls until the URL path starts with prefix after
+// normalizing trailing slashes. Use this for factory routes that continue
+// into a workspace, such as /{org}/workspaces/newwo/setup.
+func (s *TestSession) WaitForBrowserPathPrefix(prefix string) {
+	want := normalizeE2EBrowserPath(prefix)
+	s.t.Logf("Waiting for browser path prefix %q", want)
+	last := s.page.URL()
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		last = s.page.URL()
+		u, err := url.Parse(last)
+		if err == nil && strings.HasPrefix(normalizeE2EBrowserPath(u.Path), want) {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for browser path prefix %q, last URL was %q", want, last)
 }
 
 func normalizeE2EBrowserPath(p string) string {
@@ -488,7 +512,17 @@ func (s *TestSession) ScrollToTheBottomOfPage() {
 		s.t.Fatalf("scrolling to the bottom of the page: %v", err)
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	s.WaitUntil(func() bool {
+		result, err := s.page.Evaluate(`() => {
+			const doc = document.scrollingElement || document.documentElement || document.body;
+			if (!doc) {
+				return false;
+			}
+			return doc.scrollTop + doc.clientHeight >= doc.scrollHeight - 2;
+		}`, nil)
+		reached, _ := result.(bool)
+		return err == nil && reached
+	}, "page did not finish scrolling to the bottom")
 }
 
 func isMac() bool {

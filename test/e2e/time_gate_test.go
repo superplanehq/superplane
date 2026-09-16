@@ -120,13 +120,21 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.session.Sleep(300)
+	require.Eventually(s.t, func() bool {
+		node, ok := s.canvas.DraftNodeByName("timeGate")
+		if !ok {
+			return false
+		}
+		_, hasRange := node.Configuration["timeRange"]
+		_, hasTimezone := node.Configuration["timezone"]
+		return hasRange && hasTimezone
+	}, 15*time.Second, 200*time.Millisecond, "time gate configuration was not saved")
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {
 	s.canvas.StartEditingNode(node)
 	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(200)
+	s.session.AssertVisible(q.TestID("time-field-timeRange-start"))
 }
 
 func (s *TimeGateSteps) assertTimeGateSavedToDB(timeRange, timezoneLabel string, days []string) {

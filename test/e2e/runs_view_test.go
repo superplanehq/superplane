@@ -327,7 +327,6 @@ func (s *runsViewSteps) scrollSidebarToTheEnd(testID string) {
 	}))
 	require.NoError(s.t, scroller.Hover(pw.LocatorHoverOptions{Timeout: pw.Float(15000)}))
 	require.NoError(s.t, s.session.Page().Mouse().Wheel(0, 5000))
-	s.session.Sleep(500)
 }
 
 func (s *runsViewSteps) sidebarScrollTop(testID string) float64 {
