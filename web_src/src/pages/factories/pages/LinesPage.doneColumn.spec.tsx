@@ -1,11 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,
@@ -22,12 +30,15 @@ const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }))
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => ({ data: [] }),
+  useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
+  useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -43,6 +54,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => ({ data: [], isLoading: false, isError: false }),
   useImportFactoryIntakeItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -52,6 +64,10 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
   }),
+}));
+
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -67,7 +83,30 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
+  useWorkOrderPlanningActivity: (
+    _organizationId: string,
+    _factoryId: string,
+    _workOrderId: string,
+    enabled: boolean,
+    backlogAnalyzing = false,
+  ) => ({
+    hasAgentQuestion: false,
+    isWaiting: false,
+    isWorking: false,
+    isAgentWorking: Boolean(enabled && backlogAnalyzing),
+  }),
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -75,8 +114,8 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof canvasData>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
@@ -170,6 +209,24 @@ describe("LinesPage Done column", () => {
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
+  });
+
+  it("does not show a draft rejected out of the Backlog in Done — it archives off the board", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-rejected-draft",
+          title: "Retire the legacy refund webhook",
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+          lineDispatches: [],
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    renderBoard();
+
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.queryByText("Retire the legacy refund webhook")).not.toBeInTheDocument();
   });
 
   it("keeps the bookend Done column when the line has its own Done automation", () => {

@@ -4,19 +4,25 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
+  FactoriesWorkOrderRunUsageRow,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
 } from "@/api-client";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import type { PlanningSessionPayload } from "../pages/planningSessionView";
+import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
+import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -59,7 +65,7 @@ export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[nu
   };
 }
 
-export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
+export const GITHUB_ISSUES_INTAKE_APP: FactoryAutomation = {
   id: GITHUB_ISSUES_INTAKE_APP_ID,
   name: "GitHub issue intake",
   description: "Listens for GitHub issues and creates backlog tasks.",
@@ -90,7 +96,7 @@ function minutesBefore(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-/** Two tickets still in analysis, plus scored runs for the Runs tab. */
+/** Two tickets still in analysis, plus scored intake runs for API fixtures. */
 export const GITHUB_ISSUES_INTAKE_RUNS: FactoriesFactoryIntakeRun[] = [
   {
     id: "intake-run-analyzing-1",
@@ -140,7 +146,7 @@ function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   };
 }
 
-export const REFUND_FACTORY_APPS: FactoryApp[] = [
+export const REFUND_FACTORY_APPS: FactoryAutomation[] = [
   {
     id: "app-refund-planner",
     name: "Refund Planner",
@@ -215,7 +221,7 @@ export const EMPTY_FACTORY: FactoriesFactory = {
 const ACME_ONBOARDING_DONE_APP_ID = "app-acme-done";
 const ACME_ONBOARDING_BACKLOG_APP_ID = "app-acme-backlog";
 
-export const ACME_ONBOARDING_APPS: FactoryApp[] = [
+export const ACME_ONBOARDING_APPS: FactoryAutomation[] = [
   {
     id: ACME_ONBOARDING_BACKLOG_APP_ID,
     name: "Backlog",
@@ -280,19 +286,65 @@ export interface FactoriesFixture {
   organizationId: string;
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
-  appsByFactoryId: Record<string, FactoryApp[]>;
+  appsByFactoryId: Record<string, FactoryAutomation[]>;
   /** Intakes the workspace declared. Created intakes are appended here. */
   intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
+  /** PR feedback handlers the workspace declared. */
+  prFeedbackHandlersByFactoryId?: Record<string, FactoriesFactoryPrFeedbackHandler[]>;
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
+  /** Paginated task-run spend for Organization Usage. */
+  usageHistoryByFactoryId?: Record<string, FactoriesWorkOrderRunUsageRow[]>;
   /**
    * Velocity reports keyed by factory, then by requested period in days. A
    * period without an entry falls back to the empty report.
    */
   velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
   organizationWorkspaceUsage?: StorybookUsageReport;
+  organizationSpendingReport?: StorybookSpendingReport;
+  organizationCreditGrants?: Array<{
+    id?: string;
+    kind?: string;
+    amountCents?: string;
+    note?: string;
+    actorName?: string;
+    polarOrderId?: string;
+    createdAt?: string;
+    expiresAt?: string;
+  }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
+  organizationBilling?: {
+    plan?: string;
+    planSource?: string;
+    polarSubscriptionStatus?: string;
+    trialEndsAt?: string;
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    remainingCreditCents?: string;
+    includedRemainingCents?: string;
+    purchasedRemainingCents?: string;
+    welcomeRemainingCents?: string;
+    adminRemainingCents?: string;
+    billingEnabled?: boolean;
+    subscriptionCheckoutEnabled?: boolean;
+    creditPurchaseAllowed?: boolean;
+    hasBillingCustomer?: boolean;
+    cancelAtPeriodEnd?: boolean;
+  };
+  /** Count of POST /billing/sync calls in this fixture session. */
+  billingSyncCalls?: number;
+  /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */
+  billingAfterSync?: FactoriesFixture["organizationBilling"];
+  /**
+   * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
+   * Omit to treat every provider with a catalog as connected.
+   */
+  byokConnectedProviders?: string[];
+  /** Candidate model ids by provider. Falls back to the hosted catalog fixture. */
+  byokCandidatesByProvider?: Record<string, string[]>;
+  /** Selected model ids by provider. Defaults to the candidate list when connected. */
+  byokSelectedByProvider?: Record<string, string[]>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /**
@@ -306,6 +358,8 @@ export interface FactoriesFixture {
   pullRequestsByOrderId?: Record<string, FactoriesFactoryPullRequest[]>;
   /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
+  /** Storybook-only refine-chat sessions for `GET …/work-orders/{id}/planning-session`. */
+  planningSessionsByWorkOrderId?: Record<string, PlanningSessionPayload>;
   /** Storybook-only intake items for the Backlog create search. */
   intakeItemCatalog?: BacklogIntakeItemCatalog;
 }
@@ -336,8 +390,28 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
     [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
   },
+  usageHistoryByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_USAGE_HISTORY_ROWS,
+    [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: [],
+  },
   velocityByFactoryId: {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
   },
   organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
+  organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
+  organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
+  organizationBilling: {
+    plan: "trial",
+    planSource: "system",
+    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    remainingCreditCents: "4124",
+    includedRemainingCents: "0",
+    purchasedRemainingCents: "0",
+    welcomeRemainingCents: "4124",
+    billingEnabled: true,
+    subscriptionCheckoutEnabled: true,
+    creditPurchaseAllowed: false,
+    hasBillingCustomer: false,
+  },
 };

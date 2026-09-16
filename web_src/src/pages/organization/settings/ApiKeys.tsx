@@ -42,7 +42,7 @@ function useCreateApiKeyForm(
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [role, setRole] = useState("org_viewer");
+  const [role, setRole] = useState("org_operator");
   const [expiresAt, setExpiresAt] = useState("");
   const [accessMode, setAccessMode] = useState<AccessMode>("organization");
   const [selectedCanvasIds, setSelectedCanvasIds] = useState<string[]>([]);
@@ -54,7 +54,7 @@ function useCreateApiKeyForm(
     if (!canCreate) return;
     setName("");
     setDescription("");
-    setRole("org_viewer");
+    setRole("org_operator");
     setExpiresAt("");
     setAccessMode("organization");
     setSelectedCanvasIds([]);
@@ -66,7 +66,7 @@ function useCreateApiKeyForm(
     setIsCreateModalOpen(false);
     setName("");
     setDescription("");
-    setRole("org_viewer");
+    setRole("org_operator");
     setExpiresAt("");
     setAccessMode("organization");
     setSelectedCanvasIds([]);
@@ -283,7 +283,8 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
+                      <SelectItem value="org_operator">Operator</SelectItem>
+                      <SelectItem value="org_maintainer">Maintainer</SelectItem>
                       <SelectItem value="org_admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>

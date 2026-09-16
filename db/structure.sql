@@ -120,7 +120,8 @@ CREATE TABLE public.accounts (
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
     blocked_at timestamp with time zone,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    welcome_credit_granted_at timestamp with time zone
 );
 
 
@@ -394,7 +395,11 @@ CREATE TABLE public.factory_intakes (
     canvas_id uuid NOT NULL,
     source character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
+    initial_import_item_count integer,
+    CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
+    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
 
@@ -426,6 +431,86 @@ CREATE TABLE public.factory_llm_model_allowlists (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
     CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
+-- Name: factory_planning_session_activities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_activities (
+    id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    schema_version integer NOT NULL,
+    provider text NOT NULL,
+    status text NOT NULL,
+    last_sequence bigint NOT NULL,
+    snapshot jsonb NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    completed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_planning_session_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_messages (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    session_id uuid NOT NULL,
+    role text NOT NULL,
+    text text NOT NULL,
+    delivered boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid,
+    activity_id uuid
+);
+
+
+--
+-- Name: factory_planning_session_work_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_work_orders (
+    session_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_planning_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    created_by_user_id uuid,
+    repository text NOT NULL,
+    state text NOT NULL,
+    canvas_id uuid,
+    canvas_run_id uuid,
+    draft_title text DEFAULT ''::text NOT NULL,
+    draft_description text DEFAULT ''::text NOT NULL,
+    draft_work_order_id uuid,
+    wait_state text DEFAULT ''::text NOT NULL,
+    wait_kind text DEFAULT ''::text NOT NULL,
+    wait_text text DEFAULT ''::text NOT NULL,
+    wait_work_order_id uuid,
+    wait_work_order_key text DEFAULT ''::text NOT NULL,
+    survey_id uuid,
+    survey jsonb,
+    heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
+    ended_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    selectable_model_key text DEFAULT ''::text NOT NULL,
+    kind text NOT NULL,
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text]))),
+    CONSTRAINT factory_planning_sessions_task_creation_creator_check CHECK (((kind <> 'task_creation'::text) OR (created_by_user_id IS NOT NULL)))
 );
 
 
@@ -688,7 +773,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    finished_at timestamp with time zone
+    finished_at timestamp with time zone,
+    model text DEFAULT ''::text NOT NULL
 );
 
 
@@ -736,6 +822,32 @@ CREATE TABLE public.factory_work_orders (
 
 
 --
+-- Name: files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    installation_id text NOT NULL,
+    scope character varying(32) NOT NULL,
+    organization_id uuid,
+    factory_id uuid,
+    work_order_id uuid,
+    filename text NOT NULL,
+    content_type text NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    checksum text,
+    storage_key text NOT NULL,
+    state character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    created_by_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
+    CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
+    CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -764,6 +876,7 @@ CREATE TABLE public.hosted_llm_providers (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    management_key bytea,
     CONSTRAINT hosted_llm_providers_known CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
 );
 
@@ -779,6 +892,9 @@ CREATE TABLE public.installation_llm_settings (
     warning_threshold_bps integer DEFAULT 2000 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    default_hosted_provider text,
+    default_hosted_model text,
+    CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
     CONSTRAINT installation_llm_settings_warning_range CHECK (((warning_threshold_bps >= 0) AND (warning_threshold_bps <= 10000))),
@@ -798,6 +914,28 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
+-- Name: organization_billing_plans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_plans (
+    organization_id uuid NOT NULL,
+    plan text NOT NULL,
+    plan_source text DEFAULT ''::text NOT NULL,
+    polar_subscription_id text,
+    polar_subscription_status text DEFAULT ''::text NOT NULL,
+    current_period_start timestamp with time zone,
+    current_period_end timestamp with time zone,
+    trial_started_at timestamp with time zone,
+    trial_ends_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancel_at_period_end boolean DEFAULT false NOT NULL,
+    polar_modified_at timestamp with time zone,
+    CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
+    CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
 
@@ -858,8 +996,9 @@ CREATE TABLE public.organization_llm_credit_grants (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_order_id text,
     polar_refund_id text,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
+    expires_at timestamp with time zone,
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'topup_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text])))
 );
 
 
@@ -997,7 +1136,8 @@ CREATE TABLE public.usage_price_book_rates (
 CREATE TABLE public.usage_price_books (
     version text NOT NULL,
     effective_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_current boolean DEFAULT false NOT NULL
 );
 
 
@@ -1024,6 +1164,19 @@ CREATE TABLE public.user_canvas_preferences (
     user_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
     starred_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: user_last_locations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_last_locations (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    path text NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -1063,7 +1216,8 @@ CREATE TABLE public.users (
     description text,
     created_by uuid,
     api_key_expires_at timestamp without time zone,
-    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_owner boolean DEFAULT false NOT NULL
 );
 
 
@@ -1283,7 +1437,8 @@ CREATE TABLE public.workflows (
     folder_id uuid,
     description text DEFAULT ''::text NOT NULL,
     dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    factory_id uuid
+    factory_id uuid,
+    column_key text
 );
 
 
@@ -1583,6 +1738,38 @@ ALTER TABLE ONLY public.factory_llm_model_allowlists
 
 
 --
+-- Name: factory_planning_session_activities factory_planning_session_activities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_activities
+    ADD CONSTRAINT factory_planning_session_activities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_pkey PRIMARY KEY (session_id, work_order_id);
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1727,6 +1914,22 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
+-- Name: files files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: files files_storage_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_storage_key_key UNIQUE (storage_key);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1772,6 +1975,14 @@ ALTER TABLE ONLY public.installation_llm_settings
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_plans
+    ADD CONSTRAINT organization_billing_plans_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -1828,14 +2039,6 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 ALTER TABLE ONLY public.organization_llm_settings
     ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
-
-
---
--- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organizations
-    ADD CONSTRAINT organizations_name_key UNIQUE (name);
 
 
 --
@@ -1964,6 +2167,14 @@ ALTER TABLE ONLY public.user_api_tokens
 
 ALTER TABLE ONLY public.user_canvas_preferences
     ADD CONSTRAINT user_canvas_preferences_pkey PRIMARY KEY (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: user_last_locations user_last_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_pkey PRIMARY KEY (organization_id, user_id);
 
 
 --
@@ -2369,6 +2580,55 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
+-- Name: idx_factory_planning_session_activities_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_activities_session ON public.factory_planning_session_activities USING btree (session_id, started_at, id);
+
+
+--
+-- Name: idx_factory_planning_session_messages_activity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_messages_activity ON public.factory_planning_session_messages USING btree (activity_id) WHERE (activity_id IS NOT NULL);
+
+
+--
+-- Name: idx_factory_planning_session_messages_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_messages_session ON public.factory_planning_session_messages USING btree (session_id, created_at);
+
+
+--
+-- Name: idx_factory_planning_sessions_analysis_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_sessions_analysis_work_order ON public.factory_planning_sessions USING btree (organization_id, factory_id, draft_work_order_id) WHERE ((kind = 'work_order_analysis'::text) AND (draft_work_order_id IS NOT NULL));
+
+
+--
+-- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_sessions_canvas_run ON public.factory_planning_sessions USING btree (canvas_run_id) WHERE (canvas_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_factory_planning_sessions_factory_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_factory_open ON public.factory_planning_sessions USING btree (organization_id, factory_id) WHERE (state <> 'ended'::text);
+
+
+--
+-- Name: idx_factory_planning_sessions_open_heartbeat; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_open_heartbeat ON public.factory_planning_sessions USING btree (heartbeat_at) WHERE (state <> 'ended'::text);
+
+
+--
 -- Name: idx_factory_pr_feedback_handlers_canvas_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2642,6 +2902,34 @@ CREATE INDEX idx_factory_work_orders_source_run_id ON public.factory_work_orders
 
 
 --
+-- Name: idx_files_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_factory_id ON public.files USING btree (factory_id);
+
+
+--
+-- Name: idx_files_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_organization_id ON public.files USING btree (organization_id);
+
+
+--
+-- Name: idx_files_stale_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_stale_pending ON public.files USING btree (updated_at) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'failed'::character varying])::text[]));
+
+
+--
+-- Name: idx_files_work_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2666,7 +2954,7 @@ CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_gra
 -- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = ANY (ARRAY['topup'::text, 'included'::text])));
 
 
 --
@@ -3069,6 +3357,13 @@ CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btre
 
 
 --
+-- Name: usage_price_books_one_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX usage_price_books_one_current ON public.usage_price_books USING btree ((true)) WHERE is_current;
+
+
+--
 -- Name: workflows_factory_id_name_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3248,6 +3543,78 @@ ALTER TABLE ONLY public.factory_intakes
 
 ALTER TABLE ONLY public.factory_lines
     ADD CONSTRAINT factory_lines_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_session_activities factory_planning_session_activities_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_activities
+    ADD CONSTRAINT factory_planning_session_activities_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.factory_planning_session_activities(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_draft_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_draft_work_order_id_fkey FOREIGN KEY (draft_work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
@@ -3595,6 +3962,38 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
+-- Name: files files_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_created_by_id_fkey FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: files files_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.files
+    ADD CONSTRAINT files_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3736,6 +4135,22 @@ ALTER TABLE ONLY public.user_canvas_preferences
 
 ALTER TABLE ONLY public.user_canvas_preferences
     ADD CONSTRAINT user_canvas_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_last_locations user_last_locations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_last_locations user_last_locations_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -4082,7 +4497,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902092740	f
+20260916121903	f
 \.
 
 
@@ -4118,7 +4533,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260709012138	f
+20260907234118	f
 \.
 
 

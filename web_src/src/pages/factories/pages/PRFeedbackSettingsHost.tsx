@@ -5,16 +5,24 @@ import {
   useFactoryPRFeedbackHandlers,
   useUpdateFactoryPRFeedbackHandler,
 } from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
-import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import {
+  factoryAppConfigurePath,
+  factoryAppRunPath,
+  factoryPRFeedbackSetupPath,
+  prFeedbackSetupKindFromSourceId,
+} from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  apiPRFeedbackSource,
+  isPRFeedbackSetupAvailable,
   takenPRFeedbackSourceIds,
   prFeedbackDraftFromHandler,
   prFeedbackSettingsToApi,
@@ -29,6 +37,8 @@ interface PRFeedbackSettingsHostProps {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  githubIntegrationId?: string;
+  repository?: string;
   lineId?: string;
   canUpdate: boolean;
   handlerId?: string | null;
@@ -41,35 +51,38 @@ export function PRFeedbackSettingsHost({
   organizationId,
   factoryId,
   factoryKey,
+  githubIntegrationId = "",
+  repository = "",
   lineId,
   canUpdate,
   handlerId,
   initialTab = "general",
-  onCreated,
   onClose,
 }: PRFeedbackSettingsHostProps) {
+  const navigate = useNavigate();
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
+  });
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
+  });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
   const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
 
   const createFromSource = (source: PRFeedbackSource) => {
-    if (takenSourceIds.includes(source.id)) {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenSourceIds.includes(source.id) || !lineId) {
       return;
     }
     setPickerOpen(false);
-    createHandler
-      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
-      .then((created) => {
-        if (created.id) {
-          onCreated?.(created.id);
-        }
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-      });
+    onClose();
+    navigate(
+      factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)),
+    );
   };
 
   if (handlersQuery.isPending) {
@@ -129,6 +142,7 @@ export function PRFeedbackSettingsHost({
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
+      githubIntegrationId={githubIntegrationId}
       lineId={lineId}
       canUpdate={canUpdate}
       initialTab={initialTab}
@@ -145,6 +159,7 @@ function PRFeedbackSettingsLoaded({
   organizationId,
   factoryId,
   factoryKey,
+  githubIntegrationId,
   lineId,
   canUpdate,
   initialTab,
@@ -157,6 +172,7 @@ function PRFeedbackSettingsLoaded({
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  githubIntegrationId: string;
   lineId?: string;
   canUpdate: boolean;
   initialTab?: PRFeedbackSettingsTab;
@@ -168,6 +184,7 @@ function PRFeedbackSettingsLoaded({
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
+  const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
   const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
   const editAutomationHref = canvasId
@@ -177,6 +194,7 @@ function PRFeedbackSettingsLoaded({
   return (
     <PRFeedbackSettingsPopup
       organizationId={organizationId}
+      githubIntegrationId={githubIntegrationId}
       settings={settings}
       healthy={healthy}
       automationGraph={automation.graph}
@@ -213,6 +231,22 @@ function PRFeedbackSettingsLoaded({
           : undefined
       }
       editAutomationHref={editAutomationHref}
+      canvasId={canvasId}
+      runHrefFor={
+        canvasId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
+          : undefined
+      }
+      agent={
+        agent.agentNode
+          ? {
+              draft: agent.draft ?? undefined,
+              isLoading: agent.isLoading || !agent.draft,
+              organizationId,
+              onSave: agent.save,
+            }
+          : undefined
+      }
       onClose={onClose}
       initialTab={initialTab}
     />

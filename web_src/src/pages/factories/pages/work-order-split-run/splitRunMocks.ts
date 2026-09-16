@@ -6,7 +6,12 @@ import type {
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
 } from "@/api-client";
-import { UNKNOWN_ORG_USER_NAME, getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import {
+  UNKNOWN_ORG_USER_NAME,
+  getUserInitials,
+  type OrgUserDisplay,
+  type OrgUserDisplayLookup,
+} from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, providerForName } from "./splitRunFormat";
@@ -26,6 +31,7 @@ import {
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
+  confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
 } from "../../lib/confidenceScore";
@@ -33,7 +39,8 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
-import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import { analysisFinishedStatus, analysisFirstResultDelivered } from "../../lib/analysisOutcome";
+import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
@@ -84,6 +91,8 @@ export interface SplitRunStreamLine {
   kind?: SplitRunStreamKind;
   /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
   componentType?: string;
+  /** Compact session log: user talk vs a survey answer. */
+  userTalk?: "message" | "survey";
   action?: string;
   iconSlug?: string;
   iconSrc?: string;
@@ -91,6 +100,13 @@ export interface SplitRunStreamLine {
   component?: string;
   /** Node execution id for live runner logs. */
   executionId?: string;
+  /**
+   * Comparable chronological sort key (epoch ms), when known. Lets the
+   * planning session merge interleave a user reply with agent notes by true
+   * time instead of guessing from wait-slot position. Absent when the
+   * source has no timestamp (falls back to positional heuristics).
+   */
+  orderKey?: number;
 }
 
 export interface SplitRunPhase {
@@ -119,6 +135,8 @@ export interface SplitRunPhase {
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
   totalTokens?: string;
+  /** Runner model this automation used. Hidden when empty. */
+  model?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -159,9 +177,15 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
 
-function splitRunOwnerDisplay(order: FactoriesWorkOrder): OrgUserDisplay {
+function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const assignee = order.assignees?.[0];
   if (assignee?.id) {
+    // `resolveUser` looks the owner up against the org members list, which
+    // carries the avatar image. Without it we can only show initials.
+    const resolved = resolveUser?.(assignee.id, assignee.name);
+    if (resolved) {
+      return resolved;
+    }
     const name = assignee.name?.trim() || UNKNOWN_OWNER.name;
     return {
       id: assignee.id,
@@ -169,7 +193,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder): OrgUserDisplay {
       initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
     };
   }
-  return workOrderOwnerDisplay(order, UNKNOWN_OWNER);
+  return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);
 }
 
 function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
@@ -296,6 +320,7 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
 export type SplitRunFixtureOptions = {
   checks?: FactoriesWorkOrderCheck[];
   lineId?: string | null;
+  lineName?: string;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
   /** PR-feedback canvas runs for this task, shown as extra Log phases. */
@@ -306,6 +331,16 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Task files used to decide if a cancelled analysis already delivered a plan. */
+  artifacts?: FactoriesWorkOrderArtifact[];
+  /**
+   * Whether the Backlog automation is still scoring this draft. Covers the
+   * optimistic window where a fresh draft is known to be analyzing before its
+   * run appears in `analysisRuns`, so the popup matches the board card.
+   */
+  isAnalyzing?: boolean;
+  /** Looks up an org member's display (name, initials, avatar) by id. */
+  resolveUser?: OrgUserDisplayLookup;
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -328,19 +363,22 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
     descriptionText: order.description ?? "",
-    owner: splitRunOwnerDisplay(order),
+    owner: splitRunOwnerDisplay(order, options?.resolveUser),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     elapsed: elapsedForDisplay(displayStatus, order),
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
-    lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    lineName:
+      options?.lineName?.trim() ||
+      visibleDispatchForLine(order, options?.lineId)?.line?.name ||
+      SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
     openPhaseId: activeAutomationId,
     phases,
-    source: splitRunSourceForOrder(order),
+    source: splitRunSourceForOrder(order, options?.resolveUser),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
@@ -350,6 +388,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
+      analysisRuns: options?.analysisRuns,
+      isAnalyzing: options?.isAnalyzing,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -370,6 +410,8 @@ function reviewSurfaces(
     fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
+    analysisRuns?: BacklogAnalysisRun[];
+    isAnalyzing?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -380,7 +422,13 @@ function reviewSurfaces(
 
   if (displayStatus === "draft") {
     return surfaces(
-      buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order), status: displayStatus }),
+      buildSplitRunFooter({
+        kind: "draft",
+        note: draftFooterNote(order),
+        status: displayStatus,
+        isAnalyzing: draftIsAnalyzing(input),
+        confidenceScore: confidenceScoreFromChecks(checks),
+      }),
       [],
       checks,
     );
@@ -410,6 +458,15 @@ function reviewSurfaces(
     );
   }
   return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
+}
+
+/**
+ * Whether a draft is still being scored. The optimistic `isAnalyzing` flag
+ * covers the window before a fresh draft's run appears in `analysisRuns`, so
+ * the popup matches the board card even during run discovery.
+ */
+function draftIsAnalyzing(input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] }): boolean {
+  return Boolean(input.isAnalyzing) || hasActiveBacklogAnalysisRun(input.analysisRuns ?? []);
 }
 
 function stoppedReviewSurface(
@@ -562,7 +619,7 @@ function phasesForOrder(
   const apiChecks = options?.checks;
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
-    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
+    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
@@ -575,18 +632,31 @@ const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
  * its run, so the log panel streams the analysis while the automation
  * still works. The newest phase carries the reported score.
  */
-function phasesForAnalysisRuns(runs: BacklogAnalysisRun[], apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+function phasesForAnalysisRuns(
+  runs: BacklogAnalysisRun[],
+  apiChecks?: FactoriesWorkOrderCheck[],
+  artifacts?: FactoriesWorkOrderArtifact[],
+): SplitRunPhase[] {
   const ordered = [...runs]
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+  const delivered = analysisFirstResultDelivered({ checks: apiChecks, artifacts });
 
   return ordered.map((entry, index) =>
-    analysisRunToPhase(entry, index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined),
+    analysisRunToPhase(
+      entry,
+      index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined,
+      index === ordered.length - 1 && delivered,
+    ),
   );
 }
 
-function analysisRunToPhase(entry: BacklogAnalysisRun, checks?: WorkOrderCheckPresentation[]): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+function analysisRunToPhase(
+  entry: BacklogAnalysisRun,
+  checks?: WorkOrderCheckPresentation[],
+  delivered = false,
+): SplitRunPhase {
+  const status = analysisFinishedStatus(statusForCanvasRun(entry.run), delivered);
   const componentName = CONFIDENCE_CHECK_NAME;
   const duration = durationForExecution(
     {
@@ -847,12 +917,12 @@ function automationBacklogPhase(
       {
         id: "backlog-create",
         at,
-        componentName: automation.nodeName?.trim() || "Create Work Order",
+        componentName: automation.nodeName?.trim() || "Create Task",
         status: "passed",
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "factory",
       },
@@ -883,7 +953,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "user",
       },
@@ -954,6 +1024,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
+    model: dispatchModelForExecution(order, execution),
   };
 }
 
@@ -1074,6 +1145,17 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function dispatchModelForExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): string | undefined {
+  const owner = (order.lineDispatches ?? []).find((dispatch) =>
+    (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
+  );
+  const value = owner?.model?.trim();
+  return value || undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

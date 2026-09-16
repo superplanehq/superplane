@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { CREATE_PRIVATE_GITHUB_APP_LABEL, githubPrivateAppSetupPath } from "@/lib/privateGitHubApp";
@@ -65,6 +65,26 @@ describe("GitHubConnectControls", () => {
     expect(link).toHaveTextContent(CREATE_PRIVATE_GITHUB_APP_LABEL);
     await user.click(link);
     expect(screen.getByTestId("location-path")).toHaveTextContent(githubPrivateAppSetupPath("org-1"));
+  });
+
+  it("hides the private-app link when allowPrivateApp is false", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/settings/integrations"]}>
+        <TooltipProvider>
+          <GitHubConnectControls
+            organizationId="org-1"
+            definition={{ name: "github", label: "GitHub", hostedAppInstall: true, legacySetupOnly: false }}
+            canCreateIntegrations
+            permissionsLoading={false}
+            onConnect={vi.fn()}
+            allowPrivateApp={false}
+          />
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("integrations-create-private-github-app")).not.toBeInTheDocument();
+    expect(screen.getByTestId("integrations-connect-github")).toBeInTheDocument();
   });
 
   it("keeps the private-app link when the setup flow feature is off", async () => {

@@ -71,4 +71,14 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	_, err = models.FindEmailSettings(models.EmailProviderSMTP)
 	require.Error(t, err)
+
+	organization, err := models.FindOrganizationByName("Demo")
+	require.NoError(t, err)
+	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+
+	owner, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.True(t, owner.HasReceivedWelcomeCredit())
 }

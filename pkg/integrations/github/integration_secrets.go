@@ -15,6 +15,13 @@ import (
 
 const integrationSecretGitHubToken = "GITHUB_TOKEN"
 
+const githubSecretUsage = `A GitHub token is available in the GITHUB_TOKEN environment variable.
+The gh CLI is already installed on this runner. Use gh. Do not download or install gh.
+gh reads GITHUB_TOKEN.
+To clone or push a repository, use this remote URL form:
+https://x-access-token:${GITHUB_TOKEN}@github.com/<owner>/<repo>.git
+Do not print the token.`
+
 type httpContextTransport struct {
 	http core.HTTPContext
 }

@@ -5,9 +5,9 @@ import {
   canvasesListCanvases,
   canvasesPutCanvasStaging,
   factoriesMaterializeFactoryAppTemplate,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   type CanvasesCanvasSummary,
-  type FactoryApp,
+  type FactoryAutomation,
 } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -21,6 +21,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import {
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   type FactoryAgentRewrite,
@@ -50,9 +51,15 @@ export type UpdateCanvasFolderMembershipFn = (
   membership: ReturnType<typeof appendCanvasToFolderMembership>,
 ) => Promise<unknown>;
 
-export async function stageAndCommitFactorySpecs(canvasId: string, canvasYaml: string, consoleYaml: string) {
+export async function stageAndCommitFactorySpecs(
+  organizationId: string,
+  canvasId: string,
+  canvasYaml: string,
+  consoleYaml: string,
+) {
   await canvasesPutCanvasStaging(
     withOrganizationHeader({
+      organizationId,
       path: { canvasId },
       body: {
         operations: [
@@ -64,15 +71,22 @@ export async function stageAndCommitFactorySpecs(canvasId: string, canvasYaml: s
   );
   await canvasesCommitCanvasStaging(
     withOrganizationHeader({
+      organizationId,
       path: { canvasId },
       body: { commitMessage: "Install factory template" },
     }),
   );
 }
 
-export async function invokeFactoryRun(canvasId: string, definition: FactoryDefinition, startingTaskPrompt: string) {
+export async function invokeFactoryRun(
+  organizationId: string,
+  canvasId: string,
+  definition: FactoryDefinition,
+  startingTaskPrompt: string,
+) {
   await canvasesInvokeNodeTriggerHook(
     withOrganizationHeader({
+      organizationId,
       path: {
         canvasId,
         nodeId: definition.run.nodeId,
@@ -101,16 +115,8 @@ export async function materializeAndCommitFactoryTemplate(args: {
     const integrations = Object.entries(args.integrations).flatMap(([type, integration]) =>
       integration ? [{ type, id: integration.id, name: integration.name }] : [],
     );
-    const agent = args.agentRewrite
-      ? {
-          component: args.agentRewrite.component,
-          model: args.agentRewrite.model,
-          planningModel: args.agentRewrite.planningModel,
-          credentialSource: args.agentRewrite.credentials.source,
-          credentialIntegrationName:
-            args.agentRewrite.credentials.source === "integration" ? args.agentRewrite.credentials.name : undefined,
-        }
-      : undefined;
+    const rewrite = args.agentRewrite;
+    const agent = rewrite ? factoryAppTemplateAgentFromRewrite(rewrite) : undefined;
     const response = await factoriesMaterializeFactoryAppTemplate(
       withOrganizationHeader({
         organizationId: args.organizationId,
@@ -139,7 +145,7 @@ export async function materializeAndCommitFactoryTemplate(args: {
     });
     consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
   }
-  await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
+  await stageAndCommitFactorySpecs(args.organizationId, args.canvasId, canvasYaml, consoleYaml);
 }
 
 function presentNames(items: { name?: string }[]): string[] {
@@ -152,15 +158,17 @@ function presentNames(items: { name?: string }[]): string[] {
  */
 async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient, workspaceFactoryId?: string) {
   if (workspaceFactoryId) {
-    const cachedApps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, workspaceFactoryId));
+    const cachedApps = queryClient.getQueryData<FactoryAutomation[]>(
+      factoryAppsKey(organizationId, workspaceFactoryId),
+    );
     if (cachedApps) {
       return presentNames(cachedApps);
     }
 
-    const appsResponse = await factoriesListFactoryApps(
+    const appsResponse = await factoriesListFactoryAutomations(
       withOrganizationHeader({ organizationId, path: { factoryId: workspaceFactoryId } }),
     );
-    return presentNames(appsResponse.data?.apps ?? []);
+    return presentNames(appsResponse.data?.automations ?? []);
   }
 
   const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
@@ -209,10 +217,15 @@ async function createCanvasWithUniqueName(args: {
   throw new Error("Failed to create factory canvas");
 }
 
-async function resolveExistingFactoryCanvas(canvasId: string, fallbackName: string): Promise<FactoryCanvasHandle> {
+async function resolveExistingFactoryCanvas(
+  organizationId: string,
+  canvasId: string,
+  fallbackName: string,
+): Promise<FactoryCanvasHandle> {
   try {
     const response = await canvasesDescribeCanvas(
       withOrganizationHeader({
+        organizationId,
         path: { id: canvasId },
       }),
     );
@@ -238,7 +251,7 @@ export async function ensureFactoryCanvas(args: {
     if (args.pending?.canvasId === args.existingCanvasId) {
       return args.pending;
     }
-    return resolveExistingFactoryCanvas(args.existingCanvasId, args.definition.title);
+    return resolveExistingFactoryCanvas(args.organizationId, args.existingCanvasId, args.definition.title);
   }
 
   if (args.pending) return args.pending;

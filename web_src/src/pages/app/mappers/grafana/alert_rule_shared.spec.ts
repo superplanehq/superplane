@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { buildAlertRuleMetadata } from "./alert_rule_shared";
 import type { NodeInfo } from "../types";

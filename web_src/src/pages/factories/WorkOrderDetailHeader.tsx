@@ -1,9 +1,8 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Check, Ellipsis, Link2 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Ellipsis } from "lucide-react";
+import { Fragment } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
+import { CopyLinkButton } from "./CopyLinkButton";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import {
   applyWorkOrderStatusAction,
@@ -54,40 +54,14 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
       title={props.orderTitle}
       actions={
         <>
-          <CopyLinkButton />
+          <CopyLinkButton
+            className="size-7 rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            iconClassName="size-3.5"
+          />
           <HeaderOverflowMenu {...props} />
         </>
       }
     />
-  );
-}
-
-function CopyLinkButton() {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      showSuccessToast("Link copied to clipboard.");
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      showErrorToast("Failed to copy link.");
-    }
-  };
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      onClick={() => void handleCopy()}
-      className="text-muted-foreground hover:bg-accent hover:text-foreground"
-      aria-label="Copy link to task"
-      data-testid="work-order-copy-link-button"
-    >
-      {copied ? <Check className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />}
-    </Button>
   );
 }
 

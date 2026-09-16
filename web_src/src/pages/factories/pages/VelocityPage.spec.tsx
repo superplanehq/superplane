@@ -1,127 +1,39 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
-import { TooltipProvider } from "@/ui/tooltip";
+import type { FactoryVelocityParams } from "@/hooks/useFactoryVelocity";
 
-import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
-import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
-import { VelocityPage } from "./VelocityPage";
-
-interface VelocityHookState {
-  data?: FactoriesDescribeFactoryVelocityResponse;
-  isLoading?: boolean;
-  isFetching?: boolean;
-  error?: Error | null;
-}
-
-interface WorkOrdersHookState {
-  data?: FactoriesWorkOrder[];
-  isLoading?: boolean;
-  isFetching?: boolean;
-  error?: Error | null;
-}
-
-const velocityHookState: VelocityHookState = {};
-const workOrdersHookState: WorkOrdersHookState = {};
-
-/** Workspace setup picks the GitHub integration and the app repository. */
-const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
-  ...REFUND_FACTORY,
-  onboarding: { ...REFUND_FACTORY.onboarding, vcsIntegrationId: "int-1", appRepository: "acme/api" },
-};
-
-const startSync = vi.fn();
-const syncHookState: { isPending?: boolean } = {};
+import { REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import { PEOPLE_FIRST_PAGE_SIZE, PEOPLE_LOAD_MORE_SIZE } from "../lib/velocityPeopleSort";
+import { VELOCITY_TIME_COLORS } from "../lib/velocitySeriesColors";
+import {
+  FACTORY_WITH_SETUP_REPO,
+  factoryVelocityHookResult,
+  factoryWorkOrdersHookResult,
+  manyPeople,
+  metricCell,
+  metricColorDot,
+  populatedResponse,
+  renderShell,
+  resetState,
+  startSync,
+  syncFactoryVelocityHookResult,
+  syncHookState,
+  velocityHookCalls,
+  velocityHookState,
+  workOrdersHookState,
+} from "./velocityPageTestSupport";
 
 vi.mock("@/hooks/useFactoryVelocity", () => ({
-  useFactoryVelocity: () => ({
-    data: velocityHookState.data,
-    isLoading: velocityHookState.isLoading ?? false,
-    isFetching: velocityHookState.isFetching ?? false,
-    error: velocityHookState.error ?? null,
-    refetch: vi.fn(),
-  }),
-  useSyncFactoryVelocity: () => ({
-    mutate: startSync,
-    isPending: syncHookState.isPending ?? false,
-  }),
+  useFactoryVelocity: (_organizationId: string, _factoryId: string, params: FactoryVelocityParams) =>
+    factoryVelocityHookResult(params),
+  useSyncFactoryVelocity: () => syncFactoryVelocityHookResult(),
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryWorkOrders: () => ({
-    data: workOrdersHookState.data ?? [],
-    isLoading: workOrdersHookState.isLoading ?? false,
-    isFetching: workOrdersHookState.isFetching ?? false,
-    error: workOrdersHookState.error ?? null,
-  }),
+  useFactoryWorkOrders: () => factoryWorkOrdersHookResult(),
 }));
-
-/** A window with output, so the page renders the report instead of a state card. */
-function populatedResponse(
-  overrides: Partial<FactoriesDescribeFactoryVelocityResponse> = {},
-): FactoriesDescribeFactoryVelocityResponse {
-  return {
-    yesterday: { superplaneMerged: 3, waste: 1 },
-    totals: {
-      superplaneMerged: 12,
-      peopleMerged: 8,
-      waste: 4,
-      superplaneSharePct: 60,
-      wastePct: 25,
-      costCents: "4200",
-      tokens: "185000",
-      wasteCostCents: "900",
-      tasksClosed: 16,
-      tasksWaste: 4,
-    },
-    points: [
-      { day: "1", superplaneMerged: 2, peopleMerged: 1, waste: 1, costCents: "800", tokens: "20000" },
-      { day: "2", superplaneMerged: 3, peopleMerged: 2, waste: 0, costCents: "1200", tokens: "30000" },
-    ],
-    hasPeopleCohort: true,
-    ...overrides,
-  };
-}
-
-function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <TooltipProvider delayDuration={0}>
-        <MemoryRouter initialEntries={["/velocity"]}>
-          <FactoriesLayoutContext.Provider
-            value={{
-              organizationId: "org-1",
-              factoryId: PRIMARY_FACTORY_ID,
-              factoryKey: PRIMARY_FACTORY_KEY,
-              factory,
-              factories: [factory],
-              openCreateWorkOrder: vi.fn(),
-            }}
-          >
-            <VelocityPage />
-          </FactoriesLayoutContext.Provider>
-        </MemoryRouter>
-      </TooltipProvider>
-    </QueryClientProvider>,
-  );
-}
-
-function resetState() {
-  startSync.mockClear();
-  syncHookState.isPending = false;
-  velocityHookState.data = undefined;
-  velocityHookState.isLoading = false;
-  velocityHookState.isFetching = false;
-  velocityHookState.error = null;
-  workOrdersHookState.data = [];
-  workOrdersHookState.isLoading = false;
-  workOrdersHookState.isFetching = false;
-  workOrdersHookState.error = null;
-}
 
 describe("VelocityPage shell", () => {
   it("sets the document title from the page and workspace name", () => {
@@ -129,6 +41,24 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(document.title).toBe(`Velocity · ${REFUND_FACTORY.name} · SuperPlane`);
+  });
+
+  it("offers 7d, 14d, and 30d, and loads 7 days when 7d is selected", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    const user = userEvent.setup();
+
+    renderShell();
+
+    expect(screen.getByRole("tab", { name: "7d" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "14d" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "30d" })).toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({ periodDays: 14 });
+
+    await user.click(screen.getByRole("tab", { name: "7d" }));
+
+    expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute("aria-selected", "true");
+    expect(velocityHookCalls.at(-1)).toMatchObject({ periodDays: 7 });
   });
 
   it("shows the loading state while velocity is loading", () => {
@@ -159,7 +89,8 @@ describe("VelocityPage shell", () => {
     velocityHookState.data = populatedResponse();
 
     renderShell(FACTORY_WITH_SETUP_REPO);
-    await userEvent.click(screen.getByTestId("velocity-sync-button"));
+    await userEvent.click(screen.getByTestId("velocity-overflow-menu"));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Refresh data" }));
 
     expect(startSync).toHaveBeenCalledTimes(1);
   });
@@ -186,13 +117,13 @@ describe("VelocityPage shell", () => {
     expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
   });
 
-  it("hides the sync control when there is no repository to read", () => {
+  it("hides the overflow menu when there is no repository to read", () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
     renderShell();
 
-    expect(screen.queryByTestId("velocity-sync-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-overflow-menu")).not.toBeInTheDocument();
   });
 
   it("keeps the report when a refetch fails and cached data remains", () => {
@@ -333,7 +264,130 @@ describe("VelocityPage shell", () => {
     expect(people).toHaveTextContent("1 person with activity in this period");
   });
 
-  it("explains an empty Authored column when GitHub is not connected", () => {
+  it("shows only the first page of people and the true total, with a Show more control", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+
+    renderShell();
+
+    const people = screen.getByTestId("velocity-people");
+    expect(people).toHaveTextContent("12 people with activity in this period");
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE);
+    expect(within(people).getByText("Contributor 01", { selector: "p" })).toBeInTheDocument();
+    expect(within(people).queryByText("Contributor 06", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+  });
+
+  it("keeps the report and the rows already shown while the next page loads", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+
+    velocityHookState.holdsPreviousReport = true;
+    velocityHookState.isFetching = true;
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+
+    const people = screen.getByTestId("velocity-people");
+    expect(screen.queryByTestId("velocity-loading-state")).not.toBeInTheDocument();
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE);
+  });
+
+  it("loads more people, keeping ranks sequential, and hides the control once every row is shown", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+
+    const people = screen.getByTestId("velocity-people");
+    expect(within(people).getByText("Contributor 12", { selector: "p" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
+
+    const ranks = within(people)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    expect(ranks).toEqual(Array.from({ length: 12 }, (_, index) => String(index + 1)));
+  });
+
+  it("asks for 20 more people on each Show more click after the first page", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(50);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
+
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE + PEOPLE_LOAD_MORE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
+
+    const people = screen.getByTestId("velocity-people");
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE + PEOPLE_LOAD_MORE_SIZE * 2);
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+  });
+
+  it("sorts through the backend and resets paging to the first page", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent("Contributor 12");
+
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleSort: "costUsd",
+      peopleSortDirection: "desc",
+      peopleOffset: 0,
+    });
+    // Paging restarted, so the control is back and the second page is gone.
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-people")).not.toHaveTextContent("Contributor 12");
+
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleSort: "costUsd", peopleSortDirection: "asc" });
+  });
+
+  it("hides Show more while a sort reset still holds the previous report", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent("Contributor 12");
+
+    velocityHookState.holdsPreviousReport = true;
+    velocityHookState.isFetching = true;
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
+  });
+
+  it("explains an empty Manual work column when GitHub is not connected", () => {
     resetState();
     velocityHookState.data = populatedResponse({
       hasPeopleCohort: false,
@@ -343,7 +397,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.getByTestId("velocity-people")).toHaveTextContent(
-      "Connect GitHub in workspace setup to count the pull requests people merged.",
+      "Connect GitHub in workspace setup to count the pull requests people created.",
     );
   });
 
@@ -354,7 +408,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.queryByText("Intake source")).not.toBeInTheDocument();
-    expect(screen.getByText("Origin")).toBeInTheDocument();
+    expect(screen.getByText("Who created")).toBeInTheDocument();
   });
 
   it("offers the intake split when the response names its sources", () => {
@@ -379,14 +433,63 @@ describe("VelocityPage shell", () => {
     expect(taskTime).toHaveTextContent("We could not load task time.");
   });
 
-  it("reports tracked spend and the part of it that went to waste", () => {
+  it("shows cycle time, time running, and time in Waiting as equal metrics", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    const now = Date.now();
+    const hour = 60 * 60 * 1000;
+    const iso = (hoursAgo: number) => new Date(now - hoursAgo * hour).toISOString();
+    workOrdersHookState.data = [
+      {
+        id: "order-1",
+        state: "STATE_CLOSED",
+        createdAt: iso(16),
+        updatedAt: iso(2),
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            stepExecutions: [
+              {
+                id: "first",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                createdAt: iso(16),
+                finishedAt: iso(12),
+              },
+              { id: "second", state: "STATE_FINISHED", result: "RESULT_PASSED", createdAt: iso(8), finishedAt: iso(4) },
+            ],
+          },
+        ],
+      },
+    ];
+
+    renderShell();
+
+    const taskTime = screen.getByTestId("velocity-task-time");
+    const cycle = metricCell(taskTime, "Cycle time");
+    const running = metricCell(taskTime, "Time running");
+    const waiting = metricCell(taskTime, "Time in Waiting");
+
+    expect(cycle.parentElement).toHaveClass("lg:grid-cols-3");
+    expect(within(cycle).getByText("14h")).toHaveClass("text-[30px]");
+    expect(within(running).getByText("8h")).toHaveClass("text-[30px]");
+    expect(within(waiting).getByText("6h")).toHaveClass("text-[30px]");
+    expect(cycle).toHaveTextContent("From 1 task closed in this period");
+    expect(metricColorDot(cycle)).toBeNull();
+    expect(metricColorDot(running)).toHaveStyle({ backgroundColor: VELOCITY_TIME_COLORS.running });
+    expect(metricColorDot(waiting)).toHaveStyle({ backgroundColor: VELOCITY_TIME_COLORS.waiting });
+  });
+
+  it("reports tracked spend split between tokens and compute", () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
     renderShell();
 
     const cost = screen.getByTestId("velocity-cost");
+    expect(cost).toHaveTextContent("Total cost");
     expect(cost).toHaveTextContent("$42.00");
-    expect(cost).toHaveTextContent("$9.00 of this went to tasks that closed without a merge.");
+    expect(cost).toHaveTextContent("Tokens");
+    expect(cost).toHaveTextContent("Compute");
   });
 });

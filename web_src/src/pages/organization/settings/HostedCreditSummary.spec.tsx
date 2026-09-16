@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { HostedCreditSummary } from "./HostedCreditSummary";
 
 describe("HostedCreditSummary", () => {
@@ -33,6 +33,31 @@ describe("HostedCreditSummary", () => {
       "$500.00",
     ]);
     expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(3);
+  });
+
+  it("does not show a card for a custom credit pack", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="2500"
+        grantTotalCents="2500"
+        superplaneGrantCents="2500"
+        purchasedCreditCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling
+        products={[
+          { id: "prod-25", amountCents: "2500" },
+          { id: "prod-custom", amountCents: "0" },
+        ]}
+        onAddCredit={vi.fn()}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(1);
+    expect(screen.getAllByText("$25.00").length).toBeGreaterThan(0);
   });
 
   it("shows SuperPlane grant and purchased hosted credit separately", () => {
@@ -107,6 +132,54 @@ describe("HostedCreditSummary", () => {
     expect(screen.getByText("Paid")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage invoices" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open invoice" })).not.toBeInTheDocument();
+  });
+
+  it("shows checkout packs but no contact sentence when the signed-in user can manage billing", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="0"
+        grantTotalCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling
+        billingContactMessage="Contact the Acme owner (Jane Doe) to purchase hosted credit."
+        products={[
+          { id: "prod-25", amountCents: "2500" },
+          { id: "prod-100", amountCents: "10000" },
+          { id: "prod-500", amountCents: "50000" },
+        ]}
+        onAddCredit={vi.fn()}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(3);
+    expect(screen.queryByText("Contact the Acme owner (Jane Doe) to purchase hosted credit.")).not.toBeInTheDocument();
+  });
+
+  it("shows the owner contact sentence instead of checkout packs when the user cannot manage billing", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="0"
+        grantTotalCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling={false}
+        hasBillingCustomer
+        billingContactMessage="Contact the Acme owner (Jane Doe) to purchase hosted credit."
+        products={[{ id: "prod-25", amountCents: "2500" }]}
+        invoices={[]}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getByText("Contact the Acme owner (Jane Doe) to purchase hosted credit.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add hosted credit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage invoices" })).not.toBeInTheDocument();
   });
 
   it("shows the credit refresh message when checkout returns", () => {

@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
+import { refineChatBoardFixture } from "./refineChatBoardFixture";
 import {
   CLOSED_WORK_ORDER,
   defaultFactoriesFixture,
+  DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -12,6 +14,7 @@ import {
   REFUND_LINE_PLAN_ID,
   RUNNING_WORK_ORDER,
 } from "./factoryPageResponses";
+import { BUSINESS_ORGANIZATION_BILLING } from "./usageReportFixtures";
 
 describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
@@ -36,12 +39,24 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
-  it("serves factory usage and organization workspace usage reports", async () => {
+  it("serves factory usage, usage history, and organization workspace usage reports", async () => {
     const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
     await expect(usage.json()).resolves.toMatchObject({
       totalTokens: "25600",
       totalCostCents: "876",
       byModel: expect.arrayContaining([expect.objectContaining({ provider: "anthropic" })]),
+    });
+
+    const history = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage-history`);
+    await expect(history.json()).resolves.toMatchObject({
+      totalCount: 3,
+      rows: expect.arrayContaining([
+        expect.objectContaining({
+          workOrderKey: "RF-101",
+          models: [],
+          byokModels: ["anthropic/claude-sonnet-4-6"],
+        }),
+      ]),
     });
 
     const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/workspace-usage`);
@@ -57,12 +72,49 @@ describe("matchFactoryPageFixture", () => {
       enabled: true,
       models: [expect.objectContaining({ id: "claude-sonnet-4-6" })],
     });
+
+    const selectable = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/selectable-llm-models`,
+    );
+    await expect(selectable.json()).resolves.toMatchObject({
+      models: expect.arrayContaining([
+        expect.objectContaining({ key: "byok::anthropic::claude-sonnet-4-6" }),
+        expect.objectContaining({ key: "hosted::anthropic::claude-sonnet-4-6" }),
+      ]),
+    });
   });
 
-  it("returns factory apps for the populated factory", async () => {
-    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
+  it("deletes a factory automation by id", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      { method: "POST", body: JSON.stringify({ name: "Create env", columnKey: "verify" }) },
+      fixture,
+    );
+    const createdBody = (await created.json()) as { automation?: { id?: string } };
+    const automationId = createdBody.automation?.id;
+    expect(automationId).toBeTruthy();
+
+    const deleted = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations/${automationId}`,
+      { method: "DELETE" },
+      fixture,
+    );
+    expect(deleted.status).toBe(200);
+
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      undefined,
+      fixture,
+    );
+    const body = (await list.json()) as { automations?: Array<{ id?: string }> };
+    expect(body.automations?.some((entry) => entry.id === automationId)).toBe(false);
+  });
+
+  it("returns factory automations for the populated factory", async () => {
+    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`);
     await expect(apps.json()).resolves.toMatchObject({
-      apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+      automations: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
 
@@ -148,5 +200,149 @@ describe("matchFactoryPageFixture", () => {
   it("does not serve a separate line-metrics route", async () => {
     const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/line-metrics`);
     expect(response.status).toBe(404);
+  });
+
+  it("lists and creates PR feedback handlers", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      undefined,
+      fixture,
+    );
+    await expect(list.json()).resolves.toMatchObject({ handlers: [] });
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      {
+        method: "POST",
+        body: JSON.stringify({ source: "SOURCE_PULL_REQUEST_CHECKS", name: "Fix pull request checks" }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      handler: {
+        name: "Fix pull request checks",
+        source: "SOURCE_PULL_REQUEST_CHECKS",
+        healthy: true,
+      },
+    });
+
+    const afterCreate = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      undefined,
+      fixture,
+    );
+    const body = (await afterCreate.json()) as { handlers: Array<{ source?: string }> };
+    expect(body.handlers).toHaveLength(1);
+    expect(body.handlers[0]?.source).toBe("SOURCE_PULL_REQUEST_CHECKS");
+  });
+
+  it("applies Polar billing after a billing sync", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      billingSyncCalls: 0,
+      billingAfterSync: BUSINESS_ORGANIZATION_BILLING,
+    };
+
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/sync`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      plan: "business",
+      creditPurchaseAllowed: true,
+    });
+    expect(fixture.billingSyncCalls).toBe(1);
+    expect(fixture.organizationBilling).toMatchObject({ plan: "business" });
+  });
+
+  it("cancels and resumes Polar Business on the billing routes", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      organizationBilling: { ...BUSINESS_ORGANIZATION_BILLING },
+    };
+
+    const canceled = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/cancel`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(canceled.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: true,
+    });
+
+    const resumed = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/resume`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(resumed.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: false,
+    });
+  });
+
+  it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
+      undefined,
+      structuredClone(lineMetricsFactoriesFixture),
+    );
+    const body = (await response.json()) as {
+      pullRequests: Array<{ workOrderId?: string; number?: string; state?: string }>;
+    };
+    const byOrder = Object.fromEntries(body.pullRequests.map((pullRequest) => [pullRequest.workOrderId, pullRequest]));
+
+    expect(byOrder["wo-review-pay-842"]).toMatchObject({ number: "842", state: "STATE_DRAFT" });
+    expect(byOrder["wo-review-pay-844"]).toMatchObject({ number: "844", state: "STATE_DRAFT" });
+    expect(byOrder["wo-approval-refunds"]).toMatchObject({ number: "109", state: "STATE_OPEN" });
+    expect(byOrder["wo-board-implement-notify"]).toMatchObject({ number: "114", state: "STATE_DRAFT" });
+    expect(byOrder["wo-failed-refunds"]).toMatchObject({ number: "6812", state: "STATE_OPEN" });
+    expect(byOrder["wo-open-refunds-schema"]).toMatchObject({ number: "102", state: "STATE_DRAFT" });
+    expect(byOrder["wo-pr-closure-receipts"]).toMatchObject({ number: "510", state: "STATE_MERGED" });
+    expect(byOrder["wo-board-done-rejected"]).toMatchObject({ number: "112", state: "STATE_CLOSED" });
+  });
+
+  it("returns a 7-day velocity series when periodDays is 7", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/velocity?periodDays=7`);
+    const body = (await response.json()) as { points?: unknown[] };
+
+    expect(body.points).toHaveLength(7);
+  });
+
+  it("returns no planning session when the fixture does not seed one", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`,
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("serves a seeded planning session and stores a survey answer", async () => {
+    const fixture = refineChatBoardFixture();
+    const sessionPath = `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`;
+    const loaded = await fetchFactoryPageFixture(sessionPath, undefined, fixture);
+    const body = (await loaded.json()) as { session?: { id?: string; survey?: unknown } };
+
+    expect(loaded.status).toBe(200);
+    expect(body.session?.id).toBe("ps-draft-refunds");
+    expect(body.session?.survey).toBeTruthy();
+
+    const answered = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/planning-sessions/ps-draft-refunds/survey-answer`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text: "What should the first change include? Reactions on the task header only" }),
+      },
+      fixture,
+    );
+    const next = (await answered.json()) as {
+      session?: { survey?: unknown; messages?: Array<{ text?: string }> };
+    };
+
+    expect(next.session?.survey).toBeNull();
+    expect(next.session?.messages?.at(-1)?.text).toContain("Reactions on the task header only");
   });
 });

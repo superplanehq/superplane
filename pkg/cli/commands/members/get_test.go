@@ -31,7 +31,7 @@ func TestGetCommandRendersMemberText(t *testing.T) {
 	require.Contains(t, out, "ID: user-1")
 	require.Contains(t, out, "Email: alice@example.com")
 	require.Contains(t, out, "Name: Alice")
-	require.Contains(t, out, "org_owner")
+	require.Contains(t, out, "org_admin")
 }
 
 func TestGetCommandByEmailFlag(t *testing.T) {

@@ -16,7 +16,12 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { selectCreateStepFields, selectVisibleFields, selectWebhookStepFields } from "./configurationFields";
+import {
+  areRequiredCreateFieldsFilled,
+  selectCreateStepFields,
+  selectVisibleFields,
+  selectWebhookStepFields,
+} from "./configurationFields";
 import { createWithGeneratedName, useGeneratedIntegrationName } from "./generatedName";
 import { IntegrationCreateDialogFooter } from "./IntegrationCreateDialogFooter";
 import { useBrowserActionSetup } from "./useBrowserActionSetup";
@@ -195,12 +200,19 @@ export function IntegrationCreateDialog({
     setCreatedName,
   ]);
 
+  const canSubmit =
+    Boolean(effectiveIntegrationName.trim()) && areRequiredCreateFieldsFilled(createStepFields, configuration);
+
   const handleSubmit = useCallback(async () => {
     if (!integrationDefinition?.name || !organizationId) return;
     const definitionName = integrationDefinition.name;
     const nextName = effectiveIntegrationName.trim();
     if (!nextName) {
       showErrorToast("Integration name is required");
+      return;
+    }
+    if (!areRequiredCreateFieldsFilled(createStepFields, configuration)) {
+      showErrorToast("Enter every required field.");
       return;
     }
 
@@ -261,6 +273,7 @@ export function IntegrationCreateDialog({
     integrationDefinition?.name,
     organizationId,
     effectiveIntegrationName,
+    createStepFields,
     configuration,
     existingIntegrationNames,
     githubBaseName,
@@ -432,7 +445,7 @@ export function IntegrationCreateDialog({
           browserActionCompleted={browserActionCompleted}
           mutationPending={updateIntegrationMutation.isPending}
           isCreatePending={isCreatePending}
-          integrationName={effectiveIntegrationName}
+          canSubmit={canSubmit}
           onCompleteWebhookSetup={handleCompleteWebhookSetup}
           onBrowserActionContinue={handleBrowserActionContinue}
           onBrowserActionConfigSave={handleBrowserActionConfigSave}

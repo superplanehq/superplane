@@ -94,17 +94,42 @@ function selectionNeedsUpdate(current: IntegrationSelection | undefined, nextSel
   return !current || current.id !== nextSelection.id || current.ready !== nextSelection.ready;
 }
 
+/** Clears a selection whose instance is gone or not ready, or refreshes its readiness. */
+function syncExistingSelection(data: IntegrationInstanceSummary, next: IntegrationSelections): boolean {
+  const selected = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
+  if (!selected || selected.status?.state !== "ready") {
+    delete next[data.name];
+    return true;
+  }
+  const selection = selectionFromInstance(selected);
+  if (selection && selectionNeedsUpdate(next[data.name], selection)) {
+    next[data.name] = selection;
+    return true;
+  }
+  return false;
+}
+
+function autoSelectFirstReady(data: IntegrationInstanceSummary, next: IntegrationSelections): boolean {
+  if (data.readyInstances.length === 0) return false;
+  const selection = selectionFromInstance(data.readyInstances[0]);
+  if (!selection) return false;
+  next[data.name] = selection;
+  return true;
+}
+
 /**
  * Clears selections pointing to non-ready instances and auto-selects
  * the first ready instance for unselected types. When a preferred instance
  * id is set (e.g. after Connect new), that instance is kept even while
- * pending and wins once ready. Returns updated selections if anything
- * changed, or null if no changes needed.
+ * pending and wins once ready. Integration names in `manualSelectionNames`
+ * are never auto-selected; the user must pick an instance. Returns updated
+ * selections if anything changed, or null if no changes needed.
  */
 export function syncSelectionsWithInstances(
   integrationData: IntegrationInstanceSummary[],
   selections: IntegrationSelections,
   preferredInstanceIds: Record<string, string> = {},
+  manualSelectionNames: readonly string[] = [],
 ): IntegrationSelections | null {
   let changed = false;
   const next = { ...selections };
@@ -116,28 +141,10 @@ export function syncSelectionsWithInstances(
       continue;
     }
 
-    if (next[data.name]) {
-      const selected = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
-      if (!selected || selected.status?.state !== "ready") {
-        delete next[data.name];
-        changed = true;
-      } else {
-        const selection = selectionFromInstance(selected);
-        if (selection && selectionNeedsUpdate(next[data.name], selection)) {
-          next[data.name] = selection;
-          changed = true;
-        }
-      }
-    }
+    if (next[data.name] && syncExistingSelection(data, next)) changed = true;
 
-    if (!next[data.name] && data.readyInstances.length > 0) {
-      const first = data.readyInstances[0];
-      const selection = selectionFromInstance(first);
-      if (selection) {
-        next[data.name] = selection;
-        changed = true;
-      }
-    }
+    const mayAutoSelect = !next[data.name] && !manualSelectionNames.includes(data.name);
+    if (mayAutoSelect && autoSelectFirstReady(data, next)) changed = true;
   }
 
   return changed ? next : null;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { FACTORY_SIDE_HANDLE_ID, factoryRunLeafEdgeKey, layoutFactoryRunLeafGraph } from "./factoryRunLeafLayout";
 
 function expectNoOverlaps(positions: Map<string, { x: number; y: number }>, width = 280, height = 104, gap = 8) {

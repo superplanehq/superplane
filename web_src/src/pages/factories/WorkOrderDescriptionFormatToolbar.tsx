@@ -10,14 +10,17 @@ import {
   Italic,
   Link as LinkIcon,
   List,
+  Paperclip,
   Quote,
   SquareCode,
   Strikethrough,
   Underline,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { hrefFromInput } from "./lib/workOrderDescriptionHref";
+import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 
@@ -32,9 +35,14 @@ const HEADING_OPTIONS: Array<{ level: HeadingLevel | 0; label: string }> = [
 interface WorkOrderDescriptionFormatToolbarProps {
   editor: Editor;
   disabled: boolean;
+  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 }
 
-export function WorkOrderDescriptionFormatToolbar({ editor, disabled }: WorkOrderDescriptionFormatToolbarProps) {
+export function WorkOrderDescriptionFormatToolbar({
+  editor,
+  disabled,
+  onUploadFiles,
+}: WorkOrderDescriptionFormatToolbarProps) {
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkHref, setLinkHref] = useState("");
@@ -99,6 +107,7 @@ export function WorkOrderDescriptionFormatToolbar({ editor, disabled }: WorkOrde
           setLinkHref(editor.getAttributes("link").href ?? "");
           setLinkOpen((current) => !current);
         }}
+        onUploadFiles={onUploadFiles}
       />
       {linkOpen ? <LinkField href={linkHref} onHrefChange={setLinkHref} onApply={applyLink} /> : null}
     </div>
@@ -115,6 +124,7 @@ function FormatToolbarActions({
   onOpenChangeHeadingMenu,
   onSelectHeading,
   onToggleLink,
+  onUploadFiles,
 }: {
   editor: Editor;
   disabled: boolean;
@@ -136,6 +146,7 @@ function FormatToolbarActions({
   onOpenChangeHeadingMenu: (open: boolean) => void;
   onSelectHeading: (level: HeadingLevel | 0) => void;
   onToggleLink: () => void;
+  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 }) {
   return (
     <div className="flex items-center gap-0.5 p-0.5">
@@ -218,7 +229,43 @@ function FormatToolbarActions({
       <FormatButton label="Link" disabled={disabled} pressed={format.link || linkOpen} onActivate={onToggleLink}>
         <LinkIcon className="size-3.5" aria-hidden />
       </FormatButton>
+      {onUploadFiles ? <AttachFileButton disabled={disabled} editor={editor} onUploadFiles={onUploadFiles} /> : null}
     </div>
+  );
+}
+
+function AttachFileButton({
+  disabled,
+  editor,
+  onUploadFiles,
+}: {
+  disabled: boolean;
+  editor: Editor;
+  onUploadFiles: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <>
+      <FormatButton label="Attach file" disabled={disabled} onActivate={() => inputRef.current?.click()}>
+        <Paperclip className="size-3.5" aria-hidden />
+      </FormatButton>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        multiple
+        accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/markdown,.png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.md"
+        data-testid="work-order-description-file-input"
+        onChange={(event) => {
+          const files = event.target.files;
+          if (!files || files.length === 0) {
+            return;
+          }
+          void onUploadFiles(files).then((uploaded) => insertUploadedFiles(editor, uploaded));
+          event.target.value = "";
+        }}
+      />
+    </>
   );
 }
 

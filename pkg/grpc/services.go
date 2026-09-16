@@ -14,6 +14,7 @@ import (
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -41,6 +42,7 @@ type Services struct {
 	Canvases      pbCanvases.CanvasesServer
 	CanvasFolders pbCanvasFolders.CanvasFoldersServer
 	Factories     pbFactories.FactoriesServer
+	Files         pbFiles.FilesServer
 	APIKeys       pbAPIKeys.ApiKeysServer
 	Agents        pbAgents.AgentsServer
 }
@@ -97,6 +99,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.WebhooksBaseURL,
 			cfg.UsageService,
 		),
+		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),
 		Agents:  NewAgentsService(cfg.AgentService),
 	}, nil

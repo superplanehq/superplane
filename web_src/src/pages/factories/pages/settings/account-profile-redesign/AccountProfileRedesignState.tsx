@@ -110,7 +110,8 @@ function useAccountProfileRedesign() {
 }
 
 export function AccountProfileRedesignRoutePage() {
-  const { profile, setName, setEmail, saveName } = useAccountProfileRedesign();
+  const { profile, setName, setEmail, saveName, changePassword, connectSso, disconnectSso, createToken, revokeToken } =
+    useAccountProfileRedesign();
   return (
     <AccountProfileRedesignPage
       name={profile.name}
@@ -122,10 +123,22 @@ export function AccountProfileRedesignRoutePage() {
           account.identity && account.email ? [{ provider: account.provider, email: account.email }] : [],
         ),
       })}
-      userId={profile.userId}
       onNameChange={setName}
       onEmailChange={setEmail}
       onSave={saveName}
+      security={
+        <AccountSecurityRedesignPage
+          passwordSet={profile.passwordSet}
+          tokens={profile.tokens}
+          ssoAccounts={profile.ssoAccounts}
+          embedded
+          onChangePassword={changePassword}
+          onConnectSso={connectSso}
+          onDisconnectSso={disconnectSso}
+          onCreateToken={createToken}
+          onRevokeToken={revokeToken}
+        />
+      }
     />
   );
 }

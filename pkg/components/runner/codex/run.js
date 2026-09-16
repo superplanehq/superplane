@@ -12,6 +12,162 @@ const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
 
+const SESSION_FILE = "codex_session";
+
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
+
+function loadAnalysisProtocolModule() {
+  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol() {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+}
+
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt) {
+  if (!planningAnalysisEnabled()) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
+
+function envFlag(env, name) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function planningEnabled(env = process.env) {
+  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
+}
+
+// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
+// --sandbox flag. Config overrides keep both new and resumed analysis turns
+// read-only without disabling shell commands and file reads.
+function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
+  const args = ["exec"];
+  if (sessionID) {
+    args.push("resume", sessionID);
+  }
+  args.push("--json", "--skip-git-repo-check");
+  if (planningEnabled(env)) {
+    args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
+    args.push(...mcpConfigOverrides(mcpScriptPath));
+    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
+  } else {
+    args.push("--dangerously-bypass-approvals-and-sandbox");
+  }
+  if (model) {
+    args.push("-m", model);
+  }
+  return args;
+}
+
+function readSessionID(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (!fs.existsSync(file)) {
+    return "";
+  }
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function writeSessionID(taskDir, sessionID) {
+  const id = String(sessionID || "").trim();
+  if (id) {
+    fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
+  }
+}
+
+function codexSessionForPrompt(promptCount, sessionID) {
+  if (Number(promptCount) < 1) {
+    return "";
+  }
+  const id = String(sessionID || "").trim();
+  if (!id) {
+    throw new Error("Codex session ID is missing for a follow-up prompt");
+  }
+  return id;
+}
+
+function codexSessionIDFromEvent(event) {
+  return String((event && (event.thread_id || (event.thread && event.thread.id))) || "").trim();
+}
+
+function mcpConfigOverrides(mcpScriptPath) {
+  return [
+    "-c",
+    `mcp_servers.superplane.command=${tomlString("node")}`,
+    "-c",
+    `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+  ];
+}
+
+function tomlString(value) {
+  return `"${String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")}"`;
+}
+
+function tomlStringArray(values) {
+  return `[${values.map(tomlString).join(", ")}]`;
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -36,13 +192,22 @@ async function runPrompt(promptFile, model) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  const prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  if (planningAnalysisEnabled()) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
-  const codexArgs = ["exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"];
-  if (model) {
-    codexArgs.push("-m", model);
+  const startedAt = Date.now();
+  const planning = planningEnabled();
+  const activity = loadActivityStreamModule().createActivityStream({ provider: "codex", turn: promptCount + 1 });
+  activity.start();
+  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
+  if (planning) {
+    process.stdout.write("Planning session tools enabled\n");
+    process.stdout.write("sandbox: read-only\n");
   }
   if (promptCount > 0) {
     process.stdout.write("Continuing Codex session in the current directory\n");
@@ -53,7 +218,8 @@ async function runPrompt(promptFile, model) {
   child.stderr.pipe(process.stderr);
 
   let lastResult = {};
-  const formatter = createCodexFormatter();
+  const telemetry = loadTurnTelemetry();
+  const formatter = createCodexFormatter(telemetry, activity);
   const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
   rl.on("line", (raw) => {
     const line = raw.trim();
@@ -63,6 +229,10 @@ async function runPrompt(promptFile, model) {
     try {
       const event = JSON.parse(line);
       if (event && typeof event === "object") {
+        const nextSessionID = codexSessionIDFromEvent(event);
+        if (nextSessionID) {
+          writeSessionID(sp, nextSessionID);
+        }
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
         }
@@ -88,17 +258,58 @@ async function runPrompt(promptFile, model) {
   ]).then(([code]) => code);
 
   formatter.flush(exitCode !== 0);
+  activity.end(exitCode === 0 ? "passed" : "failed");
+  await activity.flush();
   const usage = extractUsage(lastResult);
+  if (tokenTotal(usage) > 0) {
+    telemetry.updateCurrentUsage(usage);
+  }
   const payload = {
     type: "result",
-    result: lastResult.result || lastResult.text || "",
+    result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: lastResult.model || model,
     usage,
   };
+  telemetry.attachToResult(payload);
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(payload.result);
+  }
+  formatTurnResult({
+    is_error: exitCode !== 0,
+    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    duration_ms: Date.now() - startedAt,
+  });
   return exitCode;
+}
+
+function tokenTotal(usage) {
+  if (!usage || typeof usage !== "object") {
+    return 0;
+  }
+  return (
+    Number(usage.input_tokens || 0) +
+    Number(usage.output_tokens || 0) +
+    Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.reasoning_tokens || 0)
+  );
+}
+
+function loadTurnTelemetry() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const candidates = [];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "turn_telemetry.js"));
+  }
+  candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file).createTurnTelemetry();
+    }
+  }
+  return require("../turn_telemetry").createTurnTelemetry();
 }
 
 function extractUsage(event) {
@@ -127,10 +338,17 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(rec)}\n`);
 }
 
-function createCodexFormatter() {
+function createCodexFormatter(telemetry, activityOverride) {
+  const tracker = telemetry || loadTurnTelemetry();
+  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "codex" });
   const open = new Map();
   const anonQueue = [];
+  const contentText = new Map();
+  const anonymousContent = new Map();
   let anonSeq = 0;
+  let contentSeq = 0;
+  let roundOpen = false;
+  let lastText = "";
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -150,6 +368,32 @@ function createCodexFormatter() {
     return anonQueue.shift() || "";
   }
 
+  function contentID(item, type, creating) {
+    const id = item && item.id != null ? String(item.id).trim() : "";
+    if (id) {
+      return id;
+    }
+    const queue = anonymousContent.get(type) || [];
+    if (creating) {
+      const generated = `${type}-${contentSeq}`;
+      contentSeq += 1;
+      queue.push(generated);
+      anonymousContent.set(type, queue);
+      return generated;
+    }
+    return queue.shift() || `${type}-${contentSeq++}`;
+  }
+
+  function appendContentDelta(contentKind, id, text) {
+    if (typeof text !== "string" || !text) {
+      return;
+    }
+    const previous = contentText.get(id) || "";
+    const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
+    activity.appendContent(contentKind, id, delta);
+    contentText.set(id, text);
+  }
+
   function rememberTool(item) {
     const id = itemID(item, true);
     if (open.has(id)) {
@@ -161,6 +405,12 @@ function createCodexFormatter() {
       startedAt: Date.now(),
       emitted: false,
     });
+    activity.startTool({
+      id,
+      kind: normalizeCodexToolKind(item),
+      name: String(item.name || item.type || "tool"),
+      input: toolTextForItem(item),
+    });
     return id;
   }
 
@@ -170,13 +420,15 @@ function createCodexFormatter() {
       return;
     }
     tracked.emitted = true;
-    writeLiveLogRecord({
-      type: "tool_start",
-      id,
-      kind: tracked.kind,
-      text: tracked.text,
-      started_at: tracked.startedAt,
-    });
+    writeLiveLogRecord(
+      tracker.stampToolStart({
+        type: "tool_start",
+        id,
+        kind: tracked.kind,
+        text: tracked.text,
+        started_at: tracked.startedAt,
+      }),
+    );
   }
 
   function completeTool(item) {
@@ -187,7 +439,11 @@ function createCodexFormatter() {
     emitStart(id);
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
-      process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+      if (activity.enabled) {
+        activity.appendToolOutput(id, output.replace(/\s+$/, ""), toolFailed(item) ? "stderr" : "stdout");
+      } else {
+        process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+      }
     }
     const tracked = open.get(id) || { kind: normalizeCodexToolKind(item), startedAt: Date.now() };
     open.delete(id);
@@ -195,12 +451,19 @@ function createCodexFormatter() {
     if (anonIndex >= 0) {
       anonQueue.splice(anonIndex, 1);
     }
-    writeLiveLogRecord({
-      type: "tool_end",
-      id,
-      kind: tracked.kind,
-      status: toolFailed(item) ? "failed" : "passed",
-      duration_ms: Math.max(0, Date.now() - tracked.startedAt),
+    writeLiveLogRecord(
+      tracker.stampToolEnd({
+        type: "tool_end",
+        id,
+        kind: tracked.kind,
+        status: toolFailed(item) ? "failed" : "passed",
+        duration_ms: Math.max(0, Date.now() - tracked.startedAt),
+      }),
+    );
+    activity.endTool(id, {
+      status: codexToolStatus(item),
+      exitCode: item.exit_code,
+      signal: item.signal,
     });
   }
 
@@ -212,10 +475,31 @@ function createCodexFormatter() {
       }
       const type = itemType(item);
       if (isMessageItem(type)) {
+        const contentKind = type === "reasoning" ? "reasoning" : "assistant";
+        const id = contentID(item, type, event.type === "item.started");
+        if (event.type === "item.started") {
+          activity.startContent(contentKind, id);
+          const initialText = item.text || item.result || "";
+          appendContentDelta(contentKind, id, initialText);
+          return;
+        }
         if (event.type === "item.completed") {
           const text = item.text || item.result || "";
+          if (!roundOpen) {
+            tracker.beginTurn(item.usage || event.usage, {
+              message: typeof text === "string" && type !== "reasoning" ? text : undefined,
+            });
+          }
+          roundOpen = false;
+          activity.startContent(contentKind, id);
+          appendContentDelta(contentKind, id, text);
+          activity.endContent(id);
+          contentText.delete(id);
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
-            process.stdout.write(`${text.replace(/\s+$/, "")}\n`);
+            lastText = text.replace(/\s+$/, "");
+            if (!activity.enabled) {
+              process.stdout.write(`${lastText}\n`);
+            }
           }
         }
         return;
@@ -224,10 +508,19 @@ function createCodexFormatter() {
         return;
       }
       if (event.type === "item.started") {
-        rememberTool(item);
+        if (!roundOpen) {
+          tracker.beginTurn(item.usage || event.usage);
+          roundOpen = true;
+        }
+        const id = rememberTool(item);
+        emitStart(id);
         return;
       }
       if (event.type === "item.completed") {
+        if (!roundOpen) {
+          tracker.beginTurn(item.usage || event.usage);
+          roundOpen = true;
+        }
         completeTool(item);
       }
     },
@@ -238,15 +531,21 @@ function createCodexFormatter() {
         if (!tracked) {
           continue;
         }
-        writeLiveLogRecord({
-          type: "tool_end",
-          id,
-          kind: tracked.kind,
-          status: failed ? "failed" : "passed",
-          duration_ms: Math.max(0, Date.now() - tracked.startedAt),
-        });
+        writeLiveLogRecord(
+          tracker.stampToolEnd({
+            type: "tool_end",
+            id,
+            kind: tracked.kind,
+            status: failed ? "failed" : "passed",
+            duration_ms: Math.max(0, Date.now() - tracked.startedAt),
+          }),
+        );
+        activity.endTool(id, { status: failed ? "failed" : "interrupted" });
         open.delete(id);
       }
+    },
+    lastText() {
+      return lastText;
     },
   };
 }
@@ -308,8 +607,8 @@ function toolTextForItem(item) {
   }
   if (type === "file_change") {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const pathValue = changes.map((change) => change && change.path).find(Boolean);
-    return String(pathValue || item.path || "file");
+    const paths = changes.map((change) => change && change.path).filter(Boolean);
+    return paths.length > 0 ? paths.map(String).join("\n") : String(item.path || "file");
   }
   return String(item.command || item.path || item.query || item.name || type || "tool");
 }
@@ -326,8 +625,36 @@ function toolFailed(item) {
   return Number.isFinite(exit) && exit !== 0;
 }
 
+function codexToolStatus(item) {
+  const status = String((item && item.status) || "").toLowerCase();
+  if (status === "cancelled" || status === "canceled") return "cancelled";
+  if (status === "timed_out" || status === "timeout") return "timed_out";
+  if (status === "interrupted") return "interrupted";
+  return toolFailed(item) ? "failed" : "passed";
+}
+
+function formatTurnResult(event) {
+  const isError = Boolean(event && event.is_error);
+  const status = isError ? "failed" : "done";
+  const parts = [isError ? `✗ ${status}` : `✓ ${status}`];
+  if (event && event.num_turns != null) {
+    parts.push(`${event.num_turns} turns`);
+  }
+  if (event && event.total_cost_usd != null) {
+    const cost = Number(event.total_cost_usd);
+    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+  }
+  if (event && event.duration_ms != null) {
+    const ms = Number(event.duration_ms);
+    if (Number.isFinite(ms)) {
+      parts.push(`${(ms / 1000).toFixed(1)}s`);
+    }
+  }
+  process.stdout.write(`${parts.join(" · ")}\n`);
+}
+
 function formatCodexJsonLines(rawLines) {
-  const formatter = createCodexFormatter();
+  const formatter = createCodexFormatter(loadTurnTelemetry());
   for (const line of rawLines) {
     const trimmed = String(line).trim();
     if (!trimmed) {
@@ -346,4 +673,15 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { formatCodexJsonLines, createCodexFormatter, normalizeCodexToolKind };
+module.exports = {
+  formatCodexJsonLines,
+  formatTurnResult,
+  createCodexFormatter,
+  normalizeCodexToolKind,
+  codexExecArgs,
+  codexSessionForPrompt,
+  codexSessionIDFromEvent,
+  planningEnabled,
+  planningSystemPrompt,
+  planningAnalysisEnabled,
+};

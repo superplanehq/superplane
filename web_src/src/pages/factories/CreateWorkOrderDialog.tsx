@@ -1,12 +1,17 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
@@ -14,15 +19,54 @@ import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 interface CreateWorkOrderDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }
 
 export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
-  if (!open) {
+  const { organizationId } = useFactoriesLayout();
+  const features = useExperimentalFeature(organizationId);
+
+  if (!open || features.isLoading) {
     return null;
   }
 
+  if (features.has(FEATURE_FACTORY_CREATE_WITH_AGENT)) {
+    return <CreateWorkOrderRequestSession onClose={onClose} onCreated={onCreated} />;
+  }
+
   return <CreateWorkOrderDialogSession onClose={onClose} onCreated={onCreated} />;
+}
+
+function CreateWorkOrderRequestSession({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
+}) {
+  const { organizationId, factoryId } = useFactoriesLayout();
+  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
+
+  return (
+    <CreateWorkOrderRequestDialog
+      open
+      description={composer.description}
+      maxLength={composer.maxDescriptionLength}
+      isCreating={composer.isCreating}
+      isUploading={fileUpload.isUploading}
+      onClose={() => {
+        if (!composer.isCreating && !fileUpload.isUploading) {
+          onClose();
+        }
+      }}
+      onDescriptionChange={composer.updateDescription}
+      onCreate={(draft) => {
+        void composer.handleCreate(draft);
+      }}
+      onUploadFiles={fileUpload.uploadFiles}
+    />
+  );
 }
 
 function CreateWorkOrderDialogSession({
@@ -30,10 +74,11 @@ function CreateWorkOrderDialogSession({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (orderNumber: string) => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -92,8 +137,10 @@ function CreateWorkOrderDialogSession({
             <WorkOrderDescriptionEditor
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
-              disabled={composer.isCreating}
+              disabled={composer.isCreating || fileUpload.isUploading}
               onChange={composer.updateDescription}
+              onUploadFiles={fileUpload.uploadFiles}
+              isUploading={fileUpload.isUploading}
             />
           </div>
         </div>

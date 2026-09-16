@@ -1,9 +1,10 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
@@ -16,7 +17,12 @@ import { canvasKeyForAutomation } from "./splitRunCanvases";
 
 export const CREATED_MANUALLY = "Created manually";
 
-export type SplitRunIntakeKind = "github-issues" | "sentry-exceptions" | "pagerduty-incidents" | "slack";
+export type SplitRunIntakeKind =
+  | "github-issues"
+  | "sentry-exceptions"
+  | "pagerduty-incidents"
+  | "productive-tasks"
+  | "slack";
 
 export type SplitRunSource =
   | {
@@ -43,8 +49,17 @@ const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: s
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
+  "productive-tasks": { name: "Productive.io tasks", iconSrc: productiveIcon, iconAlt: "Productive.io" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
+
+// Sources an intake app or a ticket link can be recognized by, before the
+// GitHub default applies. GitHub itself needs no hint: its intake app is named
+// after its issues, and its links carry no other marker.
+const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
+  { pattern: /productive/i, kind: "productive-tasks" },
+  { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
+];
 
 export function sourceTicketLabel(url: string): string {
   const parsed = parseUrl(url);
@@ -55,8 +70,13 @@ export function sourceTicketLabel(url: string): string {
   if (github) {
     return github;
   }
-  const org = parsed.hostname.split(".")[0] ?? parsed.hostname;
   const id = hostTicketId(parsed);
+  // Productive.io links carry the organization id where other hosts carry a
+  // name. A number says nothing to a reader, so the task id stands alone.
+  if (parsed.hostname.endsWith("productive.io")) {
+    return id ? `#${id}` : parsed.hostname;
+  }
+  const org = parsed.hostname.split(".")[0] ?? parsed.hostname;
   if (id) {
     return `${org}#${id}`;
   }
@@ -67,7 +87,7 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
   return intakeSourceFromHref(href, intakeKind);
 }
 
-export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSource {
+export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSource {
   const originHref = order.origin?.url?.trim();
   if (originHref) {
     return intakeSourceFromHref(
@@ -89,7 +109,7 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSourc
 
   return {
     kind: "manual",
-    person: sourcePerson(order),
+    person: sourcePerson(order, resolveUser),
     detail: CREATED_MANUALLY,
   };
 }
@@ -124,10 +144,11 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   if (key === "slack") {
     return "slack";
   }
-  if (/pagerduty/i.test(`${automation.appId ?? ""} ${automation.appName ?? ""}`)) {
-    return "pagerduty-incidents";
-  }
-  return "github-issues";
+  return intakeKindFromLabel(`${automation.appId ?? ""} ${automation.appName ?? ""}`);
+}
+
+function intakeKindFromLabel(label: string): SplitRunIntakeKind {
+  return INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind ?? "github-issues";
 }
 
 function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunSource {
@@ -142,19 +163,22 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host.includes("sentry.io")) {
     return "sentry-exceptions";
   }
-  if (host.includes("pagerduty.com")) {
-    return "pagerduty-incidents";
-  }
   if (host.includes("slack.com")) {
     return "slack";
   }
-  return "github-issues";
+  return intakeKindFromLabel(host);
 }
 
-function sourcePerson(order: FactoriesWorkOrder): OrgUserDisplay {
+function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const user = order.createdBy?.user;
   if (!user?.id && !user?.name) {
     return SOURCE_PERSON_FALLBACK;
+  }
+  // `resolveUser` looks the source up against the org members list, which
+  // carries the avatar image. Without it we can only show initials.
+  const resolved = resolveUser?.(user.id, user.name);
+  if (resolved) {
+    return resolved;
   }
   const name = user.name?.trim() || SOURCE_PERSON_FALLBACK.name;
   return {

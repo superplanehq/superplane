@@ -45,8 +45,8 @@ type secretProvidingIntegration struct {
 	panickingIntegration
 }
 
-func (p *secretProvidingIntegration) ResolveSecrets(_ core.IntegrationSecretContext) (map[string][]byte, error) {
-	return map[string][]byte{"TOKEN": []byte("value")}, nil
+func (p *secretProvidingIntegration) ResolveSecrets(_ core.IntegrationSecretContext) (core.IntegrationSecrets, error) {
+	return core.IntegrationSecrets{Values: map[string][]byte{"TOKEN": []byte("value")}}, nil
 }
 
 func TestUnwrapIntegration_UnwrapsPanicableIntegration(t *testing.T) {
@@ -63,7 +63,7 @@ func TestUnwrapIntegration_UnwrapsPanicableIntegration(t *testing.T) {
 
 	secrets, err := unwrapped.ResolveSecrets(core.IntegrationSecretContext{})
 	require.NoError(t, err)
-	assert.Equal(t, []byte("value"), secrets["TOKEN"])
+	assert.Equal(t, []byte("value"), secrets.Values["TOKEN"])
 }
 
 func TestPanicableIntegration_Sync_CatchesPanic(t *testing.T) {

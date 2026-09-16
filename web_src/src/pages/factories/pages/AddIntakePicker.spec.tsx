@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { AddIntakePicker } from "./AddIntakePicker";
 import { ADD_INTAKE_TEMPLATES } from "./lineIntakeModel";
@@ -20,7 +20,7 @@ describe("AddIntakePicker", () => {
     expect(within(picker).getByTestId("add-intake-template-improve-ci-runtime")).toHaveTextContent(
       "Improve CI runtime",
     );
-    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(6);
+    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(7);
   });
 
   it("filters templates from the search field", async () => {

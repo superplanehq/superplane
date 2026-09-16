@@ -8,7 +8,8 @@ import (
 )
 
 // FactoryResourceCleaner hard-deletes factory-owned rows in FK-safe order
-// after all factory canvases are gone. Each Run deletes at most limit rows
+// after all factory canvases are gone. File objects are deleted by the
+// cleanup worker before Run. Each Run deletes at most limit rows
 // total so large factories finish across ticks without long transactions.
 type FactoryResourceCleaner struct {
 	tx      *gorm.DB
@@ -206,7 +207,7 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 }
 
 func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
-	var executions, dispatches, orders, lines, intakes, handlers, pullRequests int64
+	var executions, dispatches, orders, lines, intakes, handlers, pullRequests, files int64
 	if err := c.tx.Model(&FactoryWorkOrderExecution{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&executions).Error; err != nil {
 		return false, err
 	}
@@ -228,7 +229,10 @@ func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
 	if err := c.tx.Model(&FactoryPullRequest{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&pullRequests).Error; err != nil {
 		return false, err
 	}
-	return executions == 0 && dispatches == 0 && orders == 0 && lines == 0 && intakes == 0 && handlers == 0 && pullRequests == 0, nil
+	if err := c.tx.Model(&File{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&files).Error; err != nil {
+		return false, err
+	}
+	return executions == 0 && dispatches == 0 && orders == 0 && lines == 0 && intakes == 0 && handlers == 0 && pullRequests == 0 && files == 0, nil
 }
 
 func deleteFactoryAssigneesLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) (int64, error) {
@@ -358,6 +362,13 @@ func deleteOrphanFactoryWorkOrdersLimited(tx *gorm.DB, factoryID uuid.UUID, limi
 			NOT EXISTS (
 				SELECT 1 FROM factory_pull_requests
 				WHERE factory_pull_requests.work_order_id = factory_work_orders.id
+			)`).
+		// File objects are deleted by the cleanup worker. Leave the order
+		// until those rows are gone so the FK does not fail.
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM files
+				WHERE files.work_order_id = factory_work_orders.id
 			)`).
 		Limit(limit)
 

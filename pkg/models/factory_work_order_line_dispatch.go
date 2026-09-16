@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,9 +44,12 @@ type FactoryWorkOrderLineDispatch struct {
 	Steps          datatypes.JSONSlice[FactoryLineStep]
 	State          string
 	Result         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	FinishedAt     *time.Time
+	// Model is the optional Start override for this traversal. Empty means
+	// Auto: each runner keeps the model stored on the live canvas.
+	Model      string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	FinishedAt *time.Time
 }
 
 func (FactoryWorkOrderLineDispatch) TableName() string {
@@ -70,8 +74,14 @@ func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWo
 
 // DispatchFrom creates a line dispatch and starts (or queues) the step at
 // startIndex. Rerun from the start uses 0. Rerun this step uses the
-// current step.
+// current step. The model stays Auto.
 func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIndex int) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+	return l.DispatchFromWithModel(tx, order, startIndex, "")
+}
+
+// DispatchFromWithModel is DispatchFrom with an optional Start model
+// override. Empty model means Auto.
+func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
 	}
@@ -90,6 +100,7 @@ func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIn
 		Steps:          l.Steps,
 		State:          FactoryWorkOrderLineDispatchStateActive,
 		Result:         "",
+		Model:          strings.TrimSpace(model),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

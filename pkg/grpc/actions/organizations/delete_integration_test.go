@@ -195,6 +195,39 @@ func Test__DeleteIntegration(t *testing.T) {
 		assert.Contains(t, msg, "integration not found")
 	})
 
+	t.Run("delete refuses when a workspace still uses the integration", func(t *testing.T) {
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value"})
+		require.NoError(t, err)
+		installResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
+		require.NoError(t, err)
+		integrationID := installResponse.Integration.Metadata.Id
+
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			VCSIntegrationID: &integrationID,
+		}))
+
+		_, err = DeleteIntegration(ctx, r.Organization.ID.String(), integrationID)
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, msg, "still used by a workspace")
+
+		integration, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(integrationID))
+		require.NoError(t, err)
+		assert.False(t, integration.DeletedAt.Valid)
+	})
+
 	t.Run("delete modifies integration name to prevent name conflicts -> success", func(t *testing.T) {
 		//
 		// Register a test integration

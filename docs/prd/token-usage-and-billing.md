@@ -104,9 +104,11 @@ SaaS runner minutes (`RunnerTaskFinishedMessage`, org **Usage** plan limits)
 stay separate. SuperPlane still publishes that message. It is not the factory
 spend ledger. `SetRunnerMinutesLimitChecker` is not a factory VM billing gate.
 
-Hosted billed spend is `SUM(cost_micros) WHERE funding_source = hosted AND
-usage_kind = model`. Compute does not debit the `organization_llm_*` wallet
-in this phase. Markup and `PrepareHostedRun` stay LLM-only.
+Hosted billed spend is `SUM(cost_micros) WHERE funding_source = hosted`.
+Compute and managed model usage both debit the `organization_llm_*` wallet.
+Compute uses published machine rates and does not apply markup.
+`PrepareHostedRun` and hosted runner starts hard-stop when remaining credit
+is empty or the organization is not on an open trial or active Business plan.
 
 ## Phases
 
@@ -146,7 +148,8 @@ selected-model gate, because hosted spend debits the wallet.
 Rates live in `usage_price_books` / `usage_price_book_rates`. The process loads
 the latest book at start. Compute rows for SuperPlane runner fleets write
 `cost_micros` from `micros_per_second`. Fleet `local` is always 0. Compute
-does not debit the hosted credit wallet and does not use markup.
+debits the hosted credit wallet at the published machine rate. Markup does
+not apply to compute.
 
 ### Phase 5 — Polar prepaid checkout
 
@@ -157,7 +160,7 @@ this phase.
 - One Polar customer per organization (`external_id` = org UUID).
 - Prepaid one-time credit packs ($25 / $100 / $500) discovered by product
   metadata `superplane_credit_pack=true`.
-- `order.paid` inserts an `organization_llm_credit_grants` row of kind `polar`.
+- `order.paid` inserts an `organization_llm_credit_grants` row of kind `topup`.
   Wallet credit equals pack face value. Tax is extra on the Polar invoice.
 - Org Workspace usage shows **Add hosted credit** and **Manage invoices** when Polar
   is configured. Hide those actions when Polar env is empty (self-hosted).

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { SuperplaneUsersUser } from "@/api-client";
 import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
@@ -56,7 +56,7 @@ describe("WorkOrderAssigneesPopover", () => {
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith(["alice"]));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(["alice"]));
   });
 
   it("supports unassigning everyone", async () => {
@@ -75,7 +75,7 @@ describe("WorkOrderAssigneesPopover", () => {
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith([]));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith([]));
   });
 
   it("does not call onSave when closing without any actual change", async () => {
@@ -96,7 +96,7 @@ describe("WorkOrderAssigneesPopover", () => {
 
     fireEvent.click(screen.getByTestId("work-order-save-assignees"));
 
-    await vi.waitFor(() => expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("work-order-save-assignees")).not.toBeInTheDocument());
     expect(onSave).not.toHaveBeenCalled();
   });
 

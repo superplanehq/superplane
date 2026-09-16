@@ -2,9 +2,9 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationCard } from "./automationsPageParts";
@@ -52,7 +52,7 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   }),
 }));
 
-const app: FactoryApp = {
+const app: FactoryAutomation = {
   id: "app-refund-planner",
   name: "Refund Planner",
   description: "Plans reconciliation work across ledger + payment services.",

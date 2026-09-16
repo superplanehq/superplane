@@ -1,0 +1,417 @@
+package public
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	minPlanningHoldSeconds   = 1
+	maxPlanningHoldSeconds   = 60
+	maxPlanningActivityBytes = 256 * 1024
+)
+
+type planningSurveyRequest struct {
+	Questions []models.PlanningSessionSurveyQuestion `json:"questions"`
+}
+
+type planningSpecRequest struct {
+	Body string `json:"body"`
+}
+
+type planningConfidenceRequest struct {
+	Score   float64 `json:"score"`
+	Summary string  `json:"summary"`
+}
+
+type planningAgentMessageRequest struct {
+	Text       string `json:"text"`
+	ActivityID string `json:"activity_id"`
+}
+
+func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	activityID, err := uuid.Parse(mux.Vars(r)["activity_id"])
+	if err != nil {
+		http.Error(w, "Invalid activity ID", http.StatusBadRequest)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPlanningActivityBytes)
+	var snapshot models.PlanningSessionActivitySnapshot
+	if err := json.NewDecoder(r.Body).Decode(&snapshot); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if snapshot.ActivityID != activityID.String() || snapshot.SchemaVersion != 2 || snapshot.Turn < 1 || snapshot.Sequence < 1 || snapshot.StartedAt < 1 {
+		http.Error(w, "Invalid activity snapshot", http.StatusBadRequest)
+		return
+	}
+	if !validPlanningActivityStatus(snapshot.Status) {
+		http.Error(w, "Invalid activity status", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	startedAt := time.UnixMilli(snapshot.StartedAt)
+	var completedAt *time.Time
+	if snapshot.CompletedAt != nil {
+		value := time.UnixMilli(*snapshot.CompletedAt)
+		completedAt = &value
+	}
+	now := time.Now()
+	activity := models.PlanningSessionActivity{
+		ID:            activityID,
+		SessionID:     session.ID,
+		SchemaVersion: snapshot.SchemaVersion,
+		Provider:      strings.TrimSpace(snapshot.Provider),
+		Status:        snapshot.Status,
+		LastSequence:  snapshot.Sequence,
+		Snapshot:      datatypes.NewJSONType(snapshot),
+		StartedAt:     startedAt,
+		CompletedAt:   completedAt,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if activity.Provider == "" {
+		http.Error(w, "Invalid activity provider", http.StatusBadRequest)
+		return
+	}
+	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
+}
+
+func validPlanningActivityStatus(status string) bool {
+	return slices.Contains([]string{
+		models.PlanningSessionActivityStatusRunning,
+		models.PlanningSessionActivityStatusPassed,
+		models.PlanningSessionActivityStatusFailed,
+		models.PlanningSessionActivityStatusCancelled,
+		models.PlanningSessionActivityStatusTimedOut,
+		models.PlanningSessionActivityStatusInterrupted,
+	}, status)
+}
+
+func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *http.Request) (*runneraction.PlanningSessionScope, bool) {
+	token := bearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil, false
+	}
+	scope, err := runneraction.ParsePlanningSessionToken(s.jwt, token)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil, false
+	}
+	return scope, true
+}
+
+func (s *Server) loadPlanningSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
+	db := database.DB(r.Context())
+	session, err := models.FindPlanningSession(db, scope.OrganizationID, scope.FactoryID, scope.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.CanvasRunID == nil || *session.CanvasRunID != scope.CanvasRunID {
+		return nil, models.ErrFactoryPlanningSessionNotFound
+	}
+	return session, nil
+}
+
+func (s *Server) loadAnalysisPlanningSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
+	session, err := s.loadPlanningSessionForRunner(r, scope)
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsAnalysisSession() {
+		return nil, models.ErrFactoryPlanningSessionInvalid
+	}
+	return session, nil
+}
+
+func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	hold := clampPlanningHoldSeconds(r.URL.Query().Get("hold_seconds"))
+	deadline := time.Now().Add(time.Duration(hold) * time.Second)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		if r.Context().Err() != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		}
+		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+		if err != nil {
+			writeRunnerPlanningError(w, err)
+			return
+		}
+		if session.State == models.PlanningSessionStateEnded {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "ended"})
+			return
+		}
+		if session.WaitState == models.PlanningWaitResolved {
+			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
+			if err != nil {
+				writeRunnerPlanningError(w, err)
+				return
+			}
+			if consumed {
+				if r.Context().Err() != nil {
+					restorePlanningWait(session, result)
+					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+					return
+				}
+				text, err := mintPlanningWaitText(r.Context(), session, result)
+				if err != nil {
+					restorePlanningWait(session, result)
+					writeRunnerPlanningError(w, err)
+					return
+				}
+				if err := writeJSON(w, http.StatusOK, map[string]any{
+					"status":         result.Kind,
+					"text":           text,
+					"work_order_id":  result.WorkOrderID,
+					"work_order_key": result.WorkOrderKey,
+				}); err != nil {
+					restorePlanningWait(session, result)
+				}
+				return
+			}
+		}
+		if err := session.BeginWait(database.DB(r.Context())); err != nil {
+			writeRunnerPlanningError(w, err)
+			return
+		}
+		if !time.Now().Before(deadline) {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		}
+		select {
+		case <-r.Context().Done():
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningSpecRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.ProposeSpec(database.DB(r.Context()), req.Body); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningConfidenceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.ProposeConfidence(database.DB(r.Context()), req.Score, req.Summary); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningSurveyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	if err := session.ProposeSurvey(database.DB(r.Context()), models.PlanningSessionSurvey{
+		Questions: req.Questions,
+	}); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningAgentMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	activityID := uuid.Nil
+	if strings.TrimSpace(req.ActivityID) != "" {
+		activityID, err = uuid.Parse(req.ActivityID)
+		if err != nil {
+			http.Error(w, "Invalid activity ID", http.StatusBadRequest)
+			return
+		}
+	}
+	if err := session.RecordAgentMessageForActivity(database.DB(r.Context()), req.Text, activityID); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {
+	if result.Kind != models.PlanningWaitKindMessage {
+		return result.Text, nil
+	}
+	if session.DraftWorkOrderID == nil {
+		return result.Text, nil
+	}
+	if len(blob.FileIDsInMarkdown(result.Text)) == 0 {
+		return result.Text, nil
+	}
+	rewritten, _, err := storedfiles.DescriptionForDispatch(
+		ctx,
+		database.DB(ctx),
+		blob.Current(),
+		session.OrganizationID,
+		session.FactoryID,
+		*session.DraftWorkOrderID,
+		result.Text,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return "", err
+	}
+	return rewritten, nil
+}
+
+func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {
+	result, err := session.ConsumeWait(tx)
+	if errors.Is(err, models.ErrFactoryPlanningWaitIdle) {
+		return models.PlanningWaitResult{}, false, nil
+	}
+	if err != nil {
+		return models.PlanningWaitResult{}, false, err
+	}
+	return result, true, nil
+}
+
+func restorePlanningWait(session *models.FactoryPlanningSession, result models.PlanningWaitResult) {
+	if err := session.RestoreWait(database.DB(context.Background()), result); err != nil {
+		log.WithError(err).Error("failed to restore planning wait after a dropped write")
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, body any) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		log.WithError(err).Error("failed to encode planning session runner response")
+		return err
+	}
+	return nil
+}
+
+func writeRunnerPlanningError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
+		errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, "planning session not found", http.StatusNotFound)
+	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
+		http.Error(w, "planning session has ended", http.StatusConflict)
+	default:
+		log.WithError(err).Error("runner planning session failed")
+		http.Error(w, "Lookup failed", http.StatusInternalServerError)
+	}
+}
+
+func clampPlanningHoldSeconds(raw string) int {
+	hold := 45
+	if raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err == nil {
+			hold = parsed
+		}
+	}
+	if hold < minPlanningHoldSeconds {
+		return minPlanningHoldSeconds
+	}
+	if hold > maxPlanningHoldSeconds {
+		return maxPlanningHoldSeconds
+	}
+	return hold
+}
+
+func bearerToken(header string) string {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(header, prefix) {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(header, prefix))
+}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -132,6 +133,10 @@ func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
 }
 
+func (c *IntegrationContext) Persist() error {
+	return nil
+}
+
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	if c.Configuration == nil {
 		return nil, fmt.Errorf("config not found: %s", name)
@@ -252,6 +257,7 @@ func (s *SubscriptionContext) SendMessage(message any) error {
 
 type ExecutionStateContext struct {
 	Finished       bool
+	Cancelling     bool
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
@@ -263,6 +269,10 @@ type ExecutionStateContext struct {
 
 func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
+}
+
+func (c *ExecutionStateContext) IsCancelling() bool {
+	return c.Cancelling
 }
 
 func (c *ExecutionStateContext) Pass() error {
@@ -416,9 +426,16 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 type HTTPContext struct {
 	Requests  []*http.Request
 	Responses []*http.Response
+
+	// mu guards Requests and Responses so components that issue concurrent
+	// requests (e.g. metric fan-out) can safely share a single mock context.
+	mu sync.Mutex
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Requests = append(c.Requests, request)
 
 	if len(c.Responses) == 0 {
@@ -431,9 +448,12 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values          map[string][]byte
-	SecretKeys      map[string]map[string][]byte
-	IntegrationKeys map[string]map[string][]byte
+	Values               map[string][]byte
+	SecretKeys           map[string]map[string][]byte
+	IntegrationKeys      map[string]map[string][]byte
+	IntegrationUsage     map[string]string
+	IntegrationSetup     map[string]string
+	IntegrationSetupName map[string]string
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -458,18 +478,23 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 	return keys, nil
 }
 
-func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+func (c *SecretsContext) GetIntegrationSecrets(installationName string) (core.IntegrationSecrets, error) {
 	if c.IntegrationKeys == nil {
-		return nil, fmt.Errorf("integration secrets not configured")
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not configured")
 	}
 
 	name := strings.TrimSpace(installationName)
 	keys, ok := c.IntegrationKeys[name]
 	if !ok {
-		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not found for ref %q", name)
 	}
 
-	return keys, nil
+	return core.IntegrationSecrets{
+		Values:    keys,
+		Usage:     c.IntegrationUsage[name],
+		Setup:     c.IntegrationSetup[name],
+		SetupName: c.IntegrationSetupName[name],
+	}, nil
 }
 
 type HostedLLMContext struct {
@@ -477,6 +502,8 @@ type HostedLLMContext struct {
 	CreditErr     error
 	ResolveErr    error
 	SelectableErr error
+	Default       core.DefaultHostedLLMModel
+	DefaultErr    error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -492,6 +519,13 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
 	return c.SelectableErr
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	if c.DefaultErr != nil {
+		return core.DefaultHostedLLMModel{}, c.DefaultErr
+	}
+	return c.Default, nil
 }
 
 type ExpressionContext struct {

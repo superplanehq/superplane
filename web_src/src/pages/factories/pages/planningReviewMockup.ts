@@ -18,6 +18,8 @@ export interface PlanningReviewComponent {
   title: string;
   description: string;
   expanded: boolean;
+  /** Canvas runner id, e.g. runnerSuperPlane. Selects the model picker. */
+  component?: string;
   configuration: Record<string, unknown>;
   concurrency: PlanningReviewConcurrency;
 }

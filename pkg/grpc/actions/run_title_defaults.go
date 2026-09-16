@@ -103,6 +103,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"pagerduty.onIncident":                "{{ root().data.incident.title }}",
 	"pagerduty.onIncidentAnnotated":       "{{ root().data.incident.title }}",
 	"pagerduty.onIncidentStatusUpdate":    "{{ root().data.status_update.message }}",
+	"productive.onTask":                   "#{{ root().data.data.attributes.task_number }} - {{ root().data.data.attributes.title }}",
 	"prometheus.onAlert":                  "{{ root().data.commonLabels.alertname }}",
 	"render.onBuild":                      "{{ root().data.serviceName }} {{ root().data.status }}",
 	"render.onDeploy":                     "{{ root().data.serviceName }} {{ root().data.status }}",

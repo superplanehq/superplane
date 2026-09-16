@@ -8,7 +8,7 @@ import type {
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseMapper,
   OutputPayload,
@@ -272,7 +272,7 @@ export const LIST_INCIDENTS_STATE_REGISTRY: EventStateRegistry = {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const incidents = getIncidents(execution);

@@ -41,15 +41,15 @@ func (c *AddWorkOrderArtifact) Name() string {
 }
 
 func (c *AddWorkOrderArtifact) Label() string {
-	return "Add Work Order Artifact"
+	return "Add Task Artifact"
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (markdown note, branch, or link) to a work order"
+	return "Attach a typed artifact (markdown note, branch, or link) to a task"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order.
+	return `The Add Task Artifact component stores a typed artifact against a task.
 
 Supported types:
 
@@ -57,13 +57,13 @@ Supported types:
 - **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` and ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL), or an explicit ` + "`url`" + `. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time.
 - **Link** (` + "`link`" + `): requires ` + "`url`" + ` (must be http or https); optional ` + "`title`" + ` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-Use the Add Pull Request component to attach a pull request to a work order.
+Use the Add Pull Request component to attach a pull request to a task.
 
 Markdown and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
-Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order. Keys are unique per factory.
+Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this task. Keys are unique per factory.
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -105,8 +105,8 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
@@ -142,7 +142,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "body",
 			Label:                "Body",
-			Description:          "Markdown note body — rendered inline in the work order timeline",
+			Description:          "Markdown note body — rendered inline in the task timeline",
 			Type:                 configuration.FieldTypeText,
 			Required:             false,
 			VisibilityConditions: markdownOnly,
@@ -180,7 +180,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
-			Description: "Optional queryable key for this artifact, unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
+			Description: "Optional queryable key for this artifact, unique per factory. Lets findWorkOrder (by: artifactKey) resolve this task later.",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,

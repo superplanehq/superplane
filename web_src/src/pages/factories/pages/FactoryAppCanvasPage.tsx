@@ -7,12 +7,16 @@ import {
   buildAgentEditPrompt,
 } from "../lib/agentEditPrompt";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { factoryAppRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
 import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
 import { FactoryAppResetConfirmDialog } from "./FactoryAppResetConfirmDialog";
 import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
+import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar";
 import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
+
+type FactoryAppCanvasPageModel = ReturnType<typeof useFactoryAppCanvasPageModel>;
 
 /**
  * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
@@ -75,20 +79,7 @@ export function FactoryAppCanvasPage() {
         }
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {model.canvasLoading && !model.canvas ? (
-          <p className="p-5 text-[13px] text-muted-foreground">Loading…</p>
-        ) : (
-          <AppPage
-            factoryEmbed
-            factoryConfigure={model.isConfigure}
-            factoryAgentEnabled={model.isConfigure}
-            factoryEditWorkspace={model.isConfigure}
-            factoryConfigureActionsRef={model.configureActionsRef}
-            onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
-            onFactoryConfigureDone={model.handleConfigureDone}
-            onFactoryConfigureSaved={model.handleConfigureSaved}
-          />
-        )}
+        <FactoryAppCanvasWorkspace model={model} />
       </div>
       <FactoryCanvasYamlModal
         open={model.yamlViewOpen}
@@ -107,6 +98,46 @@ export function FactoryAppCanvasPage() {
         onOpenChange={model.handleResetConfirmOpenChange}
         onConfirm={model.handleResetToFactoryDefaults}
       />
+    </div>
+  );
+}
+
+function FactoryAppCanvasWorkspace({ model }: { model: FactoryAppCanvasPageModel }) {
+  if (model.canvasLoading && !model.canvas) {
+    return <p className="p-5 text-[13px] text-muted-foreground">Loading…</p>;
+  }
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0">
+      {model.appId ? (
+        <FactoryAutomationRunsSidebar
+          canvasId={model.appId}
+          organizationId={model.organizationId}
+          factoryId={model.factoryId}
+          factoryKey={model.factoryKey}
+          selectedRunId={model.runId}
+          onSelectRun={model.handleSelectRun}
+          runHrefFor={(runId) =>
+            factoryAppRunPath(model.organizationId, model.factoryKey, model.appId, runId, {
+              from: parseFactoryAppNavFrom(model.from),
+              lineId: model.lineId ?? undefined,
+              orderNumber: model.orderNumber ?? undefined,
+            })
+          }
+        />
+      ) : null}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <AppPage
+          factoryEmbed
+          factoryConfigure={model.isConfigure}
+          factoryAgentEnabled={model.isConfigure}
+          factoryEditWorkspace={model.isConfigure}
+          factoryConfigureActionsRef={model.configureActionsRef}
+          onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
+          onFactoryConfigureDone={model.handleConfigureDone}
+          onFactoryConfigureSaved={model.handleConfigureSaved}
+        />
+      </div>
     </div>
   );
 }

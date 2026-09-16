@@ -5,6 +5,7 @@ import { lineIntakeSourceForApiSource } from "./lineIntakeModel";
 export const BACKLOG_CREATE_COPY = {
   createWorkOrder: "Create task",
   createManually: "Create task manually",
+  createManuallyHint: "Write the title and details.",
   empty: "No matching items.",
   loading: "Loading items.",
   loadingMore: "Loading more items.",
@@ -15,6 +16,7 @@ const INTAKE_NAME_SINGULAR: [RegExp, string][] = [
   [/ issues$/i, " issue"],
   [/ exceptions$/i, " exception"],
   [/ incidents$/i, " incident"],
+  [/ tasks$/i, " task"],
 ];
 
 export function searchPlaceholderForIntake(name: string): string {

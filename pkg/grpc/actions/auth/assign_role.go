@@ -7,7 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
@@ -28,10 +27,6 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 
 	if user.ID.String() == requesterID {
 		return nil, grpcerrors.PermissionDenied(nil, "cannot change your own role")
-	}
-
-	if user.IsAPIKey() && roleName == models.RoleOrgOwner {
-		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)

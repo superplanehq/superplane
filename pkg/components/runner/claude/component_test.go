@@ -13,7 +13,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -94,7 +93,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, runner.ExecutionModeHost, req.ExecutionMode)
 	require.Len(t, req.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
+	assert.Contains(t, req.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
 	assert.Equal(t, "Clone", req.Commands[1].Name)
 	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`)
 	assert.Contains(t, req.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
@@ -109,15 +108,91 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, "sk-test-key", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 	assert.NotContains(t, string(body), `"message_chain"`)
 
-	require.Len(t, req.Files, 7)
+	require.Len(t, req.Files, 9)
 	assert.Equal(t, runScript, requireTaskFile(t, req.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, req.Files, "llm_usage.js").Content)
+	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, req.Files, "turn_telemetry.js").Content)
+	assert.Equal(t, runner.ActivityStreamScript, requireTaskFile(t, req.Files, "activity_stream.js").Content)
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, "cd '/tmp'")
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
 	assert.Equal(t, "Fix the failing tests", requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content)
 	assert.Equal(t, "Open a pull request", requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content)
 	assert.Equal(t, "git -C /tmp/repo status", requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
+}
+
+func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-usage-1"}`))},
+		},
+	}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"model":       "sonnet",
+			"steps": []map[string]any{
+				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
+			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
+			"environmentFrom": []map[string]any{
+				{"source": "integration", "integration": map[string]any{"name": "github-acme"}},
+				{"source": "integration", "integration": map[string]any{"name": "semaphore-acme"}},
+			},
+		},
+		HTTP: httpContext,
+		Secrets: &contexts.SecretsContext{
+			Values: map[string][]byte{
+				"anthropic/api_key": []byte("sk-test-key"),
+			},
+			IntegrationKeys: map[string]map[string][]byte{
+				"github-acme":    {"GITHUB_TOKEN": []byte("gh-token")},
+				"semaphore-acme": {"SEMAPHORE_API_TOKEN": []byte("sem-token")},
+			},
+			IntegrationUsage: map[string]string{
+				"github-acme":    "The gh CLI is already installed. Use GITHUB_TOKEN.",
+				"semaphore-acme": "Use sem-ai with SEMAPHORE_API_TOKEN.",
+			},
+			IntegrationSetup: map[string]string{
+				"semaphore-acme": "echo install-sem-ai",
+			},
+			IntegrationSetupName: map[string]string{
+				"semaphore-acme": "Set up Semaphore",
+			},
+		},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+
+	require.Len(t, req.Commands, 3)
+	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
+	assert.Equal(t, "Set up Semaphore", req.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, req.Commands[1].Kind)
+	assert.Equal(t, "Set up Semaphore", req.Commands[1].Preview)
+	assert.Equal(t, "Fix tests", req.Commands[2].Name)
+	assert.Equal(t, "Fix the failing tests", req.Commands[2].Preview)
+	assert.Equal(t, "gh-token", requireEnvironmentValue(t, req.Environment, "GITHUB_TOKEN"))
+	assert.Equal(t, "sem-token", requireEnvironmentValue(t, req.Environment, "SEMAPHORE_API_TOKEN"))
+	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, req.Files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nUse sem-ai with SEMAPHORE_API_TOKEN.\n\nFix the failing tests",
+		requireTaskFile(t, req.Files, "prompts/01-fix-tests.txt").Content,
+	)
 }
 
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
@@ -163,14 +238,14 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	assert.Empty(t, req.MessageChain)
 	require.Len(t, req.Commands, 4)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
+	assert.Contains(t, req.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
 	assert.Equal(t, "Setup", req.Commands[1].Name)
 	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-setup.sh"`)
 	assert.Equal(t, "Prompt", req.Commands[2].Name)
 	assert.Contains(t, req.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-prompt.txt" ''`)
 	assert.Equal(t, "After", req.Commands[3].Name)
 	assert.Contains(t, req.Commands[3].Command, `source "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`)
-	require.Len(t, req.Files, 6)
+	require.Len(t, req.Files, 8)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
 	assert.Equal(t, "implement the issue", requireTaskFile(t, req.Files, "prompts/02-prompt.txt").Content)
 	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
@@ -244,17 +319,7 @@ func TestRunClaudeCodeExecuteDoesNotGateBYOKModels(t *testing.T) {
 	assert.Equal(t, "sk-byok", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
-func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-hosted-1"}`))},
-		},
-	}
-
+func TestRunClaudeCodeExecuteRejectsHostedCredentials(t *testing.T) {
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
@@ -265,127 +330,15 @@ func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
 			},
 			"credentials": map[string]any{"source": "hosted"},
 		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-	var req createTaskRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
-}
-
-func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-hosted-2"}`))},
-		},
-	}
-
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				BaseURL:       "https://proxy.example/v1",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-	var req createTaskRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
-	assert.Equal(t, "https://proxy.example/v1", requireEnvironmentValue(t, req.Environment, envAnthropicBaseURL))
-}
-
-func TestRunClaudeCodeExecuteRejectsPrivateHostedBaseURL(t *testing.T) {
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    &contexts.HTTPContext{},
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				BaseURL:       "http://127.0.0.1/v1",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
+		HTTP:           &contexts.HTTPContext{},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook:        &contexts.NodeWebhookContext{},
+		HostedLLM:      &contexts.HostedLLMContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Requests:       &contexts.RequestContext{},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "private")
-}
-
-func TestRunClaudeCodeExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    &contexts.HTTPContext{},
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			CreditErr: models.ErrHostedCreditEmpty,
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+	assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 }
 
 func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {

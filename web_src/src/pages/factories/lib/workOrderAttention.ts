@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, LoaderCircle, MessageCircleQuestion, Timer, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleX, LoaderCircle, Timer, type LucideIcon } from "lucide-react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
@@ -12,7 +12,6 @@ export type WorkOrderAttentionReason =
   | "checks"
   | "checksPassed"
   | "fixesPaused"
-  | "question"
   | "failed"
   | "stopped"
   | "stalled";
@@ -23,7 +22,6 @@ export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string
   checks: "Waiting on status checks",
   checksPassed: "Status checks passed",
   fixesPaused: "Automatic fixes paused",
-  question: "Agent question",
   failed: "Run failed",
   stopped: "Stopped",
   stalled: "Needs attention",
@@ -35,7 +33,6 @@ export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReaso
   checks: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   checksPassed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   fixesPaused: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  question: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   failed: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   stopped: "border-slate-500/40 bg-slate-500/15 text-slate-800 dark:text-slate-300",
   stalled: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
@@ -47,7 +44,6 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
   checks: LoaderCircle,
   checksPassed: CircleCheck,
   fixesPaused: CircleX,
-  question: MessageCircleQuestion,
   failed: CircleX,
   stopped: CircleX,
   stalled: Timer,

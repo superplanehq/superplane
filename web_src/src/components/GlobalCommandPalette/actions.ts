@@ -1,5 +1,4 @@
 import {
-  ArrowRightLeft,
   BookOpen,
   CircleUser,
   LogOut,
@@ -65,14 +64,6 @@ export function buildRootActions({
       keywords: ["new", "create", "canvas", "project", "workflow"],
     },
     ...buildOrganizationRootActions(organizationId, accountEmail, goTo),
-    {
-      id: "change-organization",
-      label: "Change Organization",
-      description: "Return to organization picker",
-      icon: ArrowRightLeft,
-      onSelect: () => goTo("/?select=true"),
-      keywords: ["switch", "organization", "workspace"],
-    },
     {
       id: "docs",
       label: "Go to Docs",

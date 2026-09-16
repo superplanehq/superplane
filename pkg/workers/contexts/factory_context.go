@@ -1,17 +1,26 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -30,6 +39,12 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onFileBindCleanup       func(FileBindCleanup)
+
+	encryptor crypto.Encryptor
+	registry  *registry.Registry
+	// remoteImageFetch, when set, copies remote images without a GitHub client.
+	remoteImageFetch storedfiles.FetchFunc
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -63,6 +78,51 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	return c
 }
 
+// FileBindCleanup is blob deletion work that must run after the surrounding
+// database transaction commits. Apply it with ApplyFileBindCleanups.
+type FileBindCleanup struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Result         storedfiles.BindResult
+	BindErr        error
+}
+
+func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
+	c.onFileBindCleanup = callback
+	return c
+}
+
+func ApplyFileBindCleanups(jobs []FileBindCleanup, txErr error) {
+	for _, job := range jobs {
+		err := txErr
+		if err == nil {
+			err = job.BindErr
+		}
+		if delErr := storedfiles.ApplyBindResult(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			job.OrganizationID,
+			job.FactoryID,
+			job.Result,
+			err,
+		); delErr != nil {
+			log.WithError(delErr).Warn("Failed to delete file objects after bind")
+		}
+	}
+}
+
+func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
+	c.encryptor = encryptor
+	c.registry = registry
+	return c
+}
+
+func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *FactoryContext {
+	c.remoteImageFetch = fetch
+	return c
+}
+
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
@@ -88,6 +148,9 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, err
 	}
 
+	if err := c.prepareWorkOrderFiles(order); err != nil {
+		return nil, err
+	}
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
@@ -124,6 +187,126 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	}
 
 	return models.OriginFromIntakeRootEvent(event)
+}
+
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
+	c.ingestGitHubImages(order)
+	return c.bindDescriptionFiles(order)
+}
+
+func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
+	if order == nil {
+		return
+	}
+	if len(blob.HTTPImageURLs(order.Description)) == 0 {
+		return
+	}
+	fetch := c.remoteImageFetcher()
+	if fetch == nil {
+		return
+	}
+	next, err := storedfiles.IngestRemoteImages(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		fetch,
+		blob.IsGitHubImageURL,
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		nil,
+		order.Description,
+	)
+	if err != nil || next.Markdown == order.Description {
+		return
+	}
+	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
+		_ = storedfiles.SweepObjects(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			order.OrganizationID,
+			order.FactoryID,
+			next.ObjectKeys,
+		)
+	}
+}
+
+func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
+	if c.remoteImageFetch != nil {
+		return c.remoteImageFetch
+	}
+	if c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client := c.githubClientForCanvas()
+	if client == nil {
+		return nil
+	}
+	return func(ctx context.Context, req *http.Request) (*http.Response, error) {
+		return client.HTTPDo(req.WithContext(ctx))
+	}
+}
+
+func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	result, err := storedfiles.BindDescriptionFiles(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+	)
+	job := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         result,
+		BindErr:        err,
+	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(job)
+		return err
+	}
+	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
+	return err
+}
+
+func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(c.tx, []uuid.UUID{c.canvas.ID})
+	if err != nil {
+		return nil
+	}
+	spec, ok := specs[c.canvas.ID]
+	if !ok {
+		return nil
+	}
+	for i := range spec.Nodes {
+		node := spec.Nodes[i]
+		if node.ComponentName() != "github.onIssue" || node.IntegrationID == nil {
+			continue
+		}
+		integrationID, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
+		if err != nil {
+			continue
+		}
+		integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, integrationID)
+		if err != nil || integration.State != models.IntegrationStateReady {
+			continue
+		}
+		client, err := githubcommon.NewClient(
+			NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
+			c.registry.HTTPContextInTransaction(c.tx),
+		)
+		if err != nil {
+			continue
+		}
+		return client
+	}
+	return nil
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
@@ -484,7 +667,7 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
-	return &core.WorkOrder{
+	item := &core.WorkOrder{
 		ID:          order.ID.String(),
 		Title:       order.Title,
 		Description: order.Description,
@@ -492,6 +675,13 @@ func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
 		Result:      order.Result,
 		Number:      order.Number,
 	}
+	if origin := order.Origin(); origin != nil {
+		item.Origin = &core.WorkOrderOrigin{
+			URL:   origin.URL,
+			Label: origin.Label,
+		}
+	}
+	return item
 }
 
 func pullRequestToCore(pullRequest *models.FactoryPullRequest) *core.PullRequest {

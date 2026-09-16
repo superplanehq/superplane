@@ -5,7 +5,7 @@ import {
 } from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
-import { storybookHostedLlmModels } from "./hostedLlmModels";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -26,6 +26,7 @@ export function buildStorybookMeUser(orgId: string) {
       "canvases",
       "integrations",
       "secrets",
+      "api_keys",
       "groups",
       "users",
       "roles",
@@ -128,6 +129,10 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
       resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
     },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
+      resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
+    },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -181,6 +186,16 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Workspace Models",
               description: "Show the in-progress workspace Models settings page",
             },
+            {
+              id: "organization_byok",
+              label: "Organization BYOK",
+              description: "Show the organization LLM Models settings page",
+            },
+            {
+              id: "factory_create_with_agent",
+              label: "Task Refinement",
+              description: "Refine draft work orders with an agent",
+            },
           ],
         },
       }),
@@ -189,8 +204,8 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/organizations"),
       resolve: () => ({
         json: [
-          { id: orgId, name: fixture.organizationName },
-          { id: "org-storybook-acme", name: "Acme" },
+          { id: orgId, slug: fixture.organizationSlug ?? "superplane", name: fixture.organizationName },
+          { id: "org-storybook-acme", slug: "acme", name: "Acme" },
         ],
       }),
     },
@@ -363,7 +378,7 @@ function storybookIntegrationDefinition(
 
 export type StorybookOrgIntegration = {
   metadata: { id: string; name: string; integrationName: string };
-  status: { state: "ready" | "pending" | "error" };
+  status: { state: "ready" | "pending" | "error"; stateDescription?: string; metadata?: Record<string, unknown> };
   spec?: { configuration?: Record<string, unknown> };
 };
 
@@ -450,8 +465,35 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
-    if (url.searchParams.get("type") === "default_branch") {
+    const resourceType = url.searchParams.get("type");
+    if (resourceType === "default_branch") {
       return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
+    if (resourceType === "status_check") {
+      return {
+        json: {
+          resources: [
+            { type: "status_check", id: "lint", name: "lint" },
+            { type: "status_check", id: "unit", name: "unit" },
+            {
+              type: "status_check",
+              id: "e2e",
+              name: "e2e",
+              url: "https://app.circleci.com/pipelines/github/acme/api/1",
+            },
+          ],
+        },
+      };
+    }
+    if (resourceType === "review_bot") {
+      return {
+        json: {
+          resources: [
+            { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+            { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
+          ],
+        },
+      };
     }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }

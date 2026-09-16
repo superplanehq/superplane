@@ -60,6 +60,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
 		ProvisionedAppId:   config.ProvisionedAppID,
 		ProvisionedLineId:  config.ProvisionedLineID,
+		Initial:            factory.IsInitialOnboarding(),
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
@@ -90,6 +91,8 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
 	case models.FactoryOnboardingAgentHarnessCodex:
 		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	case models.FactoryOnboardingAgentHarnessSuperPlane:
+		return pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE
 	default:
 		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
 	}
@@ -107,23 +110,30 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, len(canvases))
-	for i, canvas := range canvases {
-		app := &pb.Factory_App{
-			Id:          canvas.ID.String(),
-			Name:        canvas.Name,
-			Description: canvas.Description,
-		}
-		if canvas.CreatedAt != nil {
-			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
-		}
-		if canvas.UpdatedAt != nil {
-			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
-		}
-		result[i] = app
+func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automation {
+	result := make([]*pb.Factory_Automation, 0, len(canvases))
+	for _, canvas := range canvases {
+		result = append(result, serializeFactoryAutomation(canvas))
 	}
 	return result
+}
+
+func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
+	automation := &pb.Factory_Automation{
+		Id:          canvas.ID.String(),
+		Name:        canvas.Name,
+		Description: canvas.Description,
+	}
+	if canvas.ColumnKey != nil {
+		automation.ColumnKey = *canvas.ColumnKey
+	}
+	if canvas.CreatedAt != nil {
+		automation.CreatedAt = timestamppb.New(*canvas.CreatedAt)
+	}
+	if canvas.UpdatedAt != nil {
+		automation.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
+	}
+	return automation
 }
 
 func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
@@ -138,15 +148,20 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	graph := resolveIntakeGraph(intake.Source, spec)
 
 	serialized := &pb.FactoryIntake{
-		Id:        intake.ID.String(),
-		FactoryId: intake.FactoryID.String(),
-		CanvasId:  intake.CanvasID.String(),
-		Name:      intake.Name(),
-		Source:    serializeFactoryIntakeSource(intake.Source),
-		Settings:  serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
-		Healthy:   graph.Healthy(spec.Edges),
-		CreatedAt: timestamppb.New(intake.CreatedAt),
-		UpdatedAt: timestamppb.New(intake.UpdatedAt),
+		Id:                  intake.ID.String(),
+		FactoryId:           intake.FactoryID.String(),
+		CanvasId:            intake.CanvasID.String(),
+		Name:                intake.Name(),
+		Source:              serializeFactoryIntakeSource(intake.Source),
+		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Healthy:             graph.Healthy(spec.Edges),
+		CreatedAt:           timestamppb.New(intake.CreatedAt),
+		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
+		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+	}
+	if intake.InitialImportItemCount != nil {
+		itemCount := int32(*intake.InitialImportItemCount)
+		serialized.InitialImportItemCount = &itemCount
 	}
 
 	if intake.Canvas != nil {
@@ -154,6 +169,21 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
+	switch status {
+	case models.FactoryIntakeInitialImportStatusPending:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_PENDING
+	case models.FactoryIntakeInitialImportStatusCompleted:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED
+	case models.FactoryIntakeInitialImportStatusFailed:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_FAILED
+	case models.FactoryIntakeInitialImportStatusSkipped:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED
+	default:
+		return pb.FactoryIntake_INITIAL_IMPORT_STATUS_UNSPECIFIED
+	}
 }
 
 func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
@@ -164,6 +194,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
+	case models.FactoryIntakeSourceProductiveTasks:
+		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -177,6 +209,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceSentryExceptions, nil
 	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
+	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
+		return models.FactoryIntakeSourceProductiveTasks, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}
@@ -331,7 +365,15 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {
+	if order.SourceRunID == nil {
+		return ""
+	}
+	return order.SourceRunID.String()
 }
 
 func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {
@@ -445,6 +487,7 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
 		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+		Model:          dispatch.Model,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)

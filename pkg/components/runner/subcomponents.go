@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -31,8 +32,12 @@ func HandleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 	return handleBrokerWebhook(ctx, finishedEventType)
 }
 
-func CancelBrokerTask(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+func CancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error {
+	return cancelBrokerTask(ctx, finishedEventType)
+}
+
+func RevokeOpenRouterChildKey(httpCtx core.HTTPContext, state core.ExecutionStateContext, hosted core.HostedLLMContext, logger *logrus.Entry) {
+	_ = revokeOpenRouterChildKey(httpCtx, state, hosted, logger)
 }
 
 func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {

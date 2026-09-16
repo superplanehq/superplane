@@ -54,10 +54,16 @@ export const factoryCenteredSectionBodyClassName = cn(factorySectionBodyClassNam
  * measure, while the report column is sized for charts.
  */
 const settingsColumn = "mx-auto w-full max-w-3xl";
+const settingsWideColumn = "mx-auto w-full max-w-6xl";
 
 export const factorySettingsSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsColumn, "pt-14");
 
 export const factorySettingsSectionBodyClassName = cn(factorySectionBodyClassName, settingsColumn, "pb-10");
+
+/** Wider settings column for tables that cannot stay readable at the form measure. */
+export const factorySettingsWideSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsWideColumn, "pt-14");
+
+export const factorySettingsWideSectionBodyClassName = cn(factorySectionBodyClassName, settingsWideColumn, "pb-10");
 
 /** Tasks / Lines kanban body: same gutter, fills leftover height. */
 export const factoryWorkOrdersBodyClassName = cn(

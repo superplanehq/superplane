@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FACTORIES_ORGANIZATION_ID } from "../__fixtures__/factoryPageResponses";
@@ -12,18 +12,48 @@ vi.mock("@/posthog", () => ({
   posthog: { reset: vi.fn() },
 }));
 
-function renderMenu() {
+const accountMocks = vi.hoisted(() => ({
+  installationAdmin: false,
+}));
+
+vi.mock("@/contexts/useAccount", () => ({
+  useAccount: () => ({
+    account: {
+      id: "user-1",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      installation_admin: accountMocks.installationAdmin,
+    },
+  }),
+}));
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
+
+function renderMenu(planLabel?: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <ThemeProvider>
-          <SidebarUserMenu
-            organizationId={FACTORIES_ORGANIZATION_ID}
-            factoryKey="RFSDR"
-            userName="Ada Lovelace"
-            organizationName="SuperPlane"
-          />
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <SidebarUserMenu
+                  organizationId={FACTORIES_ORGANIZATION_ID}
+                  factoryKey="RFSDR"
+                  userName="Ada Lovelace"
+                  organizationName="SuperPlane"
+                  planLabel={planLabel}
+                />
+              }
+            />
+            <Route path="/admin" element={<div data-testid="installation-admin-page" />} />
+          </Routes>
+          <LocationProbe />
         </ThemeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -32,13 +62,14 @@ function renderMenu() {
 
 describe("SidebarUserMenu", () => {
   beforeEach(() => {
+    accountMocks.installationAdmin = false;
     vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url.includes("/organizations")) {
         return new Response(
           JSON.stringify([
-            { id: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
-            { id: "org-acme", name: "Acme" },
+            { id: FACTORIES_ORGANIZATION_ID, slug: "superplane", name: "SuperPlane" },
+            { id: "org-acme", slug: "acme", name: "Acme" },
           ]),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -69,10 +100,54 @@ describe("SidebarUserMenu", () => {
     expect(screen.queryByRole("menuitem", { name: "SuperPlane" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Organization settings")).toBeInTheDocument();
     expect(screen.getByLabelText("Switch organization")).toBeInTheDocument();
-    expect(screen.getByTestId("factories-sidebar-back-to-apps")).toHaveTextContent("Back to Apps");
+    expect(screen.queryByTestId("factories-sidebar-back-to-apps")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Back to Apps" })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Billing" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Installation Admin" })).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-sidebar-appearance")).toHaveTextContent("Appearance");
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("shows the plan below the organization name in the open menu", async () => {
+    const user = userEvent.setup();
+    renderMenu("Business");
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Business");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+  });
+
+  it("shows Trial in the open menu but never under the avatar for a trial organization", async () => {
+    const user = userEvent.setup();
+    renderMenu("Trial");
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Trial");
+    expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
+  });
+
+  it("opens Installation Admin for an installation admin", async () => {
+    accountMocks.installationAdmin = true;
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    expect(screen.getByTestId("factories-sidebar-installation-admin")).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Installation Admin" }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent("/admin");
   });
 
   it("lists organizations and Create new organization last", async () => {
@@ -83,8 +158,12 @@ describe("SidebarUserMenu", () => {
     await user.click(screen.getByLabelText("Switch organization"));
 
     const menu = await screen.findByTestId("factories-sidebar-organization-switch-menu");
+    expect(menu).toHaveClass("overflow-y-auto");
     expect(within(menu).getByText("SuperPlane")).toBeInTheDocument();
     expect(within(menu).getByText("Acme")).toBeInTheDocument();
+    expect(
+      within(menu).getByTestId(`factories-sidebar-organization-option-${FACTORIES_ORGANIZATION_ID}`),
+    ).toHaveAttribute("aria-checked", "true");
     const items = within(menu).getAllByRole("menuitem");
     expect(items[items.length - 1]).toHaveTextContent("Create new organization");
   });

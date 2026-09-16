@@ -14,7 +14,7 @@ import {
 import { Check, Funnel } from "lucide-react";
 import type { WorkOrderFilterDimension, WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { buildStatusFilterOptions, type WorkOrderFilterOption } from "../../lib/workOrderFilterOptions";
-import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME, MENU_TRIGGER_CLASSNAME } from "./menuStyles";
+import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
   state: WorkOrderListState;
@@ -32,19 +32,17 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className={MENU_TRIGGER_CLASSNAME}
+          size="icon"
+          aria-label="Filter"
+          className="relative size-8 shrink-0 text-muted-foreground"
           data-testid="work-orders-filter-trigger"
         >
           <Funnel className="size-3.5" aria-hidden />
-          Filter
           {filterCount > 0 ? (
-            <span className="ml-0.5 rounded bg-accent px-1 text-[10px] text-foreground">{filterCount}</span>
-          ) : (
-            <kbd className="ml-0.5 hidden rounded border border-border px-1 font-sans text-[10px] text-muted-foreground sm:inline">
-              F
-            </kbd>
-          )}
+            <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-foreground">
+              {filterCount}
+            </span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">

@@ -3,9 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import type { ReactNode } from "react";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 
 class MockResizeObserver {
@@ -85,11 +86,16 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
+const experimentalFeatureMocks = vi.hoisted(() => ({
+  has: vi.fn((_featureId?: string) => false),
+  isLoading: false,
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: () => false,
+    has: experimentalFeatureMocks.has,
     enabledExperimentalFeatures: [],
-    isLoading: false,
+    isLoading: experimentalFeatureMocks.isLoading,
   }),
 }));
 
@@ -186,6 +192,7 @@ function renderHome(initialEntries = ["/org-123"]) {
             <Route index element={<HomePage />} />
             <Route path="apps/new" element={<NewAppPage />} />
             <Route path="apps/:canvasId" element={<div>Canvas editor</div>} />
+            <Route path="workspaces" element={<div data-testid="workspaces-index">Workspaces</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -223,6 +230,8 @@ describe("HomePage canvas folders", () => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.clearAllMocks();
     window.localStorage.clear();
+    experimentalFeatureMocks.has.mockReturnValue(false);
+    experimentalFeatureMocks.isLoading = false;
     permissionMocks.canAct.mockReturnValue(true);
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
@@ -296,7 +305,8 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new"]);
 
-    expect(screen.getByRole("heading", { name: "404" })).toBeInTheDocument();
+    expect(screen.getByTestId("permission-denied-page")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
   });
 
@@ -535,12 +545,18 @@ describe("HomePage canvas folders", () => {
 
   it("opens a folder-scoped installed app when folder membership update fails", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ canvasId: "canvas-installed", organizationId: "org-123" }), { status: 200 }),
-      );
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/apps/install/preview")) {
+        return new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 });
+      }
+      if (url.includes("/apps/install")) {
+        return new Response(JSON.stringify({ canvasId: "canvas-installed", organizationId: "org-123" }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
     mutationMocks.updateCanvasFolderMembership.mockRejectedValue(new Error("Failed to fetch"));
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
@@ -770,5 +786,19 @@ describe("HomePage canvas folders", () => {
       backgroundColor: "blue",
       canvasIds: [],
     });
+  });
+
+  it("redirects org home to /workspaces when factories are on", () => {
+    experimentalFeatureMocks.has.mockImplementation((featureId) => featureId === FEATURE_FACTORIES);
+    renderHome(["/org-123"]);
+
+    expect(screen.getByTestId("workspaces-index")).toBeInTheDocument();
+  });
+
+  it("redirects /apps/new to /workspaces when factories are on", () => {
+    experimentalFeatureMocks.has.mockImplementation((featureId) => featureId === FEATURE_FACTORIES);
+    renderHome(["/org-123/apps/new"]);
+
+    expect(screen.getByTestId("workspaces-index")).toBeInTheDocument();
   });
 });

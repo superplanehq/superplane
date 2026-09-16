@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -62,7 +63,11 @@ type velocityOrder struct {
 	merged     bool
 	cycleHours *float64
 	costCents  int64
-	tokens     int64
+	// Bands of costCents: what the order spent on model tokens and on runner
+	// compute.
+	modelCostCents   int64
+	computeCostCents int64
+	tokens           int64
 }
 
 // collectVelocityOrders attributes every work order with pull request activity
@@ -140,15 +145,21 @@ func velocityIntakeLabel(key string) string {
 	return key
 }
 
-// applyVelocityOrderUsage fills tracked model spend on each order.
-func applyVelocityOrderUsage(orders map[uuid.UUID]*velocityOrder, usage map[uuid.UUID]models.UsageTotals) {
+// applyVelocityOrderUsage fills tracked spend on each order, in both bands.
+//
+// The total is the sum of the two rounded bands rather than the rounded sum,
+// so a stacked chart of the bands always adds up to the total it is drawn
+// against. The two can differ by a cent.
+func applyVelocityOrderUsage(orders map[uuid.UUID]*velocityOrder, usage map[uuid.UUID]models.UsageSplit) {
 	for id, order := range orders {
-		totals, ok := usage[id]
+		split, ok := usage[id]
 		if !ok {
 			continue
 		}
-		order.costCents = totals.CostCents()
-		order.tokens = totals.TotalTokens
+		order.modelCostCents = split.Model.CostCents()
+		order.computeCostCents = split.Compute.CostCents()
+		order.costCents = order.modelCostCents + order.computeCostCents
+		order.tokens = split.Total().TotalTokens
 	}
 }
 
@@ -314,9 +325,33 @@ func (b *velocityPeopleBuilder) addFactoryOrder(order *velocityOrder) {
 	}
 }
 
-// rowsByMergedDesc returns people with activity, most merged pull requests
-// first. Ties break on name so the order is stable between requests.
-func (b *velocityPeopleBuilder) rowsByMergedDesc() []*velocityPersonRow {
+// velocityPeopleSortKey names the column the People table is ordered by.
+type velocityPeopleSortKey int
+
+const (
+	velocitySortTotal velocityPeopleSortKey = iota
+	velocitySortFactoryMerged
+	velocitySortAuthoredMerged
+	velocitySortMedianCycleHours
+	velocitySortCostUsd
+)
+
+// velocitySortDirection is ascending or descending, applied to the primary
+// sort key only; every tie-break stays in its own fixed direction so paging
+// is stable regardless of which column or direction is active.
+type velocitySortDirection int
+
+const (
+	velocitySortDesc velocitySortDirection = iota
+	velocitySortAsc
+)
+
+// rowsSorted returns people with activity, ordered by key and direction. Ties
+// on the primary key break through total merged, then SuperPlane merged, then
+// name, then id, in that fixed order, so a page requested with an offset never
+// drops or duplicates a row because two requests disagreed on the order of
+// equal rows.
+func (b *velocityPeopleBuilder) rowsSorted(key velocityPeopleSortKey, direction velocitySortDirection) []*velocityPersonRow {
 	rows := make([]*velocityPersonRow, 0, len(b.rows))
 	for _, row := range b.rows {
 		if row.totalMerged() == 0 && row.factoryWaste == 0 {
@@ -325,15 +360,46 @@ func (b *velocityPeopleBuilder) rowsByMergedDesc() []*velocityPersonRow {
 		rows = append(rows, row)
 	}
 
+	// Computed once per row, rather than inside the comparator, so an O(n log n)
+	// sort does not resort to an O(n log n) sort of median computations.
+	medians := make(map[*velocityPersonRow]float64, len(rows))
+	for _, row := range rows {
+		medians[row] = medianFloats(row.cycleHours)
+	}
+
+	primary := func(row *velocityPersonRow) float64 {
+		switch key {
+		case velocitySortFactoryMerged:
+			return float64(row.factoryMerged)
+		case velocitySortAuthoredMerged:
+			return float64(row.authoredMerged)
+		case velocitySortMedianCycleHours:
+			return medians[row]
+		case velocitySortCostUsd:
+			return float64(row.costCents)
+		default:
+			return float64(row.totalMerged())
+		}
+	}
+
 	sort.Slice(rows, func(i, j int) bool {
 		left, right := rows[i], rows[j]
+		if lv, rv := primary(left), primary(right); lv != rv {
+			if direction == velocitySortAsc {
+				return lv < rv
+			}
+			return lv > rv
+		}
 		if left.totalMerged() != right.totalMerged() {
 			return left.totalMerged() > right.totalMerged()
 		}
 		if left.factoryMerged != right.factoryMerged {
 			return left.factoryMerged > right.factoryMerged
 		}
-		return left.name < right.name
+		if left.name != right.name {
+			return left.name < right.name
+		}
+		return left.id < right.id
 	})
 	return rows
 }
@@ -344,6 +410,22 @@ func medianFloats(values []float64) float64 {
 	}
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
+}
+
+// medianCents returns the middle value of a cent sample. An even sample
+// averages the two middle values and truncates, because a cent is the smallest
+// amount the report shows.
+func medianCents(values []int64) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := slices.Clone(values)
+	slices.Sort(sorted)
 	mid := len(sorted) / 2
 	if len(sorted)%2 == 1 {
 		return sorted[mid]

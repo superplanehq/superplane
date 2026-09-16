@@ -36,7 +36,6 @@ export interface AccountRedesignSsoAccount {
 export interface AccountRedesignProfile {
   name: string;
   email: string;
-  userId: string;
   passwordSet: boolean;
   tokens: AccountRedesignToken[];
   ssoAccounts: AccountRedesignSsoAccount[];
@@ -46,7 +45,6 @@ export interface AccountRedesignProfile {
 export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
   name: "Ada Lovelace",
   email: "ada@example.com",
-  userId: "5f76536d-bc02-4f99-81e6-e159ac40ebbb",
   passwordSet: true,
   tokens: [],
   ssoAccounts: [

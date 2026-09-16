@@ -1,5 +1,6 @@
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 export interface AddIntakeTemplate {
@@ -32,6 +33,12 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "PagerDuty incidents",
     description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
+  },
+  {
+    id: "productive-tasks",
+    name: "Productive.io tasks",
+    description: "Create tasks from Productive.io tasks.",
+    iconSrc: productiveIcon,
   },
   {
     id: "improve-ci-runtime",

@@ -15,10 +15,14 @@ interface ScopePillsProps<T extends string> {
   testIdPrefix: string;
 }
 
-/** Pill-style scope selector shared by the Tasks header and the Overview scope toggle. */
+/** Scope selector using the same rounded tab chrome as factory settings tabs. */
 export function ScopePills<T extends string>({ value, onChange, options, testIdPrefix }: ScopePillsProps<T>) {
   return (
-    <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label="Scope">
+    <div
+      className="inline-flex h-7 w-fit items-center justify-center rounded-full bg-slate-100 p-0.5 text-muted-foreground dark:bg-gray-800"
+      role="group"
+      aria-label="Scope"
+    >
       {options.map((scope) => {
         const active = scope.id === value;
         return (
@@ -30,8 +34,10 @@ export function ScopePills<T extends string>({ value, onChange, options, testIdP
                 onClick={() => onChange(scope.id)}
                 data-testid={`${testIdPrefix}-${scope.id}`}
                 className={cn(
-                  "inline-flex h-7 items-center rounded-[5px] px-2.5 text-[12px] font-medium transition-colors",
-                  active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                  "inline-flex h-[calc(100%-1px)] items-center justify-center rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow]",
+                  active
+                    ? "bg-background text-foreground shadow-sm dark:border-input dark:bg-input/30 dark:text-foreground"
+                    : "text-foreground hover:text-foreground dark:text-muted-foreground",
                 )}
               >
                 {scope.label}

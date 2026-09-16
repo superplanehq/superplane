@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 )
 
 func TestResolveHostedListModelsBaseURL(t *testing.T) {
@@ -40,6 +42,7 @@ func TestAdminLLMSettings(t *testing.T) {
 			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 		})
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
 	})
 
 	t.Run("non-admin gets 404", func(t *testing.T) {
@@ -69,6 +72,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Empty(t, settings.DefaultHostedProvider)
+		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
@@ -115,7 +120,73 @@ func TestAdminLLMSettings(t *testing.T) {
 		}
 		assert.True(t, anthropic.Enabled)
 		assert.True(t, anthropic.APIKeyConfigured)
+		assert.False(t, anthropic.ManagementKeyConfigured)
 		assert.Equal(t, []string{"claude-sonnet-4-6"}, anthropic.AllowedModels)
+
+		body, err = json.Marshal(map[string]any{
+			"default_hosted_provider": "anthropic",
+			"default_hosted_model":    "claude-sonnet-4-6",
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, "anthropic", settings.DefaultHostedProvider)
+		assert.Equal(t, "claude-sonnet-4-6", settings.DefaultHostedModel)
+	})
+
+	t.Run("admin cannot enable OpenRouter without a provisioning key", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"enabled":        true,
+			"api_key":        "sk-or-inference",
+			"allowed_models": []string{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-providers/openrouter",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "provisioning API key is required")
+	})
+
+	t.Run("admin GET reports when a provisioning key is stored", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      models.UsageProviderOpenRouter,
+			Enabled:       false,
+			APIKey:        []byte("encrypted-inference"),
+			ManagementKey: []byte("encrypted-mgmt"),
+			AllowedModels: datatypes.JSONSlice[string]{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/llm-settings",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var settings installationLLMSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		var openrouterProvider hostedLLMProviderResponse
+		for _, provider := range settings.Providers {
+			if provider.Provider == "openrouter" {
+				openrouterProvider = provider
+			}
+		}
+		assert.True(t, openrouterProvider.APIKeyConfigured)
+		assert.True(t, openrouterProvider.ManagementKeyConfigured)
+		assert.NotContains(t, response.Body.String(), "encrypted-mgmt")
 	})
 
 	t.Run("admin can grant credit and set markup override", func(t *testing.T) {
@@ -163,5 +234,118 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
 		require.NotNil(t, credit.MarkupOverrideBPS)
 		assert.Equal(t, 0, *credit.MarkupOverrideBPS)
+	})
+}
+
+func TestAdminOrganizationBillingPlan(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("admin can set a plan when Polar is not set up", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "business"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
+	t.Run("PUT allows a plan when only a Polar customer exists", func(t *testing.T) {
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
+
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
+	t.Run("GET syncs Polar paid over an admin plan", func(t *testing.T) {
+		periodStart := time.Now().UTC().Truncate(time.Second)
+		periodEnd := periodStart.AddDate(0, 1, 0)
+		polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/subscriptions/", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"id":                   "sub_admin_sync",
+						"status":               "active",
+						"current_period_start": periodStart.Format(time.RFC3339),
+						"current_period_end":   periodEnd.Format(time.RFC3339),
+						"customer_id":          "cust_polar_1",
+						"external_customer_id": r.Organization.ID.String(),
+						"customer": map[string]any{
+							"id":          "cust_polar_1",
+							"external_id": r.Organization.ID.String(),
+						},
+					},
+				},
+				"pagination": map[string]any{"max_page": 1},
+			}))
+		}))
+		t.Cleanup(polarServer.Close)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Setenv("POLAR_API_BASE_URL", polarServer.URL)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourcePolar, plan.PlanSource)
+		assert.True(t, plan.PolarManaged)
+	})
+
+	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+			ID:          "sub_admin_put",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		})
+		require.NoError(t, err)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cancel or change the subscription in Polar")
 	})
 }

@@ -10,12 +10,52 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
+
+func Test__ProductiveTaskItem(t *testing.T) {
+	item := productiveTaskItem(productive.Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+	}, "12345")
+
+	assert.Equal(t, "91", item.ID)
+	assert.Equal(t, "#512", item.Key)
+	assert.Equal(t, "Fix payment retries", item.Title)
+	assert.Equal(t, "Retries fail silently.", item.Body)
+	assert.Equal(t, "https://app.productive.io/12345/tasks/91", item.URL)
+}
+
+func TestParseGitHubIssueURL(t *testing.T) {
+	repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
+	assert.True(t, ok)
+	assert.Equal(t, "acme/payments", repository)
+	assert.Equal(t, 12, number)
+
+	_, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
+	assert.False(t, ok)
+	_, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
+	assert.False(t, ok)
+}
+
+func TestParseProductiveTaskURL(t *testing.T) {
+	organizationID, taskID, ok := parseProductiveTaskURL("https://app.productive.io/12345/tasks/91")
+	assert.True(t, ok)
+	assert.Equal(t, "12345", organizationID)
+	assert.Equal(t, "91", taskID)
+
+	_, _, ok = parseProductiveTaskURL("https://app.productive.io/12345/projects/91")
+	assert.False(t, ok)
+	_, _, ok = parseProductiveTaskURL("https://example.com/12345/tasks/91")
+	assert.False(t, ok)
+}
 
 type stubIntakeItemSource struct {
 	items []IntakeItem

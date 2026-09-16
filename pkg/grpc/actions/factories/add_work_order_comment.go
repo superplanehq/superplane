@@ -27,16 +27,6 @@ func AddWorkOrderComment(
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to add work order comment")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to add work order comment")
-	}
-
 	body := strings.TrimSpace(req.GetBody())
 	if body == "" {
 		return nil, factoryErrorToStatus(invalidArgument("body is required"), "failed to add work order comment")
@@ -57,8 +47,20 @@ func AddWorkOrderComment(
 		UserID: &userIDStr,
 	}
 
-	var comment *models.FactoryWorkOrderComment
 	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	orderID := resolvedOrder.ID
+
+	var comment *models.FactoryWorkOrderComment
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factoryModel, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {

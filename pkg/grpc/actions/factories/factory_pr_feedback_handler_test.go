@@ -165,6 +165,35 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}
 	})
 
+	t.Run("an empty mention is stored as an empty content filter", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+
+		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+					Mention:    "",
+					IgnoreBots: true,
+				},
+			},
+		})
+		assert.Equal(t, "", handler.GetSettings().GetDiscussion().GetMention())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		for _, node := range liveVersion.Nodes {
+			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
+				continue
+			}
+			assert.Equal(t, "", node.Configuration["contentFilter"])
+		}
+	})
+
 	t.Run("creating a checks handler waits for pull request checks", func(t *testing.T) {
 		factory := newFactory(t)
 		appRepo := "acme/app"
@@ -174,13 +203,18 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{
 			Source: pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					Names: []string{"lint"},
+				},
+			},
 		})
 
 		assert.Equal(t, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS, handler.GetSource())
 		assert.Equal(t, prFeedbackChecksDefaultName, handler.GetName())
 		assert.True(t, handler.GetHealthy())
 		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
-		assert.Empty(t, handler.GetSettings().GetChecks().GetNames())
+		assert.Equal(t, []string{"lint"}, handler.GetSettings().GetChecks().GetNames())
 		assert.Equal(t, int32(prFeedbackDefaultMaximumAttempts), handler.GetSettings().GetChecks().GetMaximumAttempts())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
@@ -249,6 +283,11 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}))
 		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{
 			Source: pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					Names: []string{"lint"},
+				},
+			},
 		})
 
 		name := "Fix selected checks"

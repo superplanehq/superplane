@@ -4,7 +4,7 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

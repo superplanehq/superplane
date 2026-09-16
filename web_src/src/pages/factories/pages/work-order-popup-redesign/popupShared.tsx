@@ -5,7 +5,7 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
+import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { OrgUserReference } from "../../OrgUserReference";
@@ -24,6 +24,7 @@ export function PopupShell({
   wide = false,
   canvas = false,
   fullPage = false,
+  className,
   onDismiss,
 }: {
   testId: string;
@@ -32,6 +33,7 @@ export function PopupShell({
   wide?: boolean;
   canvas?: boolean;
   fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
   return (
@@ -41,6 +43,7 @@ export function PopupShell({
       wide={wide}
       canvas={canvas}
       fullPage={fullPage}
+      className={className}
       onDismiss={onDismiss}
     >
       {children}
@@ -73,6 +76,7 @@ export function PopupHeader({
   children,
   onClose,
   actions,
+  accessory,
   expanded = false,
   onToggleExpanded,
   canEditTitle = false,
@@ -85,6 +89,7 @@ export function PopupHeader({
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
+  accessory?: ReactNode;
   expanded?: boolean;
   onToggleExpanded?: () => void;
   canEditTitle?: boolean;
@@ -117,12 +122,15 @@ export function PopupHeader({
           </div>
           {children}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {actions}
-          {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
-          <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
-            <XIcon className="h-4 w-4" />
-          </button>
+        <div className="flex shrink-0 flex-col items-end justify-between self-stretch gap-2">
+          <div className="flex items-center gap-2">
+            {actions}
+            {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
+            <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+          {accessory}
         </div>
       </div>
     </header>
@@ -134,6 +142,7 @@ type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel
 /** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
+  modelLabel,
   className,
   children,
   organizationId,
@@ -143,6 +152,7 @@ export function OwnerTimeCostRow({
   onOwnerSave,
 }: {
   fixture: OwnerTimeCostFields;
+  modelLabel?: string;
   className?: string;
   children?: ReactNode;
   organizationId?: string;
@@ -166,7 +176,7 @@ export function OwnerTimeCostRow({
 
   return (
     <div
-      className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
+      className={cn("mt-2 flex w-full flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
       data-testid="popup-owner-time-cost"
     >
       {canEditOwner && organizationId && onOwnerSave ? (
@@ -193,6 +203,12 @@ export function OwnerTimeCostRow({
       )}
       <span className="text-foreground">
         {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
+        {modelLabel ? (
+          <>
+            {" "}
+            <span className="text-muted-foreground">·</span> {modelLabel}
+          </>
+        ) : null}
       </span>
       {children}
     </div>
@@ -249,6 +265,7 @@ export function WaitingNotes({ notes }: { notes: PopupFixture["waitingNotes"] })
           key={note.key}
           note={note}
           organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey={PRIMARY_FACTORY_KEY}
           canClose={false}
           canManage={false}
           isBusy={false}

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,26 +45,26 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 
 	prompt := "implement the change"
 	command := "git push"
-	commands, files := BuildAgentBrokerTask(
-		"Prepare",
-		NodePrepareScript("", "", ""),
-		"run.js",
-		"echo run",
-		"",
-		[]AgentStep{
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
 			{Name: "Clone", Type: AgentStepBash, Command: strPtr("git clone dest repo")},
 			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt, WorkingDirectory: "repo"},
 			{Name: "Push", Type: AgentStepBash, Command: &command, WorkingDirectory: "repo"},
 		},
-		"google/gemini-3.7-flash",
-		func(promptName, model string) string {
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
 			return "node run.js " + promptName + " " + model
 		},
-	)
+	})
 
 	require.Len(t, commands, 4)
 	assert.Equal(t, LiveLogKindSetup, commands[0].Kind)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, commands[0].Command)
+	assert.Contains(t, commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
+	assert.Contains(t, commands[0].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 	assert.Equal(t, LiveLogKindBash, commands[1].Kind)
 	assert.Equal(t, "git clone dest repo", commands[1].Preview)
 	assert.Equal(t, LiveLogKindPrompt, commands[2].Kind)
@@ -80,6 +81,33 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	prepare := requireBrokerFile(t, files, "prepare.sh").Content
 	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
+	assert.Equal(t, TurnTelemetryScript, requireBrokerFile(t, files, "turn_telemetry.js").Content)
+	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
+}
+
+func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
+	t.Parallel()
+
+	prompt := "\nFirst line.\nSecond line.\n"
+	command := "set -e\necho one\necho two"
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Run", Type: AgentStepBash, Command: &command},
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 3)
+	assert.Equal(t, "set -e\necho one\necho two", commands[1].Preview)
+	assert.Equal(t, "First line.\nSecond line.", commands[2].Preview)
 }
 
 func TestBuildAgentBrokerTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing.T) {
@@ -87,22 +115,22 @@ func TestBuildAgentBrokerTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing
 
 	prompt := "implement the change"
 	command := "git push"
-	commands, _ := BuildAgentBrokerTask(
-		"Prepare",
-		NodePrepareScript("", "", "repo"),
-		"run.js",
-		"echo run",
-		"repo",
-		[]AgentStep{
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:      "Prepare",
+		PrepareScript:    NodePrepareScript("", "", "repo"),
+		RunScriptName:    "run.js",
+		RunScript:        "echo run",
+		WorkingDirectory: "repo",
+		Steps: []AgentStep{
 			{Name: "Clone", Type: AgentStepBash, Command: strPtr("git clone dest repo")},
 			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
 			{Name: "Push", Type: AgentStepBash, Command: &command, WorkingDirectory: "/tmp/override"},
 		},
-		"google/gemini-3.7-flash",
-		func(promptName, model string) string {
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
 			return "node run.js " + promptName + " " + model
 		},
-	)
+	})
 
 	require.Len(t, commands, 4)
 	assert.Contains(t, commands[1].Command, `'repo'`)
@@ -122,6 +150,55 @@ func TestValidateAgentStepsRejectsParentWorkingDirectory(t *testing.T) {
 	assert.Contains(t, err.Error(), "workingDirectory")
 }
 
+func TestApplyIntegrationUsagePrependsUsage(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "user prompt", ApplyIntegrationUsage("user prompt", ""))
+	assert.Equal(t, "Use gh.", ApplyIntegrationUsage("", "Use gh."))
+	assert.Equal(t, "Use gh.\n\nuser prompt", ApplyIntegrationUsage("user prompt", "Use gh."))
+}
+
+func TestBuildAgentBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+	t.Parallel()
+
+	prompt := "implement the change"
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Usage: "The gh CLI is already installed. Use GITHUB_TOKEN.",
+		Setups: []IntegrationSetup{
+			{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
+		},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 3)
+	assert.Equal(t, "Prepare", commands[0].Name)
+	assert.Equal(t, LiveLogKindSetup, commands[0].Kind)
+	assert.Equal(t, "Set up Semaphore", commands[1].Name)
+	assert.Equal(t, LiveLogKindSetup, commands[1].Kind)
+	assert.Equal(t, "Set up Semaphore", commands[1].Preview)
+	assert.Contains(t, commands[1].Command, `source "$SUPERPLANE_TASK_DIR/setup/01-set-up-semaphore.sh"`)
+	assert.Equal(t, "Implement", commands[2].Name)
+	assert.Equal(t, "implement the change", commands[2].Preview)
+	assert.Contains(t, commands[2].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
+
+	assert.Equal(t, "echo install-sem-ai", requireBrokerFile(t, files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
+		requireBrokerFile(t, files, "prompts/01-implement.txt").Content,
+	)
+}
+
 func assertAgentStepMergesUsage(t *testing.T, command, inner string) {
 	t.Helper()
 	assert.Contains(t, command, inner)
@@ -137,4 +214,89 @@ func requireBrokerFile(t *testing.T, files []BrokerTaskFile, path string) Broker
 	}
 	t.Fatalf("missing task file %q", path)
 	return BrokerTaskFile{}
+}
+
+func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
+	t.Parallel()
+
+	prompt := "See ![bug](https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1)"
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 3)
+	assert.Equal(t, "Fetch task attachments", commands[1].Name)
+	assert.Contains(t, commands[1].Command, `mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
+	assert.Contains(t, commands[1].Command, `curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
+	assert.Contains(t, commands[1].Command, "sp_file=1")
+	assert.Equal(t, "Implement", commands[2].Name)
+}
+
+func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:     "Prepare",
+		PrepareScript:   NodePrepareScript("", "", ""),
+		RunScriptName:   "run.js",
+		RunScript:       "echo run",
+		Steps:           []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		DispatchedSteps: dispatched,
+		Model:           "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, signed)
+	assert.NotContains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "sp-file://")
+	require.Len(t, commands, 3)
+	assert.Equal(t, "Fetch task attachments", commands[1].Name)
+	assert.Contains(t, commands[1].Command, "curl -fsSL")
+	assert.Contains(t, commands[1].Command, "sp_file=1")
+	assert.Equal(t, "Implement", commands[2].Name)
+	assert.Contains(t, commands[2].Preview, "sp-file://"+fileID)
+	assert.NotContains(t, commands[2].Preview, "sp_file=1")
+}
+
+func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	description := "See ![shot.png](sp-file://" + fileID + ")"
+	spec := "# Retry refunds\n\n![shot.png](sp-file://" + fileID + ")"
+	original := description + "\n\nSpec:\n" + spec
+	signed := "https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/" + fileID + "?sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Refine Task", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, dispatched[0].Prompt)
+	assert.Contains(t, original, "sp-file://"+fileID)
+	assert.Contains(t, *dispatched[0].Prompt, signed)
+	assert.NotContains(t, *dispatched[0].Prompt, "sp-file://")
 }

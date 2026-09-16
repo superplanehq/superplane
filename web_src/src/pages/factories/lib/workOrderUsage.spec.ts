@@ -1,6 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
-import { firstPositiveWorkOrderMetric, formatDurationSeconds, formatWorkOrderExecutionUsage } from "./workOrderUsage";
+import {
+  firstPositiveWorkOrderMetric,
+  formatDurationSeconds,
+  formatUsageCsvDollarsFromMicros,
+  formatUsageMachineTypes,
+  formatUsageModels,
+  formatUsageOccurredAt,
+  formatUsageSpend,
+  formatUsageSpendMicros,
+  formatUsageTaskKey,
+  formatUsageTaskName,
+  formatUsageTokensAndTime,
+  formatUsdMicros,
+  formatWorkOrderExecutionUsage,
+  usageSpendMicros,
+  usageTokenSpendCents,
+  usageTokenSpendMicros,
+  usageVmSpendCents,
+  usageVmSpendMicros,
+} from "./workOrderUsage";
 
 describe("firstPositiveWorkOrderMetric", () => {
   it("skips zero and empty values", () => {
@@ -49,5 +68,163 @@ describe("formatDurationSeconds", () => {
 
   it("keeps hours growing for large values", () => {
     expect(formatDurationSeconds(7200)).toBe("2 h");
+  });
+});
+
+describe("formatUsageTaskName", () => {
+  it("joins the work-order key and title like the board", () => {
+    expect(formatUsageTaskName("RF-101", "Publish draft")).toBe("RF-101 · Publish draft");
+  });
+
+  it("falls back to Untitled task when the title is empty", () => {
+    expect(formatUsageTaskName("RF-101", "  ")).toBe("RF-101 · Untitled task");
+    expect(formatUsageTaskName("", "")).toBe("Untitled task");
+  });
+});
+
+describe("formatUsageTaskKey", () => {
+  it("returns the work-order key without the title", () => {
+    expect(formatUsageTaskKey("RF-101")).toBe("RF-101");
+  });
+
+  it("falls back to Untitled task when the key is empty", () => {
+    expect(formatUsageTaskKey("  ")).toBe("Untitled task");
+    expect(formatUsageTaskKey(undefined)).toBe("Untitled task");
+  });
+});
+
+describe("formatUsageTokensAndTime", () => {
+  it("joins tokens and VM time with the board separator", () => {
+    expect(formatUsageTokensAndTime(22000, 90)).toBe("22k tokens · 1 min 30 s");
+  });
+
+  it("omits zero metrics", () => {
+    expect(formatUsageTokensAndTime(22000, 0)).toBe("22k tokens");
+    expect(formatUsageTokensAndTime(0, 45)).toBe("45 s");
+    expect(formatUsageTokensAndTime(0, 0)).toBe("—");
+  });
+});
+
+describe("formatUsageModels", () => {
+  it("notes your keys on the model when your keys paid the model", () => {
+    expect(formatUsageModels(undefined, ["anthropic/claude-sonnet-4-6"])).toBe(
+      "anthropic/claude-sonnet-4-6 (your keys)",
+    );
+  });
+
+  it("keeps hosted models without the your-keys note", () => {
+    expect(formatUsageModels(["anthropic/claude-sonnet-4-6"])).toBe("anthropic/claude-sonnet-4-6");
+  });
+
+  it("notes your keys on only the your-keys models of a mixed run", () => {
+    expect(formatUsageModels(["anthropic/claude-sonnet-4-6"], ["openai/gpt-5"])).toBe(
+      "anthropic/claude-sonnet-4-6 · openai/gpt-5 (your keys)",
+    );
+  });
+
+  it("returns an em dash when no models exist", () => {
+    expect(formatUsageModels()).toBe("—");
+  });
+});
+
+describe("formatUsageMachineTypes", () => {
+  it("joins unique machine types", () => {
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-large-amd64"])).toBe("Large x64");
+    expect(formatUsageMachineTypes(["e1-large-amd64", "e1-standard-amd64"])).toBe("Large x64 · e1-standard-amd64");
+  });
+
+  it("returns an em dash when no machine types exist", () => {
+    expect(formatUsageMachineTypes()).toBe("—");
+    expect(formatUsageMachineTypes([])).toBe("—");
+  });
+});
+
+describe("formatUsageSpend", () => {
+  it("formats a positive amount in USD", () => {
+    expect(formatUsageSpend(123)).toBe("$1.23");
+  });
+
+  it("returns an em dash when there is no spend", () => {
+    expect(formatUsageSpend(0)).toBe("—");
+  });
+});
+
+describe("usageTokenSpendCents", () => {
+  it("sums hosted and your-keys model spend", () => {
+    expect(usageTokenSpendCents(120, 3)).toBe(123);
+  });
+});
+
+describe("usageVmSpendCents", () => {
+  it("returns the remainder after model spend", () => {
+    expect(usageVmSpendCents(175, 150, 0)).toBe(25);
+    expect(usageVmSpendCents(53, 0, 3)).toBe(50);
+  });
+
+  it("returns zero when model spend covers the total", () => {
+    expect(usageVmSpendCents(123, 120, 3)).toBe(0);
+  });
+});
+
+describe("usageSpendMicros", () => {
+  it("prefers ledger micros when the field is present", () => {
+    expect(usageSpendMicros("3150", "18")).toBe(3150);
+    expect(usageSpendMicros(0, "18")).toBe(0);
+  });
+
+  it("falls back to whole cents when micros are omitted", () => {
+    expect(usageSpendMicros(undefined, "18")).toBe(180_000);
+  });
+});
+
+describe("formatUsageSpendMicros", () => {
+  it("keeps two decimals at one cent and above", () => {
+    expect(formatUsageSpendMicros(1_230_000)).toBe("$1.23");
+    expect(formatUsageSpendMicros(20_000)).toBe("$0.02");
+  });
+
+  it("shows sub-cent VM spend instead of an em dash", () => {
+    expect(formatUsageSpendMicros(3_150)).toBe("$0.00315");
+    expect(formatUsageSpendMicros(90)).toBe("$0.00009");
+  });
+
+  it("returns an em dash when there is no spend", () => {
+    expect(formatUsageSpendMicros(0)).toBe("—");
+  });
+});
+
+describe("usageVmSpendMicros", () => {
+  it("keeps a remainder that is smaller than one cent", () => {
+    expect(usageVmSpendMicros(183_150, 180_000, 0)).toBe(3_150);
+    expect(usageTokenSpendMicros(180_000, 0)).toBe(180_000);
+  });
+});
+
+describe("formatUsageCsvDollarsFromMicros", () => {
+  it("matches the table's sub-cent precision without a dollar sign", () => {
+    expect(formatUsageCsvDollarsFromMicros(1_230_000)).toBe("1.23");
+    expect(formatUsageCsvDollarsFromMicros(3_150)).toBe("0.00315");
+    expect(formatUsageCsvDollarsFromMicros(0)).toBe("");
+  });
+});
+
+describe("formatUsdMicros", () => {
+  it("formats a whole-cent amount with two decimals", () => {
+    expect(formatUsdMicros(50_000)).toBe("$0.05");
+  });
+});
+
+describe("formatUsageOccurredAt", () => {
+  it("formats an ISO timestamp without the year or UTC suffix", () => {
+    expect(formatUsageOccurredAt("2026-09-08T15:04:00Z")).toBe("Sep 8, 3:04 PM");
+  });
+
+  it("uses 12-hour time at morning hours", () => {
+    expect(formatUsageOccurredAt("2026-09-09T07:57:00Z")).toBe("Sep 9, 7:57 AM");
+  });
+
+  it("returns an em dash for missing or invalid values", () => {
+    expect(formatUsageOccurredAt(undefined)).toBe("—");
+    expect(formatUsageOccurredAt("not-a-date")).toBe("—");
   });
 });

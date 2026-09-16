@@ -19,7 +19,7 @@ import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 import { stringOrDash } from "./utils";
 
 // Custom state map for HTTP component with error state
@@ -498,7 +498,7 @@ function getHTTPEventSections(
 
     if (state === "success" || state === "failed") {
       const metadata = execution.metadata as Record<string, unknown> | undefined;
-      let responseCode: string | null = null;
+      let responseCode: string | null;
 
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
         responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;

@@ -20,6 +20,7 @@ const (
 	FactoryOnboardingAgentHarnessClaudeCode = "claude-code"
 	FactoryOnboardingAgentHarnessCursor     = "cursor"
 	FactoryOnboardingAgentHarnessCodex      = "codex"
+	FactoryOnboardingAgentHarnessSuperPlane = "superplane"
 )
 
 var (
@@ -45,15 +46,16 @@ var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
 // FactoryOnboardingConfig stores durable wizard choices and provisioned
 // resource IDs. Empty strings mean the field has not been saved yet.
 type FactoryOnboardingConfig struct {
-	VCSIntegrationID   string `json:"vcs_integration_id,omitempty"`
-	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
-	AppRepository      string `json:"app_repository,omitempty"`
-	BacklogRepository  string `json:"backlog_repository,omitempty"`
-	DefaultBranch      string `json:"default_branch,omitempty"`
-	IssuesSource       string `json:"issues_source,omitempty"`
-	AgentHarness       string `json:"agent_harness,omitempty"`
-	ProvisionedAppID   string `json:"provisioned_app_id,omitempty"`
-	ProvisionedLineID  string `json:"provisioned_line_id,omitempty"`
+	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
+	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
+	AgentIntegrationID         string `json:"agent_integration_id,omitempty"`
+	AppRepository              string `json:"app_repository,omitempty"`
+	BacklogRepository          string `json:"backlog_repository,omitempty"`
+	DefaultBranch              string `json:"default_branch,omitempty"`
+	IssuesSource               string `json:"issues_source,omitempty"`
+	AgentHarness               string `json:"agent_harness,omitempty"`
+	ProvisionedAppID           string `json:"provisioned_app_id,omitempty"`
+	ProvisionedLineID          string `json:"provisioned_line_id,omitempty"`
 }
 
 // FactoryOnboardingPatch carries optional field updates for a partial merge.
@@ -90,7 +92,8 @@ func ValidateFactoryOnboardingAgentHarness(harness string) error {
 	case "",
 		FactoryOnboardingAgentHarnessClaudeCode,
 		FactoryOnboardingAgentHarnessCursor,
-		FactoryOnboardingAgentHarnessCodex:
+		FactoryOnboardingAgentHarnessCodex,
+		FactoryOnboardingAgentHarnessSuperPlane:
 		return nil
 	default:
 		return ErrFactoryOnboardingInvalidAgentHarness
@@ -101,12 +104,36 @@ func (f *Factory) IsOnboardingComplete() bool {
 	return f.OnboardingCompletedAt != nil
 }
 
+// IsInitialOnboarding reports whether account onboarding created the workspace.
+func (f *Factory) IsInitialOnboarding() bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID != ""
+}
+
+// IsPendingInitialOnboarding reports whether this workspace is the unfinished
+// first-run organization setup for an account.
+func (f *Factory) IsPendingInitialOnboarding() bool {
+	return f.IsInitialOnboarding() && !f.IsOnboardingComplete()
+}
+
 func (f *Factory) OnboardingConfigValue() FactoryOnboardingConfig {
 	return f.OnboardingConfig.Data()
 }
 
 func (f *Factory) OnboardingConfigAfter(patch FactoryOnboardingPatch) (FactoryOnboardingConfig, error) {
 	return mergeFactoryOnboardingConfig(f.OnboardingConfigValue(), patch)
+}
+
+// SetInitialOnboardingAttempt records the server-owned retry key for a
+// workspace created during account onboarding. It is not part of the
+// user-editable onboarding patch.
+func (f *Factory) SetInitialOnboardingAttempt(tx *gorm.DB, attemptID uuid.UUID) error {
+	config := f.OnboardingConfigValue()
+	config.InitialOnboardingAttemptID = attemptID.String()
+	return f.persistOnboarding(tx, config, f.OnboardingCompletedAt)
+}
+
+func (f *Factory) HasInitialOnboardingAttempt(attemptID uuid.UUID) bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID == attemptID.String()
 }
 
 // UpdateOnboarding merges a partial patch into the stored config. It does not
@@ -265,6 +292,52 @@ func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
 		return ErrFactoryOnboardingLineIDRequired
 	}
 	return validateOptionalUUID(config.ProvisionedLineID, ErrFactoryOnboardingInvalidLineID)
+}
+
+// CountFactoriesUsingVCSIntegration counts workspaces in the organization
+// that still store this integration as their version-control connection.
+func CountFactoriesUsingVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("onboarding_config->>'vcs_integration_id' = ?", integrationID.String()).
+		Count(&count).
+		Error
+	return count, err
+}
+
+// OrganizationIDsPendingInitialOnboardingOnly returns organizations whose
+// only workspaces are unfinished first-run setup. Organizations that also
+// have a completed workspace are omitted.
+func OrganizationIDsPendingInitialOnboardingOnly(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]struct{}, error) {
+	pending := make(map[uuid.UUID]struct{})
+	if len(organizationIDs) == 0 {
+		return pending, nil
+	}
+
+	completed := tx.Model(&Factory{}).
+		Select("organization_id").
+		Where("organization_id IN ?", organizationIDs).
+		Where("onboarding_completed_at IS NOT NULL")
+
+	var ids []uuid.UUID
+	err := tx.Model(&Factory{}).
+		Select("organization_id").
+		Where("organization_id IN ?", organizationIDs).
+		Where("onboarding_completed_at IS NULL").
+		Where("NULLIF(onboarding_config->>'initial_onboarding_attempt_id', '') IS NOT NULL").
+		Where("organization_id NOT IN (?)", completed).
+		Distinct("organization_id").
+		Pluck("organization_id", &ids).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		pending[id] = struct{}{}
+	}
+	return pending, nil
 }
 
 func validateOptionalFactoryRepository(repository string) error {

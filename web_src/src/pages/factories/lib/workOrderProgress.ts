@@ -31,7 +31,13 @@ export type WorkOrderDisplayStatus =
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
-  { label: string; filterLabel: string; summary: string; className: string; dotClassName: string }
+  {
+    label: string;
+    filterLabel: string;
+    summary: string;
+    className: string;
+    dotClassName: string;
+  }
 > = {
   draft: {
     label: "Draft",

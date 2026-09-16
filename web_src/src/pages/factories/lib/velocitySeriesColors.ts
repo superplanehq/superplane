@@ -18,7 +18,14 @@ export const VELOCITY_TIME_COLORS = {
   waiting: "#f59e0b",
 } as const;
 
-export const VELOCITY_COST_COLOR = "#6366f1";
+/**
+ * The two things spend goes to. Both bands keep one hue in two tints, so a
+ * stacked cost bar reads as one total before it reads as a split.
+ */
+export const VELOCITY_COST_COLORS = {
+  model: "#6366f1",
+  compute: "#a5b4fc",
+} as const;
 
 /**
  * Colors of the intake bands. Known sources keep one color across workspaces so

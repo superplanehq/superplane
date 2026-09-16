@@ -297,10 +297,11 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
+	environment := resolved.Variables
 
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
@@ -367,7 +368,7 @@ func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhoo
 }
 
 func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunJSFinishedEventType)
 }
 
 func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }

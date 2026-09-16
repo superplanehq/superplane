@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import {
@@ -30,7 +30,7 @@ describe("BacklogCreatePopover", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it("opens from the plus control with create and collapsed intake searches", async () => {
+  it("opens from the plus control and focuses the first intake", async () => {
     const onCreateManually = vi.fn();
     const onImportItem = vi.fn();
     const onQueryChange = vi.fn();
@@ -53,18 +53,96 @@ describe("BacklogCreatePopover", () => {
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-create-menu")).toHaveAttribute("data-side", "right");
+    expect(screen.getByTestId("lines-backlog-create-menu").getAttribute("data-side")).toBe("right");
     expect(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually })).toBeInTheDocument();
+    expect(screen.getByText(BACKLOG_CREATE_COPY.createManuallyHint)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toHaveAttribute("src", "/github.svg");
+    expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-github");
     expect(screen.queryByTestId("lines-backlog-create-item-gh-1")).not.toBeInTheDocument();
+
+    expect(screen.queryByTestId("lines-backlog-create-with-agent")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));
     expect(onCreateManually).toHaveBeenCalledTimes(1);
   });
 
-  it("expands a few issues when an intake search is selected", async () => {
+  it("does not open the create menu on hover", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={[]}
+        query=""
+        focusedIntakeId={null}
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    await user.hover(screen.getByTestId("lines-backlog-create"));
+    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+  });
+
+  it("keeps the plus control in its hover style while the menu is open", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={[]}
+        query=""
+        focusedIntakeId={null}
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByTestId("lines-backlog-create");
+    expect(trigger).not.toHaveClass("bg-accent");
+
+    await user.click(trigger);
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    expect(trigger).toHaveClass("bg-accent");
+    expect(trigger).toHaveClass("text-foreground");
+  });
+
+  it("keeps the ghost card in its hover style while the menu is open", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BacklogCreatePopover
+        canAdd
+        variant="ghost"
+        sources={sources}
+        items={[]}
+        query=""
+        focusedIntakeId={null}
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByTestId("lines-backlog-create-ghost");
+    expect(trigger).not.toHaveClass("bg-muted/70");
+
+    await user.click(trigger);
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    expect(trigger).toHaveClass("bg-muted/70");
+    expect(trigger).toHaveClass("text-foreground");
+  });
+
+  it("shows GitHub issues when the menu opens without a search click", async () => {
     const onFocusedIntakeChange = vi.fn();
     const onImportItem = vi.fn();
     const user = userEvent.setup();
@@ -84,7 +162,6 @@ describe("BacklogCreatePopover", () => {
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues")));
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-github");
 
     rerender(
@@ -237,7 +314,7 @@ describe("BacklogCreatePopover", () => {
     );
   });
 
-  it("opens the create dialog when no intakes are configured", async () => {
+  it("opens the create menu when no intakes are configured", async () => {
     const onCreateManually = vi.fn();
     const user = userEvent.setup();
     render(
@@ -255,7 +332,8 @@ describe("BacklogCreatePopover", () => {
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));
     expect(onCreateManually).toHaveBeenCalledTimes(1);
   });
 

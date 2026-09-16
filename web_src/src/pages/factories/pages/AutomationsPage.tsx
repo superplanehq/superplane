@@ -5,12 +5,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import {
-  factorySectionBodyClassName,
-  factorySectionHeaderClassName,
-  factorySettingsSectionBodyClassName,
-  factorySettingsSectionHeaderClassName,
-} from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
@@ -18,20 +13,7 @@ import { useAutomationsPageModel } from "./useAutomationsPageModel";
 import { useFactoryPullRequests } from "@/hooks/useFactoryData";
 import { usePRFeedbackWorkOrderAttention } from "./useWorkOrderPRFeedbackRunHref";
 
-/**
- * Where the page is mounted. The workspace route fills the whole pane, while
- * the settings route shares the centered column of the other settings pages.
- */
-export type AutomationsPageLayout = "workspace" | "settings";
-
-function layoutClassNames(layout: AutomationsPageLayout) {
-  if (layout === "settings") {
-    return { header: factorySettingsSectionHeaderClassName, body: factorySettingsSectionBodyClassName };
-  }
-  return { header: factorySectionHeaderClassName, body: factorySectionBodyClassName };
-}
-
-export function AutomationsPage({ layout = "workspace" }: { layout?: AutomationsPageLayout }) {
+export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
   const { data: pullRequests = [] } = useFactoryPullRequests(model.organizationId, model.factoryId);
@@ -73,6 +55,7 @@ export function AutomationsPage({ layout = "workspace" }: { layout?: Automations
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
     fixesPausedOrderIds,
+    pullRequests,
     ...cardActions,
   };
 
@@ -92,12 +75,10 @@ export function AutomationsPage({ layout = "workspace" }: { layout?: Automations
     );
   }
 
-  const classNames = layoutClassNames(layout);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-8" data-testid="automations-list-page">
       <WorkspacePageHeader
-        className={classNames.header}
+        className={factorySectionHeaderClassName}
         title="Automations"
         subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
         actions={
@@ -119,7 +100,7 @@ export function AutomationsPage({ layout = "workspace" }: { layout?: Automations
         }
       />
 
-      <div className={classNames.body}>
+      <div className={factorySectionBodyClassName}>
         <AutomationsPageBody
           organizationId={model.organizationId}
           factoryKey={model.factoryKey}

@@ -1,13 +1,22 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  DRAFT_WORK_ORDER,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
@@ -26,7 +35,7 @@ function renderLinesBoard(
 }
 
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
+const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
@@ -34,6 +43,15 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
 
 const REFUND_INTAKE_SEARCH = {
   data: [
@@ -51,18 +69,20 @@ const REFUND_INTAKE_SEARCH = {
 
 async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("lines-backlog-create"));
-  await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
   await user.click(screen.getByTestId("lines-backlog-create-item-12"));
 }
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => useFactoryApps(),
+  useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
+  useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -78,6 +98,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -87,6 +108,10 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
   }),
+}));
+
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -102,7 +127,30 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
+}));
+
+vi.mock("./useWorkOrderPlanningSurvey", () => ({
+  useWorkOrderPlanningSurvey: () => false,
+  useWorkOrderPlanningActivity: (
+    _organizationId: string,
+    _factoryId: string,
+    _workOrderId: string,
+    enabled: boolean,
+    backlogAnalyzing = false,
+  ) => ({
+    hasAgentQuestion: false,
+    isWaiting: false,
+    isWorking: false,
+    isAgentWorking: Boolean(enabled && backlogAnalyzing),
+  }),
+  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
+    "planning-session-by-work-order",
+    organizationId,
+    factoryId,
+    workOrderId,
+  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -110,8 +158,8 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof canvasData>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
@@ -124,10 +172,15 @@ describe("LinesPage backlog create", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
-    useFactoryApps.mockReturnValue({ data: [] });
+    useFactoryAutomations.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("keeps a create ghost card at the bottom of the backlog", async () => {
@@ -180,8 +233,25 @@ describe("LinesPage backlog create", () => {
     expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create task manually" }));
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refine a backlog draft from the task popup", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+      ...REFUND_FACTORY,
+      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "acme/payments" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
   it("imports an intake item and opens the task popup", async () => {
@@ -205,7 +275,7 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
   });
 
   it("opens the popup from a just-imported order that already has a number", async () => {

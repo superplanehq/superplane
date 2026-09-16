@@ -16,15 +16,20 @@ const AccountBlockedMessage = "Your account has been blocked. Please contact sup
 var ErrAccountBlocked = errors.New(AccountBlockedMessage)
 
 type Account struct {
-	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Email             string
-	Name              string
-	InstallationAdmin bool `gorm:"default:false"`
-	PasswordChangedAt *time.Time
-	BlockedAt         *time.Time
-	CreatedAt         *time.Time
-	UpdatedAt         *time.Time
-	DeletedAt         gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Email                  string
+	Name                   string
+	InstallationAdmin      bool `gorm:"default:false"`
+	PasswordChangedAt      *time.Time
+	BlockedAt              *time.Time
+	WelcomeCreditGrantedAt *time.Time
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
+}
+
+func (a *Account) HasReceivedWelcomeCredit() bool {
+	return a != nil && a.WelcomeCreditGrantedAt != nil
 }
 
 func (a *Account) IsInstallationAdmin() bool {

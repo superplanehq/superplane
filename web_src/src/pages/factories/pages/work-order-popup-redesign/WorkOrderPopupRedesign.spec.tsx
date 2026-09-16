@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -168,7 +168,9 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Waiting for user review"),
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByRole("link", {
+        name: "Review pull request #6812.",
+      }),
     ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", { name: /^Open / }),
@@ -237,9 +239,8 @@ describe("Line board job popup", () => {
     );
 
     const dialog = await screen.findByTestId("work-order-split-run");
-    const source = within(dialog).getByTestId("split-run-source");
-    expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
-    expect(within(source).getByText("Created manually")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
       "Let a user add emoji reactions on a task itself (not only on comments).",
     );
@@ -267,17 +268,18 @@ describe("Line board job popup", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     expect(
-      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Waiting for user review"),
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByRole("link", {
+        name: "Review pull request #6812.",
+      }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
-    expect(within(waitingNote).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(waitingNote).getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(within(waitingNote).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
@@ -306,7 +308,11 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-title")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
+    expect(within(dialog).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
@@ -316,6 +322,12 @@ describe("Line board job popup", () => {
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
+    expect(
+      within(screen.getByTestId("work-order-card-wo-pr-closure-receipts")).getByRole("link", {
+        name: "Merged pull request #510.",
+      }),
+    ).toHaveAttribute("href", "https://github.com/example/ledger/pull/510");
+
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
@@ -323,7 +335,6 @@ describe("Line board job popup", () => {
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
     expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   }, 20000);
 
   it("dispatches a draft task to the open line", async () => {

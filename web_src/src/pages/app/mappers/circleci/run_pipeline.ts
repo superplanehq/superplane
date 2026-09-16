@@ -11,7 +11,7 @@ import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -225,7 +225,7 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const sections: EventSection[] = [];
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runPipelineStateFunction(execution);
   const subtitleTimestamp =

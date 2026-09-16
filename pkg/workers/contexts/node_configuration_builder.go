@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +15,13 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -87,16 +90,20 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 }
 
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	var (
+		resolved map[string]any
+		err      error
+	)
 	if len(b.configurationFields) > 0 {
-		return b.resolveWithSchema(configuration, b.configurationFields)
+		resolved, err = b.resolveWithSchema(configuration, b.configurationFields)
+	} else {
+		resolved, err = b.resolve(configuration)
 	}
-
-	resolved, err := b.resolve(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	return resolved, nil
+	return b.applyLineDispatchModel(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -1046,9 +1053,10 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments, and
-// assignees are loaded only when the expression AST references those fields
-// on order() or task().
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and spec are loaded only when the expression AST references
+// those fields on order() or task(). Origin is attached whenever the work
+// order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1092,6 +1100,10 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+	attachOrderOrigin(order, payload)
+	if err := attachOrderFiles(b.tx, order, payload); err != nil {
 		return nil, err
 	}
 
@@ -1196,7 +1208,68 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["assignees"] = assigneePayloads
 	}
 
+	usesSpec, err := expressionvalidation.ExpressionUsesOrderSpec(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesSpec {
+		spec, err := b.resolveOrderSpec(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["spec"] = spec
+	}
+
 	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
+	if !workOrderRefinementEnabled(b.tx, order) {
+		return "", nil
+	}
+	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
+	}
+	return planningSpecArtifactBody(artifact), nil
+}
+
+func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact == nil || artifact.Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+		return ""
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return ""
+	}
+	body, _ := data["body"].(string)
+	return strings.TrimSpace(body)
+}
+
+func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	_, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return fmt.Errorf("order() could not mint a file URL: %w", err)
+	}
+
+	filePayloads := make([]any, 0, len(files))
+	for _, file := range files {
+		filePayloads = append(filePayloads, file.Map())
+	}
+	payload["files"] = filePayloads
+	return nil
 }
 
 // resolveOrderRepository keeps orders created before repository snapshots
@@ -1226,6 +1299,19 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 
 func githubRepositoryURL(repository string) string {
 	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
+}
+
+func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
+	origin := order.Origin()
+	if origin == nil {
+		return
+	}
+
+	item := map[string]any{"url": origin.URL}
+	if origin.Label != "" {
+		item["label"] = origin.Label
+	}
+	payload["origin"] = item
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
@@ -2185,4 +2271,153 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
+	dispatch, err := b.lineDispatch()
+	if err != nil || dispatch == nil {
+		return resolved, err
+	}
+	override := strings.TrimSpace(dispatch.Model)
+	if override == "" {
+		return resolved, nil
+	}
+
+	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
+	if err != nil || !ok {
+		return resolved, err
+	}
+
+	resolved["model"] = override
+	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {
+	if b.rootEventID == nil || b.tx == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(b.tx, execution.LineDispatchID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderLineDispatchNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return dispatch, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
+	resolved map[string]any,
+	model string,
+) (bool, error) {
+	if b.nodeID == "" {
+		return false, nil
+	}
+
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, err
+	}
+
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
+	}
+
+	provider, ok := runnerProviderForComponent(node.ComponentName())
+	if !ok {
+		return false, nil
+	}
+
+	return models.ModelIsSelectable(
+		b.tx,
+		workflow.OrganizationID,
+		workflow.FactoryID,
+		provider,
+		runnerFundingSourceFromConfig(resolved),
+		model,
+	)
+}
+
+func superPlaneAcceptsDispatchModel(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	factoryID *uuid.UUID,
+	model string,
+) (bool, error) {
+	if parsed, err := models.ParseSelectableLLMModelKey(model); err == nil {
+		if parsed.Source.ID != models.UsageFundingSourceHosted {
+			return false, nil
+		}
+		return models.ModelIsSelectable(
+			tx,
+			orgID,
+			factoryID,
+			parsed.Provider.ID,
+			models.UsageFundingSourceHosted,
+			parsed.Model.ID,
+		)
+	}
+
+	hosted, err := models.ParseHostedLLMModelKey(model)
+	if err != nil || !hosted.IsSet() {
+		return false, nil
+	}
+	return models.ModelIsSelectable(
+		tx,
+		orgID,
+		factoryID,
+		hosted.Provider,
+		models.UsageFundingSourceHosted,
+		hosted.Model,
+	)
+}
+
+func runnerProviderForComponent(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerCodex":
+		return models.UsageProviderOpenAI, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func runnerFundingSourceFromConfig(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }

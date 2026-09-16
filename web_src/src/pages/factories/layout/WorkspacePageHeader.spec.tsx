@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
@@ -15,6 +15,15 @@ describe("WorkspacePageHeader (section variant)", () => {
     expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("Your workspace at a glance.");
     expect(screen.queryByTestId("workspace-page-header-back")).not.toBeInTheDocument();
     expect(screen.queryByTestId("workspace-page-header-kicker")).not.toBeInTheDocument();
+  });
+
+  it("renders compact content above the title", () => {
+    renderHeader(
+      <WorkspacePageHeader title="Tasks" aboveTitle={<span data-testid="trial-kicker">Trial 13 days.</span>} />,
+    );
+    expect(screen.getByTestId("workspace-page-header-above-title")).toContainElement(
+      screen.getByTestId("trial-kicker"),
+    );
   });
 
   it("renders leading content next to the title", () => {

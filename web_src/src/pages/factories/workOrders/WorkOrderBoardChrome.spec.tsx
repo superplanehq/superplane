@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "./WorkOrderBoardChrome";
 
@@ -83,5 +83,24 @@ describe("WorkOrderKanbanBoard", () => {
     await user.keyboard("{Enter}");
 
     expect(onRename).toHaveBeenCalledWith("Inbox");
+  });
+
+  it("packages the title and subheader as one header above a divider", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={1}
+        emptyDescription="Nothing here."
+        subheader={<p>Listens to GitHub issues</p>}
+        testId="lane-grouped"
+      >
+        <p>Card</p>
+      </WorkOrderBoardLane>,
+    );
+
+    const header = screen.getByTestId("lane-grouped-header");
+    expect(header).toHaveTextContent("Backlog");
+    expect(header).toHaveTextContent("Listens to GitHub issues");
+    expect(header.className).toContain("border-b");
   });
 });

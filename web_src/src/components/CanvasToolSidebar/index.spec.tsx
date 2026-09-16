@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { CanvasToolSidebar } from ".";
 import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
@@ -111,9 +111,31 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
-    agentMode: "operator" as const,
-    switchAgentMode: vi.fn(),
     ...overrides,
+  };
+}
+
+function mockStreamingReconcileInterval() {
+  const ticks: Array<() => void> = [];
+  const captureInterval = ((handler: TimerHandler) => {
+    if (typeof handler === "function") {
+      ticks.push(handler as () => void);
+    }
+    return 0;
+  }) as typeof setInterval;
+  const previousWindow = window.setInterval;
+  const previousGlobal = globalThis.setInterval;
+  window.setInterval = captureInterval;
+  globalThis.setInterval = captureInterval;
+
+  return {
+    tickReconcile: async () => {
+      await Promise.all(ticks.map((tick) => tick()));
+    },
+    restore: () => {
+      window.setInterval = previousWindow;
+      globalThis.setInterval = previousGlobal;
+    },
   };
 }
 
@@ -137,16 +159,12 @@ describe("CanvasToolSidebar", () => {
     sessionStorage.clear();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("renders the agent panel when the sidebar is open", async () => {
     const markAgentAvailable = vi.fn();
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentAvailable })} />);
 
-    expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
     await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
   });
 
@@ -233,7 +251,6 @@ describe("CanvasToolSidebar", () => {
     expect(sendMutation.mutateAsync).toHaveBeenCalledWith({
       chatId: "chat-1",
       content: "retry",
-      mode: "operator",
       images: [],
       autoLayoutOnUpdateEnabled: false,
     });
@@ -242,13 +259,13 @@ describe("CanvasToolSidebar", () => {
   it("does not render when managed agents are disabled", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("does not render while the sidebar is closed", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("opens the sidebar when the agent tab event is dispatched", () => {
@@ -303,40 +320,54 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("clears stale streaming state when a durable chat refetch returns idle", async () => {
-    vi.useFakeTimers();
-    chatState.status = "streaming";
-    chatState.refetchStatus = "streaming";
+    const { tickReconcile, restore } = mockStreamingReconcileInterval();
+    try {
+      chatState.status = "streaming";
+      chatState.refetchStatus = "streaming";
 
-    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+      render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
-    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+      expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+      await act(async () => {
+        await Promise.resolve();
+      });
 
-    chatState.refetchStatus = "idle";
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
-    });
+      chatState.refetchStatus = "idle";
+      await act(async () => {
+        await tickReconcile();
+      });
 
-    expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.queryByTestId("agent-stop-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
+      expect(screen.getByText("Ready")).toBeInTheDocument();
+      expect(screen.queryByTestId("agent-stop-button")).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 
   it("keeps streaming state while durable chat refetches are still streaming", async () => {
-    vi.useFakeTimers();
-    chatState.status = "streaming";
-    chatState.refetchStatus = "streaming";
+    const { tickReconcile, restore } = mockStreamingReconcileInterval();
+    try {
+      chatState.status = "streaming";
+      chatState.refetchStatus = "streaming";
 
-    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+      render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+      await act(async () => {
+        await Promise.resolve();
+      });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
-    });
+      await act(async () => {
+        await tickReconcile();
+      });
 
-    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
-    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
+      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+      expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+      expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });

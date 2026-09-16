@@ -1,12 +1,32 @@
-import { Bug, CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, Loader2, RotateCcw, Undo2 } from "lucide-react";
+import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  Archive,
+  Bug,
+  CheckCircle2,
+  CircleAlert,
+  CircleX,
+  ExternalLink,
+  FileText,
+  Hourglass,
+  Loader2,
+  Play,
+  RotateCcw,
+  Sparkles,
+  TriangleAlert,
+  Undo2,
+} from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
+import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
+import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
 
 const TONE = {
   draft: {
@@ -14,6 +34,24 @@ const TONE = {
     iconWrap: "bg-[color:var(--status-draft-dot)]/15",
     icon: "text-[color:var(--status-draft-fg)]",
     Icon: FileText,
+  },
+  "draft-blocked": {
+    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
+    iconWrap: "bg-[color:var(--status-failed-dot)]/15",
+    icon: "text-[color:var(--status-failed-fg)]",
+    Icon: CircleAlert,
+  },
+  "draft-caution": {
+    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
+    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
+    icon: "text-[color:var(--status-waiting-fg)]",
+    Icon: TriangleAlert,
+  },
+  "draft-ready": {
+    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
+    iconWrap: "bg-[color:var(--status-completed-dot)]/15",
+    icon: "text-[color:var(--status-completed-fg)]",
+    Icon: CheckCircle2,
   },
   waiting: {
     strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
@@ -43,7 +81,8 @@ const TONE = {
 
 /**
  * Sticky decision note. Actions sit beside the copy. No Update manually,
- * no source time.
+ * no source time. A waiting note that links to a pull request renders as
+ * the pull-request review strip instead.
  */
 function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
   if (!note.actor) {
@@ -65,6 +104,9 @@ export function SplitRunAttentionNote({
   actionBusy = false,
   startBusy = false,
   startDisabled = false,
+  modelSelect,
+  compact = false,
+  actionsOnly = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -74,8 +116,38 @@ export function SplitRunAttentionNote({
   actionBusy?: boolean;
   startBusy?: boolean;
   startDisabled?: boolean;
+  modelSelect?: ReactNode;
+  compact?: boolean;
+  actionsOnly?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
+  const pullRequestNote = WaitingPullRequestReview({
+    note,
+    tone,
+    actions,
+    actionBusy,
+    onAction,
+  });
+  if (pullRequestNote) {
+    return pullRequestNote;
+  }
+
+  if (compact) {
+    return (
+      <CompactAttentionNote
+        note={note}
+        actions={actions}
+        runHref={runHref}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        modelSelect={modelSelect}
+        actionsOnly={actionsOnly}
+        onAction={onAction}
+      />
+    );
+  }
+
   const visual = TONE[tone];
   const Icon = actions.some((action) => action.kind === "reopen") ? RotateCcw : visual.Icon;
 
@@ -89,7 +161,7 @@ export function SplitRunAttentionNote({
           <Icon className={cn("size-5", visual.icon)} />
         </span>
 
-        <div className="min-w-0 flex-1">
+        <div key={`${note.headline}-${note.text ?? ""}`} className="sp-text-reveal min-w-0 flex-1">
           <h3 className="workspace-section-title">
             <StoppedHeadline note={note} />
           </h3>
@@ -110,9 +182,61 @@ export function SplitRunAttentionNote({
           actionBusy={actionBusy}
           startBusy={startBusy}
           startDisabled={startDisabled}
+          modelSelect={modelSelect}
           onAction={onAction}
         />
       </div>
+    </div>
+  );
+}
+
+function CompactAttentionNote({
+  note,
+  actions,
+  runHref,
+  actionBusy,
+  startBusy,
+  startDisabled,
+  modelSelect,
+  actionsOnly,
+  onAction,
+}: {
+  note: SplitRunFooterNote;
+  actions: SplitRunFooterAction[];
+  runHref?: string | null;
+  actionBusy: boolean;
+  startBusy: boolean;
+  startDisabled: boolean;
+  modelSelect?: ReactNode;
+  actionsOnly: boolean;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  return (
+    <div
+      className={cn("flex items-center gap-3", actionsOnly ? "shrink-0" : "min-w-0 flex-1")}
+      data-testid="split-run-attention-note"
+    >
+      {actionsOnly ? null : (
+        <div
+          key={`${note.headline}-${note.text ?? ""}`}
+          className="sp-stream-text min-w-0 flex-1"
+          data-testid="split-run-intent-decision-tip"
+        >
+          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
+          {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
+        </div>
+      )}
+      <NoteActionRow
+        note={note}
+        actions={actions}
+        runHref={runHref}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        modelSelect={modelSelect}
+        capsule={actionsOnly}
+        onAction={onAction}
+      />
     </div>
   );
 }
@@ -124,6 +248,8 @@ function NoteActionRow({
   actionBusy,
   startBusy,
   startDisabled,
+  modelSelect,
+  capsule = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -132,28 +258,133 @@ function NoteActionRow({
   actionBusy: boolean;
   startBusy: boolean;
   startDisabled: boolean;
+  modelSelect?: ReactNode;
+  capsule?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const href = note.cta?.href ?? runHref ?? undefined;
   const showCta = Boolean(note.cta && href);
-  if (!showCta && actions.length === 0) {
+  if (!showCta && actions.length === 0 && !modelSelect) {
     return null;
+  }
+
+  if (capsule) {
+    return (
+      <DraftActionCapsule
+        actions={actions}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        modelSelect={modelSelect}
+        onAction={onAction}
+      />
+    );
   }
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
       {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} icon={note.cta.icon} /> : null}
-      {actions.map((action) => (
+      {actions.map((action) => {
+        const groupedStart = action.kind === "start" && Boolean(modelSelect);
+        const startLocked = startDisabled || startBusy || Boolean(action.disabled);
+        const noteAction = (
+          <NoteAction
+            action={action}
+            actionBusy={actionBusy}
+            startBusy={startBusy}
+            startDisabled={startDisabled}
+            grouped={groupedStart}
+            onClick={() => onAction?.(action)}
+          />
+        );
+        if (!groupedStart) {
+          return <Fragment key={action.id}>{noteAction}</Fragment>;
+        }
+        const select = isValidElement(modelSelect)
+          ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
+          : modelSelect;
+        return (
+          <ButtonGroup key={action.id} aria-label="Start">
+            {noteAction}
+            <ButtonGroupSeparator className="bg-primary-foreground/25" />
+            {select}
+          </ButtonGroup>
+        );
+      })}
+    </div>
+  );
+}
+
+function DraftActionCapsule({
+  actions,
+  actionBusy,
+  startBusy,
+  startDisabled,
+  modelSelect,
+  onAction,
+}: {
+  actions: SplitRunFooterAction[];
+  actionBusy: boolean;
+  startBusy: boolean;
+  startDisabled: boolean;
+  modelSelect?: ReactNode;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  const archive = actions.find((action) => action.kind === "archive");
+  const start = actions.find((action) => action.kind === "start");
+  const rest = actions.filter((action) => action.kind !== "archive" && action.kind !== "start");
+  const startLocked = Boolean(start && (startDisabled || startBusy || start.disabled));
+  const select = isValidElement(modelSelect)
+    ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
+    : modelSelect;
+
+  return (
+    <ButtonGroup
+      className="overflow-hidden rounded-md border border-input"
+      aria-label="Draft actions"
+      data-testid="split-run-draft-action-group"
+    >
+      {archive ? (
+        <NoteAction
+          action={archive}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          grouped
+          capsule
+          onClick={() => onAction?.(archive)}
+        />
+      ) : null}
+      {select ? (
+        <>
+          <ButtonGroupSeparator />
+          {select}
+        </>
+      ) : null}
+      {rest.map((action) => (
         <NoteAction
           key={action.id}
           action={action}
           actionBusy={actionBusy}
           startBusy={startBusy}
           startDisabled={startDisabled}
+          grouped
+          capsule
           onClick={() => onAction?.(action)}
         />
       ))}
-    </div>
+      {start ? (
+        <NoteAction
+          action={start}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          grouped
+          capsule
+          onClick={() => onAction?.(start)}
+        />
+      ) : null}
+    </ButtonGroup>
   );
 }
 
@@ -178,9 +409,26 @@ function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "b
   );
 }
 
-function ActionIcon({ icon }: { icon?: SplitRunFooterAction["icon"] }) {
+function ActionIcon({
+  icon,
+  kind,
+  capsule,
+}: {
+  icon?: SplitRunFooterAction["icon"];
+  kind?: SplitRunFooterAction["kind"];
+  capsule?: boolean;
+}) {
   if (icon === "undo-2") {
     return <Undo2 className="size-3.5" aria-hidden />;
+  }
+  if (icon === "sparkles") {
+    return <Sparkles className="size-3.5" aria-hidden />;
+  }
+  if (capsule && kind === "archive") {
+    return <Archive className="size-3.5 opacity-60" aria-hidden />;
+  }
+  if (capsule && kind === "start") {
+    return <Play className="size-3.5" aria-hidden />;
   }
   return null;
 }
@@ -190,29 +438,52 @@ function NoteAction({
   actionBusy,
   startBusy,
   startDisabled,
+  grouped = false,
+  capsule = false,
   onClick,
 }: {
   action: SplitRunFooterAction;
   actionBusy: boolean;
   startBusy: boolean;
   startDisabled: boolean;
+  grouped?: boolean;
+  capsule?: boolean;
   onClick: () => void;
 }) {
   const primary = action.emphasis === "primary";
   const busy = action.kind === "start" ? startBusy : actionBusy;
-  const disabled = action.kind === "start" ? startDisabled || startBusy : actionBusy;
+  const disabled = noteActionDisabled(action.kind, {
+    actionBusy,
+    startBusy,
+    startDisabled,
+    actionDisabled: action.disabled,
+  });
 
-  return (
+  const button = (
     <Button
       type="button"
       size="sm"
       variant={primary ? "default" : "outline"}
       disabled={disabled}
       onClick={onClick}
+      className={noteActionClassName({ capsule, grouped, primary })}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
-      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
+      {busy ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      ) : (
+        <ActionIcon icon={action.icon} kind={action.kind} capsule={capsule} />
+      )}
       {action.label}
     </Button>
+  );
+  if (grouped || !action.tooltip) {
+    return button;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{disabled ? <span className="inline-flex">{button}</span> : button}</TooltipTrigger>
+      <TooltipContent>{action.tooltip}</TooltipContent>
+    </Tooltip>
   );
 }

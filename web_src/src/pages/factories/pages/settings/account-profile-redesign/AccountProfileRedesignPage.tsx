@@ -1,49 +1,38 @@
 import { useState, type ReactNode } from "react";
 
-import { Avatar } from "@/components/Avatar/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { accountEmailSourceLabel, type AccountEmailOption } from "@/lib/accountSettings";
 import { showSuccessToast } from "@/lib/toast";
-import { Copy } from "lucide-react";
-
-import { getNameInitials } from "@/lib/nameInitials";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../FactorySettingsCard";
+import { SettingsIdentityField } from "../settingsIdentityField";
+import { SettingsActionRow } from "./accountProfileRedesignParts";
 
 const MAX_NAME_LENGTH = 80;
-
-function shortenedUserId(id: string): string {
-  if (id.length <= 12) {
-    return id;
-  }
-  return `${id.slice(0, 8)}…${id.slice(-4)}`;
-}
 
 export function AccountProfileRedesignPage({
   name,
   email,
   emailOptions = [],
-  userId,
   onNameChange,
   onEmailChange,
   onSave,
+  security,
   dangerZone,
 }: {
   name: string;
   email: string;
   emailOptions?: AccountEmailOption[];
-  userId: string;
   onNameChange: (name: string) => void;
   onEmailChange?: (email: string) => void | Promise<void>;
   onSave: () => void | Promise<void>;
+  security?: ReactNode;
   dangerZone?: ReactNode;
 }) {
   const [savedName, setSavedName] = useState(name);
-  const [copied, setCopied] = useState(false);
 
   const isDirty = name.trim() !== savedName;
   const nameError = name.trim() ? "" : "Name is required.";
@@ -57,36 +46,32 @@ export function AccountProfileRedesignPage({
     showSuccessToast("Profile saved.");
   };
 
-  const handleCopyId = async () => {
-    await navigator.clipboard.writeText(userId);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
-
   return (
-    <FactorySettingsPageFrame title="Profile" subtitle="Manage how your name appears in SuperPlane.">
-      <FactorySettingsCard title="Identity" data-testid="account-redesign-identity">
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Avatar initials={getNameInitials(name || email) || "?"} alt={name || email} className="size-16" />
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-medium text-foreground">{name || "No name"}</p>
-              <p className="truncate text-[12px] text-muted-foreground">{email}</p>
-            </div>
-          </div>
+    <FactorySettingsPageFrame
+      title="Account"
+      subtitle="Preferences, profile information, and security for your SuperPlane account."
+    >
+      <FactorySettingsCard title="Preferences" data-testid="account-redesign-appearance">
+        <SettingsActionRow
+          title="Theme"
+          description="Choose light, dark, or match this device."
+          testId="account-redesign-appearance-theme"
+          action={<ThemePreferenceControl variant="settings" />}
+        />
+      </FactorySettingsCard>
 
-          <div className="space-y-2">
-            <Label htmlFor="account-redesign-name">Name</Label>
-            <Input
-              id="account-redesign-name"
-              data-testid="account-redesign-name"
-              value={name}
-              maxLength={MAX_NAME_LENGTH}
-              onChange={(event) => onNameChange(event.target.value)}
-            />
-            <p className="text-[12px] text-muted-foreground">This name appears on tasks, comments, and mentions.</p>
-            {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
-          </div>
+      <FactorySettingsCard title="Profile information" data-testid="account-redesign-identity">
+        <div className="space-y-6">
+          <SettingsIdentityField
+            name={name}
+            nameId="account-redesign-name"
+            nameTestId="account-redesign-name"
+            initialsFrom={name || email}
+            maxLength={MAX_NAME_LENGTH}
+            helperText="This name appears on tasks, comments, and mentions."
+            error={nameError}
+            onNameChange={onNameChange}
+          />
 
           <ProfileEmailField email={email} options={emailOptions} onEmailChange={onEmailChange} />
 
@@ -100,26 +85,8 @@ export function AccountProfileRedesignPage({
         </div>
       </FactorySettingsCard>
 
-      <div
-        className="flex items-center justify-between gap-3 text-muted-foreground"
-        data-testid="account-redesign-user-id"
-      >
-        <p className="text-[12px]">
-          User ID{" "}
-          <span className="font-mono" title={userId}>
-            {shortenedUserId(userId)}
-          </span>
-        </p>
-        <Button
-          type="button"
-          size="icon-xs"
-          variant="ghost"
-          aria-label={copied ? "Copied" : "Copy user ID"}
-          onClick={() => void handleCopyId()}
-        >
-          <Copy className="size-3.5" aria-hidden />
-        </Button>
-      </div>
+      {security}
+
       {dangerZone}
     </FactorySettingsPageFrame>
   );
@@ -162,12 +129,19 @@ function ProfileEmailField({
           </SelectContent>
         </Select>
       ) : (
-        <Input id="account-redesign-email" data-testid="account-redesign-email" value={email} disabled />
+        <p id="account-redesign-email" className="text-[13px] text-foreground" data-testid="account-redesign-email">
+          {email}
+        </p>
       )}
       <p className="text-[12px] text-muted-foreground">
-        {canSwitch
-          ? "Choose an email from a connected sign-in method. SuperPlane uses this email to sign you in and send notifications."
-          : "Used to sign in and receive notifications."}
+        {canSwitch ? (
+          <>
+            Choose an email from a connected sign-in method. SuperPlane uses this email to sign you in and send
+            notifications.
+          </>
+        ) : (
+          "SuperPlane uses this email to sign you in. Change this in Security & access below."
+        )}
       </p>
     </div>
   );

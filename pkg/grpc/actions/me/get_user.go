@@ -49,6 +49,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		Permissions:    []*pbAuth.Permission{},
 		Roles:          []string{},
 		Groups:         []string{},
+		IsOwner:        user.IsOwner,
 	}
 
 	if !includePermissions {

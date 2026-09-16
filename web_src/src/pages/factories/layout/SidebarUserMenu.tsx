@@ -1,5 +1,6 @@
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { Avatar } from "@/components/Avatar/avatar";
+import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
+import { useAccount } from "@/contexts/useAccount";
 import { useTheme } from "@/contexts/useTheme";
 import { isThemePreference } from "@/lib/themePreference";
 import type { ThemePreference } from "@/lib/themePreference";
@@ -9,7 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -19,17 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import {
-  ArrowRightLeft,
-  Building2,
-  Check,
-  LayoutGrid,
-  LogOut,
-  Plus,
-  Settings,
-  SunMoon,
-  User as UserIcon,
-} from "lucide-react";
+import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -41,6 +31,7 @@ interface SidebarUserMenuProps {
   userAvatarUrl?: string | null;
   organizationName: string;
   defaultOpen?: boolean;
+  planLabel?: string;
 }
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -62,15 +53,17 @@ export function SidebarUserMenu({
   userAvatarUrl,
   organizationName,
   defaultOpen = false,
+  planLabel,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
-  const homeHref = `/${organizationId}`;
+  const { account } = useAccount();
   const profileHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
     : `/${organizationId}/settings/profile`;
   const organizationHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
+  const triggerLabel = `${userName}, ${organizationName}`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -78,25 +71,33 @@ export function SidebarUserMenu({
   };
 
   return (
-    <div className="flex justify-center border-t border-sidebar-border p-1.5" data-testid="factories-sidebar-user-menu">
+    <div
+      className="flex flex-col items-center border-t border-sidebar-border px-1 py-1.5"
+      data-testid="factories-sidebar-user-menu"
+    >
       <DropdownMenu defaultOpen={defaultOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             data-testid="factories-sidebar-user-menu-trigger"
-            aria-label={`${userName}, ${organizationName}`}
-            title={`${userName}, ${organizationName}`}
-            className={cn(factoriesRailControlClassName, "data-[state=open]:bg-sidebar-accent")}
+            aria-label={triggerLabel}
+            title={triggerLabel}
+            className="group flex flex-col items-center gap-0.5 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <Avatar
-              src={userAvatarUrl ?? undefined}
-              initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
-              alt=""
-              className="size-7 text-[10px]"
-            />
-            <span className="sr-only">
-              {userName}, {organizationName}
+            <span
+              className={cn(
+                factoriesRailControlClassName,
+                "pointer-events-none group-hover:bg-sidebar-accent group-hover:text-foreground group-data-[state=open]:bg-sidebar-accent",
+              )}
+            >
+              <Avatar
+                src={userAvatarUrl ?? undefined}
+                initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
+                alt=""
+                className="size-7 text-[10px]"
+              />
             </span>
+            <span className="sr-only">{triggerLabel}</span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
@@ -104,16 +105,9 @@ export function SidebarUserMenu({
             organizationId={organizationId}
             organizationName={organizationName}
             organizationHref={organizationHref}
+            planLabel={planLabel}
           />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className={MENU_ITEM_CLASS}
-            onClick={() => navigate(homeHref)}
-            data-testid="factories-sidebar-back-to-apps"
-          >
-            <LayoutGrid aria-hidden />
-            Back to Apps
-          </DropdownMenuItem>
           <DropdownMenuItem
             className={MENU_ITEM_CLASS}
             onClick={() => navigate(profileHref)}
@@ -122,6 +116,16 @@ export function SidebarUserMenu({
             <UserIcon aria-hidden />
             Profile
           </DropdownMenuItem>
+          {account?.installation_admin ? (
+            <DropdownMenuItem
+              className={MENU_ITEM_CLASS}
+              onClick={() => navigate("/admin")}
+              data-testid="factories-sidebar-installation-admin"
+            >
+              <Shield aria-hidden />
+              Installation Admin
+            </DropdownMenuItem>
+          ) : null}
           <AppearanceMenuItem />
           <DropdownMenuSeparator />
           <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={handleSignOut}>
@@ -141,38 +145,44 @@ function OrganizationMenuHeader({
   organizationId,
   organizationName,
   organizationHref,
+  planLabel,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
+  planLabel?: string;
 }) {
   const navigate = useNavigate();
 
   return (
-    <div className="flex items-center gap-0.5 px-1 py-1" data-testid="factories-sidebar-organization">
-      <p
-        className="min-w-0 flex-1 truncate px-2 py-1 text-[13px] font-medium tracking-[-0.01em] text-foreground"
-        data-testid="factories-sidebar-organization-name"
-      >
-        {organizationName}
-      </p>
-      <DropdownMenuItem
-        aria-label="Organization settings"
-        data-testid="factories-sidebar-organization-settings-link"
-        className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-        onSelect={() => navigate(organizationHref)}
-      >
-        <Settings className="size-3.5" aria-hidden />
-      </DropdownMenuItem>
-      <OrganizationSwitchSub currentOrganizationId={organizationId} />
+    <div className="px-1 py-1" data-testid="factories-sidebar-organization">
+      <div className="flex items-center gap-0.5">
+        <p
+          className="min-w-0 flex-1 truncate px-2 py-1 text-[13px] font-medium tracking-[-0.01em] text-foreground"
+          data-testid="factories-sidebar-organization-name"
+        >
+          {organizationName}
+        </p>
+        <DropdownMenuItem
+          aria-label="Organization settings"
+          data-testid="factories-sidebar-organization-settings-link"
+          className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
+          onSelect={() => navigate(organizationHref)}
+        >
+          <Settings className="size-3.5" aria-hidden />
+        </DropdownMenuItem>
+        <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
+      </div>
+      {planLabel ? (
+        <p className="px-2 text-[11px] text-muted-foreground" data-testid="factories-sidebar-plan-status">
+          {planLabel}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationId: string }) {
-  const navigate = useNavigate();
-  const { data: organizations = [] } = useAccountOrganizations();
-
+function OrganizationSwitchSub({ currentOrganizationRouteId }: { currentOrganizationRouteId: string }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
@@ -183,31 +193,14 @@ function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationI
         <ArrowRightLeft className="size-3.5" aria-hidden />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className="w-64" data-testid="factories-sidebar-organization-switch-menu">
-          <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
-          {organizations.map((organization) => {
-            const isCurrent = organization.id === currentOrganizationId;
-            return (
-              <DropdownMenuItem
-                key={organization.id}
-                onClick={() => {
-                  if (!isCurrent) {
-                    navigate(`/${organization.id}`);
-                  }
-                }}
-                data-testid={`factories-sidebar-organization-option-${organization.id}`}
-              >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
-                <span className="truncate">{organization.name}</span>
-                {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/create")} data-testid="factories-sidebar-organization-create">
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Create new organization
-          </DropdownMenuItem>
+        <DropdownMenuSubContent
+          className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
+          data-testid="factories-sidebar-organization-switch-menu"
+        >
+          <OrganizationSwitchMenu
+            currentOrganizationRouteId={currentOrganizationRouteId}
+            testIdPrefix="factories-sidebar"
+          />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>

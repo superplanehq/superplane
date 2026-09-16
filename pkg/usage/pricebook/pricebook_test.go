@@ -43,6 +43,15 @@ func TestEstimateMicros_ProviderPrefixedModel(t *testing.T) {
 	assert.Equal(t, int64(250_000), got)
 }
 
+func TestEstimateMicros_OpenRouterGatewayPrefixedModel(t *testing.T) {
+	sonnet := EstimateMicros("openrouter", "openrouter/anthropic/claude-sonnet-4-6", 1_000_000, 0, 0, 0, 0)
+	grok := EstimateMicros("openrouter", "openrouter/x-ai/grok-4.6", 1_000_000, 0, 0, 0, 0)
+	gemini := EstimateMicros("openrouter", "google/gemini-3.7-flash", 1_000_000, 0, 0, 0, 0)
+	assert.Equal(t, int64(3_000_000), sonnet)
+	assert.Equal(t, int64(3_000_000), grok)
+	assert.Equal(t, int64(150_000), gemini)
+}
+
 func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	got := EstimateMicros("openai", "unknown-lab-model", 10_000, 10_000, 0, 0, 0)
 	assert.Equal(t, int64(0), got)
@@ -50,6 +59,9 @@ func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 
 func TestIsPriced(t *testing.T) {
 	assert.True(t, IsPriced("claude-sonnet-4-6"))
+	assert.True(t, IsPriced("openrouter/anthropic/claude-sonnet-4-6"))
+	assert.True(t, IsPriced("openrouter/x-ai/grok-4.6"))
+	assert.True(t, IsPriced("google/gemini-3.7-flash"))
 	assert.False(t, IsPriced("unknown-lab-model"))
 }
 
@@ -84,7 +96,7 @@ func TestEstimateComputeMicros_DefaultCatalogRates(t *testing.T) {
 	t.Cleanup(Reset)
 	Reset()
 
-	assert.Equal(t, int64(5560), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
-	assert.Equal(t, int64(1390), EstimateComputeMicros("e1-tiny-arm64", "e1-tiny-arm64", 10))
+	assert.Equal(t, int64(700), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
+	assert.Equal(t, int64(20), EstimateComputeMicros("e1-tiny-arm64", "e1-tiny-arm64", 10))
 	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "local", 10))
 }

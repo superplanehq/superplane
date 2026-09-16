@@ -299,10 +299,11 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
+	environment := resolved.Variables
 
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
@@ -369,7 +370,7 @@ func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 }
 
 func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunBashFinishedEventType)
 }
 
 func (c *RunBash) Cleanup(ctx core.SetupContext) error { return nil }

@@ -106,6 +106,7 @@ func usersToProto(users []models.User, accountProviders []models.UserAccountProv
 			},
 			Status: &userpb.User_Status{
 				AccountProviders: accountProvidersForUser(user.ID.String(), accountProviders),
+				IsOwner:          user.IsOwner,
 			},
 		}
 	}

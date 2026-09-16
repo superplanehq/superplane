@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import * as yaml from "js-yaml";
 
 import { normalizeYamlForDiff } from "./normalize-yaml-diff";

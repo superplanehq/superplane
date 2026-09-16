@@ -1,5 +1,4 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { AccountContext } from "@/contexts/accountContextState";
 import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
 import { OutcomeProgressWidget } from "@/components/AgentSidebar/widgets/OutcomeProgressWidget";
@@ -45,8 +44,6 @@ type ChatConversationProps = {
   organizationId: string;
   initialStatus: string;
   refreshChatStatus: () => Promise<string | undefined>;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
   isAutoLayoutOnUpdateEnabled: boolean;
   onAgentStagingReady?: AgentStagingReadyHandler;
@@ -97,8 +94,6 @@ export function FactoryAgentTabPanel({ toolSidebarState }: { toolSidebarState: C
       organizationId={organizationId}
       initialStatus={chatQuery.data?.status ?? "idle"}
       refreshChatStatus={refreshChatStatus}
-      agentMode={toolSidebarState.agentMode}
-      onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
       isAutoLayoutOnUpdateEnabled={toolSidebarState.isAutoLayoutOnUpdateEnabled}
       onAgentStagingReady={toolSidebarState.onAgentStagingReady}
@@ -116,8 +111,6 @@ function ChatConversation({
   organizationId,
   initialStatus,
   refreshChatStatus,
-  agentMode,
-  onModeSwitch,
   isEditing,
   isAutoLayoutOnUpdateEnabled,
   onAgentStagingReady,
@@ -144,9 +137,8 @@ function ChatConversation({
   useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
-  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode, isAutoLayoutOnUpdateEnabled });
+  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, isAutoLayoutOnUpdateEnabled });
   const handlers = useAgentConversationHandlers({
-    agentMode,
     chatId,
     canvasId,
     isAutoLayoutOnUpdateEnabled,
@@ -221,9 +213,6 @@ function ChatConversation({
         sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
         statusLabel={resolveComposerStatusLabel(resetMutation.isPending, sendMutation.isPending, status)}
-        agentMode={agentMode}
-        onModeSwitch={onModeSwitch}
-        modeDisabled={agentBusy}
       />
     </div>
   );
@@ -293,9 +282,6 @@ function ComposerWithCanvasData({
   sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
-  modeDisabled?: boolean;
 }) {
   const { data: canvas } = useCanvas(organizationId, canvasId, {
     staleTime: Infinity,

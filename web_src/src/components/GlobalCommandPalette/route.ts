@@ -1,5 +1,5 @@
-import { PUBLIC_TOP_LEVEL_SEGMENTS } from "./constants";
 import { isAppRouteId } from "@/lib/appPaths";
+import { isReservedAppPathSegment } from "@/lib/reservedAppPaths";
 import type { CommandPage } from "./types";
 
 export function getRouteContext(pathname: string): {
@@ -8,7 +8,7 @@ export function getRouteContext(pathname: string): {
 } {
   const segments = pathname.split("/").filter(Boolean);
   const firstSegment = segments[0] || "";
-  const organizationId = PUBLIC_TOP_LEVEL_SEGMENTS.has(firstSegment) ? null : firstSegment;
+  const organizationId = firstSegment && !isReservedAppPathSegment(firstSegment) ? firstSegment : null;
   const canvasSegmentIndex = segments.findIndex((segment) => segment === "apps" || segment === "canvases");
   const parentSegment = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex] : null;
   const rawCanvasId = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex + 1] || null : null;

@@ -1,5 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
@@ -24,7 +24,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -40,7 +40,8 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpt-\d/);
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
-    expect(within(page).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(within(page).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-log-scroll")).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
@@ -52,7 +53,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner/split-run?from=lines&lineId=${line.id}&orderNumber=103&canvas=planning`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/app-refund-implementer/split-run?from=lines&lineId=${line.id}&orderNumber=103&canvas=implementation`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -69,7 +70,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}/split-run`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
@@ -87,7 +88,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=run-missing`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}/split-run?from=lines&lineId=${line.id}&run=run-missing`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
@@ -105,7 +106,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}?run=${LINE_RUN_IMPLEMENT_ID}&from=lines&lineId=${line.id}&orderNumber=103`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}?run=${LINE_RUN_IMPLEMENT_ID}&from=lines&lineId=${line.id}&orderNumber=103`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -120,7 +121,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
         factoriesFixture={defaultFactoriesFixture}
         appFixture={refundLineCanvasFixture()}
       />,
@@ -128,7 +129,7 @@ describe("FactoryAppSplitRunPage", () => {
 
     const page = await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 });
     const edit = within(page).getByTestId("factory-app-edit");
-    expect(edit).toHaveAttribute("href", expect.stringContaining(`/apps/${appId}?`));
+    expect(edit).toHaveAttribute("href", expect.stringContaining(`/automations/${appId}?`));
     expect(edit).toHaveAttribute("href", expect.stringContaining("configure=1"));
     expect(edit.getAttribute("href")).not.toContain("split-run");
   }, 10000);

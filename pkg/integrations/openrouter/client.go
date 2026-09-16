@@ -56,6 +56,13 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	}, nil
 }
 
+func NewManagementClient(httpClient core.HTTPContext, managementKey string) *Client {
+	return &Client{
+		ManagementKey: strings.TrimSpace(managementKey),
+		http:          httpClient,
+	}
+}
+
 // readAll drains a response body.
 func readAll(res *http.Response) ([]byte, error) {
 	body, err := io.ReadAll(res.Body)
@@ -356,6 +363,71 @@ func (c *Client) GetKey() (*KeyInfo, error) {
 	}
 
 	return &response.Data, nil
+}
+
+type CreateKeyRequest struct {
+	Name      string `json:"name"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+type CreatedKey struct {
+	Key  string
+	Hash string
+}
+
+type createKeyResponse struct {
+	Key  string `json:"key"`
+	Data struct {
+		Hash string `json:"hash"`
+	} `json:"data"`
+}
+
+func (c *Client) CreateKey(req CreateKeyRequest) (*CreatedKey, error) {
+	if strings.TrimSpace(c.ManagementKey) == "" {
+		return nil, fmt.Errorf("provisioning API key is not configured")
+	}
+
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create key request: %v", err)
+	}
+
+	body, err := c.execRequestWithKey(context.Background(), http.MethodPost, baseURL+"/keys", bytes.NewReader(payload), c.ManagementKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var response createKeyResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create key response: %v", err)
+	}
+	if strings.TrimSpace(response.Key) == "" || strings.TrimSpace(response.Data.Hash) == "" {
+		return nil, fmt.Errorf("create key response is missing key or hash")
+	}
+
+	return &CreatedKey{Key: response.Key, Hash: response.Data.Hash}, nil
+}
+
+func (c *Client) DeleteKey(hash string) error {
+	if strings.TrimSpace(c.ManagementKey) == "" {
+		return fmt.Errorf("provisioning API key is not configured")
+	}
+
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return fmt.Errorf("key hash is required")
+	}
+
+	_, err := c.execRequestWithKey(context.Background(), http.MethodDelete, baseURL+"/keys/"+url.PathEscape(hash), nil, c.ManagementKey)
+	if err == nil {
+		return nil
+	}
+
+	var apiErr *core.ProviderAPIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) CreateChatCompletion(req ChatCompletionRequest) (*ChatCompletionResponse, error) {

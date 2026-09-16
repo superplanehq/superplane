@@ -61,7 +61,7 @@ func reassignGroupsForDeletedRole(ctx context.Context, authService authorization
 			continue
 		}
 
-		err = authService.UpdateGroup(domainID, domainType, groupName, models.RoleOrgViewer, "", "")
+		err = authService.UpdateGroup(domainID, domainType, groupName, models.RoleOrgOperator, "", "")
 		if err != nil {
 			log.Errorf("failed to reassign group %s to member: %v", groupName, err)
 			return grpcerrors.Internal(err, "failed to reassign group")

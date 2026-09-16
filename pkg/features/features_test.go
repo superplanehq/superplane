@@ -15,14 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory velocity feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryVelocity)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryVelocity, f.ID)
-		assert.Equal(t, "Factory Velocity", f.Label)
-		assert.Equal(t, "Show the Velocity view for a factory organization", f.Description)
-	})
-
 	t.Run("known id returns factory sentry intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactorySentryIntake)
 		assert.True(t, ok)
@@ -31,12 +23,45 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryProductiveIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
+		assert.Equal(t, "Factory Productive.io Intake", f.Label)
+		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureWorkspaceModels, f.ID)
 		assert.Equal(t, "Workspace Models", f.Label)
 		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
+	})
+
+	t.Run("known id returns organization byok feature", func(t *testing.T) {
+		f, ok := Get(FeatureOrganizationBYOK)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
+		assert.Equal(t, "Organization BYOK", f.Label)
+		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
+	})
+
+	t.Run("known id returns task refinement feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCreateWithAgent)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
+		assert.Equal(t, "Task Refinement", f.Label)
+		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
+	})
+
+	t.Run("known id returns custom automations feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCustomAutomations)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
+		assert.Equal(t, "Custom Automations", f.Label)
+		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Nil(t, f.Released)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -54,9 +79,12 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryVelocity))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
+	assert.True(t, Exists(FeatureOrganizationBYOK))
+	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
+	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

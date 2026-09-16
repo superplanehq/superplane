@@ -27,15 +27,15 @@ func (c *CreateWorkOrder) Name() string {
 }
 
 func (c *CreateWorkOrder) Label() string {
-	return "Create Work Order"
+	return "Create Task"
 }
 
 func (c *CreateWorkOrder) Description() string {
-	return "Create a new work order"
+	return "Create a new task"
 }
 
 func (c *CreateWorkOrder) Documentation() string {
-	return `The Create Work Order component creates a new work order in the factory. This component can only be used in factory-owned apps.`
+	return `The Create Task component creates a new task in the factory. This component can only be used in factory-owned apps.`
 }
 
 func (c *CreateWorkOrder) Icon() string {
@@ -53,8 +53,8 @@ func (c *CreateWorkOrder) ExampleOutput() map[string]any {
 		"data": map[string]any{
 			"workOrder": map[string]any{
 				"id":          "123",
-				"title":       "Work Order 1",
-				"description": "Work Order 1 description",
+				"title":       "Task 1",
+				"description": "Task 1 description",
 			},
 		},
 	}
@@ -69,14 +69,14 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 		{
 			Name:        "title",
 			Label:       "Title",
-			Description: "The title of the work order",
+			Description: "The title of the task",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 		},
 		{
 			Name:        "description",
 			Label:       "Description",
-			Description: "The description of the work order",
+			Description: "The description of the task",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},

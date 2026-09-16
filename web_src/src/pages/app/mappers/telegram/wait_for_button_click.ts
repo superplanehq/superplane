@@ -18,7 +18,7 @@ import type {
 } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -188,7 +188,7 @@ function waitForButtonClickEventSections(nodes: NodeInfo[], execution: Execution
     return [];
   }
 
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

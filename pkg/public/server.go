@@ -3,6 +3,8 @@ package public
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +48,7 @@ import (
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -65,6 +69,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/gorm"
 )
 
 const (
@@ -363,6 +368,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbFiles.RegisterFilesHandlerServer(ctx, grpcGatewayMux, services.Files)
+	if err != nil {
+		return err
+	}
+
 	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
@@ -377,6 +387,13 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
+
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -401,6 +418,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
 		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
 	).Methods(http.MethodGet)
+
+	s.Router.Handle(
+		"/api/v1/files/{file_id}/content",
+		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
+	).Methods(http.MethodPut)
 
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
@@ -650,6 +672,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
@@ -670,9 +693,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("GET", "POST")
 	githubAppUserRoute := r.NewRoute().Subrouter()
 	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
-	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/oauth/callback", s.HandleGitHubAppOAuthCallback).Methods("GET")
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -684,6 +707,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
 	accountRoute.HandleFunc("/account/linked-accounts/{provider}", s.disconnectLinkedAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
+	accountRoute.HandleFunc("/account/onboarding", s.createInitialWorkspace).Methods("POST")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
@@ -711,7 +735,15 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
+	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
+	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
+	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
+	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
+	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
+	adminRoute.HandleFunc("/price-books/sync", s.adminSyncPriceBooks).Methods("POST")
+	adminRoute.HandleFunc("/price-books/current", s.adminActivatePriceBook).Methods("PUT")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
@@ -846,6 +878,16 @@ type OrganizationCreationRequest struct {
 	Name string `json:"name"`
 }
 
+type initialWorkspaceRequest struct {
+	Owner     string `json:"owner"`
+	AttemptID string `json:"attemptID"`
+}
+
+type initialWorkspaceResponse struct {
+	OrganizationSlug string `json:"organizationSlug"`
+	WorkspaceKey     string `json:"workspaceKey"`
+}
+
 type organizationCreationStatusResponse struct {
 	Allowed              bool   `json:"allowed"`
 	UsageEnabled         bool   `json:"usageEnabled"`
@@ -861,7 +903,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	response, err := s.describeOrganizationCreationStatus(r.Context(), database.DB(r.Context()), account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields, so we don't repeat
@@ -878,9 +920,10 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 
 func (s *Server) describeOrganizationCreationStatus(
 	ctx context.Context,
+	tx *gorm.DB,
 	accountID string,
 ) (*organizationCreationStatusResponse, error) {
-	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
+	organizationCount, err := models.CountOrganizationsByBillingAccount(tx, accountID)
 	if err != nil {
 		log.WithError(err).
 			WithField("account_id", accountID).
@@ -1011,7 +1054,15 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	tx, err := acquireOrganizationCreationLock(r.Context(), account.ID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock organization creation")
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), tx, account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields.
@@ -1029,14 +1080,13 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	//
 	// Create the organization
 	//
-	tx := database.Conn().Begin()
 	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
 	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
 
 	if err != nil {
 		tx.Rollback()
 
-		if err.Error() == "name already used" {
+		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			http.Error(w, "Organization name already in use", http.StatusConflict)
 			return
 		}
@@ -1078,6 +1128,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1097,6 +1155,298 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	response["slug"] = organization.Slug
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// createInitialWorkspace provisions the first organization and workspace for
+// an account. GitHub is optional: the account name is enough to start setup.
+func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
+	// App, so onboarding stops here on installations that do not hold the
+	// app credentials (for example, local development without a tunnel).
+	if !config.LoadGitHubHostedAppConfig().Enabled() {
+		http.Error(
+			w,
+			"This installation has no GitHub App configured, so workspace setup is not available. "+
+				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
+				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
+			http.StatusServiceUnavailable,
+		)
+		return
+	}
+
+	var req initialWorkspaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	owner := initialOrganizationName(account, req.Owner)
+	if owner == "" {
+		http.Error(w, "Organization name is required", http.StatusBadRequest)
+		return
+	}
+	attemptID, err := uuid.Parse(req.AttemptID)
+	if err != nil {
+		http.Error(w, "Invalid onboarding attempt", http.StatusBadRequest)
+		return
+	}
+
+	if !accountMayNameOrganization(database.DB(r.Context()), account, owner) {
+		http.Error(w, "Organization name does not match this account", http.StatusForbidden)
+		return
+	}
+
+	creationLock, err := acquireOrganizationCreationLock(r.Context(), account.ID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock initial workspace creation")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+	defer creationLock.Rollback()
+
+	if organization, workspace, found, err := findInitialWorkspace(creationLock, account.ID, attemptID); err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to find initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	} else if found {
+		if err := creationLock.Commit().Error; err != nil {
+			log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace lookup")
+			http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+			return
+		}
+		writeInitialWorkspaceResponse(w, organization, workspace)
+		return
+	}
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), creationLock, account.ID.String())
+	if err != nil {
+		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
+		return
+	}
+	if !creationStatus.Allowed {
+		http.Error(w, creationStatus.Message, http.StatusTooManyRequests)
+		return
+	}
+
+	organization, workspace, err := s.createInitialOrganizationAndWorkspace(creationLock, account, owner, attemptID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to create initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+
+	if err := creationLock.Commit().Error; err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace creation")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+
+	if err := messages.NewOrganizationCreatedMessage(organization.ID.String()).Publish(); err != nil {
+		log.WithError(err).WithField("organization_id", organization.ID).Error("failed to publish organization created message")
+	}
+
+	writeInitialWorkspaceResponse(w, organization, workspace)
+}
+
+// acquireOrganizationCreationLock serializes organization creation for one account.
+// Waiting requests release their database connections between attempts.
+func acquireOrganizationCreationLock(ctx context.Context, accountID uuid.UUID) (*gorm.DB, error) {
+	lockKey := int64(binary.BigEndian.Uint64(accountID[:8]))
+
+	for {
+		tx := database.DB(ctx).Begin()
+		if tx.Error != nil {
+			return nil, tx.Error
+		}
+
+		var locked bool
+		if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", lockKey).Scan(&locked).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if locked {
+			return tx, nil
+		}
+		if err := tx.Rollback().Error; err != nil {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
+	organizations, err := models.ListOrganizationsCreatedByAccount(tx, accountID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	var pendingOrganization *models.Organization
+	var pendingWorkspace *models.Factory
+
+	for i := range organizations {
+		organization := &organizations[i]
+		factories, err := models.ListFactories(tx, organization.ID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		for j := range factories {
+			factory := &factories[j]
+			if factory.HasInitialOnboardingAttempt(attemptID) {
+				return organization, factory, true, nil
+			}
+			if pendingWorkspace == nil && factory.IsPendingInitialOnboarding() {
+				pendingOrganization = organization
+				pendingWorkspace = factory
+			}
+		}
+	}
+
+	if pendingWorkspace != nil {
+		return pendingOrganization, pendingWorkspace, true, nil
+	}
+
+	return nil, nil, false, nil
+}
+
+func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.Organization, workspace *models.Factory) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(initialWorkspaceResponse{
+		OrganizationSlug: organization.Slug,
+		WorkspaceKey:     workspace.Key,
+	})
+}
+
+func initialOrganizationName(account *models.Account, requested string) string {
+	name := strings.TrimSpace(requested)
+	if name != "" {
+		return name
+	}
+	if accountName := strings.TrimSpace(account.Name); accountName != "" {
+		return accountName
+	}
+	return accountEmailLocalPart(account.Email)
+}
+
+func accountMayNameOrganization(tx *gorm.DB, account *models.Account, name string) bool {
+	if name == "" {
+		return false
+	}
+	if name == strings.TrimSpace(account.Name) {
+		return true
+	}
+	if name == accountEmailLocalPart(account.Email) {
+		return true
+	}
+	return accountOwnsGitHubName(tx, account, name)
+}
+
+func accountEmailLocalPart(email string) string {
+	email = strings.TrimSpace(email)
+	local, _, found := strings.Cut(email, "@")
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(local)
+}
+
+func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) bool {
+	linkedAccount, err := models.FindAccountLinkedAccount(tx, account.ID, models.ProviderGitHub)
+	if err == nil && (owner == linkedAccount.Name || owner == linkedAccount.Username) {
+		return true
+	}
+
+	providers, err := account.GetAccountProviders(tx)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(providers, func(provider models.AccountProvider) bool {
+		return provider.Provider == models.ProviderGitHub && owner == provider.Username
+	})
+}
+
+func (s *Server) createInitialOrganizationAndWorkspace(tx *gorm.DB, account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
+	for attempt := 1; attempt <= 100; attempt++ {
+		organizationName := owner
+		if attempt > 1 {
+			suffix, err := randomOrganizationSuffix()
+			if err != nil {
+				return nil, nil, err
+			}
+			organizationName = fmt.Sprintf("%s-%s", owner, suffix)
+		}
+
+		savepoint := fmt.Sprintf("initial_organization_name_%d", attempt)
+		if err := tx.SavePoint(savepoint).Error; err != nil {
+			return nil, nil, fmt.Errorf("create organization savepoint: %w", err)
+		}
+
+		organization, workspace, err := s.createInitialOrganizationAttempt(tx, account, organizationName, attemptID)
+		if errors.Is(err, models.ErrNameAlreadyUsed) || errors.Is(err, models.ErrSlugAlreadyUsed) {
+			if rollbackErr := tx.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return nil, nil, fmt.Errorf("rollback organization name: %w", rollbackErr)
+			}
+			continue
+		}
+		return organization, workspace, err
+	}
+
+	return nil, nil, fmt.Errorf("could not find an available organization name for %q", owner)
+}
+
+const organizationSuffixAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+func randomOrganizationSuffix() (string, error) {
+	bytes := make([]byte, 6)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		return "", fmt.Errorf("generate organization suffix: %w", err)
+	}
+
+	suffix := make([]byte, len(bytes))
+	for index, value := range bytes {
+		suffix[index] = organizationSuffixAlphabet[int(value)%len(organizationSuffixAlphabet)]
+	}
+	return string(suffix), nil
+}
+
+func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
+	organization, err := models.CreateOrganizationInTransaction(tx, organizationName, "")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create organization owner: %w", err)
+	}
+	if err := s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String()); err != nil {
+		return nil, nil, fmt.Errorf("set up organization roles: %w", err)
+	}
+	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
+		return nil, nil, fmt.Errorf("set organization creator: %w", err)
+	}
+	if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+		return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
+	}
+
+	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create initial workspace: %w", err)
+	}
+	if err := workspace.SetInitialOnboardingAttempt(tx, attemptID); err != nil {
+		return nil, nil, fmt.Errorf("set initial workspace onboarding attempt: %w", err)
+	}
+	return organization, workspace, nil
 }
 
 type AccountImpersonation struct {
@@ -1119,16 +1469,33 @@ type AccountLinkedAccountResponse struct {
 	AvatarURL string `json:"avatar_url,omitempty"`
 }
 
+type AccountOrganizationPendingDeletion struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type AccountResponse struct {
-	ID                string                         `json:"id"`
-	Name              string                         `json:"name"`
-	Email             string                         `json:"email"`
-	AvatarURL         string                         `json:"avatar_url"`
-	InstallationAdmin bool                           `json:"installation_admin"`
-	HasPassword       bool                           `json:"has_password"`
-	Providers         []AccountProviderResponse      `json:"providers"`
-	LinkedAccounts    []AccountLinkedAccountResponse `json:"linked_accounts"`
-	Impersonation     *AccountImpersonation          `json:"impersonation,omitempty"`
+	ID                           string                               `json:"id"`
+	Name                         string                               `json:"name"`
+	Email                        string                               `json:"email"`
+	AvatarURL                    string                               `json:"avatar_url"`
+	InstallationAdmin            bool                                 `json:"installation_admin"`
+	HasPassword                  bool                                 `json:"has_password"`
+	Providers                    []AccountProviderResponse            `json:"providers"`
+	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
+	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
+	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+}
+
+func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
+	pending := make([]AccountOrganizationPendingDeletion, 0, len(organizations))
+	for _, organization := range organizations {
+		pending = append(pending, AccountOrganizationPendingDeletion{
+			ID:   organization.ID.String(),
+			Name: organization.Name,
+		})
+	}
+	return pending
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1167,15 +1534,23 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pendingOrgs, err := models.ListOrganizationsPendingAccountDeletion(database.DB(r.Context()), account.ID)
+	if err != nil {
+		log.Errorf("Error listing organizations pending deletion for %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
-		ID:                account.ID.String(),
-		Name:              account.Name,
-		Email:             account.Email,
-		AvatarURL:         getAvatarURL(providers),
-		InstallationAdmin: account.IsInstallationAdmin(),
-		HasPassword:       hasPassword,
-		Providers:         accountProviderResponses(providers),
-		LinkedAccounts:    accountLinkedAccountResponses(linkedAccounts),
+		ID:                           account.ID.String(),
+		Name:                         account.Name,
+		Email:                        account.Email,
+		AvatarURL:                    getAvatarURL(providers),
+		InstallationAdmin:            account.IsInstallationAdmin(),
+		HasPassword:                  hasPassword,
+		Providers:                    accountProviderResponses(providers),
+		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
+		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1197,12 +1572,15 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	type Organization struct {
-		ID          string `json:"id"`
-		Slug        string `json:"slug"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CanvasCount int64  `json:"canvasCount"`
-		MemberCount int64  `json:"memberCount"`
+		ID                       string `json:"id"`
+		Slug                     string `json:"slug"`
+		Name                     string `json:"name"`
+		Description              string `json:"description"`
+		CanvasCount              int64  `json:"canvasCount"`
+		MemberCount              int64  `json:"memberCount"`
+		LastLocationPath         string `json:"lastLocationPath,omitempty"`
+		LastLocationUpdatedAt    string `json:"lastLocationUpdatedAt,omitempty"`
+		InitialOnboardingPending bool   `json:"initialOnboardingPending,omitempty"`
 	}
 
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
@@ -1228,17 +1606,45 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	lastLocations, err := models.ListUserLastLocationsForAccount(database.DB(r.Context()), account.ID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	lastLocationByOrg := make(map[string]models.UserLastLocation, len(lastLocations))
+	for _, location := range lastLocations {
+		lastLocationByOrg[location.OrganizationID.String()] = location
+	}
+
+	orgUUIDs := make([]uuid.UUID, 0, len(organizations))
+	for _, organization := range organizations {
+		orgUUIDs = append(orgUUIDs, organization.ID)
+	}
+	pendingInitialOnly, err := models.OrganizationIDsPendingInitialOnboardingOnly(database.DB(r.Context()), orgUUIDs)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	response := []Organization{}
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
-		response = append(response, Organization{
+		item := Organization{
 			ID:          organization.ID.String(),
 			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],
 			MemberCount: memberCounts[orgID],
-		})
+		}
+		if _, pending := pendingInitialOnly[organization.ID]; pending {
+			item.InitialOnboardingPending = true
+		}
+		if location, ok := lastLocationByOrg[orgID]; ok {
+			item.LastLocationPath = location.Path
+			item.LastLocationUpdatedAt = location.UpdatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		response = append(response, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1259,7 +1665,7 @@ func (s *Server) Serve(host string, port int) error {
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", host, port),
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 70 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		Handler:      s.Router,
 	}
@@ -1445,9 +1851,11 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 
 			organizationID := ""
 			var organizationUUID uuid.UUID
+			var factoryID *uuid.UUID
 			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
 				organizationID = workflow.OrganizationID.String()
 				organizationUUID = workflow.OrganizationID
+				factoryID = workflow.FactoryID
 			}
 
 			return &core.ExecutionContext{
@@ -1467,6 +1875,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 				Usage:          contexts.NewUsageContext(organizationUUID, execution),
+				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
 			}, nil
 		},
 	})

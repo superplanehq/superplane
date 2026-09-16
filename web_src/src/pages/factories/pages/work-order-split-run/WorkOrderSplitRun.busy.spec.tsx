@@ -2,10 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type * as ApiClient from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageResponses";
@@ -16,13 +17,21 @@ const { cancelRunMock } = vi.hoisted(() => ({
   cancelRunMock: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
   };
 });
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
 
 function renderRunningPopup() {
   return render(

@@ -16,7 +16,7 @@ func init() {
 	registry.RegisterTrigger(OnWorkOrderTriggerName, &OnWorkOrder{})
 }
 
-// OnWorkOrder starts a workflow when a work order is created in the factory
+// OnWorkOrder starts a workflow when a task is created in the factory
 // that owns this app. SuperPlane emits the event; the trigger has no webhook.
 type OnWorkOrder struct{}
 
@@ -25,17 +25,17 @@ func (t *OnWorkOrder) Name() string {
 }
 
 func (t *OnWorkOrder) Label() string {
-	return "On Work Order"
+	return "On Task"
 }
 
 func (t *OnWorkOrder) Description() string {
-	return "Start when a work order is created in this factory"
+	return "Start when a task is created in this factory"
 }
 
 func (t *OnWorkOrder) Documentation() string {
-	return `The On Work Order trigger starts a workflow when a work order is created in the factory that owns this app.
+	return `The On Task trigger starts a workflow when a task is created in the factory that owns this app.
 
-Use it on a factory-owned app, such as the generated Backlog automation that scores new work orders.
+Use it on a factory-owned app, such as the generated Backlog automation that scores new tasks.
 
 ## Event Data
 
@@ -49,12 +49,15 @@ Each event has type ` + "`workOrder.created`" + `. The payload is:
     "description": "...",
     "number": 12,
     "state": "draft",
+    "repository": "acme/app",
+    "repository_url": "https://github.com/acme/app.git",
+    "default_branch": "main",
     "origin": { "url": "...", "label": "..." }
   }
 }
 ` + "```" + `
 
-` + "`origin`" + ` is present only when the work order was created from an intake item.`
+` + "`origin`" + ` is present only when the task was created from an intake item. Repository fields are present when the workspace has an app repository.`
 }
 
 func (t *OnWorkOrder) Icon() string {
@@ -71,11 +74,14 @@ func (t *OnWorkOrder) ExampleData() map[string]any {
 		"timestamp": "2026-01-01T00:00:00Z",
 		"data": map[string]any{
 			"workOrder": map[string]any{
-				"id":          "123",
-				"title":       "Show a clearer empty state",
-				"description": "The billing page empty state does not name the next action.",
-				"number":      12,
-				"state":       "draft",
+				"id":             "123",
+				"title":          "Show a clearer empty state",
+				"description":    "The billing page empty state does not name the next action.",
+				"number":         12,
+				"state":          "draft",
+				"repository":     "acme/app",
+				"repository_url": "https://github.com/acme/app.git",
+				"default_branch": "main",
 				"origin": map[string]any{
 					"url":   "https://github.com/acme/app/issues/42",
 					"label": "acme/app#42",

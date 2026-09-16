@@ -21,18 +21,13 @@ func UpdateFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to update factory pull request")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory pull request")
-	}
-
 	prID, err := parsePullRequestID(req.GetPrId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory pull request")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory pull request")
 	}

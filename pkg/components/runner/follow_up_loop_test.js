@@ -1,0 +1,388 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const {
+  FOLLOW_UP_CMD_INDEX_BASE,
+  interpretWaitResponse,
+  nextAction,
+  runLoop,
+  runPromptFile,
+  safeWaitRequest,
+} = require("./follow_up_loop.js");
+
+const CLOUDFLARE_502 = {
+  error: "An error occurred with your request. Please try again.",
+  retryable: true,
+  retry_after: 60,
+};
+
+test("waits while SuperPlane has no event", () => {
+  assert.deepEqual(nextAction({ status: "pending" }), { type: "wait" });
+  assert.deepEqual(nextAction({}), { type: "wait" });
+});
+
+test("exits when the session ends", () => {
+  assert.deepEqual(nextAction({ status: "ended" }), { type: "exit", code: 0 });
+});
+
+test("turns a user message into the next prompt", () => {
+  assert.deepEqual(nextAction({ status: "message", text: " Add a Size field " }), {
+    type: "prompt",
+    text: "Add a Size field",
+  });
+});
+
+test("ignores an empty user message", () => {
+  assert.deepEqual(nextAction({ status: "message", text: "   " }), { type: "wait" });
+});
+
+test("runLoop runs the user prompt then exits on ended", async () => {
+  const prompts = [];
+  const results = [{ status: "pending" }, { status: "message", text: "Add color" }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async () => {},
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {
+  const got = interpretWaitResponse(502, CLOUDFLARE_502);
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("interpretWaitResponse retries 503, 504, and 429 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(503, {}), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(504, {}), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(429, { retry_after: 12 }), { status: "pending" });
+});
+
+test("interpretWaitResponse treats a Cloudflare error body as idle pending", () => {
+  const got = interpretWaitResponse(500, { cloudflare_error: true, retry_after: 30 });
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("interpretWaitResponse ignores retry_after on a transient wait", () => {
+  const got = interpretWaitResponse(502, { retryable: true, retry_after: 120 });
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("interpretWaitResponse ends on 409", () => {
+  assert.deepEqual(interpretWaitResponse(409, { message: "conflict" }), { status: "ended" });
+});
+
+test("interpretWaitResponse throws on 401", () => {
+  assert.throws(() => interpretWaitResponse(401, { message: "unauthorized" }), /unauthorized/);
+});
+
+test("interpretWaitResponse retries 404 and 403 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(404, { message: "ngrok" }), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "ERR_NGROK_3200"), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(403, { message: "forbidden" }), { status: "pending" });
+});
+
+test("interpretWaitResponse ends when the planning session is gone", () => {
+  assert.deepEqual(interpretWaitResponse(404, { message: "planning session not found" }), { status: "ended" });
+  assert.deepEqual(interpretWaitResponse(404, {}, "planning session not found\n"), { status: "ended" });
+});
+
+test("interpretWaitResponse throws on 400", () => {
+  assert.throws(() => interpretWaitResponse(400, { message: "invalid" }), /invalid/);
+});
+
+test("interpretWaitResponse retries a generic 500 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(500, { message: "oops" }), { status: "pending" });
+});
+
+test("runLoop sleeps 1s with no log after a Cloudflare 502, then runs the next message", async () => {
+  const sleeps = [];
+  const logs = [];
+  const prompts = [];
+  const results = [interpretWaitResponse(502, CLOUDFLARE_502), { status: "message", text: "hello" }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
+  assert.deepEqual(prompts, ["hello"]);
+});
+
+test("runLoop sleeps 1s with no log when a transient wait has no retry_after", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [{ status: "pending", transient: true }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("runLoop ignores a large retry_after and stays silent", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [{ status: "pending", retry_after: 99999, transient: true }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("runLoop backs off silently on idle pending and empty-message waits", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [
+    { status: "pending" },
+    { status: "message", text: "   " },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000, 1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("safeWaitRequest treats a fetch throw as unreachable pending", async () => {
+  const got = await safeWaitRequest(async () => {
+    throw new TypeError("fetch failed");
+  });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
+});
+
+test("runLoop exits after consecutive unreachable waits", async () => {
+  const logs = [];
+  const sleeps = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      if (waits > 10) {
+        throw new Error("loop did not exit after unreachable waits");
+      }
+      return { status: "pending", unreachable: true };
+    },
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+    maxUnreachableWaits: 3,
+  });
+  assert.equal(code, 1);
+  assert.equal(waits, 3);
+  assert.equal(sleeps.length, 2);
+  assert.match(logs.join(""), /unreachable|failed/i);
+});
+
+test("safeWaitRequest treats an abort as unreachable pending", async () => {
+  const got = await safeWaitRequest(async () => {
+    const err = new Error("This operation was aborted");
+    err.name = "AbortError";
+    throw err;
+  });
+  assert.deepEqual(got, { status: "pending", unreachable: true });
+});
+
+test("safeWaitRequest keeps a delivered user message", async () => {
+  const got = await safeWaitRequest(async () => ({
+    status: 200,
+    text: async () => JSON.stringify({ status: "message", text: "hello" }),
+  }));
+  assert.deepEqual(got, { status: "message", text: "hello" });
+});
+
+test("safeWaitRequest treats 404 as pending", async () => {
+  const got = await safeWaitRequest(async () => ({
+    status: 404,
+    text: async () => "ERR_NGROK_3200",
+  }));
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("safeWaitRequest still throws on 401", async () => {
+  await assert.rejects(
+    () =>
+      safeWaitRequest(async () => ({
+        status: 401,
+        text: async () => JSON.stringify({ message: "unauthorized" }),
+      })),
+    /unauthorized/,
+  );
+});
+
+test("runLoop runs a user message after a dropped wait", async () => {
+  const prompts = [];
+  const logs = [];
+  const results = [
+    await safeWaitRequest(async () => {
+      throw new TypeError("fetch failed");
+    }),
+    { status: "message", text: "hello" },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async () => {},
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["hello"]);
+  assert.deepEqual(logs, []);
+});
+
+test("runLoop stays alive when waitOnce returns pending after a fetch throw", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [await safeWaitRequest(async () => { throw new TypeError("fetch failed"); }), { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () => {
+  const records = [];
+  const nowValues = [5_000, 5_250, 6_000, 6_400];
+  const results = [
+    { status: "message", text: "Add color" },
+    { status: "message", text: "Use the existing form" },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => 0,
+    writeLiveLogRecord: (rec) => records.push(rec),
+    now: () => nowValues.shift(),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(records, [
+    {
+      type: "cmd_start",
+      index: FOLLOW_UP_CMD_INDEX_BASE,
+      text: "Add color",
+      kind: "prompt",
+      preview: "Add color",
+      started_at: 5_000,
+    },
+    {
+      type: "cmd_end",
+      index: FOLLOW_UP_CMD_INDEX_BASE,
+      status: "passed",
+      duration_ms: 250,
+    },
+    {
+      type: "cmd_start",
+      index: FOLLOW_UP_CMD_INDEX_BASE + 1,
+      text: "Use the existing form",
+      kind: "prompt",
+      preview: "Use the existing form",
+      started_at: 6_000,
+    },
+    {
+      type: "cmd_end",
+      index: FOLLOW_UP_CMD_INDEX_BASE + 1,
+      status: "passed",
+      duration_ms: 400,
+    },
+  ]);
+});
+
+test("runLoop marks a failed follow-up cmd_end and keeps waiting", async () => {
+  const records = [];
+  const results = [{ status: "message", text: "hello" }, { status: "ended" }];
+  const logs = [];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => 2,
+    writeLiveLogRecord: (rec) => records.push(rec),
+    now: () => 1_000,
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.equal(records[1].type, "cmd_end");
+  assert.equal(records[1].status, "failed");
+  assert.match(logs[0], /follow-up prompt failed with exit 2/);
+});
+
+test("runPromptFile forwards extra argv to run.js", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-"));
+  const argvFile = path.join(taskDir, "argv.json");
+  fs.writeFileSync(
+    path.join(taskDir, "run.js"),
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+  );
+  const promptFile = path.join(taskDir, "prompt.txt");
+  fs.writeFileSync(promptFile, "hello\n");
+
+  const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
+  assert.equal(code, 0);
+  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
+});

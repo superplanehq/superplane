@@ -2,7 +2,7 @@ import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   clearBacklogAnalysisPending,
@@ -10,25 +10,20 @@ import {
   pendingBacklogAnalysisIds,
 } from "@/pages/factories/lib/backlogAnalysis";
 
-const { canvasesListRuns, factoriesListFactoryApps, factoriesListFactoryIntakes, factoriesListWorkOrders } = vi.hoisted(
-  () => ({
+const { canvasesListRuns, factoriesListFactoryAutomations, factoriesListFactoryIntakes, factoriesListWorkOrders } =
+  vi.hoisted(() => ({
     canvasesListRuns: vi.fn(),
-    factoriesListFactoryApps: vi.fn(),
+    factoriesListFactoryAutomations: vi.fn(),
     factoriesListFactoryIntakes: vi.fn(),
     factoriesListWorkOrders: vi.fn(),
-  }),
-);
+  }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    canvasesListRuns,
-    factoriesListFactoryApps,
-    factoriesListFactoryIntakes,
-    factoriesListWorkOrders,
-  };
-});
+vi.mock("@/api-client", () => ({
+  canvasesListRuns,
+  factoriesListFactoryAutomations,
+  factoriesListFactoryIntakes,
+  factoriesListWorkOrders,
+}));
 
 import { useBacklogAnalysisRuns, useFactoryBacklogAnalysis } from "./useBacklogAnalysisRuns";
 
@@ -115,27 +110,37 @@ describe("useBacklogAnalysisRuns", () => {
 describe("useFactoryBacklogAnalysis", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    factoriesListFactoryApps.mockResolvedValue({ data: { apps: [{ id: "app-analyzer", name: "Backlog" }] } });
+    factoriesListFactoryAutomations.mockResolvedValue({
+      data: { automations: [{ id: "app-analyzer", name: "Backlog" }] },
+    });
     factoriesListFactoryIntakes.mockResolvedValue({ data: { intakes: [] } });
     factoriesListWorkOrders.mockResolvedValue({ data: { orders: [] } });
     canvasesListRuns.mockResolvedValue({ data: { runs: [] } });
   });
 
   it("merges a pending id into analyzingOrderIds and drops it once the real run appears", async () => {
-    const queryClient = new QueryClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     markBacklogAnalysisPending("wo-1");
 
-    const { result, rerender } = renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
+    const { result } = renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
       wrapper: createWrapper(queryClient),
     });
 
-    await waitFor(() => expect(result.current.analyzingOrderIds.has("wo-1")).toBe(true));
+    await waitFor(() => {
+      expect(result.current.analyzingOrderIds.has("wo-1")).toBe(true);
+      expect(
+        queryClient.getQueryCache().find({ queryKey: ["backlog-analysis-runs", "org-1", "app-analyzer"] }),
+      ).toBeDefined();
+    });
 
     canvasesListRuns.mockResolvedValue({
       data: { runs: [analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_STARTED" })] },
     });
-    await queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", "org-1"] });
-    rerender();
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", "org-1"] });
+    });
 
     await waitFor(() => expect(result.current.runsByWorkOrder.has("wo-1")).toBe(true));
     await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-1")).toBe(false));

@@ -140,7 +140,7 @@ export async function executeCommitStaging({
   consoleMutationGenerationRef.current += 1;
   const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   const previousVersionId = activeCanvasVersionId;
-  let committedVersionId = activeCanvasVersionId;
+  let committedVersionId: string;
   let committedVersion: CanvasesCanvasVersion | undefined;
   try {
     const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);

@@ -1,0 +1,96 @@
+import { describe, expect, it } from "bun:test";
+
+import {
+  DRAFT_START_MODEL_AUTO,
+  canvasNodesForRunnerModel,
+  displayRunnerModel,
+  draftStartModelPayload,
+  phaseWithRunnerModel,
+  runnerModelsFromCanvasNodes,
+} from "./draftStartModel";
+
+describe("draftStartModelPayload", () => {
+  it("sends no model for Auto", () => {
+    expect(draftStartModelPayload(DRAFT_START_MODEL_AUTO)).toBeUndefined();
+    expect(draftStartModelPayload("")).toBeUndefined();
+    expect(draftStartModelPayload("  ")).toBeUndefined();
+  });
+
+  it("sends the listed id", () => {
+    expect(draftStartModelPayload("claude-opus-4-6")).toBe("claude-opus-4-6");
+  });
+});
+
+describe("displayRunnerModel", () => {
+  it("keeps a short alias", () => {
+    expect(displayRunnerModel("opus")).toBe("opus");
+  });
+
+  it("keeps the last path segment of an OpenRouter id", () => {
+    expect(displayRunnerModel("anthropic/claude-opus-4-6")).toBe("claude-opus-4-6");
+  });
+
+  it("keeps the last path segment of a hosted SuperPlane id", () => {
+    expect(displayRunnerModel("hosted::openrouter::x-ai/grok-4.6")).toBe("grok-4.6");
+  });
+});
+
+describe("runnerModelsFromCanvasNodes", () => {
+  it("joins distinct runner models from canvas nodes", () => {
+    expect(
+      runnerModelsFromCanvasNodes([
+        { configuration: { model: "anthropic/claude-opus-4-6" } },
+        { configuration: { model: "anthropic/claude-opus-4-6" } },
+        { configuration: { model: "anthropic/claude-sonnet-4-6" } },
+      ]),
+    ).toBe("anthropic/claude-opus-4-6 · anthropic/claude-sonnet-4-6");
+  });
+});
+
+describe("canvasNodesForRunnerModel", () => {
+  const ran = { id: "ran", configuration: { model: "hosted::openrouter::x-ai/grok-4.6" } };
+  const idle = { id: "idle", configuration: { model: "anthropic/claude-sonnet-4-6" } };
+
+  it("keeps all nodes when the run has no executed runner model", () => {
+    expect(canvasNodesForRunnerModel([ran, idle], { ran: "did_not_run", idle: "did_not_run" })).toEqual([ran, idle]);
+    expect(canvasNodesForRunnerModel([ran, idle])).toEqual([ran, idle]);
+  });
+
+  it("keeps nodes that ran when one of them has a model", () => {
+    expect(canvasNodesForRunnerModel([ran, idle], { ran: "running", idle: "did_not_run" })).toEqual([ran]);
+  });
+});
+
+describe("phaseWithRunnerModel", () => {
+  it("keeps a model already on the phase", () => {
+    expect(phaseWithRunnerModel({ model: "opus" }, [{ configuration: { model: "sonnet" } }]).model).toBe("opus");
+  });
+
+  it("fills Auto from the canvas when the phase has no model", () => {
+    expect(phaseWithRunnerModel({ model: undefined }, [{ configuration: { model: "opus" } }]).model).toBe("opus");
+  });
+
+  it("keeps a start model the canvas runners can use", () => {
+    expect(
+      phaseWithRunnerModel({ model: "claude-opus-4-6" }, [
+        { component: "runnerClaudeCode", configuration: { model: "claude-sonnet-4-6" } },
+      ]).model,
+    ).toBe("claude-opus-4-6");
+  });
+
+  it("uses the canvas model when the start model is for another runner", () => {
+    expect(
+      phaseWithRunnerModel({ model: "claude-opus-4-6" }, [
+        { component: "runnerCodex", configuration: { model: "gpt-5" } },
+      ]).model,
+    ).toBe("gpt-5");
+  });
+
+  it("keeps a hosted SuperPlane start model", () => {
+    expect(
+      phaseWithRunnerModel({ model: "hosted::openrouter::x-ai/grok-4.6" }, [
+        { component: "runnerSuperPlane", configuration: {} },
+      ]).model,
+    ).toBe("hosted::openrouter::x-ai/grok-4.6");
+  });
+});

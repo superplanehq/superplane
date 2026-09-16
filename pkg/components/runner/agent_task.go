@@ -2,76 +2,163 @@ package runner
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/blob"
 )
 
 type AgentPromptCommand func(promptName, model string) string
 
-func BuildAgentBrokerTask(
-	prepareName, prepareScript, runScriptName, runScript, workingDirectory string,
-	steps []AgentStep,
-	model string,
-	promptCommand AgentPromptCommand,
-) (commands []BrokerCommand, files []BrokerTaskFile) {
+type AgentBrokerTaskInput struct {
+	PrepareName      string
+	PrepareScript    string
+	RunScriptName    string
+	RunScript        string
+	WorkingDirectory string
+	Steps            []AgentStep
+	// DispatchedSteps, when set to the same length as Steps, supply minted
+	// prompt/command text for task files and attachment fetches. Preview
+	// text stays on Steps.
+	DispatchedSteps []AgentStep
+	Usage           string
+	Setups          []IntegrationSetup
+	Model           string
+	PromptCommand   AgentPromptCommand
+}
+
+type TaskAttachment struct {
+	URL      string
+	Filename string
+}
+
+func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
 	files = []BrokerTaskFile{
 		LLMUsageTaskFile(),
-		{Path: runScriptName, Content: runScript, Mode: "0644"},
-		{Path: "prepare.sh", Content: prepareScript, Mode: "0644"},
+		TurnTelemetryTaskFile(),
+		ActivityStreamTaskFile(),
+		{Path: input.RunScriptName, Content: input.RunScript, Mode: "0644"},
+		{Path: "prepare.sh", Content: input.PrepareScript, Mode: "0644"},
 	}
 
-	commands = make([]BrokerCommand, 0, len(steps)+1)
+	setupCommands, setupFiles := BuildIntegrationSetupCommands(input.Setups)
+	files = append(files, setupFiles...)
+
+	commands = make([]BrokerCommand, 0, len(input.Steps)+len(setupCommands)+1)
 	commands = append(commands, BrokerCommand{
-		Name:    prepareName,
-		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
+		Name:    input.PrepareName,
+		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
 	})
+	if fetch := AttachmentFetchCommand(CollectTaskAttachmentsFromSteps(AgentStepsForDispatch(input.Steps, input.DispatchedSteps))); fetch != nil {
+		commands = append(commands, *fetch)
+	}
+	commands = append(commands, setupCommands...)
 
-	for i, step := range steps {
-		file, command := buildAgentStep(i+1, step, workingDirectory, model, runScriptName, promptCommand)
+	for i, step := range input.Steps {
+		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model, runScriptName string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
-	stepSlug := AgentStepSlug(stepNumber, step.Name)
-	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
-	switch NormalizeAgentStepType(step.Type) {
-	case AgentStepBash:
-		command := ""
-		if step.Command != nil {
-			command = *step.Command
+func AgentStepsForDispatch(original, dispatched []AgentStep) []AgentStep {
+	if len(dispatched) == len(original) {
+		return dispatched
+	}
+	return original
+}
+
+func AgentStepForDispatch(original, dispatched []AgentStep, i int) AgentStep {
+	if i >= 0 && i < len(dispatched) && len(dispatched) == len(original) {
+		return dispatched[i]
+	}
+	return original[i]
+}
+
+func ApplyIntegrationUsage(prompt, usage string) string {
+	usage = strings.TrimSpace(usage)
+	if usage == "" {
+		return prompt
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return usage
+	}
+	return usage + "\n\n" + prompt
+}
+
+func WithTaskBinOnPath(command string) string {
+	return `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"
+` + command
+}
+
+func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []BrokerCommand, files []BrokerTaskFile) {
+	for i, setup := range setups {
+		if strings.TrimSpace(setup.Script) == "" {
+			continue
 		}
+		name := strings.TrimSpace(setup.Name)
+		if name == "" {
+			name = "Set up integration"
+		}
+		scriptName := AgentStepSlug(i+1, name) + ".sh"
+		path := "setup/" + scriptName
+		files = append(files, BrokerTaskFile{
+			Path:    path,
+			Content: setup.Script,
+			Mode:    "0644",
+		})
+		commands = append(commands, BrokerCommand{
+			Name:    name,
+			Command: WrapAgentStepCommand(fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/%s"`, path)),
+			Kind:    LiveLogKindSetup,
+			Preview: LiveLogText(name),
+		})
+	}
+	return commands, files
+}
+
+func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
+	stepSlug := AgentStepSlug(stepNumber, original.Name)
+	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
+	switch NormalizeAgentStepType(original.Type) {
+	case AgentStepBash:
+		command := stringPtrValue(original.Command)
 		scriptName := stepSlug + ".sh"
 		return BrokerTaskFile{
 				Path:    "steps/" + scriptName,
-				Content: command,
+				Content: stringPtrValue(dispatched.Command),
 				Mode:    "0644",
 			}, BrokerCommand{
-				Name:    AgentStepLabel(step.Name, scriptName),
+				Name:    AgentStepLabel(original.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 				Kind:    LiveLogKindBash,
-				Preview: LiveLogPreview(command),
+				Preview: LiveLogText(command),
 			}
 	default:
-		prompt := ""
-		if step.Prompt != nil {
-			prompt = *step.Prompt
-		}
+		prompt := stringPtrValue(original.Prompt)
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: prompt,
+				Content: ApplyIntegrationUsage(stringPtrValue(dispatched.Prompt), usage),
 				Mode:    "0644",
 			}, BrokerCommand{
-				Name:    AgentStepLabel(step.Name, promptName),
+				Name:    AgentStepLabel(original.Name, promptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
-				Preview: LiveLogPreview(prompt),
+				Preview: LiveLogText(prompt),
 			}
 	}
+}
+
+func stringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // EffectiveWorkingDirectory returns the per-step directory when set,
@@ -103,10 +190,17 @@ cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
 // SUPERPLANE_RESULT_FILE even when command exits non-zero.
 func WrapAgentStepCommand(command string) string {
 	return `_sp_status=0
+_sp_merge_llm_usage() {
+  node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
+}
+trap '_sp_merge_llm_usage' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 {
-` + command + `
+` + WithTaskBinOnPath(command) + `
 } || _sp_status=$?
-node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
+_sp_merge_llm_usage
+trap - EXIT TERM INT
 if [ "$_sp_status" -ne 0 ]; then
   return "$_sp_status" 2>/dev/null || exit "$_sp_status"
 fi`
@@ -138,4 +232,80 @@ func NodePrepareScript(cliName, cliMissingMessage string, workdir string) string
 	prepare += "echo \"node=$(node --version 2>/dev/null)\"\n"
 	prepare += "echo \"cwd=$(pwd -P)\"\n"
 	return prepare
+}
+
+func CollectTaskAttachmentsFromSteps(steps []AgentStep) []TaskAttachment {
+	texts := make([]string, 0, len(steps)*2)
+	for _, step := range steps {
+		if step.Prompt != nil {
+			texts = append(texts, *step.Prompt)
+		}
+		if step.Command != nil {
+			texts = append(texts, *step.Command)
+		}
+	}
+	return CollectTaskAttachments(texts...)
+}
+
+func CollectTaskAttachments(texts ...string) []TaskAttachment {
+	seen := map[string]struct{}{}
+	var attachments []TaskAttachment
+	for _, text := range texts {
+		for _, raw := range blob.SignedFileURLs(text) {
+			if _, exists := seen[raw]; exists {
+				continue
+			}
+			seen[raw] = struct{}{}
+			attachments = append(attachments, TaskAttachment{
+				URL:      raw,
+				Filename: attachmentFilename(raw, len(attachments)+1),
+			})
+		}
+	}
+	return attachments
+}
+
+func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
+	if len(attachments) == 0 {
+		return nil
+	}
+	var builder strings.Builder
+	builder.WriteString(`mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
+	builder.WriteByte('\n')
+	for _, attachment := range attachments {
+		builder.WriteString(`curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
+		builder.WriteString(attachment.Filename)
+		builder.WriteString(`" `)
+		builder.WriteString(ShellSingleQuote(attachment.URL))
+		builder.WriteByte('\n')
+	}
+	command := builder.String()
+	return &BrokerCommand{
+		Name:    "Fetch task attachments",
+		Command: WithTaskBinOnPath(command),
+		Kind:    LiveLogKindSetup,
+		Preview: LiveLogText("Download task files"),
+	}
+}
+
+func attachmentFilename(raw string, index int) string {
+	parsed, err := url.Parse(raw)
+	base := "file"
+	if err == nil {
+		if name := path.Base(parsed.Path); name != "" && name != "." && name != "/" {
+			base = name
+		}
+	}
+	var cleaned strings.Builder
+	for _, r := range filepath.Base(base) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-', r == '_':
+			cleaned.WriteRune(r)
+		}
+	}
+	name := cleaned.String()
+	if name == "" || name == "." {
+		name = "file"
+	}
+	return fmt.Sprintf("%02d-%s", index, name)
 }

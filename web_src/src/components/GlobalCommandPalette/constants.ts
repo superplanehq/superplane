@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   CircleUser,
   Gauge,
@@ -17,18 +18,6 @@ import type { PermissionCheck } from "./types";
 
 export const COMMAND_SHORTCUT = "/";
 export const DOCS_URL = "https://docs.superplane.com";
-
-export const PUBLIC_TOP_LEVEL_SEGMENTS = new Set([
-  "",
-  "admin",
-  "create",
-  "invite",
-  "install",
-  "login",
-  "setup",
-  "signup",
-  "welcome",
-]);
 
 export const ORGANIZATION_SETTINGS_LINKS: Array<{
   id: string;
@@ -138,6 +127,13 @@ export const ADMIN_LINKS: Array<{
     description: "Installation network and SMTP settings",
     href: "/admin/settings",
     icon: Network,
+  },
+  {
+    id: "price-books",
+    label: "Price Books",
+    description: "Review model and VM rates for this installation",
+    href: "/admin/price-books",
+    icon: BookOpen,
   },
   {
     id: "runner-tasks",

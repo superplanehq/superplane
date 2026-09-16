@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -287,10 +291,24 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_FILE_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting File Cleanup Worker")
+
+		w := workers.NewFileCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_FACTORY_VELOCITY_SYNC_WORKER") == "yes" {
 		log.Println("Starting Factory Velocity Sync Worker")
 
 		w := workers.NewFactoryVelocitySyncWorker(rabbitMQURL, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Planning Session Cleanup Worker")
+
+		w := workers.NewPlanningSessionCleanupWorker()
 		go w.Start(context.Background())
 	}
 
@@ -624,6 +642,13 @@ func Start() {
 		panic(fmt.Sprintf("failed to create git provider: %v", err))
 	}
 
+	log.Println("Creating blob storage provider")
+	blobProvider, err := newBlobProvider()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create blob storage provider: %v", err))
+	}
+	blob.SetCurrent(blobProvider)
+
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
 		HTTP: registry.HTTPOptions{
@@ -723,6 +748,24 @@ func getWebhookBaseURL(baseURL string) string {
 		webhookBaseURL = baseURL
 	}
 	return webhookBaseURL
+}
+
+func newBlobProvider() (blob.Provider, error) {
+	name := strings.TrimSpace(os.Getenv("BLOB_STORAGE_PROVIDER"))
+	if name == "" {
+		return nil, fmt.Errorf("BLOB_STORAGE_PROVIDER is not set")
+	}
+
+	switch name {
+	case blob.ProviderGCS:
+		log.Println("Creating GCS blob storage provider")
+		return gcs.NewProvider()
+	case blob.ProviderFilesystem:
+		log.Println("Creating filesystem blob storage provider")
+		return filesystem.NewProvider()
+	default:
+		return nil, fmt.Errorf("unsupported blob storage provider %q", name)
+	}
 }
 
 /*

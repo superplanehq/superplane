@@ -1,12 +1,12 @@
 import type { EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type { ExecutionInfo, NodeInfo } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Incident, IncidentEvent } from "./types";
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [

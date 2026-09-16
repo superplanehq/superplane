@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 describe("withOrganizationHeader", () => {
@@ -19,6 +19,13 @@ describe("withOrganizationHeader", () => {
 
     const options = withOrganizationHeader();
     expect(options.headers["x-organization-id"]).toBe("org-from-url");
+  });
+
+  it("does not treat the onboarding route as an organization", () => {
+    setPathname("/onboarding");
+
+    const options = withOrganizationHeader();
+    expect(options.headers["x-organization-id"]).toBeUndefined();
   });
 
   it("prefers explicit organizationId when window.location is stale", () => {

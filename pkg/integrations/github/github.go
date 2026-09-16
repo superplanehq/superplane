@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
@@ -70,8 +73,9 @@ type GitHub struct {
 }
 
 type Configuration struct {
-	Organization string `mapstructure:"organization" json:"organization"`
-	PrivateApp   bool   `mapstructure:"privateApp" json:"privateApp"`
+	Organization    string `mapstructure:"organization" json:"organization"`
+	PrivateApp      bool   `mapstructure:"privateApp" json:"privateApp"`
+	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath"`
 }
 
 func (g *GitHub) Name() string {
@@ -131,6 +135,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.MarkPullRequestReadyForReview{},
 		&pulls.AddPullRequestReviewers{},
 		&pulls.UpdatePullRequest{},
+		&pulls.FindPullRequest{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
@@ -174,15 +179,15 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
+		return g.syncHostedApp(ctx, config)
+	}
+
 	//
 	// App is already installed - do not do anything.
 	//
 	if metadata.InstallationID != "" {
 		return nil
-	}
-
-	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
-		return g.syncHostedApp(ctx)
 	}
 
 	state, err := crypto.Base64String(32)
@@ -208,7 +213,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
+func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error {
 	app, ok := common.HostedAppFromEnv()
 	if !ok {
 		return fmt.Errorf("hosted GitHub App is not configured")
@@ -216,7 +221,21 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 
 	var existing common.Metadata
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &existing)
-	if existing.HostedApp && existing.InstallationID == "" && existing.State != "" {
+	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
+	if existing.HostedApp && existing.State != "" {
+		existing.SetupReturnPath = returnPath
+		// A member can request an installation without the request callback
+		// reaching this server, so a known GitHub login is enough to ask
+		// GitHub for that member's open install requests.
+		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
+			// Adopt records the requested account it found on GitHub and
+			// moves an approved installation into the account picker;
+			// refreshHostedPendingAction below persists both.
+			if err := g.adoptRequestedInstallation(ctx, app, &existing); err != nil {
+				// The connection stays pending; the next sync retries.
+				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
+			}
+		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
 	}
@@ -235,6 +254,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 		State:           state,
 		HostedApp:       true,
 		StartedByUserID: startedBy,
+		SetupReturnPath: returnPath,
 		GitHubApp: common.GitHubAppMetadata{
 			ID:   app.ID,
 			Slug: app.Slug,
@@ -245,15 +265,27 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
-	if len(metadata.PendingInstallations) >= 2 {
+	// The OAuth callback removes the browser action once installations load,
+	// so the connect screen keeps the authorize URL from metadata to ask
+	// again which GitHub account to use.
+	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
+	if oauthEnabled {
+		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	}
+	if metadata.InstallationID != "" {
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+
+	if len(metadata.PendingInstallations) >= 1 {
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
 
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if app.UserOAuthEnabled() && ctx.BaseURL != "" && len(metadata.PendingInstallations) == 0 {
-		actionURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	if oauthEnabled {
+		actionURL = metadata.AuthorizeURL
 		description = hostedOAuthDescription
 	}
 
@@ -433,11 +465,27 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
 		metadata.State = state
+		metadata.PendingInstallations = slices.DeleteFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+			return installation.ID == installationID
+		})
+		metadata.AuthorizeURL = ""
+
+		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
+		actionDescription := appInstallationDescription
+		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
+				app.ClientID,
+				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+				state,
+			)
+			actionURL = metadata.AuthorizeURL
+			actionDescription = hostedOAuthDescription
+		}
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appInstallationDescription,
-			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+			Description: actionDescription,
+			URL:         actionURL,
 			Method:      "GET",
 		})
 
@@ -779,6 +827,16 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	installationID = ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	requestState := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if requestState != state {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || requestState != state {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -860,6 +918,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	clearInstallRequested(ctx)
 	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App - installation=%s", installationID)
@@ -882,11 +941,17 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+	setupAction := ctx.Request.URL.Query().Get("setup_action")
+	state := ctx.Request.URL.Query().Get("state")
+
 	//
-	// App installation has already been set up.
-	// Just redirect to the SuperPlane app installation page.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
 		http.Redirect(
 			ctx.Response,
@@ -898,10 +963,16 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		)
 		return
 	}
-
-	installationID := ctx.Request.URL.Query().Get("installation_id")
-	setupAction := ctx.Request.URL.Query().Get("setup_action")
-	state := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if state != metadata.State {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || state != metadata.State {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -1027,15 +1098,213 @@ func isPendingInstallationSetupAction(setupAction string) bool {
 	return setupAction == "install" || setupAction == "update"
 }
 
+func isInstallationRequestSetupAction(setupAction string) bool {
+	return setupAction == "request"
+}
+
+func persistInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	requests := metadata.CurrentInstallRequests()
+	requests = append(requests, common.InstallRequest{
+		AccountLogin:   requestedInstallAccount(ctx),
+		RequesterLogin: metadata.StartedByGitHubLogin,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	metadata.SetInstallRequests(requests)
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func clearInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return
+	}
+	if !metadata.HasInstallRequests() && metadata.InstallRequestedAccount == "" {
+		return
+	}
+	metadata.SetInstallRequests(nil)
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func requestedInstallAccount(ctx core.HTTPRequestContext) string {
+	for _, key := range []string{"account", "org", "organization", "githubOrg"} {
+		if value := strings.TrimSpace(ctx.Request.URL.Query().Get(key)); value != "" {
+			return value
+		}
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		return metadata.InstallRequestedAccount
+	}
+	return ""
+}
+
 func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
-	http.Redirect(
-		ctx.Response,
-		ctx.Request,
-		fmt.Sprintf(
-			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-		),
-		http.StatusSeeOther,
+	redirectToIntegrationSettingsURL(ctx, "")
+}
+
+func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
+	query := "githubSetup=request&githubIntegrationId=" + url.QueryEscape(ctx.Integration.ID().String())
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		query += "&githubOrg=" + url.QueryEscape(metadata.InstallRequestedAccount)
+	}
+	redirectToIntegrationSettingsURL(ctx, query)
+}
+
+const integrationSetupReturnCookie = "sp_integration_setup_return"
+
+type persistentIntegration interface {
+	Persist() error
+}
+
+func persistIntegrationBeforeRedirect(ctx core.HTTPRequestContext) {
+	persister, ok := ctx.Integration.(persistentIntegration)
+	if !ok {
+		return
+	}
+
+	if err := persister.Persist(); err != nil {
+		ctx.Logger.Errorf("failed to persist GitHub integration before redirect: %v", err)
+	}
+}
+
+func redirectToIntegrationSettingsURL(ctx core.HTTPRequestContext, rawQuery string) {
+	persistIntegrationBeforeRedirect(ctx)
+	location := integrationCallbackLocation(ctx, rawQuery)
+	if integrationCallbackReturnPath(ctx) != "" {
+		clearIntegrationSetupReturnCookie(ctx.Response)
+	}
+	http.Redirect(ctx.Response, ctx.Request, location, http.StatusSeeOther)
+}
+
+func integrationCallbackLocation(ctx core.HTTPRequestContext, rawQuery string) string {
+	settings := fmt.Sprintf(
+		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 	)
+	returnPath := integrationCallbackReturnPath(ctx)
+	if returnPath == "" {
+		if rawQuery != "" {
+			return settings + "?" + rawQuery
+		}
+		return settings
+	}
+
+	return strings.TrimRight(ctx.BaseURL, "/") + mergeSetupReturnQuery(returnPath, rawQuery)
+}
+
+func integrationCallbackReturnPath(ctx core.HTTPRequestContext) string {
+	if path := setupReturnPathFromMetadata(ctx); path != "" {
+		return path
+	}
+	if path := integrationSetupReturnPath(ctx.Request); path != "" {
+		return path
+	}
+	if factoriesEnabled(ctx.OrganizationID) {
+		return "/onboarding"
+	}
+
+	return ""
+}
+
+func setupReturnPathFromMetadata(ctx core.HTTPRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	return firstSafeSetupReturnPath(metadata.SetupReturnPath)
+}
+
+func firstSafeSetupReturnPath(paths ...string) string {
+	for _, path := range paths {
+		if isSafeIntegrationSetupReturnPath(path) {
+			return path
+		}
+	}
+
+	return ""
+}
+
+func integrationSetupReturnPath(request *http.Request) string {
+	if request == nil {
+		return ""
+	}
+
+	cookie, err := request.Cookie(integrationSetupReturnCookie)
+	if err != nil || cookie == nil {
+		return ""
+	}
+
+	path, err := url.QueryUnescape(strings.TrimSpace(cookie.Value))
+	if err != nil || !isSafeIntegrationSetupReturnPath(path) {
+		return ""
+	}
+
+	return path
+}
+
+func isSafeIntegrationSetupReturnPath(path string) bool {
+	if path == "" || strings.Contains(path, "://") || strings.ContainsAny(path, "\\\t\r\n ") {
+		return false
+	}
+
+	pathname, _, _ := strings.Cut(path, "?")
+	if pathname == "/onboarding" {
+		return true
+	}
+	if !strings.HasPrefix(pathname, "/") || strings.HasPrefix(pathname, "//") {
+		return false
+	}
+
+	rest := strings.TrimPrefix(pathname, "/")
+	organization, after, ok := strings.Cut(rest, "/")
+	return ok && organization != "" && after != ""
+}
+
+func mergeSetupReturnQuery(path, rawQuery string) string {
+	if rawQuery == "" {
+		return path
+	}
+
+	pathname, existing, _ := strings.Cut(path, "?")
+	params, err := url.ParseQuery(existing)
+	if err != nil {
+		params = url.Values{}
+	}
+	extra, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path
+	}
+	for key, values := range extra {
+		if len(values) == 0 {
+			continue
+		}
+		params.Set(key, values[len(values)-1])
+	}
+	encoded := params.Encode()
+	if encoded == "" {
+		return pathname
+	}
+	return pathname + "?" + encoded
+}
+
+func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
+	if response == nil {
+		return
+	}
+
+	http.SetCookie(response, &http.Cookie{
+		Name:   integrationSetupReturnCookie,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
 }
 
 func ownerFromRepositories(repos []common.Repository) string {
@@ -1184,13 +1453,16 @@ func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
 	return ctx.Secrets().Get(common.SecretAppPEM)
 }
 
-func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
+func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.IntegrationSecrets, error) {
 	token, err := resolveAccessToken(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil, err
+		return core.IntegrationSecrets{}, err
 	}
 
-	return map[string][]byte{
-		integrationSecretGitHubToken: []byte(token),
+	return core.IntegrationSecrets{
+		Values: map[string][]byte{
+			integrationSecretGitHubToken: []byte(token),
+		},
+		Usage: githubSecretUsage,
 	}, nil
 }

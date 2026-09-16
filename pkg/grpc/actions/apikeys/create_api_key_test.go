@@ -23,7 +23,7 @@ func TestCreateAPIKeyStoresExpirationAndCanvasScope(t *testing.T) {
 
 	response, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
 		Name:      "ci-bot",
-		Role:      models.RoleOrgViewer,
+		Role:      models.RoleOrgOperator,
 		ExpiresAt: timestamppb.New(expiresAt),
 		CanvasIds: []string{canvas.ID.String()},
 	}, r.AuthService)
@@ -44,7 +44,7 @@ func TestCreateAPIKeyRejectsInvalidCanvasScope(t *testing.T) {
 
 	_, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
 		Name:      "ci-bot",
-		Role:      models.RoleOrgViewer,
+		Role:      models.RoleOrgOperator,
 		CanvasIds: []string{"not-a-canvas-id"},
 	}, r.AuthService)
 

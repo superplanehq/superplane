@@ -221,7 +221,7 @@ function renderReadonlyHighlightedValue(
   }
 
   if (lastIndex < value.length) {
-    parts.push(<span key={key++}>{value.slice(lastIndex)}</span>);
+    parts.push(<span key={key}>{value.slice(lastIndex)}</span>);
   }
 
   return parts;

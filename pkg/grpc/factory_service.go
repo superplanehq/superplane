@@ -87,9 +87,19 @@ func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFa
 	return actions.UpdateFactoryLine(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactoryAppsRequest) (*pb.ListFactoryAppsResponse, error) {
+func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.ListFactoryAutomationsRequest) (*pb.ListFactoryAutomationsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListFactoryApps(ctx, organizationID, req)
+	return actions.ListFactoryAutomations(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.CreateFactoryAutomationRequest) (*pb.CreateFactoryAutomationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (*pb.DeleteFactoryAutomationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryAutomation(ctx, organizationID, req)
 }
 
 func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req *pb.MaterializeFactoryAppTemplateRequest) (*pb.MaterializeFactoryAppTemplateResponse, error) {
@@ -97,9 +107,9 @@ func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req 
 	return actions.MaterializeFactoryAppTemplate(ctx, organizationID, req)
 }
 
-func (s *FactoryService) MaterializeFactoryAppDefaults(ctx context.Context, req *pb.MaterializeFactoryAppDefaultsRequest) (*pb.MaterializeFactoryAppDefaultsResponse, error) {
+func (s *FactoryService) MaterializeFactoryAutomationDefaults(ctx context.Context, req *pb.MaterializeFactoryAutomationDefaultsRequest) (*pb.MaterializeFactoryAutomationDefaultsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.MaterializeFactoryAppDefaults(ctx, organizationID, req)
+	return actions.MaterializeFactoryAutomationDefaults(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFactoryIntakesRequest) (*pb.ListFactoryIntakesResponse, error) {
@@ -175,6 +185,11 @@ func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.S
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) RefreshBacklog(ctx context.Context, req *pb.RefreshBacklogRequest) (*pb.RefreshBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RefreshBacklog(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
@@ -263,12 +278,52 @@ func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.Descr
 	return actions.DescribeFactoryUsage(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ListFactoryWorkOrderRunUsageRequest) (*pb.ListFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ExportFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ExportFactoryWorkOrderRunUsageRequest) (*pb.ExportFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ExportFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListFactoryLLMModelsRequest) (*pb.ListFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryLineRunnerModels(ctx context.Context, req *pb.ListFactoryLineRunnerModelsRequest) (*pb.ListFactoryLineRunnerModelsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryLineRunnerModels(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.UpdateFactoryLLMModelsRequest) (*pb.UpdateFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DescribePlanningSession(ctx context.Context, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribePlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) FindPlanningSessionByWorkOrder(ctx context.Context, req *pb.FindPlanningSessionByWorkOrderRequest) (*pb.FindPlanningSessionByWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.FindPlanningSessionByWorkOrder(ctx, organizationID, req)
+}
+
+func (s *FactoryService) EndPlanningSession(ctx context.Context, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.EndPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SendPlanningSessionMessage(ctx context.Context, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendPlanningSessionMessage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) AnswerPlanningSessionSurvey(ctx context.Context, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AnswerPlanningSessionSurvey(ctx, organizationID, req)
 }

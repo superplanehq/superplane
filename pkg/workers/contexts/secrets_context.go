@@ -90,29 +90,29 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 	return keys, nil
 }
 
-func (c *SecretsContext) GetIntegrationKeys(integrationName string) (map[string][]byte, error) {
+func (c *SecretsContext) GetIntegrationSecrets(integrationName string) (core.IntegrationSecrets, error) {
 	name := strings.TrimSpace(integrationName)
 	if name == "" {
-		return nil, fmt.Errorf("integration name is required")
+		return core.IntegrationSecrets{}, fmt.Errorf("integration name is required")
 	}
 
 	integration, err := models.FindIntegrationByName(c.tx, c.organizationID, name)
 	if err != nil {
-		return nil, err
+		return core.IntegrationSecrets{}, err
 	}
 
 	if integration.State != models.IntegrationStateReady {
-		return nil, fmt.Errorf("integration %q is not ready", integration.InstallationName)
+		return core.IntegrationSecrets{}, fmt.Errorf("integration %q is not ready", integration.InstallationName)
 	}
 
 	integrationImpl, err := c.registry.GetIntegration(integration.AppName)
 	if err != nil {
-		return nil, err
+		return core.IntegrationSecrets{}, err
 	}
 
 	provider, ok := registry.UnwrapIntegration(integrationImpl).(core.IntegrationSecretProvider)
 	if !ok {
-		return nil, fmt.Errorf("integration %q does not provide secrets", integration.InstallationName)
+		return core.IntegrationSecrets{}, fmt.Errorf("integration %q does not provide secrets", integration.InstallationName)
 	}
 
 	secretCtx := core.IntegrationSecretContext{

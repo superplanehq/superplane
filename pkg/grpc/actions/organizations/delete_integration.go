@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -10,6 +11,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"gorm.io/gorm"
 )
+
+var errIntegrationStillUsed = errors.New("integration is still used by a workspace")
 
 func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.DeleteIntegrationResponse, error) {
 	org, err := resolveOrganizationID(ctx, orgID)
@@ -33,6 +36,14 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	// and delete its webhooks before we delete the integration itself.
 	//
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		used, err := models.CountFactoriesUsingVCSIntegration(tx, org, integration.ID)
+		if err != nil {
+			return grpcerrors.Internal(err, "failed to check integration references")
+		}
+		if used > 0 {
+			return grpcerrors.FailedPrecondition(errIntegrationStillUsed, "integration is still used by a workspace")
+		}
+
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
 			return grpcerrors.Internal(err, "failed to list integration webhooks")

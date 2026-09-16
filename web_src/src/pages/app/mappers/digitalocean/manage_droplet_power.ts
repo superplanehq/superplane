@@ -2,7 +2,7 @@ import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/compo
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -144,7 +144,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   // Check if there's a custom power operation event in the outputs

@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -9,6 +11,7 @@ import (
 )
 
 const intakeGitHubAppName = "github"
+const intakeProductiveAppName = "productive"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -48,19 +51,28 @@ func (b *intakeBinding) installation() *models.Integration {
 // setup records the connected version control integration and the backlog
 // repository, which is what a GitHub intake listens on. A source that setup
 // says nothing about stays unbound, and the user finishes it in the canvas.
-func resolveIntakeBinding(tx *gorm.DB, factory *models.Factory, source string) *intakeBinding {
+func resolveIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	source string,
+	integrationID string,
+	resourceID string,
+) (*intakeBinding, error) {
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return resolveProductiveIntakeBinding(tx, factory, integrationID, resourceID)
+	}
 	if source != models.FactoryIntakeSourceGitHubIssues {
-		return nil
+		return nil, nil
 	}
 
 	config := factory.OnboardingConfigValue()
 	if config.VCSIntegrationID == "" || config.BacklogRepository == "" {
-		return nil
+		return nil, nil
 	}
 
 	integration := findIntakeGitHubIntegration(tx, factory, config.VCSIntegrationID)
 	if integration == nil {
-		return nil
+		return nil, nil
 	}
 
 	return &intakeBinding{
@@ -70,7 +82,48 @@ func resolveIntakeBinding(tx *gorm.DB, factory *models.Factory, source string) *
 		},
 		Configuration: map[string]any{"repository": config.BacklogRepository},
 		Installation:  integration,
+	}, nil
+}
+
+func resolveProductiveIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	projectID string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	projectID = strings.TrimSpace(projectID)
+	if integrationID == "" && projectID == "" {
+		return nil, nil
 	}
+	if integrationID == "" || projectID == "" {
+		return nil, invalidArgument("Productive.io integration and project are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Productive.io integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Productive.io integration was not found")
+	}
+	if integration.AppName != intakeProductiveAppName {
+		return nil, invalidArgument("selected integration is not Productive.io")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Productive.io integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"project": projectID},
+		Installation:  integration,
+	}, nil
 }
 
 // findIntakeGitHubIntegration reports nil when the workspace has no GitHub

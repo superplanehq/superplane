@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import type { OutcomeState } from "@/components/AgentSidebar/widgets/OutcomeProgressWidget";
 import type {
@@ -20,7 +19,6 @@ export type ConversationHandlers = {
 };
 
 export function useAgentConversationHandlers({
-  agentMode,
   chatId,
   canvasId,
   isAutoLayoutOnUpdateEnabled,
@@ -33,7 +31,6 @@ export function useAgentConversationHandlers({
   setNotice,
   setOutcomeState,
 }: {
-  agentMode: AgentMode;
   chatId: string;
   canvasId: string;
   isAutoLayoutOnUpdateEnabled: boolean;
@@ -90,7 +87,6 @@ export function useAgentConversationHandlers({
         .mutateAsync({
           chatId,
           content,
-          mode: agentMode,
           images,
           autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
         })
@@ -99,7 +95,7 @@ export function useAgentConversationHandlers({
           throw error;
         });
     },
-    [agentMode, chatId, canvasId, isAutoLayoutOnUpdateEnabled, setError, setNotice, setOutcomeState],
+    [chatId, canvasId, isAutoLayoutOnUpdateEnabled, setError, setNotice, setOutcomeState],
   );
 
   const handleStop = useCallback(() => {
@@ -114,14 +110,13 @@ export function useAgentConversationHandlers({
         await send.mutateAsync({
           chatId,
           content: action,
-          mode: agentMode,
           autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
         });
       } catch {
         // Keep the current transcript unchanged when quick actions fail.
       }
     },
-    [agentMode, chatId, isAutoLayoutOnUpdateEnabled],
+    [chatId, isAutoLayoutOnUpdateEnabled],
   );
 
   const handleStartBuilding = useCallback(
@@ -133,7 +128,6 @@ export function useAgentConversationHandlers({
         await send.mutateAsync({
           chatId,
           content: "Specs approved. Start building.",
-          mode: "builder",
           autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
         });
       } catch {

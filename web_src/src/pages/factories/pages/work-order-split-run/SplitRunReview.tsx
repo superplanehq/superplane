@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
@@ -12,6 +13,8 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { StartConfirmDialog } from "./StartConfirmDialog";
+import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
   splitRunDecisionTone,
   type SplitRunFooter,
@@ -46,7 +49,7 @@ function reviewRunHref(
 }
 
 /**
- * Decision note under Description and Automations. Header stays Close only.
+ * Decision note under the plan on Description, and under Automations.
  */
 export function SplitRunReview({
   footer,
@@ -56,12 +59,17 @@ export function SplitRunReview({
   orderNumber,
   canAct = true,
   onStart,
+  onArchive,
   onReject,
   onBackToDraft,
   onStop,
   startBusy = false,
   actionBusy = false,
   startDisabled = false,
+  modelSelect,
+  compact = false,
+  actionsOnly = false,
+  confirmUnclearStart = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -70,25 +78,53 @@ export function SplitRunReview({
   orderNumber?: string;
   canAct?: boolean;
   onStart?: () => void | Promise<void>;
+  onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
   onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
   startDisabled?: boolean;
+  modelSelect?: ReactNode;
+  compact?: boolean;
+  actionsOnly?: boolean;
+  confirmUnclearStart?: boolean;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
-  const actions = canAct ? footer.actions : [];
-  const onAction = (action: SplitRunFooterAction) => {
-    if (action.kind === "start") {
-      void onStart?.();
+  const actions = canAct
+    ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
+    : [];
+  const requestStart = () => {
+    if (confirmUnclearStart && needsStartConfirm(footer.confidenceScore)) {
+      setConfirmOpen(true);
       return;
     }
-    if (action.kind === "reject") {
-      void onReject?.();
+    void onStart?.();
+  };
+  const confirmStart = (skipNext: boolean) => {
+    if (skipNext) {
+      persistSkipStartConfirm();
+    }
+    setConfirmOpen(false);
+    void onStart?.();
+  };
+  const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
+    archive: onArchive,
+    reject: onReject,
+    "back-to-draft": onBackToDraft,
+  };
+  const onAction = (action: SplitRunFooterAction) => {
+    if (action.kind === "start") {
+      requestStart();
+      return;
+    }
+    const directAction = directActions[action.kind];
+    if (directAction) {
+      void directAction();
       return;
     }
     if (action.kind === "approve") {
@@ -103,13 +139,13 @@ export function SplitRunReview({
       void onStop?.("reopen");
       return;
     }
-    if (action.kind === "back-to-draft") {
-      void onBackToDraft?.();
-    }
   };
 
   return (
-    <div className={cn("shrink-0", className)} data-testid="split-run-review">
+    <div
+      className={cn(compact && !actionsOnly ? "min-w-0 flex-1" : "shrink-0", className)}
+      data-testid="split-run-review"
+    >
       <SplitRunAttentionNote
         note={footer.note}
         tone={splitRunDecisionTone(footer)}
@@ -118,8 +154,19 @@ export function SplitRunReview({
         actionBusy={actionBusy}
         startBusy={startBusy}
         startDisabled={startDisabled}
+        modelSelect={modelSelect}
+        compact={compact}
+        actionsOnly={actionsOnly}
         onAction={onAction}
       />
+      {confirmUnclearStart ? (
+        <StartConfirmDialog
+          open={confirmOpen}
+          score={footer.confidenceScore}
+          onOpenChange={setConfirmOpen}
+          onConfirm={confirmStart}
+        />
+      ) : null}
     </div>
   );
 }

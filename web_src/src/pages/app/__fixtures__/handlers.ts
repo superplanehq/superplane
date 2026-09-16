@@ -212,6 +212,7 @@ function buildMeUser(orgId: string) {
       "canvases",
       "integrations",
       "secrets",
+      "api_keys",
       "groups",
       "users",
       "roles",

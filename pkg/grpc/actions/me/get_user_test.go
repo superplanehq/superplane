@@ -21,9 +21,9 @@ func Test_ListUserPermissions(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	//
-	// Assign viewer role to user, and prepare context with user ID and organization ID
+	// Assign operator role to user, and prepare context with user ID and organization ID
 	//
-	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
+	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgOperator, orgID, models.DomainTypeOrganization))
 	ctx := metadata.NewIncomingContext(
 		context.Background(),
 		metadata.Pairs(
@@ -43,6 +43,7 @@ func Test_ListUserPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp.User)
 		assert.Empty(t, resp.User.Permissions)
+		assert.True(t, resp.User.IsOwner)
 	})
 
 	t.Run("includes permissions", func(t *testing.T) {
@@ -62,11 +63,23 @@ func Test_ListUserPermissions(t *testing.T) {
 			"agents",
 			"notifications",
 		})
-		expected = append(expected, &pbAuth.Permission{
-			Resource:   "notifications",
-			Action:     "update",
-			DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
-		})
+		expected = append(expected,
+			&pbAuth.Permission{
+				Resource:   "work_orders",
+				Action:     "create",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+			&pbAuth.Permission{
+				Resource:   "work_orders",
+				Action:     "update",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+			&pbAuth.Permission{
+				Resource:   "notifications",
+				Action:     "update",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+		)
 		assert.ElementsMatch(t, resp.User.Permissions, expected)
 	})
 

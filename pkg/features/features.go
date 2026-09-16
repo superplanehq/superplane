@@ -24,17 +24,30 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactoryVelocity gates the Velocity rail link and page for a
-// factories organization until Velocity is generally available.
-const FeatureFactoryVelocity = "factory_velocity"
-
 // FeatureFactorySentryIntake gates the manual "Add intake" entry for Sentry
 // in the Backlog column menu until the flow is generally available.
 const FeatureFactorySentryIntake = "factory_sentry_intake"
 
+// FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
+// Productive.io in the Backlog column menu until the flow is generally
+// available.
+const FeatureFactoryProductiveIntake = "factory_productive_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
+
+// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// until the BYOK UX is ready for general use.
+const FeatureOrganizationBYOK = "organization_byok"
+
+// FeatureFactoryCreateWithAgent gates live agent refinement of draft work
+// orders until the flow is generally available.
+const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
+
+// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
+// Done, and phase columns until the flow is generally available.
+const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 func released() *bool {
 	v := true
@@ -45,9 +58,12 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryVelocity, Label: "Factory Velocity", Description: "Show the Velocity view for a factory organization"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 }
 
 func All() []Feature {

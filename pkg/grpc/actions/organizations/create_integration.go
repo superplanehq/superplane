@@ -478,6 +478,15 @@ func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_Ca
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
 
+func isClearedSensitiveValue(value any) bool {
+	if value == nil {
+		return true
+	}
+
+	s, ok := value.(string)
+	return ok && s == ""
+}
+
 func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
 	result := maps.Clone(config)
 
@@ -488,6 +497,12 @@ func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Regist
 
 		value, exists := config[field.Name]
 		if !exists {
+			continue
+		}
+
+		if isClearedSensitiveValue(value) {
+			delete(result, field.Name)
+			delete(existingConfig, field.Name)
 			continue
 		}
 

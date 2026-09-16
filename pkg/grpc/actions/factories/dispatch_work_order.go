@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -23,15 +24,18 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	factoryID := resolvedFactory.ID
 
-	orderID, err := parseOrderID(req.GetOrderId())
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	orderID := resolvedOrder.ID
 
 	lineName := strings.TrimSpace(req.GetLineName())
 	if lineName == "" {
@@ -53,7 +57,6 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var logger *log.Entry
 	var fromState string
 
-	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -78,6 +81,17 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 
 		if len(line.Steps) == 0 {
 			return models.ErrFactoryLineHasNoSteps
+		}
+
+		model := strings.TrimSpace(req.GetModel())
+		if model != "" {
+			allowed, err := listLineRunnerModels(tx, orgID, factoryID, lineName)
+			if err != nil {
+				return err
+			}
+			if !slices.Contains(allowed, model) {
+				return invalidArgument("model is not available on this line")
+			}
 		}
 
 		startIndex := int(req.GetStartStepIndex())
@@ -110,7 +124,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		_, result, err := line.DispatchFrom(tx, order, startIndex)
+		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model)
 		if err != nil {
 			return err
 		}

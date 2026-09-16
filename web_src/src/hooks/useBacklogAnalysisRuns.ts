@@ -16,7 +16,7 @@ import { getWorkOrderDisplayStatus } from "@/pages/factories/lib/workOrderProgre
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { useFactoryApps, useFactoryWorkOrders } from "./useFactoryData";
+import { useFactoryAutomations, useFactoryWorkOrders } from "./useFactoryData";
 import { useFactoryIntakes } from "./useFactoryIntakeData";
 
 const BACKLOG_ANALYSIS_RUNS_LIMIT = 50;
@@ -69,7 +69,7 @@ export function useBacklogAnalysisRuns(organizationId: string, canvasId: string 
  * name, so their canvases are excluded.
  */
 export function useFactoryBacklogAnalysis(organizationId: string, factoryId: string) {
-  const { data: apps = [] } = useFactoryApps(organizationId, factoryId);
+  const { data: apps = [] } = useFactoryAutomations(organizationId, factoryId);
   const { data: intakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const { data: orders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const analyzerCanvasId = useMemo(
@@ -113,6 +113,24 @@ export function useFactoryBacklogAnalysis(organizationId: string, factoryId: str
       runsByWorkOrder,
     };
   }, [runs, runsByWorkOrder, pendingIds]);
+}
+
+/**
+ * Work orders whose Backlog analysis finished: they have at least one run
+ * and none still in flight. The first-run analysis screen counts these as
+ * scored tickets.
+ */
+export function useBacklogAnalysisScoredOrderIds(organizationId: string, factoryId: string): ReadonlySet<string> {
+  const { analyzingOrderIds, runsByWorkOrder } = useFactoryBacklogAnalysis(organizationId, factoryId);
+  return useMemo(() => {
+    const scored = new Set<string>();
+    for (const workOrderId of runsByWorkOrder.keys()) {
+      if (!analyzingOrderIds.has(workOrderId)) {
+        scored.add(workOrderId);
+      }
+    }
+    return scored;
+  }, [analyzingOrderIds, runsByWorkOrder]);
 }
 
 /**

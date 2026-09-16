@@ -104,12 +104,34 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "run is already linked to a different pull request")
 	case errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete):
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
+		return grpcerrors.NotFound(err, "planning session not found")
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
+		return grpcerrors.FailedPrecondition(err, "planning session has ended")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
+		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
+	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
+		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
+	case errors.Is(err, errIntakeRefreshUnsupported):
+		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, models.ErrFileNotFound):
+		return grpcerrors.NotFound(err, "file not found")
+	case errors.Is(err, models.ErrFileNotReady), errors.Is(err, models.ErrFileForeignReference), errors.Is(err, models.ErrFileInvalid), errors.Is(err, models.ErrFileContentType):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFileQuotaExceeded):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, errCustomAutomationsDisabled):
+		return grpcerrors.FailedPrecondition(err, "Custom automations are not enabled for this organization.")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -120,6 +142,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 }
 
 var errInvalidArgument = errors.New("invalid argument")
+var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

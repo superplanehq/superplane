@@ -1,3 +1,4 @@
+import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
@@ -7,6 +8,7 @@ const HIDDEN_KINDS = new Set(["setup"]);
 const TOOL_LINE = /^-> \[([^\]]+)\]/;
 
 export const RUNNER_COMPONENTS = new Set([
+  "runnerSuperPlane",
   "runnerClaudeCode",
   "runnerCodex",
   "runnerOpenRouter",
@@ -18,6 +20,11 @@ export const RUNNER_COMPONENTS = new Set([
 
 export function isRunnerComponent(component?: string): boolean {
   return Boolean(component && RUNNER_COMPONENTS.has(component));
+}
+
+/** Spreads `orderKey` only when known, so untimed lines stay comparable-key-free. */
+function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
+  return orderKey === undefined ? {} : { orderKey };
 }
 
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
@@ -32,6 +39,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
       continue;
     }
     const stepId = `${nodeId}-step-${section.index}`;
+    const orderKey = section.started_at ?? undefined;
     notes.push({
       id: stepId,
       nodeId,
@@ -40,11 +48,15 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
       componentType: section.kind,
       componentName: section.preview?.trim() || section.text,
       status: streamStatus(section.status),
-      detail: section.kind === "prompt" ? undefined : section.lines.filter((line) => line.trim()).join("\n"),
+      detail:
+        section.kind === "prompt"
+          ? undefined
+          : section.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n"),
+      ...orderKeyProps(orderKey),
     });
     for (const [eventIndex, event] of section.events.entries()) {
       if (event.kind === "note") {
-        if (!event.text.trim()) {
+        if (!event.text.trim() || isRawAgentTurnLiveLogText(event.text)) {
           continue;
         }
         notes.push({
@@ -57,6 +69,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentType: "note",
           componentName: event.text,
           status: "passed",
+          ...orderKeyProps(orderKey),
         });
         continue;
       }
@@ -71,7 +84,8 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentType: tool.kind,
           componentName: tool.text,
           status: streamStatus(tool.status),
-          detail: tool.lines.filter((line) => line.trim()).join("\n") || undefined,
+          detail: tool.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n") || undefined,
+          ...orderKeyProps(orderKey),
         });
       }
     }
@@ -94,6 +108,7 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
     return undefined;
   }
   const stepId = `${nodeId}-step-${section.index}`;
+  const orderKey = section.started_at ?? undefined;
   const notes: SplitRunStreamLine[] = [
     {
       id: stepId,
@@ -104,6 +119,7 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
       componentName: section.preview?.trim() || step.name,
       status: step.status,
       detail: step.output,
+      ...orderKeyProps(orderKey),
     },
   ];
   for (const [index, command] of step.commands.entries()) {
@@ -118,21 +134,65 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
       componentName: command.name,
       status: command.status,
       detail: command.output,
+      ...orderKeyProps(orderKey),
     });
   }
   return notes;
 }
 
+export function mergeLiveStreamNotes(
+  live: SplitRunStreamLine[] | undefined,
+  extra: SplitRunStreamLine[],
+): SplitRunStreamLine[] {
+  if (!live?.length) {
+    return extra;
+  }
+  if (extra.length === 0) {
+    return live;
+  }
+  const merged = [...live];
+  let insertAt = firstOpenStepIndex(merged);
+  for (const line of extra) {
+    if (streamAlreadyHasText(merged, line.componentName)) {
+      continue;
+    }
+    merged.splice(insertAt, 0, line);
+    insertAt += 1;
+  }
+  return merged;
+}
+
+function firstOpenStepIndex(notes: SplitRunStreamLine[]): number {
+  const index = notes.findIndex((note) => !note.noteParentId && note.status === "running");
+  return index === -1 ? notes.length : index;
+}
+
+function streamAlreadyHasText(notes: SplitRunStreamLine[], text: string): boolean {
+  const needle = text.trim();
+  if (!needle) {
+    return true;
+  }
+  const prefix = needle.slice(0, 48);
+  return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
 export function notesForLiveStream(input: {
   nodeId: string;
   sections: CommandSection[];
+  orphanLines?: string[];
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
     const notes = notesFromLiveLogSections(input.nodeId, input.sections);
-    return notes.length > 0 ? notes : undefined;
+    if (notes.length > 0) {
+      return notes;
+    }
+  }
+  const orphanNotes = notesFromOrphanLiveLogLines(input.nodeId, input.orphanLines ?? []);
+  if (orphanNotes.length > 0) {
+    return orphanNotes;
   }
   if (input.error) {
     return [liveStatusNote(input.nodeId, "Something went wrong while fetching logs.", "failed")];
@@ -141,6 +201,26 @@ export function notesForLiveStream(input: {
     return [liveStatusNote(input.nodeId, "Waiting for logs…", "running")];
   }
   return undefined;
+}
+
+function notesFromOrphanLiveLogLines(nodeId: string, lines: string[]): SplitRunStreamLine[] {
+  return lines.flatMap((line, index) => {
+    const text = line.trim();
+    if (!text || isRawAgentTurnLiveLogText(text)) {
+      return [];
+    }
+    return [
+      {
+        id: `${nodeId}-orphan-${index}`,
+        nodeId,
+        at: "",
+        note: true,
+        componentType: "note",
+        componentName: text,
+        status: "passed" as const,
+      },
+    ];
+  });
 }
 
 function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatus): SplitRunStreamLine {

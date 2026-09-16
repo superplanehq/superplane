@@ -172,14 +172,11 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 }
 
 func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[string]any {
-	configuration := map[string]any{
+	return map[string]any{
 		"repository": request.Repository,
 		"ref":        prFeedbackPRHeadSHAExpression(),
+		"checkNames": checkNamesNodeValue(request.CheckNames),
 	}
-	if names := checkNamesNodeValue(request.CheckNames); len(names) > 0 {
-		configuration["checkNames"] = names
-	}
-	return configuration
 }
 
 func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {

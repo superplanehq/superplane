@@ -78,7 +78,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
-	_ = models.LoadCurrentPriceBook(database.Conn())
+	restoreSeedUsagePriceBooks(t)
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
@@ -139,6 +139,12 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	}
 
 	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -218,6 +224,19 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 		t.FailNow()
 	}
 
+	if r.Account != nil {
+		err = models.SetOrganizationCreatedByAccount(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+		err = models.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+	}
+
 	err = tx.Commit().Error
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -232,7 +251,7 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	require.NoError(t, err)
 	user, err := models.CreateUser(organizationID, account.ID, account.Name, account.Email)
 	require.NoError(t, err)
-	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
+	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOperator, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
 }
@@ -733,4 +752,14 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	}
 
 	require.NoError(t, database.Conn().Create(&node).Error)
+}
+
+var seedUsagePriceBookVersions = []string{"2026-08-31.1", "2026-08-31.2", "2026-09-09.1"}
+
+func restoreSeedUsagePriceBooks(t require.TestingT) {
+	db := database.Conn()
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
+	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-09.1"))
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 }

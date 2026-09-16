@@ -63,16 +63,22 @@ After the first setup, run `make dev.up` when the stack is not running, then `ma
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
+A local dump lets you create a new environment without owner setup or GitHub
+connection. This is the intended path when a script or agent creates local
+environments.
+See [Local database snapshot](docs/contributing/local-database-snapshot.md).
+
 To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
 only for a remote broker (see `.env.example`).
 
-The runner `make dev` image includes Claude Code, Codex, git, `gh`, and `jq`
+The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, and `jq`
 so factory line apps can run locally. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you dispatch
 a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
 again in the runner repository. Check tools with `make doctor-local`.
+OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 
 ## Additional Development Resources
 
@@ -89,6 +95,7 @@ again in the runner repository. Check tools with `make doctor-local`.
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
 - **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
+- **[Local database snapshot](docs/contributing/local-database-snapshot.md)** - Restore a dump to skip owner setup in a new local environment
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 

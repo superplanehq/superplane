@@ -6,6 +6,7 @@ import type {
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -34,7 +35,7 @@ import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
 export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
-export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
+export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents" | "productive-tasks";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -123,6 +124,25 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "Create a task in Backlog",
     },
   },
+  {
+    id: "productive-tasks",
+    name: "Productive.io tasks",
+    description: "Create tasks from Productive.io tasks.",
+    iconSrc: productiveIcon,
+    iconAlt: "Productive",
+    listen: {
+      kind: "webhook",
+      label: "On Productive.io task",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Productive.io task becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
 ];
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
@@ -163,12 +183,14 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_GITHUB_ISSUES: "github-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
+  SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
   "github-issues": "SOURCE_GITHUB_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
+  "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {

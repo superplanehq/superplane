@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { CanvasesCanvas } from "@/api-client";
 import type { FactoryConfigureActions } from "@/pages/app";
@@ -9,7 +9,7 @@ import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions
 const { materializeDefaults } = vi.hoisted(() => ({ materializeDefaults: vi.fn() }));
 
 vi.mock("@/api-client", () => ({
-  factoriesMaterializeFactoryAppDefaults: materializeDefaults,
+  factoriesMaterializeFactoryAutomationDefaults: materializeDefaults,
 }));
 
 const DEFAULTS_YAML = `apiVersion: v1

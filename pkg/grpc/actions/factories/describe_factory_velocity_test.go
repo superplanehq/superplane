@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -70,6 +71,105 @@ func TestDescribeFactoryVelocity_ClampsPeriodDays(t *testing.T) {
 			assert.Len(t, resp.Points, tt.expected)
 		})
 	}
+}
+
+func TestDescribeFactoryVelocity_Automations(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	planner, plannerEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Planner", "start")
+	closure, closureEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Closure", "start")
+
+	now := time.Now()
+	plannerRun := seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultPassed, now.Add(-2*time.Hour), 30*time.Minute)
+	seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultFailed, now.Add(-3*time.Hour), 90*time.Minute)
+	seedAutomationRun(t, closure, closureEntry, models.CanvasRunResultPassed, now.Add(-4*time.Hour), 10*time.Minute)
+	seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultPassed, now.AddDate(0, 0, -20), time.Hour)
+
+	seedAutomationRunCost(t, plannerRun, 2_000_000)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 14,
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Automations, 2, "one row per automation that ran inside the window")
+
+	busiest := resp.Automations[0]
+	assert.Equal(t, planner.ID.String(), busiest.Id)
+	assert.Equal(t, planner.Name, busiest.Name)
+	assert.Equal(t, int32(2), busiest.Runs, "the run from 20 days ago is outside the window")
+	assert.Equal(t, int32(1), busiest.Failed)
+	assert.InDelta(t, 1.0, busiest.AverageDurationHours, 0.01, "mean of a 30 and a 90 minute run")
+	assert.Equal(t, int64(200), busiest.CostCents)
+
+	quietest := resp.Automations[1]
+	assert.Equal(t, closure.ID.String(), quietest.Id)
+	assert.Equal(t, int32(1), quietest.Runs)
+	assert.Equal(t, int32(0), quietest.Failed)
+	assert.Equal(t, int64(0), quietest.CostCents)
+}
+
+func TestDescribeFactoryVelocity_AutomationsEmptyWithoutRuns(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Planner", "start")
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 14,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Automations, "an automation that never ran is not a row")
+}
+
+// seedAutomationRun stores one finished run of a factory canvas, started at
+// `startedAt` and lasting `duration`.
+func seedAutomationRun(
+	t *testing.T,
+	canvas *models.Canvas,
+	entrypoint string,
+	result string,
+	startedAt time.Time,
+	duration time.Duration,
+) *models.CanvasRun {
+	t.Helper()
+	db := database.DB(t.Context())
+
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, entrypoint, models.CanvasRunStateFinished, result)
+	require.NoError(t, err)
+
+	finishedAt := startedAt.Add(duration)
+	require.NoError(t, db.Model(run).Updates(map[string]any{
+		"created_at":  startedAt,
+		"finished_at": finishedAt,
+	}).Error)
+
+	return run
+}
+
+func seedAutomationRunCost(t *testing.T, run *models.CanvasRun, costMicros int64) {
+	t.Helper()
+
+	require.NoError(t, models.RecordUsage(database.DB(t.Context()), models.WorkspaceUsageEventInput{
+		OrganizationID:  uuid.Nil,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000,
+		TotalTokens:     1_000,
+		CostMicros:      &costMicros,
+		IdempotencyKey:  run.ID.String(),
+	}))
 }
 
 func TestDescribeFactoryVelocity_FactoryNotFound(t *testing.T) {
@@ -442,10 +542,37 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 	assert.Equal(t, 1, last.tasksWaste, "a task that closed without a merge is waste")
 }
 
+func TestFillBuckets_SplitsSpendAndKeepsTaskSamples(t *testing.T) {
+	now := time.Now().In(time.Local)
+	buckets := buildDayBuckets(now, 7)
+	window := velocityWindow{start: buckets[0].start, end: buckets[len(buckets)-1].end}
+
+	today := localMidnight(now)
+	cheap, expensive := uuid.New(), uuid.New()
+
+	fillBuckets(
+		buckets,
+		nil,
+		map[uuid.UUID]*velocityOrder{
+			cheap:     {id: cheap, day: today, merged: true, costCents: 120, modelCostCents: 100, computeCostCents: 20},
+			expensive: {id: expensive, day: today, merged: true, costCents: 1100, modelCostCents: 900, computeCostCents: 200},
+		},
+		nil,
+		window,
+	)
+
+	last := buckets[len(buckets)-1]
+	assert.Equal(t, int64(1000), last.modelCostCents)
+	assert.Equal(t, int64(220), last.computeCostCents)
+	assert.Equal(t, last.costCents, last.modelCostCents+last.computeCostCents, "the bands add up to the day")
+	assert.ElementsMatch(t, []int64{100, 900}, last.taskModelCostCents, "the median needs one sample per task")
+	assert.ElementsMatch(t, []int64{20, 200}, last.taskComputeCostCents)
+}
+
 func TestAggregateTotals(t *testing.T) {
 	buckets := []dayBucket{
-		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
-		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300, tasksClosed: 1},
+		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, modelCostCents: 320, computeCostCents: 80, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
+		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, modelCostCents: 150, computeCostCents: 50, tokens: 300, tasksClosed: 1},
 	}
 	got := aggregateTotals(buckets, true)
 	assert.Equal(t, int32(4), got.SuperplaneMerged)
@@ -454,6 +581,8 @@ func TestAggregateTotals(t *testing.T) {
 	assert.Equal(t, int32(50), got.SuperplaneSharePct)
 	assert.Equal(t, int32(20), got.WastePct, "waste is 1 of 5 SuperPlane closures")
 	assert.Equal(t, int64(600), got.CostCents)
+	assert.Equal(t, int64(470), got.ModelCostCents)
+	assert.Equal(t, int64(130), got.ComputeCostCents)
 	assert.Equal(t, int64(1200), got.Tokens)
 	assert.Equal(t, int64(100), got.WasteCostCents)
 	assert.Equal(t, int32(4), got.TasksClosed)
@@ -570,6 +699,170 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 	assert.Equal(t, int32(0), resp.People[0].AuthoredMerged)
 }
 
+// TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize covers a cohort
+// larger than one page: the response caps at 5 rows, reports the true total,
+// and says more rows are available.
+func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+
+	require.Len(t, resp.People, 5, "the People table caps at 5 rows by default")
+	assert.Equal(t, int32(12), resp.PeopleTotal, "the total counts the whole cohort, not just the page")
+	assert.True(t, resp.PeopleHasMore)
+	assert.Equal(t, "Contributor 01", resp.People[0].Name)
+	assert.Equal(t, "Contributor 05", resp.People[4].Name)
+}
+
+// TestDescribeFactoryVelocity_PagesPeopleWithOffset covers "Load more": a
+// later offset returns the next slice, the last page reports no more rows,
+// and an offset past the end returns an empty page with the correct total.
+func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	secondPage, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:      factoryModel.ID.String(),
+		PeriodDays:     7,
+		Repository:     "example/repo",
+		PeopleOffset:   5,
+		PeoplePageSize: 20,
+	})
+	require.NoError(t, err)
+	require.Len(t, secondPage.People, 7, "the last page holds the remaining people")
+	assert.Equal(t, int32(12), secondPage.PeopleTotal)
+	assert.False(t, secondPage.PeopleHasMore, "there is nothing left after the last page")
+	assert.Equal(t, "Contributor 06", secondPage.People[0].Name)
+	assert.Equal(t, "Contributor 12", secondPage.People[6].Name)
+
+	pastTheEnd, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:    factoryModel.ID.String(),
+		PeriodDays:   7,
+		Repository:   "example/repo",
+		PeopleOffset: 100,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, pastTheEnd.People, "an offset beyond the cohort returns no rows, not an error")
+	assert.Equal(t, int32(12), pastTheEnd.PeopleTotal)
+	assert.False(t, pastTheEnd.PeopleHasMore)
+}
+
+// TestDescribeFactoryVelocity_ClampsPeoplePageSize covers the page size guard
+// rails: non-positive defaults to 5, and a request above the max is capped.
+func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	for _, tt := range []struct {
+		name     string
+		pageSize int32
+		expected int
+	}{
+		{"defaults to 5 when zero", 0, 5},
+		{"defaults to 5 when negative", -5, 5},
+		{"honors a page size within range", 5, 5},
+		{"caps above the max", 1000, 12},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+				FactoryId:      factoryModel.ID.String(),
+				PeriodDays:     7,
+				Repository:     "example/repo",
+				PeoplePageSize: tt.pageSize,
+			})
+			require.NoError(t, err)
+			assert.Len(t, resp.People, tt.expected)
+		})
+	}
+}
+
+// TestDescribeFactoryVelocity_SortsPeopleByRequestedKey covers the sort
+// parameter end to end: a client asking for the median cycle time ascending
+// gets a different order than the default total-descending sort.
+func TestDescribeFactoryVelocity_SortsPeopleByRequestedKey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		repositoryMergeSeed{number: 1, login: "amy", name: "Amy", mergedAt: now.Add(-1 * time.Hour)},
+		repositoryMergeSeed{number: 2, login: "amy", name: "Amy", mergedAt: now.Add(-2 * time.Hour)},
+		repositoryMergeSeed{number: 3, login: "amy", name: "Amy", mergedAt: now.Add(-3 * time.Hour)},
+		repositoryMergeSeed{number: 4, login: "ben", name: "Ben", mergedAt: now.Add(-4 * time.Hour)},
+	)
+
+	desc, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+	require.Len(t, desc.People, 2)
+	assert.Equal(t, "Amy", desc.People[0].Name, "default sort is total merged, descending")
+
+	asc, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:           factoryModel.ID.String(),
+		PeriodDays:          7,
+		Repository:          "example/repo",
+		PeopleSort:          pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_AUTHORED_MERGED,
+		PeopleSortDirection: pb.DescribeFactoryVelocityRequest_SORT_DIRECTION_ASC,
+	})
+	require.NoError(t, err)
+	require.Len(t, asc.People, 2)
+	assert.Equal(t, "Ben", asc.People[0].Name, "ascending authored merges puts the single-merge author first")
+}
+
+// numberedContributorSeeds builds a run of distinct authors with one merge
+// each, named so alphabetical order matches insertion order. Every seed ties
+// on merge count, which makes the name tie-break (and therefore paging)
+// deterministic in tests.
+func numberedContributorSeeds(count int, at time.Time) []repositoryMergeSeed {
+	seeds := make([]repositoryMergeSeed, 0, count)
+	for i := 1; i <= count; i++ {
+		seeds = append(seeds, repositoryMergeSeed{
+			number:   int64(100 + i),
+			login:    fmt.Sprintf("contributor-%02d", i),
+			name:     fmt.Sprintf("Contributor %02d", i),
+			mergedAt: at.Add(-time.Duration(i) * time.Hour),
+		})
+	}
+	return seeds
+}
+
 func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -614,6 +907,103 @@ func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) 
 	assert.Equal(t, int32(1), resp.Totals.Waste)
 	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
 	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
+}
+
+func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	// Anchor the merge to midday so it always lands in today's bucket, even
+	// when the suite runs in the first hours after local midnight. Subtracting
+	// a few hours from now would slip into yesterday near midnight and empty
+	// today's point.
+	mergedAt := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
+
+	// Two tasks that closed today. Their spend differs, so the median is not
+	// the mean and a wrong aggregation shows.
+	seedVelocityOrderSpend(t, factoryModel, 1, mergedAt, 1_000_000, 200_000)
+	seedVelocityOrderSpend(t, factoryModel, 2, mergedAt, 5_000_000, 400_000)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(600), resp.Totals.ModelCostCents, "6 million micros of model spend is 600 cents")
+	assert.Equal(t, int64(60), resp.Totals.ComputeCostCents)
+	assert.Equal(t, resp.Totals.ModelCostCents+resp.Totals.ComputeCostCents, resp.Totals.CostCents,
+		"the bands add up to the reported total")
+
+	today := resp.Points[len(resp.Points)-1]
+	assert.Equal(t, int64(600), today.ModelCostCents)
+	assert.Equal(t, int64(60), today.ComputeCostCents)
+	assert.Equal(t, int64(300), today.MedianTaskModelCostCents, "the middle of 100 and 500 cents")
+	assert.Equal(t, int64(30), today.MedianTaskComputeCostCents)
+
+	quiet := resp.Points[0]
+	assert.Zero(t, quiet.MedianTaskModelCostCents, "a day with no tasks reports no median")
+	assert.Zero(t, quiet.MedianTaskComputeCostCents)
+}
+
+// seedVelocityOrderSpend creates a merged work order and charges it the given
+// model and compute spend, in micros.
+func seedVelocityOrderSpend(
+	t *testing.T,
+	factoryModel *models.Factory,
+	number int,
+	mergedAt time.Time,
+	modelMicros, computeMicros int64,
+) {
+	t.Helper()
+
+	db := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(db, "Spending order", "", nil, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      fmt.Sprintf("https://github.com/example/repo/pull/%d", number),
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedAt,
+	})
+	require.NoError(t, err)
+
+	events := []models.WorkspaceUsageEvent{
+		{
+			Provider:    models.UsageProviderAnthropic,
+			Model:       "claude-sonnet-4-6",
+			UsageKind:   models.UsageKindModel,
+			TotalTokens: 1_000,
+			CostMicros:  modelMicros,
+		},
+		{
+			Provider:        models.UsageProviderRunner,
+			Model:           "e1-large-amd64",
+			UsageKind:       models.UsageKindCompute,
+			MachineType:     "e1-large-amd64",
+			DurationSeconds: 900,
+			CostMicros:      computeMicros,
+		},
+	}
+	for _, event := range events {
+		event.ID = uuid.New()
+		event.OrganizationID = factoryModel.OrganizationID
+		event.FactoryID = &factoryModel.ID
+		event.WorkOrderID = &order.ID
+		event.CanvasRunID = uuid.New()
+		event.NodeExecutionID = uuid.New()
+		event.NodeID = "prompt"
+		event.FundingSource = models.UsageFundingSourceBYOK
+		event.Currency = "usd"
+		event.PriceBookVersion = "test"
+		event.IdempotencyKey = uuid.NewString()
+		event.OccurredAt = mergedAt
+		require.NoError(t, db.Create(&event).Error)
+	}
 }
 
 func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryPullRequest {

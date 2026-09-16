@@ -23,8 +23,10 @@ import {
   organizationsResetInviteLink,
   organizationsDeleteOrganization,
   organizationsDescribeUsage,
+  organizationsSetUserOwner,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
+import { accountOrganizationsQueryKey } from "./useAccountOrganizations";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -61,7 +63,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeRoles = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) => {
   return useQuery({
     queryKey: includeRoles
       ? [...organizationKeys.users(organizationId), includeRoles]
@@ -80,6 +82,7 @@ export const useOrganizationUsers = (organizationId: string, includeRoles = fals
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId && enabled,
   });
 };
 
@@ -265,6 +268,30 @@ export const useAssignRole = (organizationId: string) => {
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["permissions", organizationId] });
+    },
+  });
+};
+
+export const useSetUserOwner = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { userId: string; isOwner: boolean }) => {
+      return await organizationsSetUserOwner(
+        withOrganizationHeader({
+          path: {
+            id: organizationId,
+            userId: params.userId,
+          },
+          body: {
+            isOwner: params.isOwner,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
+      queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
     },
   });
 };
@@ -550,6 +577,7 @@ export const useUpdateOrganization = (organizationId: string) => {
     mutationFn: async (params: { name?: string; description?: string; slug?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             organization: {
@@ -565,6 +593,10 @@ export const useUpdateOrganization = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
+      // The organization switcher lists every organization of the account and
+      // caches names. A rename must refresh that list, or the menu keeps the
+      // old name until the cache expires.
+      queryClient.invalidateQueries({ queryKey: accountOrganizationsQueryKey });
     },
   });
 };

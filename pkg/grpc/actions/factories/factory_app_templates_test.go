@@ -48,6 +48,10 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
+	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
+	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
+	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
+	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -56,13 +60,68 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 
 	body, ok := createPR.Configuration["body"].(string)
 	require.True(t, ok, "expected create-pr body to be a string")
-	assert.True(t, strings.HasPrefix(body, "[{{ task().key }}]({{ task().url }})"), "body: %s", body)
+	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
+	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
+	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
+
+	updatePR := findYAMLNode(t, canvas, "update-pr")
+	updateBody, ok := updatePR.Configuration["body"].(string)
+	require.True(t, ok, "expected update-pr body to be a string")
+	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
 	assert.Equal(t, "app-1", console.Metadata.CanvasID)
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
+}
+
+func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
+	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "PR Closure",
+		installParams: map[string]string{
+			"appRepository": "acme/refunds",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	hasGitHubOrigin := findYAMLNode(t, canvas, "has-github-issue-origin")
+	assert.Equal(t, "if", hasGitHubOrigin.Component)
+	assert.Equal(
+		t,
+		`$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`,
+		hasGitHubOrigin.Configuration["expression"],
+	)
+
+	comment := findYAMLNode(t, canvas, "comment-source-issue")
+	assert.Equal(t, "github.createIssueComment", comment.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
+	assert.Equal(t, `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
+	assert.Equal(t, `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
+	assert.Equal(
+		t,
+		`SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).`,
+		comment.Configuration["body"],
+	)
+
+	closeIssue := findYAMLNode(t, canvas, "close-source-issue")
+	assert.Equal(t, "github.updateIssue", closeIssue.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, closeIssue.Integration)
+	assert.Equal(t, comment.Configuration["repository"], closeIssue.Configuration["repository"])
+	assert.Equal(t, comment.Configuration["issueNumber"], closeIssue.Configuration["issueNumber"])
+	assert.Equal(t, "closed", closeIssue.Configuration["state"])
+
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "complete-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-github-issue-origin", TargetID: "comment-source-issue", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "comment-source-issue", TargetID: "close-source-issue", Channel: "default"})
+	assert.NotContains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "reject-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
 }
 
 func TestMaterializeFactoryTemplates(t *testing.T) {
@@ -89,24 +148,58 @@ func TestMaterializeFactoryTemplates(t *testing.T) {
 	}
 }
 
-func TestMaterializePlanningTemplateUsesPlanningModel(t *testing.T) {
-	result, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
+func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
+	_, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Plan",
-		installParams: map[string]string{
-			"appRepository": "acme/app",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown factory app template")
+}
+
+func TestDeriveFactoryInstallParamsSkipsRuntimeExpressions(t *testing.T) {
+	params := deriveFactoryInstallParams([]models.Node{
+		{
+			ID: "find-pull-request",
+			Configuration: map[string]any{
+				"repository": "{{ root().data.repository.full_name }}",
+				"base":       "{{ root().data.pull_request.base.ref }}",
+			},
 		},
-		agent: &factoryTemplateAgent{
-			component:        "runnerClaudeCode",
-			model:            "claude-sonnet-4-6",
-			planningModel:    "claude-opus-4-6",
-			credentialSource: "hosted",
+		{
+			ID: "runner",
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "REPO", "value": "{{ install_params.appRepository }}"},
+					map[string]any{"name": "BASE", "value": "{{ install_params.defaultBranch }}"},
+				},
+			},
+		},
+		{
+			ID: "on-pr-closed",
+			Configuration: map[string]any{
+				"repository": "acme/widgets",
+				"base":       "release",
+			},
 		},
 	})
-	require.NoError(t, err)
-	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-	require.NoError(t, err)
-	assert.Equal(t, "claude-opus-4-6", findYAMLNode(t, canvas, "planner-agent-no-issue").Configuration["model"])
+
+	assert.Equal(t, "acme/widgets", params["appRepository"])
+	assert.Equal(t, "acme/widgets", params["backlogRepository"])
+	assert.Equal(t, "release", params["defaultBranch"])
+}
+
+func TestDeriveFactoryInstallParamsWithOnlyExpressionsDerivesNothing(t *testing.T) {
+	params := deriveFactoryInstallParams([]models.Node{
+		{
+			ID: "find-pull-request",
+			Configuration: map[string]any{
+				"repository": "{{ root().data.repository.full_name }}",
+			},
+		},
+	})
+
+	assert.Empty(t, params)
 }
 
 func TestMaterializeIntakeDefaults(t *testing.T) {
@@ -115,11 +208,12 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 	require.NoError(t, err)
 
 	settings := intakeSettings{
-		ConfidencePct:     80,
-		Labels:            []string{"factory", "urgent"},
-		LabelFilterMode:   "include",
-		Assignment:        "assigned",
-		AuthorsWithAccess: true,
+		ConfidencePct:        80,
+		Labels:               []string{"factory", "urgent"},
+		LabelFilterMode:      "include",
+		Assignment:           "assigned",
+		AuthorsWithAccess:    true,
+		SuperplaneLabelAdded: true,
 	}
 	findYAMLNode(t, current, intakeFilterNodeID).Configuration["expression"] = intakeFilterExpressionFor(source, settings)
 
@@ -174,7 +268,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		Edges: current.Edges(),
 	}
 
-	result, err := materializeBacklogDefaults(canvas, version)
+	result, err := materializeBacklogDefaults(nil, nil, canvas, version)
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", result.templateID)
 
@@ -183,12 +277,16 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	assert.Equal(t, canvasID.String(), defaults.Metadata.ID)
 	assert.Equal(t, "Backlog scoring", defaults.Metadata.Name)
 	analysis := findYAMLNode(t, defaults, intakeAnalysisNodeID)
+	refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
 	assert.Equal(t, "runnerOpenRouter", analysis.Component)
+	assert.Equal(t, analysis.Component, refinement.Component)
 	assert.Equal(t, "anthropic/claude-opus-4-6", analysis.Configuration["model"])
 	assert.Equal(t, map[string]any{
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, analysis.Configuration["credentials"])
+	assert.Equal(t, analysis.Configuration["credentials"], refinement.Configuration["credentials"])
+	assert.Equal(t, analysis.Configuration["model"], refinement.Configuration["model"])
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

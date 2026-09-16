@@ -35,7 +35,7 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     text: "Review the details. Change anything you need. Then click Start to send it to the line.",
     tone: "draft",
     actions: [
-      { id: "reject", label: "Reject", emphasis: "quiet" },
+      { id: "archive", label: "Archive", emphasis: "quiet" },
       { id: "start", label: "Start", emphasis: "primary" },
     ],
   },
@@ -149,7 +149,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
         {kind === "running"
           ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
-            ? "A Set Work Order Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
+            ? "A Set Task Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}
       </div>
       {model ? <DecisionNote copy={model} /> : null}

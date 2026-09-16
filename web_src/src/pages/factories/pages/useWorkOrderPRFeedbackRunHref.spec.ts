@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { CanvasesCanvasRunRef, FactoriesFactoryPullRequest } from "@/api-client";
 
@@ -140,6 +140,8 @@ describe("statusForCanvasRun", () => {
   it("maps generic run state onto log phase status", () => {
     expect(statusForCanvasRun(run({ state: "STATE_PENDING" }))).toBe("pending");
     expect(statusForCanvasRun(run({ state: "STATE_STARTED" }))).toBe("running");
+    expect(statusForCanvasRun(run({ state: "STATE_CANCELLING" }))).toBe("failed");
+    expect(statusForCanvasRun(run({ state: "STATE_CANCELLING", result: "RESULT_PASSED" }))).toBe("passed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe("passed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe("failed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }))).toBe("failed");
@@ -147,11 +149,12 @@ describe("statusForCanvasRun", () => {
 });
 
 describe("isActiveCanvasRun", () => {
-  it("treats pending, started, and cancelling as active", () => {
+  it("treats pending and started as active", () => {
     expect(isActiveCanvasRun(run({ id: "1", state: "STATE_PENDING" }))).toBe(true);
     expect(isActiveCanvasRun(run({ id: "2", state: "STATE_STARTED" }))).toBe(true);
-    expect(isActiveCanvasRun(run({ id: "3", state: "STATE_CANCELLING" }))).toBe(true);
+    expect(isActiveCanvasRun(run({ id: "3", state: "STATE_CANCELLING" }))).toBe(false);
     expect(isActiveCanvasRun(run({ id: "4", state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe(false);
     expect(isActiveCanvasRun(run({ id: "5", state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe(false);
+    expect(isActiveCanvasRun(run({ id: "6", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }))).toBe(false);
   });
 });

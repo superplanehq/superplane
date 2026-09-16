@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 
@@ -189,7 +189,7 @@ describe("findMissionById", () => {
 describe("factoryMissionDetailPath", () => {
   it("nests the mission under the Missions list path", () => {
     expect(factoryMissionDetailPath("org-1", "RF", CHECKOUT_RELIABILITY_MISSION.id)).toBe(
-      `/org-1/workspaces/RF/missions/${CHECKOUT_RELIABILITY_MISSION.id}`,
+      `/org-1/workspaces/rf/missions/${CHECKOUT_RELIABILITY_MISSION.id}`,
     );
   });
 });

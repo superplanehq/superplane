@@ -5,7 +5,7 @@ import type {
   SuperplaneFactoriesUserRef,
 } from "@/api-client";
 import type { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 type ResolveUserFn = ReturnType<typeof useOrgUserLookup>["resolveUser"];
 
@@ -43,17 +43,32 @@ function buildAutomationCreatorDisplay(automation: FactoriesAutomationRef): OrgU
 }
 
 /** Storybook/fixture owner chip for a task. Prefers automation, then user. */
-export function workOrderOwnerDisplay(order: Pick<FactoriesWorkOrder, "createdBy">, fallback: OrgUserDisplay) {
+export function workOrderOwnerDisplay(
+  order: Pick<FactoriesWorkOrder, "createdBy">,
+  fallback: OrgUserDisplay,
+  resolveUser?: OrgUserDisplayLookup,
+) {
   const automation = order.createdBy?.automation;
   if (automation) {
-    return buildAutomationCreatorDisplay(automation) ?? userOwnerDisplay(order.createdBy?.user, fallback);
+    return buildAutomationCreatorDisplay(automation) ?? userOwnerDisplay(order.createdBy?.user, fallback, resolveUser);
   }
-  return userOwnerDisplay(order.createdBy?.user, fallback);
+  return userOwnerDisplay(order.createdBy?.user, fallback, resolveUser);
 }
 
-function userOwnerDisplay(user: SuperplaneFactoriesUserRef | undefined, fallback: OrgUserDisplay): OrgUserDisplay {
+function userOwnerDisplay(
+  user: SuperplaneFactoriesUserRef | undefined,
+  fallback: OrgUserDisplay,
+  resolveUser?: OrgUserDisplayLookup,
+): OrgUserDisplay {
   if (!user || (!user.id && !user.name)) {
     return fallback;
+  }
+  // `resolveUser` looks the owner up against the org members list, which
+  // carries the avatar image. Without it we can only show initials (or the
+  // fallback's avatar when the ids happen to match).
+  const resolved = resolveUser?.(user.id, user.name);
+  if (resolved) {
+    return resolved;
   }
   const name = user.name?.trim() || fallback.name;
   return {

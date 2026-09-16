@@ -1,49 +1,44 @@
-import type { FactoriesFactoryIntakeRun, FactoriesFactoryIntakeSettings } from "@/api-client";
-import { formatTimeAgo } from "@/lib/date";
+import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
-export type IntakeListenMode = "listen" | "schedule";
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
-export type IntakeSettingsTab = "general" | "runs" | "automation";
+export type IntakeSettingsTab = "general" | "agent" | "automation";
 
 export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
-  return value === "general" || value === "runs" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation";
 }
-export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
-export type IntakeLineStage = "implement" | "verify" | "done";
 
-export interface IntakeAutomationRun {
-  id: string;
-  appId?: string;
-  runId?: string;
-  title: string;
-  confidencePct: number;
-  ranMinutesAgo: number;
-  analyzedMinutesAgo: number;
-  placement: IntakeTicketPlacement;
-  stage?: IntakeLineStage;
-  activity?: string;
+export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
+  return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
 }
 
 export interface IntakeSourceSettings {
   name: string;
-  listenMode: IntakeListenMode;
   confidencePct: number;
   labelFilterMode: IntakeLabelFilterMode;
   labels: string[];
+  /** Show and apply the label chip list. Off means every issue matches. */
+  filterByLabel: boolean;
   assignment: IntakeAssignmentFilter;
+  /** Create a task when a GitHub issue is created. */
+  newIssues: boolean;
+  /** Create a task when a closed GitHub issue is re-opened. */
+  reopenedIssues: boolean;
+  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
 }
 
-export const GITHUB_INTAKE_LABEL_OPTIONS = ["bug", "enhancement", "documentation", "good first issue"] as const;
-
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   name: "GitHub issues",
-  listenMode: "listen",
   confidencePct: 65,
   labelFilterMode: "include",
   labels: [],
+  filterByLabel: false,
   assignment: "any",
+  newIssues: true,
+  reopenedIssues: true,
+  superplaneLabelAdded: true,
   authorsWithAccess: false,
 };
 
@@ -51,179 +46,87 @@ export const INTAKE_SETTINGS_COPY = {
   title: "Intake GitHub issues",
   tabsLabel: "Intake settings",
   generalTab: "General",
+  agentTab: "Agent",
   automationTab: "Automation",
   editAutomation: "Edit automation",
   automationLoading: "The automation is loading.",
   automationEmpty: "This intake has no automation yet.",
   automationError: "SuperPlane could not load the automation.",
   retryAutomation: "Try again",
-  runsTab: "Runs",
-  runsEmpty: "No runs yet.",
-  runsLoading: "Runs are loading.",
-  runsError: "SuperPlane could not load the runs.",
-  retryRuns: "Try again",
-  runWhen: "Run",
-  analysisWhen: "Analysis",
-  scoreWhen: "Score",
-  viewRun: "View run",
-  viewRunFor: (title: string) => `View run for ${title}`,
-  inBacklog: "In Backlog",
-  backlogActivity: "Waiting for review.",
-  rejected: "Rejected",
-  rejectedActivity: "A person rejected this ticket.",
-  belowThreshold: "Not moved to Backlog",
-  belowThresholdActivity: "Score is below the minimum confidence.",
-  stageImplement: "Implement",
-  stageVerify: "Verify",
-  stageDone: "Done",
-  nameLabel: "Name",
-  nameHelper: "Shown in the Intake list.",
-  listenLabel: "When to create",
-  listenOption: "Listen for new issues",
-  listenHelper: "Create a task when a GitHub issue is opened.",
-  scheduleOption: "Run on a schedule",
-  scheduleHelper: "Scheduled intake is not available.",
+  intakeSection: "Create task when:",
   filtersLabel: "Filters",
-  labelsLabel: "Labels",
-  includeLabels: "Include these labels",
-  excludeLabels: "Exclude these labels",
-  labelsHelper: "Leave all labels off to match every issue.",
-  assignmentLabel: "Assignment",
-  assignmentAny: "Any assignment",
-  assignmentAssigned: "Assigned",
-  assignmentUnassigned: "Unassigned",
-  authorsLabel: "Authors",
-  authorsWithAccess: "Only issues from people with repository access",
-  authorsHelper: "Skip issues opened by outside contributors.",
+  newIssues: "A new issue is opened",
+  reopenedIssues: "A closed issue is re-opened",
+  filterByLabel: "Issue has one of these labels",
+  labelInput: "Issue label",
+  labelPlaceholder: "Type a label name",
+  labelNew: "Add label",
+  labelAdd: "Add",
+  labelCancel: "Cancel",
+  labelsLoading: "Loading labels from the repository",
+  labelsEmpty: "No labels found in the repository. Add a label name.",
+  superplaneLabelAdded: 'The "superplane" label is added to the issue',
+  authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
 } as const;
 
-const STAGE_LABEL: Record<IntakeLineStage, string> = {
-  implement: INTAKE_SETTINGS_COPY.stageImplement,
-  verify: INTAKE_SETTINGS_COPY.stageVerify,
-  done: INTAKE_SETTINGS_COPY.stageDone,
-};
-
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
 }
 
-export const GITHUB_INTAKE_RUNS: IntakeAutomationRun[] = [
-  {
-    id: "gh-issue-1",
-    title: "Handle duplicate refunds on retry",
-    confidencePct: 94,
-    ranMinutesAgo: 180,
-    analyzedMinutesAgo: 170,
-    placement: "progressed",
-    stage: "implement",
-    activity: "Writing the retry handler.",
-  },
-  {
-    id: "gh-issue-2",
-    title: "Return 409 when the invoice is already paid",
-    confidencePct: 88,
-    ranMinutesAgo: 120,
-    analyzedMinutesAgo: 110,
-    placement: "progressed",
-    stage: "verify",
-    activity: "Checking the 409 response.",
-  },
-  {
-    id: "gh-issue-3",
-    title: "Show a clearer empty state on the billing page",
-    confidencePct: 81,
-    ranMinutesAgo: 90,
-    analyzedMinutesAgo: 80,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-4",
-    title: "Upgrade the Node 20 base image",
-    confidencePct: 76,
-    ranMinutesAgo: 45,
-    analyzedMinutesAgo: 40,
-    placement: "rejected",
-  },
-  {
-    id: "gh-issue-5",
-    title: "Add a flake retry to the checkout e2e suite",
-    confidencePct: 68,
-    ranMinutesAgo: 20,
-    analyzedMinutesAgo: 15,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-6",
-    title: "Document the refund webhook contract",
-    confidencePct: 52,
-    ranMinutesAgo: 8,
-    analyzedMinutesAgo: 5,
-    placement: "below-threshold",
-  },
-];
-
-export function intakeRelativeTime(minutesAgo: number): string {
-  return formatTimeAgo(new Date(Date.now() - minutesAgo * 60_000));
+export function addIntakeLabel(labels: string[], label: string): string[] {
+  const next = label.trim();
+  if (next.length === 0 || labels.includes(next)) {
+    return labels;
+  }
+  return [...labels, next];
 }
-
-export function intakeStageLabel(stage: IntakeLineStage): string {
-  return STAGE_LABEL[stage];
-}
-
-export function intakePlacementLabel(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed" && run.stage) {
-    return intakeStageLabel(run.stage);
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejected;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThreshold;
-  }
-  return INTAKE_SETTINGS_COPY.inBacklog;
-}
-
-export function intakePlacementActivity(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed") {
-    return run.activity ?? "";
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejectedActivity;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThresholdActivity;
-  }
-  return INTAKE_SETTINGS_COPY.backlogActivity;
-}
-
 export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
-  const name = draft.name.trim() || DEFAULT_GITHUB_INTAKE_SETTINGS.name;
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
-  return { ...draft, name, confidencePct };
+  if (!draft.filterByLabel) {
+    return { ...draft, confidencePct, labels: [], labelFilterMode: "include" };
+  }
+  return { ...draft, confidencePct };
+}
+
+type IntakeToggles = Pick<
+  IntakeSourceSettings,
+  "newIssues" | "reopenedIssues" | "superplaneLabelAdded" | "authorsWithAccess"
+>;
+
+/** A response that omits a toggle predates it, so fall back to the default. */
+function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefined): IntakeToggles {
+  return {
+    newIssues: settings?.newIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.newIssues,
+    reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
+    superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
+    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+  };
 }
 
 export function intakeSettingsFromApi(
   name: string,
   settings: FactoriesFactoryIntakeSettings | undefined,
 ): IntakeSourceSettings {
+  const labels = settings?.labels ?? [];
   return {
     name,
-    listenMode: "listen",
     confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
     labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
-    labels: settings?.labels ?? [],
+    labels,
+    filterByLabel: labels.length > 0,
     assignment: assignmentFromApi(settings?.assignment),
-    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    ...intakeTogglesFromApi(settings),
   };
 }
 
 export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
+  const labels = settings.filterByLabel ? settings.labels : [];
   return {
     confidencePct: settings.confidencePct,
-    labels: settings.labels,
+    labels,
     labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",
     assignment:
       settings.assignment === "assigned"
@@ -232,6 +135,9 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
           ? "ASSIGNMENT_UNASSIGNED"
           : "ASSIGNMENT_ANY",
     authorsWithAccess: settings.authorsWithAccess,
+    newIssues: settings.newIssues,
+    reopenedIssues: settings.reopenedIssues,
+    superplaneLabelAdded: settings.superplaneLabelAdded,
   };
 }
 
@@ -243,64 +149,4 @@ function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignmen
     return "unassigned";
   }
   return "any";
-}
-
-const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
-  PLACEMENT_BACKLOG: "backlog",
-  PLACEMENT_REJECTED: "rejected",
-  PLACEMENT_PROGRESSED: "progressed",
-  PLACEMENT_BELOW_THRESHOLD: "below-threshold",
-};
-
-const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
-  plan: "implement",
-  planning: "implement",
-  implement: "implement",
-  implementation: "implement",
-  verify: "verify",
-  verification: "verify",
-  done: "done",
-};
-
-/**
- * The server decides placement, confidence, and stage. This only turns the
- * response into the shape the list renders, and drops runs that are still
- * being analyzed: those belong in the Analyzing list.
- */
-export function intakeRunsFromApi(
-  runs: FactoriesFactoryIntakeRun[],
-  appId: string | undefined,
-  now = new Date(),
-): IntakeAutomationRun[] {
-  return runs.flatMap((run) => {
-    const id = run.id?.trim();
-    const title = run.title?.trim();
-    const placement = run.placement ? PLACEMENT_BY_API[run.placement] : undefined;
-    if (!id || !title || !placement) {
-      return [];
-    }
-
-    const stage = run.stage ? STAGE_BY_NAME[run.stage.trim().toLowerCase()] : undefined;
-    return [
-      {
-        id,
-        runId: id,
-        ...(appId ? { appId } : {}),
-        title,
-        confidencePct: run.confidencePct ?? 0,
-        ranMinutesAgo: minutesAgo(run.createdAt, now),
-        analyzedMinutesAgo: minutesAgo(run.analyzedAt ?? run.createdAt, now),
-        placement,
-        ...(stage ? { stage } : {}),
-      },
-    ];
-  });
-}
-
-function minutesAgo(timestamp: string | undefined, now: Date): number {
-  const value = timestamp ? Date.parse(timestamp) : Number.NaN;
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.floor((now.getTime() - value) / 60_000));
 }
