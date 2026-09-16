@@ -124,6 +124,7 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -257,6 +258,7 @@ export function LinesPage() {
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const hasSentryIntake = configuredIntakes.some((intake) => intake.source.id === "sentry-exceptions");
   const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const addIntakeTemplates = useMemo(() => {
     const allowedIds = new Set(["github-issues"]);
@@ -299,6 +301,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const canSetupSentry = canUpdate && canAddSentryIntake && !hasSentryIntake;
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -345,6 +348,7 @@ export function LinesPage() {
   }
 
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
+  const sentrySetupLineId = selectedLine.id;
 
   const intakePanel: BacklogIntakePanel | undefined = showColumnAutomations
     ? undefined
@@ -408,6 +412,12 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (template.id === "sentry-exceptions") {
+      if (selectedLine.id) {
+        navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
     if (template.id === "productive-tasks") {
       setProductiveIntakeSetupOpen(true);
       return;
@@ -588,6 +598,11 @@ export function LinesPage() {
             onAddIntake={
               showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
             }
+            onSetupSentry={
+              canSetupSentry && sentrySetupLineId
+                ? () => navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, sentrySetupLineId))
+                : undefined
+            }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
@@ -743,6 +758,7 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   verifyListeners,
   onAddPRFeedback,
   factoryIntakes,
@@ -769,6 +785,7 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupSentry?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   factoryIntakes: FactoriesFactoryIntake[];
@@ -872,6 +889,7 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupSentry={onSetupSentry}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
@@ -1116,6 +1134,7 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -1141,6 +1160,7 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupSentry?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1281,6 +1301,7 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupSentry={onSetupSentry}
           automations={backlogAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}

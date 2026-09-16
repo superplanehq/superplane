@@ -334,6 +334,18 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
   ]),
 ];
 
+const STORYBOOK_SENTRY_PROJECTS = [
+  { id: "payments", name: "payments", type: "project" },
+  { id: "checkout-web", name: "checkout-web", type: "project" },
+  { id: "refund-worker", name: "refund-worker", type: "project" },
+];
+
+const STORYBOOK_SENTRY_UNRESOLVED_ISSUES = [
+  { id: "1", name: "TimeoutError: refund gateway did not answer", type: "unresolved-issue" },
+  { id: "2", name: "TypeError: cannot read amount of undefined", type: "unresolved-issue" },
+  { id: "3", name: "ValidationError: refund amount is above the limit", type: "unresolved-issue" },
+];
+
 const STORYBOOK_GITHUB_REPOSITORIES = [
   { id: "repo_acme_web", name: "acme/web", type: "repository" },
   { id: "repo_acme_api", name: "acme/api", type: "repository" },
@@ -484,6 +496,12 @@ export async function matchFactorySetupFixture(
           ],
         },
       };
+    }
+    if (resourceType === "project") {
+      return { json: { resources: STORYBOOK_SENTRY_PROJECTS } };
+    }
+    if (resourceType === "unresolved-issue") {
+      return { json: { resources: STORYBOOK_SENTRY_UNRESOLVED_ISSUES } };
     }
     if (resourceType === "review_bot") {
       return {
