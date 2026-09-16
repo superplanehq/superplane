@@ -1,6 +1,6 @@
 import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 
-import type { CommandSection, CommandSectionEvent, CommandTool, LogState } from "./types";
+import type { CommandSection, CommandSectionEvent, CommandTool, LogState, PendingLiveLogRecord } from "./types";
 
 export type CommandStart = {
   index: number;
@@ -29,10 +29,13 @@ export function startCommandSection(state: LogState, start: CommandStart): LogSt
   if (state.sections.some((section) => section.index === start.index)) {
     return state;
   }
-  return {
-    ...state,
-    sections: [...state.sections, emptyCommandSection(start)],
-  };
+  return attachPendingRecords(
+    {
+      ...state,
+      sections: [...state.sections, emptyCommandSection(start)],
+    },
+    start.index,
+  );
 }
 
 export function completeCommandSection(
@@ -73,10 +76,7 @@ export function appendLineToLatestSection(
   }
   const sectionPos = commandSectionPosition(state, commandIndex);
   if (sectionPos < 0) {
-    return {
-      ...state,
-      orphanLines: [...state.orphanLines, text],
-    };
+    return bufferPendingRecord(state, { type: "line", text, commandIndex });
   }
 
   const section = state.sections[sectionPos];
@@ -106,7 +106,7 @@ export function startToolOnLatestSection(
 ): LogState {
   const sectionPos = commandSectionPosition(state, commandIndex);
   if (sectionPos < 0) {
-    return state;
+    return bufferPendingRecord(state, { type: "tool_start", kind, text, sourceId, commandIndex });
   }
   const section = state.sections[sectionPos];
   if (section.status !== "running") {
@@ -129,7 +129,7 @@ export function endToolOnLatestSection(
 ): LogState {
   const sectionPos = commandSectionPosition(state, commandIndex);
   if (sectionPos < 0) {
-    return state;
+    return bufferPendingRecord(state, { type: "tool_end", status, durationMs, sourceId, commandIndex });
   }
   const section = state.sections[sectionPos];
   if (sourceId) {
@@ -156,6 +156,70 @@ function commandSectionPosition(state: LogState, commandIndex?: number): number 
     return state.sections.length - 1;
   }
   return state.sections.findIndex((section) => section.index === commandIndex);
+}
+
+function pendingRecordsOf(state: LogState): PendingLiveLogRecord[] {
+  return state.pendingRecords ?? [];
+}
+
+function orphanLinesFromPending(pendingRecords: PendingLiveLogRecord[]): string[] {
+  return pendingRecords.filter((record) => record.type === "line").map((record) => record.text);
+}
+
+function bufferPendingRecord(state: LogState, record: PendingLiveLogRecord): LogState {
+  const pendingRecords = [...pendingRecordsOf(state), record];
+  return {
+    ...state,
+    pendingRecords,
+    orphanLines: orphanLinesFromPending(pendingRecords),
+  };
+}
+
+function recordBelongsToCommand(record: PendingLiveLogRecord, commandIndex: number, attachUnindexed: boolean): boolean {
+  if (record.commandIndex === undefined) {
+    return attachUnindexed;
+  }
+  return record.commandIndex === commandIndex;
+}
+
+function attachPendingRecords(state: LogState, commandIndex: number): LogState {
+  const pendingRecords = pendingRecordsOf(state);
+  if (pendingRecords.length === 0) {
+    return state;
+  }
+  const attachUnindexed = state.sections.length === 1;
+  const taken: PendingLiveLogRecord[] = [];
+  const remaining: PendingLiveLogRecord[] = [];
+  for (const record of pendingRecords) {
+    if (recordBelongsToCommand(record, commandIndex, attachUnindexed)) {
+      taken.push(record);
+    } else {
+      remaining.push(record);
+    }
+  }
+  if (taken.length === 0) {
+    return state;
+  }
+  let next: LogState = {
+    ...state,
+    pendingRecords: remaining,
+    orphanLines: orphanLinesFromPending(remaining),
+  };
+  for (const record of taken) {
+    next = applyBufferedRecord(next, record, commandIndex);
+  }
+  return next;
+}
+
+function applyBufferedRecord(state: LogState, record: PendingLiveLogRecord, commandIndex: number): LogState {
+  const index = record.commandIndex ?? commandIndex;
+  if (record.type === "line") {
+    return appendLineToLatestSection(state, record.text, undefined, index);
+  }
+  if (record.type === "tool_start") {
+    return startToolOnLatestSection(state, record.kind, record.text, record.sourceId, index);
+  }
+  return endToolOnLatestSection(state, record.status, record.durationMs, record.sourceId, index);
 }
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
