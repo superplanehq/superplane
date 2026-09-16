@@ -1279,7 +1279,8 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
             if (!roundOpen) {
               beginRound(undefined, { message: lastText });
             }
-            emitOpenCodeContent(activity, contentText, "assistant", part, lastText);
+            const contentID = emitOpenCodeContent(activity, contentText, "assistant", part, lastText);
+            activity.endContent(contentID, { endedAt: openCodePartTime(part, "end") });
             if (!activity.enabled) {
               println(lastText);
             }

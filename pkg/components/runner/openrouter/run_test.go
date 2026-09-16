@@ -210,6 +210,16 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	assert.Equal(t, "passed", findActivityRecord(t, records, "tool_end")["status"])
 }
 
+func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"text","sessionID":"ses_1","part":{"id":"text-1","type":"text","text":"I will inspect the repository.","time":{"start":1000,"end":1500}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"running","input":{"command":"find . -type f"}}}}`,
+	})
+
+	records := activityRecords(t, output)
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
+}
+
 func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
 	output := runOpenCodeFormatterWithActivity(t, []string{
 		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"read-1","tool":"read","state":{"status":"completed","input":{"filePath":"/repo/README.md"},"output":"contents"}}}`,

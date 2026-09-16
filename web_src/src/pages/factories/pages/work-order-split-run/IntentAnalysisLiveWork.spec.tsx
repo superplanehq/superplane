@@ -94,13 +94,21 @@ describe("AnalysisLiveWork", () => {
     expect(label).toHaveClass("sp-ai-thinking");
   });
 
-  it("shows stale elapsed time in seconds", () => {
+  it("updates stale elapsed seconds without replaying the status transition", () => {
     vi.useFakeTimers();
     render(<AnalysisLiveWork machineStatus="running" />);
 
-    act(() => vi.advanceTimersByTime(31_000));
+    act(() => vi.advanceTimersByTime(15_200));
 
-    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Still working · 31s");
+    const status = screen.getByTestId("split-run-intent-thinking");
+    const animatedLabel = status.querySelector(".sp-thinking-state-current");
+    expect(status).toHaveTextContent("Still working · 15s");
+
+    act(() => vi.advanceTimersByTime(800));
+
+    expect(status).toHaveTextContent("Still working · 16s");
+    expect(status.querySelector(".sp-thinking-state-current")).toBe(animatedLabel);
+    expect(status.querySelector(".sp-thinking-state-outgoing")).not.toBeInTheDocument();
   });
 
   it("shows exact reasoning and an active command", () => {
