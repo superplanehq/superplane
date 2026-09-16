@@ -71,7 +71,7 @@ dev.down:
 doctor-local:
 	docker compose exec runner sh -c '\
 	  missing=0; \
-	  for cmd in claude codex node git gh jq python3 bash; do \
+	  for cmd in claude codex opencode node git gh jq python3 bash; do \
 	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
 	      echo "$$cmd missing" >&2; \
 	      missing=1; \
@@ -81,6 +81,7 @@ doctor-local:
 	  done; \
 	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
 	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
+	  echo "opencode=$$(opencode --version 2>/dev/null | head -n1)"; \
 	  echo "node=$$(node --version 2>/dev/null)"; \
 	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
 	  test "$$missing" -eq 0'

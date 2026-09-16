@@ -43,8 +43,8 @@ Do not run two brokers at the same time.
 ## Test a Runner node
 
 1. Open SuperPlane at http://localhost:8000.
-2. Add a Runner, Run Bash, Run Python, Run JavaScript, Run Claude Code, or
-   Run Codex node.
+2. Add a Runner, Run Bash, Run Python, Run JavaScript, Run Claude Code, Run
+   OpenRouter Agent, or Run Codex node.
 3. Run the canvas. A local worker claims the task.
 
 Live logs in the UI stream from `http://localhost:8091`. The local worker does
@@ -55,9 +55,9 @@ clone cannot leak into the next task.
 ## Tools on the local worker
 
 The Compose worker image (`runner/Dockerfile.local`) includes bash, Python 3,
-Node.js 22, git, GitHub CLI (`gh`), jq, openssl, Docker CLI, Claude Code, and
-Codex. Factory line apps can run on this worker. Do not install those CLIs on
-the host. Host NVM binaries are not on the container PATH.
+Node.js 22, git, GitHub CLI (`gh`), jq, openssl, Docker CLI, Claude Code,
+OpenCode, and Codex. Factory line apps can run on this worker. Do not install
+those CLIs on the host. Host NVM binaries are not on the container PATH.
 
 Check the tools after `make dev`:
 
@@ -65,9 +65,8 @@ Check the tools after `make dev`:
 make doctor-local
 ```
 
-Factory Claude and Codex nodes use a SuperPlane integration, not a host
-`ANTHROPIC_API_KEY`. Connect GitHub and Claude (or OpenAI for Codex) in the
-organization before you dispatch a factory line.
+Factory agent nodes use a SuperPlane integration, not a host API key. Connect
+GitHub and the applicable agent integration before you dispatch a factory line.
 
 ## Manual start
 
