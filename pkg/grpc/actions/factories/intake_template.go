@@ -124,7 +124,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
 		analysisSubject:      "Sentry exception",
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    "{{ root().data.data.issue.permalink }}",
+		createDescription:    "{{ root().data.description }}",
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",

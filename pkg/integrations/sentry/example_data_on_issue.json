@@ -35,7 +35,8 @@
         }
       }
     },
-    "timestamp": "2022-04-04T18:17:18.320000Z"
+    "timestamp": "2022-04-04T18:17:18.320000Z",
+    "description": "https://your-org.sentry.io/issues/123/\n\n```json\n{\n  \"assignedTo\": {\n    \"id\": \"789\",\n    \"name\": \"Person\",\n    \"type\": \"user\"\n  },\n  \"culprit\": \"SentryCustomError(frontend/src/util)\",\n  \"firstSeen\": \"2022-04-04T18:17:18.320000Z\",\n  \"id\": \"123\",\n  \"lastSeen\": \"2022-04-04T18:17:18.320000Z\",\n  \"level\": \"error\",\n  \"permalink\": \"https://your-org.sentry.io/issues/123/\",\n  \"project\": {\n    \"id\": \"456\",\n    \"name\": \"ipe\",\n    \"slug\": \"ipe\"\n  },\n  \"shortId\": \"IPE-1\",\n  \"status\": \"unresolved\",\n  \"substatus\": \"new\",\n  \"title\": \"Error #1: This is a test error!\",\n  \"web_url\": \"https://your-org.sentry.io/issues/123/\"\n}\n```"
   },
   "timestamp": "2022-04-04T18:17:18.320000Z",
   "type": "sentry.issue"
