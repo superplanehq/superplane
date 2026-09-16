@@ -393,7 +393,8 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("email channel stays unaffected when browser is off", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
 		})
 
 		emailService := services.NewNoopEmailService()
