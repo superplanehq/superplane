@@ -1,4 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -18,6 +20,7 @@ import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
@@ -46,6 +49,8 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
+  /** Opens guided Sentry intake setup. Hidden when unset. */
+  onSetupSentry?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
@@ -83,6 +88,7 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   automations,
   automationRowCount,
   onAutomationRowAction,
@@ -145,7 +151,7 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
+        banner={<BacklogColumnBanner panel={intakePanel} onSetupSentry={onSetupSentry} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
@@ -220,14 +226,39 @@ function BacklogColumnHeaderActions({
   );
 }
 
-function BacklogColumnIntakeBanner({ panel }: { panel: BacklogIntakePanel }) {
+function BacklogColumnBanner({ panel, onSetupSentry }: { panel?: BacklogIntakePanel; onSetupSentry?: () => void }) {
+  if (!panel && !onSetupSentry) {
+    return null;
+  }
+
   return (
-    <BacklogIntakeSources
-      intakes={panel.sources}
-      showAddIntake={panel.showAddIntake}
-      onOpenSettings={panel.onOpenSettings}
-      onAddIntake={panel.onAddIntake}
-    />
+    <>
+      {panel ? (
+        <BacklogIntakeSources
+          intakes={panel.sources}
+          showAddIntake={panel.showAddIntake}
+          onOpenSettings={panel.onOpenSettings}
+          onAddIntake={panel.onAddIntake}
+        />
+      ) : null}
+      {onSetupSentry ? <BacklogSetupSentryButton onClick={onSetupSentry} /> : null}
+    </>
+  );
+}
+
+function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      data-testid="lines-backlog-setup-sentry"
+      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
+    >
+      <img src={sentryIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      {SENTRY_INTAKE_SETUP_COPY.setupButton}
+    </Button>
   );
 }
 
