@@ -355,33 +355,48 @@ func newestJiraIssueEvents(client *jira.Client, projectKey string, limit int) ([
 		return nil, fmt.Errorf("failed to list the issues of project %s: %w", projectKey, err)
 	}
 
-	return jiraIssueEvents(client, hits)
+	return jiraIssueEvents(client.GetIssue, hits)
 }
 
-func jiraIssueEvents(client *jira.Client, hits []jira.IssueSearchHit) ([]map[string]any, error) {
+// jiraIssueLoader reads one issue by key. The seed takes the read as a
+// function so a test can fail a single issue of a batch.
+type jiraIssueLoader func(issueKey string) (*jira.Issue, error)
+
+// jiraIssueEvents loads the full issue behind each search hit. One unreadable
+// issue - deleted between the search and the fetch, or hidden from the
+// connection - must not discard the rest of the first batch, so a failure is
+// logged and that issue is left out. A batch where every issue failed still
+// reports an error, because that points at the connection rather than at one
+// issue.
+func jiraIssueEvents(load jiraIssueLoader, hits []jira.IssueSearchHit) ([]map[string]any, error) {
 	events := make([]map[string]any, 0, len(hits))
+	var lastErr error
 	for _, hit := range hits {
-		event, err := jiraIssueEvent(client, hit.Key)
+		event, err := jiraIssueEvent(load, hit.Key)
 		if err != nil {
-			return nil, err
+			lastErr = err
+			log.Warnf("intake seed: issue %s stays out of the first batch: %v", hit.Key, err)
+			continue
 		}
+
 		events = append(events, event)
+	}
+
+	if len(events) == 0 && lastErr != nil {
+		return nil, lastErr
 	}
 
 	slices.Reverse(events)
 	return events, nil
 }
 
-func jiraIssueEvent(client *jira.Client, issueKey string) (map[string]any, error) {
-	issue, err := client.GetIssue(issueKey)
+func jiraIssueEvent(load jiraIssueLoader, issueKey string) (map[string]any, error) {
+	issue, err := load(issueKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
 	}
 
-	event := jira.IssueEvent{
-		Action: "created",
-		Issue:  issue,
-	}
+	event := jira.NewIssueEvent("created", issue, nil, nil)
 
 	encoded, err := json.Marshal(event)
 	if err != nil {
