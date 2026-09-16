@@ -210,19 +210,25 @@ func UpsertUserNotificationSettings(
 		UpdatedAt:               now,
 	}
 
+	updateColumns := []string{
+		"workspace_scope",
+		"workspace_filters",
+		"event_types",
+		"updated_at",
+	}
+	if updatesBrowserChannel(params) {
+		updateColumns = append(updateColumns,
+			"browser_workspace_scope",
+			"browser_workspace_filters",
+			"browser_event_types",
+			"browser_show_while_viewing",
+		)
+	}
+
 	err := tx.
 		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "organization_id"}, {Name: "user_id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"workspace_scope",
-				"workspace_filters",
-				"event_types",
-				"browser_workspace_scope",
-				"browser_workspace_filters",
-				"browser_event_types",
-				"browser_show_while_viewing",
-				"updated_at",
-			}),
+			Columns:   []clause.Column{{Name: "organization_id"}, {Name: "user_id"}},
+			DoUpdates: clause.AssignmentColumns(updateColumns),
 		}).
 		Create(settings).
 		Error
@@ -231,6 +237,13 @@ func UpsertUserNotificationSettings(
 	}
 
 	return FindUserNotificationSettings(tx, organizationID, userID)
+}
+
+func updatesBrowserChannel(params UserNotificationSettingsParams) bool {
+	return params.BrowserWorkspaceScope != "" ||
+		params.BrowserWorkspaceFilters != nil ||
+		params.BrowserEventTypes != nil ||
+		params.BrowserShowWhileViewing != nil
 }
 
 func (s *UserNotificationSettings) channelSettings(channel string) (string, []NotificationWorkspaceFilter, []string) {

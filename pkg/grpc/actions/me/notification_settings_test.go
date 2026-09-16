@@ -65,6 +65,9 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 			pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
 			pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
 		}, resp.Settings.Workspaces.EventTypes)
+		require.NotNil(t, resp.Settings.Browser)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)
+		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
@@ -279,7 +282,23 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
 	})
 
-	t.Run("omitted browser channel stays off", func(t *testing.T) {
+	t.Run("omitted browser channel keeps stored browser settings", func(t *testing.T) {
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_NONE,
+				},
+				Browser: &pb.NotificationSettings_Browser{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+					EventTypes: []pb.NotificationSettings_Type{
+						pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+					},
+					ShowWhileViewing: false,
+				},
+			},
+		})
+		require.NoError(t, err)
+
 		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
 				Workspaces: &pb.NotificationSettings_Workspaces{
@@ -289,8 +308,12 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.Settings.Browser)
-		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)
-		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Workspaces.Scope)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Browser.Scope)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+		}, resp.Settings.Browser.EventTypes)
+		assert.False(t, resp.Settings.Browser.ShowWhileViewing)
 	})
 }
 

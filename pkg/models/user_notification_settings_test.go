@@ -52,6 +52,30 @@ func Test__UserNotificationSettings(t *testing.T) {
 		assert.True(t, updated.BrowserShowWhileViewing)
 	})
 
+	t.Run("email-only upsert keeps stored browser fields", func(t *testing.T) {
+		userID := support.CreateUser(t, r, r.Organization.ID).ID
+		showWhileViewing := false
+		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
+			WorkspaceScope:          models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope:   models.NotificationWorkspaceScopeAll,
+			BrowserEventTypes:       []string{models.NotificationTypeWorkOrderCommentOwned},
+			BrowserShowWhileViewing: &showWhileViewing,
+		})
+		require.NoError(t, err)
+
+		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, created.ID, updated.ID)
+		assert.Equal(t, models.NotificationWorkspaceScopeAll, updated.WorkspaceScope)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.EventTypes.Data())
+		assert.Equal(t, models.NotificationWorkspaceScopeAll, updated.BrowserWorkspaceScope)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderCommentOwned}, updated.BrowserEventTypes.Data())
+		assert.False(t, updated.BrowserShowWhileViewing)
+	})
+
 	t.Run("upsert round-trips browser channel fields", func(t *testing.T) {
 		userID := support.CreateUser(t, r, r.Organization.ID).ID
 		factoryID := uuid.New().String()

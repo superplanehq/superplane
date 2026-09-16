@@ -252,6 +252,35 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.queryByTestId("account-redesign-notifications-browser-events")).not.toBeInTheDocument();
   });
 
+  it("asks for permission when browser notifications are already on", async () => {
+    const user = userEvent.setup();
+    const requestPermission = vi.fn(async () => "granted" as NotificationPermission);
+    class FakeNotification {
+      static permission: NotificationPermission = "default";
+      static requestPermission = requestPermission;
+    }
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: FakeNotification,
+    });
+
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={{ ...ACCOUNT_REDESIGN_NOTIFICATIONS, browserEnabled: true }}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-allow")).toHaveTextContent(
+      "This browser needs permission before SuperPlane can show alerts.",
+    );
+    await user.click(screen.getByRole("button", { name: "Allow notifications" }));
+    expect(requestPermission).toHaveBeenCalled();
+  });
+
   it("filters the settings nav", async () => {
     const user = userEvent.setup();
     renderPlayground();

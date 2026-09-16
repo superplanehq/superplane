@@ -44,27 +44,28 @@ func UpdateNotificationSettings(
 		return nil, err
 	}
 
+	params := models.UserNotificationSettingsParams{
+		WorkspaceScope: emailChannel.scope,
+		EventTypes:     emailChannel.eventTypes,
+	}
+
 	browser := requested.GetBrowser()
-	browserChannel := defaultBrowserChannelParams()
+	var browserChannel *parsedNotificationChannel
 	if browser != nil {
-		browserChannel, err = parseNotificationChannel(
+		parsed, parseErr := parseNotificationChannel(
 			browser.GetScope(),
 			browser.GetEventTypes(),
 			browser.GetFilters(),
 		)
-		if err != nil {
-			return nil, err
+		if parseErr != nil {
+			return nil, parseErr
 		}
 		showWhileViewing := browser.GetShowWhileViewing()
-		browserChannel.showWhileViewing = &showWhileViewing
-	}
-
-	params := models.UserNotificationSettingsParams{
-		WorkspaceScope:          emailChannel.scope,
-		EventTypes:              emailChannel.eventTypes,
-		BrowserWorkspaceScope:   browserChannel.scope,
-		BrowserEventTypes:       browserChannel.eventTypes,
-		BrowserShowWhileViewing: browserChannel.showWhileViewing,
+		parsed.showWhileViewing = &showWhileViewing
+		browserChannel = &parsed
+		params.BrowserWorkspaceScope = parsed.scope
+		params.BrowserEventTypes = parsed.eventTypes
+		params.BrowserShowWhileViewing = parsed.showWhileViewing
 	}
 
 	var settings *models.UserNotificationSettings
@@ -77,7 +78,7 @@ func UpdateNotificationSettings(
 			params.WorkspaceFilters = filters
 		}
 
-		if browserChannel.scope == models.NotificationWorkspaceScopeFiltered {
+		if browserChannel != nil && browserChannel.scope == models.NotificationWorkspaceScopeFiltered {
 			filters, resolveErr := resolveRequiredWorkspaceFilters(tx, orgID, browserChannel.filters)
 			if resolveErr != nil {
 				return resolveErr
@@ -127,14 +128,6 @@ func parseNotificationChannel(
 	}
 
 	return parsed, nil
-}
-
-func defaultBrowserChannelParams() parsedNotificationChannel {
-	showWhileViewing := true
-	return parsedNotificationChannel{
-		scope:            models.NotificationWorkspaceScopeNone,
-		showWhileViewing: &showWhileViewing,
-	}
 }
 
 func resolveRequiredWorkspaceFilters(

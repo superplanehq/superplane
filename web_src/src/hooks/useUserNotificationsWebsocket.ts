@@ -8,7 +8,7 @@ import {
 } from "@/lib/browserNotifications";
 import { accountNotificationsFromSettings } from "@/lib/notificationSettings";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/users/notifications`;
@@ -25,16 +25,6 @@ export function useUserNotificationsWebsocket(organizationId: string): void {
   const { data: settings } = useNotificationSettings(organizationId);
   const form = accountNotificationsFromSettings(settings);
   const enabled = Boolean(account && organizationId && form.browserEnabled);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    if (currentBrowserNotificationPermission() !== "default") {
-      return;
-    }
-    void Notification.requestPermission();
-  }, [enabled]);
 
   const onMessage = useCallback(
     (event: MessageEvent<unknown>) => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { currentBrowserNotificationPermission } from "@/lib/browserNotifications";
 import { NOTIFICATION_TYPE_OPTIONS, eventTypesFromToggles } from "@/lib/notificationSettings";
@@ -106,6 +107,9 @@ export function AccountNotificationsRedesignPage({
             }
             onChange(next);
           }}
+          onAllow={async () => {
+            setPermission(await requestBrowserPermission());
+          }}
         />
         {notifications.browserEnabled ? (
           <EnabledBrowserSections
@@ -158,10 +162,12 @@ function BrowserCard({
   notifications,
   permission,
   onChange,
+  onAllow,
 }: {
   notifications: AccountRedesignNotifications;
   permission: ReturnType<typeof currentBrowserNotificationPermission>;
   onChange: (notifications: AccountRedesignNotifications) => void | Promise<void>;
+  onAllow: () => void | Promise<void>;
 }) {
   return (
     <FactorySettingsCard title="Browser" data-testid="account-redesign-notifications-browser">
@@ -179,6 +185,19 @@ function BrowserCard({
         >
           <BellOff className="size-4 shrink-0" aria-hidden />
           <span>Browser notifications are off.</span>
+        </div>
+      ) : null}
+      {notifications.browserEnabled && permission === "default" ? (
+        <div
+          className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+          data-testid="account-redesign-notifications-browser-allow"
+        >
+          <p className="text-[12px] text-muted-foreground">
+            This browser needs permission before SuperPlane can show alerts.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={() => void onAllow()}>
+            Allow notifications
+          </Button>
         </div>
       ) : null}
       {notifications.browserEnabled && permission !== "granted" && permission !== "default" ? (

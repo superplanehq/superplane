@@ -105,6 +105,15 @@ describe("useUserNotificationsWebsocket", () => {
     expect(url).toContain("/ws/users/notifications");
     expect(url).toContain("organization_id=org-1");
     expect(enabled).toBe(true);
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("does not request permission on connect", () => {
+    permission = "default";
+    renderNotificationsHook("/org-1/settings/account");
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    const [, , enabled] = lastCall();
+    expect(enabled).toBe(true);
   });
 
   it("does not connect when the browser channel is off", () => {
