@@ -215,7 +215,7 @@ describe("AgentActivityView", () => {
     expect(screen.getByTestId("agent-tool-command-1")).not.toHaveTextContent('{"command"');
   });
 
-  it("summarizes mixed tool activity like Cursor", () => {
+  it("uses a compact summary for a completed turn", () => {
     render(
       <AgentActivityView
         activity={activityWithItems([
@@ -231,10 +231,34 @@ describe("AgentActivityView", () => {
     );
 
     const summary = screen.getByRole("button", {
-      name: "Explored 1 file, searched code, researched 1 source, prepared specification, scored task, used terminal 2 times",
+      name: "Explored codebase, researched sources, prepared task, used terminal",
     });
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(summary.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("keeps detailed factual action counts during streaming", () => {
+    render(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          { ...completedTool("read-1", "bash", "Bash"), input: "cat README.md setup.py" },
+          { ...completedTool("explore-1", "bash", "Bash"), input: "find src -type f" },
+          { ...completedTool("explore-2", "bash", "Bash"), input: "ls pkg" },
+          { ...completedTool("git-1", "bash", "Bash"), input: "git status --short" },
+          { ...completedTool("git-2", "bash", "Bash"), input: "git log -1" },
+          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
+          completedTool("mcp-2", "propose_confidence", "mcp_tool_call"),
+          completedTool("mcp-3", "mcp__superplane__survey", "mcp__superplane__survey"),
+        ])}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Explored 2 files, explored repository 2 times, inspected Git 2 times, prepared specification, scored task, prepared questions",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("keeps chronological tool batches collapsed inside a completed turn", async () => {
@@ -257,7 +281,7 @@ describe("AgentActivityView", () => {
       />,
     );
 
-    const summary = screen.getByRole("button", { name: "Explored 1 file, searched code, explored repository" });
+    const summary = screen.getByRole("button", { name: "Explored codebase" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("rg retry")).not.toBeInTheDocument();
 
@@ -415,7 +439,7 @@ describe("AgentActivityView", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "Explored 2 files, searched code, explored repository, researched 1 source, inspected Git, ran 1 check",
+        name: "Explored codebase, researched sources, ran checks",
       }),
     ).toBeInTheDocument();
   });

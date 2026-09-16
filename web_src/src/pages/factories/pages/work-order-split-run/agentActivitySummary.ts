@@ -49,6 +49,30 @@ export function activitySummaryLabel(tools: AgentToolItem[]): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+export function completedActivitySummaryLabel(tools: AgentToolItem[]): string {
+  const counts = countActivities(tools);
+  const parts = [
+    groupedActivityLabel([counts.fileChanges], "editing files", "edited files"),
+    groupedActivityLabel(
+      [counts.fileReads, counts.searches, counts.repositoryExplorations, counts.gitInspections],
+      "exploring codebase",
+      "explored codebase",
+    ),
+    groupedActivityLabel([counts.sources], "researching sources", "researched sources"),
+    groupedActivityLabel([counts.checks], "running checks", "ran checks"),
+    groupedActivityLabel(
+      [counts.specifications, counts.taskScores, counts.questions],
+      "preparing task",
+      "prepared task",
+    ),
+    groupedActivityLabel([counts.toolCalls], "using tools", "used tools"),
+    groupedActivityLabel([counts.terminalUses], "using terminal", "used terminal"),
+  ].filter((part): part is string => Boolean(part));
+
+  const label = parts.join(", ") || "Activity";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
   const grouped: ActivityEntry[] = [];
   let index = 0;
@@ -259,6 +283,15 @@ function repeatedActionLabel(
   if (activity.count === 0) return undefined;
   const phrase = activity.running ? runningPhrase : completedPhrase;
   return activity.count === 1 ? phrase : `${phrase} ${activity.count} times`;
+}
+
+function groupedActivityLabel(
+  activities: ActivityCount[],
+  runningPhrase: string,
+  completedPhrase: string,
+): string | undefined {
+  if (!activities.some((activity) => activity.count > 0)) return undefined;
+  return activities.some((activity) => activity.running) ? runningPhrase : completedPhrase;
 }
 
 function isMCPTool(tool: AgentToolItem): boolean {

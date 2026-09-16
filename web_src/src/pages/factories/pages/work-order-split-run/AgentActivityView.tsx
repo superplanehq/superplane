@@ -10,6 +10,7 @@ import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
   activitySummaryLabel,
   commandDisplayText,
+  completedActivitySummaryLabel,
   groupToolRuns,
   isCommandTool,
   toolFilePaths,
@@ -42,7 +43,7 @@ function CompletedActivity({
   tools: AgentToolItem[];
 }) {
   const [open, setOpen] = useState(false);
-  const label = activitySummaryLabel(tools);
+  const label = completedActivitySummaryLabel(tools);
 
   return (
     <div className="space-y-1 py-1.5" data-testid={`agent-activity-${activity.id}`}>
