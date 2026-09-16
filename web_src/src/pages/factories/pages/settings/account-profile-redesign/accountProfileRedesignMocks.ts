@@ -1,21 +1,21 @@
-import { defaultNotificationTypeToggles, type NotificationTypeToggles } from "@/lib/notificationSettings";
+import { defaultNotificationTypeToggles, type AccountNotificationForm } from "@/lib/notificationSettings";
 
 export type AccountRedesignPageId = "profile" | "security";
 
 export type AccountRedesignWorkspaceScope = "all" | "selected";
 
-export interface AccountRedesignNotifications {
-  emailEnabled: boolean;
-  workspaceScope: AccountRedesignWorkspaceScope;
-  workspaceIds: string[];
-  events: NotificationTypeToggles;
-}
+export type AccountRedesignNotifications = AccountNotificationForm;
 
 export const ACCOUNT_REDESIGN_NOTIFICATIONS: AccountRedesignNotifications = {
   emailEnabled: true,
   workspaceScope: "all",
   workspaceIds: [],
   events: defaultNotificationTypeToggles(true),
+  browserEnabled: false,
+  browserWorkspaceScope: "all",
+  browserWorkspaceIds: [],
+  browserEvents: defaultNotificationTypeToggles(true),
+  browserShowWhileViewing: true,
 };
 
 export type AccountRedesignSsoProvider = "github" | "google";
