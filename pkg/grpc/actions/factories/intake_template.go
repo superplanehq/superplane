@@ -157,9 +157,12 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerConfiguration: map[string]any{
 			"events": intakeTriggerEventsFor(defaultJiraIntakeSettings()),
 		},
-		analysisSubject:   "Jira issue",
-		createTitle:       `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
-		createDescription: `{{ root().data.issue.fields.description }}`,
+		analysisSubject: "Jira issue",
+		createTitle:     `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
+		// The raw description field holds an Atlassian Document Format
+		// object, so the work order reads the plain text copy the trigger
+		// reports next to it.
+		createDescription: `{{ root().data.description }}`,
 	},
 }
 

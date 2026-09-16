@@ -56,6 +56,17 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
 	})
 
+	t.Run("a Jira work order reads the plain text description, not the raw document", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceJiraIssues})
+		require.NoError(t, err)
+
+		// Jira holds a description in Atlassian Document Format, which reads
+		// as a Go map once a template interpolates it.
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "fields.description")
+	})
+
 	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
 		for _, source := range []string{
 			models.FactoryIntakeSourceSentryExceptions,
