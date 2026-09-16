@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Logs } from "lucide-react";
 import { FactoryNodeCard } from "./FactoryNodeCard";
 
 const meta = {
@@ -114,6 +115,26 @@ export const Cancelled: Story = {
     nodeName: "Babysit",
     iconSlug: "bot",
     eventSections: [{ eventId: "6", eventState: "cancelled", eventTitle: "Cancelled", eventSubtitle: "12s" }],
+  },
+};
+
+export const SeeLogs: Story = {
+  args: {
+    title: "Run Shell Command",
+    componentLabel: "Run Shell Command",
+    nodeName: "Build & Deploy Storybook",
+    iconSlug: "terminal",
+    canvasMode: "live",
+    eventSections: [{ eventId: "logs-1", eventState: "failed", eventTitle: "Failed", eventSubtitle: "12m ago" }],
+    customField: (
+      <button
+        type="button"
+        aria-label="See logs"
+        className="flex size-6 items-center justify-center rounded-md text-muted-foreground"
+      >
+        <Logs className="size-3.5" aria-hidden />
+      </button>
+    ),
   },
 };
 

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
@@ -111,6 +112,7 @@ export function useRunCanvasData({
   visibleNodeExecutionsMap,
   selectedRunFullExecutions,
 }: UseRunCanvasDataParams): RunCanvasData | null {
+  const organizationId = useOrganizationId() ?? undefined;
   return useMemo(() => {
     if (
       !isRunInspectionMode ||
@@ -160,6 +162,8 @@ export function useRunCanvasData({
       queryClient,
       me,
       "live",
+      undefined,
+      organizationId,
     );
     return {
       nodes: stripCanvasNodeSetupWarningsForRunsView(prepared.nodes),
@@ -177,6 +181,7 @@ export function useRunCanvasData({
     allTriggers,
     allComponents,
     canvasId,
+    organizationId,
     queryClient,
     me,
     visibleNodeExecutionsMap,

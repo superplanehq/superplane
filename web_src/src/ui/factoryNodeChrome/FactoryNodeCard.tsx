@@ -56,6 +56,8 @@ export type FactoryNodeCardProps = {
   eventStateMap?: EventStateMap;
   /** Optional content between the node header and status footer. */
   body?: React.ReactNode;
+  /** Extra header action such as the See logs icon. Does not widen the card. */
+  customField?: React.ReactNode;
 };
 
 function useFactoryNodeMetrics(
@@ -144,6 +146,7 @@ export function FactoryNodeCard({
   runIsActive = true,
   eventStateMap,
   body,
+  customField,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const runtimeStatus = resolveFactoryRuntimeStatus({
@@ -195,6 +198,7 @@ export function FactoryNodeCard({
         isCompactView={isCompactView}
         showStatusFooter={footer.showStatusFooter}
         body={body}
+        customField={customField}
       />
     </div>
   );
