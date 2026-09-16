@@ -8,6 +8,11 @@ import { useAgentActivityStream } from "./useAgentActivityStream";
 
 const STALE_ACTIVITY_MS = 15_000;
 
+type LiveStatus = {
+  label: string;
+  elapsedSeconds?: number;
+};
+
 export function AnalysisLiveWork({
   machineStatus,
   organizationId,
@@ -34,12 +39,13 @@ export function AnalysisLiveWork({
       {status ? (
         <p
           role="status"
-          aria-label={status}
+          aria-label={status.label}
           aria-live="polite"
           className="px-3 py-0.5 text-[13px] leading-5 text-muted-foreground"
           data-testid="split-run-intent-thinking"
         >
-          <AnimatedThinkingState text={status} />
+          <AnimatedThinkingState text={status.label} />
+          {status.elapsedSeconds === undefined ? null : <span aria-hidden> · {status.elapsedSeconds}s</span>}
         </p>
       ) : null}
     </div>
@@ -58,20 +64,20 @@ function useActivityElapsed(sequence: number, active: boolean): number {
   return elapsedMs;
 }
 
-function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): string | undefined {
-  if (error) return "Live activity disconnected. Reconnecting…";
+function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): LiveStatus | undefined {
+  if (error) return { label: "Live activity disconnected. Reconnecting…" };
   if (elapsedMs >= STALE_ACTIVITY_MS) {
-    return `Still working · ${Math.floor(elapsedMs / 1000)}s`;
+    return { label: "Still working", elapsedSeconds: Math.floor(elapsedMs / 1000) };
   }
-  if (!activity || activity.items.length === 0) return "Starting analysis…";
+  if (!activity || activity.items.length === 0) return { label: "Starting analysis…" };
 
   const latestRunningItem = findLatestRunningItem(activity.items);
   if (latestRunningItem?.type === "content") {
     if (latestRunningItem.kind === "reasoning" || latestRunningItem.text.trim()) return undefined;
-    return "Writing response…";
+    return { label: "Writing response…" };
   }
   if (latestRunningItem?.type === "tool") return undefined;
-  return "Planning next step…";
+  return { label: "Planning next step…" };
 }
 
 function findLatestRunningItem(items: AgentActivityItem[]): AgentActivityItem | undefined {

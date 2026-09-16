@@ -417,6 +417,24 @@ describe("AgentActivityView", () => {
     expect(screen.getByRole("button", { name: "Edited 3 files, explored 2 files" })).toBeInTheDocument();
   });
 
+  it("shows file names from historical OpenCode camel-case input", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        live
+        activity={activityWith({
+          ...completedTool("read-1", "read", "read"),
+          input: JSON.stringify({ filePath: "/repo/src/main.ts" }),
+        })}
+      />,
+    );
+
+    const summary = screen.getByRole("button", { name: "Explored 1 file" });
+    await user.click(summary);
+
+    expect(screen.getByText("Explored main.ts")).toBeInTheDocument();
+  });
+
   it("uses factual names for common shell activity", () => {
     render(
       <AgentActivityView
