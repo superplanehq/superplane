@@ -38,6 +38,9 @@ const (
 	// to short-circuit: only a `labeled` payload carries a label to read.
 	intakeSuperplaneLabelCondition = `(root().data.action != "labeled" || (root().data.issue.state == "open" && root().data.label.name == "` +
 		intakeSuperplaneLabel + `"))`
+
+	intakeJiraAssignedCondition   = "root().data.issue.fields.assignee != null"
+	intakeJiraUnassignedCondition = "root().data.issue.fields.assignee == null"
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -68,6 +71,18 @@ func defaultIntakeSettings() intakeSettings {
 	}
 }
 
+func defaultJiraIntakeSettings() intakeSettings {
+	settings := defaultIntakeSettings()
+	settings.ReopenedIssues = true
+	settings.SuperplaneLabelAdded = false
+	return settings
+}
+
+func intakeSourceHasFilterNode(source string) bool {
+	return source == models.FactoryIntakeSourceGitHubIssues ||
+		source == models.FactoryIntakeSourceJiraIssues
+}
+
 func (s intakeSettings) normalized() intakeSettings {
 	s.ConfidencePct = clampIntakeConfidence(s.ConfidencePct)
 
@@ -95,10 +110,17 @@ func (s intakeSettings) normalized() intakeSettings {
 // matching event still creates a work order.
 func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	settings = settings.normalized()
-	if source != models.FactoryIntakeSourceGitHubIssues {
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues:
+		return intakeGitHubFilterExpression(settings)
+	case models.FactoryIntakeSourceJiraIssues:
+		return intakeJiraFilterExpression(settings)
+	default:
 		return "true"
 	}
+}
 
+func intakeGitHubFilterExpression(settings intakeSettings) string {
 	conditions := []string{}
 	if len(settings.Labels) > 0 {
 		if labels, err := json.Marshal(settings.Labels); err == nil {
@@ -128,6 +150,32 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+func intakeJiraFilterExpression(settings intakeSettings) string {
+	conditions := []string{}
+	if len(settings.Labels) > 0 {
+		if labels, err := json.Marshal(settings.Labels); err == nil {
+			matches := fmt.Sprintf("any(root().data.issue.fields.labels, # in %s)", labels)
+			if settings.LabelFilterMode == intakeLabelFilterExclude {
+				matches = fmt.Sprintf("!(%s)", matches)
+			}
+			conditions = append(conditions, matches)
+		}
+	}
+
+	switch settings.Assignment {
+	case intakeAssignmentAssigned:
+		conditions = append(conditions, intakeJiraAssignedCondition)
+	case intakeAssignmentUnassigned:
+		conditions = append(conditions, intakeJiraUnassignedCondition)
+	}
+
+	if len(conditions) == 0 {
+		return "true"
+	}
+
+	return strings.Join(conditions, " && ")
+}
+
 func intakeTriggerActionsFor(settings intakeSettings) []any {
 	actions := []any{}
 	if settings.NewIssues {
@@ -142,7 +190,22 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 	return actions
 }
 
-func intakeSettingsChangeTrigger(current, updated intakeSettings) bool {
+func intakeTriggerEventsFor(settings intakeSettings) []any {
+	events := []any{}
+	if settings.NewIssues {
+		events = append(events, "created")
+	}
+	if settings.ReopenedIssues {
+		events = append(events, "updated")
+	}
+	return events
+}
+
+func intakeSettingsChangeTrigger(source string, current, updated intakeSettings) bool {
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return current.NewIssues != updated.NewIssues ||
+			current.ReopenedIssues != updated.ReopenedIssues
+	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
 		current.SuperplaneLabelAdded != updated.SuperplaneLabelAdded
@@ -179,19 +242,33 @@ var intakeLabelsPattern = regexp.MustCompile(
 	`(!\()?(?:any\(root\(\)\.data\.issue\.labels, \.name in|root\(\)\.data\.issue\.labels\.exists\(label, label\.name in) (\[[^\]]*\])\)`,
 )
 
+var intakeJiraLabelsPattern = regexp.MustCompile(
+	`(!\()?any\(root\(\)\.data\.issue\.fields\.labels, # in (\[[^\]]*\])\)`,
+)
+
 // intakeSettingsFromGraph reads the settings back out of the filter
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.
-func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
+func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
 	settings := defaultIntakeSettings()
+	if source == models.FactoryIntakeSourceJiraIssues {
+		settings = defaultJiraIntakeSettings()
+	}
 	settings.ConfidencePct = graph.ConfidencePct
 
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
 	if trigger != nil {
-		actions := configurationStrings(trigger.Configuration["actions"])
-		settings.NewIssues = slices.Contains(actions, "opened")
-		settings.ReopenedIssues = slices.Contains(actions, "reopened")
-		settings.SuperplaneLabelAdded = slices.Contains(actions, "labeled")
+		switch source {
+		case models.FactoryIntakeSourceJiraIssues:
+			events := configurationStrings(trigger.Configuration["events"])
+			settings.NewIssues = slices.Contains(events, "created")
+			settings.ReopenedIssues = slices.Contains(events, "updated")
+		default:
+			actions := configurationStrings(trigger.Configuration["actions"])
+			settings.NewIssues = slices.Contains(actions, "opened")
+			settings.ReopenedIssues = slices.Contains(actions, "reopened")
+			settings.SuperplaneLabelAdded = slices.Contains(actions, "labeled")
+		}
 	}
 
 	filter := findIntakeNode(spec.Nodes, graph.FilterNodeID)
@@ -202,6 +279,27 @@ func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) inta
 	expression, _ := filter.Configuration["expression"].(string)
 	if expression == "" {
 		return settings
+	}
+
+	if source == models.FactoryIntakeSourceJiraIssues {
+		if match := intakeJiraLabelsPattern.FindStringSubmatch(expression); match != nil {
+			var labels []string
+			if err := json.Unmarshal([]byte(match[2]), &labels); err == nil {
+				settings.Labels = labels
+				if match[1] != "" {
+					settings.LabelFilterMode = intakeLabelFilterExclude
+				}
+			}
+		}
+
+		switch {
+		case strings.Contains(expression, intakeJiraUnassignedCondition):
+			settings.Assignment = intakeAssignmentUnassigned
+		case strings.Contains(expression, intakeJiraAssignedCondition):
+			settings.Assignment = intakeAssignmentAssigned
+		}
+
+		return settings.normalized()
 	}
 
 	if match := intakeLabelsPattern.FindStringSubmatch(expression); match != nil {
