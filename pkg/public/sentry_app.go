@@ -98,7 +98,9 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 
 	installationUUID := sentryInstallationUUID(body)
 	if uuid, ok := sentry.ParseInstallationDeletedUUID(r.Header.Get("Sentry-Hook-Resource"), body); ok {
-		sentry.ForgetKnownHostedInstallation(uuid)
+		if err := sentry.ForgetKnownHostedInstallation(uuid); err != nil {
+			log.WithError(err).Error("failed to drop the grant of a deleted Sentry app install")
+		}
 	}
 
 	integrations, err := models.ListSentryIntegrationsByInstallationUUID(database.DB(r.Context()), installationUUID)

@@ -122,16 +122,16 @@ func Test__Sentry__Sync(t *testing.T) {
 		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-		t.Cleanup(resetUnclaimedHostedInstalls)
+		grants := useFakeHostedInstallGrants(t)
 
-		rememberUnclaimedHostedInstall(hostedSentryInstall{
+		require.NoError(t, grants.Remember(hostedSentryInstall{
 			InstallationUUID: "install-uuid",
 			AccessToken:      "install-token",
 			RefreshToken:     "refresh-token",
 			TokenExpiresAt:   "2030-01-01T00:00:00Z",
 			Organization:     &OrganizationSummary{Slug: "acme"},
 			Code:             "grant-code",
-		})
+		}))
 
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
@@ -159,13 +159,13 @@ func Test__Sentry__Sync(t *testing.T) {
 		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-		t.Cleanup(resetUnclaimedHostedInstalls)
+		grants := useFakeHostedInstallGrants(t)
 
-		rememberUnclaimedHostedInstall(hostedSentryInstall{
+		require.NoError(t, grants.Remember(hostedSentryInstall{
 			InstallationUUID: "install-uuid",
 			Code:             "grant-code",
 			Organization:     &OrganizationSummary{Slug: "acme"},
-		})
+		}))
 
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
@@ -200,18 +200,18 @@ func Test__Sentry__Sync(t *testing.T) {
 		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-		t.Cleanup(resetUnclaimedHostedInstalls)
+		grants := useFakeHostedInstallGrants(t)
 
-		rememberUnclaimedHostedInstall(hostedSentryInstall{
+		require.NoError(t, grants.Remember(hostedSentryInstall{
 			InstallationUUID: "install-1",
 			Code:             "grant-1",
 			Organization:     &OrganizationSummary{Slug: "acme"},
-		})
-		rememberUnclaimedHostedInstall(hostedSentryInstall{
+		}))
+		require.NoError(t, grants.Remember(hostedSentryInstall{
 			InstallationUUID: "install-2",
 			Code:             "grant-2",
 			Organization:     &OrganizationSummary{Slug: "other"},
-		})
+		}))
 
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",

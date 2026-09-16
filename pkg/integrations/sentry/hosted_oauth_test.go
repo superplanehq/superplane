@@ -29,6 +29,7 @@ func Test__afterHostedAppSetup(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	useFakeHostedInstallGrants(t)
 
 	impl := &Sentry{}
 	integrationCtx := &contexts.IntegrationContext{
@@ -101,6 +102,7 @@ func Test__afterHostedAppSetup_installationIdAlias(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	useFakeHostedInstallGrants(t)
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
@@ -126,7 +128,7 @@ func Test__afterHostedAppSetup_missingCode_rejectsUnknownInstallation(t *testing
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	useFakeHostedInstallGrants(t)
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
@@ -149,7 +151,7 @@ func Test__afterHostedAppSetup_codeExchangeFailed_doesNotMint(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	useFakeHostedInstallGrants(t)
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
@@ -199,16 +201,16 @@ func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	grants := useFakeHostedInstallGrants(t)
 
-	rememberUnclaimedHostedInstall(hostedSentryInstall{
+	require.NoError(t, grants.Remember(hostedSentryInstall{
 		InstallationUUID: "install-1",
 		AccessToken:      "webhook-token",
 		RefreshToken:     "webhook-refresh",
 		TokenExpiresAt:   time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
 		Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
 		Code:             "grant-code",
-	})
+	}))
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
@@ -259,46 +261,19 @@ func Test__ParseInstallationCreatedGrant(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func Test__takeUnclaimedHostedInstall_requiresMatchingCode(t *testing.T) {
-	t.Cleanup(resetUnclaimedHostedInstalls)
-
-	rememberUnclaimedHostedInstall(hostedSentryInstall{
-		InstallationUUID: "install-1",
-		AccessToken:      "webhook-token",
-		Code:             "grant-code",
-	})
-
-	assert.Nil(t, takeUnclaimedHostedInstall("install-1", ""))
-	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "other-code"))
-	taken := takeUnclaimedHostedInstall("install-1", "grant-code")
-	require.NotNil(t, taken)
-	assert.Equal(t, "webhook-token", taken.AccessToken)
-	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
-}
-
-func Test__takeUnclaimedHostedInstall_ignoresExpiredGrant(t *testing.T) {
-	t.Cleanup(resetUnclaimedHostedInstalls)
-
-	rememberUnclaimedHostedInstall(hostedSentryInstall{
-		InstallationUUID: "install-1",
-		AccessToken:      "webhook-token",
-		Code:             "grant-code",
-		ExpiresAt:        time.Now().Add(-time.Minute),
-	})
-
-	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
-}
-
 func Test__ForgetKnownHostedInstallation_dropsUnclaimedGrant(t *testing.T) {
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	grants := useFakeHostedInstallGrants(t)
 
-	rememberUnclaimedHostedInstall(hostedSentryInstall{
+	require.NoError(t, grants.Remember(hostedSentryInstall{
 		InstallationUUID: "install-1",
 		AccessToken:      "webhook-token",
 		Code:             "grant-code",
-	})
-	ForgetKnownHostedInstallation("install-1")
-	assert.Nil(t, takeUnclaimedHostedInstall("install-1", "grant-code"))
+	}))
+	require.NoError(t, ForgetKnownHostedInstallation("install-1"))
+
+	taken, err := grants.Take("install-1", "grant-code")
+	require.NoError(t, err)
+	assert.Nil(t, taken)
 }
 
 func Test__ParseInstallationDeletedUUID(t *testing.T) {
@@ -317,14 +292,14 @@ func Test__redirectHostedAppInstall_doesNotBindUnclaimedGrant(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	grants := useFakeHostedInstallGrants(t)
 
-	rememberUnclaimedHostedInstall(hostedSentryInstall{
+	require.NoError(t, grants.Remember(hostedSentryInstall{
 		InstallationUUID: "install-1",
 		AccessToken:      "install-token",
 		Organization:     &OrganizationSummary{Slug: "acme"},
 		Code:             "grant-code",
-	})
+	}))
 
 	impl := &Sentry{}
 	integrationCtx := pendingHostedIntegration()
@@ -343,7 +318,7 @@ func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	t.Cleanup(resetUnclaimedHostedInstalls)
+	grants := useFakeHostedInstallGrants(t)
 
 	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	httpContext := &contexts.HTTPContext{
@@ -363,7 +338,8 @@ func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 		OrgSlug: "acme",
 	}))
 
-	unclaimed := takeUnclaimedHostedInstall("install-1", "grant-code")
+	unclaimed, err := grants.Take("install-1", "grant-code")
+	require.NoError(t, err)
 	require.NotNil(t, unclaimed)
 	assert.Equal(t, "webhook-token", unclaimed.AccessToken)
 	assert.Equal(t, "acme", unclaimed.Organization.Slug)

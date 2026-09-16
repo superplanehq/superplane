@@ -1109,6 +1109,23 @@ CREATE TABLE public.secrets (
 
 
 --
+-- Name: sentry_app_install_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sentry_app_install_grants (
+    installation_uuid text NOT NULL,
+    code_digest text NOT NULL,
+    organization_slug text DEFAULT ''::text NOT NULL,
+    access_token bytea,
+    refresh_token bytea,
+    token_expires_at text DEFAULT ''::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2113,6 +2130,14 @@ ALTER TABLE ONLY public.secrets
 
 
 --
+-- Name: sentry_app_install_grants sentry_app_install_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sentry_app_install_grants
+    ADD CONSTRAINT sentry_app_install_grants_pkey PRIMARY KEY (installation_uuid);
+
+
+--
 -- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2996,6 +3021,13 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_sentry_app_install_grants_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sentry_app_install_grants_expires_at ON public.sentry_app_install_grants USING btree (expires_at);
 
 
 --
@@ -4496,7 +4528,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260915135706	f
+20260916110301	f
 \.
 
 

@@ -248,8 +248,13 @@ func resolveHostedAppTokens(
 	app HostedApp,
 	installationUUID, code, knownInstallationUUID string,
 ) (*sentryAppAuthorizationResponse, string, error) {
+	unclaimed, err := hostedInstallGrants.Take(installationUUID, code)
+	if err != nil {
+		return nil, "", fmt.Errorf("read Sentry install grant: %w", err)
+	}
+
 	orgSlug := ""
-	if unclaimed := takeUnclaimedHostedInstall(installationUUID, code); unclaimed != nil {
+	if unclaimed != nil {
 		if unclaimed.Organization != nil {
 			orgSlug = unclaimed.Organization.Slug
 		}
@@ -324,8 +329,7 @@ func RememberHostedInstallGrant(httpCtx core.HTTPContext, app HostedApp, grant I
 		install.RefreshToken = tokens.RefreshToken
 		install.TokenExpiresAt = tokens.ExpiresAt
 	}
-	rememberUnclaimedHostedInstall(install)
-	return nil
+	return hostedInstallGrants.Remember(install)
 }
 
 func hostedCallbackState(request *http.Request) string {

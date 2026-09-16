@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,8 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
-
-const unclaimedHostedInstallTTL = 20 * time.Minute
 
 // hostedSentryInstall is a SuperPlane-side copy of a public Sentry app
 // install. SuperPlane reuses a ready connection in the same organization,
@@ -43,8 +40,6 @@ type hostedSentryInstallFinder func(organizationID, excludeID string) (*hostedSe
 var (
 	hostedInstallEncryptor       crypto.Encryptor
 	findReadyHostedSentryInstall hostedSentryInstallFinder = noopReadyHostedSentryInstall
-	unclaimedHostedMu            sync.Mutex
-	unclaimedHostedInstalls      = map[string]hostedSentryInstall{}
 )
 
 func noopReadyHostedSentryInstall(organizationID, excludeID string) (*hostedSentryInstall, error) {
@@ -52,7 +47,9 @@ func noopReadyHostedSentryInstall(organizationID, excludeID string) (*hostedSent
 }
 
 // EnableHostedInstallBind lets Sync reuse a ready hosted Sentry connection in
-// the same SuperPlane organization instead of opening Sentry again.
+// the same SuperPlane organization instead of opening Sentry again. The
+// encryptor also protects the install grants that the installation webhook
+// stores for the setup callback.
 func EnableHostedInstallBind(encryptor crypto.Encryptor) {
 	if encryptor == nil {
 		return
@@ -184,75 +181,13 @@ func (s *Sentry) adoptKnownHostedInstall(ctx core.SyncContext, pending Metadata,
 	return s.adoptHostedInstall(ctx, pending, tokens, install.InstallationUUID, orgSlug)
 }
 
-func rememberUnclaimedHostedInstall(install hostedSentryInstall) {
-	install.InstallationUUID = strings.TrimSpace(install.InstallationUUID)
-	install.Code = strings.TrimSpace(install.Code)
-	if install.InstallationUUID == "" || install.Code == "" {
-		return
-	}
-	if install.ExpiresAt.IsZero() {
-		install.ExpiresAt = time.Now().Add(unclaimedHostedInstallTTL)
-	}
-
-	unclaimedHostedMu.Lock()
-	defer unclaimedHostedMu.Unlock()
-	purgeExpiredUnclaimedHostedInstallsLocked(time.Now())
-	unclaimedHostedInstalls[install.InstallationUUID] = install
-}
-
-// ForgetKnownHostedInstallation drops a Sentry install after Sentry reports
-// that the organization uninstalled the app.
-func ForgetKnownHostedInstallation(installationUUID string) {
-	installationUUID = strings.TrimSpace(installationUUID)
-	if installationUUID == "" {
-		return
-	}
-
-	unclaimedHostedMu.Lock()
-	defer unclaimedHostedMu.Unlock()
-	delete(unclaimedHostedInstalls, installationUUID)
-}
-
-func takeUnclaimedHostedInstall(installationUUID, code string) *hostedSentryInstall {
-	installationUUID = strings.TrimSpace(installationUUID)
-	code = strings.TrimSpace(code)
-	if installationUUID == "" || code == "" {
+// ForgetKnownHostedInstallation drops a Sentry install grant after Sentry
+// reports that the organization uninstalled the app.
+func ForgetKnownHostedInstallation(installationUUID string) error {
+	if strings.TrimSpace(installationUUID) == "" {
 		return nil
 	}
-
-	unclaimedHostedMu.Lock()
-	defer unclaimedHostedMu.Unlock()
-	now := time.Now()
-	purgeExpiredUnclaimedHostedInstallsLocked(now)
-
-	install, ok := unclaimedHostedInstalls[installationUUID]
-	if !ok {
-		return nil
-	}
-	if !install.ExpiresAt.IsZero() && !install.ExpiresAt.After(now) {
-		delete(unclaimedHostedInstalls, installationUUID)
-		return nil
-	}
-	if strings.TrimSpace(install.Code) != code {
-		return nil
-	}
-	delete(unclaimedHostedInstalls, installationUUID)
-	copied := install
-	return &copied
-}
-
-func purgeExpiredUnclaimedHostedInstallsLocked(now time.Time) {
-	for uuid, install := range unclaimedHostedInstalls {
-		if !install.ExpiresAt.IsZero() && !install.ExpiresAt.After(now) {
-			delete(unclaimedHostedInstalls, uuid)
-		}
-	}
-}
-
-func resetUnclaimedHostedInstalls() {
-	unclaimedHostedMu.Lock()
-	defer unclaimedHostedMu.Unlock()
-	unclaimedHostedInstalls = map[string]hostedSentryInstall{}
+	return hostedInstallGrants.Forget(installationUUID)
 }
 
 func lookupReadyHostedSentryInstall(organizationID, excludeID string) (*hostedSentryInstall, error) {
