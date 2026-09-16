@@ -250,6 +250,28 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, integrationContext.BrowserAction.URL, "state=existing-state")
 	})
 
+	t.Run("sync after a consumed state issues a new state", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.State)
+		assert.NotEmpty(t, *metadata.State)
+	})
+
 	t.Run("valid access token - ready + populated projects", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegration()
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
@@ -715,6 +737,10 @@ func Test__Jira__HandleRequest(t *testing.T) {
 
 		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
 		assert.Empty(t, accessToken, "must not store the access token without a refresh token")
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Nil(t, metadata.State)
 	})
 
 	t.Run("accessible resources failure redirects with an error state", func(t *testing.T) {
@@ -757,6 +783,10 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		// button again instead of getting stuck with an access token but no cloud id.
 		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
 		assert.Empty(t, accessToken)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Nil(t, metadata.State)
 	})
 
 	// Regression test: the OAuth exchange and site resolution already succeeded by this point,
@@ -834,6 +864,11 @@ func Test__Jira__HandleRequest(t *testing.T) {
 
 		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
 		assert.Empty(t, accessToken)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.State)
+		assert.Equal(t, "expected-state", *metadata.State)
 	})
 
 	t.Run("rejects a missing code", func(t *testing.T) {
@@ -856,6 +891,34 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	})
+
+	t.Run("denied callback consumes the matching state", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?error=access_denied&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:     request,
+			Response:    recorder,
+			BaseURL:     "https://sp.example.com",
+			HTTP:        &contexts.HTTPContext{},
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Nil(t, metadata.State)
 	})
 
 	t.Run("missing config -> internal server error", func(t *testing.T) {

@@ -166,13 +166,9 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("no integration context available to refresh the OAuth token")
 	}
 
-	clientID, err := c.integration.GetConfig("clientId")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client id: %w", err)
-	}
-	clientSecret, err := c.integration.GetConfig("clientSecret")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client secret: %w", err)
+	app := resolveOAuthApp(c.integration)
+	if app.ClientID == "" || app.ClientSecret == "" {
+		return fmt.Errorf("missing Jira OAuth app credentials")
 	}
 	refreshToken, err := findSecret(c.integration, SecretOAuthRefreshToken)
 	if err != nil {
@@ -182,7 +178,7 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("missing Jira OAuth refresh token; connect Jira via OAuth first")
 	}
 
-	token, err := NewAuth(c.http).RefreshToken(string(clientID), string(clientSecret), refreshToken)
+	token, err := NewAuth(c.http).RefreshToken(app.ClientID, app.ClientSecret, refreshToken)
 	if err != nil {
 		return err
 	}
@@ -1207,7 +1203,7 @@ func (c *Client) DeleteIssue(issueKey string, opts DeleteIssueOptions) error {
 	return nil
 }
 
-// IssueSearchHit is one element from GET /rest/api/3/search.
+// IssueSearchHit is one element from POST /rest/api/3/search/jql.
 type IssueSearchHit struct {
 	ID     string         `json:"id"`
 	Key    string         `json:"key"`
@@ -1215,20 +1211,20 @@ type IssueSearchHit struct {
 }
 
 type issueSearchAPIResponse struct {
-	StartAt    int              `json:"startAt"`
-	MaxResults int              `json:"maxResults"`
-	Total      int              `json:"total"`
-	Issues     []IssueSearchHit `json:"issues"`
+	MaxResults    int              `json:"maxResults"`
+	IsLast        bool             `json:"isLast"`
+	NextPageToken string           `json:"nextPageToken"`
+	Issues        []IssueSearchHit `json:"issues"`
 }
 
 type jiraSearchPOSTBody struct {
-	JQL        string   `json:"jql"`
-	StartAt    int      `json:"startAt"`
-	MaxResults int      `json:"maxResults"`
-	Fields     []string `json:"fields"`
+	JQL           string   `json:"jql"`
+	MaxResults    int      `json:"maxResults"`
+	Fields        []string `json:"fields"`
+	NextPageToken string   `json:"nextPageToken,omitempty"`
 }
 
-func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSearchAPIResponse, error) {
+func (c *Client) searchIssuesPage(jql, nextPageToken string, maxResults int) (issueSearchAPIResponse, error) {
 	var empty issueSearchAPIResponse
 	if maxResults <= 0 {
 		maxResults = 50
@@ -1238,17 +1234,17 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 	}
 
 	body := jiraSearchPOSTBody{
-		JQL:        jql,
-		StartAt:    startAt,
-		MaxResults: maxResults,
-		Fields:     []string{"summary"},
+		JQL:           jql,
+		MaxResults:    maxResults,
+		Fields:        []string{"summary"},
+		NextPageToken: nextPageToken,
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return empty, fmt.Errorf("marshal search body: %w", err)
 	}
 
-	u := c.apiURL("/rest/api/3/search")
+	u := c.apiURL("/rest/api/3/search/jql")
 	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return empty, err
@@ -1267,17 +1263,17 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 
 // SearchIssues runs a JQL search and returns the first page of issues (maxResults is capped at 100).
 func (c *Client) SearchIssues(jql string, maxResults int) ([]IssueSearchHit, error) {
-	resp, err := c.searchIssuesPage(jql, 0, maxResults)
+	resp, err := c.searchIssuesPage(jql, "", maxResults)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Issues, nil
 }
 
-// SearchIssuesUpTo pages through POST /rest/api/3/search until maxIssues are collected, a page is
-// short, or Jira reports no further results. Jira caps each request at 100 issues; busy service
-// projects often need more than one page so incident pickers are not dominated by recently
-// updated non-incident work.
+// SearchIssuesUpTo pages through POST /rest/api/3/search/jql until maxIssues are
+// collected or Jira reports no further results. Jira caps each request at 100
+// issues; busy service projects often need more than one page so incident
+// pickers are not dominated by recently updated non-incident work.
 func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, error) {
 	if maxIssues <= 0 {
 		maxIssues = 500
@@ -1285,7 +1281,7 @@ func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, 
 	const pageCap = 100
 
 	var out []IssueSearchHit
-	startAt := 0
+	nextPageToken := ""
 	for len(out) < maxIssues {
 		pageMax := pageCap
 		if remain := maxIssues - len(out); remain < pageMax {
@@ -1295,22 +1291,16 @@ func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, 
 			break
 		}
 
-		resp, err := c.searchIssuesPage(jql, startAt, pageMax)
+		resp, err := c.searchIssuesPage(jql, nextPageToken, pageMax)
 		if err != nil {
 			return nil, err
 		}
 
 		out = append(out, resp.Issues...)
-		if len(resp.Issues) == 0 {
+		if len(resp.Issues) == 0 || resp.IsLast || resp.NextPageToken == "" || resp.NextPageToken == nextPageToken {
 			break
 		}
-		startAt += len(resp.Issues)
-		if len(resp.Issues) < pageMax {
-			break
-		}
-		if resp.Total > 0 && startAt >= resp.Total {
-			break
-		}
+		nextPageToken = resp.NextPageToken
 	}
 
 	return out, nil

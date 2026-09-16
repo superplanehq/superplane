@@ -153,7 +153,7 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
 		Healthy:             graph.Healthy(spec.Edges),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
@@ -196,6 +196,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
 	case models.FactoryIntakeSourceProductiveTasks:
 		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
+	case models.FactoryIntakeSourceJiraIssues:
+		return pb.FactoryIntake_SOURCE_JIRA_ISSUES
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -211,6 +213,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
 	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
 		return models.FactoryIntakeSourceProductiveTasks, nil
+	case pb.FactoryIntake_SOURCE_JIRA_ISSUES:
+		return models.FactoryIntakeSourceJiraIssues, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

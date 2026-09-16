@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -49,6 +50,7 @@ func registerIntakeItemSource(triggerComponent string, builder intakeItemSourceB
 
 func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
+	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 }
 
@@ -57,6 +59,14 @@ type gitHubIntakeItemSource struct {
 	repository               string
 	repositoryProbe          sync.Once
 	repositoryReadabilityErr error
+}
+
+type jiraIntakeItemSource struct {
+	jira               *jira.Client
+	projectKey         string
+	siteURL            string
+	projectProbe       sync.Once
+	projectReadableErr error
 }
 
 type productiveIntakeItemSource struct {
@@ -117,6 +127,206 @@ func newGitHubIntakeItemSource(
 
 func (s *gitHubIntakeItemSource) RemoteFetch(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return s.github.HTTPDo(req.WithContext(ctx))
+}
+
+func newJiraIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	projectKey, _ := trigger.Configuration["project"].(string)
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeJiraClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	siteURL, _ := integration.Metadata.Data()["siteUrl"].(string)
+	siteURL = strings.TrimSpace(siteURL)
+	return &jiraIntakeItemSource{
+		jira:       client,
+		projectKey: projectKey,
+		siteURL:    siteURL,
+	}, nil
+}
+
+func (s *jiraIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
+	jql := fmt.Sprintf(`project = "%s" AND resolution = Unresolved`, jiraQuotedProjectKey(s.projectKey))
+	query = strings.TrimSpace(query)
+	if query != "" {
+		jql += fmt.Sprintf(` AND text ~ "%s"`, jiraQuotedProjectKey(query))
+	}
+	jql += " ORDER BY updated DESC"
+
+	hits, err := s.jira.SearchIssues(jql, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(hits))
+	for _, hit := range hits {
+		items = append(items, jiraIssueItem(hit, s.siteURL))
+	}
+	return items, nil
+}
+
+func (s *jiraIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
+	issueKey := strings.TrimSpace(id)
+	if issueKey == "" {
+		return nil, errIntakeItemNotFound
+	}
+
+	issue, err := s.jira.GetIssue(issueKey)
+	if err != nil {
+		return nil, err
+	}
+	// A Jira site holds every project the connection can read, so an issue
+	// key alone does not say that the issue belongs to this intake. Without
+	// this check a caller could import an issue from another project.
+	if issue == nil || !s.ownsIssue(issue.Fields) {
+		return nil, errIntakeItemNotFound
+	}
+
+	item := jiraIssueFromFullIssue(issue, s.siteURL)
+	return &item, nil
+}
+
+// ownsIssue reports whether the issue belongs to the project this intake
+// listens on. An issue without a readable project key is rejected, so a
+// missing field cannot widen the boundary.
+func (s *jiraIntakeItemSource) ownsIssue(fields map[string]any) bool {
+	project, _ := fields["project"].(map[string]any)
+	key, _ := project["key"].(string)
+	return key != "" && strings.EqualFold(strings.TrimSpace(key), s.projectKey)
+}
+
+func (s *jiraIntakeItemSource) AvailabilityScope() string {
+	return "jira:" + strings.ToUpper(s.projectKey)
+}
+
+func (s *jiraIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
+	issueKey, ok := parseJiraIssueURL(rawURL, s.siteURL)
+	// Every project of the site shares one browse path, so the host match
+	// alone would let a backlog item of another project look like it came
+	// from this intake.
+	if !ok || !strings.EqualFold(jiraIssueProjectKey(issueKey), s.projectKey) {
+		return "", false
+	}
+
+	return issueKey, true
+}
+
+func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
+	issueKey := strings.TrimSpace(id)
+	if issueKey == "" {
+		return false, errIntakeItemNotFound
+	}
+
+	issue, err := s.jira.GetIssueWithOptions(issueKey, jira.GetIssueOptions{Fields: "status,project"})
+	if err != nil {
+		s.projectProbe.Do(func() {
+			_, s.projectReadableErr = s.jira.SearchIssues(
+				fmt.Sprintf(`project = "%s"`, jiraQuotedProjectKey(s.projectKey)),
+				1,
+			)
+		})
+		if s.projectReadableErr != nil {
+			return false, s.projectReadableErr
+		}
+		return false, nil
+	}
+	if issue == nil || !s.ownsIssue(issue.Fields) {
+		return false, nil
+	}
+
+	status, _ := issue.Fields["status"].(map[string]any)
+	if status == nil {
+		return true, nil
+	}
+	category, _ := status["statusCategory"].(map[string]any)
+	key, _ := category["key"].(string)
+	return !strings.EqualFold(key, "done"), nil
+}
+
+// jiraIssueProjectKey reads the project of an issue key such as ENG-42. A key
+// without the "<project>-<number>" shape reports an empty project.
+func jiraIssueProjectKey(issueKey string) string {
+	separator := strings.LastIndex(issueKey, "-")
+	if separator <= 0 {
+		return ""
+	}
+
+	return issueKey[:separator]
+}
+
+func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
+	title := jiraIssueSummary(hit.Fields)
+	return IntakeItem{
+		ID:    hit.Key,
+		Key:   hit.Key,
+		Title: title,
+		URL:   jiraIssueURL(siteURL, hit.Key),
+	}
+}
+
+func jiraIssueFromFullIssue(issue *jira.Issue, siteURL string) IntakeItem {
+	return IntakeItem{
+		ID:    issue.Key,
+		Key:   issue.Key,
+		Title: jiraIssueSummary(issue.Fields),
+		Body:  jira.IssueDescriptionText(issue),
+		URL:   jiraIssueURL(siteURL, issue.Key),
+	}
+}
+
+func jiraIssueSummary(fields map[string]any) string {
+	if fields == nil {
+		return ""
+	}
+	summary, _ := fields["summary"].(string)
+	return summary
+}
+
+func jiraIssueURL(siteURL, issueKey string) string {
+	siteURL = strings.TrimRight(strings.TrimSpace(siteURL), "/")
+	if siteURL == "" || issueKey == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/browse/%s", siteURL, issueKey)
+}
+
+func parseJiraIssueURL(rawURL, siteURL string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "browse") {
+		return "", false
+	}
+
+	issueKey := strings.TrimSpace(parts[1])
+	if issueKey == "" {
+		return "", false
+	}
+
+	if siteURL != "" {
+		expectedHost := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(siteURL)), "https://")
+		expectedHost = strings.TrimPrefix(expectedHost, "http://")
+		expectedHost = strings.TrimSuffix(expectedHost, "/")
+		if expectedHost != "" && !strings.EqualFold(parsed.Hostname(), strings.Split(expectedHost, "/")[0]) {
+			return "", false
+		}
+	}
+
+	return issueKey, true
 }
 
 func newProductiveIntakeItemSource(

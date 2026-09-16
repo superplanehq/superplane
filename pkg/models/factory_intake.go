@@ -16,6 +16,7 @@ const (
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
 	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
+	FactoryIntakeSourceJiraIssues         = "jira-issues"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
 	FactoryIntakeInitialImportStatusPending     = "pending"
@@ -38,6 +39,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
 	FactoryIntakeSourceProductiveTasks,
+	FactoryIntakeSourceJiraIssues,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,

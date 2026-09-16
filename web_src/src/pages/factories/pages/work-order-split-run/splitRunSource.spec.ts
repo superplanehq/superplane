@@ -31,6 +31,14 @@ describe("sourceTicketLabel", () => {
   it("uses the task id alone for Productive.io, whose link holds an organization id", () => {
     expect(sourceTicketLabel("https://app.productive.io/48521/tasks/19976991")).toBe("#19976991");
   });
+
+  it("uses the issue key for Jira browse links", () => {
+    expect(sourceTicketLabel("https://acme.atlassian.net/browse/DEV-3")).toBe("DEV-3");
+  });
+
+  it("uses the issue key for Jira project issue links", () => {
+    expect(sourceTicketLabel("https://acme.atlassian.net/jira/software/projects/DEV/issues/DEV-3")).toBe("DEV-3");
+  });
 });
 
 describe("splitRunSourceForOrder", () => {
@@ -135,6 +143,32 @@ describe("splitRunSourceForOrder", () => {
         origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
       }),
     ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks" }));
+  });
+
+  it("names the Jira intake from a browse link", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://acme.atlassian.net/browse/DEV-3", label: "DEV-3" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Jira issues",
+        iconAlt: "Jira",
+        ticket: { label: "DEV-3", href: "https://acme.atlassian.net/browse/DEV-3" },
+      }),
+    );
+  });
+
+  it("names the Jira intake when the order has no origin but the automation is Jira", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: undefined,
+        createdBy: { automation: { appId: "app-jira-intake", appName: "Jira issues" } },
+      }),
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Jira issues", iconAlt: "Jira" }));
   });
 
   it("uses the person and Created manually when a person opened the task", () => {
