@@ -77,11 +77,7 @@ function Frame({
   );
 }
 
-function FramePanel({
-  className,
-  fit,
-  ...props
-}: React.ComponentProps<"div"> & { fit?: boolean }) {
+function FramePanel({ className, fit, ...props }: React.ComponentProps<"div"> & { fit?: boolean }) {
   return (
     <div
       className={cn(

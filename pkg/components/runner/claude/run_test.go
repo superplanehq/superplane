@@ -73,7 +73,19 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.NotContains(t, analysis, "check copy")
 	assert.Contains(t, analysis, "Use only the analysis tools")
 	assert.Contains(t, analysis, "call survey with 2 to 4 options")
+	assert.Contains(t, analysis, "do not have enough Clarity to write a plan")
+	assert.Contains(t, analysis, "If the score is 1 or 2")
+	assert.Contains(t, analysis, "Keep asking until Clarity is 5")
+	assert.Contains(t, analysis, "Scores 3 and 4")
+	assert.Contains(t, analysis, "Review it and start if you are happy")
+	assert.Contains(t, analysis, "If the score is below 5, you must ask")
+	assert.NotContains(t, analysis, "Why not start")
 	assert.Contains(t, analysis, "does not publish the specification or the score")
+	assert.Contains(t, analysis, "## Proposed outcome")
+	assert.Contains(t, analysis, "## Constraints")
+	assert.Contains(t, analysis, "Do not add an Open questions section")
+	assert.NotContains(t, analysis, "## Executive summary")
+	assert.NotContains(t, analysis, "Key architecture decisions")
 
 	unknown := planningSystemPromptFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",

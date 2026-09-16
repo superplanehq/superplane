@@ -31,9 +31,9 @@ export function refinePopupShowsAutomations(args: {
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
-/** Refine overlay size. Show plan uses the classic 70rem task dialog. Chat-only is 48rem. */
+/** Refine overlay size. Chat-only is 48rem. Plan open is 80rem. Classic stays 70rem. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
-  "has-[[data-refine-chat-solo]]:w-[min(48rem,calc(100vw-5rem))] transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+  "has-[[data-refine-chat-solo]]:w-[min(48rem,calc(100vw-5rem))] has-[[data-refine-plan-open]]:w-[min(80rem,calc(100vw-5rem))] transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 /** Refine chat column. Chat-only uses wider side padding. */
 export const SPLIT_RUN_CHAT_COLUMN_CLASSNAME = "mx-auto w-full max-w-5xl";

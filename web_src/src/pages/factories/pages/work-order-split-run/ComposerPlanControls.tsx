@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { PanelRight, PanelRightClose, Sparkle } from "lucide-react";
+import { EyeOff, FileText, Sparkle } from "lucide-react";
 
 import { CountButton } from "@/components/examples/c-button-38";
+import { Badge } from "@/components/reui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -9,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { CONFIDENCE_SCORE_MAX, confidenceBandForScore, type ConfidenceBand } from "../../lib/confidenceScore";
 import { CONFIDENCE_ANALYZING_TOOLTIP, ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import type { PlanChipStatus } from "./planChipStatus";
 
 const FALLBACK_WHY = "The analysis scored how clear this work is.";
 
@@ -24,6 +26,7 @@ export function ComposerPlanStack({
   scoreSummary,
   isAnalyzing = false,
   canTogglePlan = true,
+  planStatus,
   onToggle,
   actions,
 }: {
@@ -32,6 +35,7 @@ export function ComposerPlanStack({
   scoreSummary?: string;
   isAnalyzing?: boolean;
   canTogglePlan?: boolean;
+  planStatus?: PlanChipStatus;
   onToggle?: () => void;
   actions?: ReactNode;
 }) {
@@ -46,7 +50,9 @@ export function ComposerPlanStack({
     <div className="flex w-full min-w-0 shrink-0 flex-col" data-testid="split-run-intent-plan-updated">
       <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
         <ScoreChip score={score} scoreSummary={scoreSummary} isAnalyzing={isAnalyzing} />
-        {canTogglePlan ? <PlanToggle open={open} onToggle={onToggle} /> : null}
+        {canTogglePlan ? (
+          <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
+        ) : null}
         {actions ? (
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
         ) : null}
@@ -55,9 +61,17 @@ export function ComposerPlanStack({
   );
 }
 
-function PlanToggle({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
-  const label = open ? CREATE_WITH_AGENT_COPY.hidePlan : CREATE_WITH_AGENT_COPY.showPlan;
-
+function PlanToggle({
+  open,
+  isAnalyzing,
+  planStatus,
+  onToggle,
+}: {
+  open: boolean;
+  isAnalyzing: boolean;
+  planStatus?: PlanChipStatus;
+  onToggle?: () => void;
+}) {
   return (
     <Button
       type="button"
@@ -65,18 +79,18 @@ function PlanToggle({ open, onToggle }: { open: boolean; onToggle?: () => void }
       size="sm"
       aria-expanded={open}
       aria-pressed={open}
-      aria-label={label}
+      aria-label={CREATE_WITH_AGENT_COPY.plan}
       onClick={onToggle}
     >
       <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
-        <PanelRight
+        <FileText
           aria-hidden
           className={cn(
             "size-4 transition-all duration-300",
             open ? "scale-0 -rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100",
           )}
         />
-        <PanelRightClose
+        <EyeOff
           aria-hidden
           className={cn(
             "absolute size-4 transition-all duration-300",
@@ -84,9 +98,44 @@ function PlanToggle({ open, onToggle }: { open: boolean; onToggle?: () => void }
           )}
         />
       </span>
-      {label}
+      {CREATE_WITH_AGENT_COPY.plan}
+      <PlanStatusMark isAnalyzing={isAnalyzing} planStatus={planStatus} />
     </Button>
   );
+}
+
+function PlanStatusMark({ isAnalyzing, planStatus }: { isAnalyzing: boolean; planStatus?: PlanChipStatus }) {
+  if (isAnalyzing) {
+    return (
+      <ConfidenceAnalyzingIndicator
+        testId="split-run-intent-plan-chip-analyzing"
+        showTooltip={false}
+        decorative
+        className="shrink-0"
+      />
+    );
+  }
+  if (planStatus === "updated") {
+    return (
+      <Badge
+        variant="info-light"
+        size="xs"
+        aria-hidden
+        data-testid="split-run-intent-plan-status"
+        className="dark:border-warning/25 dark:bg-warning/15 dark:text-warning"
+      >
+        {CREATE_WITH_AGENT_COPY.planStatusUpdated}
+      </Badge>
+    );
+  }
+  if (planStatus === "ready") {
+    return (
+      <Badge variant="success-light" size="xs" aria-hidden data-testid="split-run-intent-plan-status">
+        {CREATE_WITH_AGENT_COPY.planReady}
+      </Badge>
+    );
+  }
+  return null;
 }
 
 function ScoreChip({
@@ -102,11 +151,16 @@ function ScoreChip({
     return null;
   }
 
+  const showMatrix = isAnalyzing || score == null;
   const label =
-    score == null
+    showMatrix || score == null
       ? CREATE_WITH_AGENT_COPY.clarity
       : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
-  const why = score == null ? CONFIDENCE_ANALYZING_TOOLTIP : scoreSummary?.trim() || FALLBACK_WHY;
+  const why = score == null || isAnalyzing ? CONFIDENCE_ANALYZING_TOOLTIP : scoreSummary?.trim() || FALLBACK_WHY;
+  const countClassName =
+    showMatrix || score == null
+      ? "min-w-7 self-stretch py-0"
+      : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)]);
 
   return (
     <Popover>
@@ -115,14 +169,10 @@ function ScoreChip({
           type="button"
           size="sm"
           aria-label={label}
-          data-testid={score == null ? undefined : "split-run-intent-composer-score"}
-          countClassName={
-            score == null
-              ? "min-w-7 self-stretch py-0"
-              : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)])
-          }
+          data-testid={showMatrix ? undefined : "split-run-intent-composer-score"}
+          countClassName={countClassName}
           count={
-            score == null ? (
+            showMatrix ? (
               <ConfidenceAnalyzingIndicator
                 testId="split-run-intent-plan-analyzing"
                 showTooltip={false}

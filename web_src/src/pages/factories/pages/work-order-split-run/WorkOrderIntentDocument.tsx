@@ -3,10 +3,11 @@ import { cloneElement, isValidElement, useState, type PointerEvent, type ReactEl
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 
-import { hasAnalysisPlan } from "../../lib/analysisOutcome";
+import { analysisPlanBody, hasAnalysisPlan } from "../../lib/analysisOutcome";
 import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { latestPlanScore } from "./latestPlanScore";
+import { usePlanChipStatus } from "./planChipStatus";
 import { splitRunIntentDocument } from "./splitRunPopupModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
@@ -69,6 +70,7 @@ export function WorkOrderIntentDocument({
     maxPercent: 68,
   });
   const document = splitRunIntentDocument({ artifacts, description });
+  const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planPaneOpen);
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
   const showPlanPane = !refineOpen || planPaneOpen;
   const chatSolo = refineOpen && !planPaneOpen;
@@ -83,6 +85,7 @@ export function WorkOrderIntentDocument({
         canTogglePlan: hasAnalysisPlan(artifacts),
         latestPlanScore: latestPlanScore(analysis.view.messages) ?? confidence?.score,
         latestPlanSummary: confidence?.summary?.trim(),
+        planStatus,
         isAnalyzing,
         closedDecision: refineOpen ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
       }
@@ -93,6 +96,7 @@ export function WorkOrderIntentDocument({
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="split-run-intent-document"
       data-refine-chat-solo={chatSolo ? "" : undefined}
+      data-refine-plan-open={refineOpen && planPaneOpen ? "" : undefined}
     >
       <div ref={split.containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <div

@@ -137,4 +137,3 @@ function MatrixDotLoader() {
 function matrixScanDelay(index: number): number {
   return (index % 4) * (MATRIX_CYCLE_MS / 10);
 }
-

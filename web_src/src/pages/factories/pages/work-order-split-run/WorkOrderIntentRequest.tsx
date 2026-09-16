@@ -11,6 +11,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
 import { ComposerPlanStack } from "./ComposerPlanControls";
+import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
@@ -39,6 +40,7 @@ export type IntentAnalysisChat = {
   canTogglePlan?: boolean;
   latestPlanScore?: number;
   latestPlanSummary?: string;
+  planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
 };
@@ -99,8 +101,7 @@ function AnalysisRequestChat({
   });
   const showComposerChips = Boolean(
     analysis.closedDecision ||
-      (analysis.onTogglePlan &&
-        (analysis.latestPlanScore != null || analysis.isAnalyzing || analysis.canTogglePlan)),
+      (analysis.onTogglePlan && (analysis.latestPlanScore != null || analysis.isAnalyzing || analysis.canTogglePlan)),
   );
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -171,8 +172,13 @@ function AnalysisRequestChat({
                   open={Boolean(analysis.planPaneOpen)}
                   score={analysis.latestPlanScore}
                   scoreSummary={analysis.latestPlanSummary}
-                  isAnalyzing={Boolean(analysis.isAnalyzing)}
+                  isAnalyzing={composerChipsWorking({
+                    isAnalyzing: analysis.isAnalyzing,
+                    score: analysis.latestPlanScore,
+                    machineStatus: analysis.view.machineStatus,
+                  })}
                   canTogglePlan={Boolean(analysis.canTogglePlan)}
+                  planStatus={analysis.planStatus}
                   onToggle={analysis.onTogglePlan}
                   actions={analysis.closedDecision}
                 />

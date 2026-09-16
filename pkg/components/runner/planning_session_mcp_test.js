@@ -29,10 +29,21 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /2 to 4 short sentences/);
   assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /call survey with 2 to 4 options/);
-  assert.match(pack, /If the score is 1 through 3/);
+  assert.match(pack, /If the score is 1 or 2/);
+  assert.match(pack, /do not have enough Clarity to write a plan/);
+  assert.match(pack, /Keep asking until Clarity is 5/);
+  assert.match(pack, /Scores 3 and 4/);
+  assert.match(pack, /Review it and start if you are happy/);
+  assert.match(pack, /If the score is below 5, you must ask/);
+  assert.doesNotMatch(pack, /Why not start/);
   assert.match(pack, /this is a continuation/);
   assert.match(pack, /does not publish the specification or the score/);
   assert.match(pack, /only after those calls/);
+  assert.match(pack, /## Proposed outcome/);
+  assert.match(pack, /## Constraints/);
+  assert.match(pack, /Do not add an Open questions section/);
+  assert.doesNotMatch(pack, /## Executive summary/);
+  assert.doesNotMatch(pack, /Key architecture decisions/);
   assert.doesNotMatch(pack, /check copy/);
   assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
 });
@@ -156,7 +167,12 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.match(replies[1].result.tools[1].description, /how well you understand the task/);
   assert.match(replies[1].result.tools[2].description, /short everyday options/);
   assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /why Clarity is not 5/);
+  assert.match(replies[1].result.tools[0].description, /Clarity is 3 or higher/);
   assert.match(replies[1].result.tools[1].description, /without propose_spec/);
+  assert.match(replies[1].result.tools[1].description, /not enough Clarity to write a plan/);
+  assert.match(replies[1].result.tools[1].description, /Keep asking until Clarity is 5/);
+  assert.match(replies[1].result.tools[1].description, /Review it and start if you are happy/);
+  assert.match(replies[1].result.tools[2].description, /Clarity is below 5/);
   assert.doesNotMatch(replies[1].result.tools[1].description, /check copy/);
 });
 
