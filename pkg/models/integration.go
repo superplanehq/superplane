@@ -456,6 +456,24 @@ func FindGitHubIntegrationByAppState(tx *gorm.DB, state string) (*Integration, e
 	return &integration, nil
 }
 
+// FindJiraIntegrationByOAuthState finds the pending Jira connection that
+// started authorization with this CSRF state.
+func FindJiraIntegrationByOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "jira", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
 // ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a
 // GitHub App installation. One installation can belong to more than one
 // SuperPlane organization.

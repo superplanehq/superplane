@@ -50,7 +50,7 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 			FilterNodeID:           "filter",
 			AuthorPermissionNodeID: intakeAuthorPermissionNodeID,
 		}
-		parsed := intakeSettingsFromGraph(graph, newSpec("true"))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec("true"))
 
 		assert.True(t, parsed.AuthorsWithAccess)
 	})
@@ -60,21 +60,21 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
 		graph := intakeGraph{FilterNodeID: "filter"}
-		parsed := intakeSettingsFromGraph(graph, newSpec(expression))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(expression))
 
 		assert.False(t, parsed.AuthorsWithAccess)
 	})
 
 	t.Run("a hand-edited expression falls back to the default", func(t *testing.T) {
 		graph := intakeGraph{FilterNodeID: "filter"}
-		parsed := intakeSettingsFromGraph(graph, newSpec(`root().data.issue.author_association == "OWNER"`))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(`root().data.issue.author_association == "OWNER"`))
 
 		assert.False(t, parsed.AuthorsWithAccess)
 	})
 
 	t.Run("reads the legacy webhook condition", func(t *testing.T) {
 		graph := intakeGraph{FilterNodeID: "filter"}
-		parsed := intakeSettingsFromGraph(graph, newSpec(intakeAuthorAccessCondition))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(intakeAuthorAccessCondition))
 
 		assert.True(t, parsed.AuthorsWithAccess)
 	})
@@ -134,16 +134,16 @@ func Test__intakeSettingsFromGraph_TriggerActions(t *testing.T) {
 	graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID}
 
 	t.Run("reads each action on its own", func(t *testing.T) {
-		settings := intakeSettingsFromGraph(graph, newSpec([]any{"labeled"}))
+		settings := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec([]any{"labeled"}))
 		assert.False(t, settings.NewIssues)
 		assert.False(t, settings.ReopenedIssues)
 		assert.True(t, settings.SuperplaneLabelAdded)
 
-		settings = intakeSettingsFromGraph(graph, newSpec([]any{"opened"}))
+		settings = intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec([]any{"opened"}))
 		assert.True(t, settings.NewIssues)
 		assert.False(t, settings.ReopenedIssues)
 
-		settings = intakeSettingsFromGraph(graph, newSpec([]any{"reopened"}))
+		settings = intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec([]any{"reopened"}))
 		assert.False(t, settings.NewIssues)
 		assert.True(t, settings.ReopenedIssues)
 	})
@@ -155,7 +155,7 @@ func Test__intakeSettingsFromGraph_TriggerActions(t *testing.T) {
 				settings.NewIssues = newIssues
 				settings.ReopenedIssues = reopenedIssues
 
-				parsed := intakeSettingsFromGraph(graph, newSpec(intakeTriggerActionsFor(settings)))
+				parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(intakeTriggerActionsFor(settings)))
 
 				assert.Equal(t, newIssues, parsed.NewIssues)
 				assert.Equal(t, reopenedIssues, parsed.ReopenedIssues)
@@ -170,13 +170,13 @@ func Test__intakeSettingsChangeTrigger(t *testing.T) {
 		updated := current
 		updated.ReopenedIssues = false
 
-		assert.True(t, intakeSettingsChangeTrigger(current, updated))
+		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceGitHubIssues, current, updated))
 	})
 
 	t.Run("sees no change when the toggles match", func(t *testing.T) {
 		current := defaultIntakeSettings()
 
-		assert.False(t, intakeSettingsChangeTrigger(current, current))
+		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceGitHubIssues, current, current))
 	})
 }
 
@@ -313,7 +313,7 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 		settings.Labels = []string{"documentation", "bug"}
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
-		parsed := intakeSettingsFromGraph(graph, newSpec(expression))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(expression))
 
 		assert.Equal(t, []string{"documentation", "bug"}, parsed.Labels)
 		assert.Equal(t, intakeLabelFilterInclude, parsed.LabelFilterMode)
@@ -325,7 +325,7 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 		settings.LabelFilterMode = intakeLabelFilterExclude
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
-		parsed := intakeSettingsFromGraph(graph, newSpec(expression))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(expression))
 
 		assert.Equal(t, []string{"bug"}, parsed.Labels)
 		assert.Equal(t, intakeLabelFilterExclude, parsed.LabelFilterMode)
@@ -337,7 +337,7 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 	t.Run("reads labels from the legacy expression", func(t *testing.T) {
 		legacy := `root().data.issue.labels.exists(label, label.name in ["documentation","bug"])`
 
-		parsed := intakeSettingsFromGraph(graph, newSpec(legacy))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(legacy))
 
 		assert.Equal(t, []string{"documentation", "bug"}, parsed.Labels)
 		assert.Equal(t, intakeLabelFilterInclude, parsed.LabelFilterMode)
@@ -346,17 +346,17 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 	t.Run("reads the exclude mode from the legacy expression", func(t *testing.T) {
 		legacy := `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`
 
-		parsed := intakeSettingsFromGraph(graph, newSpec(legacy))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(legacy))
 
 		assert.Equal(t, []string{"bug"}, parsed.Labels)
 		assert.Equal(t, intakeLabelFilterExclude, parsed.LabelFilterMode)
 	})
 
 	t.Run("reads the assignment from the legacy expression", func(t *testing.T) {
-		parsed := intakeSettingsFromGraph(graph, newSpec(intakeLegacyUnassignedCondition))
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(intakeLegacyUnassignedCondition))
 		assert.Equal(t, intakeAssignmentUnassigned, parsed.Assignment)
 
-		parsed = intakeSettingsFromGraph(graph, newSpec(intakeLegacyAssignedCondition))
+		parsed = intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(intakeLegacyAssignedCondition))
 		assert.Equal(t, intakeAssignmentAssigned, parsed.Assignment)
 	})
 
@@ -366,7 +366,7 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 			settings.Assignment = assignment
 			expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
-			parsed := intakeSettingsFromGraph(graph, newSpec(expression))
+			parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, newSpec(expression))
 
 			assert.Equal(t, assignment, parsed.Assignment)
 		}

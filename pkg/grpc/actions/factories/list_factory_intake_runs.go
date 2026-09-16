@@ -329,6 +329,13 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		return nestedString(payload, "incident", "title")
 	case models.FactoryIntakeSourceProductiveTasks:
 		return nestedString(payload, "data", "attributes", "title")
+	case models.FactoryIntakeSourceJiraIssues:
+		summary := nestedString(payload, "issue", "fields", "summary")
+		key := nestedString(payload, "issue", "key")
+		if key != "" && summary != "" {
+			return key + ": " + summary
+		}
+		return summary
 	default:
 		return ""
 	}
