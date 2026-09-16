@@ -156,17 +156,20 @@ function ConnectionStep({
             const id = integration.metadata?.id ?? "";
             const selected = id === selectedId;
             return (
-              <button
+              <Button
                 key={id}
                 type="button"
+                variant="ghost"
                 onClick={() => onSelect(id)}
-                className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left ${
-                  selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30"
-                }`}
+                data-testid={`sentry-connection-${id}`}
+                className={cn(
+                  "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
+                  selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
+                )}
               >
-                <span className="text-[13px] font-medium">{integration.metadata?.name || "Sentry"}</span>
-                {selected ? <Check className="size-4" aria-hidden /> : null}
-              </button>
+                <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Sentry"}</span>
+                {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+              </Button>
             );
           })}
         </div>
@@ -256,24 +259,23 @@ function ProjectPicker({
               const selected = id === selectedId;
               return (
                 <li key={id}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     role="option"
                     aria-selected={selected}
                     onClick={() => onSelect(id)}
                     data-testid={`sentry-project-${id}`}
                     className={cn(
-                      "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                      "h-auto w-full justify-start gap-3 rounded-none px-3 py-2.5 text-left text-[13px] font-medium",
                       selected ? "bg-accent/50" : "hover:bg-accent/30",
                     )}
                   >
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                      {project.name || "Untitled project"}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate">{project.name || "Untitled project"}</span>
                     {selected ? (
                       <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
                     ) : null}
-                  </button>
+                  </Button>
                 </li>
               );
             })}

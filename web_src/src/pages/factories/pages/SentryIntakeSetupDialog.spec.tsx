@@ -89,7 +89,9 @@ describe("SentryIntakeSetupDialog", () => {
   it("opens the project step when a ready Sentry connection already exists", async () => {
     renderDialog();
 
-    expect(await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).toBeInTheDocument();
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
@@ -140,9 +142,37 @@ describe("SentryIntakeSetupDialog", () => {
   it("reuses a ready Sentry connection instead of opening Sentry again", async () => {
     renderDialog();
 
-    expect(await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("sentry-setup-connect")).not.toBeInTheDocument();
     expect(mocks.createIntegration).not.toHaveBeenCalled();
+  });
+
+  it("binds the intake to the connection chosen from the list", async () => {
+    mocks.connected.splice(
+      0,
+      mocks.connected.length,
+      { metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" }, status: { state: "ready" } },
+      { metadata: { id: "integration-2", name: "Sentry EU", integrationName: "sentry" }, status: { state: "ready" } },
+    );
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-setup-back"));
+    await user.click(await screen.findByTestId("sentry-connection-integration-2"));
+    await user.click(screen.getByTestId("sentry-setup-continue"));
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("sentry-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        integrationId: "integration-2",
+        resourceId: "payments",
+      });
+    });
   });
 
   it("opens project selection as soon as a new organization is connected", async () => {
