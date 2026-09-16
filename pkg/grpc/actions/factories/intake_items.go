@@ -257,12 +257,7 @@ func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bo
 // jiraIssueProjectKey reads the project of an issue key such as ENG-42. A key
 // without the "<project>-<number>" shape reports an empty project.
 func jiraIssueProjectKey(issueKey string) string {
-	separator := strings.LastIndex(issueKey, "-")
-	if separator <= 0 {
-		return ""
-	}
-
-	return issueKey[:separator]
+	return jira.ProjectKeyFromIssueKey(issueKey)
 }
 
 func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {

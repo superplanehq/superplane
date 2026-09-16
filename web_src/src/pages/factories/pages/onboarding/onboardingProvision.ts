@@ -15,10 +15,12 @@ import {
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import type { IssuesChoiceId } from "./onboardingFixtures";
 
 export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
+export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -172,6 +174,26 @@ export async function provisionGithubIntake(args: {
   }
 
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+}
+
+// Onboarding does not store a Jira project key, so a bound Jira intake cannot
+// be created here. Skip GitHub intake when the user chose Jira: a GitHub
+// intake would listen to the wrong source. The user adds Jira intake from
+// the Backlog column after setup.
+export async function provisionOnboardingIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  issuesChoice: IssuesChoiceId | null;
+}): Promise<FactoriesFactoryIntake | undefined> {
+  if (args.issuesChoice === "jira") {
+    const intakes = await args.listIntakes();
+    return intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  }
+
+  return provisionGithubIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+  });
 }
 
 export async function provisionLine(args: {
