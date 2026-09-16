@@ -20,12 +20,15 @@ func Test__factoryErrorToStatus(t *testing.T) {
 		assert.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
 	})
 
-	t.Run("classifies an unknown error as a client-safe internal failure", func(t *testing.T) {
-		err := factoryErrorToStatus(errors.New("db down"), "failed to create factory intake")
+	t.Run("keeps a resource-exhausted handler error", func(t *testing.T) {
+		original := grpcerrors.ResourceExhausted(errors.New("limit"), "organization canvas limit exceeded")
 
-		assert.Equal(t, codes.Internal, grpcerrors.Code(err))
+		err := factoryErrorToStatus(original, "failed to create factory intake")
+
+		assert.Equal(t, original, err)
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
 		message, ok := grpcerrors.HandlerMessage(err)
 		require.True(t, ok)
-		assert.Equal(t, "failed to create factory intake", message)
+		assert.Equal(t, "organization canvas limit exceeded", message)
 	})
 }

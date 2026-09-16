@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -40,11 +41,51 @@ func DeleteFactoryAutomation(
 		return nil, factoryErrorToStatus(gorm.ErrRecordNotFound, "failed to delete factory automation")
 	}
 
+	if err := rejectReservedFactoryAutomation(db, factory, canvas); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
+	}
+
 	if _, err := canvases.DeleteCanvas(ctx, db, canvas); err != nil {
 		return nil, err
 	}
 
 	return &pb.DeleteFactoryAutomationResponse{}, nil
+}
+
+func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
+	if _, err := models.FindFactoryIntakeByCanvasID(tx, canvas.ID); err == nil {
+		return errFactoryAutomationReserved
+	} else if !errors.Is(err, models.ErrFactoryIntakeNotFound) {
+		return err
+	}
+
+	if _, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID); err == nil {
+		return errFactoryAutomationReserved
+	} else if !errors.Is(err, models.ErrFactoryPRFeedbackHandlerNotFound) {
+		return err
+	}
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	if err != nil {
+		return err
+	}
+	if models.IsBacklogFactoryApp(liveVersion.Nodes, liveVersion.Edges) {
+		return errFactoryAutomationReserved
+	}
+
+	lines, err := factory.ListLines(tx)
+	if err != nil {
+		return err
+	}
+	for _, line := range lines {
+		for _, step := range line.Steps {
+			if step.AppID == canvas.ID {
+				return errFactoryAutomationReserved
+			}
+		}
+	}
+
+	return nil
 }
 
 func parseFactoryAutomationID(value string) (uuid.UUID, error) {

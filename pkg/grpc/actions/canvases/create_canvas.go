@@ -21,6 +21,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -249,6 +250,10 @@ func CreateCanvasWithSeedFiles(
 func classifyCanvasCreateError(err error) error {
 	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 		return err
+	}
+
+	if grpcerrors.Code(err) == codes.ResourceExhausted {
+		return grpcerrors.ResourceExhausted(err, grpcerrors.StatusMessage(err))
 	}
 
 	return grpcerrors.Internal(err, "failed to create canvas")
