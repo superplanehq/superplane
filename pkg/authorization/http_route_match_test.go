@@ -42,6 +42,11 @@ func TestMatchHTTPRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodPost,
+			path:   "/api/v1/me/feedback",
+			wantOK: false,
+		},
+		{
+			method: http.MethodPost,
 			path:   "/api/v1/factories/factory-123/apps/app-456:defaults",
 			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"},
 			wantOK: true,

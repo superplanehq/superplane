@@ -80,3 +80,7 @@ func (s *failingEmailService) SendMagicCodeEmail(_, _, _ string) error {
 func (s *failingEmailService) SendWorkOrderNotificationEmail(_, _ string, _ services.WorkOrderNotificationTemplateData) error {
 	return s.err
 }
+
+func (s *failingEmailService) SendSupportFeedbackEmail(_ string, _ services.SupportFeedback) error {
+	return s.err
+}
