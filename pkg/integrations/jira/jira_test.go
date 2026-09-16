@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -978,8 +979,101 @@ func Test__Jira__HandleHook(t *testing.T) {
 			Logger:      newLogger(),
 		})
 		require.NoError(t, err)
-		assert.Empty(t, httpCtx.Requests)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 		assert.Empty(t, integrationCtx.ActionRequests)
+	})
+
+	t.Run("recovers a webhook id that was never mirrored onto the integration", func(t *testing.T) {
+		integrationCtx := newAuthorizedIntegration()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values":[{"id":1000}]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		stored := Metadata{}
+		require.NoError(t, mapstructure.Decode(integrationCtx.Metadata, &stored))
+		require.NotNil(t, stored.WebhookID)
+		assert.Equal(t, int64(1000), *stored.WebhookID)
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, webhookRefreshInterval, integrationCtx.ActionRequests[0].Interval)
+	})
+
+	t.Run("recreates the Atlassian registration with the stored shared events", func(t *testing.T) {
+		webhookID := int64(1000)
+		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{
+			WebhookID:  &webhookID,
+			WebhookURL: "https://sp.test/webhooks/w1",
+			WebhookEvents: []string{
+				issueEventCreated, issueEventUpdated, issueEventDeleted,
+				commentEventCreated, commentEventUpdated, commentEventDeleted,
+			},
+		})
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values":[]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 4)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[2].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[2].Body)
+		assert.Contains(t, string(body), `"comment_created"`)
+		assert.Contains(t, string(body), `"comment_updated"`)
+		assert.Contains(t, string(body), `"comment_deleted"`)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+	})
+
+	t.Run("recreates the Atlassian registration when the stored id is gone", func(t *testing.T) {
+		webhookID := int64(1000)
+		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{
+			WebhookID:  &webhookID,
+			WebhookURL: "https://sp.test/webhooks/w1",
+		})
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values":[]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		stored := Metadata{}
+		require.NoError(t, mapstructure.Decode(integrationCtx.Metadata, &stored))
+		require.NotNil(t, stored.WebhookID)
+		assert.Equal(t, int64(2000), *stored.WebhookID)
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, webhookRefreshInterval, integrationCtx.ActionRequests[0].Interval)
 	})
 
 	// Regression test: a transient refresh failure must still reschedule itself (with a much

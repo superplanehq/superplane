@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	log "github.com/sirupsen/logrus"
@@ -199,6 +200,10 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 		outcome = executorOutcomeFailed
 		reason = webhookProvisionerReasonSetupError
 
+		if rememberErr := w.rememberSetupMetadata(lockedWebhook, metadata); rememberErr != nil {
+			logger.Errorf("Error storing webhook metadata after setup failure: %v", rememberErr)
+		}
+
 		err := w.handleProvisioningError(logger, lockedWebhook, setupErr)
 		if err != nil {
 			logger.Errorf("Error handling provisioning error for webhook: %v", err)
@@ -268,14 +273,29 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 		WithField("source", "webhook").
 		Info("Calling integration webhook setup handler")
 
+	integrationCtx := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
+		Integration: integrationCtx,
 		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})
+	if saveErr := db.Save(instance).Error; saveErr != nil && err == nil {
+		return metadata, instance.AppName, saveErr
+	}
 
 	return metadata, instance.AppName, err
+}
+
+func (w *WebhookProvisioner) rememberSetupMetadata(webhook *models.Webhook, metadata any) error {
+	if metadata == nil {
+		return nil
+	}
+
+	return database.Conn().Model(webhook).Updates(map[string]any{
+		"metadata":   datatypes.NewJSONType(metadata),
+		"updated_at": time.Now(),
+	}).Error
 }
 
 func (w *WebhookProvisioner) markReady(webhook *models.Webhook, metadata any) error {

@@ -50,6 +50,15 @@ type Metadata struct {
 	// has access to the integration, not any particular webhook record - can find it.
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 
+	// WebhookURL is the SuperPlane callback registered with that webhook. Refresh uses it to
+	// create a replacement when Atlassian no longer has the stored id.
+	WebhookURL string `json:"webhookUrl,omitempty" mapstructure:"webhookUrl,omitempty"`
+
+	// WebhookEvents is the union of native Jira events the shared registration must deliver.
+	// Refresh recreates the webhook with this list so a lost registration does not drop
+	// comment or incident listeners that Setup had already merged in.
+	WebhookEvents []string `json:"webhookEvents,omitempty" mapstructure:"webhookEvents,omitempty"`
+
 	// OpsScopesRequested records whether the currently stored OAuth token was granted with JSM Ops
 	// scopes. Set only after a successful OAuth callback — never when building the authorize URL —
 	// so a Sync that prompts reconnect for ops keeps re-prompting until the user actually finishes
@@ -618,16 +627,28 @@ func refreshWebhook(httpCtx core.HTTPContext, integration core.IntegrationContex
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	if metadata.WebhookID == nil {
-		return nil
-	}
-
 	client, err := NewClient(httpCtx, integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	refreshErr := client.RefreshIssueWebhooks([]int64{*metadata.WebhookID})
+	var refreshErr error
+	if metadata.WebhookID == nil {
+		refreshErr = ensureIssueWebhookRegistration(client, integration, &metadata)
+	}
+	if metadata.WebhookID == nil && refreshErr == nil {
+		return nil
+	}
+	if refreshErr == nil {
+		refreshErr = client.RefreshIssueWebhooks([]int64{*metadata.WebhookID})
+		if isMissingIssueWebhook(refreshErr) {
+			metadata.WebhookID = nil
+			refreshErr = ensureIssueWebhookRegistration(client, integration, &metadata)
+			if refreshErr == nil && metadata.WebhookID != nil {
+				refreshErr = client.RefreshIssueWebhooks([]int64{*metadata.WebhookID})
+			}
+		}
+	}
 
 	// Reschedule regardless of outcome - a transient failure here must not permanently stop the
 	// loop and leave the webhook to expire in 30 days with nothing left to retry it. A failed
@@ -646,4 +667,50 @@ func refreshWebhook(httpCtx core.HTTPContext, integration core.IntegrationContex
 	}
 
 	return nil
+}
+
+// ensureIssueWebhookRegistration recovers a mirrored webhook id that was never stored, or
+// recreates the Atlassian registration when the stored id is gone and the callback URL remains.
+func ensureIssueWebhookRegistration(client *Client, integration core.IntegrationContext, metadata *Metadata) error {
+	if metadata.WebhookID != nil {
+		return nil
+	}
+
+	listed, err := client.ListIssueWebhooks()
+	if err != nil {
+		if strings.TrimSpace(metadata.WebhookURL) == "" {
+			return nil
+		}
+		return fmt.Errorf("failed to list Jira webhooks: %w", err)
+	}
+	if len(listed) > 0 {
+		webhookID := listed[0].ID
+		metadata.WebhookID = &webhookID
+		integration.SetMetadata(*metadata)
+		return nil
+	}
+
+	if strings.TrimSpace(metadata.WebhookURL) == "" {
+		return nil
+	}
+
+	webhookID, createErr := client.CreateIssueWebhook(
+		metadata.WebhookURL,
+		allProjectsJQLFilter,
+		issueWebhookEvents(metadata.WebhookEvents),
+	)
+	if createErr != nil {
+		return fmt.Errorf("failed to recreate Jira webhook: %w", createErr)
+	}
+	metadata.WebhookID = &webhookID
+	integration.SetMetadata(*metadata)
+	return nil
+}
+
+func isMissingIssueWebhook(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "request got 404 ") || strings.Contains(message, "request got 410 ")
 }

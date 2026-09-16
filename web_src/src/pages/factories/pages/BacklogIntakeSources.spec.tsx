@@ -71,13 +71,28 @@ describe("BacklogIntakeSources", () => {
     expect(screen.queryByTestId("line-intake-source-intake-sentry")).not.toBeInTheDocument();
   });
 
-  it("marks an intake whose automation can no longer create tasks", () => {
+  it("marks an intake that cannot listen as not listening", () => {
     renderSources({ intakes: [configuredIntake({ healthy: false })] });
 
     const intake = screen.getByTestId("line-intake-source-intake-github");
     expect(within(intake).getByTestId("line-intake-source-intake-github-needs-repair")).toHaveTextContent(
-      "Needs repair",
+      "Not listening",
     );
+  });
+
+  it("marks a Jira intake whose listener failed as not listening", () => {
+    renderSources({
+      intakes: [
+        configuredIntake({
+          intakeId: "intake-jira",
+          appId: "app-jira-issues-intake",
+          healthy: false,
+          source: lineIntakeSourceById("jira-issues")!,
+        }),
+      ],
+    });
+
+    expect(screen.getByTestId("line-intake-source-intake-jira-needs-repair")).toHaveTextContent("Not listening");
   });
 
   it("opens the settings of the intake the user clicked", async () => {

@@ -147,7 +147,7 @@ func CreateFactoryIntake(
 	}
 
 	return &pb.CreateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, spec[canvasID]),
+		Intake: serializeFactoryIntake(intake, spec[canvasID], intakeListeningByID(db, []models.FactoryIntake{*intake}, spec)[intake.ID]),
 	}, nil
 }
 

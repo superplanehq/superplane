@@ -105,6 +105,21 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "Alice", event.User.DisplayName)
 	})
 
+	t.Run("emits a created event when the canvas stored events as a JSON list", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []any{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+	})
+
 	t.Run("ignores events for a different project", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		metadata := &contexts.MetadataContext{Metadata: OnIssueMetadata{Project: &Project{Key: "OTHER"}}}
@@ -151,6 +166,45 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
+	t.Run("matches the project from the issue key when fields.project is absent", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		bodyWithoutProject := []byte(`{
+			"webhookEvent": "jira:issue_created",
+			"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithoutProject,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		assert.Equal(t, IssueEventPayloadType, events.Payloads[0].Type)
+	})
+
+	t.Run("ignores an event whose issue key belongs to another project", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		bodyWithoutProject := []byte(`{
+			"webhookEvent": "jira:issue_created",
+			"issue": {"id": "10001", "key": "OTHER-1", "fields": {}}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithoutProject,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
 	// Regression test: the webhook is shared by every jira.onIssue trigger on the integration, so
 	// a payload that doesn't carry a project key (e.g. a stripped-down delete payload) must not
 	// fail open and fire for a trigger configured for a different project.
@@ -158,7 +212,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		events := &contexts.EventContext{}
 		bodyWithoutProject := []byte(`{
 			"webhookEvent": "jira:issue_created",
-			"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+			"issue": {"id": "10001", "fields": {}}
 		}`)
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          bodyWithoutProject,

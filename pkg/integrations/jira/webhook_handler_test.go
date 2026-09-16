@@ -160,6 +160,11 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
 		require.NotNil(t, storedMetadata.WebhookID)
 		assert.Equal(t, int64(1000), *storedMetadata.WebhookID)
+		assert.Equal(t, "https://sp.test/webhooks/w1", storedMetadata.WebhookURL)
+		assert.Equal(t, []string{
+			issueEventCreated, issueEventUpdated, issueEventDeleted,
+			commentEventCreated, commentEventUpdated, commentEventDeleted,
+		}, storedMetadata.WebhookEvents)
 
 		require.Len(t, integration.ActionRequests, 1)
 		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)

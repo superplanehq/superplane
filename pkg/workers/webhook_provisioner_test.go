@@ -265,3 +265,90 @@ func Test__WebhookProvisioner_MarkFailed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
 }
+
+func Test__WebhookProvisioner_KeepsExternalIDWhenSetupFailsAfterCreate(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			return map[string]any{"webhookId": float64(1000)}, errors.New("failed to persist integration metadata")
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            []byte("encrypted-secret"),
+		AppInstallationID: &integration.ID,
+		RetryCount:        0,
+		MaxRetries:        3,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	updatedWebhook, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStatePending, updatedWebhook.State)
+	assert.Equal(t, 1, updatedWebhook.RetryCount)
+	data, ok := updatedWebhook.Metadata.Data().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1000), data["webhookId"])
+}
+
+func Test__WebhookProvisioner_PersistsIntegrationMetadata(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			ctx.Integration.SetMetadata(map[string]any{"webhookId": float64(1000)})
+			return map[string]any{"ok": true}, nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            []byte("encrypted-secret"),
+		AppInstallationID: &integration.ID,
+		RetryCount:        0,
+		MaxRetries:        3,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	updated, err := models.FindUnscopedIntegrationInTransaction(database.Conn(), integration.ID)
+	require.NoError(t, err)
+	require.Equal(t, float64(1000), updated.Metadata.Data()["webhookId"])
+}

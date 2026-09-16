@@ -136,15 +136,16 @@ func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	return automation
 }
 
-func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryIntakes(tx *gorm.DB, intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+	listening := intakeListeningByID(tx, intakes, specs)
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID], listening[intakes[i].ID])
 	}
 	return result
 }
 
-func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec, listening bool) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
 
 	serialized := &pb.FactoryIntake{
@@ -154,7 +155,7 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
 		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
-		Healthy:             graph.Healthy(spec.Edges),
+		Healthy:             graph.Healthy(spec.Edges) && listening,
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),

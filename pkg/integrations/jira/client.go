@@ -1130,6 +1130,28 @@ func (c *Client) RefreshIssueWebhooks(webhookIDs []int64) error {
 	return err
 }
 
+type ListedIssueWebhook struct {
+	ID int64 `json:"id"`
+}
+
+type listIssueWebhooksResponse struct {
+	Values []ListedIssueWebhook `json:"values"`
+}
+
+// ListIssueWebhooks returns the dynamic webhooks registered for this OAuth connection.
+func (c *Client) ListIssueWebhooks() ([]ListedIssueWebhook, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/webhook"), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response listIssueWebhooksResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing list webhooks response: %w", err)
+	}
+	return response.Values, nil
+}
+
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {

@@ -54,6 +54,27 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
 		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, "true", filter.Configuration["expression"])
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		event := map[string]any{
+			"action": "created",
+			"issue": map[string]any{
+				"key": "ENG-42",
+				"fields": map[string]any{
+					"summary": "Login page returns 500",
+				},
+			},
+			"description": "Sign in with a wrong password returns a 500 error.",
+		}
+		assert.Equal(t, true, evalRootDataExpression(t, filter.Configuration["expression"].(string), event))
+		assert.Equal(t, `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`, create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.Equal(t, "ENG-42", evalRootDataExpression(t, "root().data.issue.key", event))
+		assert.Equal(t, "Login page returns 500", evalRootDataExpression(t, "root().data.issue.fields.summary", event))
+		assert.Equal(t, "Sign in with a wrong password returns a 500 error.", evalRootDataExpression(t, "root().data.description", event))
 	})
 
 	t.Run("a Jira work order reads the plain text description, not the raw document", func(t *testing.T) {
@@ -162,6 +183,10 @@ func Test__IntakeFilterExpression(t *testing.T) {
 		assert.NotContains(t, expression, ">=")
 		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
 		assert.Contains(t, expression, intakeUnassignedCondition)
+	})
+
+	t.Run("a default Jira filter lets a created issue through", func(t *testing.T) {
+		assert.Equal(t, "true", intakeFilterExpressionFor(models.FactoryIntakeSourceJiraIssues, defaultJiraIntakeSettings()))
 	})
 }
 
