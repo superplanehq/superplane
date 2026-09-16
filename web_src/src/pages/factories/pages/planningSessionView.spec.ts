@@ -482,7 +482,7 @@ describe("createWithAgentViewFromSession", () => {
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );
 
-    expect(view.messages[0]?.activityId).toBe("activity-1");
+    expect(view.messages[0]).toMatchObject({ kind: "text", activityId: "activity-1" });
     expect(view.activities).toMatchObject([
       {
         id: "activity-1",

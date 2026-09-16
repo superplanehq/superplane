@@ -16,8 +16,7 @@ import { parsePlanningSurveyReply } from "../planningSessionSurvey";
 import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity } from "./agentActivity";
 
-const MESSAGE_MARKDOWN =
-  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p]:!my-0";
+const MESSAGE_MARKDOWN = "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p]:!my-0";
 
 export function WorkOrderIntentTranscript({
   messages,

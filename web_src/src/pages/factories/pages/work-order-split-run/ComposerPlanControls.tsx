@@ -49,6 +49,60 @@ export function ComposerPlanStack({
   const toggleSummary = onToggleSummary ?? (() => setUncontrolledSummaryOpen((current) => !current));
   const body = score == null ? undefined : scoreSummary?.trim() || FALLBACK_WHY;
   const chips = (
+    <ComposerChipRow
+      open={open}
+      score={score}
+      isAnalyzing={isAnalyzing}
+      canTogglePlan={canTogglePlan}
+      planStatus={planStatus}
+      summaryOpen={summaryOpen}
+      body={body}
+      toggleSummary={toggleSummary}
+      onToggle={onToggle}
+      actions={actions}
+    />
+  );
+  if (!body) {
+    return (
+      <div className="flex w-full min-w-0 shrink-0 flex-col" data-testid="split-run-intent-plan-updated">
+        {chips}
+      </div>
+    );
+  }
+  return (
+    <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
+      <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
+        {chips}
+      </FrameHeader>
+      <ClaritySummaryDrawer open={summaryOpen} body={body} />
+    </Frame>
+  );
+}
+
+function ComposerChipRow({
+  open,
+  score,
+  isAnalyzing,
+  canTogglePlan,
+  planStatus,
+  summaryOpen,
+  body,
+  toggleSummary,
+  onToggle,
+  actions,
+}: {
+  open: boolean;
+  score?: number;
+  isAnalyzing: boolean;
+  canTogglePlan: boolean;
+  planStatus?: PlanChipStatus;
+  summaryOpen: boolean;
+  body?: string;
+  toggleSummary: () => void;
+  onToggle?: () => void;
+  actions?: ReactNode;
+}) {
+  return (
     <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
       <ScoreChip
         score={score}
@@ -64,40 +118,25 @@ export function ComposerPlanStack({
       ) : null}
     </div>
   );
+}
 
-  if (!body) {
-    return (
-      <div className="flex w-full min-w-0 shrink-0 flex-col" data-testid="split-run-intent-plan-updated">
-        {chips}
-      </div>
-    );
-  }
-
+function ClaritySummaryDrawer({ open, body }: { open: boolean; body: string }) {
   return (
-    <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
-      <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
-        {chips}
-      </FrameHeader>
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows]",
-          DRAWER_EASE,
-          summaryOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-        )}
-        data-testid="split-run-intent-confidence-drawer"
-        data-state={summaryOpen ? "open" : "closed"}
-        aria-hidden={summaryOpen ? undefined : true}
-        inert={summaryOpen ? undefined : true}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <FramePanel fit>
-            <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-confidence-copy">
-              {body}
-            </p>
-          </FramePanel>
-        </div>
+    <div
+      className={cn("grid transition-[grid-template-rows]", DRAWER_EASE, open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
+      data-testid="split-run-intent-confidence-drawer"
+      data-state={open ? "open" : "closed"}
+      aria-hidden={open ? undefined : true}
+      inert={open ? undefined : true}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <FramePanel fit>
+          <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-confidence-copy">
+            {body}
+          </p>
+        </FramePanel>
       </div>
-    </Frame>
+    </div>
   );
 }
 

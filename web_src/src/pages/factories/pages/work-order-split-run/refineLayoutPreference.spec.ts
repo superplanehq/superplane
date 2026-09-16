@@ -1,11 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import {
-  REFINE_LAYOUT_STORAGE_KEY,
-  readStoredRefineLayout,
-  useRefineLayoutPreference,
-} from "./refineLayoutPreference";
+import { REFINE_LAYOUT_STORAGE_KEY, readStoredRefineLayout, useRefineLayoutPreference } from "./refineLayoutPreference";
 
 describe("refineLayoutPreference", () => {
   beforeEach(() => {
@@ -25,10 +21,7 @@ describe("refineLayoutPreference", () => {
   });
 
   it("reads a stored layout on init", () => {
-    window.localStorage.setItem(
-      REFINE_LAYOUT_STORAGE_KEY,
-      JSON.stringify({ clarityExpanded: false, planOpen: true }),
-    );
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: false, planOpen: true }));
 
     const { result } = renderHook(() => useRefineLayoutPreference());
     expect(result.current.clarityExpanded).toBe(false);

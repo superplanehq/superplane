@@ -1,26 +1,16 @@
-import { cloneElement, isValidElement, useState, type PointerEvent, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, type PointerEvent, type ReactElement, type ReactNode } from "react";
 
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 
-import { analysisPlanBody, hasAnalysisPlan } from "../../lib/analysisOutcome";
-import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
+import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { latestPlanScore } from "./latestPlanScore";
-import { usePlanChipStatus } from "./planChipStatus";
-import { useRefineLayoutPreference } from "./refineLayoutPreference";
-import { splitRunIntentDocument } from "./splitRunPopupModel";
+import { useRefineDocumentModel } from "./useRefineDocumentModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
 import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
-import {
-  DEFAULT_INTENT_LEFT_PERCENT,
-  DEFAULT_REFINE_INTENT_LEFT_PERCENT,
-  useSplitRunPanePercent,
-} from "./useSplitRunPanePercent";
 import type { SplitRunSource } from "./splitRunSource";
 
-const SESSION_TITLE_FALLBACK = "Task";
 const REQUEST_PANE_BASE_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
 const REQUEST_PANE_SPLIT_CLASS =
   "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[var(--intent-left)] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
@@ -33,6 +23,22 @@ export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
  * plan control opens the spec on the right. After Start, the left pane shows
  * source context. The summary stays on the right.
  */
+type WorkOrderIntentDocumentProps = {
+  title: string;
+  description: string;
+  artifacts: FactoriesWorkOrderArtifact[];
+  confidence?: WorkOrderCheckPresentation;
+  isAnalyzing?: boolean;
+  files?: FilesFile[];
+  resultAfterBody?: ReactNode;
+  resultFooter?: ReactNode;
+  analysis?: IntentAnalysisChat;
+  contextSidebar?: ReactNode;
+  streamKey?: string;
+  streamReady?: boolean;
+  source?: SplitRunSource;
+};
+
 export function WorkOrderIntentDocument({
   title,
   description,
@@ -47,101 +53,52 @@ export function WorkOrderIntentDocument({
   streamKey,
   streamReady = true,
   source,
-}: {
-  title: string;
-  description: string;
-  artifacts: FactoriesWorkOrderArtifact[];
-  confidence?: WorkOrderCheckPresentation;
-  isAnalyzing?: boolean;
-  files?: FilesFile[];
-  resultAfterBody?: ReactNode;
-  resultFooter?: ReactNode;
-  analysis?: IntentAnalysisChat;
-  contextSidebar?: ReactNode;
-  streamKey?: string;
-  streamReady?: boolean;
-  source?: SplitRunSource;
-}) {
-  const refineOpen = Boolean(analysis) && !contextSidebar;
-  const [showPlan, setShowPlan] = useState(false);
-  const [planOpenedHere, setPlanOpenedHere] = useState(false);
-  const layout = useRefineLayoutPreference();
-  const hasPlan = hasAnalysisPlan(artifacts);
-  const planPaneOpen = layout.planOpen && hasPlan;
-  const split = useSplitRunPanePercent({
-    defaultPercent: refineOpen ? DEFAULT_REFINE_INTENT_LEFT_PERCENT : DEFAULT_INTENT_LEFT_PERCENT,
-    minPercent: 28,
-    maxPercent: 68,
+}: WorkOrderIntentDocumentProps) {
+  const {
+    refineOpen,
+    showPlan,
+    setShowPlan,
+    split,
+    document,
+    sessionTitle,
+    showPlanPane,
+    chatSolo,
+    mountPlanPane,
+    planWidth,
+    chatWidth,
+    showClosedDecision,
+    analysisChat,
+  } = useRefineDocumentModel({
+    title,
+    description,
+    artifacts,
+    confidence,
+    isAnalyzing,
+    resultFooter,
+    analysis,
+    contextSidebar,
   });
-  const document = splitRunIntentDocument({ artifacts, description });
-  const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planOpenedHere && planPaneOpen);
-  const clarityScore = analysis ? (latestPlanScore(analysis.view.messages) ?? confidence?.score) : confidence?.score;
-  const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
-  const showPlanPane = !refineOpen || planPaneOpen;
-  const chatSolo = refineOpen && !planPaneOpen;
-  const mountPlanPane = !refineOpen ? showPlanPane : true;
-  const planWidth = showPlanPane ? `${100 - split.percent}%` : "0%";
-  const chatWidth = showPlanPane ? `${split.percent}%` : "100%";
-  const analysisChat = analysis
-    ? {
-        ...analysis,
-        planPaneOpen,
-        onTogglePlan: () => {
-          setPlanOpenedHere(true);
-          layout.togglePlan();
-        },
-        canTogglePlan: hasPlan,
-        clarityExpanded: layout.clarityExpanded,
-        onToggleClarity: layout.toggleClarity,
-        latestPlanScore: clarityScore,
-        latestPlanSummary: confidence?.summary?.trim(),
-        planStatus,
-        isAnalyzing,
-        closedDecision:
-          refineOpen && resultFooter && clarityScore != null ? (
-            <ClosedPlanActions resultFooter={resultFooter} />
-          ) : undefined,
-      }
-    : undefined;
-
   return (
     <article
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="split-run-intent-document"
       data-refine-chat-solo={chatSolo ? "" : undefined}
-      data-refine-plan-open={refineOpen && planPaneOpen ? "" : undefined}
+      data-refine-plan-open={refineOpen && showPlanPane ? "" : undefined}
     >
       <div ref={split.containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div
-          className={cn(
-            refineOpen
-              ? cn(
-                  REQUEST_PANE_BASE_CLASS,
-                  "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
-                  showPlanPane && "lg:min-w-[14rem]",
-                  !split.isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
-                )
-              : showPlanPane
-                ? REQUEST_PANE_SPLIT_CLASS
-                : REQUEST_PANE_BASE_CLASS,
-          )}
-          style={{
-            ["--intent-left" as string]: refineOpen ? chatWidth : showPlanPane ? `${split.percent}%` : undefined,
-          }}
-          data-testid="split-run-intent-request"
-        >
-          {contextSidebar ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
-          ) : (
-            <WorkOrderIntentRequest
-              title={sessionTitle}
-              description={description}
-              files={files}
-              analysis={analysisChat}
-              source={source}
-            />
-          )}
-        </div>
+        <IntentRequestPane
+          refineOpen={refineOpen}
+          showPlanPane={showPlanPane}
+          chatWidth={chatWidth}
+          percent={split.percent}
+          isResizing={split.isResizing}
+          title={sessionTitle}
+          description={description}
+          files={files}
+          source={source}
+          contextSidebar={contextSidebar}
+          analysis={withClosedDecision(analysisChat, showClosedDecision, resultFooter)}
+        />
         {mountPlanPane ? (
           <IntentSpecColumn
             title={document.title || INTENT_DOCUMENT_TITLE}
@@ -165,6 +122,80 @@ export function WorkOrderIntentDocument({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function withClosedDecision(
+  analysisChat: IntentAnalysisChat | undefined,
+  showClosedDecision: boolean,
+  resultFooter?: ReactNode,
+): IntentAnalysisChat | undefined {
+  if (!analysisChat) {
+    return undefined;
+  }
+  return {
+    ...analysisChat,
+    closedDecision: showClosedDecision ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
+  };
+}
+
+function requestPaneClassName(refineOpen: boolean, showPlanPane: boolean, isResizing: boolean) {
+  if (!refineOpen) {
+    return showPlanPane ? REQUEST_PANE_SPLIT_CLASS : REQUEST_PANE_BASE_CLASS;
+  }
+  return cn(
+    REQUEST_PANE_BASE_CLASS,
+    "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
+    showPlanPane && "lg:min-w-[14rem]",
+    !isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
+  );
+}
+
+function IntentRequestPane({
+  refineOpen,
+  showPlanPane,
+  chatWidth,
+  percent,
+  isResizing,
+  title,
+  description,
+  files,
+  source,
+  contextSidebar,
+  analysis,
+}: {
+  refineOpen: boolean;
+  showPlanPane: boolean;
+  chatWidth: string;
+  percent: number;
+  isResizing: boolean;
+  title: string;
+  description: string;
+  files?: FilesFile[];
+  source?: SplitRunSource;
+  contextSidebar?: ReactNode;
+  analysis?: IntentAnalysisChat;
+}) {
+  return (
+    <div
+      className={requestPaneClassName(refineOpen, showPlanPane, isResizing)}
+      style={{
+        ["--intent-left" as string]: refineOpen ? chatWidth : showPlanPane ? `${percent}%` : undefined,
+      }}
+      data-testid="split-run-intent-request"
+    >
+      {contextSidebar ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contextSidebar}</div>
+      ) : (
+        <WorkOrderIntentRequest
+          title={title}
+          description={description}
+          files={files}
+          analysis={analysis}
+          source={source}
+        />
+      )}
+    </div>
   );
 }
 
@@ -196,7 +227,7 @@ function IntentSpecColumn({
   onResize,
 }: {
   title: string;
-  document: ReturnType<typeof splitRunIntentDocument>;
+  document: IntentDocument;
   streamKey?: string;
   streamReady?: boolean;
   showPlan: boolean;

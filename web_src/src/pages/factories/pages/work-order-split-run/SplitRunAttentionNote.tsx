@@ -25,8 +25,8 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
-import { SplitRunPullRequestReviewNote } from "./SplitRunPullRequestReviewNote";
-import { pullRequestReviewNote } from "./splitRunPullRequestReview";
+import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
+import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
 
 const TONE = {
   draft: {
@@ -121,17 +121,15 @@ export function SplitRunAttentionNote({
   actionsOnly?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
-  if (pullRequest && note.cta) {
-    return (
-      <SplitRunPullRequestReviewNote
-        ctaLabel={note.cta.label}
-        pullRequest={pullRequest}
-        actions={actions}
-        actionBusy={actionBusy}
-        onAction={onAction}
-      />
-    );
+  const pullRequestNote = WaitingPullRequestReview({
+    note,
+    tone,
+    actions,
+    actionBusy,
+    onAction,
+  });
+  if (pullRequestNote) {
+    return pullRequestNote;
   }
 
   if (compact) {
@@ -354,7 +352,6 @@ function DraftActionCapsule({
           startDisabled={startDisabled}
           grouped
           capsule
-          capsulePosition="first"
           onClick={() => onAction?.(archive)}
         />
       ) : null}
@@ -373,7 +370,6 @@ function DraftActionCapsule({
           startDisabled={startDisabled}
           grouped
           capsule
-          capsulePosition="middle"
           onClick={() => onAction?.(action)}
         />
       ))}
@@ -385,7 +381,6 @@ function DraftActionCapsule({
           startDisabled={startDisabled}
           grouped
           capsule
-          capsulePosition="last"
           onClick={() => onAction?.(start)}
         />
       ) : null}
@@ -445,7 +440,6 @@ function NoteAction({
   startDisabled,
   grouped = false,
   capsule = false,
-  capsulePosition,
   onClick,
 }: {
   action: SplitRunFooterAction;
@@ -454,12 +448,16 @@ function NoteAction({
   startDisabled: boolean;
   grouped?: boolean;
   capsule?: boolean;
-  capsulePosition?: "first" | "middle" | "last";
   onClick: () => void;
 }) {
   const primary = action.emphasis === "primary";
   const busy = action.kind === "start" ? startBusy : actionBusy;
-  const disabled = action.kind === "start" ? startDisabled || startBusy || Boolean(action.disabled) : actionBusy;
+  const disabled = noteActionDisabled(action.kind, {
+    actionBusy,
+    startBusy,
+    startDisabled,
+    actionDisabled: action.disabled,
+  });
 
   const button = (
     <Button
@@ -468,13 +466,7 @@ function NoteAction({
       variant={primary ? "default" : "outline"}
       disabled={disabled}
       onClick={onClick}
-      className={
-        capsule
-          ? cn("!rounded-none h-7 border-0 shadow-none", !primary && "bg-background")
-          : grouped
-            ? "rounded-md rounded-r-none"
-            : undefined
-      }
+      className={noteActionClassName({ capsule, grouped, primary })}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
       {busy ? (
