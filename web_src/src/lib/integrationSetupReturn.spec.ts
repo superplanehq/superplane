@@ -6,6 +6,7 @@ import {
   consumeIntegrationSetupReturnIfArrived,
   hasGitHubSetupRequest,
   hasIntegrationSetupStay,
+  peekIntegrationSetupReturnPreferredIntegration,
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
   withGitHubSetupRequest,
@@ -35,6 +36,15 @@ describe("integration setup return", () => {
     consumeIntegrationSetupReturn("org-1");
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
     expect(setupReturnCookie()).toBeUndefined();
+  });
+
+  it("stores the integration that started the provider round trip", () => {
+    rememberIntegrationSetupReturn("org-1", "/org-1/workspaces/APP/setup?step=agent", "openrouter-1");
+
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBe("openrouter-1");
+
+    consumeIntegrationSetupReturn("org-1");
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBeNull();
   });
 
   it("mirrors the return path in a cookie for the GitHub callback", () => {

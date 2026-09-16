@@ -8,6 +8,7 @@ import type {
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
+import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
 import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
@@ -110,6 +111,7 @@ export function useIntegrationConnectDialog({
     onSelectionsChange,
     manualSelectionNames,
     loading: connectionsLoading,
+    initialPreferredIntegrationId: peekIntegrationSetupReturnPreferredIntegration(organizationId),
   });
   useRefetchOnWindowFocus(refetch);
 
