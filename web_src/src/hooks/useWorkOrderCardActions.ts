@@ -1,4 +1,4 @@
-import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { useDispatchWorkOrder, useUpdateWorkOrderAssignees, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useState } from "react";
 
@@ -8,19 +8,17 @@ const NO_ORDERS: ReadonlySet<string> = new Set();
 export function useWorkOrderCardActions(organizationId: string, factoryId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   // The mutation is shared by every card on the page, so its pending flag
   // cannot say which card the user clicked. Track the tasks in flight
   // instead, so only their controls show a busy state.
   const [dispatchingOrderIds, setDispatchingOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
+  const [cancelingOrderIds, setCancelingOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
 
   const onDispatch = useCallback(
     async (orderId: string, input: { lineName: string; model?: string }) => {
       setDispatchingOrderIds((current) => withOrderId(current, orderId));
       try {
-        // mutateAsync runs the mutation's onMutate before the request
-        // resolves, which patches the work-orders cache so the card moves
-        // to the line's first phase column right away — see
-        // useDispatchWorkOrder.
         await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName, model: input.model });
         showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {
@@ -30,6 +28,21 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
       }
     },
     [dispatchWorkOrder],
+  );
+
+  const onCancelQueue = useCallback(
+    async (orderId: string) => {
+      setCancelingOrderIds((current) => withOrderId(current, orderId));
+      try {
+        await updateStatus.mutateAsync({ orderId, state: "STATE_DRAFT" });
+        showSuccessToast("Removed from the queue.");
+      } catch {
+        showErrorToast("Failed to cancel the queue.");
+      } finally {
+        setCancelingOrderIds((current) => withoutOrderId(current, orderId));
+      }
+    },
+    [updateStatus],
   );
 
   const onAssigneesSave = useCallback(
@@ -46,8 +59,10 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
 
   return {
     dispatchingOrderIds,
+    cancelingOrderIds,
     isAssigneesSaving: updateAssignees.isPending,
     onDispatch,
+    onCancelQueue,
     onAssigneesSave,
   };
 }

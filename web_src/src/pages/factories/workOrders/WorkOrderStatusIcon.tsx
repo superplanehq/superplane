@@ -15,6 +15,7 @@ const GLYPH = "size-[9px] text-white dark:text-zinc-950";
  */
 export function WorkOrderStatusIcon({
   status,
+  queued = false,
   title,
   className,
   "aria-label": ariaLabel,
@@ -22,6 +23,8 @@ export function WorkOrderStatusIcon({
   "data-testid": testId,
 }: {
   status: WorkOrderDisplayStatus;
+  /** First-step queue: a clock, not the running spinner. */
+  queued?: boolean;
   title?: string;
   className?: string;
   "aria-label"?: string;
@@ -30,14 +33,14 @@ export function WorkOrderStatusIcon({
 }) {
   return (
     <span
-      className={cn(markClassName(status), className)}
+      className={cn(markClassName(queued ? "waiting" : status), className)}
       title={title}
       aria-label={ariaLabel}
       aria-hidden={ariaHidden}
       data-testid={testId}
-      data-status-mark={status}
+      data-status-mark={queued ? "queued" : status}
     >
-      {markGlyph(status)}
+      {queued ? <ClockHands /> : markGlyph(status)}
     </span>
   );
 }

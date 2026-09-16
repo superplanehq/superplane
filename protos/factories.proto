@@ -820,6 +820,10 @@ message Factory {
   FactoryOnboarding onboarding = 6;
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
+  // Maximum pending and running executions in this factory. The
+  // organization or installation sets this value. Unset means the
+  // server default (50).
+  optional int32 max_parallel_tasks = 8;
 }
 
 message FactoryLine {

@@ -98,6 +98,26 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 	})
 }
 
+func Test__DescribeFactory_IncludesMaxParallelTasks(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	resp, err := DescribeFactory(ctx, r.Organization.ID.String(), factoryModel.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, int32(models.DefaultFactoryMaxParallelTasks), resp.Factory.GetMaxParallelTasks())
+
+	one := 1
+	require.NoError(t, models.SetOrganizationMaxParallelFactoryTasks(db, r.Organization.ID, &one))
+
+	resp, err = DescribeFactory(ctx, r.Organization.ID.String(), factoryModel.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), resp.Factory.GetMaxParallelTasks())
+}
+
 func factoryLineByID(lines []*pb.FactoryLine, id string) *pb.FactoryLine {
 	for _, line := range lines {
 		if line.GetId() == id {

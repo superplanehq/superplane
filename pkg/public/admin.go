@@ -50,6 +50,7 @@ type installationSettingsResponse struct {
 	SMTPFromEmail              string   `json:"smtp_from_email"`
 	SMTPUseTLS                 bool     `json:"smtp_use_tls"`
 	SMTPPasswordConfigured     bool     `json:"smtp_password_configured"`
+	MaxParallelFactoryTasks    int      `json:"max_parallel_factory_tasks"`
 }
 
 type installationSettingsRequest struct {
@@ -63,6 +64,7 @@ type installationSettingsRequest struct {
 	SMTPFromName              *string `json:"smtp_from_name"`
 	SMTPFromEmail             *string `json:"smtp_from_email"`
 	SMTPUseTLS                *bool   `json:"smtp_use_tls"`
+	MaxParallelFactoryTasks   *int    `json:"max_parallel_factory_tasks"`
 }
 
 func parsePagination(r *http.Request) (search string, limit, offset int) {
@@ -110,7 +112,8 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 		log.Errorf("admin: failed to update installation settings: %v", err)
 
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, errInvalidInstallationSettingsRequest) {
+		if errors.Is(err, errInvalidInstallationSettingsRequest) ||
+			errors.Is(err, models.ErrMaxParallelFactoryTasksInvalid) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -120,6 +123,10 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 
 	if req.AllowPrivateNetworkAccess != nil {
 		s.registry.HTTPContext().InvalidatePolicyCache()
+	}
+
+	if req.MaxParallelFactoryTasks != nil {
+		admitQueuedFactoryWork(models.AdmitQueuedOnInstallationDefault)
 	}
 
 	response, err := s.buildInstallationSettingsResponse()
@@ -136,7 +143,7 @@ var errInvalidInstallationSettingsRequest = errors.New("invalid installation set
 
 func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.MaxParallelFactoryTasks != nil {
 			metadata, err := models.GetInstallationMetadata(tx)
 			if err != nil {
 				return err
@@ -154,6 +161,12 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 
 			if err := models.UpdateInstallationMetadata(tx, metadata); err != nil {
 				return err
+			}
+
+			if req.MaxParallelFactoryTasks != nil {
+				if err := models.SetInstallationMaxParallelFactoryTasks(tx, *req.MaxParallelFactoryTasks); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -184,6 +197,7 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
 		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,
 		PrivateIPRangesOverridden:  policy.PrivateIPRangesOverridden,
+		MaxParallelFactoryTasks:    metadata.MaxParallelFactoryTasks,
 	}
 
 	emailSettings, err := models.FindEmailSettings(models.EmailProviderSMTP)

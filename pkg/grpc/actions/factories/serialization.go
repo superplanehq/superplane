@@ -23,6 +23,21 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	return serialized
 }
 
+func withFactoryMaxParallelTasks(serialized *pb.Factory, max int) *pb.Factory {
+	value := int32(max)
+	serialized.MaxParallelTasks = &value
+	return serialized
+}
+
+func attachFactoryMaxParallelTasks(tx *gorm.DB, orgID uuid.UUID, serialized *pb.Factory) error {
+	max, err := models.ResolveOrganizationFactoryMaxParallelTasks(tx, orgID)
+	if err != nil {
+		return err
+	}
+	withFactoryMaxParallelTasks(serialized, max)
+	return nil
+}
+
 func serializeFactoryWithLines(
 	factory *models.Factory,
 	lines []models.FactoryLine,
@@ -38,14 +53,20 @@ func serializeFactoryWithLineMetrics(
 	factory *models.Factory,
 	lines []models.FactoryLine,
 ) (*pb.Factory, error) {
+	var serialized *pb.Factory
 	if len(lines) == 0 {
-		return serializeFactoryWithLines(factory, lines, nil), nil
+		serialized = serializeFactoryWithLines(factory, lines, nil)
+	} else {
+		metricsByLine, err := loadFactoryLineMetrics(tx, factory.ID)
+		if err != nil {
+			return nil, err
+		}
+		serialized = serializeFactoryWithLines(factory, lines, metricsByLine)
 	}
-	metricsByLine, err := loadFactoryLineMetrics(tx, factory.ID)
-	if err != nil {
+	if err := attachFactoryMaxParallelTasks(tx, factory.OrganizationID, serialized); err != nil {
 		return nil, err
 	}
-	return serializeFactoryWithLines(factory, lines, metricsByLine), nil
+	return serialized, nil
 }
 
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
@@ -315,12 +336,24 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 }
 
-func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) []*pb.Factory {
+func serializeFactories(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	factories []models.Factory,
+	linesByFactory map[uuid.UUID][]models.FactoryLine,
+) ([]*pb.Factory, error) {
+	max, err := models.ResolveOrganizationFactoryMaxParallelTasks(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]*pb.Factory, len(factories))
 	for i := range factories {
-		result[i] = serializeFactoryWithLines(&factories[i], linesByFactory[factories[i].ID], nil)
+		result[i] = withFactoryMaxParallelTasks(
+			serializeFactoryWithLines(&factories[i], linesByFactory[factories[i].ID], nil),
+			max,
+		)
 	}
-	return result
+	return result, nil
 }
 
 func serializeWorkOrder(
