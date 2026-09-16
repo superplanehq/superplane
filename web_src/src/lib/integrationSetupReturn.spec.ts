@@ -24,6 +24,7 @@ function setupReturnCookie(): string | undefined {
 describe("integration setup return", () => {
   afterEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=; Path=/; Max-Age=0`;
     vi.useRealTimers();
   });
@@ -45,6 +46,20 @@ describe("integration setup return", () => {
 
     consumeIntegrationSetupReturn("org-1");
     expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBeNull();
+  });
+
+  it("keeps a provider return isolated from another tab", () => {
+    const providerPath = "/org-1/workspaces/APP/setup?step=agent";
+    rememberIntegrationSetupReturn("org-1", providerPath, "openrouter-1");
+
+    // A legacy setup in another tab writes organization-wide local storage.
+    window.localStorage.setItem(
+      "integration-setup-return:org-1",
+      JSON.stringify({ path: "/org-1/workspaces/OTHER/setup", createdAt: Date.now() }),
+    );
+
+    expect(peekIntegrationSetupReturn("org-1")).toBe(providerPath);
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBe("openrouter-1");
   });
 
   it("mirrors the return path in a cookie for the GitHub callback", () => {

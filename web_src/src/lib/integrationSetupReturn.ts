@@ -21,9 +21,10 @@ interface StoredReturn {
   preferredIntegrationId?: string;
 }
 
-// The return remains keyed by organization because legacy GitHub setup can
-// change integration ids during its provider round trip. Other providers can
-// include the starting id as a selection hint.
+// Legacy GitHub setup uses organization-wide local storage because it can
+// change integration ids during its provider round trip. Other provider flows
+// use tab-scoped session storage so concurrent setup tabs cannot overwrite one
+// another.
 function storageKey(organizationId: string): string {
   return `${STORAGE_PREFIX}:${organizationId}`;
 }
@@ -46,15 +47,20 @@ export function rememberIntegrationSetupReturn(
     createdAt: Date.now(),
     ...(preferredIntegrationId?.trim() ? { preferredIntegrationId: preferredIntegrationId.trim() } : {}),
   };
-  window.localStorage.setItem(storageKey(organizationId), JSON.stringify(value));
+  const key = storageKey(organizationId);
+  if (value.preferredIntegrationId) {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+    return;
+  }
+
+  window.sessionStorage.removeItem(key);
+  window.localStorage.setItem(key, JSON.stringify(value));
   writeSetupReturnCookie(path);
 }
 
-function readIntegrationSetupReturn(organizationId: string): StoredReturn | null {
-  if (!organizationId) return null;
-
+function readStoredReturn(organizationId: string, storage: Storage): StoredReturn | null {
   const key = storageKey(organizationId);
-  const raw = window.localStorage.getItem(key);
+  const raw = storage.getItem(key);
   if (!raw) return null;
 
   try {
@@ -65,7 +71,7 @@ function readIntegrationSetupReturn(organizationId: string): StoredReturn | null
       !isSafePath(value.path, organizationId) ||
       Date.now() - value.createdAt > MAX_AGE_MS
     ) {
-      window.localStorage.removeItem(key);
+      storage.removeItem(key);
       return null;
     }
     const preferredIntegrationId =
@@ -78,9 +84,19 @@ function readIntegrationSetupReturn(organizationId: string): StoredReturn | null
       ...(preferredIntegrationId ? { preferredIntegrationId } : {}),
     };
   } catch {
-    window.localStorage.removeItem(key);
+    storage.removeItem(key);
     return null;
   }
+}
+
+function readIntegrationSetupReturn(organizationId: string): StoredReturn | null {
+  if (!organizationId) return null;
+
+  const key = storageKey(organizationId);
+  if (window.sessionStorage.getItem(key)) {
+    return readStoredReturn(organizationId, window.sessionStorage);
+  }
+  return readStoredReturn(organizationId, window.localStorage);
 }
 
 export function peekIntegrationSetupReturn(organizationId: string): string | null {
@@ -92,7 +108,13 @@ export function peekIntegrationSetupReturnPreferredIntegration(organizationId: s
 }
 
 export function consumeIntegrationSetupReturn(organizationId: string): void {
-  window.localStorage.removeItem(storageKey(organizationId));
+  const key = storageKey(organizationId);
+  if (window.sessionStorage.getItem(key)) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+
+  window.localStorage.removeItem(key);
   clearSetupReturnCookie();
 }
 
