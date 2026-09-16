@@ -156,7 +156,7 @@ function ComposerNoteBubble({
   const sender = senderDisplay(userId, resolveUser);
 
   return (
-    <div className="sp-text-reveal flex w-full justify-end">
+    <div className="sp-text-reveal flex w-full justify-end py-1.5">
       <div
         className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5"
         data-testid="split-run-intent-user-note"
@@ -191,7 +191,7 @@ function SurveyAnswerBubble({
   const sender = senderDisplay(userId, resolveUser);
 
   return (
-    <div className="sp-text-reveal flex w-full justify-end">
+    <div className="sp-text-reveal flex w-full justify-end py-1.5">
       <div
         className="sp-survey-card max-w-[92%] rounded-2xl border px-3.5 py-3"
         data-testid="split-run-intent-survey-answer"
