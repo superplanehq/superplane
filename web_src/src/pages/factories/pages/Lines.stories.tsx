@@ -24,6 +24,7 @@ import {
   LOW_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
 } from "../__fixtures__/usageReportFixtures";
+import { SENTRY_SETUP_INTEGRATIONS } from "../__fixtures__/setupStoryFixtures";
 import {
   columnAutomationsEmptyPhaseFixture,
   columnAutomationsFixture,
@@ -116,6 +117,20 @@ export const LineBoardGithubAndSentry: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const SentryIntakeSetup: Story = {
+  name: "Sentry intake setup — connection and project steps",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/setup/sentry`}
+        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+        orgIntegrations={SENTRY_SETUP_INTEGRATIONS}
       />
     );
   },
