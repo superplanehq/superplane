@@ -74,7 +74,8 @@ function useSplitRunWorkOrderExtras(
 
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
-  const { appId = "" } = useParams<{ appId: string }>();
+  const params = useParams<{ appId?: string; automationId?: string }>();
+  const appId = params.automationId ?? params.appId ?? "";
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);

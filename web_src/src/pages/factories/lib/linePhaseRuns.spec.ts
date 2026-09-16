@@ -522,6 +522,15 @@ describe("findClosureAutomationApp", () => {
       name: "PR Closure",
     });
   });
+
+  it("ignores a custom canvas that reuses the PR Closure name", () => {
+    expect(
+      findClosureAutomationApp([
+        { id: "app-custom-close", name: "PR Closure", columnKey: "done" },
+        { id: "app-custom-verify", name: "PR Closure", columnKey: "verify" },
+      ]),
+    ).toBeUndefined();
+  });
 });
 
 describe("growPhaseRunWindow", () => {
