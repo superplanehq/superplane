@@ -6,6 +6,13 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import {
+  compareLineOrders,
+  compareLinePhaseRuns,
+  type LineColumnSortDirection,
+  type LineColumnSortId,
+  type LinePhaseColumnSort,
+} from "./lineColumnSort";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -91,6 +98,7 @@ export function buildLinePhaseBoard(
   line: FactoriesFactoryLine,
   workOrders: FactoriesWorkOrder[],
   apps: Array<{ id?: string; name?: string }> = [],
+  phaseSorts: Readonly<Record<number, LineColumnSortId | LinePhaseColumnSort>> = {},
 ): LinePhaseColumn[] {
   const lineId = line.id;
   const steps = line.steps ?? [];
@@ -107,7 +115,7 @@ export function buildLinePhaseBoard(
     tick: null,
   }));
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders, phaseSorts);
   for (const column of columns) {
     column.runs = runsByStep.get(column.stepIndex) ?? [];
     column.tick = resolvePhaseTick(column.runs);
@@ -130,8 +138,15 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
  * Draft tasks. A draft that already ran on a line still belongs
  * here after To Backlog. Newest updated drafts come first.
  */
-export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+export function collectLineBacklogOrders(
+  workOrders: FactoriesWorkOrder[],
+  sort: LineColumnSortId = "updated",
+  confidenceByOrderId?: ReadonlyMap<string, number | undefined>,
+  direction: LineColumnSortDirection = "desc",
+): FactoriesWorkOrder[] {
+  return workOrders
+    .filter(isLineBacklogOrder)
+    .sort((left, right) => compareLineOrders(sort, left, right, confidenceByOrderId, direction));
 }
 
 /**
@@ -145,6 +160,8 @@ export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
   line: FactoriesFactoryLine,
   board: LinePhaseColumn[] = [],
+  sort: LineColumnSortId = "updated",
+  direction: LineColumnSortDirection = "desc",
 ): FactoriesWorkOrder[] {
   const doneById = new Map<string, FactoriesWorkOrder>();
 
@@ -169,11 +186,15 @@ export function collectLineDoneOrders(
     }
   }
 
-  return [...doneById.values()].sort(compareOrdersNewestFirst);
+  return [...doneById.values()].sort((left, right) => compareLineOrders(sort, left, right, undefined, direction));
 }
 
 /** Open work that waits for review after the last stage passed. Newest first. */
-export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWorkOrder[] {
+export function collectLineVerifyOrders(
+  board: LinePhaseColumn[],
+  sort: LineColumnSortId = "updated",
+  direction: LineColumnSortDirection = "desc",
+): FactoriesWorkOrder[] {
   const lastStage = lineStageColumns(board).at(-1);
   if (!lastStage) {
     return [];
@@ -187,7 +208,7 @@ export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWork
     verifyById.set(run.order.id, run.order);
   }
 
-  return [...verifyById.values()].sort(compareOrdersNewestFirst);
+  return [...verifyById.values()].sort((left, right) => compareLineOrders(sort, left, right, undefined, direction));
 }
 
 function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
@@ -285,15 +306,6 @@ function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefine
   return dispatches.some((dispatch) => dispatch.line?.id === lineId);
 }
 
-function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
-  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
-  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
-  if (leftTime !== rightTime) {
-    return rightTime - leftTime;
-  }
-  return (right.id ?? "").localeCompare(left.id ?? "");
-}
-
 /** Board-level status for a phase column header. */
 export function resolveColumnGlyph(column: LinePhaseColumn): PhaseGlyphKind {
   if (column.tick) {
@@ -315,15 +327,24 @@ function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
+  phaseSorts: Readonly<Record<number, LineColumnSortId | LinePhaseColumnSort>>,
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
     appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
-  for (const runs of runsByStep.values()) {
-    runs.sort(compareRunsNewestFirst);
+  for (const [stepIndex, runs] of runsByStep.entries()) {
+    const spec = resolvePhaseColumnSort(phaseSorts[stepIndex]);
+    runs.sort((left, right) => compareLinePhaseRuns(spec.sort, left, right, spec.direction));
   }
   return runsByStep;
+}
+
+function resolvePhaseColumnSort(value: LineColumnSortId | LinePhaseColumnSort | undefined): LinePhaseColumnSort {
+  if (typeof value === "string") {
+    return { sort: value, direction: "desc" };
+  }
+  return { sort: value?.sort ?? "updated", direction: value?.direction ?? "desc" };
 }
 
 function executionStepIndex(execution: FactoriesWorkOrderExecution): number | undefined {
@@ -466,15 +487,6 @@ function pickCurrentLineExecution(executions: WorkOrderStepRow[]): WorkOrderStep
   }
 
   return best;
-}
-
-function compareRunsNewestFirst(left: LinePhaseRunCard, right: LinePhaseRunCard): number {
-  const leftTime = Date.parse(left.execution.updatedAt ?? left.execution.createdAt ?? "") || 0;
-  const rightTime = Date.parse(right.execution.updatedAt ?? right.execution.createdAt ?? "") || 0;
-  if (leftTime !== rightTime) {
-    return rightTime - leftTime;
-  }
-  return (right.executionId ?? "").localeCompare(left.executionId ?? "");
 }
 
 function resolvePhaseTick(runs: LinePhaseRunCard[]): LinePhaseTick {

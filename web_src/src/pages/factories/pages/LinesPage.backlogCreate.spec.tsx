@@ -128,6 +128,7 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
+  useWorkOrderChecksForOrders: () => [],
   ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
 }));
 

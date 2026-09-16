@@ -7,12 +7,31 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
+import {
+  allowedFiltersForColumn,
+  allowedSortsForColumn,
+  DEFAULT_LINE_COLUMN_FILTER,
+  DEFAULT_LINE_COLUMN_SORT,
+  DEFAULT_LINE_COLUMN_SORT_DIRECTION,
+  LINE_COLUMN_FILTER_LABELS,
+  LINE_COLUMN_SORT_LABELS,
+  lineColumnSortDirectionLabels,
+  resolveLineColumnFilter,
+  resolveLineColumnSort,
+  resolveLineColumnSortDirection,
+  type LineColumnFilterId,
+  type LineColumnKey,
+  type LineColumnSortDirection,
+  type LineColumnSortId,
+} from "../lib/lineColumnSort";
 import { BACKLOG_REFRESH_COPY } from "./backlogRefresh";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
@@ -35,6 +54,13 @@ interface ColumnLaneMenuProps {
   /** Refreshes backlog tasks from readable intake sources. Hidden when unset. */
   onRefreshBacklog?: () => void;
   refreshBacklogPending?: boolean;
+  columnKey?: LineColumnKey;
+  sortId?: LineColumnSortId;
+  onSortChange?: (sortId: LineColumnSortId) => void;
+  sortDirection?: LineColumnSortDirection;
+  onSortDirectionChange?: (direction: LineColumnSortDirection) => void;
+  filterId?: LineColumnFilterId;
+  onFilterChange?: (filterId: LineColumnFilterId) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -54,12 +80,24 @@ export function ColumnLaneMenu({
   onAddAutomation,
   onRefreshBacklog,
   refreshBacklogPending = false,
+  columnKey = "phase-0",
+  sortId = DEFAULT_LINE_COLUMN_SORT,
+  onSortChange,
+  sortDirection = DEFAULT_LINE_COLUMN_SORT_DIRECTION,
+  onSortDirectionChange,
+  filterId = DEFAULT_LINE_COLUMN_FILTER,
+  onFilterChange,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
   const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation || onRefreshBacklog);
+  const sortOptions = allowedSortsForColumn(columnKey);
+  const filterOptions = allowedFiltersForColumn(columnKey);
+  const resolvedSortId = resolveLineColumnSort(columnKey, sortId);
+  const resolvedDirection = resolveLineColumnSortDirection(sortDirection);
+  const resolvedFilterId = resolveLineColumnFilter(columnKey, filterId);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -101,6 +139,18 @@ export function ColumnLaneMenu({
             <DropdownMenuSeparator className="my-0" />
           </>
         ) : null}
+        <ColumnLaneSortPicker
+          testId={testId}
+          sortId={resolvedSortId}
+          sortOptions={sortOptions}
+          onSortChange={onSortChange}
+          sortDirection={resolvedDirection}
+          onSortDirectionChange={onSortDirectionChange}
+          filterId={resolvedFilterId}
+          filterOptions={filterOptions}
+          onFilterChange={onFilterChange}
+        />
+        <DropdownMenuSeparator className="my-0" />
         <ColumnLaneColorPicker title={title} testId={testId} colorId={colorId} onColorChange={onColorChange} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -165,6 +215,114 @@ function ColumnLaneMenuActions({
           <RefreshCw className="h-3.5 w-3.5" aria-hidden />
           {BACKLOG_REFRESH_COPY.menu}
         </DropdownMenuItem>
+      ) : null}
+    </div>
+  );
+}
+
+function ColumnLaneSortPicker({
+  testId,
+  sortId,
+  sortOptions,
+  onSortChange,
+  sortDirection,
+  onSortDirectionChange,
+  filterId,
+  filterOptions,
+  onFilterChange,
+}: {
+  testId: string;
+  sortId: LineColumnSortId;
+  sortOptions: readonly LineColumnSortId[];
+  onSortChange?: (sortId: LineColumnSortId) => void;
+  sortDirection: LineColumnSortDirection;
+  onSortDirectionChange?: (direction: LineColumnSortDirection) => void;
+  filterId: LineColumnFilterId;
+  filterOptions: readonly LineColumnFilterId[];
+  onFilterChange?: (filterId: LineColumnFilterId) => void;
+}) {
+  const directionLabels = lineColumnSortDirectionLabels(sortId);
+  const showFilter = filterOptions.length > 1;
+
+  return (
+    <div className="px-1 pb-1 pt-2" data-testid={`${testId}-sort`}>
+      <DropdownMenuLabel className="px-1 pb-1.5 pt-0 text-[12px] font-medium text-muted-foreground">
+        Sort by
+      </DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={sortId}
+        onValueChange={(value) => {
+          if (onSortChange && (sortOptions as readonly string[]).includes(value)) {
+            onSortChange(value as LineColumnSortId);
+          }
+        }}
+      >
+        {sortOptions.map((option) => (
+          <DropdownMenuRadioItem
+            key={option}
+            value={option}
+            className="py-1 text-[13px]"
+            data-testid={`${testId}-sort-${option}`}
+            onSelect={(event) => event.preventDefault()}
+          >
+            {LINE_COLUMN_SORT_LABELS[option]}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+      <DropdownMenuLabel className="px-1 pb-1.5 pt-2 text-[12px] font-medium text-muted-foreground">
+        Order
+      </DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={sortDirection}
+        onValueChange={(value) => {
+          if (onSortDirectionChange && (value === "asc" || value === "desc")) {
+            onSortDirectionChange(value);
+          }
+        }}
+      >
+        <DropdownMenuRadioItem
+          value="desc"
+          className="py-1 text-[13px]"
+          data-testid={`${testId}-sort-direction-desc`}
+          onSelect={(event) => event.preventDefault()}
+        >
+          {directionLabels.desc}
+        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem
+          value="asc"
+          className="py-1 text-[13px]"
+          data-testid={`${testId}-sort-direction-asc`}
+          onSelect={(event) => event.preventDefault()}
+        >
+          {directionLabels.asc}
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+      {showFilter ? (
+        <>
+          <DropdownMenuLabel className="px-1 pb-1.5 pt-2 text-[12px] font-medium text-muted-foreground">
+            Filter
+          </DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={filterId}
+            onValueChange={(value) => {
+              if (onFilterChange && (filterOptions as readonly string[]).includes(value)) {
+                onFilterChange(value as LineColumnFilterId);
+              }
+            }}
+          >
+            {filterOptions.map((option) => (
+              <DropdownMenuRadioItem
+                key={option}
+                value={option}
+                className="py-1 text-[13px]"
+                data-testid={`${testId}-filter-${option}`}
+                onSelect={(event) => event.preventDefault()}
+              >
+                {LINE_COLUMN_FILTER_LABELS[option]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </>
       ) : null}
     </div>
   );
