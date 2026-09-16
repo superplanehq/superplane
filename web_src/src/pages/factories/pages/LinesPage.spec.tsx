@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type {
   FactoriesFactory,
@@ -40,7 +40,9 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
+import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
@@ -97,6 +99,7 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const refreshBacklogMutateAsync = vi.fn();
 
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
@@ -148,6 +151,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -268,6 +272,7 @@ async function resetLinesBoardMocks() {
   useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
+  refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
   useWorkOrderChecks.mockReset();
   useWorkOrderChecks.mockImplementation(
@@ -897,6 +902,32 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
 
+  it("offers Refresh backlog when a readable intake exists", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    refreshBacklogMutateAsync.mockResolvedValueOnce({
+      archivedCount: 1,
+      failedItemCount: 0,
+      failedSourceCount: 0,
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-refresh-backlog"));
+
+    await waitFor(() => {
+      expect(refreshBacklogMutateAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("hides Refresh backlog when no readable intake exists", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
+  });
+
   it("opens guided Sentry setup from the overflow menu when the feature is on", async () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
     const user = userEvent.setup();
@@ -1405,5 +1436,109 @@ describe("LinesPage board editing", () => {
 
     expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();
+  });
+});
+
+function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+  return () => {
+    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+  };
+}
+
+function kickoffDraft(index: number): FactoriesWorkOrder {
+  const createdAt = new Date(Date.now() - (10 - index) * 1000).toISOString();
+  return {
+    id: `wo-kickoff-${index}`,
+    number: `${200 + index}`,
+    title: `Kickoff task ${index}`,
+    state: "STATE_DRAFT",
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function dispatchDraftToImplement(order: FactoriesWorkOrder, at: string): FactoriesWorkOrder {
+  return {
+    ...order,
+    state: "STATE_OPEN",
+    updatedAt: at,
+    lineDispatches: [
+      planLineActiveDispatch(order.id!, [
+        {
+          id: `exec-${order.id}`,
+          step: "Implement",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          createdAt: at,
+          updatedAt: at,
+          run: { id: `run-${order.id}`, appId: "app-refund-implementer", appName: "Implement" },
+        },
+      ]),
+    ],
+  };
+}
+
+function implementPhaseCards() {
+  return within(screen.getByTestId("lines-phase-column-0")).queryAllByTestId(/^lines-phase-run-/);
+}
+
+describe("LinesPage Implement phase window", () => {
+  let restoreHeights: (() => void) | undefined;
+
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  afterEach(() => {
+    restoreHeights?.();
+    restoreHeights = undefined;
+  });
+
+  it("keeps every Implement card after five consecutive dispatches", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 80, clientHeight: 400 });
+    const drafts = [0, 1, 2, 3, 4].map(kickoffDraft);
+    const orders = [...drafts];
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    const view = renderLinesBoard();
+
+    expect(implementPhaseCards()).toHaveLength(0);
+
+    for (let index = 0; index < drafts.length; index++) {
+      const at = new Date(Date.now() + index * 1000).toISOString();
+      orders[index] = dispatchDraftToImplement(drafts[index], at);
+      useFactoryWorkOrders.mockReturnValue({ data: [...orders] });
+      view.rerender(
+        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      );
+
+      await waitFor(() => {
+        expect(implementPhaseCards()).toHaveLength(index + 1);
+      });
+    }
+
+    expect(implementPhaseCards()).toHaveLength(5);
+    expect(screen.getByTestId("lines-phase-run-exec-wo-kickoff-4")).toBeInTheDocument();
+  });
+
+  it("starts an overflowing Implement column at the first page and loads more on scroll", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) =>
+      dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
+    );
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    renderLinesBoard();
+
+    expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE);
+
+    const scroller = screen.getByTestId("lines-phase-column-scroll-0");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+
+    await waitFor(() => {
+      expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE * 2);
+    });
   });
 });

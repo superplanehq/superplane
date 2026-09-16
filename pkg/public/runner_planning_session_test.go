@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,10 +15,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -132,6 +136,75 @@ func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
 	assert.True(t, messages[0].Delivered)
 }
 
+func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	activityID := uuid.New()
+	startedAt := time.Now().Add(-time.Second).UnixMilli()
+
+	body := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"codex",
+		"turn":1,
+		"sequence":4,
+		"status":"passed",
+		"started_at":%d,
+		"completed_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/models","status":"passed"}]
+	}`, activityID.String(), startedAt, time.Now().UnixMilli())
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	messageBody := fmt.Sprintf(`{"text":"Ready.","activity_id":%q}`, activityID.String())
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/agent-messages", bytes.NewReader([]byte(messageBody)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	activities, err := models.ListPlanningSessionActivities(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, activities, 1)
+	assert.Equal(t, int64(4), activities[0].LastSequence)
+	assert.Equal(t, "go test ./pkg/models", activities[0].Snapshot.Data().Items[0].Input)
+	messages, err := models.ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.NotNil(t, messages[0].ActivityID)
+	assert.Equal(t, activityID, *messages[0].ActivityID)
+}
+
+func TestRunnerPlanningSessionIgnoresStaleActivitySnapshot(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	activityID := uuid.New()
+	startedAt := time.Now().UnixMilli()
+
+	put := func(sequence int, provider string) {
+		body := fmt.Sprintf(`{"schema_version":2,"activity_id":%q,"provider":%q,"turn":1,"sequence":%d,"status":"running","started_at":%d,"items":[]}`,
+			activityID.String(), provider, sequence, startedAt)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(body)))
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	put(5, "claude")
+	put(4, "stale")
+	activities, err := models.ListPlanningSessionActivities(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, activities, 1)
+	assert.Equal(t, int64(5), activities[0].LastSequence)
+	assert.Equal(t, "claude", activities[0].Provider)
+}
+
 func TestRunnerPlanningSessionRejectsOtherToken(t *testing.T) {
 	r := support.Setup(t)
 	server, signer := mustRunnerLiveLogServer(t, r)
@@ -178,6 +251,7 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
+		{name: "activity", method: http.MethodPut, path: "/api/v1/runner/planning-sessions/activities/" + uuid.New().String(), body: `{}`},
 	}
 	for _, request := range requests {
 		t.Run(request.name, func(t *testing.T) {
@@ -382,6 +456,55 @@ func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	require.NoError(t, json.Unmarshal(liveRec.Body.Bytes(), &delivered))
 	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
 	assert.Equal(t, "hello", delivered["text"])
+}
+
+func TestRunnerPlanningWaitMintsFileRefsInDeliveredText(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: session.OrganizationID,
+		FactoryID:      session.FactoryID,
+		WorkOrderID:    *session.DraftWorkOrderID,
+		Filename:       "shot.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, store, file, bytes.NewReader([]byte("png-bytes"))))
+
+	message := "See ![shot.png](" + blob.FileRef(file.ID) + ")"
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, message, uuid.Nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	text, _ := delivered["text"].(string)
+	assert.Contains(t, text, "sp_file=1")
+	assert.Contains(t, text, "/api/v1/public/files/"+file.ID.String())
+	assert.NotContains(t, text, blob.FileRef(file.ID))
+
+	messages, err := models.ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, messages)
+	assert.Equal(t, message, messages[len(messages)-1].Text)
 }
 
 type failingResponseWriter struct {

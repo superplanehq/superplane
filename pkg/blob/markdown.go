@@ -19,6 +19,25 @@ func FileRef(id uuid.UUID) string {
 	return FileRefScheme + "://" + id.String()
 }
 
+func MarkdownLinkLabel(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		if r < 32 || r == 127 {
+			continue
+		}
+		switch r {
+		case '[', ']', '(', ')', '\\':
+			b.WriteByte('_')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "attachment"
+	}
+	return b.String()
+}
+
 func ParseFileID(raw string) (uuid.UUID, bool) {
 	trimmed := strings.TrimSpace(raw)
 	if !strings.HasPrefix(trimmed, FileRefScheme+"://") {

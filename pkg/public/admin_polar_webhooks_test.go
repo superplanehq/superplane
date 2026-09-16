@@ -68,9 +68,10 @@ func TestAdminPolarWebhooks(t *testing.T) {
 						"http_code":  500,
 						"response":   "unable to apply order",
 						"webhook_event": map[string]any{
-							"id":      "evt_1",
-							"type":    "order.paid",
-							"payload": `{"type":"order.paid"}`,
+							"id":        "evt_1",
+							"type":      "order.paid",
+							"succeeded": true,
+							"payload":   `{"type":"order.paid"}`,
 						},
 					},
 				},
@@ -98,6 +99,8 @@ func TestAdminPolarWebhooks(t *testing.T) {
 		assert.Equal(t, "order.paid", body.Items[0].EventType)
 		require.NotNil(t, body.Items[0].HTTPCode)
 		assert.Equal(t, 500, *body.Items[0].HTTPCode)
+		require.NotNil(t, body.Items[0].EventSucceeded)
+		assert.True(t, *body.Items[0].EventSucceeded)
 		assert.Equal(t, 1, body.Total)
 	})
 

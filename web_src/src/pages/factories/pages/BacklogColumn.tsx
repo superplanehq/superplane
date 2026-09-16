@@ -1,6 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/usePermissions";
+import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -18,6 +22,7 @@ import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
+import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -92,6 +97,10 @@ export function BacklogColumn({
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const { canAct } = usePermissions();
+  const canUpdateWorkOrders = canAct("work_orders", "update");
+  const intakesQuery = useFactoryIntakes(organizationId, factoryId);
+  const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -123,6 +132,14 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
+            onRefreshBacklog={
+              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
+                ? () => {
+                    void runBacklogRefresh(refreshBacklog.mutateAsync);
+                  }
+                : undefined
+            }
+            refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
@@ -165,6 +182,8 @@ function BacklogColumnHeaderActions({
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
+  onRefreshBacklog,
+  refreshBacklogPending,
   colorId,
   onColorChange,
 }: Pick<
@@ -179,6 +198,8 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -196,6 +217,8 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
+        onRefreshBacklog={onRefreshBacklog}
+        refreshBacklogPending={refreshBacklogPending}
         colorId={colorId}
         onColorChange={onColorChange}
       />
@@ -272,6 +295,23 @@ function BacklogColumnOrderList({
 }
 
 type BacklogCreatePopoverProps = ReturnType<typeof backlogCreatePopoverProps>;
+
+async function runBacklogRefresh(run: () => Promise<RefreshBacklogResult>): Promise<void> {
+  try {
+    const toast = backlogRefreshToast(await run());
+    if (toast.kind === "error") {
+      showErrorToast(toast.message);
+      return;
+    }
+    if (toast.kind === "success") {
+      showSuccessToast(toast.message);
+      return;
+    }
+    showInfoToast(toast.message);
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, BACKLOG_REFRESH_COPY.failed));
+  }
+}
 
 function backlogCreatePopoverProps(args: {
   canAdd: boolean;

@@ -1,200 +1,89 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-
-import { cn } from "@/lib/utils";
-import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
-import { PLANNING_SESSION_AGENT_LINE_ID } from "../planningSessionActivity";
-import {
-  ANALYSIS_REPLY_THINKING_STATES,
-  ANALYSIS_THINKING_INTERVAL_MS,
-  ANALYSIS_THINKING_STATES,
-  analysisLiveWorkKind,
-  hasAgentReasoning,
-  liveReasoningForTurn,
-  reasoningLinesFromPlanningNotes,
-  staleReasoningIds,
-  thinkingStatusFor,
-  type ReasoningItem,
-} from "./analysisLiveWorkState";
-import { notesForLiveStream } from "./streamNotesFromLiveLog";
+import { AgentActivityView } from "./AgentActivityView";
+import { AnimatedThinkingState } from "./AnimatedThinkingState";
+import { currentLiveActivity, type AgentActivity, type AgentActivityItem } from "./agentActivity";
+import { useAgentActivityStream } from "./useAgentActivityStream";
+
+const STALE_ACTIVITY_MS = 15_000;
+
+type LiveStatus = {
+  label: string;
+  elapsedSeconds?: number;
+};
 
 export function AnalysisLiveWork({
   machineStatus,
   organizationId,
   canvasId,
   executionId,
-  items,
-  waitingForAgent = false,
-  previousAgentText,
+  activities,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
   organizationId?: string;
   canvasId?: string;
   executionId?: string;
-  items?: ReasoningItem[];
-  waitingForAgent?: boolean;
-  previousAgentText?: string;
+  activities?: AgentActivity[];
 }) {
-  const liveItems = useAnalysisReasoningItems({
-    organizationId,
-    canvasId,
-    executionId,
-    active: machineStatus === "starting" || machineStatus === "running",
-    skip: items !== undefined,
-  });
-  const rawItems = items ?? liveItems;
-  const staleIds = useStaleReasoningIds(rawItems, Boolean(previousAgentText));
-  const reasoningItems = liveReasoningForTurn(rawItems, previousAgentText, staleIds);
-  const kind = analysisLiveWorkKind({ machineStatus, items: reasoningItems });
+  const active = machineStatus === "starting" || machineStatus === "running";
+  const stream = useAgentActivityStream({ organizationId, canvasId, executionId, active });
+  const activity = currentLiveActivity(activities, stream.activities);
+  const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
+  const status = liveStatus(activity, elapsedMs, stream.hasConnectedOnce ? stream.error : undefined);
 
-  if (kind === "idle") {
-    return null;
-  }
-  const showThinking =
-    waitingForAgent && !hasAgentReasoning(reasoningItems) && (kind === "thinking" || kind === "reasoning");
+  if (!active) return null;
   return (
     <div data-testid="split-run-intent-live-work">
-      {showThinking ? <ThinkingStatus reply={Boolean(previousAgentText)} /> : null}
-      {kind === "reasoning" ? <ReasoningStream items={reasoningItems} /> : null}
-    </div>
-  );
-}
-
-function useStaleReasoningIds(items: ReasoningItem[], hidePrevious: boolean): ReadonlySet<string> {
-  const staleIds = useRef<Set<string>>(new Set());
-  const wasHiding = useRef<boolean | null>(null);
-  if (wasHiding.current === null) {
-    wasHiding.current = hidePrevious;
-    return staleIds.current;
-  }
-  if (hidePrevious && !wasHiding.current) {
-    staleIds.current = staleReasoningIds(items);
-  }
-  if (!hidePrevious) {
-    staleIds.current = new Set();
-  }
-  wasHiding.current = hidePrevious;
-  return staleIds.current;
-}
-
-function ThinkingStatus({ reply = false }: { reply?: boolean }) {
-  const [elapsedMs, setElapsedMs] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setElapsedMs((current) => current + ANALYSIS_THINKING_INTERVAL_MS);
-    }, ANALYSIS_THINKING_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-  const status = thinkingStatusFor(
-    elapsedMs,
-    ANALYSIS_THINKING_INTERVAL_MS,
-    reply ? ANALYSIS_REPLY_THINKING_STATES : ANALYSIS_THINKING_STATES,
-  );
-
-  return (
-    <div className="px-2 py-1.5">
-      <p
-        className="sp-ai-thinking text-[13px] leading-5 text-muted-foreground"
-        data-testid="split-run-intent-thinking"
-        data-text={status}
-      >
-        {status}
-      </p>
-    </div>
-  );
-}
-
-function ReasoningStream({ items }: { items: ReasoningItem[] }) {
-  const liveId = items.at(-1)?.id;
-
-  return (
-    <div className="sp-reasoning-stream px-2 py-1.5" data-testid="split-run-intent-reasoning">
-      {items.map((item) => (
-        <ReasoningLine key={item.id} item={item} live={item.id === liveId} />
-      ))}
-    </div>
-  );
-}
-
-function ReasoningLine({ item, live }: { item: ReasoningItem; live: boolean }) {
-  if (item.details && item.details.length > 0) {
-    return <ReasoningTools item={item} live={live} />;
-  }
-  return (
-    <p
-      data-testid={`split-run-intent-reasoning-${item.id}`}
-      data-text={live ? item.text : undefined}
-      className={cn("sp-reasoning-stream-line", live && "sp-ai-thinking")}
-    >
-      {item.text}
-    </p>
-  );
-}
-
-function ReasoningTools({ item, live }: { item: ReasoningItem; live: boolean }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div>
-      <button
-        type="button"
-        data-testid={`split-run-intent-tools-${item.id}`}
-        aria-expanded={open}
-        aria-label={item.text}
-        onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-start gap-1 text-left"
-      >
-        <ChevronRight className={cn("mt-0.5 size-3 shrink-0 text-muted-foreground", open && "rotate-90")} aria-hidden />
-        <span
-          data-testid={`split-run-intent-reasoning-${item.id}`}
-          data-text={live ? item.text : undefined}
-          className={cn("sp-reasoning-stream-line", live && "sp-ai-thinking")}
+      {activity ? <AgentActivityView activity={activity} live /> : null}
+      {status ? (
+        <p
+          role="status"
+          aria-label={status.label}
+          aria-live="polite"
+          className="px-2 py-1.5 text-[13px] leading-5 text-muted-foreground"
+          data-testid="split-run-intent-thinking"
         >
-          {item.text}
-        </span>
-      </button>
-      {open ? (
-        <ul className="ml-4 space-y-0.5">
-          {item.details?.map((detail, index) => (
-            <li key={`${index}:${detail}`} className="text-[12px] leading-4 text-muted-foreground">
-              {detail}
-            </li>
-          ))}
-        </ul>
+          <AnimatedThinkingState text={status.label} />
+          {status.elapsedSeconds === undefined ? null : <span aria-hidden> · {status.elapsedSeconds}s</span>}
+        </p>
       ) : null}
     </div>
   );
 }
 
-function useAnalysisReasoningItems(args: {
-  organizationId?: string;
-  canvasId?: string;
-  executionId?: string;
-  active: boolean;
-  skip: boolean;
-}): ReasoningItem[] {
-  const canStream = !args.skip && Boolean(args.organizationId && args.canvasId && args.executionId && args.active);
-  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
-    canStream ? (args.executionId ?? "") : "",
-    canStream && args.active,
-    null,
-    null,
-    { organizationId: args.organizationId, canvasId: args.canvasId },
-  );
-  return useMemo(() => {
-    if (!canStream) {
-      return [];
-    }
-    const notes = notesForLiveStream({
-      nodeId: PLANNING_SESSION_AGENT_LINE_ID,
-      sections,
-      orphanLines,
-      error,
-      isStreaming,
-      nodeStatus: "running",
-    });
-    return reasoningLinesFromPlanningNotes(notes ?? []);
-  }, [canStream, error, isStreaming, orphanLines, sections]);
+function useActivityElapsed(sequence: number, active: boolean): number {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    setElapsedMs(0);
+    if (!active) return;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 1000);
+    return () => window.clearInterval(timer);
+  }, [active, sequence]);
+  return elapsedMs;
+}
+
+function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): LiveStatus | undefined {
+  if (error) return { label: "Live activity disconnected. Reconnecting…" };
+  if (elapsedMs >= STALE_ACTIVITY_MS) {
+    return { label: "Still working", elapsedSeconds: Math.floor(elapsedMs / 1000) };
+  }
+  if (!activity || activity.items.length === 0) return { label: "Starting analysis…" };
+
+  const latestRunningItem = findLatestRunningItem(activity.items);
+  if (latestRunningItem?.type === "content") {
+    if (latestRunningItem.kind === "reasoning" || latestRunningItem.text.trim()) return undefined;
+    return { label: "Writing response…" };
+  }
+  if (latestRunningItem?.type === "tool") return undefined;
+  return { label: "Planning next step…" };
+}
+
+function findLatestRunningItem(items: AgentActivityItem[]): AgentActivityItem | undefined {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item.type !== "notice" && item.status === "running") return item;
+  }
+  return undefined;
 }
