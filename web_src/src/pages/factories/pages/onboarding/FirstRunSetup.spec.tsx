@@ -97,6 +97,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     provisionedDestination: null,
     githubOwner: undefined,
+    jiraIntegrationId: "",
+    jiraProjectId: "",
+    setJiraProjectId: vi.fn(),
+    jiraProjects: [],
+    jiraProjectsLoading: false,
+    jiraProjectsError: false,
+    retryJiraProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -456,6 +463,44 @@ describe("FirstRunSetup", () => {
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
     expect(model.finish).not.toHaveBeenCalled();
+  });
+
+  it("connects Jira from the ticket screen", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true, requestConnect: vi.fn().mockResolvedValue(true) });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: "Connect Jira" }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.requestConnect).toHaveBeenCalledWith("jira"));
+  });
+
+  it("finishes setup with Jira after a project is chosen", async () => {
+    const user = userEvent.setup();
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+    const model = pageModel({
+      hostedAgentReady: true,
+      setup: result.current,
+      jiraIntegrationId: "jira-1",
+      jiraProjectId: "PAY",
+      jiraProjects: [{ id: "PAY", name: "Payments" }],
+    });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("jira"));
+    expect(model.finish).not.toHaveBeenCalledWith("vcs");
   });
 
   // Setup saved the ticket answer, then provisioning did not finish. The user

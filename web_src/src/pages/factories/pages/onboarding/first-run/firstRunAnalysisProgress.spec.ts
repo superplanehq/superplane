@@ -3,7 +3,7 @@ import type { FactoriesFactoryIntake } from "@/api-client";
 
 import {
   firstRunAnalysisProgress,
-  githubIssuesIntake,
+  firstRunBacklogIntake,
   initialImportFailed,
   type FirstRunInitialImport,
 } from "./firstRunAnalysisProgress";
@@ -105,14 +105,23 @@ describe("firstRunAnalysisProgress", () => {
   });
 });
 
-describe("githubIssuesIntake", () => {
+describe("firstRunBacklogIntake", () => {
   it("selects the GitHub intake when another source appears first", () => {
     const intakes: FactoriesFactoryIntake[] = [
       { id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" },
       { id: "github-1", source: "SOURCE_GITHUB_ISSUES" },
     ];
 
-    expect(githubIssuesIntake(intakes)?.id).toBe("github-1");
+    expect(firstRunBacklogIntake(intakes)?.id).toBe("github-1");
+  });
+
+  it("selects the Jira intake when GitHub issues are not present", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" },
+      { id: "jira-1", source: "SOURCE_JIRA_ISSUES" },
+    ];
+
+    expect(firstRunBacklogIntake(intakes)?.id).toBe("jira-1");
   });
 });
 

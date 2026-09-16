@@ -5,8 +5,10 @@ import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
 import {
   DEFAULT_LINE_NAME,
   GITHUB_INTAKE_SOURCE,
+  JIRA_INTAKE_SOURCE,
   provisionEventApps,
   provisionGithubIntake,
+  provisionJiraIntake,
   provisionLine,
 } from "./onboardingProvision";
 
@@ -220,5 +222,41 @@ describe("provisionGithubIntake", () => {
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(intake.id).toBe("intake-2");
+  });
+});
+
+describe("provisionJiraIntake", () => {
+  it("creates the Jira intake with the selected connection and project", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    expect(intake.id).toBe("intake-jira");
+  });
+
+  it("leaves an existing Jira intake alone so a retry adds no second copy", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: JIRA_INTAKE_SOURCE }]);
+    const createIntake = vi.fn();
+
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
   });
 });

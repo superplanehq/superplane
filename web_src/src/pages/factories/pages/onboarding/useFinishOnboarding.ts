@@ -16,6 +16,7 @@ import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   provisionEventApps,
   provisionGithubIntake,
+  provisionJiraIntake,
   provisionLine,
   type CreateFactoryIntake,
   type InstallOnboardingApp,
@@ -36,9 +37,15 @@ export function finishOnboardingError(args: {
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
+  issuesChoice?: IssuesChoiceId | null;
+  jiraReady?: boolean;
+  jiraProjectId?: string;
 }): string | null {
   if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
     return "Connect GitHub, then select both repositories.";
+  }
+  if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
+    return "Connect Jira, then choose a project.";
   }
   const agentError = firstWorkOrderAgentError({
     remainingCreditCents: args.remainingCreditCents,
@@ -125,6 +132,7 @@ export async function provisionWorkspace(args: {
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
+  jira?: { integrationId: string; projectId: string };
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -170,16 +178,50 @@ export async function provisionWorkspace(args: {
     listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
-  await provisionGithubIntake({
-    listIntakes: args.listIntakes,
-    createIntake: args.createIntake,
-  });
+  await provisionOnboardingIntake(args);
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
     complete: true,
   });
   return { lineId };
+}
+
+function jiraIntakeBinding(
+  issuesChoice: IssuesChoiceId | null,
+  jiraId: string | undefined,
+  projectId: string | undefined,
+): { integrationId: string; projectId: string } | undefined {
+  if (issuesChoice !== "jira" || !jiraId || !projectId) return undefined;
+  return { integrationId: jiraId, projectId };
+}
+
+function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): string | undefined {
+  if (plan.credentialsSource !== "integration" || !plan.integrationName) return undefined;
+  return selections[plan.integrationName]?.id;
+}
+
+async function provisionOnboardingIntake(args: {
+  issuesChoice: IssuesChoiceId | null;
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  jira?: { integrationId: string; projectId: string };
+}): Promise<unknown> {
+  if (args.issuesChoice !== "jira") {
+    return provisionGithubIntake({
+      listIntakes: args.listIntakes,
+      createIntake: args.createIntake,
+    });
+  }
+  if (!args.jira?.integrationId || !args.jira.projectId) {
+    throw new Error("Connect Jira, then choose a project.");
+  }
+  return provisionJiraIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+    integrationId: args.jira.integrationId,
+    resourceId: args.jira.projectId,
+  });
 }
 
 export function useFinishOnboarding(args: {
@@ -203,6 +245,7 @@ export function useFinishOnboarding(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
   githubOwner?: string;
+  jiraProjectId?: string;
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
@@ -220,6 +263,7 @@ export function useFinishOnboarding(args: {
     const workspaceName = args.setup.workspaceName.trim();
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
     const github = args.selections.github;
+    const jira = args.selections.jira;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
@@ -228,6 +272,9 @@ export function useFinishOnboarding(args: {
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
       plan: args.plan,
+      issuesChoice,
+      jiraReady: Boolean(jira?.ready),
+      jiraProjectId: args.jiraProjectId,
     });
     if (error) {
       showErrorToast(error);
@@ -248,10 +295,8 @@ export function useFinishOnboarding(args: {
         github,
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
-        agentIntegrationId:
-          args.plan.credentialsSource === "integration" && args.plan.integrationName
-            ? args.selections[args.plan.integrationName]?.id
-            : undefined,
+        agentIntegrationId: agentIntegrationIdForPlan(args.plan, args.selections),
+        jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,
