@@ -159,12 +159,7 @@ const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Rej
 const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
-const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Build", emphasis: "primary" };
-const START_BLOCKED: SplitRunFooterAction = {
-  ...START,
-  disabled: true,
-  tooltip: "Confidence is too low to build.",
-};
+const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 const BACK_TO_DRAFT: SplitRunFooterAction = {
   id: "back-to-draft",
@@ -195,12 +190,12 @@ export const SPLIT_RUN_REJECTED_HEADLINE_ACTOR = "marked this task as unsuccessf
 
 export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
   headline: "This task is ready to start",
-  text: "Review the summary and the plan. Then click Build to send it to the line.",
+  text: "Review the summary and the plan. Then click Start to send it to the line.",
 };
 
 export const SPLIT_RUN_CLASSIC_DRAFT_NOTE: SplitRunFooterNote = {
   headline: "This task is ready to start",
-  text: "Review the details. Change anything you need. Then click Build to send it to the line.",
+  text: "Review the details. Change anything you need. Then click Start to send it to the line.",
 };
 
 /** Restore the established draft controls outside live refinement mode. */
@@ -219,7 +214,7 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
 
 export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
   headline: "SuperPlane is currently analyzing this task",
-  text: "Wait for the analysis to finish. Or click Build to send this task to the line now.",
+  text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
 };
 
 export const SPLIT_RUN_DRAFT_BLOCKED_NOTE: SplitRunFooterNote = {
@@ -369,10 +364,7 @@ function draftReadinessNote(score?: number, isAnalyzing?: boolean): SplitRunFoot
   return { ...SPLIT_RUN_DRAFT_NOTE };
 }
 
-function draftDecisionActions(score?: number): SplitRunFooterAction[] {
-  if (score != null && score <= 1) {
-    return [ARCHIVE, START_BLOCKED];
-  }
+function draftDecisionActions(): SplitRunFooterAction[] {
   return [ARCHIVE, START];
 }
 
@@ -394,7 +386,7 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
     note:
       analyzing || score != null ? draftReadinessNote(score, input.isAnalyzing) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
     attentionCard: true,
-    actions: draftDecisionActions(score),
+    actions: draftDecisionActions(),
   });
 }
 

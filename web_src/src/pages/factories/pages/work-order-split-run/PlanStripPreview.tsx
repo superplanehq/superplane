@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { ComposerPlanStack } from "./ComposerPlanControls";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 
 /**
  * Isolated strip playground. Compare the live one-bar Alert with the chip row.
@@ -143,7 +144,7 @@ function DraftActions() {
         Archive
       </Button>
       <Button type="button" size="sm">
-        Build
+        Start
       </Button>
     </>
   );
@@ -152,7 +153,7 @@ function DraftActions() {
 function FakeComposer() {
   return (
     <div className="sp-user-note flex min-h-[3.5rem] items-center rounded-2xl border px-3.5 text-[13px] text-muted-foreground">
-      Add context for this plan
+      {ANALYSIS_PLANNING_COPY.composerPlaceholder}
     </div>
   );
 }

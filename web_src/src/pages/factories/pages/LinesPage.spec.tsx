@@ -408,7 +408,7 @@ describe("LinesPage board", () => {
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
       expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
-      expect(within(dialog).queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);
     }

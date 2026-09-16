@@ -77,7 +77,7 @@ export function useRefineDocumentModel({
     document: splitRunIntentDocument({ artifacts, description }),
     sessionTitle: title.trim() || SESSION_TITLE_FALLBACK,
     ...panes,
-    showClosedDecision: refineOpen && resultFooter != null && clarityScore != null,
+    showClosedDecision: refineOpen && resultFooter != null,
     analysisChat: bindRefineChat({
       analysis,
       planPaneOpen,

@@ -5,6 +5,7 @@ import { CountButton } from "@/components/examples/c-button-38";
 import { Badge } from "@/components/reui/badge";
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { CONFIDENCE_SCORE_MAX, confidenceBandForScore, type ConfidenceBand } from "../../lib/confidenceScore";
@@ -48,33 +49,23 @@ export function ComposerPlanStack({
   const summaryOpen = summaryOpenProp ?? uncontrolledSummaryOpen;
   const toggleSummary = onToggleSummary ?? (() => setUncontrolledSummaryOpen((current) => !current));
   const body = score == null ? undefined : scoreSummary?.trim() || FALLBACK_WHY;
-  const chips = (
-    <ComposerChipRow
-      open={open}
-      score={score}
-      isAnalyzing={isAnalyzing}
-      canTogglePlan={canTogglePlan}
-      planStatus={planStatus}
-      summaryOpen={summaryOpen}
-      body={body}
-      toggleSummary={toggleSummary}
-      onToggle={onToggle}
-      actions={actions}
-    />
-  );
-  if (!body) {
-    return (
-      <div className="flex w-full min-w-0 shrink-0 flex-col" data-testid="split-run-intent-plan-updated">
-        {chips}
-      </div>
-    );
-  }
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
-        {chips}
+        <ComposerChipRow
+          open={open}
+          score={score}
+          isAnalyzing={isAnalyzing}
+          canTogglePlan={canTogglePlan}
+          planStatus={planStatus}
+          summaryOpen={summaryOpen}
+          body={body}
+          toggleSummary={toggleSummary}
+          onToggle={onToggle}
+          actions={actions}
+        />
       </FrameHeader>
-      <ClaritySummaryDrawer open={summaryOpen} body={body} />
+      {body ? <ClaritySummaryDrawer open={summaryOpen} body={body} /> : null}
     </Frame>
   );
 }
@@ -239,7 +230,7 @@ function ScoreChip({
       ? "text-muted-foreground"
       : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)]);
 
-  return (
+  const chip = (
     <CountButton
       type="button"
       size="sm"
@@ -267,5 +258,14 @@ function ScoreChip({
       <Sparkle aria-hidden="true" />
       {CREATE_WITH_AGENT_COPY.clarity}
     </CountButton>
+  );
+  if (!showMatrix) {
+    return chip;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{chip}</TooltipTrigger>
+      <TooltipContent>{CREATE_WITH_AGENT_COPY.clarityAnalyzing}</TooltipContent>
+    </Tooltip>
   );
 }

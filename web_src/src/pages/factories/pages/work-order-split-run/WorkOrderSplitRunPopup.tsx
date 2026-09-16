@@ -20,6 +20,7 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import {
   draftStartAction,
@@ -126,7 +127,7 @@ function AnalysisWorkOrderPopup({
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
-  const [fullPage, setFullPage] = useState(false);
+  const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
@@ -179,7 +180,7 @@ function AnalysisWorkOrderPopup({
             titleBusy={edits.titleBusy}
             onTitleSave={(next) => void edits.saveTitle(next)}
             expanded={fullPage}
-            onToggleExpanded={() => setFullPage((current) => !current)}
+            onToggleExpanded={toggleFullPage}
             actions={
               <PopupHeaderActions
                 copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
@@ -234,6 +235,7 @@ function analysisPopupReview(args: {
       actionBusy={args.footerBusy}
       startDisabled={!args.canDispatch}
       compact={args.fixture.footer.kind === "draft"}
+      confirmUnclearStart
       modelSelect={analysisDraftStartModelSelect({
         organizationId: args.organizationId,
         factoryId: args.factoryId,

@@ -13,6 +13,8 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { StartConfirmDialog } from "./StartConfirmDialog";
+import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
   splitRunDecisionTone,
   type SplitRunFooter,
@@ -67,6 +69,7 @@ export function SplitRunReview({
   modelSelect,
   compact = false,
   actionsOnly = false,
+  confirmUnclearStart = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -85,7 +88,9 @@ export function SplitRunReview({
   modelSelect?: ReactNode;
   compact?: boolean;
   actionsOnly?: boolean;
+  confirmUnclearStart?: boolean;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
@@ -93,13 +98,30 @@ export function SplitRunReview({
   const actions = canAct
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
     : [];
+  const requestStart = () => {
+    if (confirmUnclearStart && needsStartConfirm(footer.confidenceScore)) {
+      setConfirmOpen(true);
+      return;
+    }
+    void onStart?.();
+  };
+  const confirmStart = (skipNext: boolean) => {
+    if (skipNext) {
+      persistSkipStartConfirm();
+    }
+    setConfirmOpen(false);
+    void onStart?.();
+  };
   const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
-    start: onStart,
     archive: onArchive,
     reject: onReject,
     "back-to-draft": onBackToDraft,
   };
   const onAction = (action: SplitRunFooterAction) => {
+    if (action.kind === "start") {
+      requestStart();
+      return;
+    }
     const directAction = directActions[action.kind];
     if (directAction) {
       void directAction();
@@ -137,6 +159,14 @@ export function SplitRunReview({
         actionsOnly={actionsOnly}
         onAction={onAction}
       />
+      {confirmUnclearStart ? (
+        <StartConfirmDialog
+          open={confirmOpen}
+          score={footer.confidenceScore}
+          onOpenChange={setConfirmOpen}
+          onConfirm={confirmStart}
+        />
+      ) : null}
     </div>
   );
 }

@@ -180,7 +180,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
-    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
     expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
     expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
@@ -194,7 +194,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
     await user.click(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
     expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
     expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");

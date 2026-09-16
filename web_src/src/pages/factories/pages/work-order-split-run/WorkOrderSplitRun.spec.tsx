@@ -46,6 +46,7 @@ import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { WORK_ORDER_FULL_PAGE_STORAGE_KEY } from "./workOrderFullPagePreference";
 
 function withPublishedSpec(fixture: SplitRunFixture): SplitRunFixture {
   const spec = {
@@ -237,12 +238,28 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
     expect(screen.getByRole("button", { name: "Exit full screen" })).toBeInTheDocument();
 
+    expect(window.localStorage.getItem(WORK_ORDER_FULL_PAGE_STORAGE_KEY)).toBe("1");
+
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
 
     expect(screen.getByTestId("work-order-split-run").className.split(/\s+/)).toEqual(
       expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
     );
     expect(screen.getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
+    expect(window.localStorage.getItem(WORK_ORDER_FULL_PAGE_STORAGE_KEY)).toBe("0");
+  });
+
+  it("opens the task modal in full screen from the stored preference", () => {
+    window.localStorage.setItem(WORK_ORDER_FULL_PAGE_STORAGE_KEY, "1");
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
+      fixed: true,
+    });
+
+    const dialog = screen.getByTestId("work-order-split-run");
+    expect(dialog.className).toContain("h-full");
+    expect(dialog.className).toContain("w-full");
+    expect(screen.getByRole("button", { name: "Exit full screen" })).toBeInTheDocument();
   });
 
   it("collapses finished steps and expands the running component stream", () => {
@@ -762,10 +779,11 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(chips).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
@@ -818,12 +836,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(chips).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });
@@ -882,7 +901,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Build" }),
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Plan" }));
@@ -913,7 +932,7 @@ describe("WorkOrderSplitRunPopup", () => {
       within(tab).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
     ).not.toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
-    expect(within(tab).getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(within(tab).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
   });
 

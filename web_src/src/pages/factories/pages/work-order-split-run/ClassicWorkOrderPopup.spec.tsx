@@ -10,6 +10,7 @@ import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 
 function renderClassicPopup() {
   const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
@@ -64,11 +65,11 @@ describe("ClassicWorkOrderPopup", () => {
     expect(
       within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Archive" }),
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Add context for this plan")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(ANALYSIS_PLANNING_COPY.composerPlaceholder)).not.toBeInTheDocument();
   });
 
   it("does not show a copyable task ID in the header", () => {

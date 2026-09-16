@@ -163,9 +163,13 @@ function bindUserScrollStop(
     return;
   }
   const stopFollowOnUserScroll = () => {
-    if (followingRef.current) {
-      setFollowing(false);
+    if (!followingRef.current) {
+      return;
     }
+    if (isNearLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
+      return;
+    }
+    setFollowing(false);
   };
   el.addEventListener("wheel", stopFollowOnUserScroll, { passive: true });
   el.addEventListener("touchmove", stopFollowOnUserScroll, { passive: true });

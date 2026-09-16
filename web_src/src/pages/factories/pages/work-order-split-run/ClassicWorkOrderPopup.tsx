@@ -14,6 +14,7 @@ import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
+import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
@@ -64,7 +65,7 @@ export function ClassicWorkOrderPopup({
     footerKind: classicFixture.footer.kind,
   });
   const [tab, setTab] = useState(defaultSplitRunPopupTab(classicFixture));
-  const [fullPage, setFullPage] = useState(false);
+  const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
@@ -95,7 +96,7 @@ export function ClassicWorkOrderPopup({
             titleBusy={edits.titleBusy}
             onTitleSave={(next) => void edits.saveTitle(next)}
             expanded={fullPage}
-            onToggleExpanded={() => setFullPage((current) => !current)}
+            onToggleExpanded={toggleFullPage}
             actions={
               <PopupHeaderActions
                 copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}

@@ -32,11 +32,11 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
   draft: {
     title: "Add refund reconciliation test",
     headline: "This task is ready to start",
-    text: "Review the details. Change anything you need. Then click Build to send it to the line.",
+    text: "Review the details. Change anything you need. Then click Start to send it to the line.",
     tone: "draft",
     actions: [
       { id: "archive", label: "Archive", emphasis: "quiet" },
-      { id: "start", label: "Build", emphasis: "primary" },
+      { id: "start", label: "Start", emphasis: "primary" },
     ],
   },
   waiting: {

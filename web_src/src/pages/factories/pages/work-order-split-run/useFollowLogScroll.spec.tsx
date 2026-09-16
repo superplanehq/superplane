@@ -95,6 +95,18 @@ describe("useFollowLogScroll", () => {
     expect(scroller.scrollTop).toBe(40);
   });
 
+  it("keeps following when the user stays within 144 pixels of the bottom", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} resumeOnBottom />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    await settleScrollIgnore();
+
+    scroller.scrollTop = 156;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("on");
+  });
+
   it("turns Follow back on at the bottom when resumeOnBottom is on", async () => {
     const box = { height: 400, view: 100 };
     render(<FollowLog tick={1} resumeOnBottom />);
@@ -161,6 +173,7 @@ describe("useFollowLogScroll", () => {
       expect(screen.getByTestId("following")).toHaveTextContent("on");
 
       resize.notifyResize();
+      scroller.scrollTop = 155;
       fireEvent.wheel(scroller);
       expect(screen.getByTestId("following")).toHaveTextContent("off");
     } finally {

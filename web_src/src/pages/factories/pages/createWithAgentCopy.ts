@@ -48,6 +48,7 @@ export const CREATE_WITH_AGENT_COPY = {
   showPlan: "Show plan",
   hidePlan: "Hide plan",
   clarity: "Clarity",
+  clarityAnalyzing: "Agent is still reviewing",
   greeting: "The repository is ready. What do you want to do?",
   afterCreate: "The task is created. Tell me if you want to do something else.",
   afterSkip: "Skipped that draft. Tell me if you want to do something else.",

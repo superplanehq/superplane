@@ -20,7 +20,7 @@ import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey"
 const POLL_MS = 1500;
 
 export const ANALYSIS_PLANNING_COPY = {
-  composerPlaceholder: "Add context for this plan",
+  composerPlaceholder: "Tell the agent more about this task",
   send: "Send",
   sendShortcut: "Enter",
   stopped: "This analysis has stopped.",

@@ -131,7 +131,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "Build" }));
+    await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(undefined);
   });
 
@@ -177,7 +177,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
-    await user.click(within(note).getByRole("button", { name: "Build" }));
+    await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
@@ -269,7 +269,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const note = screen.getByTestId("split-run-attention-note");
     await user.click(within(note).getByRole("button", { name: "Model: Auto" }));
     await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
-    await user.click(within(note).getByRole("button", { name: "Build" }));
+    await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
