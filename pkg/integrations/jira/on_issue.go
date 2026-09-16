@@ -57,10 +57,37 @@ type IssueChangelogItem struct {
 
 // IssueEvent is the event SuperPlane emits for each matching issue webhook.
 type IssueEvent struct {
-	Action    string          `json:"action"`
-	Issue     *Issue          `json:"issue"`
-	User      *User           `json:"user,omitempty"`
-	Changelog *IssueChangelog `json:"changelog,omitempty"`
+	Action string `json:"action"`
+	Issue  *Issue `json:"issue"`
+	// Description is the issue description as plain text. Jira Cloud holds a
+	// description in Atlassian Document Format, which reads as a Go map when a
+	// template interpolates it, so the event carries a readable copy next to
+	// the raw field. The key is always present: an absent key would resolve to
+	// "null" in a template.
+	Description string          `json:"description"`
+	User        *User           `json:"user,omitempty"`
+	Changelog   *IssueChangelog `json:"changelog,omitempty"`
+}
+
+// NewIssueEvent builds the event for one issue, so every emitter - the issue
+// and incident webhooks, and the intake seed - reports the same shape.
+func NewIssueEvent(action string, issue *Issue, user *User, changelog *IssueChangelog) IssueEvent {
+	return IssueEvent{
+		Action:      action,
+		Issue:       issue,
+		Description: IssueDescriptionText(issue),
+		User:        user,
+		Changelog:   changelog,
+	}
+}
+
+// IssueDescriptionText reads the description of an issue as plain text.
+func IssueDescriptionText(issue *Issue) string {
+	if issue == nil {
+		return ""
+	}
+
+	return ADFToText(issue.Fields["description"])
 }
 
 func (t *OnIssue) Name() string {
@@ -98,6 +125,7 @@ This is provisioned automatically. Jira's dynamic webhook registration API (` + 
 Emits one event per matching issue webhook with:
 - **action**: ` + "`created`" + `, ` + "`updated`" + `, or ` + "`deleted`" + `
 - **issue**: The full issue (id, key, self, fields)
+- **description**: The issue description as plain text. Use this instead of ` + "`issue.fields.description`" + `, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
 - **changelog**: The list of changed fields (only present for updates)`
 }
@@ -238,12 +266,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusOK, nil, nil
 	}
 
-	event := IssueEvent{
-		Action:    action,
-		Issue:     payload.Issue,
-		User:      payload.User,
-		Changelog: payload.Changelog,
-	}
+	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog)
 
 	if err := ctx.Events.Emit(IssueEventPayloadType, event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)

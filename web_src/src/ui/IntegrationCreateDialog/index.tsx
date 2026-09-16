@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { hiddenFieldsForHostedJira } from "@/lib/integrations";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -120,12 +121,15 @@ export function IntegrationCreateDialog({
   }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
   const { createStepFields, webhookStepFields } = useMemo(() => {
-    const visibleFields = selectVisibleFields(integrationDefinition?.configuration, hiddenFieldNames);
+    const visibleFields = selectVisibleFields(
+      integrationDefinition?.configuration,
+      hiddenFieldsForHostedJira(integrationDefinition, hiddenFieldNames),
+    );
     return {
       createStepFields: selectCreateStepFields(visibleFields, initialStepFieldNames),
       webhookStepFields: selectWebhookStepFields(visibleFields, initialStepFieldNames),
     };
-  }, [integrationDefinition?.configuration, hiddenFieldNames, initialStepFieldNames]);
+  }, [integrationDefinition, hiddenFieldNames, initialStepFieldNames]);
 
   const isGitHub = integrationDefinition?.name === "github";
   const {

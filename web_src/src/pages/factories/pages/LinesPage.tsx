@@ -30,6 +30,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -154,6 +155,7 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
   ADD_INTAKE_TEMPLATES,
@@ -256,10 +258,15 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
+  const canAddJiraIntake = hasExperimentalFeature(FEATURE_FACTORY_JIRA_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const hasJiraIntake = configuredIntakes.some((intake) => intake.source.id === "jira-issues");
   const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const addIntakeTemplates = useMemo(() => {
     const allowedIds = new Set(["github-issues"]);
+    if (canAddJiraIntake) {
+      allowedIds.add("jira-issues");
+    }
     if (canAddSentryIntake) {
       allowedIds.add("sentry-exceptions");
     }
@@ -267,11 +274,12 @@ export function LinesPage() {
       allowedIds.add("productive-tasks");
     }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddSentryIntake, canAddProductiveIntake]);
+  }, [canAddJiraIntake, canAddSentryIntake, canAddProductiveIntake]);
   // The menu entry only pays off once a source beyond the default GitHub issues is available.
-  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake;
+  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddJiraIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
+  const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -299,6 +307,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const canSetupJira = canUpdate && canAddJiraIntake && !hasJiraIntake;
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -412,6 +421,10 @@ export function LinesPage() {
       setProductiveIntakeSetupOpen(true);
       return;
     }
+    if (template.id === "jira-issues") {
+      setJiraIntakeSetupOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -496,6 +509,12 @@ export function LinesPage() {
         organizationId={organizationId}
         factoryId={factoryId}
         onClose={() => setProductiveIntakeSetupOpen(false)}
+      />
+      <JiraIntakeSetupDialog
+        open={jiraIntakeSetupOpen}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        onClose={() => setJiraIntakeSetupOpen(false)}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -588,6 +607,7 @@ export function LinesPage() {
             onAddIntake={
               showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
             }
+            onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
@@ -743,6 +763,7 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   factoryIntakes,
@@ -769,6 +790,7 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   factoryIntakes: FactoriesFactoryIntake[];
@@ -872,6 +894,7 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupJira={onSetupJira}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
@@ -1116,6 +1139,7 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -1141,6 +1165,7 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1281,6 +1306,7 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupJira={onSetupJira}
           automations={backlogAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}

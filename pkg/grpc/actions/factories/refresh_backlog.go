@@ -143,6 +143,7 @@ func connectedIntakeAvailabilitySources(
 
 func intakeSourceSupportsAvailability(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
+		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceProductiveTasks
 }
 

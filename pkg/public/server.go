@@ -697,6 +697,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
