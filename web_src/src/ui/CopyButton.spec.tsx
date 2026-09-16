@@ -66,15 +66,21 @@ describe("CopyButton", () => {
     expect(screen.getByRole("button", { name: /token copied/i })).toBeInTheDocument();
   });
 
-  it("icon variant toggles its aria-label to 'Copied to clipboard' after a click", async () => {
+  it("icon variant exposes its copied state and resets after the timeout", async () => {
     mockClipboard(() => Promise.resolve());
 
-    render(<CopyButton text="secret-token" />);
+    render(<CopyButton text="secret-token" ariaLabel="Copy token" copiedAriaLabel="Token copied" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy to clipboard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy token" }));
     await flushPromises();
 
-    expect(screen.getByRole("button", { name: "Copied to clipboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Token copied" })).toHaveAttribute("data-copied", "true");
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(screen.getByRole("button", { name: "Copy token" })).not.toHaveAttribute("data-copied");
   });
 
   it("labeled default variant uses the primary button chrome", () => {

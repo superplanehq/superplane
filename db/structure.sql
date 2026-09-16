@@ -435,6 +435,25 @@ CREATE TABLE public.factory_llm_model_allowlists (
 
 
 --
+-- Name: factory_planning_session_activities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_activities (
+    id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    schema_version integer NOT NULL,
+    provider text NOT NULL,
+    status text NOT NULL,
+    last_sequence bigint NOT NULL,
+    snapshot jsonb NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    completed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_planning_session_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -445,7 +464,8 @@ CREATE TABLE public.factory_planning_session_messages (
     text text NOT NULL,
     delivered boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_id uuid
+    user_id uuid,
+    activity_id uuid
 );
 
 
@@ -1717,6 +1737,14 @@ ALTER TABLE ONLY public.factory_llm_model_allowlists
 
 
 --
+-- Name: factory_planning_session_activities factory_planning_session_activities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_activities
+    ADD CONSTRAINT factory_planning_session_activities_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_planning_session_messages factory_planning_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2548,6 +2576,20 @@ CREATE INDEX idx_factory_intakes_factory_id ON public.factory_intakes USING btre
 --
 
 CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_planning_session_activities_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_activities_session ON public.factory_planning_session_activities USING btree (session_id, started_at, id);
+
+
+--
+-- Name: idx_factory_planning_session_messages_activity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_messages_activity ON public.factory_planning_session_messages USING btree (activity_id) WHERE (activity_id IS NOT NULL);
 
 
 --
@@ -3503,6 +3545,22 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_planning_session_activities factory_planning_session_activities_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_activities
+    ADD CONSTRAINT factory_planning_session_activities_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_messages factory_planning_session_messages_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.factory_planning_session_activities(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_planning_session_messages factory_planning_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4438,7 +4496,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260915064721	f
+20260915135706	f
 \.
 
 

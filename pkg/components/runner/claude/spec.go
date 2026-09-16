@@ -125,6 +125,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 	files := []runner.BrokerTaskFile{
 		runner.LLMUsageTaskFile(),
 		runner.TurnTelemetryTaskFile(),
+		runner.ActivityStreamTaskFile(),
 		{Path: "run.js", Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
