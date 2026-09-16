@@ -14,9 +14,11 @@ var (
 	ErrAccountDeleteLastInstallationAdmin = errors.New("promote another installation admin before you delete this account")
 	ErrLastSignInMethod                   = errors.New("keep at least one sign-in method")
 	ErrSignInMethodNotConnected           = errors.New("this sign-in method is not connected")
-	ErrSignInIdentityInUse                = errors.New("this identity already belongs to another SuperPlane account")
-	ErrAccountEmailNotFromSignInMethod    = errors.New("choose an email from a connected sign-in method")
-	ErrAccountEmailInUse                  = errors.New("this email already belongs to another SuperPlane account")
+	// ErrSignInIdentityInUse is returned when a non-GitHub identity is already
+	// connected to another SuperPlane account. GitHub identities can be shared.
+	ErrSignInIdentityInUse             = errors.New("this identity already belongs to another SuperPlane account")
+	ErrAccountEmailNotFromSignInMethod = errors.New("choose an email from a connected sign-in method")
+	ErrAccountEmailInUse               = errors.New("this email already belongs to another SuperPlane account")
 )
 
 func AccountHasPassword(tx *gorm.DB, accountID uuid.UUID) (bool, error) {

@@ -21,9 +21,7 @@ export function useAccountSettingsAuthResults(refreshAccount: () => Promise<void
 
     const provider = params.get("provider") === "google" ? "Google" : "GitHub";
     if (error === "signin_method_in_use") {
-      showErrorToast(
-        `This ${provider} identity already belongs to another SuperPlane account. Delete that account first.`,
-      );
+      showErrorToast(`This ${provider} identity already belongs to another SuperPlane account.`);
     }
     if (error === "linked_account_in_use") {
       showErrorToast("Another SuperPlane account already uses this GitHub account.");
