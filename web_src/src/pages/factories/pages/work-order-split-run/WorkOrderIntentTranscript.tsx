@@ -125,7 +125,7 @@ const AgentMessage = memo(function AgentMessage({
   }, [animateWords]);
 
   return (
-    <div className="flex w-full items-start">
+    <div className="flex w-full items-start px-2" data-testid="split-run-intent-agent-message">
       <div
         ref={contentRef}
         className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${animateWords ? "sp-stream-words" : "sp-text-reveal"}`}

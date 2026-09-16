@@ -87,7 +87,7 @@ export function WorkOrderIntentDocument({
         latestPlanSummary: confidence?.summary?.trim(),
         planStatus,
         isAnalyzing,
-        closedDecision: refineOpen ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
+        closedDecision: refineOpen && resultFooter ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
       }
     : undefined;
 

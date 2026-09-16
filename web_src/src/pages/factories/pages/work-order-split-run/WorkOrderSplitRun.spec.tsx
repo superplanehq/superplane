@@ -829,13 +829,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
-    const analyzing = within(screen.getByTestId("split-run-intent-plan-updated")).getByTestId(
-      "split-run-intent-plan-analyzing",
-    );
-    expect(analyzing.querySelector(".t-matrix")).not.toBeNull();
-    expect(analyzing).not.toHaveTextContent("Refining");
-    expect(analyzing).not.toHaveTextContent("Planning");
-    expect(analyzing).not.toHaveTextContent("Checking");
+    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-plan-analyzing")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
@@ -916,7 +911,16 @@ describe("WorkOrderSplitRunPopup", () => {
     const tab = screen.getByTestId("split-run-work-order-tab");
     expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(within(tab).queryByText("This issue is a good fit for an agent on this factory line.")).toBeNull();
+    expect(within(tab).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+      "This issue is a good fit for an agent on this factory line.",
+    );
+    expect(within(tab).getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
+    expect(within(tab).getByTestId("split-run-intent-status-card")).toContainElement(
+      within(tab).getByTestId("split-run-intent-confidence-copy"),
+    );
+    expect(
+      within(tab).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
+    ).not.toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
   });
 

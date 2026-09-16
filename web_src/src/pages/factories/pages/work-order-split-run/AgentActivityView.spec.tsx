@@ -238,6 +238,7 @@ describe("AgentActivityView", () => {
     });
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(summary.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-activity-activity-1")).toHaveClass("px-2");
   });
 
   it("keeps detailed factual action counts during streaming", () => {

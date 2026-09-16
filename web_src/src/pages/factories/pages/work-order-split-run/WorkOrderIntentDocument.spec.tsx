@@ -177,8 +177,9 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
-    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "frame");
-    expect(screen.getByTestId("split-run-intent-composer-card").className).not.toContain("focus-within:ring");
+    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer-chips")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
     expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
@@ -192,14 +193,11 @@ describe("WorkOrderIntentDocument", () => {
     const columns = screen.getAllByTestId("split-run-intent-chat-column");
     expect(columns.length).toBeGreaterThanOrEqual(2);
     for (const column of columns) {
-      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-8");
+      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-4");
     }
     expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
     expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
-    const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(chips.closest("[data-slot=frame-panel-header]")).not.toBeNull();
-    expect(chips.closest("[data-slot=frame-panel]")).toBeNull();
-    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=frame-panel]")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=input-group]")).not.toBeNull();
     expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
     expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
     expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
@@ -516,7 +514,6 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
     for (const column of screen.getAllByTestId("split-run-intent-chat-column")) {
       expect(column).toHaveClass("px-4");
-      expect(column).not.toHaveClass("px-8");
     }
     expect(screen.getByTestId("split-run-intent-request").style.getPropertyValue("--intent-left")).toBe("50%");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
@@ -649,8 +646,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
   });
 
-  it("opens the Clarity summary in a popover", async () => {
-    const user = userEvent.setup();
+  it("shows the Clarity summary in the status card", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -668,10 +664,16 @@ describe("WorkOrderIntentDocument", () => {
       />,
     );
 
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("split-run-intent-composer-score"));
-    expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+    const card = screen.getByTestId("split-run-intent-status-card");
+    expect(card).toHaveAttribute("data-slot", "frame");
+    expect(within(card).getByTestId("split-run-intent-composer-chips").closest("[data-slot=frame-panel-header]")).not.toBeNull();
+    expect(within(card).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]")).not.toBeNull();
+    expect(within(card).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
       "This issue is a good fit for an agent on this factory line.",
+    );
+    expect(within(card).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
+    expect(screen.getByTestId("split-run-intent-composer-card")).not.toContainElement(
+      screen.getByTestId("split-run-intent-confidence-copy"),
     );
   });
 });
