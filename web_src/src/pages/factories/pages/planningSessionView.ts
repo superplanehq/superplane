@@ -291,6 +291,9 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
   if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
     return [];
   }
+  if (message.role === "plan") {
+    return planningPlanMessageFromPayload(message);
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
     const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
     return [
@@ -307,6 +310,38 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
     ];
   }
   return [];
+}
+
+function planningPlanMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const score = planningPlanScoreFromPayload(message.text);
+  if (score === undefined) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? message.text ?? "plan",
+      kind: "plan",
+      role: "plan",
+      score,
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+    },
+  ];
+}
+
+function planningPlanScoreFromPayload(text: string | undefined): number | undefined {
+  if (!text?.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(text) as { score?: unknown };
+    if (typeof parsed.score === "number" && Number.isFinite(parsed.score)) {
+      return parsed.score;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function agentActivityFromPayload(payload: PlanningSessionActivityPayload): AgentActivity[] {
