@@ -215,7 +215,7 @@ describe("AccountProfileRedesignPlayground", () => {
       />,
     );
 
-    expect(screen.getByText("Choose which task emails SuperPlane sends you.")).toBeInTheDocument();
+    expect(screen.getByText("Choose which task emails and browser alerts SuperPlane sends you.")).toBeInTheDocument();
     expect(screen.getByText("Added as a task owner")).toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Send task emails" }));
@@ -233,6 +233,23 @@ describe("AccountProfileRedesignPlayground", () => {
 
     expect(screen.getByTestId("account-redesign-notifications-off")).toHaveTextContent("Task emails are off.");
     expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
+  });
+
+  it("keeps browser notifications off by default", () => {
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={ACCOUNT_REDESIGN_NOTIFICATIONS}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-off")).toHaveTextContent(
+      "Browser notifications are off.",
+    );
+    expect(screen.queryByTestId("account-redesign-notifications-browser-events")).not.toBeInTheDocument();
   });
 
   it("filters the settings nav", async () => {

@@ -3,6 +3,7 @@ package me
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -34,33 +35,54 @@ func UpdateNotificationSettings(
 		return nil, grpcerrors.InvalidArgument(nil, "workspaces is required")
 	}
 
-	scope, ok := notificationScopeFromProto(workspaces.GetScope())
-	if !ok {
-		return nil, grpcerrors.InvalidArgument(nil, "workspace scope must be all, filtered, or none")
+	emailChannel, err := parseNotificationChannel(
+		workspaces.GetScope(),
+		workspaces.GetEventTypes(),
+		workspaces.GetFilters(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	browser := requested.GetBrowser()
+	browserChannel := defaultBrowserChannelParams()
+	if browser != nil {
+		browserChannel, err = parseNotificationChannel(
+			browser.GetScope(),
+			browser.GetEventTypes(),
+			browser.GetFilters(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		showWhileViewing := browser.GetShowWhileViewing()
+		browserChannel.showWhileViewing = &showWhileViewing
 	}
 
 	params := models.UserNotificationSettingsParams{
-		WorkspaceScope: scope,
-	}
-	if scope == models.NotificationWorkspaceScopeAll {
-		eventTypes, typeErr := notificationTypesFromProto(workspaces.GetEventTypes())
-		if typeErr != nil {
-			return nil, typeErr
-		}
-		params.EventTypes = eventTypes
+		WorkspaceScope:          emailChannel.scope,
+		EventTypes:              emailChannel.eventTypes,
+		BrowserWorkspaceScope:   browserChannel.scope,
+		BrowserEventTypes:       browserChannel.eventTypes,
+		BrowserShowWhileViewing: browserChannel.showWhileViewing,
 	}
 
 	var settings *models.UserNotificationSettings
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		if scope == models.NotificationWorkspaceScopeFiltered {
-			filters, resolveErr := resolveWorkspaceFilters(tx, orgID, workspaces.GetFilters())
+		if emailChannel.scope == models.NotificationWorkspaceScopeFiltered {
+			filters, resolveErr := resolveRequiredWorkspaceFilters(tx, orgID, emailChannel.filters)
 			if resolveErr != nil {
 				return resolveErr
 			}
-			if len(filters) == 0 {
-				return grpcerrors.InvalidArgument(nil, "select at least one workspace or use the all workspaces scope")
-			}
 			params.WorkspaceFilters = filters
+		}
+
+		if browserChannel.scope == models.NotificationWorkspaceScopeFiltered {
+			filters, resolveErr := resolveRequiredWorkspaceFilters(tx, orgID, browserChannel.filters)
+			if resolveErr != nil {
+				return resolveErr
+			}
+			params.BrowserWorkspaceFilters = filters
 		}
 
 		settings, err = models.UpsertUserNotificationSettings(tx, orgID, userID, params)
@@ -73,6 +95,61 @@ func UpdateNotificationSettings(
 	return &pb.UpdateNotificationSettingsResponse{
 		Settings: serializeNotificationSettings(settings),
 	}, nil
+}
+
+type parsedNotificationChannel struct {
+	scope            string
+	eventTypes       []string
+	filters          []*pb.NotificationSettings_WorkspaceFilter
+	showWhileViewing *bool
+}
+
+func parseNotificationChannel(
+	scope pb.NotificationSettings_WorkspaceScope,
+	eventTypes []pb.NotificationSettings_Type,
+	filters []*pb.NotificationSettings_WorkspaceFilter,
+) (parsedNotificationChannel, error) {
+	parsedScope, ok := notificationScopeFromProto(scope)
+	if !ok {
+		return parsedNotificationChannel{}, grpcerrors.InvalidArgument(nil, "workspace scope must be all, filtered, or none")
+	}
+
+	parsed := parsedNotificationChannel{
+		scope:   parsedScope,
+		filters: filters,
+	}
+	if parsedScope == models.NotificationWorkspaceScopeAll {
+		names, err := notificationTypesFromProto(eventTypes)
+		if err != nil {
+			return parsedNotificationChannel{}, err
+		}
+		parsed.eventTypes = names
+	}
+
+	return parsed, nil
+}
+
+func defaultBrowserChannelParams() parsedNotificationChannel {
+	showWhileViewing := true
+	return parsedNotificationChannel{
+		scope:            models.NotificationWorkspaceScopeNone,
+		showWhileViewing: &showWhileViewing,
+	}
+}
+
+func resolveRequiredWorkspaceFilters(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	filters []*pb.NotificationSettings_WorkspaceFilter,
+) ([]models.NotificationWorkspaceFilter, error) {
+	resolved, err := resolveWorkspaceFilters(tx, orgID, filters)
+	if err != nil {
+		return nil, err
+	}
+	if len(resolved) == 0 {
+		return nil, grpcerrors.InvalidArgument(nil, "select at least one workspace or use the all workspaces scope")
+	}
+	return resolved, nil
 }
 
 func mapNotificationSettingsError(err error) error {

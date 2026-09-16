@@ -1,7 +1,9 @@
 import type {
   MeNotificationSettings,
   MeNotificationSettingsType,
+  NotificationSettingsBrowser,
   NotificationSettingsWorkspaceFilter,
+  NotificationSettingsWorkspaces,
 } from "@/api-client";
 
 export const NOTIFICATION_SETTINGS_TYPES = [
@@ -27,6 +29,11 @@ export interface AccountNotificationForm {
   workspaceScope: AccountNotificationWorkspaceScope;
   workspaceIds: string[];
   events: NotificationTypeToggles;
+  browserEnabled: boolean;
+  browserWorkspaceScope: AccountNotificationWorkspaceScope;
+  browserWorkspaceIds: string[];
+  browserEvents: NotificationTypeToggles;
+  browserShowWhileViewing: boolean;
 }
 
 export interface NotificationTypeOption {
@@ -83,17 +90,32 @@ export function defaultNotificationSettings(): MeNotificationSettings {
       scope: "WORKSPACE_SCOPE_ALL",
       filters: [],
     },
+    browser: {
+      scope: "WORKSPACE_SCOPE_NONE",
+      filters: [],
+      eventTypes: [],
+      showWhileViewing: true,
+    },
   };
 }
 
 export function workspaceScopeFromSettings(settings: MeNotificationSettings | undefined): WorkspaceScopeForm {
-  switch (settings?.workspaces?.scope) {
+  return workspaceScopeFromChannel(settings?.workspaces);
+}
+
+export function workspaceScopeFromChannel(
+  channel: Pick<NotificationSettingsWorkspaces, "scope"> | undefined,
+  missing: WorkspaceScopeForm = "all",
+): WorkspaceScopeForm {
+  switch (channel?.scope) {
     case "WORKSPACE_SCOPE_FILTERED":
       return "filtered";
     case "WORKSPACE_SCOPE_NONE":
       return "none";
-    default:
+    case "WORKSPACE_SCOPE_ALL":
       return "all";
+    default:
+      return missing;
   }
 }
 
@@ -120,10 +142,16 @@ export function togglesFromAllScopeEventTypes(
 export function filtersFromSettings(
   settings: MeNotificationSettings | undefined,
 ): NotificationSettingsWorkspaceFilter[] {
-  if (settings?.workspaces?.scope !== "WORKSPACE_SCOPE_FILTERED") {
+  return filtersFromChannel(settings?.workspaces);
+}
+
+export function filtersFromChannel(
+  channel: Pick<NotificationSettingsWorkspaces, "scope" | "filters"> | undefined,
+): NotificationSettingsWorkspaceFilter[] {
+  if (channel?.scope !== "WORKSPACE_SCOPE_FILTERED") {
     return [];
   }
-  return settings.workspaces.filters ?? [];
+  return channel.filters ?? [];
 }
 
 export function isConfigurableNotificationType(
@@ -135,40 +163,80 @@ export function isConfigurableNotificationType(
 export function accountNotificationsFromSettings(
   settings: MeNotificationSettings | undefined,
 ): AccountNotificationForm {
-  const scope = workspaceScopeFromSettings(settings);
-  const filters = filtersFromSettings(settings);
+  const email = channelFormFromSettings(settings?.workspaces, "all");
+  const browser = channelFormFromSettings(settings?.browser, "none");
   return {
-    emailEnabled: scope !== "none",
+    emailEnabled: email.enabled,
+    workspaceScope: email.workspaceScope,
+    workspaceIds: email.workspaceIds,
+    events: email.events,
+    browserEnabled: browser.enabled,
+    browserWorkspaceScope: browser.workspaceScope,
+    browserWorkspaceIds: browser.workspaceIds,
+    browserEvents: browser.events,
+    browserShowWhileViewing: settings?.browser?.showWhileViewing ?? true,
+  };
+}
+
+export function settingsFromAccountNotifications(form: AccountNotificationForm): MeNotificationSettings {
+  return {
+    workspaces: channelSettingsFromForm(form.emailEnabled, form.workspaceScope, form.workspaceIds, form.events),
+    browser: {
+      ...channelSettingsFromForm(
+        form.browserEnabled,
+        form.browserWorkspaceScope,
+        form.browserWorkspaceIds,
+        form.browserEvents,
+      ),
+      showWhileViewing: form.browserShowWhileViewing,
+    },
+  };
+}
+
+function channelFormFromSettings(
+  channel: NotificationSettingsWorkspaces | NotificationSettingsBrowser | undefined,
+  missingScope: WorkspaceScopeForm,
+): {
+  enabled: boolean;
+  workspaceScope: AccountNotificationWorkspaceScope;
+  workspaceIds: string[];
+  events: NotificationTypeToggles;
+} {
+  const scope = workspaceScopeFromChannel(channel, missingScope);
+  const filters = filtersFromChannel(channel);
+  return {
+    enabled: scope !== "none",
     workspaceScope: scope === "filtered" ? "selected" : "all",
     workspaceIds: filters.flatMap((filter) => (filter.workspaceId ? [filter.workspaceId] : [])),
     events:
       scope === "filtered"
         ? togglesFromEventTypes(filters[0]?.eventTypes)
-        : togglesFromAllScopeEventTypes(settings?.workspaces?.eventTypes),
+        : togglesFromAllScopeEventTypes(channel?.eventTypes),
   };
 }
 
-export function settingsFromAccountNotifications(form: AccountNotificationForm): MeNotificationSettings {
-  if (!form.emailEnabled) {
-    return { workspaces: { scope: "WORKSPACE_SCOPE_NONE", eventTypes: [], filters: [] } };
+function channelSettingsFromForm(
+  enabled: boolean,
+  workspaceScope: AccountNotificationWorkspaceScope,
+  workspaceIds: string[],
+  events: NotificationTypeToggles,
+): NotificationSettingsWorkspaces {
+  if (!enabled) {
+    return { scope: "WORKSPACE_SCOPE_NONE", eventTypes: [], filters: [] };
   }
-  if (form.workspaceScope === "selected") {
+  if (workspaceScope === "selected") {
     return {
-      workspaces: {
-        scope: "WORKSPACE_SCOPE_FILTERED",
-        eventTypes: [],
-        filters: form.workspaceIds.map((workspaceId) => ({
-          workspaceId,
-          eventTypes: eventTypesFromToggles(form.events),
-        })),
-      },
+      scope: "WORKSPACE_SCOPE_FILTERED",
+      eventTypes: [],
+      filters: workspaceIds.map((workspaceId) => ({
+        workspaceId,
+        eventTypes: eventTypesFromToggles(events),
+      })),
     };
   }
   return {
-    workspaces: {
-      scope: "WORKSPACE_SCOPE_ALL",
-      eventTypes: eventTypesFromToggles(form.events),
-      filters: [],
-    },
+    scope: "WORKSPACE_SCOPE_ALL",
+    eventTypes: eventTypesFromToggles(events),
+    filters: [],
   };
 }
