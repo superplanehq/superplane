@@ -21,6 +21,12 @@ import { useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
+import {
+  canAnalyzeTicketSource,
+  DEFAULT_TICKET_SOURCE,
+  issuesChoiceForTicketSource,
+  ticketSourceFromIssuesChoice,
+} from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
 import { isWizardStepId } from "./onboardingStatus";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -33,10 +39,10 @@ type FirstRunBlockingAction =
   | "saving-github-connection"
   | "saving-repository"
   | "saving-ticket-source"
+  | "connecting-jira"
   | "finishing-setup";
 
-export const DEFAULT_TICKET_SOURCE: FirstRunTicketSource = "github-issues";
-const DEFAULT_ISSUES_CHOICE: IssuesChoiceId = "vcs";
+export { DEFAULT_TICKET_SOURCE };
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
   repo: "choose",
@@ -206,6 +212,22 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
+  const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
+  const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  if (
+    !issuesChoice ||
+    !canAnalyzeTicketSource({
+      ticketSource,
+      jiraConnected: model.setup.connected.has("jira"),
+      jiraProjectId: model.jiraProjectId,
+    })
+  ) {
+    return null;
+  }
+  return issuesChoice;
+}
+
 function useFirstRunCommands(
   model: OnboardingPageModel,
   skipAgentScreen: boolean,
@@ -222,17 +244,26 @@ function useFirstRunCommands(
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      model.setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
+      const issuesChoice = selectedIssuesChoice(model);
+      if (!issuesChoice) return;
+      model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
-      if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
+      if (!(await model.saveIssues(issuesChoice))) return;
       if (!skipAgentScreen) return navigation.goToScreen("agent");
       blocking.setAction("finishing-setup");
-      await model.finish(DEFAULT_ISSUES_CHOICE);
+      await model.finish(issuesChoice);
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
       await waitForBrowserPaint();
       return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
+    });
+  const connectJira = () =>
+    blocking.runUntilNavigation("connecting-jira", async () => {
+      model.setup.setIssuesChoice("jira");
+      if (!(await model.saveIssues("jira"))) return false;
+      await waitForBrowserPaint();
+      return model.requestConnect("jira");
     });
   const finishSetup = () =>
     blocking.run("finishing-setup", async () => {
@@ -249,10 +280,12 @@ function useFirstRunCommands(
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
-    if (source === DEFAULT_TICKET_SOURCE) model.setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
+    const issuesChoice = issuesChoiceForTicketSource(source);
+    if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
   return {
     connectGitHub,
+    connectJira,
     continueFromRepository,
     continueFromTickets,
     finishSetup,
@@ -369,6 +402,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...commands,
     ...binding,
     skipAgentScreen,
+    ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,

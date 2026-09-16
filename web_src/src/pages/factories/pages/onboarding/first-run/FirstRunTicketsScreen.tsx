@@ -1,10 +1,14 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
+import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
+
+export type FirstRunJiraProject = { id?: string; name?: string };
 
 export function FirstRunTicketsScreen({
   ticketSource,
@@ -13,8 +17,16 @@ export function FirstRunTicketsScreen({
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   saving = false,
   savingLabel = FIRST_RUN_COPY.finish.saving,
+  jiraConnected = false,
+  jiraProjects = [],
+  jiraProjectsLoading = false,
+  jiraProjectsError = false,
+  jiraProjectId = "",
   onSelectTicketSource,
   onAnalyzeTickets,
+  onConnectJira,
+  onSelectJiraProject,
+  onRetryJiraProjects,
 }: {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
@@ -23,10 +35,20 @@ export function FirstRunTicketsScreen({
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
   savingLabel?: string;
+  jiraConnected?: boolean;
+  jiraProjects?: FirstRunJiraProject[];
+  jiraProjectsLoading?: boolean;
+  jiraProjectsError?: boolean;
+  jiraProjectId?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
+  onConnectJira?: () => void;
+  onSelectJiraProject?: (id: string) => void;
+  onRetryJiraProjects?: () => void;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
+  const jiraSelected = ticketSource === "jira";
+  const canAnalyze = canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
@@ -49,9 +71,12 @@ export function FirstRunTicketsScreen({
               icon={<IntegrationChoiceIcon name="jira" />}
               title={copy.jira}
               detail={copy.jiraHelper}
-              soon
+              selected={jiraSelected}
+              connectLabel={copy.jira}
+              connected={jiraConnected}
               disabled={saving}
-              onSelect={() => undefined}
+              onSelect={() => onSelectTicketSource("jira")}
+              onConnect={onConnectJira}
             />
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="linear" />}
@@ -62,13 +87,26 @@ export function FirstRunTicketsScreen({
               onSelect={() => undefined}
             />
           </div>
+          {jiraSelected && jiraConnected ? (
+            <div className="mt-4 border-t border-border pt-4" data-testid="first-run-jira-projects">
+              <p className="mb-3 text-[13px] font-medium">{copy.jiraProjectHeading}</p>
+              <JiraProjectStep
+                projects={jiraProjects}
+                selectedId={jiraProjectId}
+                loading={jiraProjectsLoading}
+                error={jiraProjectsError}
+                onSelect={(id) => onSelectJiraProject?.(id)}
+                onRetry={() => onRetryJiraProjects?.()}
+              />
+            </div>
+          ) : null}
         </FirstRunPanel>
 
         <div className="space-y-3">
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!ticketSource}
+            disabled={!canAnalyze}
             loading={saving}
             loadingText={savingLabel}
             onClick={onAnalyzeTickets}

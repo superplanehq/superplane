@@ -19,6 +19,7 @@ import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
+export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -155,7 +156,11 @@ export async function provisionEventApps(args: {
 
 export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
-export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+export type CreateFactoryIntake = (input: {
+  source: FactoriesFactoryIntakeSource;
+  integrationId?: string;
+  resourceId?: string;
+}) => Promise<FactoriesFactoryIntake>;
 
 // The GitHub intake opens a task for each matching issue. The Backlog
 // canvas scores those tasks. The backend reads the connection and the
@@ -172,6 +177,25 @@ export async function provisionGithubIntake(args: {
   }
 
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+}
+
+export async function provisionJiraIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  integrationId: string;
+  resourceId: string;
+}): Promise<FactoriesFactoryIntake> {
+  const intakes = await args.listIntakes();
+  const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  if (existing) {
+    return existing;
+  }
+
+  return args.createIntake({
+    source: JIRA_INTAKE_SOURCE,
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+  });
 }
 
 export async function provisionLine(args: {
