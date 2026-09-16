@@ -96,17 +96,19 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	trigger := &OnIssue{}
 	eventCtx := &contexts.EventContext{}
 
+	issue := map[string]any{
+		"id":        "123",
+		"title":     "Broken deploy",
+		"permalink": "https://your-org.sentry.io/issues/123/",
+		"project": map[string]any{
+			"slug": "backend",
+		},
+	}
 	message := WebhookMessage{
 		Resource: "issue",
 		Action:   "resolved",
 		Data: map[string]any{
-			"issue": map[string]any{
-				"id":    "123",
-				"title": "Broken deploy",
-				"project": map[string]any{
-					"slug": "backend",
-				},
-			},
+			"issue": issue,
 		},
 	}
 
@@ -123,6 +125,36 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, eventCtx.Payloads, 1)
 	assert.Equal(t, "sentry.issue", eventCtx.Payloads[0].Type)
+
+	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, IssueDescription(issue), payload["description"])
+	assert.Equal(t, issue, payload["data"].(map[string]any)["issue"])
+}
+
+func Test__OnIssue__OnIntegrationMessage__MissingIssue(t *testing.T) {
+	trigger := &OnIssue{}
+	eventCtx := &contexts.EventContext{}
+
+	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Message: WebhookMessage{
+			Resource: "issue",
+			Action:   "created",
+			Data:     map[string]any{},
+		},
+		Configuration: map[string]any{
+			"actions": []string{"created"},
+		},
+		Events: eventCtx,
+		Logger: logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, eventCtx.Payloads, 1)
+
+	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	assert.Empty(t, payload["description"])
 }
 
 func Test__OnIssue__OnIntegrationMessage__UsesTopLevelWebhookTimestamp(t *testing.T) {

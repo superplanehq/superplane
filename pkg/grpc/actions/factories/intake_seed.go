@@ -291,10 +291,12 @@ func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
 func sentryIssueEvent(issue sentry.Issue) map[string]any {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
+		payload := map[string]any{"id": issue.ID, "title": issue.Title}
 		return map[string]any{
-			"resource": "issue",
-			"action":   "created",
-			"data":     map[string]any{"issue": map[string]any{"id": issue.ID, "title": issue.Title}},
+			"resource":    "issue",
+			"action":      "created",
+			"data":        map[string]any{"issue": payload},
+			"description": sentry.IssueDescription(payload),
 		}
 	}
 
@@ -309,10 +311,11 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 	}
 
 	return map[string]any{
-		"resource":  "issue",
-		"action":    "created",
-		"data":      map[string]any{"issue": payload},
-		"timestamp": timestamp,
+		"resource":    "issue",
+		"action":      "created",
+		"data":        map[string]any{"issue": payload},
+		"timestamp":   timestamp,
+		"description": sentry.IssueDescription(payload),
 	}
 }
 

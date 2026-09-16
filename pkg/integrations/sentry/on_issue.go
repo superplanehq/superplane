@@ -53,6 +53,7 @@ func (t *OnIssue) Documentation() string {
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object
+- **description**: The delivered issue as a formatted JSON block, with the issue link above it. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
@@ -211,6 +212,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
+		"description":  IssueDescription(message.Data["issue"]),
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
