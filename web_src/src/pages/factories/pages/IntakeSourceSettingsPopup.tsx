@@ -12,6 +12,7 @@ import {
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import {
   SettingsAutomationCanvasEdit,
@@ -241,6 +242,7 @@ function IntakeGeneralTab({
             labelOptions={labelOptions}
             labelOptionsLoading={labelOptionsLoading}
           />
+          <JiraIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
         </div>
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">

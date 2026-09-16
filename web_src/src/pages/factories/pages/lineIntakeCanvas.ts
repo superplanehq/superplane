@@ -20,6 +20,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.issue.body }}",
     title: "GitHub issue intake",
   },
+  "jira-issues": {
+    triggerComponent: "jira.onIssue",
+    triggerName: "On Issue",
+    createTitle: "{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}",
+    createDescription: "{{ root().data.issue.fields.description }}",
+    title: "Jira issue intake",
+  },
   "sentry-exceptions": {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
