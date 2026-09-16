@@ -189,13 +189,16 @@ function ScoreChip({
   expanded?: boolean;
   onToggle?: () => void;
 }) {
-  const showMatrix = isAnalyzing || score == null;
-  const label = showMatrix
-    ? CREATE_WITH_AGENT_COPY.clarity
-    : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
+  const showMatrix = isAnalyzing;
+  const label =
+    showMatrix || score == null
+      ? CREATE_WITH_AGENT_COPY.clarity
+      : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
   const countClassName = showMatrix
     ? "min-w-7 self-stretch py-0"
-    : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score ?? 0)]);
+    : score == null
+      ? "text-muted-foreground"
+      : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)]);
 
   return (
     <CountButton
@@ -215,6 +218,8 @@ function ScoreChip({
             decorative
             className="shrink-0"
           />
+        ) : score == null ? (
+          "–"
         ) : (
           `${score}/${CONFIDENCE_SCORE_MAX}`
         )

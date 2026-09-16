@@ -587,6 +587,26 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
   });
 
+  it("stops the Clarity matrix when analysis ends without a score", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "failed",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-composer-score")).toHaveTextContent("–");
+    expect(screen.queryByTestId("split-run-intent-plan-analyzing")).not.toBeInTheDocument();
+  });
+
   it("shows Ready then Updated when the spec changes", () => {
     const { rerender } = renderIntentDocument(
       <WorkOrderIntentDocument
