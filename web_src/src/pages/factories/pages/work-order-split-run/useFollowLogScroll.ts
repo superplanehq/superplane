@@ -37,6 +37,21 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     setFollowing((wasFollowing) => followAfterRunningPhaseChange(wasFollowing, previousRunningPhaseId, runningPhaseId));
   }, [runningPhaseId]);
 
+  const releaseScrollIgnore = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        ignoreScrollRef.current = false;
+        const node = scrollRef.current;
+        if (
+          node &&
+          !isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight)
+        ) {
+          setFollowing(false);
+        }
+      });
+    });
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) {
@@ -49,11 +64,9 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
       if (node && followingRef.current) {
         node.scrollTop = node.scrollHeight;
       }
-      requestAnimationFrame(() => {
-        ignoreScrollRef.current = false;
-      });
     });
-  }, []);
+    releaseScrollIgnore();
+  }, [releaseScrollIgnore]);
 
   const setFollow = useCallback(
     (next: boolean) => {
@@ -96,11 +109,7 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     }
     const ignoreLayoutScroll = () => {
       ignoreScrollRef.current = true;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          ignoreScrollRef.current = false;
-        });
-      });
+      releaseScrollIgnore();
     };
     const observer = new ResizeObserver(() => {
       if (followingRef.current) {
@@ -111,7 +120,25 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [scrollToBottom]);
+  }, [releaseScrollIgnore, scrollToBottom]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    const stopFollowOnUserScroll = () => {
+      if (followingRef.current) {
+        setFollowing(false);
+      }
+    };
+    el.addEventListener("wheel", stopFollowOnUserScroll, { passive: true });
+    el.addEventListener("touchmove", stopFollowOnUserScroll, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", stopFollowOnUserScroll);
+      el.removeEventListener("touchmove", stopFollowOnUserScroll);
+    };
+  }, []);
 
   const onScroll = useCallback(() => {
     if (ignoreScrollRef.current) {

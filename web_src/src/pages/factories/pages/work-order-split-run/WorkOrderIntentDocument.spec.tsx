@@ -766,6 +766,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-composer-score")).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(true);
     expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "open");
+    expect(screen.getByTestId("split-run-intent-plan-status")).toHaveTextContent(CREATE_WITH_AGENT_COPY.planReady);
   });
 
   it("does not open the plan pane from storage before a spec exists", () => {

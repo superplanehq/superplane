@@ -149,6 +149,25 @@ describe("useFollowLogScroll", () => {
     }
   });
 
+  it("stops following on wheel during a layout resize", async () => {
+    const resize = stubResizeObserver();
+    try {
+      const box = { height: 400, view: 100 };
+      render(<FollowLog tick={1} resumeOnBottom />);
+      const scroller = screen.getByTestId("log-scroller");
+      mockOverflow(scroller, box);
+      scroller.scrollTop = 300;
+      await settleScrollIgnore();
+      expect(screen.getByTestId("following")).toHaveTextContent("on");
+
+      resize.notifyResize();
+      fireEvent.wheel(scroller);
+      expect(screen.getByTestId("following")).toHaveTextContent("off");
+    } finally {
+      resize.restore();
+    }
+  });
+
   it("does not resume following when a resize fires while the user is up the log", async () => {
     const resize = stubResizeObserver();
     try {

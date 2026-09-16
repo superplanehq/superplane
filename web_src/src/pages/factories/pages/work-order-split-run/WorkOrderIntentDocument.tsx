@@ -64,6 +64,7 @@ export function WorkOrderIntentDocument({
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
+  const [planOpenedHere, setPlanOpenedHere] = useState(false);
   const layout = useRefineLayoutPreference();
   const hasPlan = hasAnalysisPlan(artifacts);
   const planPaneOpen = layout.planOpen && hasPlan;
@@ -73,7 +74,7 @@ export function WorkOrderIntentDocument({
     maxPercent: 68,
   });
   const document = splitRunIntentDocument({ artifacts, description });
-  const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planPaneOpen);
+  const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planOpenedHere && planPaneOpen);
   const clarityScore = analysis ? (latestPlanScore(analysis.view.messages) ?? confidence?.score) : confidence?.score;
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
   const showPlanPane = !refineOpen || planPaneOpen;
@@ -85,7 +86,10 @@ export function WorkOrderIntentDocument({
     ? {
         ...analysis,
         planPaneOpen,
-        onTogglePlan: layout.togglePlan,
+        onTogglePlan: () => {
+          setPlanOpenedHere(true);
+          layout.togglePlan();
+        },
         canTogglePlan: hasPlan,
         clarityExpanded: layout.clarityExpanded,
         onToggleClarity: layout.toggleClarity,

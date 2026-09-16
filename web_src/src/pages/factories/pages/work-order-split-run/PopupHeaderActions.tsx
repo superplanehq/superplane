@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
@@ -34,8 +35,10 @@ function PopupArchiveButton({ onArchive, busy }: { onArchive: () => void | Promi
     <Tooltip>
       <TooltipTrigger asChild>
         <span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={() => void onArchive()}
             disabled={busy}
             className={HEADER_ICON_BUTTON}
@@ -43,7 +46,7 @@ function PopupArchiveButton({ onArchive, busy }: { onArchive: () => void | Promi
             data-testid="popup-work-order-archive-button"
           >
             <Trash2 className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </span>
       </TooltipTrigger>
       <TooltipContent side="bottom">Archive</TooltipContent>
