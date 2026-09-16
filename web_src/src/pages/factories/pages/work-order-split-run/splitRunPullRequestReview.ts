@@ -8,12 +8,20 @@ export interface PullRequestReviewTarget {
   number: number;
 }
 
+/** Headline for the waiting note after automatic pull-request fixes pause. */
+export const PULL_REQUEST_FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
+
 /**
  * A status note whose call to action opens a pull request. The Implement
  * line sets one when it opens or updates the pull request for a task.
- * The popup renders such a note as the pull-request review strip.
+ * The popup renders such a note as the pull-request review strip. A
+ * paused-fixes note also links the pull request; it stays a standard
+ * waiting note so close actions remain.
  */
 export function pullRequestReviewNote(note: SplitRunFooterNote): PullRequestReviewTarget | undefined {
+  if (note.headline === PULL_REQUEST_FIXES_PAUSED_HEADLINE) {
+    return undefined;
+  }
   const href = note.cta?.href;
   if (!href) {
     return undefined;

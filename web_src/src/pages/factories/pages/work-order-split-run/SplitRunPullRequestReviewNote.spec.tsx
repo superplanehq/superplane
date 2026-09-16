@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
+import { PULL_REQUEST_FIXES_PAUSED_HEADLINE } from "./splitRunPullRequestReview";
 
 const PR_NOTE: SplitRunFooterNote = {
   headline: "Waiting for user review",
@@ -85,6 +86,27 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-pull-request-cta")).toBeInTheDocument();
+  });
+
+  it("keeps close actions when automatic fixes did not succeed", () => {
+    renderNote({
+      note: {
+        headline: PULL_REQUEST_FIXES_PAUSED_HEADLINE,
+        text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
+        cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+      },
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).not.toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: PULL_REQUEST_FIXES_PAUSED_HEADLINE })).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/payments/pull/6812",
+    );
+    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
   it("keeps the standard note for a link that is not a pull request", () => {

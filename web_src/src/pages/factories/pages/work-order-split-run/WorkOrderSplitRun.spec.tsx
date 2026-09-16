@@ -547,6 +547,36 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
+  it("keeps close actions when automatic pull-request fixes pause", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-checks",
+            pullRequestNumber: "6812",
+            description: "Automatic fixes paused after 3 attempts",
+            kind: "fixes-paused",
+            run: {
+              id: "run-paused",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).not.toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "Automatic fixes did not succeed" })).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  });
+
   it("hides work-order close actions when the user cannot update the task", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
