@@ -147,6 +147,28 @@ type StreamHandlerContext = {
   onFailure: (message: string) => void;
 };
 
+function unindexedPendingRecords(state: LogState): NonNullable<LogState["pendingRecords"]> {
+  return (state.pendingRecords ?? []).filter((record) => record.commandIndex === undefined);
+}
+
+function logStateAfterStreamOpen(prev: LogState, reconnecting: boolean, resetParsedLogs: boolean): LogState {
+  if (resetParsedLogs) {
+    return { ...initialLogState, isStreaming: true };
+  }
+  if (!reconnecting) {
+    return { ...prev, error: null, isLoading: false, isStreaming: true };
+  }
+  const pendingRecords = hasFinishedCommandSection(prev) ? unindexedPendingRecords(prev) : [];
+  return {
+    ...prev,
+    pendingRecords,
+    orphanLines: pendingRecords.filter((record) => record.type === "line").map((record) => record.text),
+    error: null,
+    isLoading: false,
+    isStreaming: true,
+  };
+}
+
 function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers {
   const { reconnecting, resetParsedLogs, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
   return {
@@ -154,13 +176,7 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       if (resetParsedLogs) {
         setUsage(emptyPromptUsageState());
       }
-      setState((prev) => ({
-        ...(resetParsedLogs ? initialLogState : prev),
-        ...(reconnecting ? { pendingRecords: [], orphanLines: [] } : {}),
-        error: null,
-        isLoading: false,
-        isStreaming: true,
-      }));
+      setState((prev) => logStateAfterStreamOpen(prev, reconnecting, resetParsedLogs));
     },
     onLogLine: (text, commandIndex) => {
       const index = commandIndex ?? commandCursor.index;
@@ -182,8 +198,12 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
         setUsage((prev) => startPromptUsageSeries(prev, text, index));
       }
     },
-    onCmdEnd: (index, status, durationMs) =>
-      setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs))),
+    onCmdEnd: (index, status, durationMs) => {
+      if (commandCursor.index === index) {
+        commandCursor.index = undefined;
+      }
+      setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs)));
+    },
     onToolStart: (kind, text, id, turn, commandIndex) => {
       setState((prev) =>
         startReplayedTool(

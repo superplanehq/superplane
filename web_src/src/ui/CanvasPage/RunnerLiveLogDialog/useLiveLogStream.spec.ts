@@ -469,4 +469,58 @@ describe("useLiveLogStream", () => {
     expect(result.current.sections).toHaveLength(1);
     expect(result.current.sections[0]?.lines).toEqual(["Cloning into 'repo'..."]);
   });
+
+  it("keeps unindexed records after cmd_end across in-flight reconnect", async () => {
+    type LiveLogHandlers = {
+      onOpen?: () => void;
+      onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
+      onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
+      onToolStart?: (kind: string, text: string, id?: string) => void;
+      onLogLine: (line: string, commandIndex?: number) => void;
+    };
+    const playHistory = (handlers: LiveLogHandlers, includeNextCommand: boolean) => {
+      handlers.onOpen?.();
+      handlers.onCmdStart?.(0, "Clone Repo", 1, "bash", "git clone");
+      handlers.onLogLine("Cloning into 'repo'...", 0);
+      handlers.onCmdEnd?.(0, "passed", 20);
+      handlers.onToolStart?.("grep", "rootTriggerRenderer", "toolu_grep");
+      handlers.onLogLine("Found 1 matches");
+      if (includeNextCommand) {
+        handlers.onCmdStart?.(5, "Implementation", 2, "prompt", "You are implementing");
+      }
+    };
+
+    pumpMock.mockImplementationOnce(async (handlers: LiveLogHandlers) => {
+      playHistory(handlers, false);
+    });
+    pumpMock.mockImplementationOnce(async (handlers: LiveLogHandlers) => {
+      playHistory(handlers, true);
+      return new Promise(() => undefined);
+    });
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", true, null, null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.orphanLines).toEqual(["Found 1 matches"]));
+    await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    await waitFor(() => expect(result.current.sections).toHaveLength(2));
+    expect(result.current.sections[0]?.lines).toEqual(["Cloning into 'repo'..."]);
+    expect(result.current.orphanLines).toEqual([]);
+    const tools = result.current.sections[1]?.events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools).toHaveLength(1);
+    expect(tools.tools[0]).toMatchObject({
+      kind: "grep",
+      text: "rootTriggerRenderer",
+      sourceId: "toolu_grep",
+      lines: ["Found 1 matches"],
+    });
+  });
 });
