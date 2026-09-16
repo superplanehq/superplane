@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -278,9 +279,10 @@ func issueEventTitle(t *testing.T, event map[string]any) string {
 }
 
 func Test__SentryIssueEvents(t *testing.T) {
+	now := time.Now().UTC()
 	issues := []sentry.Issue{
-		{ID: "1", Title: "Newest timeout", LastSeen: "2026-09-11T12:00:00Z"},
-		{ID: "2", Title: "Older null pointer", LastSeen: "2026-09-10T12:00:00Z"},
+		{ID: "1", Title: "Newest timeout", LastSeen: now.Format(time.RFC3339)},
+		{ID: "2", Title: "Older null pointer", LastSeen: now.Add(-time.Hour).Format(time.RFC3339)},
 	}
 
 	events := sentryIssueEvents(issues)
