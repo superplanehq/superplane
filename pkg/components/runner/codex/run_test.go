@@ -38,6 +38,17 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 	assert.Contains(t, joined, "developer_instructions")
 }
 
+func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+	assert.Contains(t, joined, `mcp_servers.docs.http_headers.Authorization="Bearer tok"`)
+}
+
 func TestCodexExecArgsResumesExactSession(t *testing.T) {
 	args := codexExecArgsFromScriptWithSession(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
