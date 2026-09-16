@@ -335,14 +335,7 @@ export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasD
     ? rematerializeDuplicateConsoleYaml(sourceConsoleYaml, canvasId, duplicateName)
     : undefined;
 
-  if (
-    !duplicateNeedsSpecCommit(
-      sourceCanvas,
-      consoleYaml,
-      description,
-      createdWithoutDescription(deps),
-    )
-  ) {
+  if (!duplicateNeedsSpecCommit(sourceCanvas, consoleYaml, description, createdWithoutDescription(deps))) {
     return canvasId;
   }
 
