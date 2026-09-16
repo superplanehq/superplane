@@ -51,13 +51,13 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { incidentId?: string; duration?: string } | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.duration) {
+  if (configuration?.duration) {
     const durationLabel = DURATION_LABELS[configuration.duration] || configuration.duration;
     metadata.push({ icon: "clock", label: `Duration: ${durationLabel}` });
   }
