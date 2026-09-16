@@ -241,7 +241,7 @@ function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresenta
       key: "draft-plan-ready",
       headline: "Review the plan, then start",
       text: [
-        "Review **plan.md**. Change anything you need. Then click Start to send it to the line.",
+        "Review **plan.md**. Change anything you need. Then click Build to send it to the line.",
         "",
         `From GitHub issue [${candidate.ticketKey}](${candidate.issue.url}).`,
         "",

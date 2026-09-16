@@ -48,7 +48,8 @@ describe("ClassicWorkOrderPopup", () => {
     renderClassicPopup();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).not.toContain("w-[min(80rem");
+    expect(dialog.className).toContain("w-[min(70rem");
+    expect(dialog.className).not.toContain("has-[[data-refine-chat-solo]]");
     for (const className of SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)) {
       expect(dialog).not.toHaveClass(className);
     }
@@ -59,8 +60,11 @@ describe("ClassicWorkOrderPopup", () => {
     expect(within(dialog).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
     expect(within(dialog).getByText("This task is ready to start")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Archive" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Build" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();

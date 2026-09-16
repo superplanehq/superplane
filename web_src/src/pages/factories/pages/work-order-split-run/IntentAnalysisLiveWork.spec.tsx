@@ -90,6 +90,7 @@ describe("AnalysisLiveWork", () => {
     const status = screen.getByTestId("split-run-intent-thinking");
     const label = within(status).getByText("Starting analysis…");
 
+    expect(status).toHaveClass("px-3");
     expect(status).not.toHaveClass("sp-ai-thinking");
     expect(label).toHaveClass("sp-ai-thinking");
   });
