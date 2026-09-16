@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
     status: { state: string };
   }>,
   issues: [] as Array<{ id: string; name: string }>,
+  issuesError: false,
+  refetchIssues: vi.fn(),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -33,8 +35,8 @@ vi.mock("@/hooks/useIntegrations", () => ({
       return {
         data: mocks.issues,
         isLoading: false,
-        isError: false,
-        refetch: vi.fn(),
+        isError: mocks.issuesError,
+        refetch: mocks.refetchIssues,
       };
     }
     return {
@@ -80,6 +82,8 @@ describe("SentryIntakeSetupDialog", () => {
       },
     });
     mocks.issues.splice(0);
+    mocks.issuesError = false;
+    mocks.refetchIssues.mockReset();
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" },
       status: { state: "ready" },
@@ -185,5 +189,29 @@ describe("SentryIntakeSetupDialog", () => {
 
     expect(screen.getByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
     expect(screen.getByTestId("sentry-project-payments")).toBeInTheDocument();
+  });
+
+  it("keeps the project list and shows an issue-load error after a project is chosen", async () => {
+    mocks.issuesError = true;
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardIssuesError)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.wizardRetry }));
+    expect(mocks.refetchIssues).toHaveBeenCalled();
+    expect(screen.getByTestId("sentry-setup-finish")).toBeEnabled();
+  });
+
+  it("shows the create fallback when SuperPlane returns internal error", async () => {
+    mocks.createIntake.mockRejectedValue({ response: { data: { message: "internal error" } } });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("sentry-setup-finish"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(SENTRY_INTAKE_SETUP_COPY.wizardCreateError);
   });
 });

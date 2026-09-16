@@ -65,6 +65,31 @@ func Test__OnIssue__Setup(t *testing.T) {
 		assert.Empty(t, integrationCtx.Subscriptions)
 		assert.Nil(t, metadataCtx.Metadata)
 	})
+
+	t.Run("does not panic when the trigger has no integration", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+
+		require.NotPanics(t, func() {
+			err := trigger.Setup(core.TriggerContext{
+				Configuration: map[string]any{"actions": []string{"created"}},
+				Metadata:      metadata,
+			})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("requires an integration when a project is selected", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"project": "production",
+				"actions": []string{"created"},
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, "Sentry integration is not connected", err.Error())
+	})
 }
 
 func Test__OnIssue__OnIntegrationMessage(t *testing.T) {

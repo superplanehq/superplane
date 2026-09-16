@@ -129,6 +129,42 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, []any{"created", "unresolved"}, trigger.Configuration["actions"])
 	})
 
+	t.Run("a Sentry intake listens to the production project from setup", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "production",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "production", trigger.Configuration["project"])
+	})
+
+	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		invalidUserCtx := authentication.SetUserIdInMetadata(context.Background(), "not-a-uuid")
+
+		require.NotPanics(t, func() {
+			_, err := CreateFactoryIntake(invalidUserCtx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+				FactoryId:     factory.ID.String(),
+				Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+				IntegrationId: integrationID,
+				ResourceId:    "production",
+			})
+			require.Error(t, err)
+			assert.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
+			message, ok := grpcerrors.HandlerMessage(err)
+			require.True(t, ok)
+			assert.Equal(t, "user not authenticated", message)
+		})
+	})
+
 	t.Run("a Sentry intake rejects an integration of another type", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")

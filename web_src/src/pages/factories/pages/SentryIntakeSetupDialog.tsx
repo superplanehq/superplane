@@ -119,6 +119,8 @@ function SetupStepBody({ setup }: { setup: SentryIntakeSetupModel }) {
       error={setup.projectsQuery.isError}
       onSelect={setup.setProjectId}
       onRetry={() => void setup.projectsQuery.refetch()}
+      issuesError={Boolean(setup.projectId) && setup.issuesQuery.isError}
+      onRetryIssues={() => void setup.issuesQuery.refetch()}
     />
   );
 }
@@ -189,6 +191,8 @@ function ProjectStep({
   error,
   onSelect,
   onRetry,
+  issuesError,
+  onRetryIssues,
 }: {
   projects: Array<{ id?: string; name?: string }>;
   selectedId: string;
@@ -196,6 +200,8 @@ function ProjectStep({
   error: boolean;
   onSelect: (id: string) => void;
   onRetry: () => void;
+  issuesError: boolean;
+  onRetryIssues: () => void;
 }) {
   if (loading) {
     return (
@@ -218,7 +224,21 @@ function ProjectStep({
   if (projects.length === 0) {
     return <p className="workspace-body-text text-muted-foreground">{SENTRY_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>;
   }
-  return <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />;
+  return (
+    <div className="space-y-4">
+      <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />
+      {issuesError ? (
+        <div className="space-y-3">
+          <p className="workspace-body-text text-destructive" role="alert">
+            {SENTRY_INTAKE_SETUP_COPY.wizardIssuesError}
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={onRetryIssues}>
+            {SENTRY_INTAKE_SETUP_COPY.wizardRetry}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ProjectPicker({

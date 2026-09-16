@@ -23,6 +23,7 @@ export const SENTRY_INTAKE_SETUP_COPY = {
   wizardPreviewCaptionNoProject: "Select a project to import 10 unresolved issues and listen for new ones.",
   wizardProjectsLoading: "Loading Sentry projects...",
   wizardProjectsError: "SuperPlane could not load Sentry projects.",
+  wizardIssuesError: "SuperPlane could not load unresolved issues for this project.",
   wizardProjectsEmpty: "This connection has no available projects.",
   wizardRetry: "Try again",
   wizardConnectError: "SuperPlane could not open the Sentry install page.",

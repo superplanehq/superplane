@@ -1165,6 +1165,81 @@ func Test__Sentry__ListResources(t *testing.T) {
 		assert.Equal(t, "https://sentry.io/api/0/organizations/example/alert-rules/7/", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[1].URL.String())
 	})
+
+	t.Run("lists the newest unresolved issues of the selected project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(
+					http.StatusOK,
+					`[{"id":"98","shortId":"PRODUCTION-98","title":"HTTP 500 /api/v1/refunds"},{"id":"99","shortId":"PRODUCTION-99","title":"Cannot read properties of undefined"}]`,
+				),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeUnresolvedIssue, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"project": "production",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeUnresolvedIssue, ID: "98", Name: "PRODUCTION-98 · HTTP 500 /api/v1/refunds"},
+			{Type: ResourceTypeUnresolvedIssue, ID: "99", Name: "PRODUCTION-99 · Cannot read properties of undefined"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(
+			t,
+			"https://sentry.io/api/0/projects/example/production/issues/?query=is%3Aunresolved&limit=10",
+			httpContext.Requests[0].URL.String(),
+		)
+	})
+
+	t.Run("returns an error when unresolved issues cannot be listed", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusInternalServerError, `{"detail":"internal error"}`),
+			},
+		}
+
+		require.NotPanics(t, func() {
+			_, err := impl.ListResources(ResourceTypeUnresolvedIssue, core.ListResourcesContext{
+				HTTP:        httpContext,
+				Integration: integrationCtx,
+				Parameters: map[string]string{
+					"project": "production",
+				},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to list unresolved issues")
+		})
+	})
 }
 
 func Test__Sentry__Configuration(t *testing.T) {
