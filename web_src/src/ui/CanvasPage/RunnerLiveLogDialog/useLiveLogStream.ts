@@ -1,6 +1,6 @@
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import {
   appendLineToLatestSection,
@@ -38,10 +38,22 @@ type LiveLogFailureContext = {
 const initialLogState: LogState = {
   sections: [],
   orphanLines: [],
+  pendingRecords: [],
   error: null,
   isLoading: false,
   isStreaming: false,
 };
+
+function liveLogSessionKey(session: {
+  organizationId: string;
+  canvasId: string;
+  executionId: string;
+  executionInFlight: boolean;
+  terminalCommandStatus: "passed" | "failed" | null;
+  terminalAtMs: number | null;
+}): string {
+  return `${session.organizationId}:${session.canvasId}:${session.executionId}:${session.executionInFlight}:${session.terminalCommandStatus}:${session.terminalAtMs}`;
+}
 
 function hasRunningCommand(state: LogState): boolean {
   return state.sections.some((section) => section.status === "running");
@@ -137,7 +149,14 @@ type StreamHandlerContext = {
 function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers {
   const { reconnecting, replayLineSkip, setState, setUsage, commandCursor, onFailure } = ctx;
   return {
-    onOpen: () => setState((prev) => ({ ...prev, error: null, isLoading: false, isStreaming: true })),
+    onOpen: () =>
+      setState((prev) => ({
+        ...prev,
+        ...(reconnecting ? { pendingRecords: [], orphanLines: [] } : {}),
+        error: null,
+        isLoading: false,
+        isStreaming: true,
+      })),
     onLogLine: (text, commandIndex) => {
       const index = commandIndex ?? commandCursor.index;
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
@@ -160,15 +179,23 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
     },
     onCmdEnd: (index, status, durationMs) =>
       setState((prev) => withClearedError(completeCommandSection(prev, index, status, durationMs))),
-    onToolStart: (kind, text, id, turn) => {
+    onToolStart: (kind, text, id, turn, commandIndex) => {
       setState((prev) =>
-        startReplayedTool(prev, { kind, text, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
+        startReplayedTool(
+          prev,
+          { kind, text, sourceId: id, commandIndex: commandIndex ?? commandCursor.index },
+          reconnecting,
+        ),
       );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_start", kind, text, id, turn }));
     },
-    onToolEnd: (status, durationMs, id, turn) => {
+    onToolEnd: (status, durationMs, id, turn, commandIndex) => {
       setState((prev) =>
-        endReplayedTool(prev, { status, durationMs, sourceId: id, commandIndex: commandCursor.index }, reconnecting),
+        endReplayedTool(
+          prev,
+          { status, durationMs, sourceId: id, commandIndex: commandIndex ?? commandCursor.index },
+          reconnecting,
+        ),
       );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
     },
@@ -391,6 +418,7 @@ export function useLiveLogStream(
   const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isLoading: true, isStreaming: true }));
   const [usage, setUsage] = useState(emptyPromptUsageState);
   const [sessionAttempt, setSessionAttempt] = useState(0);
+  const sessionKeyRef = useRef<string | null>(null);
 
   const scrollTrigger = useMemo(() => {
     const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
@@ -431,7 +459,25 @@ export function useLiveLogStream(
 
     const sessionAbort = new AbortController();
     let activeStream: LiveLogStream | null = null;
-    setState((prev) => ({ ...prev, error: null, isLoading: true, isStreaming: true }));
+    const sessionKey = liveLogSessionKey({
+      organizationId,
+      canvasId,
+      executionId,
+      executionInFlight,
+      terminalCommandStatus,
+      terminalAtMs,
+    });
+    const resetParsedLogs = sessionKeyRef.current !== sessionKey;
+    sessionKeyRef.current = sessionKey;
+    setState((prev) => ({
+      ...(resetParsedLogs ? initialLogState : prev),
+      error: null,
+      isLoading: true,
+      isStreaming: true,
+    }));
+    if (resetParsedLogs) {
+      setUsage(emptyPromptUsageState());
+    }
 
     void runLiveLogSession({
       organizationId,
