@@ -267,7 +267,7 @@ CREATE TABLE public.canvas_folders (
     sort_order bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
+    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY (ARRAY[('blue'::character varying)::text, ('green'::character varying)::text, ('purple'::character varying)::text, ('slate'::character varying)::text, ('orange'::character varying)::text])))
 );
 
 
@@ -399,7 +399,7 @@ CREATE TABLE public.factory_intakes (
     initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
     initial_import_item_count integer,
     CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
-    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
+    CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY (ARRAY[('unspecified'::character varying)::text, ('pending'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text, ('skipped'::character varying)::text])))
 );
 
 
@@ -563,10 +563,10 @@ CREATE TABLE public.factory_pull_request_runs (
     access_requested_at timestamp with time zone,
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
+    CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY (ARRAY[('concurrent'::character varying)::text, ('waiting'::character varying)::text, ('exclusive'::character varying)::text, ('released'::character varying)::text]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
-    CONSTRAINT factory_pull_request_runs_state_valid CHECK (((state)::text = ANY ((ARRAY['active'::character varying, 'finished'::character varying, 'limit_reached'::character varying])::text[])))
+    CONSTRAINT factory_pull_request_runs_state_valid CHECK (((state)::text = ANY (ARRAY[('active'::character varying)::text, ('finished'::character varying)::text, ('limit_reached'::character varying)::text])))
 );
 
 
@@ -841,9 +841,9 @@ CREATE TABLE public.files (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
+    CONSTRAINT files_scope_check CHECK (((scope)::text = ANY (ARRAY[('app'::character varying)::text, ('organization'::character varying)::text, ('workspace'::character varying)::text, ('task'::character varying)::text]))),
     CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
-    CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
+    CONSTRAINT files_state_check CHECK (((state)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text])))
 );
 
 
@@ -2841,7 +2841,7 @@ CREATE INDEX idx_factory_work_order_executions_work_order_created ON public.fact
 -- Name: idx_factory_work_order_executions_work_order_line_active; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.factory_work_order_executions USING btree (work_order_id, line_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.factory_work_order_executions USING btree (work_order_id, line_id) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text]));
 
 
 --
@@ -2918,7 +2918,7 @@ CREATE INDEX idx_files_organization_id ON public.files USING btree (organization
 -- Name: idx_files_stale_pending; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_files_stale_pending ON public.files USING btree (updated_at) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'failed'::character varying])::text[]));
+CREATE INDEX idx_files_stale_pending ON public.files USING btree (updated_at) WHERE ((state)::text = ANY (ARRAY[('pending'::character varying)::text, ('failed'::character varying)::text]));
 
 
 --
@@ -3079,7 +3079,7 @@ CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.w
 -- Name: idx_workflow_node_executions_active_queue; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_node_executions_active_queue ON public.workflow_node_executions USING btree (workflow_id, node_id, queue_name) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'started'::character varying, 'cancelling'::character varying])::text[]));
+CREATE INDEX idx_workflow_node_executions_active_queue ON public.workflow_node_executions USING btree (workflow_id, node_id, queue_name) WHERE ((state)::text = ANY (ARRAY[('pending'::character varying)::text, ('started'::character varying)::text, ('cancelling'::character varying)::text]));
 
 
 --

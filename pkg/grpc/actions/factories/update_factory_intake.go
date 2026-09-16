@@ -104,15 +104,15 @@ func applyIntakeSettings(
 
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
 		graph := resolveIntakeGraph(intake.Source, spec)
-		current := intakeSettingsFromGraph(graph, spec)
+		current := intakeSettingsFromGraph(intake.Source, graph, spec)
 		updated := parseIntakeSettings(current, settings)
-		if intake.Source == models.FactoryIntakeSourceGitHubIssues &&
-			intakeSettingsChangeTrigger(current, updated) &&
+		if intakeSourceHasFilterNode(intake.Source) &&
+			intakeSettingsChangeTrigger(intake.Source, current, updated) &&
 			graph.TriggerNodeID == "" {
 			return invalidArgument("intake automation has no trigger to update")
 		}
 		if graph.FilterNodeID == "" {
-			if intake.Source == models.FactoryIntakeSourceGitHubIssues && intakeSettingsChangeFilters(current, updated) {
+			if intakeSourceHasFilterNode(intake.Source) && intakeSettingsChangeFilters(current, updated) {
 				return invalidArgument("intake automation has no filter to update")
 			}
 		}
@@ -124,15 +124,20 @@ func applyIntakeSettings(
 		for i := range nodes {
 			switch nodes[i].ID {
 			case graph.TriggerNodeID:
-				if intake.Source != models.FactoryIntakeSourceGitHubIssues {
-					continue
-				}
 				configuration := maps.Clone(nodes[i].Configuration)
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["actions"] = intakeTriggerActionsFor(updated)
-				nodes[i].Configuration = configuration
+				switch intake.Source {
+				case models.FactoryIntakeSourceGitHubIssues:
+					configuration["actions"] = intakeTriggerActionsFor(updated)
+					nodes[i].Configuration = configuration
+				case models.FactoryIntakeSourceJiraIssues:
+					configuration["events"] = intakeTriggerEventsFor(updated)
+					nodes[i].Configuration = configuration
+				default:
+					continue
+				}
 			case graph.FilterNodeID:
 				configuration := maps.Clone(nodes[i].Configuration)
 				if configuration == nil {

@@ -28,6 +28,10 @@ const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 // in the Backlog column menu until the flow is generally available.
 const FeatureFactorySentryIntake = "factory_sentry_intake"
 
+// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactoryJiraIntake = "factory_jira_intake"
+
 // FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
 // Productive.io in the Backlog column menu until the flow is generally
 // available.
@@ -55,6 +59,7 @@ var registry = []Feature{
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
+	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
