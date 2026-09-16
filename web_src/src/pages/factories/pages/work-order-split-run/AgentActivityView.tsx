@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CopyButton } from "@/ui/CopyButton";
 import { ChevronRight } from "lucide-react";
 
 import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem } from "./agentActivity";
@@ -144,18 +143,12 @@ function ActivitySummaryButton({
       aria-label={label}
       onClick={onToggle}
       data-testid={testId}
-      className="group sp-tool-enter flex w-full items-start gap-2 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
+      className="sp-tool-enter flex w-full items-start gap-1 rounded-md px-1 py-1 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
     >
-      <span className="min-w-0 flex-1 whitespace-normal break-words">
+      <span className="min-w-0 whitespace-normal break-words">
         {running ? <AnimatedThinkingState text={label} /> : label}
       </span>
-      <ChevronRight
-        className={cn(
-          "mt-0.5 size-3.5 shrink-0 opacity-0 transition-[transform,opacity] group-hover:opacity-100 group-focus-visible:opacity-100",
-          open && "rotate-90 opacity-100",
-        )}
-        aria-hidden
-      />
+      <ChevronRight className={cn("mt-0.5 size-3.5 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
     </button>
   );
 }
@@ -189,7 +182,7 @@ function ToolLine({ tool }: { tool: AgentToolItem }) {
 function CommandLine({ tool }: { tool: AgentToolItem }) {
   const command = commandDisplayText(tool.input) ?? "Command";
   return (
-    <div className="group flex min-w-0 items-center gap-1 px-1 py-0.5">
+    <div className="flex min-w-0 items-center px-1 py-0.5">
       <code
         className={cn(
           "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
@@ -201,12 +194,6 @@ function CommandLine({ tool }: { tool: AgentToolItem }) {
       >
         {command}
       </code>
-      <CopyButton
-        text={command}
-        ariaLabel="Copy command"
-        copiedAriaLabel="Command copied"
-        className="size-5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-transparent focus-visible:opacity-100 data-[copied=true]:opacity-100 dark:hover:bg-transparent"
-      />
     </div>
   );
 }

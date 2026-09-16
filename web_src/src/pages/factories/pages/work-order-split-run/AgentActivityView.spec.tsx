@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity, AgentToolItem } from "./agentActivity";
@@ -112,8 +112,9 @@ describe("AgentActivityView", () => {
 
     const summary = screen.getByRole("button", { name: "Explored repository, used terminal" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(summary.querySelector("svg")).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(summary.querySelector("svg")).not.toHaveClass("opacity-0");
     expect(summary.querySelector("span")).toHaveClass("whitespace-normal", "break-words");
+    expect(summary.querySelector("span")).not.toHaveClass("flex-1");
     expect(screen.queryByText("pwd && find . -type f")).not.toBeInTheDocument();
 
     await user.click(summary);
@@ -142,7 +143,7 @@ describe("AgentActivityView", () => {
     const summary = screen.getByRole("button", { name: "Exploring 1 file, searching code" });
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(summary.querySelector(".sp-thinking-state-current")).toBeInTheDocument();
-    expect(summary.querySelector("svg")).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(summary.querySelector("svg")).not.toHaveClass("opacity-0");
     expect(screen.queryByText("cat README.md")).not.toBeInTheDocument();
 
     await user.click(summary);
@@ -374,38 +375,23 @@ describe("AgentActivityView", () => {
     expect(screen.queryByText("Exit code 1")).not.toBeInTheDocument();
   });
 
-  it("reveals command copy on hover and temporarily shows success", async () => {
-    vi.useFakeTimers();
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  it("does not offer a copy action for commands", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        live
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "pwd",
+          status: "running",
+        })}
+      />,
+    );
 
-    try {
-      render(
-        <AgentActivityView
-          live
-          activity={activityWith({
-            ...completedTool("command-1", "bash", "Bash"),
-            input: "pwd",
-            status: "running",
-          })}
-        />,
-      );
+    await user.click(screen.getByRole("button", { name: "Using terminal" }));
 
-      fireEvent.click(screen.getByRole("button", { name: "Using terminal" }));
-      const copyButton = screen.getByRole("button", { name: "Copy command" });
-      expect(copyButton).toHaveClass("opacity-0", "group-hover:opacity-100", "data-[copied=true]:opacity-100");
-
-      fireEvent.click(copyButton);
-      await act(async () => Promise.resolve());
-      expect(writeText).toHaveBeenCalledWith("pwd");
-      expect(screen.getByRole("button", { name: "Command copied" })).toHaveAttribute("data-copied", "true");
-
-      act(() => vi.advanceTimersByTime(2000));
-      expect(screen.getByRole("button", { name: "Copy command" })).not.toHaveAttribute("data-copied");
-    } finally {
-      vi.useRealTimers();
-      vi.restoreAllMocks();
-    }
+    expect(screen.getByText("pwd")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy command" })).not.toBeInTheDocument();
   });
 
   it("counts all files in multi-file activity summaries", () => {
