@@ -31,6 +31,7 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -217,6 +218,7 @@ func NewServer(
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
+	sentry.EnableHostedInstallBind(encryptor)
 	server.InitRouter(middlewares...)
 	return server, nil
 }
@@ -697,6 +699,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	sentryAppUserRoute := r.NewRoute().Subrouter()
+	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
@@ -820,6 +827,10 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		writeHostedGitHubAppAuthError(w, status)
 		return
 	}
+	if status := hostedSentryAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
+		writeHostedGitHubAppAuthError(w, status)
+		return
+	}
 
 	s.dispatchIntegrationRequest(w, r, integrationInstance)
 }
@@ -865,7 +876,8 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(integrationInstance).Error
 	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
+		logging.ForIntegration(*integrationInstance).WithError(err).Error("failed to save integration after request")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
