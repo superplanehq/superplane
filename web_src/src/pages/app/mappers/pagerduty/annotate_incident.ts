@@ -48,13 +48,13 @@ export const annotateIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { incidentId?: string; content?: string } | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.content) {
+  if (configuration?.content) {
     metadata.push({ icon: "message-square", label: `Note: ${truncate(configuration.content, 50)}` });
   }
 
