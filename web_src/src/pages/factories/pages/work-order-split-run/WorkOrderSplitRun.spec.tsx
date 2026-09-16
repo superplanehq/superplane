@@ -522,8 +522,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
-  it("pins a pull request review strip with one call to action and a More menu", async () => {
-    const user = userEvent.setup();
+  it("pins a pull request review strip with one call to action", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
     const note = screen.getByTestId("split-run-attention-note");
@@ -540,15 +539,42 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
-
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: "To Backlog" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Reject" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
+  });
+
+  it("keeps close actions when automatic pull-request fixes pause", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-checks",
+            pullRequestNumber: "6812",
+            description: "Automatic fixes paused after 3 attempts",
+            kind: "fixes-paused",
+            run: {
+              id: "run-paused",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).not.toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "Automatic fixes did not succeed" })).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
   it("hides work-order close actions when the user cannot update the task", () => {
