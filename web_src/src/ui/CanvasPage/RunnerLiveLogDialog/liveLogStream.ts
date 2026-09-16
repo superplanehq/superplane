@@ -35,8 +35,14 @@ export type LiveLogStreamHandlers = {
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
-  onToolStart?: (kind: string, text: string, id?: string, turn?: number) => void;
-  onToolEnd?: (status: "passed" | "failed", durationMs: number, id?: string, turn?: number) => void;
+  onToolStart?: (kind: string, text: string, id?: string, turn?: number, commandIndex?: number) => void;
+  onToolEnd?: (
+    status: "passed" | "failed",
+    durationMs: number,
+    id?: string,
+    turn?: number,
+    commandIndex?: number,
+  ) => void;
   onTurn?: (turn: number, usage: Record<string, number>, message?: string) => void;
 };
 
@@ -151,6 +157,7 @@ function dispatchToolStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogSt
     typeof rec.text === "string" ? rec.text : "",
     typeof rec.id === "string" ? rec.id : undefined,
     typeof rec.turn === "number" ? rec.turn : undefined,
+    typeof rec.index === "number" ? rec.index : undefined,
   );
   return true;
 }
@@ -168,6 +175,7 @@ function dispatchToolEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
     rec.duration_ms,
     typeof rec.id === "string" ? rec.id : undefined,
     typeof rec.turn === "number" ? rec.turn : undefined,
+    typeof rec.index === "number" ? rec.index : undefined,
   );
   return true;
 }
