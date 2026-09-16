@@ -307,7 +307,7 @@ describe("lineIntakeModel", () => {
   });
 
   it("filters add-intake templates by name or description", () => {
-    expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
+    expect(filterAddIntakeTemplates("unresolved").map((template) => template.id)).toEqual(["sentry-exceptions"]);
     expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
     expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
     expect(filterAddIntakeTemplates("")).toHaveLength(7);
