@@ -131,6 +131,7 @@ export function prepareData(
   user?: SuperplaneMeUser | null,
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  organizationId?: string,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -156,6 +157,7 @@ export function prepareData(
           workflowEdges,
           canvasMode,
           openModal,
+          organizationId,
         );
       })
       .map((node) => ({
@@ -256,6 +258,7 @@ export function prepareNode(
   edges?: ComponentsEdge[],
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  organizationId?: string,
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -275,6 +278,7 @@ export function prepareNode(
         nodeQueueItemsMap,
         canvasId: workflowId,
         queryClient,
+        organizationId,
         currentUser,
         edges,
         canvasMode,
