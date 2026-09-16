@@ -1,4 +1,4 @@
-export const FOLLOW_BOTTOM_THRESHOLD_PX = 16;
+export const FOLLOW_BOTTOM_THRESHOLD_PX = 144;
 
 export function runningSplitRunPhaseId(phases: ReadonlyArray<{ id: string; status: string }>): string | null {
   return phases.find((phase) => phase.status === "running")?.id ?? null;

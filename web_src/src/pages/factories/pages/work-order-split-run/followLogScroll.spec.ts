@@ -22,11 +22,11 @@ describe("followAfterRunningPhaseChange", () => {
 });
 
 describe("isNearLogBottom", () => {
-  it("is true within 16 pixels of the bottom", () => {
-    expect(isNearLogBottom(84, 200, 100)).toBe(true);
+  it("is true within 144 pixels of the bottom", () => {
+    expect(isNearLogBottom(56, 300, 100)).toBe(true);
   });
 
-  it("is false when the user scrolls more than 16 pixels up", () => {
-    expect(isNearLogBottom(80, 200, 100)).toBe(false);
+  it("is false when the user scrolls more than 144 pixels up", () => {
+    expect(isNearLogBottom(55, 300, 100)).toBe(false);
   });
 });

@@ -94,6 +94,8 @@
   --matrix-ease: ease-in-out;
   display: grid;
   flex-shrink: 0;
+  place-content: center;
+  place-items: center;
   grid-template-columns: repeat(4, 2px);
   grid-auto-rows: 2px;
   gap: 2px;
@@ -101,6 +103,9 @@
 
 .t-matrix i {
   display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
   background: var(--matrix-base);
   animation: t-matrix-pulse var(--matrix-cycle) var(--matrix-ease) infinite;
   animation-delay: calc(var(--d, 0) * 1ms);

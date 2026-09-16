@@ -9,7 +9,8 @@ export type FollowLogScrollOptions = {
 /**
  * Follow pins the log scroller to the bottom. Live runner notes grow
  * inside the phase card, so the hook watches the scroller DOM rather
- * than only a parent stream-length tick.
+ * than only a parent stream-length tick. A layout resize (plan pane
+ * open or wrap) must not look like the user scrolled away.
  */
 export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   runningPhaseId: string | null,
@@ -36,6 +37,18 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     setFollowing((wasFollowing) => followAfterRunningPhaseChange(wasFollowing, previousRunningPhaseId, runningPhaseId));
   }, [runningPhaseId]);
 
+  const releaseScrollIgnore = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        ignoreScrollRef.current = false;
+        const node = scrollRef.current;
+        if (node && !isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight)) {
+          setFollowing(false);
+        }
+      });
+    });
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) {
@@ -48,11 +61,9 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
       if (node && followingRef.current) {
         node.scrollTop = node.scrollHeight;
       }
-      requestAnimationFrame(() => {
-        ignoreScrollRef.current = false;
-      });
     });
-  }, []);
+    releaseScrollIgnore();
+  }, [releaseScrollIgnore]);
 
   const setFollow = useCallback(
     (next: boolean) => {
@@ -71,22 +82,17 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
     scrollToBottom();
   }, [contentTick, following, scrollToBottom]);
 
-  useLayoutEffect(() => {
-    if (!following) {
-      return;
-    }
-    const el = scrollRef.current;
-    if (!el) {
-      return;
-    }
-    const observer = new MutationObserver(() => {
-      if (followingRef.current) {
-        scrollToBottom();
-      }
-    });
-    observer.observe(el, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [following, scrollToBottom]);
+  useLayoutEffect(
+    () => observeLogMutations(scrollRef.current, following, followingRef, scrollToBottom),
+    [following, scrollToBottom],
+  );
+
+  useLayoutEffect(
+    () => observeLogResize(scrollRef.current, followingRef, ignoreScrollRef, scrollToBottom, releaseScrollIgnore),
+    [releaseScrollIgnore, scrollToBottom],
+  );
+
+  useEffect(() => bindUserScrollStop(scrollRef.current, followingRef, setFollowing), []);
 
   const onScroll = useCallback(() => {
     if (ignoreScrollRef.current) {
@@ -106,4 +112,69 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   }, [resumeOnBottom]);
 
   return { following, setFollowing: setFollow, scrollRef, onScroll };
+}
+
+function observeLogMutations(
+  el: HTMLElement | null,
+  following: boolean,
+  followingRef: { current: boolean },
+  scrollToBottom: () => void,
+) {
+  if (!following || !el) {
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    if (followingRef.current) {
+      scrollToBottom();
+    }
+  });
+  observer.observe(el, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+function observeLogResize(
+  el: HTMLElement | null,
+  followingRef: { current: boolean },
+  ignoreScrollRef: { current: boolean },
+  scrollToBottom: () => void,
+  releaseScrollIgnore: () => void,
+) {
+  if (!el || typeof ResizeObserver === "undefined") {
+    return;
+  }
+  const observer = new ResizeObserver(() => {
+    if (followingRef.current) {
+      scrollToBottom();
+      return;
+    }
+    ignoreScrollRef.current = true;
+    releaseScrollIgnore();
+  });
+  observer.observe(el);
+  return () => observer.disconnect();
+}
+
+function bindUserScrollStop(
+  el: HTMLElement | null,
+  followingRef: { current: boolean },
+  setFollowing: (next: boolean) => void,
+) {
+  if (!el) {
+    return;
+  }
+  const stopFollowOnUserScroll = () => {
+    if (!followingRef.current) {
+      return;
+    }
+    if (isNearLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
+      return;
+    }
+    setFollowing(false);
+  };
+  el.addEventListener("wheel", stopFollowOnUserScroll, { passive: true });
+  el.addEventListener("touchmove", stopFollowOnUserScroll, { passive: true });
+  return () => {
+    el.removeEventListener("wheel", stopFollowOnUserScroll);
+    el.removeEventListener("touchmove", stopFollowOnUserScroll);
+  };
 }

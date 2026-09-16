@@ -410,14 +410,14 @@ describe("LinesPage board", () => {
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
       const dialog = screen.getByTestId("work-order-split-run");
-      expect(within(dialog).getByTestId("split-run-intent-decision-tip")).toHaveTextContent(
-        "SuperPlane is currently analyzing this task",
-      );
+      expect(within(dialog).queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+      expect(within(dialog).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
+      expect(within(dialog).getByTestId("split-run-intent-plan-analyzing")).toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-      expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+      expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
       expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);

@@ -3,10 +3,10 @@ import { useMemo, useState } from "react";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { classicSplitRunFooter } from "./splitRunFooter";
@@ -14,6 +14,7 @@ import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
+import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
@@ -64,7 +65,7 @@ export function ClassicWorkOrderPopup({
     footerKind: classicFixture.footer.kind,
   });
   const [tab, setTab] = useState(defaultSplitRunPopupTab(classicFixture));
-  const [fullPage, setFullPage] = useState(false);
+  const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
@@ -95,13 +96,12 @@ export function ClassicWorkOrderPopup({
             titleBusy={edits.titleBusy}
             onTitleSave={(next) => void edits.saveTitle(next)}
             expanded={fullPage}
-            onToggleExpanded={() => setFullPage((current) => !current)}
+            onToggleExpanded={toggleFullPage}
             actions={
-              <CopyLinkButton
-                url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-                iconClassName="h-4 w-4"
-                testId="popup-work-order-copy-link-button"
+              <PopupHeaderActions
+                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+                onArchive={classicFixture.footer.kind === "draft" ? mutations.onArchive : undefined}
+                archiveBusy={footerActions.busy}
               />
             }
             accessory={views}
