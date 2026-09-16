@@ -1,16 +1,30 @@
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
-import { PR_FEEDBACK_SOURCES, availablePRFeedbackSources, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
+import { lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
+import { PR_FEEDBACK_SOURCES, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
 import {
   buildColumnAutomationActivity,
   emptyColumnAutomationActivity,
   type ColumnAutomationActivity,
 } from "./columnAutomationActivity";
+import {
+  AGENT_STEP_CATALOG_ID,
+  ANALYSIS_CATALOG_ID,
+  ANALYSIS_ENTRY,
+  CUSTOM_CATALOG_ID,
+  CUSTOM_ENTRY,
+  EVENT_CUSTOM_ENTRY,
+  PR_CLOSURE_CATALOG_ID,
+  PR_CLOSURE_ENTRY,
+  prFeedbackSentence,
+} from "./columnAutomationCatalog";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
+
+export { catalogForColumn, onlyCustomCatalogRemains, takenCatalogIds } from "./columnAutomationCatalog";
+export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
 
 export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
 
@@ -63,71 +77,6 @@ export type ColumnAutomationsInput = {
 
 const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
 
-const ANALYSIS_CATALOG_ID = "analysis";
-const AGENT_STEP_CATALOG_ID = "agent-step";
-const CUSTOM_CATALOG_ID = "custom";
-const PR_CLOSURE_CATALOG_ID = "pr-closure";
-
-const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
-  id: ANALYSIS_CATALOG_ID,
-  kind: "analysis",
-  name: "Task analysis",
-  description: "Score a task when it enters Backlog.",
-  trigger: "On task in Backlog",
-  action: "Score the task",
-  iconSrc: "",
-  iconAlt: "",
-  unique: true,
-};
-
-const AGENT_STEP_ENTRY: ColumnAutomationCatalogEntry = {
-  id: AGENT_STEP_CATALOG_ID,
-  kind: "agent-step",
-  name: "Run an agent",
-  description: "Start an agent when a task enters this column.",
-  trigger: "On task in this column",
-  action: "Run the agent",
-  iconSrc: "",
-  iconAlt: "",
-  unique: false,
-};
-
-const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
-  id: CUSTOM_CATALOG_ID,
-  kind: "custom",
-  name: "Custom automation",
-  description: "Add a blank automation canvas to this column.",
-  trigger: "On task in this column",
-  action: "Run the automation",
-  iconSrc: "",
-  iconAlt: "",
-  unique: false,
-};
-
-const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
-  id: CUSTOM_CATALOG_ID,
-  kind: "custom",
-  name: "Custom automation",
-  description: "Add a blank canvas. Choose a trigger and the steps to run.",
-  trigger: "On a trigger you choose",
-  action: "Run the automation",
-  iconSrc: "",
-  iconAlt: "",
-  unique: false,
-};
-
-const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
-  id: PR_CLOSURE_CATALOG_ID,
-  kind: "pr-closure",
-  name: "Pull request closure",
-  description: "Complete the task when the pull request merges or closes.",
-  trigger: "On pull request merged or closed",
-  action: "Complete the task",
-  iconSrc: githubIcon,
-  iconAlt: "GitHub",
-  unique: true,
-};
-
 export function isColumnKey(value: string | null | undefined): value is ColumnKey {
   if (!value) {
     return false;
@@ -168,62 +117,6 @@ export function columnAutomationsEmptyCopy(columnTitle: string, key: ColumnKey):
     return "No automations. Tasks stay here when they finish.";
   }
   return `No automations. Tasks pass through ${columnTitle} without action.`;
-}
-
-export function catalogForColumn(key: ColumnKey): ColumnAutomationCatalogEntry[] {
-  if (key === "backlog") {
-    return [
-      ...LINE_INTAKE_SOURCES.map((source) => ({
-        id: source.id,
-        kind: "intake" as const,
-        name: source.name,
-        description: source.description,
-        trigger: source.listen.label,
-        action: source.accept.label,
-        iconSrc: source.iconSrc,
-        iconAlt: source.iconAlt,
-        unique: true,
-      })),
-      ANALYSIS_ENTRY,
-    ];
-  }
-  if (key === "verify") {
-    return [
-      ...availablePRFeedbackSources().map((source) => {
-        const sentence = prFeedbackSentence(source.id);
-        return {
-          id: source.id,
-          kind: sentence.kind,
-          name: source.name,
-          description: source.description,
-          trigger: sentence.trigger,
-          action: sentence.action,
-          iconSrc: source.iconSrc,
-          iconAlt: source.iconAlt,
-          unique: true,
-        };
-      }),
-      EVENT_CUSTOM_ENTRY,
-    ];
-  }
-  if (key === "done") {
-    return [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY];
-  }
-  return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
-}
-
-export function takenCatalogIds(automations: ColumnAutomation[], catalog: ColumnAutomationCatalogEntry[]): string[] {
-  const present = new Set(automations.map((automation) => automation.catalogId));
-  return catalog.filter((entry) => entry.unique && present.has(entry.id)).map((entry) => entry.id);
-}
-
-/** True when every unique catalog type is taken and custom is the only remaining choice. */
-export function onlyCustomCatalogRemains(
-  catalog: ColumnAutomationCatalogEntry[],
-  takenIds: readonly string[],
-): boolean {
-  const remaining = catalog.filter((entry) => !takenIds.includes(entry.id));
-  return remaining.length === 1 && remaining[0]?.kind === "custom";
 }
 
 export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): boolean {
@@ -317,13 +210,6 @@ function analysisAutomation(
       canvasId: app.id,
     },
   ];
-}
-
-function prFeedbackSentence(sourceId: string): { kind: ColumnAutomationKind; trigger: string; action: string } {
-  if (sourceId === "checks") {
-    return { kind: "pr-checks", trigger: "On failing pull request check", action: "Fix the checks" };
-  }
-  return { kind: "pr-discussion", trigger: "On pull request comment", action: "Address the feedback" };
 }
 
 function prFeedbackAutomation(
@@ -536,36 +422,3 @@ export function catalogEntryToAutomation(
     activity: emptyColumnAutomationActivity(0),
   };
 }
-
-export const COLUMN_AUTOMATIONS_COPY = {
-  menuLabel: "Automations",
-  addLabel: "Add automation",
-  addHint: "Choose a trigger and an action.",
-  pickerTitle: "Add automation",
-  pickerDescription: "Choose an automation for this column.",
-  sourceTaken: "This automation is already configured.",
-  needsRepairLabel: "Needs repair",
-  disabledLabel: "Disabled",
-  editLabel: "Edit automation",
-  tabsLabel: "Automation sections",
-  generalTab: "General",
-  agentTab: "Agent",
-  automationTab: "Automation",
-  viewLoading: "The automation is loading.",
-  viewEmpty: "This automation has no canvas yet.",
-  viewError: "SuperPlane could not load the automation.",
-  viewRetry: "Try again",
-  rowsEmpty: "No automations",
-  rowMenu: "Open automation",
-  deleteLabel: "Delete automation",
-  deletingLabel: "Deleting",
-  keepLabel: "Keep automation",
-  confirmDelete: "Delete this automation? This cannot be undone.",
-  viewMenuLabel: "Board view",
-  viewOptions: "View options",
-  viewNames: "Automation names",
-  viewIcons: "Automation icons",
-  lastRunPassed: "Passed",
-  lastRunFailed: "Failed",
-  activityRunning: "running",
-} as const;

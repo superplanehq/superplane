@@ -260,6 +260,7 @@ export function isActivePRFeedbackActivity(activity: FactoriesFactoryPullRequest
 
 const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for checks\b/i;
 const CHECKS_PASSED_DESCRIPTION = /^Checks passed\b/i;
+const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
 
 /**
  * Built-in checks wait. Custom canvases also use concurrent access when they
@@ -279,8 +280,6 @@ export function isAddressingFeedbackActivity(activity: FactoriesFactoryPullReque
 export function addressingFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
   return new Set(addressingFeedbackLabelsByWorkOrder(pullRequests).keys());
 }
-
-const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
 
 export function addressingFeedbackLabelsByWorkOrder(
   pullRequests: FactoriesFactoryPullRequest[],

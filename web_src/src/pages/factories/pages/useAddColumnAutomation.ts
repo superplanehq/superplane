@@ -72,7 +72,14 @@ export function useAddColumnAutomation(args: {
     if (!column) {
       return;
     }
-    await createCustomAutomation(column, args, createAutomation.mutateAsync, navigate, closePicker, name);
+    await createCustomAutomation({
+      column,
+      args,
+      mutateAsync: createAutomation.mutateAsync,
+      navigate,
+      close: closePicker,
+      name,
+    });
   };
 
   return {
@@ -158,26 +165,26 @@ async function installPRClosure(
   }
 }
 
-async function createCustomAutomation(
-  column: ColumnKey,
-  args: { organizationId: string; factoryKey: string; lineId?: string },
-  mutateAsync: (input: { name?: string; columnKey?: string }) => Promise<{ id?: string }>,
-  navigate: (path: string) => void,
-  close: () => void,
-  name: string,
-) {
-  const automation = await mutateAsync({
-    name,
-    columnKey: column === "verify" || column === "done" ? column : undefined,
+async function createCustomAutomation(input: {
+  column: ColumnKey;
+  args: { organizationId: string; factoryKey: string; lineId?: string };
+  mutateAsync: (body: { name?: string; columnKey?: string }) => Promise<{ id?: string }>;
+  navigate: (path: string) => void;
+  close: () => void;
+  name: string;
+}) {
+  const automation = await input.mutateAsync({
+    name: input.name,
+    columnKey: input.column === "verify" || input.column === "done" ? input.column : undefined,
   });
-  close();
+  input.close();
   if (!automation.id) {
     return;
   }
-  navigate(
-    factoryAppConfigurePath(args.organizationId, args.factoryKey, automation.id, {
+  input.navigate(
+    factoryAppConfigurePath(input.args.organizationId, input.args.factoryKey, automation.id, {
       from: "lines",
-      lineId: args.lineId,
+      lineId: input.args.lineId,
     }),
   );
 }

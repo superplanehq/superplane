@@ -308,7 +308,7 @@ export function automationsPath(organizationId: string, factoryKey: string) {
 }
 
 export function automationDetailPath(organizationId: string, factoryKey: string, appId: string) {
-  return `${automationsPath(organizationId, factoryKey)}/${appId}`;
+  return factoryAppPath(organizationId, factoryKey, appId, { from: "automations" });
 }
 
 export type FactoryAppNavFrom = "automations" | "lines" | "task" | "overview";

@@ -10,7 +10,7 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns automation detail when appId present", () => {
+  it("returns the automations list when appId is present", () => {
     expect(
       resolveFactoryAppBackNav("org", "fac", {
         from: "automations",
@@ -18,8 +18,8 @@ describe("resolveFactoryAppBackNav", () => {
         appName: "Label to task",
       }),
     ).toEqual({
-      label: "Label to task",
-      href: "/org/workspaces/fac/automations/app-1",
+      label: "Automations",
+      href: "/org/workspaces/fac/automations",
     });
   });
 
