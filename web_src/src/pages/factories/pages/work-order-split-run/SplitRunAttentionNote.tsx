@@ -124,9 +124,6 @@ export function SplitRunAttentionNote({
   const pullRequestNote = WaitingPullRequestReview({
     note,
     tone,
-    actions,
-    actionBusy,
-    onAction,
   });
   if (pullRequestNote) {
     return pullRequestNote;

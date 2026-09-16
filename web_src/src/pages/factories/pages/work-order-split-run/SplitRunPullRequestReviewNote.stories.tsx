@@ -46,9 +46,7 @@ export const Default: Story = {
   name: "Pull request is ready",
   render: () => (
     <PopupShell>
-      {footer.note ? (
-        <SplitRunAttentionNote note={footer.note} tone="waiting" actions={footer.actions} onAction={() => {}} />
-      ) : null}
+      {footer.note ? <SplitRunAttentionNote note={footer.note} tone="waiting" actions={[]} /> : null}
     </PopupShell>
   ),
 };
