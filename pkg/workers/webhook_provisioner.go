@@ -268,12 +268,16 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 		WithField("source", "webhook").
 		Info("Calling integration webhook setup handler")
 
+	integrationCtx := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
+		Integration: integrationCtx,
 		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})
+	if saveErr := db.Save(instance).Error; saveErr != nil && err == nil {
+		return metadata, instance.AppName, saveErr
+	}
 
 	return metadata, instance.AppName, err
 }
