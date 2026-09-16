@@ -9,7 +9,7 @@ import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions
 const { materializeDefaults } = vi.hoisted(() => ({ materializeDefaults: vi.fn() }));
 
 vi.mock("@/api-client", () => ({
-  factoriesMaterializeFactoryAppDefaults: materializeDefaults,
+  factoriesMaterializeFactoryAutomationDefaults: materializeDefaults,
 }));
 
 const DEFAULTS_YAML = `apiVersion: v1

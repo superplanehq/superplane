@@ -45,6 +45,10 @@ const FeatureOrganizationBYOK = "organization_byok"
 // orders until the flow is generally available.
 const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
 
+// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
+// Done, and phase columns until the flow is generally available.
+const FeatureFactoryCustomAutomations = "factory_custom_automations"
+
 func released() *bool {
 	v := true
 	return &v
@@ -59,6 +63,7 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 }
 
 func All() []Feature {

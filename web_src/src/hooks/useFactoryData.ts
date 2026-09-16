@@ -8,8 +8,10 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesCreateFactoryAutomation,
+  factoriesDeleteFactoryAutomation,
   factoriesListFactories,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
@@ -28,7 +30,7 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -628,21 +630,65 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
-export async function fetchFactoryApps(organizationId: string, factoryId: string): Promise<FactoryApp[]> {
-  const response = await factoriesListFactoryApps(
+export async function fetchFactoryAutomations(organizationId: string, factoryId: string): Promise<FactoryAutomation[]> {
+  const response = await factoriesListFactoryAutomations(
     withOrganizationHeader({
       organizationId,
       path: { factoryId },
     }),
   );
-  return response.data?.apps ?? [];
+  return response.data?.automations ?? [];
 }
 
-export function useFactoryApps(organizationId: string, factoryId: string) {
+export function useFactoryAutomations(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryAppsKey(organizationId, factoryId),
-    queryFn: () => fetchFactoryApps(organizationId, factoryId),
+    queryFn: () => fetchFactoryAutomations(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
+  });
+}
+
+export function useCreateFactoryAutomation(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name?: string; columnKey?: string }) => {
+      const response = await factoriesCreateFactoryAutomation(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {
+            name: input.name,
+            columnKey: input.columnKey,
+          },
+        }),
+      );
+      if (!response.data?.automation) {
+        throw new Error("Failed to create automation");
+      }
+      return response.data.automation;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactoryAutomation(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (automationId: string) => {
+      await factoriesDeleteFactoryAutomation(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, automationId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+    },
   });
 }
 
@@ -713,4 +759,4 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   });
 }
 
-export type { FactoryApp, FactoriesFactoryLine, FactoryLineStep };
+export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };

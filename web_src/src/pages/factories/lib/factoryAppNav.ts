@@ -1,5 +1,4 @@
 import {
-  automationDetailPath,
   automationsPath,
   factoryHomePath,
   factoryLineDetailPath,
@@ -36,12 +35,6 @@ export function resolveFactoryAppBackNav(
   const from = parseFactoryAppNavFrom(options.from ?? null) ?? options.from;
 
   if (from === "automations") {
-    if (options.appId) {
-      return {
-        label: options.appName?.trim() || "Automations",
-        href: automationDetailPath(organizationId, factoryKey, options.appId),
-      };
-    }
     return { label: "Automations", href: automationsPath(organizationId, factoryKey) };
   }
 

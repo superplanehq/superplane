@@ -39,6 +39,8 @@ import {
   FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsLayout,
+  LegacyFactoryAppRedirect,
+  LegacyFactoryAppSplitRunRedirect,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
@@ -163,10 +165,11 @@ function organizationScopedRouteTree() {
               <Route index element={<AutomationsPage />} />
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
-              <Route path=":appId" element={<AutomationsPage />} />
+              <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
+              <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
-            <Route path="apps/:appId" element={<FactoryCanvasConfigureGate />} />
-            <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
+            <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />
+            <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
           </Route>
         </Route>
         <Route

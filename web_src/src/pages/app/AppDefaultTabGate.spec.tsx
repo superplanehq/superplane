@@ -70,7 +70,10 @@ function renderGate({ initialEntry }: { initialEntry: string }) {
         <Route path="/apps/:appId" element={<AppDefaultTabGate />} />
         <Route path="/:organizationId" element={<div data-testid="org-home" />} />
         <Route path="/:organizationId/workspaces" element={<div data-testid="workspaces-index" />} />
-        <Route path="/:organizationId/workspaces/:factoryKey/apps/:appId" element={<div data-testid="factory-app" />} />
+        <Route
+          path="/:organizationId/workspaces/:factoryKey/automations/:appId"
+          element={<div data-testid="factory-app" />}
+        />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -198,7 +201,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
     renderGate({ initialEntry: "/org-1/apps/canvas-1" });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/automations/canvas-1");
     expect(getLocation().search).toBe("?configure=1&agent=1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
@@ -209,7 +212,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
     renderGate({ initialEntry: "/org-1/apps/canvas-1?run=run-9" });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/automations/canvas-1");
     expect(getLocation().search).toBe("?run=run-9");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
@@ -222,7 +225,7 @@ describe("AppDefaultTabGate — factory apps", () => {
       initialEntry: "/org-1/apps/canvas-1?edit=1&sidebar=1&node=create-pr&version=v1&file=app.yaml",
     });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/automations/canvas-1");
     expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });

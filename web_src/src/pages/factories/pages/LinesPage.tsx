@@ -8,7 +8,8 @@ import type {
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import {
-  useFactoryApps,
+  useDeleteFactoryAutomation,
+  useFactoryAutomations,
   useFactoryPullRequests,
   useFactoryWorkOrders,
   useUpdateFactoryLine,
@@ -24,10 +25,14 @@ import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -38,8 +43,11 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
+import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
+import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -139,6 +147,7 @@ import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   columnAutomationOpenPath,
+  columnTitleForKey,
   type ColumnAutomation,
   type ColumnKey,
 } from "../lib/columnAutomations";
@@ -236,7 +245,8 @@ export function LinesPage() {
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const { data: workOrders = [], isLoading: workOrdersLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
-  const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
+  const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
+  const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
   const { data: me } = useMe(false);
   const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
@@ -249,6 +259,7 @@ export function LinesPage() {
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
   const hasSentryIntake = configuredIntakes.some((intake) => intake.source.id === "sentry-exceptions");
+  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const addIntakeTemplates = useMemo(() => {
     const allowedIds = new Set(["github-issues"]);
     if (canAddSentryIntake) {
@@ -281,7 +292,7 @@ export function LinesPage() {
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
     fixesPausedOrderIds,
-  } = usePRFeedbackWorkOrderAttention(pullRequests);
+  } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
   const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
     organizationId,
@@ -450,6 +461,24 @@ export function LinesPage() {
     navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id), { replace: true });
   };
 
+  const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
+  const canDeleteViewedCustom =
+    canUpdate && (viewedAutomation?.columnKey === "verify" || viewedAutomation?.columnKey === "done");
+  const closeAutomationView = () => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id));
+  const deleteViewedCustomAutomation = async () => {
+    if (!automationViewCanvasId) {
+      return;
+    }
+    try {
+      await deleteAutomation.mutateAsync(automationViewCanvasId);
+      showSuccessToast("Automation deleted.");
+      closeAutomationView();
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to delete automation"));
+      throw error;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
       {settingsIntake ? (
@@ -490,8 +519,10 @@ export function LinesPage() {
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
-          title={factoryApps.find((app) => app.id === automationViewCanvasId)?.name?.trim() || "Automation"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          title={viewedAutomation?.name?.trim() || "Automation"}
+          onClose={closeAutomationView}
+          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+          deletePending={deleteAutomation.isPending}
         />
       ) : null}
       {prFeedbackOpen ? (
@@ -574,10 +605,18 @@ export function LinesPage() {
             }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
+              showColumnAutomations && customAutomationsEnabled
+                ? undefined
+                : canAddPRFeedback
+                  ? () => setAddPRFeedbackOpen(true)
+                  : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
+            appRepository={appRepository}
+            backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
+            defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
+            githubIntegrationId={githubIntegrationId}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             workOrderCardContext={{
@@ -724,6 +763,10 @@ function LineDetail({
   onAddPRFeedback,
   factoryIntakes,
   prFeedbackHandlers,
+  appRepository,
+  backlogRepository,
+  defaultBranch,
+  githubIntegrationId,
   showColumnAutomations,
   showAutomationRows,
   workOrderCardContext,
@@ -735,7 +778,7 @@ function LineDetail({
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string }>;
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
@@ -747,6 +790,10 @@ function LineDetail({
   onAddPRFeedback?: () => void;
   factoryIntakes: FactoriesFactoryIntake[];
   prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
+  appRepository: string;
+  backlogRepository: string;
+  defaultBranch: string;
+  githubIntegrationId: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   workOrderCardContext: WorkOrderCardContext;
@@ -785,6 +832,19 @@ function LineDetail({
     },
     [apps, board, factoryIntakes, overlay, prFeedbackHandlers, workOrders],
   );
+
+  const addAutomation = useAddColumnAutomation({
+    organizationId,
+    factoryId,
+    factoryKey,
+    lineId: line.id,
+    appRepository,
+    backlogRepository,
+    defaultBranch,
+    githubIntegrationId,
+    automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
+  });
+  const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -839,8 +899,28 @@ function LineDetail({
           showAutomationRows={showAutomationRows}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
+          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}
+      <AddColumnAutomationPicker
+        open={addAutomation.pickerOpen}
+        onClose={addAutomation.closePicker}
+        onSelect={(entry) => {
+          void addAutomation.onSelect(entry);
+        }}
+        catalog={addAutomation.catalog}
+        takenIds={addAutomation.takenIds}
+      />
+      <CreateFactoryAppDialog
+        open={addAutomation.naming}
+        isSaving={addAutomation.isPending}
+        showDescription={false}
+        onClose={addAutomation.closePicker}
+        onCreate={async ({ name }) => {
+          await addAutomation.createNamed(name);
+        }}
+      />
       {peekOrderId && peekOrder ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
@@ -1064,6 +1144,8 @@ function PhaseBoard({
   showAutomationRows,
   automationsFor,
   onAutomationRowAction,
+  onAddVerifyAutomation,
+  onAddDoneAutomation,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1088,6 +1170,8 @@ function PhaseBoard({
   showAutomationRows: boolean;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAddVerifyAutomation?: () => void;
+  onAddDoneAutomation?: () => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
@@ -1270,6 +1354,7 @@ function PhaseBoard({
           automations={verifyAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}
+          onAddAutomation={onAddVerifyAutomation}
         />
       </div>
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
@@ -1286,6 +1371,7 @@ function PhaseBoard({
           automations={doneAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}
+          onAddAutomation={onAddDoneAutomation}
         />
       </div>
     </WorkOrderKanbanBoard>
@@ -1306,6 +1392,7 @@ function VerifyColumn({
   automations,
   automationRowCount,
   onAutomationRowAction,
+  onAddAutomation,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1320,6 +1407,7 @@ function VerifyColumn({
   automations?: ColumnAutomation[];
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAddAutomation?: () => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1357,7 +1445,13 @@ function VerifyColumn({
               <Plus className="size-3.5" aria-hidden />
             </button>
           ) : null}
-          <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
+          <ColumnLaneMenu
+            title={title}
+            testId="lines-verify-menu"
+            colorId={colorId}
+            onColorChange={onColorChange}
+            onAddAutomation={onAddAutomation}
+          />
         </div>
       }
       subheader={columnAutomationRowsSubheader({
@@ -1365,6 +1459,7 @@ function VerifyColumn({
         automations,
         rowCount: automationRowCount,
         onRowAction: onAutomationRowAction,
+        onAdd: onAddAutomation,
         testId: "lines-verify-automation-rows",
       })}
       banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
@@ -1397,6 +1492,7 @@ function DoneColumn({
   automations,
   automationRowCount,
   onAutomationRowAction,
+  onAddAutomation,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1409,6 +1505,7 @@ function DoneColumn({
   automations?: ColumnAutomation[];
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAddAutomation?: () => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1434,7 +1531,13 @@ function DoneColumn({
               testId="lines-done-automations"
             />
           )}
-          <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
+          <ColumnLaneMenu
+            title={title}
+            testId="lines-done-menu"
+            colorId={colorId}
+            onColorChange={onColorChange}
+            onAddAutomation={onAddAutomation}
+          />
         </div>
       }
       subheader={columnAutomationRowsSubheader({
@@ -1442,6 +1545,7 @@ function DoneColumn({
         automations,
         rowCount: automationRowCount,
         onRowAction: onAutomationRowAction,
+        onAdd: onAddAutomation,
         testId: "lines-done-automation-rows",
       })}
       testId="lines-done-column"
