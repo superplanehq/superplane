@@ -54,10 +54,7 @@ function CompletedActivity({
         testId={`agent-activity-summary-${activity.id}`}
       />
       {open ? (
-        <div
-          className="ml-1 space-y-0.5 border-l border-border/70 pl-2"
-          data-testid={`agent-activity-details-${activity.id}`}
-        >
+        <div className="space-y-0.5" data-testid={`agent-activity-details-${activity.id}`}>
           <ActivityEntries entries={entries} truncated={activity.truncated} />
         </div>
       ) : null}
@@ -117,7 +114,7 @@ function ToolGroup({ group }: { group: ToolActivityGroup }) {
         onToggle={() => setOpen((current) => !current)}
       />
       {open ? (
-        <div className="ml-1 space-y-0.5 border-l border-border/70 pl-2" data-testid={`${group.id}-details`}>
+        <div className="space-y-0.5" data-testid={`${group.id}-details`}>
           {group.tools.map((tool) => (
             <ToolLine key={tool.id} tool={tool} />
           ))}

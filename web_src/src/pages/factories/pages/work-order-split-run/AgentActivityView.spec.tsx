@@ -287,6 +287,9 @@ describe("AgentActivityView", () => {
 
     await user.click(summary);
 
+    const activityDetails = screen.getByTestId("agent-activity-details-activity-1");
+    expect(activityDetails).not.toHaveClass("ml-1", "border-l", "pl-2");
+
     const searchBatch = screen.getByRole("button", { name: "Searched code" });
     const explorationBatch = screen.getByRole("button", { name: "Explored 1 file, explored repository" });
     expect(searchBatch).toHaveAttribute("aria-expanded", "false");
@@ -296,6 +299,8 @@ describe("AgentActivityView", () => {
     expect(screen.queryByText("cat retry.go")).not.toBeInTheDocument();
 
     await user.click(searchBatch);
+    const searchDetails = screen.getByTestId("tool-group-search-1-details");
+    expect(searchDetails).not.toHaveClass("ml-1", "border-l", "pl-2");
     expect(screen.getByText("rg retry")).toBeInTheDocument();
     expect(screen.queryByText("cat retry.go")).not.toBeInTheDocument();
 
