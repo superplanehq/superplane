@@ -11,7 +11,7 @@ const DEFAULT_LIMITS = Object.freeze({
   toolOutputHeadBytes: 8 * 1024,
   snapshotBytes: 256 * 1024,
 });
-const SECRET_NAME_PATTERN = /(api[_-]?key|access[_-]?token|auth[_-]?token|secret|password|credential)/i;
+const SECRET_NAME_PATTERN = /(api[_-]?key|access[_-]?token|auth[_-]?token|run[_-]?token|secret|password|credential)/i;
 const ANSI_PATTERN = /[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;
 const UNSAFE_CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001A\u001C-\u001F\u007F]/g;
 

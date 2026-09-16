@@ -85,6 +85,16 @@ test("redacts credentials from activity text", () => {
   assert.match(output, /\[REDACTED\]/);
 });
 
+test("redacts the planning session runner token from activity text", () => {
+  const token = "eyJhbGciOiJIUzI1NiJ9.eyJwdXJwb3NlIjoicGxhbm5pbmdfc2Vzc2lvbiJ9.signature";
+  const output = redactSensitiveText(`SUPERPLANE_RUN_TOKEN=${token}\n${token}`, {
+    SUPERPLANE_RUN_TOKEN: token,
+  });
+
+  assert.equal(output.includes(token), false);
+  assert.equal(output, "SUPERPLANE_RUN_TOKEN=[REDACTED]\n[REDACTED]");
+});
+
 test("keeps the first and last output when a tool exceeds its limit", () => {
   const records = [];
   const stream = createActivityStream({
