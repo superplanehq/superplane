@@ -56,8 +56,6 @@ export function WorkOrderIntentDocument({
 }: WorkOrderIntentDocumentProps) {
   const {
     refineOpen,
-    showPlan,
-    setShowPlan,
     split,
     document,
     sessionTitle,
@@ -105,9 +103,7 @@ export function WorkOrderIntentDocument({
             document={document}
             streamKey={streamKey}
             streamReady={streamReady}
-            showPlan={showPlan}
             isAnalyzing={isAnalyzing}
-            onTogglePlan={() => setShowPlan((current) => !current)}
             resultAfterBody={resultAfterBody}
             resultFooter={resultFooter}
             confidence={confidence}
@@ -212,9 +208,7 @@ function IntentSpecColumn({
   document,
   streamKey,
   streamReady,
-  showPlan,
   isAnalyzing,
-  onTogglePlan,
   resultAfterBody,
   resultFooter,
   confidence,
@@ -230,9 +224,7 @@ function IntentSpecColumn({
   document: IntentDocument;
   streamKey?: string;
   streamReady?: boolean;
-  showPlan: boolean;
   isAnalyzing: boolean;
-  onTogglePlan: () => void;
   resultAfterBody?: ReactNode;
   resultFooter?: ReactNode;
   confidence?: WorkOrderCheckPresentation;
@@ -286,9 +278,7 @@ function IntentSpecColumn({
             document={document}
             streamKey={streamKey}
             streamReady={streamReady}
-            expanded={showPlan}
             isAnalyzing={isAnalyzing}
-            onToggle={onTogglePlan}
           />
           {resultAfterBody}
         </div>
