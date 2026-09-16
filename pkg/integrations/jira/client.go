@@ -166,13 +166,9 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("no integration context available to refresh the OAuth token")
 	}
 
-	clientID, err := c.integration.GetConfig("clientId")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client id: %w", err)
-	}
-	clientSecret, err := c.integration.GetConfig("clientSecret")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client secret: %w", err)
+	app := resolveOAuthApp(c.integration)
+	if app.ClientID == "" || app.ClientSecret == "" {
+		return fmt.Errorf("missing Jira OAuth app credentials")
 	}
 	refreshToken, err := findSecret(c.integration, SecretOAuthRefreshToken)
 	if err != nil {
@@ -182,7 +178,7 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("missing Jira OAuth refresh token; connect Jira via OAuth first")
 	}
 
-	token, err := NewAuth(c.http).RefreshToken(string(clientID), string(clientSecret), refreshToken)
+	token, err := NewAuth(c.http).RefreshToken(app.ClientID, app.ClientSecret, refreshToken)
 	if err != nil {
 		return err
 	}
