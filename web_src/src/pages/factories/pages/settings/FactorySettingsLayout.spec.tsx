@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_WORKSPACE_AGENT_RESOURCES,
+  FEATURE_WORKSPACE_MODELS,
+} from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -401,6 +405,63 @@ describe("FactorySettingsLayout sidebar", () => {
 
       await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Models");
+    }, 10000);
+  });
+
+  describe("workspace-agent-resources experimental feature", () => {
+    it("hides the Agent resources nav item when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent-resources")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("shows the Agent resources nav item when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent-resources")).toHaveTextContent(
+        "Agent resources",
+      );
+    }, 10000);
+
+    it("redirects away from the Agent resources route when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("factory-settings-agent-resources")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("renders the Agent resources page when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        />,
+      );
+
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Agent resources");
+      expect(await screen.findByTestId("factory-settings-agent-resources")).toBeInTheDocument();
     }, 10000);
   });
 

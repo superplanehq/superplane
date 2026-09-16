@@ -7,7 +7,11 @@ import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_WORKSPACE_AGENT_RESOURCES,
+  FEATURE_WORKSPACE_MODELS,
+} from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
@@ -40,6 +44,9 @@ import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScro
 /** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
 const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
 
+/** Nav item id for workspace Agent resources, gated behind `FEATURE_WORKSPACE_AGENT_RESOURCES`. */
+const WORKSPACE_AGENT_RESOURCES_NAV_ITEM_ID = "workspace-agent-resources";
+
 /** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
 const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
 
@@ -55,6 +62,9 @@ function visibleFactorySettingsNavGroups(
   const hiddenNavItemIds = new Set<string>();
   if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
     hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_AGENT_RESOURCES)) {
+    hiddenNavItemIds.add(WORKSPACE_AGENT_RESOURCES_NAV_ITEM_ID);
   }
   if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
     hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
