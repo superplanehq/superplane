@@ -18,7 +18,7 @@ import (
 const hostedInstallGrantTTL = 20 * time.Minute
 
 // hostedInstallGrantStore keeps public Sentry app install grants until the
-// setup callback claims one. Sentry sends the installation webhook and the
+// setup callback binds one. Sentry sends the installation webhook and the
 // browser redirect at the same time, and each one can reach a different
 // SuperPlane process, so every process reads the grants from one place.
 type hostedInstallGrantStore interface {
@@ -90,7 +90,7 @@ func (databaseHostedInstallGrants) Take(installationUUID, code string) (*hostedS
 		return nil, err
 	}
 
-	grant, err := models.TakeSentryAppInstallGrant(
+	grant, err := models.FindSentryAppInstallGrant(
 		database.Conn(),
 		installationUUID,
 		hostedInstallCodeDigest(code),

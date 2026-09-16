@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -46,34 +47,34 @@ func UpsertSentryAppInstallGrant(tx *gorm.DB, grant SentryAppInstallGrant) error
 	}).Create(&grant).Error
 }
 
-// TakeSentryAppInstallGrant removes and returns the grant of an installation
-// when the caller presents the same install code. It returns nil when no
-// unexpired grant matches, so a caller without the code cannot claim an
-// installation it does not own.
-func TakeSentryAppInstallGrant(tx *gorm.DB, installationUUID, codeDigest string, now time.Time) (*SentryAppInstallGrant, error) {
+// FindSentryAppInstallGrant returns the grant of an installation when the
+// caller presents the same install code. It leaves the row in place so a
+// later callback can retry if decrypting the tokens or binding the
+// integration fails. It returns nil when no unexpired grant matches, so a
+// caller without the code cannot claim an installation it does not own.
+func FindSentryAppInstallGrant(tx *gorm.DB, installationUUID, codeDigest string, now time.Time) (*SentryAppInstallGrant, error) {
 	installationUUID = strings.TrimSpace(installationUUID)
 	if installationUUID == "" || codeDigest == "" {
 		return nil, nil
 	}
 
-	grants := []SentryAppInstallGrant{}
+	var grant SentryAppInstallGrant
 	err := tx.
-		Clauses(clause.Returning{}).
 		Where(
 			"installation_uuid = ? AND code_digest = ? AND expires_at > ?",
 			installationUUID,
 			codeDigest,
 			now,
 		).
-		Delete(&grants).
+		First(&grant).
 		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	if len(grants) == 0 {
-		return nil, nil
-	}
-	return &grants[0], nil
+	return &grant, nil
 }
 
 // DeleteSentryAppInstallGrant drops the grant of an installation, for example

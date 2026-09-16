@@ -280,6 +280,47 @@ func Test__afterHostedAppSetup_usesUnclaimedWebhookGrant(t *testing.T) {
 	for _, request := range httpContext.Requests {
 		assert.NotContains(t, request.URL.String(), "/authorizations/")
 	}
+
+	taken, err := grants.Take("install-1", "grant-code")
+	require.NoError(t, err)
+	assert.Nil(t, taken)
+}
+
+func Test__afterHostedAppSetup_failedOrgLoad_keepsGrant(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	grants := useFakeHostedInstallGrants(t)
+
+	require.NoError(t, grants.Remember(hostedSentryInstall{
+		InstallationUUID: "install-1",
+		AccessToken:      "webhook-token",
+		RefreshToken:     "webhook-refresh",
+		TokenExpiresAt:   time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+		Organization:     &OrganizationSummary{ID: "1", Slug: "acme", Name: "Acme"},
+		Code:             "grant-code",
+	}))
+
+	impl := &Sentry{}
+	integrationCtx := pendingHostedIntegration()
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusInternalServerError, `{"detail":"unavailable"}`),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	req := hostedSetupRequest("/api/v1/sentry/app/setup?code=grant-code&installationId=install-1", "csrf-state")
+
+	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.NotEqual(t, "ready", integrationCtx.State)
+
+	taken, err := grants.Take("install-1", "grant-code")
+	require.NoError(t, err)
+	require.NotNil(t, taken)
+	assert.Equal(t, "webhook-token", taken.AccessToken)
 }
 
 func Test__ParseInstallationCreatedGrant(t *testing.T) {

@@ -56,8 +56,8 @@ func (f *fakeHostedInstallGrants) Take(installationUUID, code string) (*hostedSe
 	if !ok || install.Code != code || !install.ExpiresAt.After(time.Now()) {
 		return nil, nil
 	}
-	delete(f.grants, installationUUID)
-	return &install, nil
+	copied := install
+	return &copied, nil
 }
 
 func (f *fakeHostedInstallGrants) Forget(installationUUID string) error {

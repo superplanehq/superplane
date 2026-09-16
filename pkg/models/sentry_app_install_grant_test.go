@@ -26,30 +26,35 @@ func Test__SentryAppInstallGrant(t *testing.T) {
 		ExpiresAt:        now.Add(20 * time.Minute),
 	}
 
-	t.Run("a grant is claimed one time only", func(t *testing.T) {
+	t.Run("a grant stays readable until it is deleted", func(t *testing.T) {
 		require.NoError(t, models.UpsertSentryAppInstallGrant(db, grant))
 
-		taken, err := models.TakeSentryAppInstallGrant(db, "install-1", "digest-1", now)
+		found, err := models.FindSentryAppInstallGrant(db, "install-1", "digest-1", now)
 		require.NoError(t, err)
-		require.NotNil(t, taken)
-		assert.Equal(t, "acme", taken.OrganizationSlug)
-		assert.Equal(t, []byte("sealed-access"), taken.AccessToken)
-		assert.Equal(t, []byte("sealed-refresh"), taken.RefreshToken)
-		assert.Equal(t, grant.TokenExpiresAt, taken.TokenExpiresAt)
+		require.NotNil(t, found)
+		assert.Equal(t, "acme", found.OrganizationSlug)
+		assert.Equal(t, []byte("sealed-access"), found.AccessToken)
+		assert.Equal(t, []byte("sealed-refresh"), found.RefreshToken)
+		assert.Equal(t, grant.TokenExpiresAt, found.TokenExpiresAt)
 
-		taken, err = models.TakeSentryAppInstallGrant(db, "install-1", "digest-1", now)
+		found, err = models.FindSentryAppInstallGrant(db, "install-1", "digest-1", now)
 		require.NoError(t, err)
-		assert.Nil(t, taken)
+		require.NotNil(t, found)
+
+		require.NoError(t, models.DeleteSentryAppInstallGrant(db, "install-1"))
+		found, err = models.FindSentryAppInstallGrant(db, "install-1", "digest-1", now)
+		require.NoError(t, err)
+		assert.Nil(t, found)
 	})
 
 	t.Run("another code cannot claim the grant", func(t *testing.T) {
 		require.NoError(t, models.UpsertSentryAppInstallGrant(db, grant))
 
-		taken, err := models.TakeSentryAppInstallGrant(db, "install-1", "other-digest", now)
+		taken, err := models.FindSentryAppInstallGrant(db, "install-1", "other-digest", now)
 		require.NoError(t, err)
 		assert.Nil(t, taken)
 
-		taken, err = models.TakeSentryAppInstallGrant(db, "install-1", "", now)
+		taken, err = models.FindSentryAppInstallGrant(db, "install-1", "", now)
 		require.NoError(t, err)
 		assert.Nil(t, taken)
 	})
@@ -60,7 +65,7 @@ func Test__SentryAppInstallGrant(t *testing.T) {
 		expired.ExpiresAt = now.Add(-time.Minute)
 		require.NoError(t, models.UpsertSentryAppInstallGrant(db, expired))
 
-		taken, err := models.TakeSentryAppInstallGrant(db, "install-expired", "digest-1", now)
+		taken, err := models.FindSentryAppInstallGrant(db, "install-expired", "digest-1", now)
 		require.NoError(t, err)
 		assert.Nil(t, taken)
 	})
@@ -73,11 +78,11 @@ func Test__SentryAppInstallGrant(t *testing.T) {
 		next.AccessToken = []byte("sealed-next")
 		require.NoError(t, models.UpsertSentryAppInstallGrant(db, next))
 
-		taken, err := models.TakeSentryAppInstallGrant(db, "install-1", "digest-1", now)
+		taken, err := models.FindSentryAppInstallGrant(db, "install-1", "digest-1", now)
 		require.NoError(t, err)
 		assert.Nil(t, taken)
 
-		taken, err = models.TakeSentryAppInstallGrant(db, "install-1", "digest-2", now)
+		taken, err = models.FindSentryAppInstallGrant(db, "install-1", "digest-2", now)
 		require.NoError(t, err)
 		require.NotNil(t, taken)
 		assert.Equal(t, []byte("sealed-next"), taken.AccessToken)
@@ -87,7 +92,7 @@ func Test__SentryAppInstallGrant(t *testing.T) {
 		require.NoError(t, models.UpsertSentryAppInstallGrant(db, grant))
 		require.NoError(t, models.DeleteSentryAppInstallGrant(db, "install-1"))
 
-		taken, err := models.TakeSentryAppInstallGrant(db, "install-1", "digest-1", now)
+		taken, err := models.FindSentryAppInstallGrant(db, "install-1", "digest-1", now)
 		require.NoError(t, err)
 		assert.Nil(t, taken)
 	})

@@ -117,7 +117,16 @@ func (s *Sentry) completeHostedAppInstall(
 	if orgSlug == "" {
 		orgSlug = rememberedOrgSlug
 	}
-	return s.finishHostedInstall(ctx, metadata, tokens, installationUUID, orgSlug)
+	if err := s.finishHostedInstall(ctx, metadata, tokens, installationUUID, orgSlug); err != nil {
+		return err
+	}
+
+	// Binding succeeded. Drop the grant now. A failed bind still finds
+	// it on retry because Take does not consume the row.
+	if err := hostedInstallGrants.Forget(installationUUID); err != nil {
+		ctx.Logger.Errorf("failed to drop Sentry install grant: %v", err)
+	}
+	return nil
 }
 
 func (s *Sentry) finishHostedInstall(
