@@ -3,8 +3,12 @@ import { ChevronDown, ExternalLink, GitPullRequest } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
-import type { SplitRunFooterAction } from "./splitRunFooter";
-import { PULL_REQUEST_REVIEW_COPY, type PullRequestReviewTarget } from "./splitRunPullRequestReview";
+import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
+import {
+  PULL_REQUEST_REVIEW_COPY,
+  pullRequestReviewNote,
+  type PullRequestReviewTarget,
+} from "./splitRunPullRequestReview";
 
 const MARK_CLASSNAME = "flex shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white";
 
@@ -124,5 +128,33 @@ function MoreActionsMenu({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+export function WaitingPullRequestReview({
+  note,
+  tone,
+  actions,
+  actionBusy,
+  onAction,
+}: {
+  note: SplitRunFooterNote;
+  tone: SplitRunDecisionTone;
+  actions: SplitRunFooterAction[];
+  actionBusy: boolean;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
+  if (!pullRequest || !note.cta) {
+    return null;
+  }
+  return (
+    <SplitRunPullRequestReviewNote
+      ctaLabel={note.cta.label}
+      pullRequest={pullRequest}
+      actions={actions}
+      actionBusy={actionBusy}
+      onAction={onAction}
+    />
   );
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   analysisFinishedStatus,
   analysisFirstResultDelivered,
+  analysisPlanBody,
   hasAnalysisPlan,
   hasAnalysisScore,
 } from "./analysisOutcome";
@@ -41,6 +42,7 @@ describe("analysisFirstResultDelivered", () => {
 
   it("accepts intent.md as the plan", () => {
     expect(hasAnalysisPlan([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe(true);
+    expect(analysisPlanBody([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe("A retry loop.");
   });
 });
 

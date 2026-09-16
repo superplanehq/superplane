@@ -308,7 +308,14 @@ function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQu
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
   if (isAnalyzing) {
-    return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+    return (
+      <ConfidenceAnalyzingIndicator
+        className="shrink-0"
+        testId={`work-order-card-analyzing-${entryId}`}
+        showThinkingStates
+        showTooltip={false}
+      />
+    );
   }
   if (score != null) {
     return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
