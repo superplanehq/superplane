@@ -213,4 +213,15 @@ describe("WorkOrderIntentTranscript", () => {
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
   });
+
+  it("hides plan-updated rows so the sticky control can own the latest plan", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I published the spec." },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+    ]);
+
+    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated })).not.toBeInTheDocument();
+    expect(screen.getByText("I published the spec.")).toBeInTheDocument();
+  });
 });

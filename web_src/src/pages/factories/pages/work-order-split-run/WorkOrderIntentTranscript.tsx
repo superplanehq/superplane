@@ -33,10 +33,11 @@ export function WorkOrderIntentTranscript({
   activities?: AgentActivity[];
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const visible = messages.filter((message) => message.kind !== "plan");
   const knownMessageIDs = useRef<Set<string> | null>(null);
   const newAgentMessageIDs = new Set(
     knownMessageIDs.current
-      ? messages
+      ? visible
           .filter((message) => message.role === "agent" && !knownMessageIDs.current?.has(message.id))
           .map((message) => message.id)
       : [],
@@ -46,20 +47,20 @@ export function WorkOrderIntentTranscript({
     knownMessageIDs.current = new Set(messages.map((message) => message.id));
   }, [messages]);
 
-  if (messages.length === 0 && activities.length === 0) {
+  if (visible.length === 0 && activities.length === 0) {
     return null;
   }
 
-  const last = messages.at(-1);
+  const last = visible.at(-1);
   const activitiesByID = new Map(activities.map((activity) => [activity.id, activity]));
-  const linkedActivityIDs = new Set(messages.flatMap((message) => (message.activityId ? [message.activityId] : [])));
+  const linkedActivityIDs = new Set(visible.flatMap((message) => (message.activityId ? [message.activityId] : [])));
   const unlinkedActivities = activities.filter(
     (activity) => activity.status !== "running" && !linkedActivityIDs.has(activity.id),
   );
 
   return (
-    <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
-      {messages.map((message) => {
+    <div className="mb-3 space-y-3" data-testid="split-run-intent-transcript">
+      {visible.map((message) => {
         const activity = message.activityId ? activitiesByID.get(message.activityId) : undefined;
         return (
           <div key={message.id}>
@@ -93,6 +94,9 @@ function TranscriptMessage({
   streaming: boolean;
   files?: FilesFile[];
 }) {
+  if (message.kind === "plan") {
+    return null;
+  }
   if (message.role === "user") {
     if (message.origin === "survey") {
       return <SurveyAnswerBubble text={message.text} userId={message.userId} resolveUser={resolveUser} />;

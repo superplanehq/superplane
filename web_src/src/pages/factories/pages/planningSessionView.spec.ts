@@ -386,6 +386,7 @@ describe("createWithAgentViewFromSession", () => {
         messages: [
           { id: "note", role: "user", text: "Refine NEW-11: Retry refunds." },
           { id: "ready", role: "agent", text: "I have this task. What do you want to change?" },
+          { id: "plan-1", role: "plan", text: `{"score":4,"summary":"This issue is a good fit for an agent."}` },
         ],
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
@@ -394,7 +395,32 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.refining).toBe(true);
     expect(view.messages).toEqual([
       { id: "ready", kind: "text", role: "agent", text: "I have this task. What do you want to change?" },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
     ]);
+  });
+
+  it("maps a plan publish to a score banner and keeps the why sentence out of chat", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          {
+            id: "plan-1",
+            role: "plan",
+            text: `{"score":3,"summary":"Start only after you name the uncertainty."}`,
+            createdAt: "2026-09-03T10:00:00Z",
+          },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "plan-1", kind: "plan", role: "plan", score: 3, createdAtMs: Date.parse("2026-09-03T10:00:00Z") },
+    ]);
+    expect(JSON.stringify(view.messages)).not.toContain("uncertainty");
   });
 
   it("leaves the order key undefined when the server sends no created_at", () => {
