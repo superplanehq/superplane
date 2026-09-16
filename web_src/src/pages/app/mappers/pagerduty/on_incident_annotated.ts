@@ -63,7 +63,7 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
-    const configuration = node.configuration as any;
+    const configuration = node.configuration as { contentFilter?: string } | undefined;
     const metadataItems = [];
 
     if (metadata?.service?.name) {

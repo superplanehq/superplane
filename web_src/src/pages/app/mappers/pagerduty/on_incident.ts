@@ -44,7 +44,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentMetadata;
-    const configuration = node.configuration as any;
+    const configuration = node.configuration as { events?: string[]; urgencies?: string[] } | undefined;
     const metadataItems = [];
 
     if (metadata?.service?.name) {
@@ -54,14 +54,14 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration.events) {
+    if (configuration?.events) {
       metadataItems.push({
         icon: "funnel",
         label: `Events: ${configuration.events.join(", ")}`,
       });
     }
 
-    if (configuration.urgencies) {
+    if (configuration?.urgencies) {
       metadataItems.push({
         icon: "funnel",
         label: `Urgencies: ${configuration.urgencies.join(", ")}`,
