@@ -59,7 +59,7 @@ export function WorkOrderIntentTranscript({
 
   return (
     <div className="space-y-0" data-testid="split-run-intent-transcript">
-      {visible.map((message) => {
+      {visible.map((message, index) => {
         const activity = message.activityId ? activitiesByID.get(message.activityId) : undefined;
         return (
           <div key={message.id}>
@@ -71,6 +71,8 @@ export function WorkOrderIntentTranscript({
                 newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
               }
               files={files}
+              adjacentUserAbove={visible[index - 1]?.role === "user"}
+              adjacentUserBelow={visible[index + 1]?.role === "user"}
             />
           </div>
         );
@@ -87,23 +89,51 @@ function TranscriptMessage({
   resolveUser,
   streaming,
   files,
+  adjacentUserAbove,
+  adjacentUserBelow,
 }: {
   message: CreateWithAgentMessage;
   resolveUser: OrgUserDisplayLookup;
   streaming: boolean;
   files?: FilesFile[];
+  adjacentUserAbove: boolean;
+  adjacentUserBelow: boolean;
 }) {
   if (message.kind === "plan") {
     return null;
   }
   if (message.role === "user") {
+    const frameClassName = userMessageFrameClass(adjacentUserAbove, adjacentUserBelow);
     if (message.origin === "survey") {
-      return <SurveyAnswerBubble text={message.text} userId={message.userId} resolveUser={resolveUser} />;
+      return (
+        <SurveyAnswerBubble
+          text={message.text}
+          userId={message.userId}
+          resolveUser={resolveUser}
+          frameClassName={frameClassName}
+        />
+      );
     }
-    return <ComposerNoteBubble text={message.text} userId={message.userId} resolveUser={resolveUser} files={files} />;
+    return (
+      <ComposerNoteBubble
+        text={message.text}
+        userId={message.userId}
+        resolveUser={resolveUser}
+        files={files}
+        frameClassName={frameClassName}
+      />
+    );
   }
 
   return <AgentMessage text={message.text} streaming={streaming} files={files} />;
+}
+
+function userMessageFrameClass(adjacentUserAbove: boolean, adjacentUserBelow: boolean) {
+  return cn(
+    "sp-text-reveal flex w-full justify-end",
+    adjacentUserAbove ? "pt-1.5" : "pt-2.5",
+    adjacentUserBelow ? "pb-1.5" : "pb-2.5",
+  );
 }
 
 const AgentMessage = memo(function AgentMessage({
@@ -147,16 +177,18 @@ function ComposerNoteBubble({
   userId,
   resolveUser,
   files,
+  frameClassName,
 }: {
   text: string;
   userId?: string;
   resolveUser: OrgUserDisplayLookup;
   files?: FilesFile[];
+  frameClassName: string;
 }) {
   const sender = senderDisplay(userId, resolveUser);
 
   return (
-    <div className="sp-text-reveal flex w-full justify-end">
+    <div className={frameClassName}>
       <div
         className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5"
         data-testid="split-run-intent-user-note"
@@ -181,17 +213,19 @@ function SurveyAnswerBubble({
   text,
   userId,
   resolveUser,
+  frameClassName,
 }: {
   text: string;
   userId?: string;
   resolveUser: OrgUserDisplayLookup;
+  frameClassName: string;
 }) {
   const pairs = parsePlanningSurveyReply(text);
   const skipped = text.trim() === CREATE_WITH_AGENT_COPY.surveySkipped;
   const sender = senderDisplay(userId, resolveUser);
 
   return (
-    <div className="sp-text-reveal flex w-full justify-end">
+    <div className={frameClassName}>
       <div
         className="sp-survey-card max-w-[92%] rounded-2xl border px-3.5 py-3"
         data-testid="split-run-intent-survey-answer"
