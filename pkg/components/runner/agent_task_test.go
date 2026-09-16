@@ -220,7 +220,7 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 	t.Parallel()
 
 	prompt := "See ![bug](https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1)"
-	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -234,12 +234,18 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 		},
 	})
 
-	require.Len(t, commands, 3)
+	require.Len(t, commands, 5)
 	assert.Equal(t, "Fetch task attachments", commands[1].Name)
 	assert.Contains(t, commands[1].Command, `mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
 	assert.Contains(t, commands[1].Command, `curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
 	assert.Contains(t, commands[1].Command, "sp_file=1")
-	assert.Equal(t, "Implement", commands[2].Name)
+	assert.Contains(t, requireBrokerFile(t, files, "process_video_attachments.sh").Content, "Extract still frames")
+	assert.Contains(t, requireBrokerFile(t, files, "transcribe_video_attachments.sh").Content, "Transcribe narration")
+	assert.Equal(t, "Process video attachments", commands[2].Name)
+	assert.Contains(t, commands[2].Command, "process_video_attachments.sh")
+	assert.Equal(t, "Transcribe video attachments", commands[3].Name)
+	assert.Contains(t, commands[3].Command, "transcribe_video_attachments.sh")
+	assert.Equal(t, "Implement", commands[4].Name)
 }
 
 func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
@@ -271,13 +277,15 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 
 	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, signed)
 	assert.NotContains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "sp-file://")
-	require.Len(t, commands, 3)
+	require.Len(t, commands, 5)
 	assert.Equal(t, "Fetch task attachments", commands[1].Name)
 	assert.Contains(t, commands[1].Command, "curl -fsSL")
 	assert.Contains(t, commands[1].Command, "sp_file=1")
-	assert.Equal(t, "Implement", commands[2].Name)
-	assert.Contains(t, commands[2].Preview, "sp-file://"+fileID)
-	assert.NotContains(t, commands[2].Preview, "sp_file=1")
+	assert.Equal(t, "Process video attachments", commands[2].Name)
+	assert.Equal(t, "Transcribe video attachments", commands[3].Name)
+	assert.Equal(t, "Implement", commands[4].Name)
+	assert.Contains(t, commands[4].Preview, "sp-file://"+fileID)
+	assert.NotContains(t, commands[4].Preview, "sp_file=1")
 }
 
 func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {

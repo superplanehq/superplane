@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"embed"
 	"fmt"
 	"net/url"
 	"path"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/blob"
 )
+
+//go:embed process_video_attachments.sh transcribe_video_attachments.sh
+var attachmentSetupScripts embed.FS
 
 type AgentPromptCommand func(promptName, model string) string
 
@@ -53,7 +57,9 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 		Kind:    LiveLogKindSetup,
 	})
 	if fetch := AttachmentFetchCommand(CollectTaskAttachmentsFromSteps(AgentStepsForDispatch(input.Steps, input.DispatchedSteps))); fetch != nil {
+		files = append(files, AttachmentSetupFiles()...)
 		commands = append(commands, *fetch)
+		commands = append(commands, VideoAttachmentCommands()...)
 	}
 	commands = append(commands, setupCommands...)
 
@@ -272,11 +278,17 @@ func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
 	var builder strings.Builder
 	builder.WriteString(`mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
 	builder.WriteByte('\n')
+	builder.WriteString(`printf '# Task files\n\nOriginal files stay here. Video frames and transcripts are added next.\n' >"$SUPERPLANE_TASK_DIR/attachments/INDEX.md"`)
+	builder.WriteByte('\n')
 	for _, attachment := range attachments {
 		builder.WriteString(`curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
 		builder.WriteString(attachment.Filename)
 		builder.WriteString(`" `)
 		builder.WriteString(ShellSingleQuote(attachment.URL))
+		builder.WriteByte('\n')
+		builder.WriteString(`printf -- '- original: attachments/`)
+		builder.WriteString(attachment.Filename)
+		builder.WriteString(`\n' >>"$SUPERPLANE_TASK_DIR/attachments/INDEX.md"`)
 		builder.WriteByte('\n')
 	}
 	command := builder.String()
@@ -285,6 +297,38 @@ func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
 		Command: WithTaskBinOnPath(command),
 		Kind:    LiveLogKindSetup,
 		Preview: LiveLogText("Download task files"),
+	}
+}
+
+func AttachmentSetupFiles() []BrokerTaskFile {
+	process, err := attachmentSetupScripts.ReadFile("process_video_attachments.sh")
+	if err != nil {
+		panic(err)
+	}
+	transcribe, err := attachmentSetupScripts.ReadFile("transcribe_video_attachments.sh")
+	if err != nil {
+		panic(err)
+	}
+	return []BrokerTaskFile{
+		{Path: "process_video_attachments.sh", Content: string(process), Mode: "0755"},
+		{Path: "transcribe_video_attachments.sh", Content: string(transcribe), Mode: "0755"},
+	}
+}
+
+func VideoAttachmentCommands() []BrokerCommand {
+	return []BrokerCommand{
+		{
+			Name:    "Process video attachments",
+			Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/process_video_attachments.sh"`),
+			Kind:    LiveLogKindSetup,
+			Preview: LiveLogText("Extract still frames from task videos"),
+		},
+		{
+			Name:    "Transcribe video attachments",
+			Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/transcribe_video_attachments.sh"`),
+			Kind:    LiveLogKindSetup,
+			Preview: LiveLogText("Transcribe narration from task videos"),
+		},
 	}
 }
 

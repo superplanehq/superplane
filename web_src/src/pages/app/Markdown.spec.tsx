@@ -355,6 +355,19 @@ describe("MarkdownContent work order files", () => {
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
   });
+
+  it("renders a video player for video task files", () => {
+    render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
+  });
 });
 
 describe("MarkdownContent images", () => {

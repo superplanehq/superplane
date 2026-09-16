@@ -1,12 +1,13 @@
 import { mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 
-import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
+import { isWorkOrderVideoSource, parseWorkOrderFileId, resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 
 declare module "@tiptap/core" {
   interface Storage {
     image: {
       downloadUrls: Record<string, string>;
+      contentTypes: Record<string, string>;
     };
   }
 }
@@ -15,6 +16,7 @@ export const WorkOrderImage = Image.extend({
   addStorage() {
     return {
       downloadUrls: {} as Record<string, string>,
+      contentTypes: {} as Record<string, string>,
     };
   },
   addAttributes() {
@@ -31,13 +33,16 @@ export const WorkOrderImage = Image.extend({
     const src =
       (resolvedSrc as string | undefined | null) ??
       resolveWorkOrderFileSrc(rest.src as string | undefined, this.editor?.storage.image?.downloadUrls);
-    return [
-      "img",
-      mergeAttributes(this.options.HTMLAttributes, rest, {
-        src,
-        class: "work-order-file-image",
-      }),
-    ];
+    const fileId = parseWorkOrderFileId(rest.src as string | undefined);
+    const contentType = fileId ? this.editor?.storage.image?.contentTypes?.[fileId] : undefined;
+    const attrs = mergeAttributes(this.options.HTMLAttributes, rest, {
+      src,
+      class: "work-order-file-image",
+    });
+    if (isWorkOrderVideoSource({ contentType, src, alt: rest.alt as string | undefined })) {
+      return ["video", mergeAttributes(attrs, { controls: "", playsinline: "" })];
+    }
+    return ["img", attrs];
   },
 }).configure({
   inline: false,

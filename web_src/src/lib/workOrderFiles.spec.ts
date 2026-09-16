@@ -4,6 +4,7 @@ import {
   clearWorkOrderFileDownloadCache,
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
+  isInlineWorkOrderVideo,
   isReachableWorkOrderFileUrl,
   parseWorkOrderFileId,
   rewriteWorkOrderFileRefs,
@@ -37,9 +38,11 @@ describe("workOrderFiles", () => {
 
   it("accepts allowed images and rejects other types", () => {
     expect(isAllowedWorkOrderFile(new File(["x"], "a.png", { type: "image/png" }))).toBe(true);
-    expect(isAllowedWorkOrderFile(new File(["x"], "a.mp4", { type: "video/mp4" }))).toBe(false);
+    expect(isAllowedWorkOrderFile(new File(["x"], "a.mp4", { type: "video/mp4" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "a.zip", { type: "application/zip" }))).toBe(false);
     expect(isInlineWorkOrderImage("image/jpeg")).toBe(true);
-    expect(isInlineWorkOrderImage("application/pdf")).toBe(false);
+    expect(isInlineWorkOrderVideo("video/webm")).toBe(true);
+    expect(isInlineWorkOrderVideo("image/png")).toBe(false);
   });
 
   it("treats http, https, and blob URLs as reachable image sources", () => {

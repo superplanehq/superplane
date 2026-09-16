@@ -146,8 +146,11 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 		Kind:    runner.LiveLogKindSetup,
 	}
 	commands := append([]runner.BrokerCommand{prepareCommand}, setupCommands...)
-	if fetch := runner.AttachmentFetchCommand(runner.CollectTaskAttachmentsFromSteps(runner.AgentStepsForDispatch(spec.Steps, dispatched))); fetch != nil {
+	attachments := runner.CollectTaskAttachmentsFromSteps(runner.AgentStepsForDispatch(spec.Steps, dispatched))
+	if fetch := runner.AttachmentFetchCommand(attachments); fetch != nil {
+		files = append(files, runner.AttachmentSetupFiles()...)
 		commands = append(commands, *fetch)
+		commands = append(commands, runner.VideoAttachmentCommands()...)
 	}
 	return ClaudeCodeBrokerTask{
 		Commands: append(commands, stepCommands...),

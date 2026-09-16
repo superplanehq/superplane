@@ -4,6 +4,7 @@ import type { FilesFile } from "@/api-client";
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
+import { isInlineWorkOrderVideo, workOrderUploadContentType } from "@/lib/workOrderFiles";
 
 import {
   countCreateWorkOrderRequestImages,
@@ -34,11 +35,13 @@ export function useAnalysisComposerImages({
     if (selected.rejectedCount > 0) {
       showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
     }
-    const accepted = selected.accepted.filter(isSupportedImageFile);
+    const accepted = selected.accepted.filter(
+      (file) => isSupportedImageFile(file) || isInlineWorkOrderVideo(workOrderUploadContentType(file)),
+    );
     if (accepted.length === 0) {
       return;
     }
-    const uploaded = (await onUploadFiles(accepted)).filter((file) => file.isImage);
+    const uploaded = (await onUploadFiles(accepted)).filter((file) => file.isImage || file.isVideo);
     if (uploaded.length === 0) {
       return;
     }

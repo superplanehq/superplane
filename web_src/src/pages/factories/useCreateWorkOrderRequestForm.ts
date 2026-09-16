@@ -97,7 +97,7 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleAttach = async (files: FileList | File[]) => {
-    const uploaded = (await uploadAcceptedFiles(files)).filter((file) => file.isImage);
+    const uploaded = (await uploadAcceptedFiles(files)).filter((file) => file.isImage || file.isVideo);
     if (uploaded.length === 0) {
       return;
     }
