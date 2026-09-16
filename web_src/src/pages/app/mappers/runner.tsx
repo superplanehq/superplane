@@ -189,8 +189,16 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
-      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution} />,
-      customFieldPosition: "after",
+      headerAction: (
+        <RunnerLiveLogDialog
+          title={title}
+          canvasMode={canvasMode}
+          execution={lastExecution}
+          component={context.node.componentName || componentDef.name}
+          iconSlug={iconSlug}
+          session={{ organizationId: context.organizationId, canvasId: context.canvasId }}
+        />
+      ),
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
