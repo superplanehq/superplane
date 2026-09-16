@@ -20,7 +20,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactorySentryIntake, f.ID)
 		assert.Equal(t, "Factory Sentry Intake", f.Label)
-		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Add Sentry intake from the Backlog column", f.Description)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {

@@ -11,6 +11,7 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
   factoryColumnAutomationsPath,
   factoryColumnAutomationViewPath,
   columnAutomationsKeyFromSearch,
@@ -136,6 +137,14 @@ describe("factoryPRFeedbackSetupPath", () => {
   it("maps PR feedback source ids to setup path kinds", () => {
     expect(prFeedbackSetupKindFromSourceId("discussion")).toBe("comments");
     expect(prFeedbackSetupKindFromSourceId("checks")).toBe("checks");
+  });
+});
+
+describe("factorySentryIntakeSetupPath", () => {
+  it("opens the Sentry intake setup page on the line board", () => {
+    expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
   });
 });
 
