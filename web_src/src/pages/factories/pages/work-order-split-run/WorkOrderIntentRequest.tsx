@@ -36,6 +36,8 @@ export type IntentAnalysisChat = {
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
+  clarityExpanded?: boolean;
+  onToggleClarity?: () => void;
   latestPlanScore?: number;
   latestPlanSummary?: string;
   planStatus?: PlanChipStatus;
@@ -113,6 +115,8 @@ function AnalysisRequestChat({
       canTogglePlan={Boolean(hasClarity && analysis.canTogglePlan)}
       planStatus={analysis.planStatus}
       onToggle={analysis.onTogglePlan}
+      summaryOpen={analysis.clarityExpanded}
+      onToggleSummary={analysis.onToggleClarity}
       actions={analysis.closedDecision}
     />
   );

@@ -88,6 +88,7 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     enabledExperimentalFeatures.clear();
   });
 

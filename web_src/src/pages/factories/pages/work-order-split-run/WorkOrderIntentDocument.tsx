@@ -8,6 +8,7 @@ import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { latestPlanScore } from "./latestPlanScore";
 import { usePlanChipStatus } from "./planChipStatus";
+import { useRefineLayoutPreference } from "./refineLayoutPreference";
 import { splitRunIntentDocument } from "./splitRunPopupModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
@@ -63,7 +64,9 @@ export function WorkOrderIntentDocument({
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [showPlan, setShowPlan] = useState(false);
-  const [planPaneOpen, setPlanPaneOpen] = useState(false);
+  const layout = useRefineLayoutPreference();
+  const hasPlan = hasAnalysisPlan(artifacts);
+  const planPaneOpen = layout.planOpen && hasPlan;
   const split = useSplitRunPanePercent({
     defaultPercent: refineOpen ? DEFAULT_REFINE_INTENT_LEFT_PERCENT : DEFAULT_INTENT_LEFT_PERCENT,
     minPercent: 28,
@@ -82,8 +85,10 @@ export function WorkOrderIntentDocument({
     ? {
         ...analysis,
         planPaneOpen,
-        onTogglePlan: () => setPlanPaneOpen((current) => !current),
-        canTogglePlan: hasAnalysisPlan(artifacts),
+        onTogglePlan: layout.togglePlan,
+        canTogglePlan: hasPlan,
+        clarityExpanded: layout.clarityExpanded,
+        onToggleClarity: layout.toggleClarity,
         latestPlanScore: clarityScore,
         latestPlanSummary: confidence?.summary?.trim(),
         planStatus,

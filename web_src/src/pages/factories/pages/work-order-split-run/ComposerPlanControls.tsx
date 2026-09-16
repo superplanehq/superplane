@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { EyeOff, FileText, Sparkle } from "lucide-react";
 
 import { CountButton } from "@/components/examples/c-button-38";
@@ -13,6 +13,7 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
 
 const FALLBACK_WHY = "The analysis scored how clear this work is.";
+const DRAWER_EASE = "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 const SCORE_TONE: Record<ConfidenceBand, string> = {
   High: "text-success",
@@ -28,6 +29,8 @@ export function ComposerPlanStack({
   canTogglePlan = true,
   planStatus,
   onToggle,
+  summaryOpen: summaryOpenProp,
+  onToggleSummary,
   actions,
 }: {
   open: boolean;
@@ -37,8 +40,13 @@ export function ComposerPlanStack({
   canTogglePlan?: boolean;
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
+  summaryOpen?: boolean;
+  onToggleSummary?: () => void;
   actions?: ReactNode;
 }) {
+  const [uncontrolledSummaryOpen, setUncontrolledSummaryOpen] = useState(true);
+  const summaryOpen = summaryOpenProp ?? uncontrolledSummaryOpen;
+  const toggleSummary = onToggleSummary ?? (() => setUncontrolledSummaryOpen((current) => !current));
   const showScore = score != null;
   const showPlan = canTogglePlan;
   const showActions = Boolean(actions);
@@ -49,7 +57,12 @@ export function ComposerPlanStack({
 
   const chips = (
     <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
-      <ScoreChip score={score} isAnalyzing={isAnalyzing} />
+      <ScoreChip
+        score={score}
+        isAnalyzing={isAnalyzing}
+        expanded={Boolean(body) && summaryOpen}
+        onToggle={body ? toggleSummary : undefined}
+      />
       {canTogglePlan ? (
         <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
       ) : null}
@@ -72,11 +85,25 @@ export function ComposerPlanStack({
       <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
         {chips}
       </FrameHeader>
-      <FramePanel fit>
-        <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-confidence-copy">
-          {body}
-        </p>
-      </FramePanel>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows]",
+          DRAWER_EASE,
+          summaryOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+        data-testid="split-run-intent-confidence-drawer"
+        data-state={summaryOpen ? "open" : "closed"}
+        aria-hidden={summaryOpen ? undefined : true}
+        inert={summaryOpen ? undefined : true}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <FramePanel fit>
+            <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-confidence-copy">
+              {body}
+            </p>
+          </FramePanel>
+        </div>
+      </div>
     </Frame>
   );
 }
@@ -158,7 +185,17 @@ function PlanStatusMark({ isAnalyzing, planStatus }: { isAnalyzing: boolean; pla
   return null;
 }
 
-function ScoreChip({ score, isAnalyzing }: { score?: number; isAnalyzing: boolean }) {
+function ScoreChip({
+  score,
+  isAnalyzing,
+  expanded = false,
+  onToggle,
+}: {
+  score?: number;
+  isAnalyzing: boolean;
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
   if (score == null) {
     return null;
   }
@@ -176,6 +213,9 @@ function ScoreChip({ score, isAnalyzing }: { score?: number; isAnalyzing: boolea
       type="button"
       size="sm"
       aria-label={label}
+      aria-expanded={onToggle ? expanded : undefined}
+      aria-pressed={onToggle ? expanded : undefined}
+      onClick={onToggle}
       data-testid={showMatrix ? undefined : "split-run-intent-composer-score"}
       countClassName={countClassName}
       count={

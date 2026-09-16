@@ -73,6 +73,7 @@ function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fix
 
 describe("WorkOrderSplitRunPopup decision footer", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     enabledExperimentalFeatures.clear();
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
