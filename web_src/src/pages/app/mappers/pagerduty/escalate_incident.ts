@@ -47,14 +47,15 @@ export const escalateIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as { incidentId?: string; escalationLevel?: number } | undefined;
+  const configuration = node.configuration as { incidentId?: string; escalationLevel?: string } | undefined;
+  const escalationLevel = Number(configuration?.escalationLevel);
 
   if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration?.escalationLevel && configuration.escalationLevel > 0) {
-    metadata.push({ icon: "arrow-up", label: `Level: ${configuration.escalationLevel}` });
+  if (Number.isFinite(escalationLevel) && escalationLevel > 0) {
+    metadata.push({ icon: "arrow-up", label: `Level: ${configuration?.escalationLevel}` });
   } else {
     metadata.push({ icon: "arrow-up", label: "Next level" });
   }
