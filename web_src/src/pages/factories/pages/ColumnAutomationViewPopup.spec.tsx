@@ -147,6 +147,23 @@ describe("ColumnAutomationViewPopup", () => {
     );
   });
 
+  it("asks for confirmation before deleting a custom automation", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    renderPopup({ onDelete });
+
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    expect(screen.getByText("Delete this automation? This cannot be undone.")).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides delete when the automation cannot be removed", () => {
+    renderPopup();
+
+    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
+  });
+
   it("closes from the popup chrome", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

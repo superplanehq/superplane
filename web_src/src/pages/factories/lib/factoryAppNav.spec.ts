@@ -10,7 +10,7 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns automation detail when appId present", () => {
+  it("returns the automations list when appId is present", () => {
     expect(
       resolveFactoryAppBackNav("org", "fac", {
         from: "automations",
@@ -18,8 +18,8 @@ describe("resolveFactoryAppBackNav", () => {
         appName: "Label to task",
       }),
     ).toEqual({
-      label: "Label to task",
-      href: "/org/workspaces/fac/automations/app-1",
+      label: "Automations",
+      href: "/org/workspaces/fac/automations",
     });
   });
 
@@ -62,16 +62,16 @@ describe("resolveFactoryAppBackNav", () => {
 describe("factoryAppPath", () => {
   it("builds embed path with run and from", () => {
     expect(factoryAppRunPath("org", "fac", "app-1", "run-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?run=run-1&from=automations",
+      "/org/workspaces/fac/automations/app-1?run=run-1&from=automations",
     );
     expect(factoryAppPath("org", "fac", "app-1", { from: "lines", lineId: "line-1" })).toBe(
-      "/org/workspaces/fac/apps/app-1?from=lines&lineId=line-1",
+      "/org/workspaces/fac/automations/app-1?from=lines&lineId=line-1",
     );
   });
 
   it("builds configure path with the agent panel open and components closed", () => {
     expect(factoryAppConfigurePath("org", "fac", "app-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?configure=1&agent=1&from=automations",
+      "/org/workspaces/fac/automations/app-1?configure=1&agent=1&from=automations",
     );
   });
 });
