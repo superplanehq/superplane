@@ -4,8 +4,10 @@ import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
 
@@ -230,6 +232,8 @@ function RequestDialogFooter({
   onAttach: (files: FileList | File[]) => void;
   onRemoveAttachment: (id: string) => void;
 }) {
+  const sendShortcut = useShortcutLabel("Enter");
+
   return (
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
@@ -239,21 +243,26 @@ function RequestDialogFooter({
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
           ) : null}
         </div>
-        <Button
-          type="submit"
-          size="icon"
-          className="size-8 rounded-full"
-          disabled={!canCreate}
-          aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
-          aria-keyshortcuts="Meta+Enter Control+Enter"
-          data-testid="create-work-order-request-create"
-        >
-          {isCreating ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          ) : (
-            <ArrowUp className="size-3.5" aria-hidden />
-          )}
-        </Button>
+        <div className="ms-auto flex items-center gap-1.5">
+          <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">
+            {sendShortcut}
+          </Kbd>
+          <Button
+            type="submit"
+            size="icon"
+            className="size-8 rounded-full"
+            disabled={!canCreate}
+            aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
+            aria-keyshortcuts="Meta+Enter Control+Enter"
+            data-testid="create-work-order-request-create"
+          >
+            {isCreating ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <ArrowUp className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        </div>
       </InputGroupAddon>
     </InputGroup>
   );
