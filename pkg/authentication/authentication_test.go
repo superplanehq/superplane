@@ -602,6 +602,12 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusSeeOther, recorder.Code)
 		location := recorder.Header().Get("Location")
 		assert.True(t, strings.HasPrefix(location, "/login/choose-account?token="))
+		parsed, err := url.Parse(location)
+		require.NoError(t, err)
+		token := parsed.Query().Get("token")
+		require.NotEmpty(t, token)
+		assert.NotContains(t, token, ".")
+		assert.NotContains(t, location, githubUser.AccessToken)
 		assert.Empty(t, sessionAccountIDOrEmpty(recorder))
 	})
 
@@ -660,7 +666,7 @@ func TestHandler_accountChoice(t *testing.T) {
 
 	t.Run("should list candidate accounts for a valid selection token", func(t *testing.T) {
 		handler, first, second := setupChoiceAccounts(t)
-		token, err := handler.signSelectState(githubUser, "/canvases")
+		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/auth/choose-account?token="+url.QueryEscape(token), nil)
@@ -678,11 +684,15 @@ func TestHandler_accountChoice(t *testing.T) {
 		assert.Equal(t, first.Email, payload.Accounts[0].Email)
 		assert.Equal(t, "https://avatars.example/select-github-id.png", payload.Accounts[0].AvatarURL)
 		assert.Equal(t, second.ID.String(), payload.Accounts[1].ID)
+
+		again := httptest.NewRecorder()
+		handler.handleListAccountChoice(again, req)
+		require.Equal(t, http.StatusOK, again.Code)
 	})
 
 	t.Run("should issue a session for the chosen account", func(t *testing.T) {
 		handler, _, second := setupChoiceAccounts(t)
-		token, err := handler.signSelectState(githubUser, "/canvases")
+		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
 		require.NoError(t, err)
 
 		form := url.Values{
@@ -699,19 +709,35 @@ func TestHandler_accountChoice(t *testing.T) {
 		assert.Equal(t, second.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
 
-	t.Run("should refuse an expired selection token", func(t *testing.T) {
-		handler, first, _ := setupChoiceAccounts(t)
-		token, err := handler.jwtSigner.GenerateWithClaims(-time.Minute, map[string]string{
-			"sub":         githubUser.UserID,
-			"intent":      authSelectIntent,
-			"provider":    githubUser.Provider,
-			"provider_id": githubUser.UserID,
-			"jti":         "expired-nonce",
-		})
+	t.Run("should refuse a reused selection token", func(t *testing.T) {
+		handler, _, second := setupChoiceAccounts(t)
+		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
 		require.NoError(t, err)
 
 		form := url.Values{
-			"token":      {authSelectStatePrefix + token},
+			"token":      {token},
+			"account_id": {second.ID.String()},
+		}
+		firstReq := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
+		firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		first := httptest.NewRecorder()
+		handler.completeAccountChoice(first, firstReq)
+		require.Equal(t, http.StatusSeeOther, first.Code)
+
+		replayReq := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
+		replayReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		replay := httptest.NewRecorder()
+		handler.completeAccountChoice(replay, replayReq)
+		assert.Equal(t, http.StatusBadRequest, replay.Code)
+		assert.Empty(t, sessionAccountIDOrEmpty(replay))
+	})
+
+	t.Run("should refuse an expired selection token", func(t *testing.T) {
+		handler, first, _ := setupChoiceAccounts(t)
+		token := storeExpiredSelectState(t, githubUser)
+
+		form := url.Values{
+			"token":      {token},
 			"account_id": {first.ID.String()},
 		}
 		req := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
@@ -725,7 +751,7 @@ func TestHandler_accountChoice(t *testing.T) {
 
 	t.Run("should refuse an altered selection token", func(t *testing.T) {
 		handler, first, _ := setupChoiceAccounts(t)
-		token, err := handler.signSelectState(githubUser, "/")
+		token, err := handler.storeSelectState(t.Context(), githubUser, "/")
 		require.NoError(t, err)
 
 		form := url.Values{
@@ -744,7 +770,7 @@ func TestHandler_accountChoice(t *testing.T) {
 		handler, _, _ := setupChoiceAccounts(t)
 		outsider, err := models.CreateAccount("Outsider", "select-outsider@example.com")
 		require.NoError(t, err)
-		token, err := handler.signSelectState(githubUser, "/")
+		token, err := handler.storeSelectState(t.Context(), githubUser, "/")
 		require.NoError(t, err)
 
 		form := url.Values{
@@ -759,6 +785,19 @@ func TestHandler_accountChoice(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, recorder.Code)
 		assert.Empty(t, sessionAccountIDOrEmpty(recorder))
 	})
+}
+
+func storeExpiredSelectState(t *testing.T, githubUser goth.User) string {
+	t.Helper()
+	token, err := crypto.Base64String(32)
+	require.NoError(t, err)
+	require.NoError(t, models.CreateAccountChoiceState(database.Conn(), &models.AccountChoiceState{
+		TokenHash:  crypto.HashToken(token),
+		Provider:   githubUser.Provider,
+		ProviderID: githubUser.UserID,
+		ExpiresAt:  time.Now().Add(-time.Minute),
+	}))
+	return token
 }
 
 func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {

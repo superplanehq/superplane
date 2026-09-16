@@ -266,8 +266,8 @@ func FindAccountsByProvider(tx *gorm.DB, provider, providerID string) ([]Account
 // FindAccountByProvider returns the oldest account that holds the provider
 // identity. GitHub identities can belong to more than one account; use
 // FindAccountsByProvider when you need the full set.
-func FindAccountByProvider(provider, providerID string) (*Account, error) {
-	accounts, err := FindAccountsByProvider(database.Conn(), provider, providerID)
+func FindAccountByProvider(tx *gorm.DB, provider, providerID string) (*Account, error) {
+	accounts, err := FindAccountsByProvider(tx, provider, providerID)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -131,7 +132,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	err = LinkProviderToAccount(a.encryptor, sessionAccount, gothUser)
+	err = LinkProviderToAccount(database.DB(r.Context()), a.encryptor, sessionAccount, gothUser)
 	if errors.Is(err, models.ErrSignInIdentityInUse) {
 		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorLinkFailed, gothUser.Provider), http.StatusSeeOther)
 		return
@@ -145,9 +146,9 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther)
 }
 
-func LinkProviderToAccount(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
+func LinkProviderToAccount(tx *gorm.DB, encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
 	if gothUser.Provider != models.ProviderGitHub {
-		existing, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
+		existing, err := models.FindAccountByProvider(tx, gothUser.Provider, gothUser.UserID)
 		if err == nil && existing.ID != account.ID {
 			return models.ErrSignInIdentityInUse
 		}
