@@ -13,6 +13,7 @@ export function useInstallIntegrationSelections({
   onSelectionsChange,
   manualSelectionNames,
   loading,
+  initialPreferredIntegrationId,
 }: {
   integrationData: IntegrationInstanceSummary[];
   selections: IntegrationSelections;
@@ -21,8 +22,11 @@ export function useInstallIntegrationSelections({
   manualSelectionNames?: readonly string[];
   /** True while the connection list still loads; sync waits so it does not drop a saved selection. */
   loading?: boolean;
+  /** Integration that returned from an external setup flow before this hook mounted. */
+  initialPreferredIntegrationId?: string | null;
 }) {
   const [preferredInstanceIds, setPreferredInstanceIds] = useState<Record<string, string>>({});
+  const [returningIntegrationId] = useState(initialPreferredIntegrationId);
 
   const rememberPreferredInstance = (integrationName: string, integrationId: string) => {
     setPreferredInstanceIds((prev) => ({ ...prev, [integrationName]: integrationId }));
@@ -30,9 +34,29 @@ export function useInstallIntegrationSelections({
 
   useEffect(() => {
     if (loading) return;
-    const synced = syncSelectionsWithInstances(integrationData, selections, preferredInstanceIds, manualSelectionNames);
+    const returningIntegration = integrationData.find((data) =>
+      data.allInstances.some((instance) => instance.metadata?.id === returningIntegrationId),
+    );
+    const effectivePreferredIds =
+      returningIntegration && returningIntegrationId && !preferredInstanceIds[returningIntegration.name]
+        ? { ...preferredInstanceIds, [returningIntegration.name]: returningIntegrationId }
+        : preferredInstanceIds;
+    const synced = syncSelectionsWithInstances(
+      integrationData,
+      selections,
+      effectivePreferredIds,
+      manualSelectionNames,
+    );
     if (synced) onSelectionsChange(synced);
-  }, [integrationData, selections, preferredInstanceIds, onSelectionsChange, manualSelectionNames, loading]);
+  }, [
+    integrationData,
+    selections,
+    preferredInstanceIds,
+    onSelectionsChange,
+    manualSelectionNames,
+    loading,
+    returningIntegrationId,
+  ]);
 
   return { rememberPreferredInstance };
 }
