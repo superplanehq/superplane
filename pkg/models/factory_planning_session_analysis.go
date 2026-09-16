@@ -207,8 +207,8 @@ func markdownFileRef(file File) string {
 }
 
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
-	if score < 0 || score > PlanningConfidenceScoreMax {
-		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
+	if err := validatePlanningConfidenceScore(score); err != nil {
+		return err
 	}
 	return s.withLockedSession(tx, func(inner *gorm.DB) error {
 		if err := s.guardOpen(); err != nil {
@@ -218,22 +218,33 @@ func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, s
 		if err != nil {
 			return err
 		}
-		var run *factory.RunRef
-		if s.CanvasRunID != nil {
-			run = &factory.RunRef{ID: *s.CanvasRunID}
-		}
-		_, err = order.ReportCheck(inner, FactoryWorkOrderCheckParams{
-			Key:      PlanningConfidenceCheckKey,
-			Name:     PlanningConfidenceCheckName,
-			Score:    score,
-			MaxScore: PlanningConfidenceScoreMax,
-			Format:   FactoryWorkOrderCheckFormatFraction,
-			Level:    planningConfidenceLevel(score),
-			Summary:  strings.TrimSpace(summary),
-			Run:      run,
-		})
-		return err
+		return reportPlanningConfidence(inner, s, order, score, summary)
 	})
+}
+
+func validatePlanningConfidenceScore(score float64) error {
+	if !isFiniteCheckNumber(score) || score < 1 || score > PlanningConfidenceScoreMax {
+		return fmt.Errorf("%w: confidence score must be 1 through 5", ErrFactoryPlanningSessionInvalid)
+	}
+	return nil
+}
+
+func reportPlanningConfidence(tx *gorm.DB, session *FactoryPlanningSession, order *FactoryWorkOrder, score float64, summary string) error {
+	var run *factory.RunRef
+	if session.CanvasRunID != nil {
+		run = &factory.RunRef{ID: *session.CanvasRunID}
+	}
+	_, err := order.ReportCheck(tx, FactoryWorkOrderCheckParams{
+		Key:      PlanningConfidenceCheckKey,
+		Name:     PlanningConfidenceCheckName,
+		Score:    score,
+		MaxScore: PlanningConfidenceScoreMax,
+		Format:   FactoryWorkOrderCheckFormatFraction,
+		Level:    planningConfidenceLevel(score),
+		Summary:  strings.TrimSpace(summary),
+		Run:      run,
+	})
+	return err
 }
 
 func (s *FactoryPlanningSession) analysisWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
@@ -303,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the current specification and the score when the new context changes them.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the specification with propose_spec and the score with propose_confidence when the new context changes them. You may update the score without rewriting the specification. If the score is below 5, the summary must say why Clarity is not 5 and what the user must add, decide, or answer. Write chat, survey, and the Clarity summary in short direct sentences. Use I and you. Do not name files.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
@@ -340,6 +351,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 }
 
 func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
+	messages = filterPlanningRewindMessages(messages)
 	if len(messages) == 0 || hardLimit <= 0 {
 		return analysisMessageWindow{Omitted: len(messages)}
 	}
@@ -368,6 +380,17 @@ func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int
 	}
 	reversePlanningMessages(selected)
 	return analysisMessageWindow{Messages: selected}
+}
+
+func filterPlanningRewindMessages(messages []PlanningSessionMessage) []PlanningSessionMessage {
+	filtered := make([]PlanningSessionMessage, 0, len(messages))
+	for _, message := range messages {
+		if message.Role == PlanningSessionMessageRolePlan {
+			continue
+		}
+		filtered = append(filtered, message)
+	}
+	return filtered
 }
 
 func analysisMessagesContextCharacters(messages []PlanningSessionMessage) int {

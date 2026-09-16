@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 
@@ -45,23 +45,14 @@ function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; ha
   );
 }
 
-function liveThinkingCopy(testId: string): string | undefined {
-  return [...screen.getByTestId(testId).querySelectorAll(".t-think-text")].find(
-    (el) => !el.classList.contains("is-exit"),
-  )?.textContent;
-}
-
 describe("Confidence score on a backlog card", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("shows that analysis runs while the score is not ready", () => {
     renderCard({ isAnalyzing: true });
 
     const indicator = screen.getByTestId("work-order-card-analyzing-wo-1");
-    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
     expect(indicator.querySelector(".t-matrix")).not.toBeNull();
+    expect(indicator).not.toHaveTextContent("Analyzing");
+    expect(indicator).not.toHaveTextContent("Refining");
     expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
@@ -78,21 +69,12 @@ describe("Confidence score on a backlog card", () => {
     expect(tip).not.toHaveTextContent("SuperPlane");
   });
 
-  it("cycles thinking copy while analysis runs", () => {
-    vi.useFakeTimers();
-    renderCard({ isAnalyzing: true });
-
-    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
-    act(() => {
-      vi.advanceTimersByTime(2050);
-    });
-    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Refining");
-  });
-
-  it("keeps thinking states while the agent still works after a score arrives", () => {
+  it("keeps the matrix while the agent still works after a score arrives", () => {
     renderCard({ isAnalyzing: true, confidenceScore: 4 });
 
-    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
+    const indicator = screen.getByTestId("work-order-card-analyzing-wo-1");
+    expect(indicator.querySelector(".t-matrix")).not.toBeNull();
+    expect(indicator).not.toHaveTextContent("Analyzing");
     expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });

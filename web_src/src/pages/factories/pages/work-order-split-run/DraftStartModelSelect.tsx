@@ -20,6 +20,7 @@ export function DraftStartModelSelect({
   value,
   onChange,
   disabled = false,
+  appearance = "icon",
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -27,24 +28,31 @@ export function DraftStartModelSelect({
   value: string;
   onChange: (next: string) => void;
   disabled?: boolean;
+  appearance?: "icon" | "labeled";
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
   const selectedName =
     value === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((model) => model.id === value)?.name || value;
+  const labeled = appearance === "labeled";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          size="icon-xs"
-          variant="default"
+          size={labeled ? "sm" : "icon-xs"}
+          variant={labeled ? "outline" : "default"}
           aria-label={`Model: ${selectedName}`}
           data-testid="split-run-draft-model"
           disabled={disabled}
-          className="rounded-md rounded-l-none"
+          className={
+            labeled
+              ? "!rounded-none h-7 gap-1.5 border-0 bg-background text-xs shadow-none"
+              : "rounded-md rounded-l-none"
+          }
         >
-          <ChevronDown className="size-3.5" aria-hidden />
+          {labeled ? selectedName : null}
+          <ChevronDown className={labeled ? "size-3 opacity-60" : "size-3.5"} aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="min-w-44">
