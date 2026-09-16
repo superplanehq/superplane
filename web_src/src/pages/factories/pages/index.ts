@@ -17,6 +17,7 @@ export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";
 export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderDetailPage";
 export { LegacyWorkOrderPermalinkRedirect, LegacyWorkOrdersRedirect } from "./LegacyWorkOrderRouteRedirects";
+export { LegacyFactoryAppRedirect, LegacyFactoryAppSplitRunRedirect } from "./LegacyFactoryAppRouteRedirects";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";

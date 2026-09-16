@@ -10,18 +10,17 @@ import {
   pendingBacklogAnalysisIds,
 } from "@/pages/factories/lib/backlogAnalysis";
 
-const { canvasesListRuns, factoriesListFactoryApps, factoriesListFactoryIntakes, factoriesListWorkOrders } = vi.hoisted(
-  () => ({
+const { canvasesListRuns, factoriesListFactoryAutomations, factoriesListFactoryIntakes, factoriesListWorkOrders } =
+  vi.hoisted(() => ({
     canvasesListRuns: vi.fn(),
-    factoriesListFactoryApps: vi.fn(),
+    factoriesListFactoryAutomations: vi.fn(),
     factoriesListFactoryIntakes: vi.fn(),
     factoriesListWorkOrders: vi.fn(),
-  }),
-);
+  }));
 
 vi.mock("@/api-client", () => ({
   canvasesListRuns,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   factoriesListFactoryIntakes,
   factoriesListWorkOrders,
 }));
@@ -111,7 +110,9 @@ describe("useBacklogAnalysisRuns", () => {
 describe("useFactoryBacklogAnalysis", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    factoriesListFactoryApps.mockResolvedValue({ data: { apps: [{ id: "app-analyzer", name: "Backlog" }] } });
+    factoriesListFactoryAutomations.mockResolvedValue({
+      data: { automations: [{ id: "app-analyzer", name: "Backlog" }] },
+    });
     factoriesListFactoryIntakes.mockResolvedValue({ data: { intakes: [] } });
     factoriesListWorkOrders.mockResolvedValue({ data: { orders: [] } });
     canvasesListRuns.mockResolvedValue({ data: { runs: [] } });

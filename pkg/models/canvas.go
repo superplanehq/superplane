@@ -23,14 +23,22 @@ var canvasNameUniqueConstraints = []string{
 	"workflows_factory_id_name_active_key",
 }
 
+const (
+	CanvasColumnKeyVerify = "verify"
+	CanvasColumnKeyDone   = "done"
+)
+
 type Canvas struct {
-	ID                          uuid.UUID
-	OrganizationID              uuid.UUID
-	FactoryID                   *uuid.UUID
-	LiveVersionID               *uuid.UUID
-	CanvasFolderID              *uuid.UUID `gorm:"column:folder_id"`
-	Name                        string
-	Description                 string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	FactoryID      *uuid.UUID
+	LiveVersionID  *uuid.UUID
+	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
+	Name           string
+	Description    string
+	// ColumnKey is the line-board column this factory event automation is
+	// shown on. Empty when the canvas is not attached to Verify or Done.
+	ColumnKey                   *string
 	CreatedBy                   *uuid.UUID
 	DismissedAgentSuggestionIDs datatypes.JSONSlice[string]
 	CreatedAt                   *time.Time
@@ -173,6 +181,33 @@ func FindCanvasNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]
 
 func (c *Canvas) SoftDelete() error {
 	return c.SoftDeleteInTransaction(database.Conn())
+}
+
+func ValidCanvasColumnKey(key string) bool {
+	return key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+}
+
+// SetColumnKey attaches this factory canvas to Verify or Done. An empty key
+// clears the attachment.
+func (c *Canvas) SetColumnKey(tx *gorm.DB, key string) error {
+	var stored *string
+	if key != "" {
+		if !ValidCanvasColumnKey(key) {
+			return fmt.Errorf("canvas column key is not valid")
+		}
+		stored = &key
+	}
+
+	now := time.Now()
+	if err := tx.Model(c).Updates(map[string]any{
+		"column_key": stored,
+		"updated_at": now,
+	}).Error; err != nil {
+		return err
+	}
+	c.ColumnKey = stored
+	c.UpdatedAt = &now
+	return nil
 }
 
 func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
