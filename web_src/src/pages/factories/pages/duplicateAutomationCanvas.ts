@@ -3,7 +3,7 @@ import {
   canvasesDescribeCanvas,
   canvasesPutCanvasStaging,
   type CanvasesCanvas,
-  type FactoryApp,
+  type FactoryAutomation,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
@@ -35,12 +35,24 @@ type CreateCanvasInput = {
   method?: "ui" | "cli" | "yaml_import" | "template";
 };
 
+type CreateAttachedAutomationInput = {
+  name: string;
+  columnKey: string;
+};
+
+type CreateAttachedAutomationResult = {
+  id?: string;
+  name?: string;
+};
+
 type CanvasNodes = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>;
 
 export type DuplicateAutomationCanvasDeps = {
   factoryId: string;
-  app: FactoryApp;
+  app: FactoryAutomation;
   createCanvas: (input: CreateCanvasInput) => Promise<CreateCanvasResult>;
+  /** Creates a Verify or Done copy so the duplicate stays on that column. */
+  createAttachedAutomation?: (input: CreateAttachedAutomationInput) => Promise<CreateAttachedAutomationResult>;
   /** Names already taken in the workspace (used to pick "X copy", "X copy (2)", …). */
   existingCanvasNames?: Iterable<string>;
   /** When set, skip CreateCanvas and reuse this id (retry after failed stage/commit). */
@@ -116,6 +128,14 @@ async function defaultCommitCanvasStaging(canvasId: string) {
       body: { commitMessage: "Duplicate automation" },
     }),
   );
+}
+
+function attachedColumnKey(columnKey: string | undefined): "verify" | "done" | undefined {
+  const key = columnKey?.trim();
+  if (key === "verify" || key === "done") {
+    return key;
+  }
+  return undefined;
 }
 
 function sourceGraphIsEmpty(canvas: CanvasesCanvas | undefined): boolean {
@@ -212,9 +232,18 @@ async function createDuplicateCanvasShell(
     [...(deps.existingCanvasNames ?? [])].map((name) => name.trim()).filter((name): name is string => Boolean(name)),
   );
   let canvasName = uniqueCanvasName(preferredName, taken);
+  const columnKey = attachedColumnKey(deps.app.columnKey);
 
   for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {
     try {
+      if (columnKey && deps.createAttachedAutomation) {
+        const created = await deps.createAttachedAutomation({ name: canvasName, columnKey });
+        const canvasId = created.id?.trim();
+        if (!canvasId) {
+          throw new Error("Failed to create automation canvas");
+        }
+        return { canvasId, name: created.name?.trim() || canvasName };
+      }
       const created = await deps.createCanvas({
         name: canvasName,
         description,
