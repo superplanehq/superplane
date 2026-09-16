@@ -96,6 +96,28 @@ func TestCollectVelocityOrders_ReportsEarliestMerge(t *testing.T) {
 	assert.Equal(t, localMidnight(first), orders[orderID].day)
 }
 
+func TestCollectVelocityOrders_CopiesAssigneeIDs(t *testing.T) {
+	window := testWindow(t)
+	orderID := uuid.New()
+	opener := uuid.New()
+	first, second := uuid.New(), uuid.New()
+	mergedAt := window.start.Add(24 * time.Hour)
+
+	orders := collectVelocityOrders([]models.FactoryVelocityPullRequest{
+		{
+			WorkOrderID: orderID,
+			CreatedByID: &opener,
+			AssigneeIDs: []uuid.UUID{first, second},
+			MergedAt:    &mergedAt,
+		},
+	}, window)
+
+	require.Len(t, orders, 1)
+	assert.Equal(t, []uuid.UUID{first, second}, orders[orderID].assigneeIDs)
+	require.NotNil(t, orders[orderID].createdByID)
+	assert.Equal(t, opener, *orders[orderID].createdByID)
+}
+
 func TestCollectVelocityOrders_SkipsWorkOutsideWindow(t *testing.T) {
 	window := testWindow(t)
 	before := window.start.Add(-time.Hour)
@@ -202,6 +224,111 @@ func TestVelocityPeopleBuilder_SkipsAutomationOrders(t *testing.T) {
 	builder.addFactoryOrder(&velocityOrder{createdByID: func() *uuid.UUID { id := uuid.New(); return &id }(), merged: true})
 
 	assert.Empty(t, builder.rowsSorted(velocitySortTotal, velocitySortDesc), "the table lists people, not automations or former members")
+}
+
+func TestVelocityPeopleBuilder_CreditsAssigneeOnlyOrder(t *testing.T) {
+	opener, assignee := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+		{UserID: assignee, Name: "Assignee"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		assigneeIDs: []uuid.UUID{assignee},
+		merged:      true,
+		costCents:   40,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, assignee.String(), rows[0].id)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+	assert.Equal(t, int64(40), rows[0].costCents)
+}
+
+func TestVelocityPeopleBuilder_CreditsAssigneeNotOpener(t *testing.T) {
+	opener, assignee := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+		{UserID: assignee, Name: "Assignee"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &opener,
+		assigneeIDs: []uuid.UUID{assignee},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1, "one order credits one person")
+	assert.Equal(t, "Assignee", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_CreditsOpenerOnceWhenAlsoAssignee(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &userID,
+		assigneeIDs: []uuid.UUID{userID},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, 1, rows[0].factoryMerged, "an opener who is also assigned is credited once")
+}
+
+func TestVelocityPeopleBuilder_CreditsOpenerWhenUnassigned(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: true})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, userID.String(), rows[0].id)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_FallsBackToOpenerWhenAssigneeIsNotAMember(t *testing.T) {
+	opener, outsider := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &opener,
+		assigneeIDs: []uuid.UUID{outsider},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "Opener", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_CreditsFirstAssigneeWhoIsAMember(t *testing.T) {
+	outsider, member := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: member, Name: "Member"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		assigneeIDs: []uuid.UUID{outsider, member},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "Member", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
 }
 
 func TestVelocityPeopleBuilder_ReportsWasteOnlyContributors(t *testing.T) {
