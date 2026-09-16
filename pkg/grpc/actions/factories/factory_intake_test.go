@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -550,6 +551,31 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 	})
 
+	t.Run("an intake whose listener failed to register is not healthy", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.True(t, intake.GetHealthy())
+
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
+		require.NoError(t, err)
+
+		now := time.Now()
+		webhookID := uuid.New()
+		require.NoError(t, database.DB(t.Context()).Create(&models.Webhook{
+			ID:        webhookID,
+			State:     models.WebhookStateFailed,
+			Secret:    []byte("secret"),
+			CreatedAt: &now,
+		}).Error)
+		require.NoError(t, database.DB(t.Context()).Model(node).Update("webhook_id", webhookID).Error)
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+	})
+
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -603,11 +629,24 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{}, true)
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
 	assert.Zero(t, serialized.GetInitialImportItemCount())
+}
+
+func Test__SerializeFactoryIntakeListenerFailed(t *testing.T) {
+	intake := &models.FactoryIntake{
+		ID:        uuid.New(),
+		FactoryID: uuid.New(),
+		CanvasID:  uuid.New(),
+		Source:    models.FactoryIntakeSourceJiraIssues,
+	}
+	spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceJiraIssues)
+
+	assert.True(t, serializeFactoryIntake(intake, spec, true).GetHealthy())
+	assert.False(t, serializeFactoryIntake(intake, spec, false).GetHealthy())
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {

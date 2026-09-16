@@ -247,7 +247,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusOK, nil, nil
 	}
 
-	if !slices.Contains(config.Events, action) {
+	if !issueActionConfigured(config.Events, ctx.Configuration, action) {
 		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
 		return http.StatusOK, nil, nil
 	}
@@ -259,9 +259,9 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	// The webhook is shared by every jira.onIssue trigger on the integration (see
 	// JiraWebhookHandler), so this project check is the only thing keeping one trigger from
-	// reacting to another project's events - fail closed when the payload doesn't carry a
-	// project key to compare against, rather than letting an unidentifiable event through.
-	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
+	// reacting to another project's events. Fail closed when the payload has no project to
+	// compare: an unidentifiable event must not fan out to every trigger.
+	if metadata.Project != nil && !issueMatchesProject(payload.Issue, metadata.Project.Key) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
 		return http.StatusOK, nil, nil
 	}
@@ -296,14 +296,70 @@ func issueEventAction(webhookEvent string) (string, bool) {
 	}
 }
 
-func issueProjectKey(issue *Issue) string {
-	if issue == nil || issue.Fields == nil {
-		return ""
+func issueActionConfigured(decoded []string, rawConfiguration any, action string) bool {
+	if slices.Contains(decoded, action) {
+		return true
 	}
-	project, ok := issue.Fields["project"].(map[string]any)
+	asMap, ok := rawConfiguration.(map[string]any)
 	if !ok {
+		return false
+	}
+	return slices.Contains(stringList(asMap["events"]), action)
+}
+
+func stringList(value any) []string {
+	switch values := value.(type) {
+	case []string:
+		return values
+	case []any:
+		result := make([]string, 0, len(values))
+		for _, item := range values {
+			text, ok := item.(string)
+			if !ok {
+				continue
+			}
+			result = append(result, text)
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func issueMatchesProject(issue *Issue, projectKey string) bool {
+	payloadKey := issueProjectKey(issue)
+	return payloadKey != "" && strings.EqualFold(payloadKey, projectKey)
+}
+
+func issueProjectKey(issue *Issue) string {
+	if issue == nil {
 		return ""
 	}
-	key, _ := project["key"].(string)
-	return key
+	if key := issueProjectKeyFromFields(issue.Fields); key != "" {
+		return key
+	}
+	return projectKeyFromIssueKey(issue.Key)
+}
+
+func issueProjectKeyFromFields(fields map[string]any) string {
+	if fields == nil {
+		return ""
+	}
+	switch project := fields["project"].(type) {
+	case map[string]any:
+		key, _ := project["key"].(string)
+		return strings.TrimSpace(key)
+	case string:
+		return strings.TrimSpace(project)
+	default:
+		return ""
+	}
+}
+
+func projectKeyFromIssueKey(issueKey string) string {
+	separator := strings.LastIndex(issueKey, "-")
+	if separator <= 0 {
+		return ""
+	}
+	return issueKey[:separator]
 }

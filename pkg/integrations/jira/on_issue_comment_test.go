@@ -186,7 +186,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		bodyWithoutProject := []byte(`{
 			"webhookEvent": "comment_created",
 			"comment": {"id": "10019", "body": "test"},
-			"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+			"issue": {"id": "10001", "fields": {}}
 		}`)
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          bodyWithoutProject,

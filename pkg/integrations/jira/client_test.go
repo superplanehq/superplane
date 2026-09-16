@@ -702,6 +702,23 @@ func Test__Client__RefreshIssueWebhooks(t *testing.T) {
 	})
 }
 
+func Test__Client__ListIssueWebhooks(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values":[{"id":1000}]}`))},
+		},
+	}
+	client, err := NewClient(httpContext, newAuthorizedIntegration())
+	require.NoError(t, err)
+
+	webhooks, err := client.ListIssueWebhooks()
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	assert.Equal(t, int64(1000), webhooks[0].ID)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/webhook")
+}
+
 func Test__Client__ExecRequestWithStatus(t *testing.T) {
 	t.Run("401 self-heals via a reactive refresh and retries the request", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
