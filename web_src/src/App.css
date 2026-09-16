@@ -1140,27 +1140,29 @@
   animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Same violet / amber pair as the first-run sphere. */
 .sp-survey-accent,
 .sp-user-note-label {
-  color: #4c2a94;
+  color: var(--muted-foreground);
 }
 
-.dark .sp-survey-accent,
-.dark .sp-user-note-label {
-  color: #f6a821;
+.sp-survey-card,
+.sp-user-note,
+.sp-user-note-fade,
+[data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"],
+.sp-survey-option-selected {
+  --sp-chat-user-surface: color-mix(in oklab, var(--secondary) 80%, var(--background));
+}
+
+.sp-survey-card,
+.sp-user-note,
+[data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"],
+.sp-survey-option-selected {
+  background: var(--sp-chat-user-surface);
 }
 
 .sp-survey-card,
 .sp-user-note {
-  border-color: rgb(91 51 173 / 28%);
-  background: color-mix(in oklab, #f3ecff 82%, transparent);
-}
-
-.dark .sp-survey-card,
-.dark .sp-user-note {
-  border-color: rgb(246 168 33 / 34%);
-  background: color-mix(in oklab, #f6a821 10%, transparent);
+  border-color: transparent;
 }
 
 .sp-user-note textarea {
@@ -1168,45 +1170,23 @@
 }
 
 .sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f3ecff 82%, white), transparent);
+  background-image: linear-gradient(to top, var(--sp-chat-user-surface), transparent);
 }
 
-.dark .sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f6a821 10%, var(--background)), transparent);
-}
-
-/* Selected Task / Automations pill. Same violet / amber pair as user notes. */
 [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
-  border-color: rgb(91 51 173 / 28%);
-  background: color-mix(in oklab, #f3ecff 82%, transparent);
-  color: #4c2a94;
+  border-color: transparent;
+  color: var(--foreground);
   box-shadow: none;
 }
 
-.dark [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
-  border-color: rgb(246 168 33 / 34%);
-  background: color-mix(in oklab, #f6a821 10%, transparent);
-  color: #f6a821;
-}
-
 .sp-survey-option-selected {
-  background: rgb(91 51 173 / 10%);
-}
-
-.dark .sp-survey-option-selected {
-  background: rgb(246 168 33 / 14%);
+  color: var(--foreground);
 }
 
 .sp-survey-pick {
-  border-color: #5b33ad;
-  background: #5b33ad;
-  color: #fff;
-}
-
-.dark .sp-survey-pick {
-  border-color: #f6a821;
-  background: #f6a821;
-  color: #14100a;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .sp-survey-page {
