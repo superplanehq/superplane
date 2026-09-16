@@ -61,8 +61,8 @@ describe("SplitRunReview draft model select", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
-    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("keeps the model select off a waiting footer", () => {
@@ -76,7 +76,7 @@ describe("SplitRunReview draft model select", () => {
     const onStart = vi.fn();
     renderDraftFooter(onStart);
 
-    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByRole("button", { name: "Build" }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(draftStartModelPayload(DRAFT_START_MODEL_AUTO)).toBeUndefined();
   });
@@ -95,7 +95,7 @@ describe("SplitRunReview draft model select", () => {
   it("disables the model chevron when Start is disabled", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, vi.fn(), true);
 
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Build" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
   });
 });

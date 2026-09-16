@@ -1,91 +1,4 @@
-/* Transitions.dev — Thinking states + Matrix dot loader */
-
-.t-think {
-  --think-hold: 2000ms;
-  --think-swap: 150ms;
-  --think-gap: 50ms;
-  --think-distance: 8px;
-  --think-blur: 2px;
-  --think-shimmer: 2000ms;
-  --think-base: var(--muted-foreground);
-  --think-highlight: #ededed;
-  --think-ease: ease-in-out;
-  position: relative;
-  display: inline-block;
-  text-align: center;
-}
-
-.dark .t-think {
-  --think-highlight: #f3f4f6;
-}
-
-.t-think-sizer {
-  display: block;
-  visibility: hidden;
-  white-space: nowrap;
-}
-
-.t-think-text {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: block;
-  color: var(--think-base);
-  white-space: nowrap;
-  transform: translateY(0);
-  filter: blur(0);
-  opacity: 1;
-  transition:
-    transform var(--think-swap) var(--think-ease),
-    filter var(--think-swap) var(--think-ease),
-    opacity var(--think-swap) var(--think-ease);
-  will-change: transform, filter, opacity;
-}
-
-.t-think-text::before {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 40%,
-    var(--think-highlight) 50%,
-    transparent 60%,
-    transparent 100%
-  );
-  background-size: 400% 100%;
-  background-repeat: no-repeat;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: t-think-shimmer var(--think-shimmer) linear infinite;
-}
-
-@keyframes t-think-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: 0% 0;
-  }
-}
-
-.t-think-text.is-exit {
-  transform: translateY(calc(var(--think-distance) * -1));
-  filter: blur(var(--think-blur));
-  opacity: 0;
-}
-
-.t-think-text.is-enter-start {
-  transition: none;
-  transform: translateY(var(--think-distance));
-  filter: blur(var(--think-blur));
-  opacity: 0;
-}
+/* Transitions.dev — Matrix dot loader */
 
 .t-matrix {
   --matrix-cycle: 1200ms;
@@ -94,6 +7,8 @@
   --matrix-ease: ease-in-out;
   display: grid;
   flex-shrink: 0;
+  place-content: center;
+  place-items: center;
   grid-template-columns: repeat(4, 2px);
   grid-auto-rows: 2px;
   gap: 2px;
@@ -101,6 +16,9 @@
 
 .t-matrix i {
   display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
   background: var(--matrix-base);
   animation: t-matrix-pulse var(--matrix-cycle) var(--matrix-ease) infinite;
   animation-delay: calc(var(--d, 0) * 1ms);
@@ -118,16 +36,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-think-text {
-    transition: none !important;
-    transform: none !important;
-    filter: none !important;
-  }
-
-  .t-think-text::before {
-    display: none !important;
-  }
-
   .t-matrix i {
     animation: none !important;
   }

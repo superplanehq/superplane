@@ -25,6 +25,7 @@ const (
 
 	PlanningSessionMessageRoleUser  = "user"
 	PlanningSessionMessageRoleAgent = "agent"
+	PlanningSessionMessageRolePlan  = "plan"
 
 	PlanningWaitIdle     = ""
 	PlanningWaitPending  = "pending"
