@@ -319,7 +319,10 @@ function collectJSONPaths(value: unknown, paths: string[]): void {
   }
   if (!value || typeof value !== "object") return;
   for (const [key, entry] of Object.entries(value)) {
-    if (["path", "file", "file_path", "filename"].includes(key) && typeof entry === "string") {
+    if (
+      ["path", "file", "filePath", "file_path", "filename", "notebookPath", "notebook_path"].includes(key) &&
+      typeof entry === "string"
+    ) {
       paths.push(entry);
       continue;
     }
