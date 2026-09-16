@@ -74,7 +74,6 @@ describe("WorkOrderIntentDocument", () => {
     expect(
       within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-overview-checks"),
     ).toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
   });
 
   it("reveals the confidence why when the chip is opened", async () => {
@@ -122,15 +121,15 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-review")).toBeNull();
   });
 
-  it("switches to the full plan", async () => {
-    const user = userEvent.setup();
+  it("shows the summary and the full plan", () => {
     renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
 
     expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show full plan" }));
     expect(screen.getByTestId("split-run-intent-plan")).toHaveTextContent("The empty state tells the user");
-    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show full plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide full plan" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-body").querySelector('[data-slot="separator"]')).not.toBeNull();
   });
 
   it("starts the request pane at two fifths width and lets the reader drag the split", () => {

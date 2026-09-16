@@ -55,7 +55,6 @@ export function useRefineDocumentModel({
   contextSidebar?: ReactNode;
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
-  const [showPlan, setShowPlan] = useState(false);
   const [planOpenedHere, setPlanOpenedHere] = useState(false);
   const layout = useRefineLayoutPreference();
   const hasPlan = hasAnalysisPlan(artifacts);
@@ -71,8 +70,6 @@ export function useRefineDocumentModel({
 
   return {
     refineOpen,
-    showPlan,
-    setShowPlan,
     split,
     document: splitRunIntentDocument({ artifacts, description }),
     sessionTitle: title.trim() || SESSION_TITLE_FALLBACK,
