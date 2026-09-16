@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
 
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
@@ -101,3 +102,20 @@ export class IntentDocumentResizeObserver {
   unobserve() {}
   disconnect() {}
 }
+
+export function uploadedComposerImage(id: string, filename: string): UploadedWorkOrderFile {
+  return {
+    id,
+    filename,
+    contentType: "image/png",
+    ref: `sp-file://${id}`,
+    previewUrl: `https://cdn.example.com/${filename}`,
+    isImage: true,
+  };
+}
+
+export function composerPng(name: string) {
+  return new File(["img"], name, { type: "image/png" });
+}
+
+export const WAITING_COMPOSER_VIEW = { machineStatus: "waiting" as const };

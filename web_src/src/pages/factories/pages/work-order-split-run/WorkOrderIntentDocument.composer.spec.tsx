@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,11 +11,18 @@ import {
   INTENT,
   INTENT_DOC,
   IntentDocumentResizeObserver,
+  composerPng,
   renderIntentDocument,
+  uploadedComposerImage,
+  WAITING_COMPOSER_VIEW,
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 import { REFINE_LAYOUT_STORAGE_KEY } from "./refineLayoutPreference";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
+
+const { showErrorToast } = vi.hoisted(() => ({ showErrorToast: vi.fn() }));
+
+vi.mock("@/lib/toast", () => ({ showErrorToast }));
 
 vi.mock("@/hooks/useOrgUserLookup", () => ({
   useOrgUserLookup: () => ({
@@ -35,6 +42,7 @@ describe("WorkOrderIntentDocument composer", () => {
     window.localStorage.clear();
     vi.unstubAllGlobals();
     resetStreamMemoryForTests();
+    showErrorToast.mockReset();
   });
 
   it("keeps the latest plan sticky and toggles the spec column", async () => {
@@ -415,5 +423,59 @@ describe("WorkOrderIntentDocument composer", () => {
 
     expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(false);
+  });
+
+  it("attaches, pastes, caps, and sends composer images", async () => {
+    const user = userEvent.setup();
+    let nextId = 0;
+    const onUploadFiles = vi.fn(async (files: FileList | File[]) =>
+      Array.from(files).map((file) => uploadedComposerImage(`file-${++nextId}`, file.name)),
+    );
+    const onSend = vi.fn();
+    const input = () => screen.getByTestId("create-work-order-request-image-input");
+    const { rerender } = renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW, onUploadFiles, onSend })}
+      />,
+    );
+    await user.upload(input(), new File(["notes"], "notes.md", { type: "text/markdown" }));
+    expect(onUploadFiles).not.toHaveBeenCalled();
+    await user.upload(input(), composerPng("bug.png"));
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-1")).toBeInTheDocument());
+    fireEvent.paste(screen.getByTestId("split-run-intent-composer"), {
+      clipboardData: { files: [composerPng("shot.png")], getData: () => "" },
+    });
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-2")).toBeInTheDocument());
+    await user.click(screen.getByTestId("create-work-order-request-attachment-file-2"));
+    await user.click(screen.getByTestId("create-work-order-request-image-remove"));
+    await user.upload(
+      input(),
+      Array.from({ length: 10 }, (_, index) => composerPng(`extra-${index}.png`)),
+    );
+    await waitFor(() => expect(screen.getAllByTestId(/create-work-order-request-attachment-/)).toHaveLength(8));
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    await user.click(screen.getByTestId("split-run-intent-composer-send"));
+    const uploaded = uploadedComposerImage("file-1", "bug.png");
+    rerender(
+      <TooltipProvider>
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          artifacts={[INTENT]}
+          files={[{ id: uploaded.id, downloadUrl: uploaded.previewUrl }]}
+          analysis={analysisChat({
+            view: {
+              ...WAITING_COMPOSER_VIEW,
+              messages: [{ id: "user-1", kind: "text", role: "user", text: String(onSend.mock.calls[0]?.[0]) }],
+            },
+          })}
+        />
+      </TooltipProvider>,
+    );
+    expect(
+      within(screen.getByTestId("split-run-intent-user-note")).getByRole("img", { name: "bug.png" }),
+    ).toHaveAttribute("src", uploaded.previewUrl);
+    expect(screen.getByTestId("split-run-description")).not.toHaveTextContent("bug.png");
   });
 });
