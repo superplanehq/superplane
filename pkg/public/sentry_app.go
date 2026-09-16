@@ -116,6 +116,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	dropped := false
 	for i := range integrations {
 		cloned, err := cloneRequestWithBody(r, body)
 		if err != nil {
@@ -123,10 +124,47 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		s.dispatchIntegrationRequest(httptest.NewRecorder(), cloned, &integrations[i])
+		if !s.deliverSentryWebhook(cloned, &integrations[i]) {
+			dropped = true
+		}
+	}
+
+	if dropped {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// deliverSentryWebhook sends the event to one connection and reports whether
+// Sentry can consider the delivery finished.
+func (s *Server) deliverSentryWebhook(r *http.Request, integration *models.Integration) bool {
+	recorder := httptest.NewRecorder()
+	s.dispatchIntegrationRequest(recorder, r, integration)
+	finished := sentryDeliveryFinished(recorder.Code)
+	if recorder.Code < http.StatusBadRequest {
+		return finished
+	}
+
+	entry := log.WithFields(log.Fields{
+		"integration_id": integration.ID.String(),
+		"status":         recorder.Code,
+	})
+	if finished {
+		entry.Warn("Sentry app webhook delivery was rejected")
+		return finished
+	}
+
+	entry.Error("Sentry app webhook delivery failed")
+	return finished
+}
+
+// sentryDeliveryFinished reads the answer of one connection. A server error
+// means SuperPlane dropped the event, so Sentry must send it again. Sentry
+// cannot fix a rejected event, so SuperPlane accepts that delivery.
+func sentryDeliveryFinished(status int) bool {
+	return status < http.StatusInternalServerError
 }
 
 func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentry.HostedApp, body []byte) {

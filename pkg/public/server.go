@@ -876,7 +876,8 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(integrationInstance).Error
 	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
+		logging.ForIntegration(*integrationInstance).WithError(err).Error("failed to save integration after request")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

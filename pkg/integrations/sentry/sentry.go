@@ -673,6 +673,7 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 		return fmt.Errorf("failed to list sentry subscriptions: %w", err)
 	}
 
+	sendErrors := []error{}
 	for _, subscription := range subscriptions {
 		config := SubscriptionConfiguration{}
 		if err := mapstructure.Decode(subscription.Configuration(), &config); err != nil {
@@ -686,10 +687,11 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 
 		if err := subscription.SendMessage(message); err != nil {
 			ctx.Logger.Errorf("failed to send sentry message to subscription: %v", err)
+			sendErrors = append(sendErrors, err)
 		}
 	}
 
-	return nil
+	return errors.Join(sendErrors...)
 }
 
 func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
