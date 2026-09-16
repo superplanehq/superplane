@@ -179,6 +179,8 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer-chips")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
     expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(

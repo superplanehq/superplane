@@ -17,7 +17,7 @@ import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity } from "./agentActivity";
 
 const MESSAGE_MARKDOWN =
-  "max-w-none font-sans text-[14px] leading-6 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
+  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p]:!my-0";
 
 export function WorkOrderIntentTranscript({
   messages,
@@ -59,7 +59,7 @@ export function WorkOrderIntentTranscript({
   );
 
   return (
-    <div className="mb-1 space-y-1" data-testid="split-run-intent-transcript">
+    <div className="space-y-0" data-testid="split-run-intent-transcript">
       {visible.map((message) => {
         const activity = message.activityId ? activitiesByID.get(message.activityId) : undefined;
         return (
@@ -125,10 +125,10 @@ const AgentMessage = memo(function AgentMessage({
   }, [animateWords]);
 
   return (
-    <div className="flex w-full items-start px-2" data-testid="split-run-intent-agent-message">
+    <div className="flex w-full items-start px-2 py-0.5" data-testid="split-run-intent-agent-message">
       <div
         ref={contentRef}
-        className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${animateWords ? "sp-stream-words" : "sp-text-reveal"}`}
+        className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-5 text-foreground ${animateWords ? "sp-stream-words" : "sp-text-reveal"}`}
       >
         <MarkdownContent content={text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>

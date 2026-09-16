@@ -36,7 +36,7 @@ export function AnalysisLiveWork({
           role="status"
           aria-label={status}
           aria-live="polite"
-          className="px-2 py-0.5 text-[13px] leading-5 text-muted-foreground"
+          className="px-3 py-0.5 text-[13px] leading-5 text-muted-foreground"
           data-testid="split-run-intent-thinking"
         >
           <AnimatedThinkingState text={status} />

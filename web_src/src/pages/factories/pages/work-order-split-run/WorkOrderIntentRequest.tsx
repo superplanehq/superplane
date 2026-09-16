@@ -179,7 +179,7 @@ function AnalysisRequestChat({
             {ANALYSIS_PLANNING_COPY.composerPlaceholder}
           </label>
           <div className="flex flex-col gap-2">
-            {hasClarity || analysis.closedDecision ? planStack : null}
+            {hasClarity ? planStack : null}
             <InputGroup className="h-auto rounded-xl" data-testid="split-run-intent-composer-card">
               <InputGroupTextarea
                 id="split-run-intent-composer"

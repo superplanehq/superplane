@@ -53,6 +53,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
+import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -146,7 +147,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    expect(within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
   it("starts and archives a draft from the note", async () => {
@@ -254,7 +255,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
           <ThemeProvider>
             <TooltipProvider>
               <WorkOrderSplitRunPopup
-                fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
+                fixture={splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0])}
                 onDispatch={onDispatch}
                 canDispatch
               />

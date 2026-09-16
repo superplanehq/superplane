@@ -71,6 +71,7 @@ export function WorkOrderIntentDocument({
   });
   const document = splitRunIntentDocument({ artifacts, description });
   const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planPaneOpen);
+  const clarityScore = analysis ? (latestPlanScore(analysis.view.messages) ?? confidence?.score) : confidence?.score;
   const sessionTitle = title.trim() || SESSION_TITLE_FALLBACK;
   const showPlanPane = !refineOpen || planPaneOpen;
   const chatSolo = refineOpen && !planPaneOpen;
@@ -83,11 +84,14 @@ export function WorkOrderIntentDocument({
         planPaneOpen,
         onTogglePlan: () => setPlanPaneOpen((current) => !current),
         canTogglePlan: hasAnalysisPlan(artifacts),
-        latestPlanScore: latestPlanScore(analysis.view.messages) ?? confidence?.score,
+        latestPlanScore: clarityScore,
         latestPlanSummary: confidence?.summary?.trim(),
         planStatus,
         isAnalyzing,
-        closedDecision: refineOpen && resultFooter ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
+        closedDecision:
+          refineOpen && resultFooter && clarityScore != null ? (
+            <ClosedPlanActions resultFooter={resultFooter} />
+          ) : undefined,
       }
     : undefined;
 
