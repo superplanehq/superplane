@@ -18,11 +18,12 @@ export const GITHUB_SETUP_INTEGRATION_PARAM = "githubIntegrationId";
 interface StoredReturn {
   path: string;
   createdAt: number;
+  preferredIntegrationId?: string;
 }
 
-// Keyed by organization only, not by integration id: the legacy GitHub connect
-// creates a new integration during the round trip to the provider, so the id the
-// caller knows before leaving does not match the id the provider redirects to.
+// The return remains keyed by organization because legacy GitHub setup can
+// change integration ids during its provider round trip. Other providers can
+// include the starting id as a selection hint.
 function storageKey(organizationId: string): string {
   return `${STORAGE_PREFIX}:${organizationId}`;
 }
@@ -33,15 +34,23 @@ function isSafePath(path: string, organizationId: string): boolean {
   return (isOrganizationPath || pathname === "/onboarding") && !path.startsWith("//");
 }
 
-export function rememberIntegrationSetupReturn(organizationId: string, path: string | undefined): void {
+export function rememberIntegrationSetupReturn(
+  organizationId: string,
+  path: string | undefined,
+  preferredIntegrationId?: string,
+): void {
   if (!organizationId || !path || !isSafePath(path, organizationId)) return;
 
-  const value: StoredReturn = { path, createdAt: Date.now() };
+  const value: StoredReturn = {
+    path,
+    createdAt: Date.now(),
+    ...(preferredIntegrationId?.trim() ? { preferredIntegrationId: preferredIntegrationId.trim() } : {}),
+  };
   window.localStorage.setItem(storageKey(organizationId), JSON.stringify(value));
   writeSetupReturnCookie(path);
 }
 
-export function peekIntegrationSetupReturn(organizationId: string): string | null {
+function readIntegrationSetupReturn(organizationId: string): StoredReturn | null {
   if (!organizationId) return null;
 
   const key = storageKey(organizationId);
@@ -59,11 +68,27 @@ export function peekIntegrationSetupReturn(organizationId: string): string | nul
       window.localStorage.removeItem(key);
       return null;
     }
-    return value.path;
+    const preferredIntegrationId =
+      typeof value.preferredIntegrationId === "string" && value.preferredIntegrationId.trim()
+        ? value.preferredIntegrationId.trim()
+        : undefined;
+    return {
+      path: value.path,
+      createdAt: value.createdAt,
+      ...(preferredIntegrationId ? { preferredIntegrationId } : {}),
+    };
   } catch {
     window.localStorage.removeItem(key);
     return null;
   }
+}
+
+export function peekIntegrationSetupReturn(organizationId: string): string | null {
+  return readIntegrationSetupReturn(organizationId)?.path ?? null;
+}
+
+export function peekIntegrationSetupReturnPreferredIntegration(organizationId: string): string | null {
+  return readIntegrationSetupReturn(organizationId)?.preferredIntegrationId ?? null;
 }
 
 export function consumeIntegrationSetupReturn(organizationId: string): void {
