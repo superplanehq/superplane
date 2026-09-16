@@ -63,7 +63,10 @@ describe("FactorySettingsAccountProfilePage GitHub sign-in", () => {
 
     expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Used to sign in and to credit pull requests.",
+      "Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
+    );
+    expect(screen.getByTestId("account-redesign-signin")).toHaveTextContent(
+      "A GitHub identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeInTheDocument();
   });

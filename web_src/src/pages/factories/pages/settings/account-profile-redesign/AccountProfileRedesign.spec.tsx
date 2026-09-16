@@ -158,7 +158,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests.",
+      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
     expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests.",
+      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
 
@@ -195,7 +195,7 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
 
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Used to sign in and to credit pull requests.",
+      "Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
   });

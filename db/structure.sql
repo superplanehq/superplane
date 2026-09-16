@@ -1556,14 +1556,6 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
-
-
---
 -- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2340,6 +2332,13 @@ ALTER TABLE ONLY public.workspace_usage_events
 
 
 --
+-- Name: account_providers_non_github_provider_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX account_providers_non_github_provider_id_key ON public.account_providers USING btree (provider, provider_id) WHERE ((provider)::text <> 'github'::text);
+
+
+--
 -- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2435,6 +2434,13 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_account_providers_provider_provider_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_providers_provider_provider_id ON public.account_providers USING btree (provider, provider_id);
 
 
 --
@@ -4530,7 +4536,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260916172910	f
+20260916202310	f
 \.
 
 

@@ -23,7 +23,8 @@ export function AccountSecuritySignInCard({
   return (
     <FactorySettingsCard title="Sign in methods" data-testid="account-redesign-signin">
       <p className="text-[12px] text-muted-foreground">
-        Use a password or a connected provider to sign in to this SuperPlane account.
+        Use a password or a connected provider to sign in to this SuperPlane account. A GitHub identity can also sign in
+        to another SuperPlane account.
       </p>
       <ul className="mt-4 space-y-4">
         {passwordSet ? (
