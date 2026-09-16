@@ -237,10 +237,10 @@ function senderDisplay(userId: string | undefined, resolveUser: OrgUserDisplayLo
 function ChatSenderMark({ display }: { display: OrgUserDisplay }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5" title={display.name}>
-      <span className="truncate text-[11px] leading-4 text-muted-foreground">{senderGivenName(display.name)}</span>
       <span className="inline-flex size-5 shrink-0 items-center justify-center">
         <OrgUserReference display={display} size="xs" showName={false} className="rounded-full leading-none" />
       </span>
+      <span className="truncate text-[11px] leading-4 text-muted-foreground">{senderGivenName(display.name)}</span>
     </span>
   );
 }

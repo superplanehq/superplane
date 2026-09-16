@@ -13,9 +13,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -188,9 +190,15 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 					return
 				}
+				text, err := mintPlanningWaitText(r.Context(), session, result)
+				if err != nil {
+					restorePlanningWait(session, result)
+					writeRunnerPlanningError(w, err)
+					return
+				}
 				if err := writeJSON(w, http.StatusOK, map[string]any{
 					"status":         result.Kind,
-					"text":           result.Text,
+					"text":           text,
 					"work_order_id":  result.WorkOrderID,
 					"work_order_key": result.WorkOrderKey,
 				}); err != nil {
@@ -312,6 +320,32 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {
+	if result.Kind != models.PlanningWaitKindMessage {
+		return result.Text, nil
+	}
+	if session.DraftWorkOrderID == nil {
+		return result.Text, nil
+	}
+	if len(blob.FileIDsInMarkdown(result.Text)) == 0 {
+		return result.Text, nil
+	}
+	rewritten, _, err := storedfiles.DescriptionForDispatch(
+		ctx,
+		database.DB(ctx),
+		blob.Current(),
+		session.OrganizationID,
+		session.FactoryID,
+		*session.DraftWorkOrderID,
+		result.Text,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return "", err
+	}
+	return rewritten, nil
 }
 
 func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {

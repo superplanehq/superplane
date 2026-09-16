@@ -3,6 +3,7 @@ import {
   factoriesImportFactoryIntakeItem,
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
+  factoriesRefreshBacklog,
   factoriesSearchFactoryIntakeItems,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
@@ -233,4 +234,34 @@ function upsertImportedWorkOrder(
     return current.map((existing) => (existing.id === order.id ? order : existing));
   }
   return [order, ...current];
+}
+
+export type RefreshBacklogResult = {
+  archivedCount: number;
+  failedItemCount: number;
+  failedSourceCount: number;
+};
+
+export function useRefreshBacklog(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<RefreshBacklogResult> => {
+      const response = await factoriesRefreshBacklog(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {},
+        }),
+      );
+      return {
+        archivedCount: response.data?.archivedCount ?? 0,
+        failedItemCount: response.data?.failedItemCount ?? 0,
+        failedSourceCount: response.data?.failedSourceCount ?? 0,
+      };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+    },
+  });
 }
