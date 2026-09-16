@@ -339,6 +339,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <div className="h-50 overflow-auto rounded -mt-2">
                 <JsonPayload
                   value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
+                  collapsed={false}
                   jsonViewStyle={{ padding: "8px" }}
                 />
               </div>
@@ -416,7 +417,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             </div>
             <div className="flex-1 overflow-auto bg-white rounded-b-lg dark:bg-gray-900">
               <div className="p-4">
-                <JsonPayload value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload} />
+                <JsonPayload
+                  value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
+                  collapsed={false}
+                  jsonViewStyle={{ fontSize: "14px" }}
+                />
               </div>
             </div>
           </div>

@@ -7,13 +7,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * The one JSON viewer used across the app (run inspector, node detail tabs,
- * component payload previews, event payloads). It keeps every string value
- * whole — the underlying viewer truncates strings after 30 chars by default,
- * which hides the tail of error messages users need — and wraps long lines so
- * they stay inside the panel.
+ * component payload previews, event payloads).
  *
- * The style comes from the active theme; pass `jsonViewStyle` to layer extras
- * (e.g. padding) on top of it.
+ * It keeps every string value whole. The underlying viewer truncates strings
+ * after 30 chars by default, which hides the tail of the error messages users
+ * need. It also wraps long lines so they stay inside the panel.
+ *
+ * The style comes from the active theme. Pass `jsonViewStyle` to layer extras
+ * such as padding on top of it.
  */
 export function JsonPayload({
   value,

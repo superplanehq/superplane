@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { escapeJsonStringValue } from "@/lib/jsonViewTheme";
@@ -26,6 +26,15 @@ describe("JsonPayload", () => {
 
     expect(container.textContent).toContain(longError);
     expect(container.textContent).not.toContain("...");
+  });
+
+  it("escapes control characters in the values it renders", () => {
+    // Without the JsonView.String override the viewer prints a real newline, so
+    // a two-line error reads as two unrelated values. This is the one place the
+    // escaping is wired into the component rather than tested on its own.
+    const { container } = render(<JsonPayload value={{ note: "first line\nsecond" }} />, { wrapper: ThemeProvider });
+
+    expect(container.textContent).toContain("first line\\nsecond");
   });
 
   it("marks string values wrappable so long lines don't overflow the panel", () => {

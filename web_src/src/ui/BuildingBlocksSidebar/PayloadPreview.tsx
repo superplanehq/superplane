@@ -70,7 +70,7 @@ export function PayloadPreview({
         </div>
       </div>
       <div className={`${maxHeight} overflow-auto rounded`}>
-        <JsonPayload value={value} jsonViewStyle={{ padding: "8px" }} />
+        <JsonPayload value={value} collapsed={false} jsonViewStyle={{ padding: "8px" }} />
       </div>
 
       {managesOwnDialog && (
