@@ -144,6 +144,22 @@ function sourceGraphIsEmpty(canvas: CanvasesCanvas | undefined): boolean {
   return nodes.length === 0 && edges.length === 0;
 }
 
+function createdWithoutDescription(deps: DuplicateAutomationCanvasDeps): boolean {
+  return Boolean(attachedColumnKey(deps.app.columnKey) && deps.createAttachedAutomation);
+}
+
+function duplicateNeedsSpecCommit(
+  sourceCanvas: CanvasesCanvas | undefined,
+  consoleYaml: string | undefined,
+  description: string,
+  restoreDescription: boolean,
+): boolean {
+  if (!sourceGraphIsEmpty(sourceCanvas) || consoleYaml) {
+    return true;
+  }
+  return restoreDescription && description.trim() !== "";
+}
+
 /** Point self-runApp refs at the clone instead of the source canvas. */
 export function rewriteSelfCanvasRefs(
   nodes: CanvasNodes | undefined,
@@ -319,7 +335,14 @@ export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasD
     ? rematerializeDuplicateConsoleYaml(sourceConsoleYaml, canvasId, duplicateName)
     : undefined;
 
-  if (sourceGraphIsEmpty(sourceCanvas) && !consoleYaml) {
+  if (
+    !duplicateNeedsSpecCommit(
+      sourceCanvas,
+      consoleYaml,
+      description,
+      createdWithoutDescription(deps),
+    )
+  ) {
     return canvasId;
   }
 
