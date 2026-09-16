@@ -95,6 +95,14 @@ describe("provisionWorkspace", () => {
   it("does not create a comments handler during workspace setup", async () => {
     await provisionWorkspace(provisionArgs());
   });
+
+  it("does not create a GitHub intake when the ticket source is Jira", async () => {
+    const createIntake = vi.fn();
+
+    await provisionWorkspace(provisionArgs({ issuesChoice: "jira", createIntake }));
+
+    expect(createIntake).not.toHaveBeenCalled();
+  });
 });
 
 describe("afterWorkspaceProvisioned", () => {
