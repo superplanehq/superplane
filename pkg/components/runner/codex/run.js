@@ -14,6 +14,35 @@ const { spawn } = require("child_process");
 
 const SESSION_FILE = "codex_session";
 
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
+
 function loadAnalysisProtocolModule() {
   const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
   for (const file of candidates) {
@@ -173,6 +202,8 @@ async function runPrompt(promptFile, model) {
 
   const startedAt = Date.now();
   const planning = planningEnabled();
+  const activity = loadActivityStreamModule().createActivityStream({ provider: "codex", turn: promptCount + 1 });
+  activity.start();
   const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
@@ -188,7 +219,7 @@ async function runPrompt(promptFile, model) {
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
-  const formatter = createCodexFormatter(telemetry);
+  const formatter = createCodexFormatter(telemetry, activity);
   const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
   rl.on("line", (raw) => {
     const line = raw.trim();
@@ -227,6 +258,8 @@ async function runPrompt(promptFile, model) {
   ]).then(([code]) => code);
 
   formatter.flush(exitCode !== 0);
+  activity.end(exitCode === 0 ? "passed" : "failed");
+  await activity.flush();
   const usage = extractUsage(lastResult);
   if (tokenTotal(usage) > 0) {
     telemetry.updateCurrentUsage(usage);
@@ -305,11 +338,15 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(rec)}\n`);
 }
 
-function createCodexFormatter(telemetry) {
+function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
+  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "codex" });
   const open = new Map();
   const anonQueue = [];
+  const contentText = new Map();
+  const anonymousContent = new Map();
   let anonSeq = 0;
+  let contentSeq = 0;
   let roundOpen = false;
   let lastText = "";
 
@@ -331,6 +368,32 @@ function createCodexFormatter(telemetry) {
     return anonQueue.shift() || "";
   }
 
+  function contentID(item, type, creating) {
+    const id = item && item.id != null ? String(item.id).trim() : "";
+    if (id) {
+      return id;
+    }
+    const queue = anonymousContent.get(type) || [];
+    if (creating) {
+      const generated = `${type}-${contentSeq}`;
+      contentSeq += 1;
+      queue.push(generated);
+      anonymousContent.set(type, queue);
+      return generated;
+    }
+    return queue.shift() || `${type}-${contentSeq++}`;
+  }
+
+  function appendContentDelta(contentKind, id, text) {
+    if (typeof text !== "string" || !text) {
+      return;
+    }
+    const previous = contentText.get(id) || "";
+    const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
+    activity.appendContent(contentKind, id, delta);
+    contentText.set(id, text);
+  }
+
   function rememberTool(item) {
     const id = itemID(item, true);
     if (open.has(id)) {
@@ -341,6 +404,12 @@ function createCodexFormatter(telemetry) {
       text: toolTextForItem(item),
       startedAt: Date.now(),
       emitted: false,
+    });
+    activity.startTool({
+      id,
+      kind: normalizeCodexToolKind(item),
+      name: String(item.name || item.type || "tool"),
+      input: toolTextForItem(item),
     });
     return id;
   }
@@ -370,7 +439,11 @@ function createCodexFormatter(telemetry) {
     emitStart(id);
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
-      process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+      if (activity.enabled) {
+        activity.appendToolOutput(id, output.replace(/\s+$/, ""), toolFailed(item) ? "stderr" : "stdout");
+      } else {
+        process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+      }
     }
     const tracked = open.get(id) || { kind: normalizeCodexToolKind(item), startedAt: Date.now() };
     open.delete(id);
@@ -387,6 +460,11 @@ function createCodexFormatter(telemetry) {
         duration_ms: Math.max(0, Date.now() - tracked.startedAt),
       }),
     );
+    activity.endTool(id, {
+      status: codexToolStatus(item),
+      exitCode: item.exit_code,
+      signal: item.signal,
+    });
   }
 
   return {
@@ -397,6 +475,14 @@ function createCodexFormatter(telemetry) {
       }
       const type = itemType(item);
       if (isMessageItem(type)) {
+        const contentKind = type === "reasoning" ? "reasoning" : "assistant";
+        const id = contentID(item, type, event.type === "item.started");
+        if (event.type === "item.started") {
+          activity.startContent(contentKind, id);
+          const initialText = item.text || item.result || "";
+          appendContentDelta(contentKind, id, initialText);
+          return;
+        }
         if (event.type === "item.completed") {
           const text = item.text || item.result || "";
           if (!roundOpen) {
@@ -405,9 +491,15 @@ function createCodexFormatter(telemetry) {
             });
           }
           roundOpen = false;
+          activity.startContent(contentKind, id);
+          appendContentDelta(contentKind, id, text);
+          activity.endContent(id);
+          contentText.delete(id);
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
             lastText = text.replace(/\s+$/, "");
-            process.stdout.write(`${lastText}\n`);
+            if (!activity.enabled) {
+              process.stdout.write(`${lastText}\n`);
+            }
           }
         }
         return;
@@ -420,7 +512,8 @@ function createCodexFormatter(telemetry) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
         }
-        rememberTool(item);
+        const id = rememberTool(item);
+        emitStart(id);
         return;
       }
       if (event.type === "item.completed") {
@@ -447,6 +540,7 @@ function createCodexFormatter(telemetry) {
             duration_ms: Math.max(0, Date.now() - tracked.startedAt),
           }),
         );
+        activity.endTool(id, { status: failed ? "failed" : "interrupted" });
         open.delete(id);
       }
     },
@@ -513,8 +607,8 @@ function toolTextForItem(item) {
   }
   if (type === "file_change") {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const pathValue = changes.map((change) => change && change.path).find(Boolean);
-    return String(pathValue || item.path || "file");
+    const paths = changes.map((change) => change && change.path).filter(Boolean);
+    return paths.length > 0 ? paths.map(String).join("\n") : String(item.path || "file");
   }
   return String(item.command || item.path || item.query || item.name || type || "tool");
 }
@@ -529,6 +623,14 @@ function toolFailed(item) {
   }
   const exit = Number(item.exit_code);
   return Number.isFinite(exit) && exit !== 0;
+}
+
+function codexToolStatus(item) {
+  const status = String((item && item.status) || "").toLowerCase();
+  if (status === "cancelled" || status === "canceled") return "cancelled";
+  if (status === "timed_out" || status === "timeout") return "timed_out";
+  if (status === "interrupted") return "interrupted";
+  return toolFailed(item) ? "failed" : "passed";
 }
 
 function formatTurnResult(event) {

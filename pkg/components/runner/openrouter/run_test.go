@@ -183,6 +183,30 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Contains(t, output, `"type":"turn"`)
 }
 
+func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":"Inspect the repository."}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"running","input":{"command":"printf first\nprintf second"},"output":"fir"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":"printf first\nprintf second"},"output":"first"}}}`,
+	})
+
+	records := activityRecords(t, output)
+	require.NotEmpty(t, records)
+	assert.Equal(t, "activity_start", records[0]["type"])
+	assert.Equal(t, "reasoning", records[1]["channel"])
+	toolStart := findActivityRecord(t, records, "tool_start")
+	assert.Equal(t, "tool_start", toolStart["type"])
+	assert.Equal(t, "printf first\nprintf second", toolStart["input"])
+	var outputText string
+	for _, record := range records {
+		if record["type"] == "line" && record["channel"] == "tool_output" {
+			outputText += record["text"].(string)
+		}
+	}
+	assert.Equal(t, "first", outputText)
+	assert.Equal(t, "passed", findActivityRecord(t, records, "tool_end")["status"])
+}
+
 func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
@@ -1227,6 +1251,45 @@ func runOpenCodeFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func runOpenCodeFormatterWithActivity(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatOpenCodeJsonLines } = require(process.argv[1]); formatOpenCodeJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func activityRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["schema_version"] == float64(2) {
+			records = append(records, record)
+		}
+	}
+	return records
+}
+
+func findActivityRecord(t *testing.T, records []map[string]any, recordType string) map[string]any {
+	t.Helper()
+	for _, record := range records {
+		if record["type"] == recordType {
+			return record
+		}
+	}
+	require.FailNow(t, "activity record not found", recordType)
+	return nil
 }
 
 func formatOpenCodeJSONLinesFailed(t *testing.T, lines []string) bool {

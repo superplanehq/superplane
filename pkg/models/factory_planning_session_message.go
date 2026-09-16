@@ -12,13 +12,14 @@ import (
 )
 
 type PlanningSessionMessage struct {
-	ID        uuid.UUID
-	SessionID uuid.UUID
-	Role      string
-	Text      string
-	Delivered bool
-	UserID    *uuid.UUID
-	CreatedAt time.Time
+	ID         uuid.UUID
+	SessionID  uuid.UUID
+	Role       string
+	Text       string
+	Delivered  bool
+	UserID     *uuid.UUID
+	ActivityID *uuid.UUID
+	CreatedAt  time.Time
 }
 
 func (PlanningSessionMessage) TableName() string {
@@ -97,6 +98,10 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string, userI
 }
 
 func (s *FactoryPlanningSession) RecordAgentMessage(tx *gorm.DB, text string) error {
+	return s.RecordAgentMessageForActivity(tx, text, uuid.Nil)
+}
+
+func (s *FactoryPlanningSession) RecordAgentMessageForActivity(tx *gorm.DB, text string, activityID uuid.UUID) error {
 	return s.withLockedSession(tx, func(inner *gorm.DB) error {
 		if err := s.guardOpen(); err != nil {
 			return err
@@ -112,6 +117,19 @@ func (s *FactoryPlanningSession) RecordAgentMessage(tx *gorm.DB, text string) er
 			Text:      body,
 			Delivered: true,
 			CreatedAt: time.Now(),
+		}
+		if activityID != uuid.Nil {
+			var activity PlanningSessionActivity
+			err := inner.Select("id", "session_id").Where("id = ?", activityID).First(&activity).Error
+			if err == nil && activity.SessionID != s.ID {
+				return fmt.Errorf("%w: activity belongs to a different session", ErrFactoryPlanningSessionInvalid)
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if err == nil {
+				message.ActivityID = &activityID
+			}
 		}
 		if err := inner.Create(&message).Error; err != nil {
 			return err
