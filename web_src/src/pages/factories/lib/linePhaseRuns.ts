@@ -39,6 +39,20 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
+ * When the column already showed every run, keep new runs in the window.
+ * Overflowing columns stay at their current page until scroll loads more.
+ */
+export function growPhaseRunWindow(visibleCount: number, previousTotal: number, totalRuns: number): number {
+  if (totalRuns <= previousTotal) {
+    return visibleCount;
+  }
+  if (visibleCount < previousTotal) {
+    return visibleCount;
+  }
+  return Math.max(visibleCount, totalRuns);
+}
+
+/**
  * Destination for a phase-board card: the split-run page for this phase.
  * Never the task page — that destination stays on the Tasks list.
  */

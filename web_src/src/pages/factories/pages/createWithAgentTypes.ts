@@ -24,6 +24,7 @@ export type CreateWithAgentMessage = {
   text: string;
   origin?: "survey";
   userId?: string;
+  activityId?: string;
   /**
    * Epoch ms this message was created, when known. Lets the transcript
    * merge order this message against agent notes by true chronology
@@ -56,4 +57,6 @@ export type CreateWithAgentView = {
   endConfirmOpen: boolean;
   selectableModelKey: string;
   refining: boolean;
+  activities?: AgentActivity[];
 };
+import type { AgentActivity } from "./work-order-split-run/agentActivity";

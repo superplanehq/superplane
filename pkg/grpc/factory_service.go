@@ -187,6 +187,11 @@ func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.Im
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) RefreshBacklog(ctx context.Context, req *pb.RefreshBacklogRequest) (*pb.RefreshBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RefreshBacklog(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListWorkOrders(ctx, organizationID, req)

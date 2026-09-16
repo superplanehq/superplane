@@ -14,7 +14,9 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  growPhaseRunWindow,
   isDoneLineColumn,
+  LINE_PHASE_RUNS_PAGE_SIZE,
   linePhaseRunHref,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
@@ -528,6 +530,16 @@ describe("findClosureAutomationApp", () => {
         { id: "app-custom-verify", name: "PR Closure", columnKey: "verify" },
       ]),
     ).toBeUndefined();
+  });
+});
+
+describe("growPhaseRunWindow", () => {
+  it("raises the window when it already showed every run", () => {
+    expect(growPhaseRunWindow(LINE_PHASE_RUNS_PAGE_SIZE, 3, 5)).toBe(5);
+  });
+
+  it("keeps the current page when the list was already windowed", () => {
+    expect(growPhaseRunWindow(LINE_PHASE_RUNS_PAGE_SIZE, 8, 9)).toBe(LINE_PHASE_RUNS_PAGE_SIZE);
   });
 });
 

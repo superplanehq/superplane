@@ -8,6 +8,7 @@ import type {
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
+import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
 import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
@@ -32,14 +33,17 @@ import { resolveIntegrationHomeHref, useCreateDialogProps } from "./integrationC
 import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
 import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useInstallIntegrationSelections";
 
-function selectReadyIntegrationInstance(
+export function selectReadyIntegrationInstance(
   connected: OrganizationsIntegration[],
   selections: IntegrationSelections,
   integrationName: string,
-  integrationId: string,
+  integrationId?: string,
 ): IntegrationSelections | null {
   const instance = connected?.find(
-    (item) => item.metadata?.integrationName === integrationName && item.metadata?.id === integrationId,
+    (item) =>
+      item.metadata?.integrationName === integrationName &&
+      (!integrationId || item.metadata?.id === integrationId) &&
+      item.status?.state === "ready",
   );
   const selection = instance ? selectionFromInstance(instance) : null;
   return selection?.ready ? { ...selections, [integrationName]: selection } : null;
@@ -110,6 +114,7 @@ export function useIntegrationConnectDialog({
     onSelectionsChange,
     manualSelectionNames,
     loading: connectionsLoading,
+    initialPreferredIntegrationId: peekIntegrationSetupReturnPreferredIntegration(organizationId),
   });
   useRefetchOnWindowFocus(refetch);
 
@@ -158,6 +163,11 @@ export function useIntegrationConnectDialog({
   const requestConnect = async (integrationName: string, preferredIntegrationId?: string): Promise<boolean> => {
     if (integrationName === "github" && githubConnect.hosted) {
       return connectGitHubWithoutDialog(false, preferredIntegrationId);
+    }
+    const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
+    if (existingSelection) {
+      onSelectionsChange(existingSelection);
+      return true;
     }
     openConnectDialog(integrationName);
     return false;

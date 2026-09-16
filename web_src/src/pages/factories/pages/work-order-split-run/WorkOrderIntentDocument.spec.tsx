@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
-import { ANALYSIS_REPLY_THINKING_STATES, ANALYSIS_THINKING_STATES } from "./analysisLiveWorkState";
 import {
   analysisChat,
   HIGH_CONFIDENCE,
@@ -182,7 +181,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
       "Imported from GitHub: billing empty state is unclear.",
     );
-    expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_THINKING_STATES[0]);
+    expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
     expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show full plan" })).toBeInTheDocument();
@@ -324,9 +323,9 @@ describe("WorkOrderIntentDocument", () => {
 
     const transcript = screen.getByTestId("split-run-intent-transcript");
     expect(within(transcript).getByText(/Because the premise is false/)).toBeInTheDocument();
-    expect(transcript.querySelector(".sp-stream-text")).toBeNull();
+    expect(transcript.querySelector(".sp-stream-w")).toBeNull();
     expect(screen.getAllByText(/Because the premise is false/)).toHaveLength(1);
-    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent(ANALYSIS_REPLY_THINKING_STATES[0]);
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.machineStarting)).not.toBeInTheDocument();
   });
 
@@ -341,6 +340,7 @@ describe("WorkOrderIntentDocument", () => {
           onSubmitSurvey,
           view: {
             machineStatus: "waiting",
+            messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need two details." }],
             survey: {
               id: "survey-1",
               questions: [
@@ -363,6 +363,55 @@ describe("WorkOrderIntentDocument", () => {
     expect(onSubmitSurvey).not.toHaveBeenCalled();
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
+  });
+
+  it("waits for the final agent message before it shows a survey", () => {
+    const survey = {
+      id: "survey-1",
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+    };
+    const { rerender } = renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            survey,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("create-with-agent-survey")).not.toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider>
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          artifacts={[INTENT]}
+          analysis={analysisChat({
+            view: {
+              machineStatus: "waiting",
+              canvasId: "canvas-1",
+              canvasRunId: "run-1",
+              executionId: "exec-1",
+              messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need one detail." }],
+              survey,
+            },
+          })}
+        />
+      </TooltipProvider>,
+    );
+
+    const log = screen.getByTestId("split-run-intent-chat-log");
+    const message = within(log).getByTestId("split-run-intent-transcript");
+    expect(message).toHaveTextContent("I need one detail.");
+    const question = within(log).getByText("What is the priority?");
+    expect(message.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("streams the analysis agent in the left chat", () => {

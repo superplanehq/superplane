@@ -37,6 +37,12 @@ function renderTranscript(messages: CreateWithAgentMessage[], extras: { streamin
   return render(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={extras.streaming} />);
 }
 
+function expectAvatarBeforeGivenName(container: HTMLElement, avatarName: string, givenName: string) {
+  const avatar = within(container).getByRole("img", { name: avatarName });
+  const name = within(container).getByText(givenName);
+  expect(avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("WorkOrderIntentTranscript", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
@@ -56,7 +62,7 @@ describe("WorkOrderIntentTranscript", () => {
     );
 
     const transcript = screen.getByTestId("split-run-intent-transcript");
-    expect(transcript.querySelector(".sp-stream-text")).toBeNull();
+    expect(transcript.querySelector(".sp-stream-w")).toBeNull();
     expect(transcript.querySelector(".sp-text-reveal")).not.toBeNull();
   });
 
@@ -65,7 +71,38 @@ describe("WorkOrderIntentTranscript", () => {
       streaming: true,
     });
 
-    expect(screen.getByTestId("split-run-intent-transcript").querySelector(".sp-stream-text")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-transcript").querySelectorAll(".sp-stream-w")).not.toHaveLength(0);
+  });
+
+  it("streams a final agent line that arrives as the run becomes idle", () => {
+    const { rerender } = renderTranscript([]);
+
+    rerender(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        messages={[{ id: "agent-1", kind: "text", role: "agent", text: "The final answer is ready." }]}
+      />,
+    );
+
+    const words = screen.getByTestId("split-run-intent-transcript").querySelectorAll(".sp-stream-w");
+    expect(words).toHaveLength(5);
+    expect(words[0]).toHaveClass("is-streaming");
+  });
+
+  it("continues a final message animation after the parent stops streaming", () => {
+    const { rerender } = renderTranscript([]);
+    const messages: CreateWithAgentMessage[] = [
+      { id: "agent-1", kind: "text", role: "agent", text: "The final answer is ready." },
+    ];
+
+    rerender(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} />);
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    const firstWord = transcript.querySelector(".sp-stream-w");
+
+    rerender(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={false} />);
+
+    expect(transcript.querySelector(".sp-stream-w")).toBe(firstWord);
+    expect(transcript.querySelectorAll(".sp-stream-w.is-streaming")).toHaveLength(5);
   });
 
   it("shows survey answers as question and answer in a stronger bubble", () => {
@@ -83,6 +120,7 @@ describe("WorkOrderIntentTranscript", () => {
     const answer = screen.getByTestId("split-run-intent-survey-answer");
     expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.answeredBy);
     expect(answer).toHaveTextContent("Ada");
+    expectAvatarBeforeGivenName(answer, "Ada Lovelace", "Ada");
     expect(answer).toHaveTextContent("What should the agent build?");
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
@@ -105,6 +143,7 @@ describe("WorkOrderIntentTranscript", () => {
       "src",
       "https://example.com/ada.png",
     );
+    expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
     expect(note.parentElement).toHaveClass("justify-end");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();

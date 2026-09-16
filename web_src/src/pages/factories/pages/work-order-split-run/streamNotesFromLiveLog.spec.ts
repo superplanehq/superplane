@@ -1,9 +1,34 @@
 import { describe, expect, it } from "bun:test";
 
-import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
+import {
+  appendLineToLatestSection,
+  startCommandSection,
+  startToolOnLatestSection,
+} from "@/ui/CanvasPage/RunnerLiveLogDialog/liveLogSections";
+import type { CommandSection, LogState } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
 import { mergeLiveStreamNotes, notesForLiveStream, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
 import type { SplitRunStreamLine } from "./splitRunMocks";
+
+function emptyLiveLogState(): LogState {
+  return { sections: [], orphanLines: [], pendingRecords: [], error: null, isLoading: false, isStreaming: false };
+}
+
+const GREP_STDOUT = [
+  "Found 1 matches",
+  "/home/ubuntu/repo/web_src/.eslint-budget-baseline.json:",
+  'Line 8: "@typescript-eslint/no-non-null-asserted-optional-cha',
+  "Found 44 matches",
+  "/home/ubuntu/repo/web_src/src/pages/app/mappers/circleci/ru",
+  "Line 228: const rootTriggerRenderer = getTriggerRenderer(rooi",
+  "/home/ubuntu/repo/web_src/src/pages/app/mappers/if.ts:",
+  "Line 132: const rootTriggerRenderer = getTriggerRenderer(root",
+  "/home/ubuntu/repo/web_src/src/pages/app/mappers/datadog/c",
+  "Line 72: const rootTriggerRenderer = getTriggerRenderer(rootT",
+  "/home/ubuntu/repo/web_src/src/pages/app/mappers/filter.ts:",
+  "Line 126: const rootTriggerRenderer = getTriggerRenderer(roo",
+  "/home/ubuntu/repo/web_src/src/pages/app/mappers/dash0/del",
+];
 
 function bashSection(): CommandSection {
   return {
@@ -170,6 +195,33 @@ describe("notesFromLiveLogSections", () => {
     ]);
     expect(notes.some((note) => note.componentName.includes('"type":"turn"'))).toBe(false);
     expect(notes.some((note) => note.componentName.startsWith("Turn "))).toBe(false);
+  });
+
+  it("maps grep stdout after a late cmd_start to one tool detail, not note titles", () => {
+    let state = startToolOnLatestSection(emptyLiveLogState(), "grep", "rootTriggerRenderer", "toolu_grep");
+    for (const line of GREP_STDOUT) {
+      state = appendLineToLatestSection(state, line);
+    }
+    state = startCommandSection(state, {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+
+    const notes = notesFromLiveLogSections("agent", state.sections);
+    const noteTitles = notes.filter((note) => note.componentType === "note").map((note) => note.componentName);
+    const grep = notes.find((note) => note.componentType === "grep");
+
+    expect(noteTitles).toEqual([]);
+    expect(notes.some((note) => note.componentName === "Found 1 matches")).toBe(false);
+    expect(grep?.componentName).toBe("rootTriggerRenderer");
+    expect(grep?.noteParentId).toBe("agent-step-5");
+    expect(grep?.detail).toContain("Found 1 matches");
+    expect(grep?.detail).toContain(".eslint-budget-baseline.json");
+    expect(grep?.detail).toContain("Found 44 matches");
+    expect(grep?.detail).toContain("rootTriggerRenderer");
   });
 });
 
