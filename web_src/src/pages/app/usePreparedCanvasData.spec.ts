@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { QueryClient } from "@tanstack/react-query";
 import type { CanvasesCanvas } from "@/api-client";
 import { usePreparedCanvasData } from "./usePreparedCanvasData";
@@ -10,6 +10,34 @@ vi.mock("./workflowPageHelpers", () => ({
 }));
 
 describe("usePreparedCanvasData", () => {
+  beforeEach(() => {
+    vi.mocked(prepareData).mockClear();
+  });
+
+  it("accepts a null canvas from the live page", () => {
+    const queryClient = {} as QueryClient;
+
+    const { result } = renderHook(() =>
+      usePreparedCanvasData({
+        canvas: null,
+        triggers: [],
+        components: [],
+        nodeEventsMap: {},
+        nodeExecutionsMap: {},
+        nodeQueueItemsMap: {},
+        canvasId: "canvas-1",
+        queryClient,
+        user: null,
+        canvasMode: "live",
+        organizationId: "org-1",
+        enabled: true,
+      }),
+    );
+
+    expect(result.current).toEqual({ nodes: [], edges: [] });
+    expect(prepareData).not.toHaveBeenCalled();
+  });
+
   it("passes the organization id so runner logs can stream", () => {
     const queryClient = {} as QueryClient;
     const canvas = { metadata: { id: "canvas-1" } } as CanvasesCanvas;

@@ -14,7 +14,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { prepareData } from "./workflowPageHelpers";
 
 type PreparedCanvasDataArgs = {
-  canvas?: CanvasesCanvas;
+  canvas?: CanvasesCanvas | null;
   triggers: TriggersTrigger[];
   components: ActionsAction[];
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
