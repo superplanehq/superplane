@@ -62,7 +62,7 @@ describe("SplitRunReview draft model select", () => {
     expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("keeps the model select off a waiting footer", () => {

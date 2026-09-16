@@ -6,6 +6,8 @@ export const INTENT_DOCUMENT_TITLE = "What this work will do";
 
 export const EXECUTIVE_SUMMARY_HEADING = "Executive summary";
 
+export const CONSTRAINTS_HEADING = "Constraints";
+
 export interface IntentDocument {
   title: string;
   summary: string;
@@ -21,6 +23,15 @@ export function parseIntentDocument(markdown: string): IntentDocument {
   const titled = trimmed.match(/^#\s+(.+)\n+([\s\S]*)$/);
   const title = titled?.[1]?.trim() || INTENT_DOCUMENT_TITLE;
   const body = (titled?.[2] ?? trimmed).trim();
+
+  const brief = headingSection(body, CONSTRAINTS_HEADING);
+  if (brief) {
+    return {
+      title,
+      summary: body.slice(0, brief.end).trim(),
+      plan: body.slice(brief.end).trim(),
+    };
+  }
 
   const executive = headingSection(body, EXECUTIVE_SUMMARY_HEADING);
   if (executive) {

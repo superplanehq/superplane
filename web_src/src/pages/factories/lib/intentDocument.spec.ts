@@ -3,33 +3,26 @@ import { describe, expect, it } from "vitest";
 import { composeIntentDocument, INTENT_DOCUMENT_TITLE, parseIntentDocument } from "./intentDocument";
 
 describe("intentDocument", () => {
-  it("uses the H1 as the title and Executive summary as the short view", () => {
+  it("uses the H1 as the title and the brief through Constraints as the short view", () => {
     const document = parseIntentDocument(`# Clearer empty state
 
-## Executive summary
-
-### Goal
-
 A person can add a payment method from the empty billing page.
-
-The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
-
-### Done when
-
-- The empty view names the next action.
-- The action opens add-payment-method.
-
-### Out of scope
-
-- The page after a card exists.
-
-### Key architecture decisions
-
-- Reuse the current empty view. Do not add a new page.
 
 ## Problem
 
 The empty view only shows a title.
+
+## Proposed outcome
+
+The empty view names the next action.
+
+## Constraints
+
+Do not build a new billing flow.
+
+## Scope
+
+Copy on the current empty view.
 
 ## Outcome
 
@@ -38,13 +31,32 @@ A person sees the next action on the billing page.
 
     expect(document.title).toBe("Clearer empty state");
     expect(document.summary).toContain("A person can add a payment method from the empty billing page.");
+    expect(document.summary).toContain("## Problem");
+    expect(document.summary).toContain("## Proposed outcome");
+    expect(document.summary).toContain("## Constraints");
+    expect(document.summary).not.toContain("## Scope");
+    expect(document.plan).toContain("## Scope");
+    expect(document.plan).toContain("## Outcome");
+    expect(document.plan).not.toContain("## Constraints");
+  });
+
+  it("still reads Executive summary on older specs", () => {
+    const document = parseIntentDocument(`# Clearer empty state
+
+## Executive summary
+
+### Goal
+
+A person can add a payment method from the empty billing page.
+
+## Problem
+
+The empty view only shows a title.
+`);
+
     expect(document.summary).toContain("### Goal");
-    expect(document.summary).toContain("### Done when");
-    expect(document.summary).toContain("### Out of scope");
-    expect(document.summary).toContain("### Key architecture decisions");
     expect(document.summary).not.toContain("## Problem");
     expect(document.plan).toContain("## Problem");
-    expect(document.plan).toContain("## Outcome");
     expect(document.plan).not.toContain("## Executive summary");
   });
 

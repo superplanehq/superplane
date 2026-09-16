@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 import {
   clampConfidenceScore,
-  CONFIDENCE_CHECK_NAME,
+  CLARITY_SCORE_LABEL,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   type ConfidenceBand,
@@ -44,7 +44,7 @@ export function ConfidenceMeter({
     <span
       role={decorative ? undefined : "meter"}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : CONFIDENCE_CHECK_NAME}
+      aria-label={decorative ? undefined : CLARITY_SCORE_LABEL}
       aria-valuemin={decorative ? undefined : 0}
       aria-valuemax={decorative ? undefined : CONFIDENCE_SCORE_MAX}
       aria-valuenow={decorative ? undefined : value}
@@ -70,7 +70,7 @@ export function ConfidenceMeter({
     <Tooltip>
       <TooltipTrigger asChild>{meter}</TooltipTrigger>
       <TooltipContent>
-        <span>{CONFIDENCE_CHECK_NAME}</span>
+        <span>{CLARITY_SCORE_LABEL}</span>
         <span className="ml-1.5 tabular-nums">{scoreLabel}</span>
       </TooltipContent>
     </Tooltip>
@@ -92,20 +92,22 @@ const THINKING_SIZER = CONFIDENCE_THINKING_STATES.reduce((longest, state) =>
 );
 
 /**
- * Placeholder for the meter while the Backlog automation still analyzes the
- * task. It takes the same slot as the meter, so the card does not
- * move when the score arrives.
+ * Round dot matrix while analysis still runs. The board card passes
+ * `showThinkingStates` to cycle Analyzing, Refining, Planning, and
+ * Checking next to the dots. Refine chips stay matrix-only.
  */
 export function ConfidenceAnalyzingIndicator({
   className,
   testId,
   showTooltip = true,
   decorative = false,
+  showThinkingStates = false,
 }: {
   className?: string;
   testId?: string;
   showTooltip?: boolean;
   decorative?: boolean;
+  showThinkingStates?: boolean;
 }) {
   const indicator = (
     <span
@@ -114,12 +116,13 @@ export function ConfidenceAnalyzingIndicator({
       aria-label={decorative ? undefined : CONFIDENCE_ANALYZING_LABEL}
       data-testid={testId}
       className={cn(
-        "pointer-events-auto inline-flex items-center gap-1.5 text-[11px] leading-none text-muted-foreground",
+        "pointer-events-auto inline-flex items-center leading-none",
+        showThinkingStates ? "gap-1.5 text-[11px] text-muted-foreground" : "justify-center",
         className,
       )}
     >
       <MatrixDotLoader />
-      <ThinkingStatesLabel />
+      {showThinkingStates ? <ThinkingStatesLabel /> : null}
     </span>
   );
 

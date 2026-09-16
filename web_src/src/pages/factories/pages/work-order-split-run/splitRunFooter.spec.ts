@@ -73,15 +73,12 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
-  it("blocks Start when confidence is 0 or 1", () => {
+  it("keeps Start available when confidence is 0 or 1", () => {
     const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 1 });
 
     expect(footer.note?.headline).toBe("This task is not ready to start");
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
-    expect(footer.actions.find((action) => action.kind === "start")).toMatchObject({
-      disabled: true,
-      tooltip: "Confidence is too low to start.",
-    });
+    expect(footer.actions.find((action) => action.kind === "start")).toEqual(START);
     expect(footer.confidenceScore).toBe(1);
   });
 
