@@ -42,6 +42,7 @@ func intakeListeningByID(
 	if err := tx.
 		Where("workflow_id IN ? AND node_id IN ?", canvasIDs, nodeIDs).
 		Find(&nodes).Error; err != nil {
+		markUnknownListenersDown(listening, intakes, triggerByCanvas)
 		return listening
 	}
 
@@ -62,6 +63,7 @@ func intakeListeningByID(
 	if len(webhookIDs) > 0 {
 		var webhooks []models.Webhook
 		if err := tx.Where("id IN ?", webhookIDs).Find(&webhooks).Error; err != nil {
+			markUnknownListenersDown(listening, intakes, triggerByCanvas)
 			return listening
 		}
 		for i := range webhooks {
@@ -78,6 +80,18 @@ func intakeListeningByID(
 	}
 
 	return listening
+}
+
+func markUnknownListenersDown(
+	listening map[uuid.UUID]bool,
+	intakes []models.FactoryIntake,
+	triggerByCanvas map[uuid.UUID]string,
+) {
+	for i := range intakes {
+		if triggerByCanvas[intakes[i].CanvasID] != "" {
+			listening[intakes[i].ID] = false
+		}
+	}
 }
 
 func intakeTriggerIsListening(node models.CanvasNode, webhookByID map[uuid.UUID]models.Webhook) bool {

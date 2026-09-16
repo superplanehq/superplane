@@ -1009,6 +1009,42 @@ func Test__Jira__HandleHook(t *testing.T) {
 		assert.Equal(t, webhookRefreshInterval, integrationCtx.ActionRequests[0].Interval)
 	})
 
+	t.Run("recreates the Atlassian registration with the stored shared events", func(t *testing.T) {
+		webhookID := int64(1000)
+		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{
+			WebhookID:  &webhookID,
+			WebhookURL: "https://sp.test/webhooks/w1",
+			WebhookEvents: []string{
+				issueEventCreated, issueEventUpdated, issueEventDeleted,
+				commentEventCreated, commentEventUpdated, commentEventDeleted,
+			},
+		})
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values":[]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 4)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[2].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[2].Body)
+		assert.Contains(t, string(body), `"comment_created"`)
+		assert.Contains(t, string(body), `"comment_updated"`)
+		assert.Contains(t, string(body), `"comment_deleted"`)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+	})
+
 	t.Run("recreates the Atlassian registration when the stored id is gone", func(t *testing.T) {
 		webhookID := int64(1000)
 		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{

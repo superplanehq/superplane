@@ -54,6 +54,11 @@ type Metadata struct {
 	// create a replacement when Atlassian no longer has the stored id.
 	WebhookURL string `json:"webhookUrl,omitempty" mapstructure:"webhookUrl,omitempty"`
 
+	// WebhookEvents is the union of native Jira events the shared registration must deliver.
+	// Refresh recreates the webhook with this list so a lost registration does not drop
+	// comment or incident listeners that Setup had already merged in.
+	WebhookEvents []string `json:"webhookEvents,omitempty" mapstructure:"webhookEvents,omitempty"`
+
 	// OpsScopesRequested records whether the currently stored OAuth token was granted with JSM Ops
 	// scopes. Set only after a successful OAuth callback — never when building the authorize URL —
 	// so a Sync that prompts reconnect for ops keeps re-prompting until the user actually finishes
@@ -689,7 +694,11 @@ func ensureIssueWebhookRegistration(client *Client, integration core.Integration
 		return nil
 	}
 
-	webhookID, createErr := client.CreateIssueWebhook(metadata.WebhookURL, allProjectsJQLFilter, legacyIssueEvents)
+	webhookID, createErr := client.CreateIssueWebhook(
+		metadata.WebhookURL,
+		allProjectsJQLFilter,
+		issueWebhookEvents(metadata.WebhookEvents),
+	)
 	if createErr != nil {
 		return fmt.Errorf("failed to recreate Jira webhook: %w", createErr)
 	}

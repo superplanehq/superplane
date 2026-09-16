@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	log "github.com/sirupsen/logrus"
@@ -199,6 +200,10 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 		outcome = executorOutcomeFailed
 		reason = webhookProvisionerReasonSetupError
 
+		if rememberErr := w.rememberSetupMetadata(lockedWebhook, metadata); rememberErr != nil {
+			logger.Errorf("Error storing webhook metadata after setup failure: %v", rememberErr)
+		}
+
 		err := w.handleProvisioningError(logger, lockedWebhook, setupErr)
 		if err != nil {
 			logger.Errorf("Error handling provisioning error for webhook: %v", err)
@@ -280,6 +285,17 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 	}
 
 	return metadata, instance.AppName, err
+}
+
+func (w *WebhookProvisioner) rememberSetupMetadata(webhook *models.Webhook, metadata any) error {
+	if metadata == nil {
+		return nil
+	}
+
+	return database.Conn().Model(webhook).Updates(map[string]any{
+		"metadata":   datatypes.NewJSONType(metadata),
+		"updated_at": time.Now(),
+	}).Error
 }
 
 func (w *WebhookProvisioner) markReady(webhook *models.Webhook, metadata any) error {
