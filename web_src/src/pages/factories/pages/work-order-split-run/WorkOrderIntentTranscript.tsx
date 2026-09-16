@@ -1,6 +1,9 @@
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
+
 import type { FilesFile } from "@/api-client";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
+import { streamWordsIn } from "@/lib/streamWords";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
@@ -10,6 +13,8 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
+import { AgentActivityView } from "./AgentActivityView";
+import type { AgentActivity } from "./agentActivity";
 
 const MESSAGE_MARKDOWN =
   "max-w-none font-sans text-[14px] leading-6 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
@@ -19,30 +24,59 @@ export function WorkOrderIntentTranscript({
   organizationId,
   streaming = false,
   files,
+  activities = [],
 }: {
   messages: CreateWithAgentMessage[];
   organizationId: string;
   streaming?: boolean;
   files?: FilesFile[];
+  activities?: AgentActivity[];
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const knownMessageIDs = useRef<Set<string> | null>(null);
+  const newAgentMessageIDs = new Set(
+    knownMessageIDs.current
+      ? messages
+          .filter((message) => message.role === "agent" && !knownMessageIDs.current?.has(message.id))
+          .map((message) => message.id)
+      : [],
+  );
 
-  if (messages.length === 0) {
+  useLayoutEffect(() => {
+    knownMessageIDs.current = new Set(messages.map((message) => message.id));
+  }, [messages]);
+
+  if (messages.length === 0 && activities.length === 0) {
     return null;
   }
 
   const last = messages.at(-1);
+  const activitiesByID = new Map(activities.map((activity) => [activity.id, activity]));
+  const linkedActivityIDs = new Set(messages.flatMap((message) => (message.activityId ? [message.activityId] : [])));
+  const unlinkedActivities = activities.filter(
+    (activity) => activity.status !== "running" && !linkedActivityIDs.has(activity.id),
+  );
 
   return (
     <div className="mb-4 space-y-4" data-testid="split-run-intent-transcript">
-      {messages.map((message) => (
-        <TranscriptMessage
-          key={message.id}
-          message={message}
-          resolveUser={resolveUser}
-          streaming={streaming && last?.role === "agent" && message.id === last.id}
-          files={files}
-        />
+      {messages.map((message) => {
+        const activity = message.activityId ? activitiesByID.get(message.activityId) : undefined;
+        return (
+          <div key={message.id}>
+            {activity ? <AgentActivityView activity={activity} /> : null}
+            <TranscriptMessage
+              message={message}
+              resolveUser={resolveUser}
+              streaming={
+                newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
+              }
+              files={files}
+            />
+          </div>
+        );
+      })}
+      {unlinkedActivities.map((activity) => (
+        <AgentActivityView key={activity.id} activity={activity} />
       ))}
     </div>
   );
@@ -66,15 +100,43 @@ function TranscriptMessage({
     return <ComposerNoteBubble text={message.text} userId={message.userId} resolveUser={resolveUser} files={files} />;
   }
 
+  return <AgentMessage text={message.text} streaming={streaming} files={files} />;
+}
+
+const AgentMessage = memo(function AgentMessage({
+  text,
+  streaming,
+  files,
+}: {
+  text: string;
+  streaming: boolean;
+  files?: FilesFile[];
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const animateWords = useRef(streaming).current;
+
+  useEffect(() => {
+    if (!animateWords || !contentRef.current) return;
+    return streamWordsIn(contentRef.current);
+  }, [animateWords]);
+
   return (
     <div className="flex w-full items-start">
       <div
-        className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${streaming ? "sp-stream-text" : "sp-text-reveal"}`}
+        ref={contentRef}
+        className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-6 text-foreground ${animateWords ? "sp-stream-words" : "sp-text-reveal"}`}
       >
-        <MarkdownContent content={message.text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
+        <MarkdownContent content={text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>
     </div>
   );
+}, sameAgentMessage);
+
+function sameAgentMessage(
+  previous: { text: string; streaming: boolean; files?: FilesFile[] },
+  next: { text: string; streaming: boolean; files?: FilesFile[] },
+): boolean {
+  return previous.text === next.text && previous.files === next.files;
 }
 
 function ComposerNoteBubble({

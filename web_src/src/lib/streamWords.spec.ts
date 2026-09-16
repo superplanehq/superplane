@@ -61,23 +61,21 @@ describe("streamWords", () => {
     expect(paragraph.textContent).toBe("The empty view names the next action.");
   });
 
-  it("resolves words one by one through is-in", () => {
+  it("stages words with CSS delays and reveals them on cleanup", () => {
     const root = document.createElement("div");
     root.textContent = "one two three";
     const spans = wrapStreamWords(root);
 
-    playStreamWords(spans);
+    const finish = playStreamWords(spans);
 
-    expect(spans[0]?.classList.contains("is-in")).toBe(true);
-    expect(spans[1]?.classList.contains("is-in")).toBe(false);
-    expect(spans[2]?.classList.contains("is-in")).toBe(false);
+    expect(spans.every((span) => span.classList.contains("is-streaming"))).toBe(true);
+    expect(spans.map((span) => span.style.getPropertyValue("--stream-delay"))).toEqual(["0ms", "60ms", "120ms"]);
 
-    vi.advanceTimersByTime(60);
-    expect(spans[1]?.classList.contains("is-in")).toBe(true);
-    expect(spans[2]?.classList.contains("is-in")).toBe(false);
+    finish();
 
-    vi.advanceTimersByTime(60);
-    expect(spans[2]?.classList.contains("is-in")).toBe(true);
+    expect(spans.every((span) => span.classList.contains("is-in"))).toBe(true);
+    expect(spans.every((span) => !span.classList.contains("is-streaming"))).toBe(true);
+    expect(spans.every((span) => !span.style.getPropertyValue("--stream-delay"))).toBe(true);
   });
 
   it("shows every word at once when the user prefers reduced motion", () => {
@@ -87,8 +85,21 @@ describe("streamWords", () => {
 
     streamWordsIn(root);
 
-    expect([...root.querySelectorAll(".sp-stream-w")].every((span) => span.classList.contains("is-in"))).toBe(true);
-    vi.advanceTimersByTime(120);
+    expect(root.querySelectorAll(".sp-stream-w")).toHaveLength(0);
+    expect(root.textContent).toBe("one two");
+  });
+
+  it("uses one block animation instead of wrapping a long message", () => {
+    const root = document.createElement("div");
+    root.textContent = Array.from({ length: 201 }, (_, index) => `word-${index}`).join(" ");
+
+    const finish = streamWordsIn(root);
+
+    expect(root).toHaveClass("sp-stream-text");
+    expect(root.querySelectorAll(".sp-stream-w")).toHaveLength(0);
+
+    finish();
+    expect(root).not.toHaveClass("sp-stream-text");
   });
 
   it("keeps a heading or list line as one generated unit", () => {
@@ -114,13 +125,10 @@ describe("streamWords", () => {
     const root = document.createElement("div");
     root.textContent = "one two";
     streamWordsIn(root);
-    vi.advanceTimersByTime(60);
 
     streamWordsIn(root);
 
     expect(root.querySelectorAll(".sp-stream-w")).toHaveLength(2);
-    expect(root.querySelectorAll(".sp-stream-w.is-in")).toHaveLength(1);
-    vi.advanceTimersByTime(60);
-    expect(root.querySelectorAll(".sp-stream-w.is-in")).toHaveLength(2);
+    expect(root.querySelectorAll(".sp-stream-w.is-streaming")).toHaveLength(2);
   });
 });

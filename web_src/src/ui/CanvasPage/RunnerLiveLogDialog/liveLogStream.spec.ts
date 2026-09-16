@@ -73,6 +73,17 @@ describe("consumeLiveLogNdjsonLine", () => {
     expect(next.onLogLine).toHaveBeenCalledWith("Hello", 2);
   });
 
+  it("sends version 2 activity records only to the activity consumer", () => {
+    const next = handlers({ onRecord: vi.fn(), onToolStart: vi.fn() });
+    const record = { schema_version: 2, type: "tool_start", id: "call-1", kind: "bash", text: "pwd" };
+
+    consumeLiveLogNdjsonLine(JSON.stringify(record), next);
+
+    expect(next.onRecord).toHaveBeenCalledWith(record);
+    expect(next.onToolStart).not.toHaveBeenCalled();
+    expect(next.onLogLine).not.toHaveBeenCalled();
+  });
+
   it("splits each prompt command into its own usage series", () => {
     const series = reducePromptUsageFromLiveLogLines([
       JSON.stringify({ type: "cmd_start", index: 2, text: "Implementation", kind: "prompt" }),

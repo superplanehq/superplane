@@ -1,5 +1,8 @@
 const STREAM_WORD_CLASS = "sp-stream-w";
+const STREAMING_WORD_CLASS = "is-streaming";
 const DEFAULT_STREAM_GAP_MS = 28;
+const MAX_WORD_STREAM_DURATION_MS = 1800;
+const MAX_STREAM_WORDS = 200;
 const SKIP_PARENTS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "NOSCRIPT"]);
 const STRUCTURE_LINE = /^(?:[ \t]*#{1,6}[ \t]+|[ \t]*(?:[-*+]|\d+\.)[ \t]+)/;
 
@@ -95,7 +98,7 @@ export function wrapStreamWords(root: HTMLElement): HTMLElement[] {
   return spans;
 }
 
-/** Wipe, then resolve each word through opacity plus a small blur. */
+/** Resolve each word through opacity and a small blur with CSS-only staggering. */
 export function playStreamWords(spans: HTMLElement[]): () => void {
   if (spans.length === 0) {
     return () => {};
@@ -108,34 +111,46 @@ export function playStreamWords(spans: HTMLElement[]): () => void {
     return () => {};
   }
 
-  for (const span of spans) {
-    span.style.transition = "none";
+  const gap = Math.min(streamGapMs(), MAX_WORD_STREAM_DURATION_MS / Math.max(1, spans.length - 1));
+  for (const [index, span] of spans.entries()) {
     span.classList.remove("is-in");
-  }
-  void spans[0]?.offsetWidth;
-  for (const span of spans) {
-    span.style.transition = "";
+    span.style.setProperty("--stream-delay", `${Math.round(index * gap)}ms`);
+    span.classList.add(STREAMING_WORD_CLASS);
   }
 
-  const gap = streamGapMs();
-  let index = 0;
-  let timer = 0;
-  const next = () => {
-    if (index >= spans.length) {
-      return;
-    }
-    spans[index]?.classList.add("is-in");
-    index += 1;
-    if (index < spans.length) {
-      timer = window.setTimeout(next, gap);
+  const lastSpan = spans.at(-1);
+  let complete = false;
+  const finish = () => {
+    if (complete) return;
+    complete = true;
+    lastSpan?.removeEventListener("animationend", finish);
+    for (const span of spans) {
+      span.classList.remove(STREAMING_WORD_CLASS);
+      span.classList.add("is-in");
+      span.style.removeProperty("--stream-delay");
     }
   };
-  next();
-  return () => window.clearTimeout(timer);
+  lastSpan?.addEventListener("animationend", finish, { once: true });
+  return finish;
 }
 
 /** Wrap once, or replay spans already in the tree (React Strict Mode). */
 export function streamWordsIn(root: HTMLElement): () => void {
+  if (prefersReducedMotion()) {
+    return () => {};
+  }
+
   const existing = [...root.querySelectorAll<HTMLElement>(`.${STREAM_WORD_CLASS}`)];
+  const wordCount = existing.length || root.textContent?.match(/\S+/g)?.length || 0;
+  if (wordCount > MAX_STREAM_WORDS) {
+    existing.forEach((span) => span.classList.add("is-in"));
+    root.classList.add("sp-stream-text");
+    const finish = () => {
+      root.removeEventListener("animationend", finish);
+      root.classList.remove("sp-stream-text");
+    };
+    root.addEventListener("animationend", finish, { once: true });
+    return finish;
+  }
   return playStreamWords(existing.length > 0 ? existing : wrapStreamWords(root));
 }
