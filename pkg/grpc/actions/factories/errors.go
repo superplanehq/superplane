@@ -9,6 +9,10 @@ import (
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
+	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+		return err
+	}
+
 	switch {
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
@@ -132,6 +136,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errCustomAutomationsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Custom automations are not enabled for this organization.")
+	case errors.Is(err, errFactoryAutomationReserved):
+		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -143,6 +149,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 
 var errInvalidArgument = errors.New("invalid argument")
 var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
+var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

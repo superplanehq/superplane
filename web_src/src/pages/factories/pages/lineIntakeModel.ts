@@ -114,7 +114,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
     listen: {

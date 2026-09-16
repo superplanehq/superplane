@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -25,9 +26,16 @@ const (
 	// with few open items gives fewer, so the seed is an upper bound.
 	intakeSeedSize = 30
 
+	// intakeSentrySeedSize is how many unresolved Sentry issues a new intake
+	// imports. The wizard tells the user this number.
+	intakeSentrySeedSize = 10
+
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
+
+	// intakeSentryIssuePayloadType is the payload type the Sentry trigger emits.
+	intakeSentryIssuePayloadType = "sentry.issue"
 
 	// intakeJiraIssuePayloadType is the payload type the Jira trigger emits.
 	intakeJiraIssuePayloadType = jira.IssueEventPayloadType
@@ -61,6 +69,8 @@ func seedIntake(
 		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceProductiveTasks:
 		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceSentryExceptions:
+		return seedSentryIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceJiraIssues:
 		return seedJiraIssues(deps, tx, canvasID, binding, installation)
 	}
@@ -240,6 +250,92 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	slices.Reverse(events)
 
 	return events
+}
+
+func seedSentryIssues(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeSentryClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	project, _ := binding.Configuration["project"].(string)
+	issues, err := client.ListNewestUnresolvedIssues(project, intakeSentrySeedSize)
+	if err != nil {
+		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
+	}
+
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues)); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(issues)}, nil
+}
+
+// sentryIssueEvents shapes each issue of a newest-first page like the webhook
+// the trigger emits, so the rest of the graph cannot tell a seeded issue from
+// a received one.
+func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
+	events := make([]map[string]any, 0, len(issues))
+	for _, issue := range issues {
+		events = append(events, sentryIssueEvent(issue))
+	}
+	slices.Reverse(events)
+	return events
+}
+
+func sentryIssueEvent(issue sentry.Issue) map[string]any {
+	encoded, err := json.Marshal(issue)
+	if err != nil {
+		return map[string]any{
+			"resource": "issue",
+			"action":   "created",
+			"data":     map[string]any{"issue": map[string]any{"id": issue.ID, "title": issue.Title}},
+		}
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		payload = map[string]any{"id": issue.ID, "title": issue.Title}
+	}
+
+	timestamp := strings.TrimSpace(issue.LastSeen)
+	if timestamp == "" {
+		timestamp = strings.TrimSpace(issue.FirstSeen)
+	}
+
+	return map[string]any{
+		"resource":  "issue",
+		"action":    "created",
+		"data":      map[string]any{"issue": payload},
+		"timestamp": timestamp,
+	}
+}
+
+func newIntakeSentryClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*sentry.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := sentry.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Sentry client: %w", err)
+	}
+
+	return client, nil
 }
 
 func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*common.Client, error) {
