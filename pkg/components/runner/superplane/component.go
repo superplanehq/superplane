@@ -172,6 +172,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
+	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)

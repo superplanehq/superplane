@@ -327,3 +327,33 @@ func (s *FactoryService) AnswerPlanningSessionSurvey(ctx context.Context, req *p
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.AnswerPlanningSessionSurvey(ctx, organizationID, req)
 }
+
+func (s *FactoryService) ListFactoryAgentResources(ctx context.Context, req *pb.ListFactoryAgentResourcesRequest) (*pb.ListFactoryAgentResourcesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryAgentResources(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb.CreateFactoryAgentResourceRequest) (*pb.CreateFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryAgentResource(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryAgentResource(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryAgentResource(ctx context.Context, req *pb.DeleteFactoryAgentResourceRequest) (*pb.DeleteFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryAgentResource(ctx, organizationID, req)
+}
+
+func (s *FactoryService) StartFactoryAgentResourceOAuth(ctx context.Context, req *pb.StartFactoryAgentResourceOAuthRequest) (*pb.StartFactoryAgentResourceOAuthResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context, req *pb.DisconnectFactoryAgentResourceOAuthRequest) (*pb.DisconnectFactoryAgentResourceOAuthResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DisconnectFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
+}

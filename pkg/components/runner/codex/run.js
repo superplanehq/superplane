@@ -106,10 +106,11 @@ function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") 
   args.push("--json", "--skip-git-repo-check");
   if (planningEnabled(env)) {
     args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
-    args.push(...mcpConfigOverrides(mcpScriptPath));
+    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
+    args.push(...workspaceMCPConfigOverrides(env));
   }
   if (model) {
     args.push("-m", model);
@@ -147,13 +148,47 @@ function codexSessionIDFromEvent(event) {
   return String((event && (event.thread_id || (event.thread && event.thread.id))) || "").trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath) {
+function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   return [
     "-c",
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    ...workspaceMCPConfigOverrides(env),
   ];
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  if (!configPath || !fs.existsSync(configPath)) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    return Array.isArray(parsed.servers) ? parsed.servers : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function workspaceMCPConfigOverrides(env = process.env) {
+  const args = [];
+  for (const server of workspaceMCPServers(env)) {
+    const name = String((server && server.name) || "").trim();
+    const url = String((server && server.url) || "").trim();
+    if (!name || name === "superplane" || !url) {
+      continue;
+    }
+    args.push("-c", `mcp_servers.${name}.url=${tomlString(url)}`);
+    const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (!headerName) {
+        continue;
+      }
+      args.push("-c", `mcp_servers.${name}.http_headers.${headerName}=${tomlString(String(headerValue))}`);
+    }
+  }
+  return args;
 }
 
 function tomlString(value) {
@@ -684,4 +719,5 @@ module.exports = {
   planningEnabled,
   planningSystemPrompt,
   planningAnalysisEnabled,
+  workspaceMCPConfigOverrides,
 };
