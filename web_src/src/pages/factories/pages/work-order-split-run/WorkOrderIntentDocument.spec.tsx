@@ -162,7 +162,8 @@ describe("WorkOrderIntentDocument", () => {
     expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
   });
 
-  it("shows the request as the first chat message on the right", () => {
+  it("shows the request as the first chat message on the right", async () => {
+    const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -181,7 +182,15 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-composer-chips")).not.toBeInTheDocument();
+    const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
+    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
+    expect(within(pendingChips).getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(within(pendingChips).getByTestId("split-run-intent-plan-chip-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    await user.click(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
@@ -572,10 +581,9 @@ describe("WorkOrderIntentDocument", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.showPlan })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.hidePlan })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    const chips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(chips).queryByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).not.toBeInTheDocument();
+    expect(within(chips).getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
   });
 

@@ -100,7 +100,6 @@ function AnalysisRequestChat({
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
     resumeOnBottom: true,
   });
-  const hasClarity = analysis.latestPlanScore != null;
   const chipsWorking = composerChipsWorking({
     isAnalyzing: analysis.isAnalyzing,
     score: analysis.latestPlanScore,
@@ -112,7 +111,7 @@ function AnalysisRequestChat({
       score={analysis.latestPlanScore}
       scoreSummary={analysis.latestPlanSummary}
       isAnalyzing={chipsWorking}
-      canTogglePlan={Boolean(hasClarity && analysis.canTogglePlan)}
+      canTogglePlan={Boolean(analysis.canTogglePlan)}
       planStatus={analysis.planStatus}
       onToggle={analysis.onTogglePlan}
       summaryOpen={analysis.clarityExpanded}
@@ -183,7 +182,7 @@ function AnalysisRequestChat({
             {ANALYSIS_PLANNING_COPY.composerPlaceholder}
           </label>
           <div className="flex flex-col gap-2">
-            {hasClarity ? planStack : null}
+            {planStack}
             <InputGroup className="h-auto rounded-xl" data-testid="split-run-intent-composer-card">
               <InputGroupTextarea
                 id="split-run-intent-composer"

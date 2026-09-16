@@ -47,14 +47,7 @@ export function ComposerPlanStack({
   const [uncontrolledSummaryOpen, setUncontrolledSummaryOpen] = useState(true);
   const summaryOpen = summaryOpenProp ?? uncontrolledSummaryOpen;
   const toggleSummary = onToggleSummary ?? (() => setUncontrolledSummaryOpen((current) => !current));
-  const showScore = score != null;
-  const showPlan = canTogglePlan;
-  const showActions = Boolean(actions);
   const body = score == null ? undefined : scoreSummary?.trim() || FALLBACK_WHY;
-  if (!showScore && !showPlan && !showActions) {
-    return null;
-  }
-
   const chips = (
     <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
       <ScoreChip
@@ -124,8 +117,8 @@ function PlanToggle({
       type="button"
       variant="outline"
       size="sm"
-      aria-expanded={open}
-      aria-pressed={open}
+      aria-expanded={onToggle ? open : undefined}
+      aria-pressed={onToggle ? open : undefined}
       aria-label={CREATE_WITH_AGENT_COPY.plan}
       onClick={onToggle}
     >
@@ -196,17 +189,13 @@ function ScoreChip({
   expanded?: boolean;
   onToggle?: () => void;
 }) {
-  if (score == null) {
-    return null;
-  }
-
-  const showMatrix = isAnalyzing;
+  const showMatrix = isAnalyzing || score == null;
   const label = showMatrix
     ? CREATE_WITH_AGENT_COPY.clarity
     : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
   const countClassName = showMatrix
     ? "min-w-7 self-stretch py-0"
-    : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)]);
+    : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score ?? 0)]);
 
   return (
     <CountButton

@@ -766,7 +766,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     const archive = screen.getByTestId("popup-work-order-archive-button");
     const share = screen.getByTestId("popup-work-order-copy-link-button");
     expect(archive).toHaveAttribute("aria-label", "Archive");
@@ -817,7 +819,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-plan-analyzing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
