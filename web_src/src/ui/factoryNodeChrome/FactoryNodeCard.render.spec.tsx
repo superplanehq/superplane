@@ -30,6 +30,23 @@ describe("FactoryNodeCard", () => {
     expect(screen.getByTestId("factory-node-run-bash")).toHaveStyle({ width: "280px" });
   });
 
+  it("shows a custom field at the top right of the card without widening it", () => {
+    render(
+      <FactoryNodeCard
+        title="Run Bash"
+        componentLabel="Run Bash"
+        nodeName="Build Storybook"
+        customField={<button type="button">See logs</button>}
+      />,
+    );
+
+    const card = screen.getByTestId("factory-node-run-bash");
+    const action = screen.getByTestId("factory-node-header-action");
+    expect(action).toContainElement(screen.getByRole("button", { name: "See logs" }));
+    expect(card).toContainElement(action);
+    expect(card).toHaveStyle({ width: "280px" });
+  });
+
   it("uses the same blue selection ring as the run canvas", () => {
     const { container } = render(
       <FactoryNodeCard title="Create Pull Request" componentLabel="Create Pull Request" selected canvasMode="edit" />,
