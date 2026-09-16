@@ -1079,6 +1079,21 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1`,
+    );
+  });
+
+  it("reopens Jira intake setup when the OAuth return query is present", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&pick=newest`,
+      vi.fn(),
+      REFUND_FACTORY,
+      LANE_BANNERS,
+    );
+
+    expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
   });
 
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {

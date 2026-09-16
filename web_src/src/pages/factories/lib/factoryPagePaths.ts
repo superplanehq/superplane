@@ -130,6 +130,44 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
+/** Reopens Add Jira intake after Atlassian OAuth returns to this line. */
+export const JIRA_INTAKE_SETUP_SEARCH_PARAM = "jiraIntake";
+/** Shared with workspace onboarding: select the connection created in this round trip. */
+export const INTEGRATION_PICK_SEARCH_PARAM = "pick";
+export const INTEGRATION_PICK_NEWEST_VALUE = "newest";
+
+export function factoryJiraIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  options?: { pickNewest?: boolean },
+) {
+  const params = new URLSearchParams();
+  params.set(JIRA_INTAKE_SETUP_SEARCH_PARAM, "1");
+  if (options?.pickNewest) {
+    params.set(INTEGRATION_PICK_SEARCH_PARAM, INTEGRATION_PICK_NEWEST_VALUE);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function isJiraIntakeSetupSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(JIRA_INTAKE_SETUP_SEARCH_PARAM) === "1";
+}
+
+export function shouldPickNewestIntegration(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTEGRATION_PICK_SEARCH_PARAM) === INTEGRATION_PICK_NEWEST_VALUE;
+}
+
+export function withoutJiraIntakeSetupSearch(pathname: string, search: string): string {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  params.delete(JIRA_INTAKE_SETUP_SEARCH_PARAM);
+  params.delete(INTEGRATION_PICK_SEARCH_PARAM);
+  const next = params.toString();
+  return next === "" ? pathname : `${pathname}?${next}`;
+}
+
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
 /** Opens PR feedback settings on a tab: general, agent, or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";

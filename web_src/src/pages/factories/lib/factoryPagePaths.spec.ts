@@ -9,6 +9,7 @@ import {
   factoryHomePath,
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factoryColumnAutomationsPath,
@@ -18,7 +19,10 @@ import {
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
+  isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
+  shouldPickNewestIntegration,
+  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -120,6 +124,40 @@ describe("factoryIntakePath", () => {
   it("reads the settings tab from the search string", () => {
     expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
     expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
+  });
+});
+
+describe("factoryJiraIntakeSetupPath", () => {
+  it("opens Add Jira intake on the line board", () => {
+    expect(factoryJiraIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1",
+    );
+  });
+
+  it("asks the dialog to select the newest connection after OAuth", () => {
+    expect(factoryJiraIntakeSetupPath("org-1", "SP", "line-plan", { pickNewest: true })).toBe(
+      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&pick=newest",
+    );
+  });
+
+  it("reads the Jira intake resume query", () => {
+    expect(isJiraIntakeSetupSearchOpen("?jiraIntake=1")).toBe(true);
+    expect(isJiraIntakeSetupSearchOpen("jiraIntake=1&pick=newest")).toBe(true);
+    expect(isJiraIntakeSetupSearchOpen("")).toBe(false);
+  });
+
+  it("reads pick=newest from the search string", () => {
+    expect(shouldPickNewestIntegration("?jiraIntake=1&pick=newest")).toBe(true);
+    expect(shouldPickNewestIntegration("jiraIntake=1")).toBe(false);
+  });
+
+  it("drops the Jira intake resume query from the line URL", () => {
+    expect(withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&pick=newest")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan",
+    );
+    expect(
+      withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&automations=backlog"),
+    ).toBe("/org-1/workspaces/sp/lines/line-plan?automations=backlog");
   });
 });
 
