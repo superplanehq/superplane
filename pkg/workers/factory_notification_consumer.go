@@ -198,7 +198,6 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 				order,
 				message,
 				actorName,
-				recipient.notificationType,
 			)
 			applyWorkOrderEmailCard(&content.Data, order, executions, time.Now())
 			content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.Key)
@@ -236,7 +235,6 @@ func (c *FactoryNotificationConsumer) publishBrowserNotifications(
 				order,
 				message,
 				actorName,
-				recipient.notificationType,
 			)
 			contentByType[recipient.notificationType] = content
 		}
@@ -349,8 +347,8 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 
 // workOrderNotificationCandidates maps candidate recipients to the
 // notification type that covers them for this event. When a user matches
-// several types (owner and creator), the owner-facing type wins so each
-// user gets at most one email per event.
+// several types, the first match wins so each user gets at most one
+// email per event.
 func workOrderNotificationCandidates(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
@@ -367,24 +365,6 @@ func workOrderNotificationCandidates(
 	}
 
 	switch message.EventType {
-	case factory.EventTypeOrderAssigneesUpdated:
-		for _, assignedID := range message.AssignedUserIDs {
-			if userID, err := uuid.Parse(assignedID); err == nil {
-				add(userID, models.NotificationTypeWorkOrderAssigned)
-			}
-		}
-	case factory.EventTypeOrderCommentAdded:
-		for _, mentionedID := range message.MentionedUserIDs {
-			if userID, err := uuid.Parse(mentionedID); err == nil {
-				add(userID, models.NotificationTypeWorkOrderMention)
-			}
-		}
-		for _, assignee := range order.Assignees {
-			add(assignee.UserID, models.NotificationTypeWorkOrderCommentOwned)
-		}
-		if order.CreatedByID != nil {
-			add(*order.CreatedByID, models.NotificationTypeWorkOrderCommentCreated)
-		}
 	case factory.EventTypeOrderStatusUpdated:
 		// The initial `"" → draft` transition is work order creation,
 		// not a change anyone needs an email about.
@@ -397,10 +377,6 @@ func workOrderNotificationCandidates(
 		if order.CreatedByID != nil {
 			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusOwned)
 		}
-	case factory.EventTypeOrderArtifactAdded:
-		for _, assignee := range order.Assignees {
-			add(assignee.UserID, models.NotificationTypeWorkOrderArtifactOwned)
-		}
 	case factory.EventTypeOrderStatusNoteUpdated:
 		for _, assignee := range order.Assignees {
 			add(assignee.UserID, models.NotificationTypeWorkOrderStatusNoteOwned)
@@ -408,9 +384,27 @@ func workOrderNotificationCandidates(
 		if order.CreatedByID != nil {
 			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusNoteOwned)
 		}
+	case factory.EventTypeOrderAgentQuestion:
+		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderAgentQuestion)
+	case factory.EventTypeOrderPlanReady:
+		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderPlanReady)
 	}
 
 	return candidates
+}
+
+func addCreatorAndSessionStarter(
+	add func(uuid.UUID, string),
+	order *models.FactoryWorkOrder,
+	message messages.FactoryWorkOrderNotificationMessage,
+	notificationType string,
+) {
+	if order.CreatedByID != nil {
+		add(*order.CreatedByID, notificationType)
+	}
+	if starterID, err := uuid.Parse(message.SessionStarterUserID); err == nil {
+		add(starterID, notificationType)
+	}
 }
 
 func (c *FactoryNotificationConsumer) actorDisplayName(
@@ -442,7 +436,6 @@ func buildWorkOrderNotificationContent(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
 	actorName string,
-	notificationType string,
 ) workOrderNotificationContent {
 	orderKey := factoryModel.WorkOrderKey(order.Number)
 
@@ -454,31 +447,23 @@ func buildWorkOrderNotificationContent(
 	}
 
 	switch message.EventType {
-	case factory.EventTypeOrderAssigneesUpdated:
-		content.Subject = fmt.Sprintf("[%s] You are now an owner", orderKey)
-		content.Data.Summary = fmt.Sprintf("%s made you an owner of %s.", actorName, orderKey)
-	case factory.EventTypeOrderCommentAdded:
-		if notificationType == models.NotificationTypeWorkOrderMention {
-			content.Subject = fmt.Sprintf("[%s] %s mentioned you", orderKey, actorName)
-			content.Data.Summary = fmt.Sprintf("%s mentioned you in a comment on %s.", actorName, orderKey)
-		} else {
-			content.Subject = fmt.Sprintf("[%s] New comment from %s", orderKey, actorName)
-			content.Data.Summary = fmt.Sprintf("%s commented on %s.", actorName, orderKey)
-		}
-		content.Data.Detail = truncateNotificationDetail(message.CommentBody)
 	case factory.EventTypeOrderStatusUpdated:
 		verb := statusChangeDescription(message)
 		content.Subject = fmt.Sprintf("[%s] Task %s", orderKey, verb)
 		content.Data.Summary = fmt.Sprintf("%s %s %s.", actorName, verb, orderKey)
-	case factory.EventTypeOrderArtifactAdded:
-		content.Subject = fmt.Sprintf("[%s] New artifact", orderKey)
-		content.Data.Summary = fmt.Sprintf("%s added a %s artifact to %s.", actorName, artifactTypeLabel(message.ArtifactType), orderKey)
 	case factory.EventTypeOrderStatusNoteUpdated:
 		content.Subject = fmt.Sprintf("[%s] %s", orderKey, message.StatusNoteHeadline)
 		content.Data.Summary = fmt.Sprintf("%s flagged %s as waiting on you: %s.", actorName, orderKey, message.StatusNoteHeadline)
 		content.Data.Detail = truncateNotificationDetail(message.StatusNoteBody)
 		content.Data.DetailCtaLabel = message.StatusNoteCtaLabel
 		content.Data.DetailCtaURL = message.StatusNoteCtaURL
+	case factory.EventTypeOrderAgentQuestion:
+		content.Subject = fmt.Sprintf("[%s] The agent has a question", orderKey)
+		content.Data.Summary = fmt.Sprintf("The agent is waiting for an answer on %s.", orderKey)
+		content.Data.Detail = truncateNotificationDetail(message.QuestionPrompt)
+	case factory.EventTypeOrderPlanReady:
+		content.Subject = fmt.Sprintf("[%s] Plan is ready", orderKey)
+		content.Data.Summary = fmt.Sprintf("Refinement finished and the plan is ready for %s.", orderKey)
 	default:
 		content.Subject = fmt.Sprintf("[%s] Task update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)
@@ -505,17 +490,6 @@ func statusChangeDescription(message messages.FactoryWorkOrderNotificationMessag
 		return "closed"
 	default:
 		return "updated"
-	}
-}
-
-func artifactTypeLabel(artifactType string) string {
-	switch artifactType {
-	case factory.ArtifactTypeMarkdown:
-		return "markdown"
-	case factory.ArtifactTypeBranch:
-		return "branch"
-	default:
-		return "new"
 	}
 }
 
