@@ -50,6 +50,25 @@ func TestOriginFromIntakeRootEvent_PeelsEnvelopeThenReadsURL(t *testing.T) {
 	}, OriginFromIntakeRootEvent(event))
 }
 
+func TestOriginFromIntakePayload_PrefersJiraBrowseURLOverProxySelf(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"action": "created",
+		"url":    "https://acme.atlassian.net/browse/ENG-42",
+		"issue": map[string]any{
+			"key":  "ENG-42",
+			"self": "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/issue/10001",
+			"fields": map[string]any{
+				"self": "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/issue/10001",
+			},
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://acme.atlassian.net/browse/ENG-42",
+		Label: "ENG-42",
+	}, origin)
+}
+
 func TestOriginFromIntakePayload_MissingURLReturnsNil(t *testing.T) {
 	assert.Nil(t, OriginFromIntakePayload(map[string]any{
 		"issue": map[string]any{"title": "No URL"},
@@ -62,4 +81,5 @@ func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "7670162495", OriginLabelFromURL("https://example.com/issues/7670162495/"))
 	assert.Equal(t, "P123ABC", OriginLabelFromURL("https://acme.example.com/incidents/P123ABC"))
 	assert.Equal(t, "1", OriginLabelFromURL("https://example.com/item/1"))
+	assert.Equal(t, "ENG-42", OriginLabelFromURL("https://acme.atlassian.net/browse/ENG-42"))
 }

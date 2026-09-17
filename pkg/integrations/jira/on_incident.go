@@ -230,7 +230,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog)
+	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog, siteURLFromIntegration(ctx.Integration))
 
 	if err := ctx.Events.Emit(IncidentEventPayloadType, event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)

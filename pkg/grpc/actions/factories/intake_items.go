@@ -147,12 +147,10 @@ func newJiraIntakeItemSource(
 		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
 	}
 
-	siteURL, _ := integration.Metadata.Data()["siteUrl"].(string)
-	siteURL = strings.TrimSpace(siteURL)
 	return &jiraIntakeItemSource{
 		jira:       client,
 		projectKey: projectKey,
-		siteURL:    siteURL,
+		siteURL:    jira.SiteURLFromMetadata(integration.Metadata.Data()),
 	}, nil
 }
 
@@ -266,7 +264,7 @@ func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
 		ID:    hit.Key,
 		Key:   hit.Key,
 		Title: title,
-		URL:   jiraIssueURL(siteURL, hit.Key),
+		URL:   jira.IssueURL(siteURL, hit.Key),
 	}
 }
 
@@ -276,7 +274,7 @@ func jiraIssueFromFullIssue(issue *jira.Issue, siteURL string) IntakeItem {
 		Key:   issue.Key,
 		Title: jiraIssueSummary(issue.Fields),
 		Body:  jira.IssueDescriptionText(issue),
-		URL:   jiraIssueURL(siteURL, issue.Key),
+		URL:   jira.IssueURL(siteURL, issue.Key),
 	}
 }
 
@@ -286,14 +284,6 @@ func jiraIssueSummary(fields map[string]any) string {
 	}
 	summary, _ := fields["summary"].(string)
 	return summary
-}
-
-func jiraIssueURL(siteURL, issueKey string) string {
-	siteURL = strings.TrimRight(strings.TrimSpace(siteURL), "/")
-	if siteURL == "" || issueKey == "" {
-		return ""
-	}
-	return fmt.Sprintf("%s/browse/%s", siteURL, issueKey)
 }
 
 func parseJiraIssueURL(rawURL, siteURL string) (string, bool) {
