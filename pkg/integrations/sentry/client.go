@@ -241,6 +241,49 @@ type IssueEvent struct {
 	User        map[string]any `json:"user" mapstructure:"user"`
 }
 
+const (
+	IssueEventLatest      = "latest"
+	IssueEventRecommended = "recommended"
+)
+
+// IssueEventDetail is the full event body from GET .../events/{latest|recommended|id}/.
+// ListIssueEvents returns summaries without entries or stack frames.
+type IssueEventDetail struct {
+	ID          string            `json:"id" mapstructure:"id"`
+	EventID     string            `json:"eventID" mapstructure:"eventID"`
+	Title       string            `json:"title" mapstructure:"title"`
+	Message     string            `json:"message" mapstructure:"message"`
+	DateCreated string            `json:"dateCreated" mapstructure:"dateCreated"`
+	Platform    string            `json:"platform" mapstructure:"platform"`
+	Location    string            `json:"location" mapstructure:"location"`
+	Culprit     string            `json:"culprit" mapstructure:"culprit"`
+	Type        string            `json:"type" mapstructure:"type"`
+	WebURL      string            `json:"web_url" mapstructure:"web_url"`
+	Tags        []IssueTag        `json:"tags" mapstructure:"tags"`
+	User        map[string]any    `json:"user" mapstructure:"user"`
+	Contexts    map[string]any    `json:"contexts" mapstructure:"contexts"`
+	Context     map[string]any    `json:"context" mapstructure:"context"`
+	Extra       map[string]any    `json:"extra" mapstructure:"extra"`
+	SDK         map[string]any    `json:"sdk" mapstructure:"sdk"`
+	Entries     []IssueEventEntry `json:"entries" mapstructure:"entries"`
+}
+
+type IssueEventEntry struct {
+	Type string         `json:"type" mapstructure:"type"`
+	Data map[string]any `json:"data" mapstructure:"data"`
+}
+
+func (e *IssueEventDetail) HasStack() bool {
+	return len(stackFrames(e)) > 0
+}
+
+func (e *IssueEventDetail) EntryCount() int {
+	if e == nil {
+		return 0
+	}
+	return len(e.Entries)
+}
+
 type IssueAssignee struct {
 	Type  string `json:"type" mapstructure:"type"`
 	ID    string `json:"id" mapstructure:"id"`
@@ -802,6 +845,61 @@ func (c *Client) ListIssueEvents(issueID string) ([]IssueEvent, error) {
 	}
 
 	return events, nil
+}
+
+func (c *Client) GetIssueEvent(issueID, eventID string) (*IssueEventDetail, error) {
+	issueID = strings.TrimSpace(issueID)
+	if issueID == "" {
+		return nil, fmt.Errorf("issue id is required")
+	}
+
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		eventID = IssueEventLatest
+	}
+
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf(
+			"/api/0/organizations/%s/issues/%s/events/%s/",
+			c.orgSlug,
+			url.PathEscape(issueID),
+			url.PathEscape(eventID),
+		),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	event := IssueEventDetail{}
+	if err := json.Unmarshal(responseBody, &event); err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+// GetPreferredIssueEvent returns the latest event, then recommended when latest
+// has no stack and recommended has a stack or more entries.
+func (c *Client) GetPreferredIssueEvent(issueID string) (*IssueEventDetail, error) {
+	latest, err := c.GetIssueEvent(issueID, IssueEventLatest)
+	if err != nil {
+		return nil, err
+	}
+	if latest.HasStack() {
+		return latest, nil
+	}
+
+	recommended, err := c.GetIssueEvent(issueID, IssueEventRecommended)
+	if err != nil {
+		return latest, nil
+	}
+	if recommended.HasStack() || recommended.EntryCount() > latest.EntryCount() {
+		return recommended, nil
+	}
+
+	return latest, nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {

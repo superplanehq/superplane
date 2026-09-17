@@ -367,7 +367,7 @@ func Test__SentryIssueEvents(t *testing.T) {
 		{ID: "2", Title: "Older null pointer", LastSeen: now.Add(-time.Hour).Format(time.RFC3339)},
 	}
 
-	events := sentryIssueEvents(issues)
+	events := sentryIssueEvents(nil, issues)
 	require.Len(t, events, 2)
 	assert.Equal(t, "created", events[0]["action"])
 	assert.Equal(t, "issue", events[0]["resource"])
@@ -377,12 +377,12 @@ func Test__SentryIssueEvents(t *testing.T) {
 	firstIssue, ok := firstData["issue"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "Older null pointer", firstIssue["title"])
-	assert.Equal(t, sentry.IssueDescription(firstIssue), events[0]["description"])
+	assert.Equal(t, sentry.IssueDescription(firstIssue, nil), events[0]["description"])
 
 	secondData, ok := events[1]["data"].(map[string]any)
 	require.True(t, ok)
 	secondIssue, ok := secondData["issue"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "Newest timeout", secondIssue["title"])
-	assert.Equal(t, sentry.IssueDescription(secondIssue), events[1]["description"])
+	assert.Equal(t, sentry.IssueDescription(secondIssue, nil), events[1]["description"])
 }
