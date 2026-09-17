@@ -7,13 +7,10 @@ import type {
 } from "@/api-client";
 
 export const NOTIFICATION_SETTINGS_TYPES = [
-  "TYPE_WORK_ORDER_ASSIGNED",
-  "TYPE_WORK_ORDER_COMMENT_OWNED",
-  "TYPE_WORK_ORDER_COMMENT_CREATED",
   "TYPE_WORK_ORDER_STATUS_OWNED",
-  "TYPE_WORK_ORDER_ARTIFACT_OWNED",
-  "TYPE_WORK_ORDER_MENTIONED",
   "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
+  "TYPE_WORK_ORDER_AGENT_QUESTION",
+  "TYPE_WORK_ORDER_PLAN_READY",
 ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
 
 export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];
@@ -44,39 +41,24 @@ export interface NotificationTypeOption {
 
 export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   {
-    key: "TYPE_WORK_ORDER_ASSIGNED",
-    label: "Added as a task owner",
-    description: "You become an owner of a task.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_COMMENT_OWNED",
-    label: "Comments on tasks you own",
-    description: "Someone comments on a task you own.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_COMMENT_CREATED",
-    label: "Comments on tasks you created",
-    description: "Someone comments on a task you created.",
-  },
-  {
     key: "TYPE_WORK_ORDER_STATUS_OWNED",
-    label: "Status changes on tasks you own or created",
-    description: "A task you own or created opens, closes, or moves back to draft.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_ARTIFACT_OWNED",
-    label: "New artifacts on tasks you own",
-    description: "An artifact is added to a task you own.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_MENTIONED",
-    label: "Mentions in task comments",
-    description: "Someone mentions you in a task comment.",
+    label: "Status changes on your tasks",
+    description: "A task you created opens, closes, or moves back to draft.",
   },
   {
     key: "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
-    label: "Review requests on tasks you own or created",
-    description: "An automation flags a task you own or created as waiting on your review.",
+    label: "Review requests on your tasks",
+    description: "An automation flags a task you created as waiting on your review.",
+  },
+  {
+    key: "TYPE_WORK_ORDER_AGENT_QUESTION",
+    label: "Agent questions on your tasks",
+    description: "The agent asks a question and waits for an answer.",
+  },
+  {
+    key: "TYPE_WORK_ORDER_PLAN_READY",
+    label: "Ready plans on your tasks",
+    description: "Refinement finishes and the plan is ready.",
   },
 ];
 

@@ -27,18 +27,18 @@ func Test__UserNotificationSettings(t *testing.T) {
 
 		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
+			EventTypes:     []string{models.NotificationTypeWorkOrderStatusOwned},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, created.WorkspaceScope)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, created.EventTypes.Data())
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderStatusOwned}, created.EventTypes.Data())
 
 		factoryID := uuid.New().String()
 		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
 			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
 				WorkspaceID: factoryID,
-				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+				EventTypes:  []string{models.NotificationTypeWorkOrderStatusOwned},
 			}},
 		})
 		require.NoError(t, err)
@@ -47,7 +47,7 @@ func Test__UserNotificationSettings(t *testing.T) {
 		assert.Empty(t, updated.EventTypes.Data())
 		require.Len(t, updated.WorkspaceFilters.Data(), 1)
 		assert.Equal(t, factoryID, updated.WorkspaceFilters.Data()[0].WorkspaceID)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.WorkspaceFilters.Data()[0].EventTypes)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderStatusOwned}, updated.WorkspaceFilters.Data()[0].EventTypes)
 		assert.Equal(t, models.NotificationWorkspaceScopeNone, updated.BrowserWorkspaceScope)
 		assert.True(t, updated.BrowserShowWhileViewing)
 	})
@@ -58,21 +58,21 @@ func Test__UserNotificationSettings(t *testing.T) {
 		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope:          models.NotificationWorkspaceScopeNone,
 			BrowserWorkspaceScope:   models.NotificationWorkspaceScopeAll,
-			BrowserEventTypes:       []string{models.NotificationTypeWorkOrderCommentOwned},
+			BrowserEventTypes:       []string{models.NotificationTypeWorkOrderAgentQuestion},
 			BrowserShowWhileViewing: &showWhileViewing,
 		})
 		require.NoError(t, err)
 
 		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
+			EventTypes:     []string{models.NotificationTypeWorkOrderStatusOwned},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, created.ID, updated.ID)
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, updated.WorkspaceScope)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.EventTypes.Data())
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderStatusOwned}, updated.EventTypes.Data())
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, updated.BrowserWorkspaceScope)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderCommentOwned}, updated.BrowserEventTypes.Data())
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderAgentQuestion}, updated.BrowserEventTypes.Data())
 		assert.False(t, updated.BrowserShowWhileViewing)
 	})
 
@@ -86,9 +86,9 @@ func Test__UserNotificationSettings(t *testing.T) {
 			BrowserWorkspaceScope: models.NotificationWorkspaceScopeFiltered,
 			BrowserWorkspaceFilters: []models.NotificationWorkspaceFilter{{
 				WorkspaceID: factoryID,
-				EventTypes:  []string{models.NotificationTypeWorkOrderCommentOwned},
+				EventTypes:  []string{models.NotificationTypeWorkOrderAgentQuestion},
 			}},
-			BrowserEventTypes:       []string{models.NotificationTypeWorkOrderAssigned},
+			BrowserEventTypes:       []string{models.NotificationTypeWorkOrderStatusOwned},
 			BrowserShowWhileViewing: &showWhileViewing,
 		})
 		require.NoError(t, err)
@@ -97,17 +97,17 @@ func Test__UserNotificationSettings(t *testing.T) {
 		assert.False(t, created.BrowserShowWhileViewing)
 		require.Len(t, created.BrowserWorkspaceFilters.Data(), 1)
 		assert.Equal(t, factoryID, created.BrowserWorkspaceFilters.Data()[0].WorkspaceID)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderCommentOwned}, created.BrowserWorkspaceFilters.Data()[0].EventTypes)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderAgentQuestion}, created.BrowserWorkspaceFilters.Data()[0].EventTypes)
 
 		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
 			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
-			BrowserEventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
+			BrowserEventTypes:     []string{models.NotificationTypeWorkOrderStatusOwned},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, created.ID, updated.ID)
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, updated.BrowserWorkspaceScope)
-		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.BrowserEventTypes.Data())
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderStatusOwned}, updated.BrowserEventTypes.Data())
 		assert.Empty(t, updated.BrowserWorkspaceFilters.Data())
 		assert.True(t, updated.BrowserShowWhileViewing)
 	})
@@ -141,38 +141,38 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 
 	t.Run("defaults notify every type in every workspace", func(t *testing.T) {
 		settings := models.DefaultUserNotificationSettings()
-		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAgentQuestion))
 		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusNoteOwned))
 	})
 
 	t.Run("none scope blocks every type", func(t *testing.T) {
 		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeNone}
-		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 
 	t.Run("all scope keeps a missing type on", func(t *testing.T) {
 		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeAll}
-		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
 	})
 
 	t.Run("all scope with a type list honors the list", func(t *testing.T) {
 		settings := models.UserNotificationSettings{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderAssigned}),
+			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderStatusOwned}),
 		}
-		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
-		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 
 	t.Run("all scope with a type list can opt out of status notes alone", func(t *testing.T) {
 		settings := models.UserNotificationSettings{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderCommentOwned}),
+			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderAgentQuestion}),
 		}
 		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusNoteOwned))
-		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
 	})
 
 	t.Run("filtered scope requires the workspace and the type", func(t *testing.T) {
@@ -180,12 +180,12 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
 			WorkspaceFilters: datatypes.NewJSONType([]models.NotificationWorkspaceFilter{{
 				WorkspaceID: workspaceID.String(),
-				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+				EventTypes:  []string{models.NotificationTypeWorkOrderStatusOwned},
 			}}),
 		}
-		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
-		assert.False(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.False(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 }
 
@@ -195,25 +195,25 @@ func Test__UserNotificationSettings__NotifiesChannel(t *testing.T) {
 
 	t.Run("defaults keep the browser channel off", func(t *testing.T) {
 		settings := models.DefaultUserNotificationSettings()
-		assert.True(t, settings.NotifiesChannel(models.NotificationChannelEmail, workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.NotifiesChannel(models.NotificationChannelEmail, workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderStatusOwned))
 		assert.True(t, settings.BrowserShowWhileViewing)
 	})
 
 	t.Run("empty browser scope stays off", func(t *testing.T) {
 		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeAll}
-		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 
 	t.Run("browser all scope honors the type list", func(t *testing.T) {
 		settings := models.UserNotificationSettings{
 			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
 			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
-			BrowserEventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderAssigned}),
+			BrowserEventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderStatusOwned}),
 		}
-		assert.True(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderCommentOwned))
-		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 
 	t.Run("browser filtered scope requires the workspace and the type", func(t *testing.T) {
@@ -222,12 +222,12 @@ func Test__UserNotificationSettings__NotifiesChannel(t *testing.T) {
 			BrowserWorkspaceScope: models.NotificationWorkspaceScopeFiltered,
 			BrowserWorkspaceFilters: datatypes.NewJSONType([]models.NotificationWorkspaceFilter{{
 				WorkspaceID: workspaceID.String(),
-				EventTypes:  []string{models.NotificationTypeWorkOrderCommentOwned},
+				EventTypes:  []string{models.NotificationTypeWorkOrderAgentQuestion},
 			}}),
 		}
-		assert.True(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderCommentOwned))
-		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAssigned))
-		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
-		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.NotifiesChannel(models.NotificationChannelBrowser, otherWorkspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 }
