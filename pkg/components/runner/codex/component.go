@@ -146,11 +146,11 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 
-	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
-	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
+	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)

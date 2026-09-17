@@ -77,7 +77,7 @@ type OpenRouterBrokerTask struct {
 	Files    []runner.BrokerTaskFile
 }
 
-func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) OpenRouterBrokerTask {
+func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment) OpenRouterBrokerTask {
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare OpenRouter agent",
 		PrepareScript:    runner.NodePrepareScript("opencode", opencodeMissingMessage, spec.WorkingDirectory),
@@ -86,6 +86,7 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 		WorkingDirectory: spec.WorkingDirectory,
 		Steps:            spec.Steps,
 		DispatchedSteps:  dispatched,
+		Attachments:      attachments,
 		Usage:            usage,
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
@@ -101,11 +102,15 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 }
 
 func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups, nil)
+	return buildOpenRouterBrokerTask(spec, usage, setups, nil, nil)
 }
 
-func BuildDispatchedBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups, dispatched)
+func BuildDispatchedBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments ...[]runner.TaskAttachment) OpenRouterBrokerTask {
+	var extra []runner.TaskAttachment
+	if len(attachments) > 0 {
+		extra = attachments[0]
+	}
+	return buildOpenRouterBrokerTask(spec, usage, setups, dispatched, extra)
 }
 
 func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
@@ -127,7 +132,7 @@ func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.Broke
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = append(task.Files, runner.FollowUpLoopFile())
+	task.Files = runner.AppendAttachmentSetupFiles(append(task.Files, runner.FollowUpLoopFile()))
 	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
 	return task
 }

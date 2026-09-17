@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
+import { resolveWorkOrderFileSrc, revokeWorkOrderFilePreviewUrl, parseWorkOrderFileId } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
@@ -234,6 +234,18 @@ export function WorkOrderDescriptionEditor({
     emittedMarkdownRef.current = value;
     editor.commands.setContent(value, { contentType: "markdown" });
   }, [editor, value]);
+
+  useEffect(() => {
+    return () => {
+      const markdown = emittedMarkdownRef.current;
+      for (const match of markdown.matchAll(/sp-file:\/\/([0-9a-fA-F-]+)/g)) {
+        const id = parseWorkOrderFileId(`sp-file://${match[1]}`);
+        if (id) {
+          revokeWorkOrderFilePreviewUrl(id);
+        }
+      }
+    };
+  }, [editor]);
 
   return (
     <>

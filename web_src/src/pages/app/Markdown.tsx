@@ -37,6 +37,7 @@ import { MarkdownSection } from "./markdownSection";
 import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import { highlightMentionChildren } from "./markdownMentionHighlight";
+import { WorkOrderVideo } from "./WorkOrderVideo";
 import {
   MARKDOWN_TABLE_CLASSES,
   MARKDOWN_TABLE_DATA_CLASSES,
@@ -355,7 +356,7 @@ function MarkdownImage({
   }
   const contentType = workOrderFileContentTypeForSrc(src, files) ?? workOrderFileContentTypeForSrc(resolved, files);
   if (isWorkOrderVideoSource({ contentType, src: resolved, alt })) {
-    return <video src={resolved} className={className} controls playsInline aria-label={alt} />;
+    return <WorkOrderVideo src={resolved} alt={alt} className={className} contentType={contentType} />;
   }
   if (hideUntilLoaded) {
     return <WorkspaceMarkdownImage src={resolved} alt={alt} className={className} {...props} />;

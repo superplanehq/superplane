@@ -111,16 +111,17 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	task := buildOpenRouterBrokerTask(spec, "", nil, nil)
+	task := buildOpenRouterBrokerTask(spec, "", nil, nil, nil)
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
+	require.Equal(t, runner.AttachmentAgentInstructions+"\n\nfix tests", requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content)
 }
 
 func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil)
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	require.Contains(t, prepare, "opencode CLI not found on PATH; install OpenCode on the runner")
 	require.Contains(t, prepare, "command -v opencode")
@@ -130,7 +131,7 @@ func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 func TestBuildOpenRouterBrokerTaskOmitsFallbackModelsFile(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil)
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil)
 	for _, file := range task.Files {
 		assert.NotEqual(t, "openrouter_models.json", file.Path)
 	}
@@ -140,7 +141,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("fix tests")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	require.Len(t, got.Commands, len(base.Commands))
 	require.Len(t, got.Files, len(base.Files))
@@ -153,7 +154,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 32
 	spec.Steps[0].WorkingDirectory = "repo"
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
@@ -175,13 +176,15 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 		}
 	}
 	require.True(t, found, "expected follow_up_loop.js task file")
+	require.NotEmpty(t, requireTaskFile(t, got.Files, "fetch_task_attachments.sh").Content)
+	require.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
 
 func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("greet")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil)
 	got := attachPlanningSessionFiles(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",

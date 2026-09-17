@@ -9,6 +9,7 @@ const {
   FOLLOW_UP_CMD_INDEX_BASE,
   interpretWaitResponse,
   nextAction,
+  prepareIncomingAttachments,
   runLoop,
   runPromptFile,
   safeWaitRequest,
@@ -29,11 +30,92 @@ test("exits when the session ends", () => {
   assert.deepEqual(nextAction({ status: "ended" }), { type: "exit", code: 0 });
 });
 
-test("turns a user message into the next prompt", () => {
-  assert.deepEqual(nextAction({ status: "message", text: " Add a Size field " }), {
-    type: "prompt",
-    text: "Add a Size field",
-  });
+test("turns a user message with files into the next prompt", () => {
+  assert.deepEqual(
+    nextAction({
+      status: "message",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    }),
+    {
+      type: "prompt",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    },
+  );
+});
+
+test("prepareIncomingAttachments downloads unseen files and processes videos", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-files-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      size_bytes: 12,
+      checksum: "abc",
+      url: "https://files.example/clip.mp4",
+    },
+  ]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].dest, "01-clip.mp4");
+  assert.equal(manifest.files[0].kind, "video");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments skips files already in the manifest", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-skip-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+  prepareIncomingAttachments(taskDir, incoming);
+  prepareIncomingAttachments(taskDir, incoming);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments does not process image-only follow-ups", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-image-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-2",
+      filename: "shot.png",
+      content_type: "image/png",
+      url: "https://files.example/shot.png",
+    },
+  ]);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\n");
 });
 
 test("ignores an empty user message", () => {

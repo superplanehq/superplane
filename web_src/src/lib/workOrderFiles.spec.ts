@@ -1,13 +1,16 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
   clearWorkOrderFileDownloadCache,
+  clearWorkOrderFilePreviewUrls,
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
   isInlineWorkOrderVideo,
+  isBrowserPlayableWorkOrderVideo,
   isReachableWorkOrderFileUrl,
   parseWorkOrderFileId,
   rewriteWorkOrderFileRefs,
+  revokeWorkOrderFilePreviewUrl,
   setWorkOrderFilePreviewUrl,
   resolveWorkOrderFileSrc,
   workOrderFileDownloadMap,
@@ -18,6 +21,7 @@ import {
 describe("workOrderFiles", () => {
   afterEach(() => {
     clearWorkOrderFileDownloadCache();
+    clearWorkOrderFilePreviewUrls();
   });
 
   it("parses and rewrites stored file refs", () => {
@@ -43,6 +47,8 @@ describe("workOrderFiles", () => {
     expect(isInlineWorkOrderImage("image/jpeg")).toBe(true);
     expect(isInlineWorkOrderVideo("video/webm")).toBe(true);
     expect(isInlineWorkOrderVideo("image/png")).toBe(false);
+    expect(isBrowserPlayableWorkOrderVideo("video/mp4")).toBe(true);
+    expect(isBrowserPlayableWorkOrderVideo("video/quicktime", "clip.mov", "clip.mov")).toBe(false);
   });
 
   it("treats http, https, and blob URLs as reachable image sources", () => {
@@ -113,5 +119,25 @@ describe("workOrderFiles", () => {
     }
 
     expect(workOrderFileDownloadMap([{ id: firstId, downloadUrl: reminted }])[firstId]).toBe(reminted);
+  });
+
+  it("revokes blob preview URLs when an attachment is removed", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    setWorkOrderFilePreviewUrl(id, "blob:clip");
+    revokeWorkOrderFilePreviewUrl(id);
+    expect(revoke).toHaveBeenCalledWith("blob:clip");
+    expect(resolveWorkOrderFileSrc(workOrderFileRef(id))).toBe(workOrderFileRef(id));
+    revoke.mockRestore();
+  });
+
+  it("revokes remaining blob preview URLs on cleanup", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    setWorkOrderFilePreviewUrl("one", "blob:one");
+    setWorkOrderFilePreviewUrl("two", "blob:two");
+    clearWorkOrderFilePreviewUrls();
+    expect(revoke).toHaveBeenCalledWith("blob:one");
+    expect(revoke).toHaveBeenCalledWith("blob:two");
+    revoke.mockRestore();
   });
 });

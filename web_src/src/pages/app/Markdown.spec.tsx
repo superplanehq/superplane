@@ -368,6 +368,23 @@ describe("MarkdownContent work order files", () => {
     expect(video).not.toBeNull();
     expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
   });
+
+  it("shows a download fallback for videos the browser cannot play", () => {
+    render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mov", contentType: "video/quicktime" }]}
+      />,
+    );
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByText("clip")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download video" })).toHaveAttribute(
+      "href",
+      "https://cdn.example/clip.mov",
+    );
+    expect(screen.getByText("This browser cannot play this video.")).toBeInTheDocument();
+  });
 });
 
 describe("MarkdownContent images", () => {

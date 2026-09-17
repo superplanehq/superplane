@@ -15,6 +15,8 @@ export const ALLOWED_WORK_ORDER_VIDEO_TYPES = [
   "video/x-matroska",
 ] as const;
 
+export const BROWSER_PLAYABLE_WORK_ORDER_VIDEO_TYPES = ["video/mp4", "video/webm", "video/ogg"] as const;
+
 export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
   "application/pdf",
@@ -24,6 +26,25 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
 ] as const;
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"] as const;
+
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+  ".png": "image/png",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".markdown": "text/markdown",
+  ".md": "text/markdown",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".ogv": "video/ogg",
+  ".ogg": "video/ogg",
+  ".m4v": "video/x-m4v",
+  ".mkv": "video/x-matroska",
+};
 
 export const WORK_ORDER_FILE_ACCEPT = [
   ...ALLOWED_WORK_ORDER_FILE_TYPES,
@@ -90,6 +111,18 @@ export function isInlineWorkOrderVideo(contentType: string | undefined): boolean
   return (ALLOWED_WORK_ORDER_VIDEO_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
 }
 
+export function isBrowserPlayableWorkOrderVideo(contentType?: string, src?: string, alt?: string): boolean {
+  const type = normalizeWorkOrderFileType(contentType);
+  if ((BROWSER_PLAYABLE_WORK_ORDER_VIDEO_TYPES as readonly string[]).includes(type)) {
+    return true;
+  }
+  if (type && type.startsWith("video/")) {
+    return false;
+  }
+  const name = `${alt ?? ""} ${src ?? ""}`.toLowerCase();
+  return [".mp4", ".webm", ".ogv", ".ogg"].some((extension) => name.split("?")[0]?.endsWith(extension));
+}
+
 export function isInlineWorkOrderMedia(contentType: string | undefined): boolean {
   return isInlineWorkOrderImage(contentType) || isInlineWorkOrderVideo(contentType);
 }
@@ -136,17 +169,7 @@ export function workOrderFileContentTypeForSrc(
   if (!src) {
     return undefined;
   }
-  for (const file of files ?? []) {
-    if (file.downloadUrl && (file.downloadUrl === src || src.startsWith(file.downloadUrl.split("?")[0] ?? ""))) {
-      return file.contentType;
-    }
-  }
-  for (const [fileId, type] of Object.entries(contentTypes ?? {})) {
-    if (src.includes(fileId)) {
-      return type;
-    }
-  }
-  return undefined;
+  return contentTypeFromDownloadUrl(src, files) ?? contentTypeFromIdInSrc(src, contentTypes);
 }
 
 export function normalizeWorkOrderFileType(contentType: string | undefined): string {
@@ -162,24 +185,54 @@ export function normalizeWorkOrderFileType(contentType: string | undefined): str
 
 function contentTypeFromFilename(filename: string): string {
   const name = filename.toLowerCase();
-  if (name.endsWith(".png")) return "image/png";
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
-  if (name.endsWith(".gif")) return "image/gif";
-  if (name.endsWith(".webp")) return "image/webp";
-  if (name.endsWith(".pdf")) return "application/pdf";
-  if (name.endsWith(".txt")) return "text/plain";
-  if (name.endsWith(".md") || name.endsWith(".markdown")) return "text/markdown";
-  if (name.endsWith(".mp4")) return "video/mp4";
-  if (name.endsWith(".webm")) return "video/webm";
-  if (name.endsWith(".mov")) return "video/quicktime";
-  if (name.endsWith(".ogv") || name.endsWith(".ogg")) return "video/ogg";
-  if (name.endsWith(".m4v")) return "video/x-m4v";
-  if (name.endsWith(".mkv")) return "video/x-matroska";
-  return "";
+  const matches = Object.entries(CONTENT_TYPE_BY_EXTENSION)
+    .filter(([extension]) => name.endsWith(extension))
+    .sort((left, right) => right[0].length - left[0].length);
+  return matches[0]?.[1] ?? "";
+}
+
+function contentTypeFromDownloadUrl(src: string, files?: WorkOrderFileRef[]): string | undefined {
+  for (const file of files ?? []) {
+    const base = file.downloadUrl?.split("?")[0] ?? "";
+    if (file.downloadUrl && (file.downloadUrl === src || (base !== "" && src.startsWith(base)))) {
+      return file.contentType;
+    }
+  }
+  return undefined;
+}
+
+function contentTypeFromIdInSrc(src: string, contentTypes?: Record<string, string>): string | undefined {
+  for (const [fileId, type] of Object.entries(contentTypes ?? {})) {
+    if (src.includes(fileId)) {
+      return type;
+    }
+  }
+  return undefined;
 }
 
 export function setWorkOrderFilePreviewUrl(id: string, url: string): void {
+  const previous = previewUrls.get(id);
+  if (previous && previous !== url && previous.startsWith("blob:")) {
+    URL.revokeObjectURL(previous);
+  }
   previewUrls.set(id, url);
+}
+
+export function revokeWorkOrderFilePreviewUrl(id: string): void {
+  const url = previewUrls.get(id);
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+  previewUrls.delete(id);
+}
+
+export function clearWorkOrderFilePreviewUrls(): void {
+  for (const url of previewUrls.values()) {
+    if (url.startsWith("blob:")) {
+      URL.revokeObjectURL(url);
+    }
+  }
+  previewUrls.clear();
 }
 
 export function clearWorkOrderFileDownloadCache(): void {

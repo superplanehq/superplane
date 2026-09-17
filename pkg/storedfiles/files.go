@@ -294,17 +294,22 @@ type DispatchFile struct {
 	Filename    string
 	ContentType string
 	SizeBytes   int64
+	Checksum    string
 	URL         string
 }
 
 func (f DispatchFile) Map() map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id":           f.ID.String(),
 		"filename":     f.Filename,
 		"content_type": f.ContentType,
 		"size_bytes":   f.SizeBytes,
 		"url":          f.URL,
 	}
+	if f.Checksum != "" {
+		out["checksum"] = f.Checksum
+	}
+	return out
 }
 
 func DescriptionForDispatch(
@@ -344,11 +349,16 @@ func DescriptionForDispatch(
 			return markdown, nil, err
 		}
 		urls[id] = downloadURL
+		checksum := ""
+		if file.Checksum != nil {
+			checksum = *file.Checksum
+		}
 		dispatched = append(dispatched, DispatchFile{
 			ID:          file.ID,
 			Filename:    file.Filename,
 			ContentType: file.ContentType,
 			SizeBytes:   file.SizeBytes,
+			Checksum:    checksum,
 			URL:         downloadURL,
 		})
 	}
