@@ -205,7 +205,7 @@ function waitForButtonClickEventSections(nodes: NodeInfo[], execution: Execution
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
-      eventState: waitForButtonClickStateFunction(execution as any),
+      eventState: waitForButtonClickStateFunction(execution),
       eventId: execution.rootEvent!.id!,
     },
   ];
