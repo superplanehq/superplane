@@ -1,66 +1,52 @@
-import { useState, type ReactNode } from "react";
-import { EyeOff, FileText, Gauge, Sparkle, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { EyeOff, FileText } from "lucide-react";
 
-import { CountButton } from "@/components/examples/c-button-38";
-import { Badge } from "@/components/reui/badge";
-import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
+import { Frame, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { CONFIDENCE_SCORE_MAX, confidenceBandForScore, type ConfidenceBand } from "../../lib/confidenceScore";
-import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
-import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
-  composerSummaryBodies,
-  resolveOpenSummary,
-  summaryToggleTarget,
-  type ComposerScore,
-} from "./composerScoreSummary";
+  DRAFT_READINESS_NOTES,
+  draftReadiness,
+  type DraftReadiness,
+  type DraftReadinessTone,
+} from "../../lib/draftReadiness";
+import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
+import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
-import type { RefineSummaryKind } from "./refineLayoutPreference";
 
-export type { ComposerScore } from "./composerScoreSummary";
+export type ComposerScore = ScoreEvidenceValue;
 
-const DRAWER_EASE = "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+const SCORE_TEST_IDS = {
+  clarity: "split-run-intent-composer-score",
+  confidence: "split-run-intent-composer-confidence",
+} as const;
 
-const SCORE_TONE: Record<ConfidenceBand, string> = {
-  High: "text-success",
-  Medium: "text-warning",
-  Low: "text-destructive",
+const VERDICT_DOT: Record<DraftReadinessTone, string> = {
+  analyzing: "text-[color:var(--status-draft-dot)]",
+  pending: "text-[color:var(--status-draft-dot)]",
+  blocked: "text-[color:var(--status-failed-dot)]",
+  caution: "text-[color:var(--status-waiting-dot)]",
+  ready: "text-[color:var(--status-completed-dot)]",
 };
 
-type ScoreChipCopy = {
-  label: string;
-  icon: LucideIcon;
-  testId: string;
-};
+/** The verdict text repeats the button for pending and ready, so only warnings keep it. */
+const VERDICT_WITH_TEXT: readonly DraftReadinessTone[] = ["blocked", "caution"];
 
-const SCORE_CHIP_COPY: Record<RefineSummaryKind, ScoreChipCopy> = {
-  clarity: {
-    label: CREATE_WITH_AGENT_COPY.clarity,
-    icon: Sparkle,
-    testId: "split-run-intent-composer-score",
-  },
-  confidence: {
-    label: CREATE_WITH_AGENT_COPY.confidence,
-    icon: Gauge,
-    testId: "split-run-intent-composer-confidence",
-  },
-};
-
-const SUMMARY_KINDS: readonly RefineSummaryKind[] = ["clarity", "confidence"];
-
-/** Uncontrolled fallback for previews. The refine model passes the stored preference. */
-function useOpenSummary(
-  controlled: RefineSummaryKind | null | undefined,
-  onToggle: ((kind: RefineSummaryKind) => void) | undefined,
-): [RefineSummaryKind | null, (kind: RefineSummaryKind) => void] {
-  const [local, setLocal] = useState<RefineSummaryKind | null>("clarity");
-  const toggleLocal = (kind: RefineSummaryKind) => setLocal((current) => (current === kind ? null : kind));
-  return [controlled === undefined ? local : controlled, onToggle ?? toggleLocal];
+/** While the agent works the strip says so, even when older scores exist. */
+function stripReadiness(clarity?: ComposerScore, confidence?: ComposerScore, isAnalyzing = false): DraftReadiness {
+  if (isAnalyzing) {
+    return { tone: "analyzing", ...DRAFT_READINESS_NOTES.analyzing };
+  }
+  return draftReadiness({ clarity: clarity?.score, confidence: confidence?.score });
 }
 
+/**
+ * Decision strip above the refine composer. Row one is the verdict and the
+ * draft actions. Row two is the evidence: both scores and the Plan toggle.
+ */
 export function ComposerPlanStack({
   open,
   clarity,
@@ -69,8 +55,6 @@ export function ComposerPlanStack({
   canTogglePlan = true,
   planStatus,
   onToggle,
-  openSummary: openSummaryProp,
-  onToggleSummary,
   actions,
 }: {
   open: boolean;
@@ -80,63 +64,71 @@ export function ComposerPlanStack({
   canTogglePlan?: boolean;
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
-  openSummary?: RefineSummaryKind | null;
-  onToggleSummary?: (kind: RefineSummaryKind) => void;
   actions?: ReactNode;
 }) {
-  const [openSummary, toggleSummary] = useOpenSummary(openSummaryProp, onToggleSummary);
-  const scores: Record<RefineSummaryKind, ComposerScore | undefined> = { clarity, confidence };
-  const bodies = composerSummaryBodies(clarity, confidence);
-  const shownSummary = resolveOpenSummary(openSummary, bodies);
-  const drawerBody = shownSummary ? bodies[shownSummary] : undefined;
-  const hasAnyBody = Boolean(bodies.clarity || bodies.confidence);
+  const readiness = stripReadiness(clarity, confidence, isAnalyzing);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
-      <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
-        <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
-          {SUMMARY_KINDS.map((kind) => (
-            <ScoreChip
-              key={kind}
-              kind={kind}
-              score={scores[kind]?.score}
-              isAnalyzing={isAnalyzing}
-              expanded={Boolean(bodies[kind]) && shownSummary === kind}
-              onToggle={
-                bodies[kind] ? () => toggleSummary(summaryToggleTarget(kind, shownSummary, openSummary)) : undefined
-              }
-            />
-          ))}
-          {canTogglePlan ? (
-            <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
-          ) : null}
+      <FramePanel fit className="flex flex-col gap-1.5 px-3 py-2" data-testid="split-run-intent-plan-updated">
+        <div className="flex min-w-0 items-center gap-3">
+          <Verdict readiness={readiness} />
           {actions ? (
             <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
           ) : null}
         </div>
-      </FrameHeader>
-      {hasAnyBody ? <ScoreSummaryDrawer open={Boolean(drawerBody)} kind={shownSummary} body={drawerBody} /> : null}
+        <div className="flex min-w-0 items-center gap-2" data-testid="split-run-intent-composer-chips">
+          <ScoreEvidenceRow
+            clarity={clarity}
+            confidence={confidence}
+            isAnalyzing={isAnalyzing}
+            testIds={SCORE_TEST_IDS}
+          />
+          {canTogglePlan ? (
+            <PlanToggle
+              open={open}
+              isAnalyzing={isAnalyzing}
+              planStatus={planStatus}
+              onToggle={onToggle}
+              className="ml-auto"
+            />
+          ) : null}
+        </div>
+      </FramePanel>
     </Frame>
   );
 }
 
-function ScoreSummaryDrawer({ open, kind, body }: { open: boolean; kind: RefineSummaryKind | null; body?: string }) {
+function Verdict({ readiness }: { readiness: DraftReadiness }) {
+  const showText = VERDICT_WITH_TEXT.includes(readiness.tone);
   return (
     <div
-      className={cn("grid transition-[grid-template-rows]", DRAWER_EASE, open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
-      data-testid="split-run-intent-summary-drawer"
-      data-state={open ? "open" : "closed"}
-      data-kind={kind ?? undefined}
-      aria-hidden={open ? undefined : true}
-      inert={open ? undefined : true}
+      key={readiness.headline}
+      className="sp-stream-text flex min-w-0 flex-1 items-start gap-2"
+      data-testid="split-run-intent-verdict"
+      data-tone={readiness.tone}
     >
-      <div className="min-h-0 overflow-hidden">
-        <FramePanel fit>
-          <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-summary-copy">
-            {body}
-          </p>
-        </FramePanel>
+      <VerdictMark tone={readiness.tone} />
+      <div className="min-w-0">
+        <p className="text-[13px] leading-5 font-medium text-foreground">{readiness.headline}</p>
+        {showText ? <p className="text-[12px] leading-4 text-muted-foreground">{readiness.text}</p> : null}
       </div>
     </div>
+  );
+}
+
+function VerdictMark({ tone }: { tone: DraftReadinessTone }) {
+  if (tone === "analyzing") {
+    return (
+      <ConfidenceAnalyzingIndicator
+        testId="split-run-intent-verdict-analyzing"
+        showTooltip={false}
+        decorative
+        className="mt-1 shrink-0"
+      />
+    );
+  }
+  return (
+    <span className={cn("mt-1.5 inline-flex size-2 shrink-0 rounded-full bg-current", VERDICT_DOT[tone])} aria-hidden />
   );
 }
 
@@ -145,21 +137,24 @@ function PlanToggle({
   isAnalyzing,
   planStatus,
   onToggle,
+  className,
 }: {
   open: boolean;
   isAnalyzing: boolean;
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
+  className?: string;
 }) {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
       size="sm"
       aria-expanded={onToggle ? open : undefined}
       aria-pressed={onToggle ? open : undefined}
       aria-label={CREATE_WITH_AGENT_COPY.plan}
       onClick={onToggle}
+      className={cn("text-muted-foreground hover:text-foreground", className)}
     >
       <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
         <FileText
@@ -183,6 +178,7 @@ function PlanToggle({
   );
 }
 
+/** The matrix while the agent writes. An unread dot when the plan changed and the pane is closed. */
 function PlanStatusMark({ isAnalyzing, planStatus }: { isAnalyzing: boolean; planStatus?: PlanChipStatus }) {
   if (isAnalyzing) {
     return (
@@ -194,88 +190,20 @@ function PlanStatusMark({ isAnalyzing, planStatus }: { isAnalyzing: boolean; pla
       />
     );
   }
-  if (planStatus === "updated") {
-    return (
-      <Badge
-        variant="info-light"
-        size="xs"
-        aria-hidden
-        data-testid="split-run-intent-plan-status"
-        className="dark:border-warning/25 dark:bg-warning/15 dark:text-warning"
-      >
-        {CREATE_WITH_AGENT_COPY.planStatusUpdated}
-      </Badge>
-    );
-  }
-  if (planStatus === "ready") {
-    return (
-      <Badge variant="success-light" size="xs" aria-hidden data-testid="split-run-intent-plan-status">
-        {CREATE_WITH_AGENT_COPY.planReady}
-      </Badge>
-    );
-  }
-  return null;
-}
-
-function ScoreChip({
-  kind,
-  score,
-  isAnalyzing,
-  expanded = false,
-  onToggle,
-}: {
-  kind: RefineSummaryKind;
-  score?: number;
-  isAnalyzing: boolean;
-  expanded?: boolean;
-  onToggle?: () => void;
-}) {
-  const copy = SCORE_CHIP_COPY[kind];
-  const Icon = copy.icon;
-  const showMatrix = isAnalyzing;
-  const label = showMatrix || score == null ? copy.label : `${copy.label} ${score}/${CONFIDENCE_SCORE_MAX}`;
-  const countClassName = showMatrix
-    ? "min-w-7 self-stretch py-0"
-    : score == null
-      ? "text-muted-foreground"
-      : cn("font-semibold", SCORE_TONE[confidenceBandForScore(score)]);
-
-  const chip = (
-    <CountButton
-      type="button"
-      size="sm"
-      aria-label={label}
-      aria-expanded={onToggle ? expanded : undefined}
-      aria-pressed={onToggle ? expanded : undefined}
-      onClick={onToggle}
-      data-testid={showMatrix ? undefined : copy.testId}
-      countClassName={countClassName}
-      count={
-        showMatrix ? (
-          <ConfidenceAnalyzingIndicator
-            testId={kind === "clarity" ? "split-run-intent-plan-analyzing" : undefined}
-            showTooltip={false}
-            decorative
-            className="shrink-0"
-          />
-        ) : score == null ? (
-          "–"
-        ) : (
-          `${score}/${CONFIDENCE_SCORE_MAX}`
-        )
-      }
-    >
-      <Icon aria-hidden="true" />
-      {copy.label}
-    </CountButton>
-  );
-  if (!showMatrix) {
-    return chip;
+  if (planStatus !== "updated") {
+    return null;
   }
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{chip}</TooltipTrigger>
-      <TooltipContent>{CREATE_WITH_AGENT_COPY.scoreAnalyzing}</TooltipContent>
+      <TooltipTrigger asChild>
+        <span
+          role="status"
+          aria-label={CREATE_WITH_AGENT_COPY.planUpdated}
+          data-testid="split-run-intent-plan-status"
+          className="inline-flex size-2 shrink-0 rounded-full bg-[color:var(--status-waiting-dot)]"
+        />
+      </TooltipTrigger>
+      <TooltipContent>{CREATE_WITH_AGENT_COPY.planUpdated}</TooltipContent>
     </Tooltip>
   );
 }

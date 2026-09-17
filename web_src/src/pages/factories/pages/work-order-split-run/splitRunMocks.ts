@@ -29,6 +29,7 @@ import {
 
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
+  clarityScoreFromChecks,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
@@ -444,6 +445,7 @@ function reviewSurfaces(
         note: draftFooterNote(order),
         status: displayStatus,
         isAnalyzing: draftIsAnalyzing(input),
+        clarityScore: clarityScoreFromChecks(checks),
         confidenceScore: confidenceScoreFromChecks(checks),
       }),
       [],

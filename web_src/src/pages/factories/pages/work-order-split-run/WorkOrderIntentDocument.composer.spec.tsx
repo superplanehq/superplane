@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
+import { CONFIDENCE_ANALYZING_TOOLTIP } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
   analysisChat,
@@ -75,22 +77,17 @@ describe("WorkOrderIntentDocument composer", () => {
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     const showPlan = within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan });
     expect(within(chips).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
-    expect(within(chips).getByTestId("split-run-intent-plan-status")).toHaveTextContent(
-      CREATE_WITH_AGENT_COPY.planReady,
-    );
+    expect(within(chips).queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
     expect(showPlan).toHaveTextContent(CREATE_WITH_AGENT_COPY.plan);
     expect(showPlan).not.toHaveTextContent(CREATE_WITH_AGENT_COPY.showPlan);
     expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     expect(within(strip).getByTestId("split-run-review")).toHaveTextContent("Ready");
-    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision")).not.toBeInTheDocument();
 
     await user.click(showPlan);
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      openSummary: "clarity",
-      planOpen: true,
-    });
+    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({ planOpen: true });
     expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
     for (const column of screen.getAllByTestId("split-run-intent-chat-column")) {
       expect(column).toHaveClass("px-4");
@@ -147,11 +144,11 @@ describe("WorkOrderIntentDocument composer", () => {
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     expect(card).toHaveAttribute("data-slot", "frame");
     expect(card).toContainElement(chips);
-    expect(screen.queryByTestId("split-run-intent-summary-copy")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
-    expect(within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
-    expect(within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.confidence })).toBeInTheDocument();
-    expect(within(chips).getByTestId("split-run-review")).toHaveTextContent("Ready");
+    expect(within(chips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
+    expect(within(chips).getByRole("status", { name: /^Confidence\./ })).toBeInTheDocument();
+    expect(within(card).getByTestId("split-run-review")).toHaveTextContent("Ready");
+    expect(within(card).getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "analyzing");
   });
 
   it("hides the plan toggle until a spec exists", () => {
@@ -173,13 +170,14 @@ describe("WorkOrderIntentDocument composer", () => {
 
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     expect(within(chips).queryByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).not.toBeInTheDocument();
-    const analyzing = within(chips).getByTestId("split-run-intent-plan-analyzing");
+    const analyzing = screen.getByTestId("split-run-intent-verdict-analyzing");
     expect(analyzing.querySelector(".t-matrix")).not.toBeNull();
     expect(analyzing).not.toHaveTextContent("Analyzing");
+    expect(screen.getByTestId("split-run-intent-verdict")).toHaveTextContent(DRAFT_READINESS_NOTES.analyzing.headline);
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
   });
 
-  it("stops the Clarity matrix when analysis ends without a score", () => {
+  it("stops the matrix when analysis ends without a score", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -197,10 +195,11 @@ describe("WorkOrderIntentDocument composer", () => {
 
     expect(screen.getByTestId("split-run-intent-composer-score")).toHaveTextContent("–");
     expect(screen.getByTestId("split-run-intent-composer-confidence")).toHaveTextContent("–");
-    expect(screen.queryByTestId("split-run-intent-plan-analyzing")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-verdict-analyzing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "pending");
   });
 
-  it("shows Ready then Updated when the spec changes", () => {
+  it("marks the Plan toggle when the spec changes", () => {
     const { rerender } = renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -219,9 +218,7 @@ describe("WorkOrderIntentDocument composer", () => {
     );
 
     const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(chips).getByTestId("split-run-intent-plan-status")).toHaveTextContent(
-      CREATE_WITH_AGENT_COPY.planReady,
-    );
+    expect(within(chips).queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
 
     rerender(
       <TooltipProvider>
@@ -245,12 +242,12 @@ describe("WorkOrderIntentDocument composer", () => {
     const updated = within(screen.getByTestId("split-run-intent-composer-chips")).getByTestId(
       "split-run-intent-plan-status",
     );
-    expect(updated).toHaveTextContent(CREATE_WITH_AGENT_COPY.planStatusUpdated);
-    expect(updated.className).toContain("text-info-foreground");
-    expect(updated.className).toContain("dark:text-warning");
+    expect(updated).toHaveAccessibleName(CREATE_WITH_AGENT_COPY.planUpdated);
+    expect(updated).toHaveAttribute("role", "status");
+    expect(within(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).getByRole("status")).toBe(updated);
   });
 
-  it("explains the Clarity matrix on hover while the agent works", async () => {
+  it("explains the score matrix on hover while the agent works", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
@@ -267,11 +264,11 @@ describe("WorkOrderIntentDocument composer", () => {
       />,
     );
 
-    await user.hover(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(CREATE_WITH_AGENT_COPY.scoreAnalyzing);
+    await user.hover(screen.getByRole("status", { name: /^Clarity\./ }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(CONFIDENCE_ANALYZING_TOOLTIP);
   });
 
-  it("replaces Clarity and the plan badge with the matrix while the agent works", () => {
+  it("replaces the scores and the plan badge with the matrix while the agent works", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -290,15 +287,17 @@ describe("WorkOrderIntentDocument composer", () => {
     );
 
     const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
-    const cardMatrix = within(chips).getByTestId("split-run-intent-plan-analyzing");
+    expect(within(chips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
+    expect(within(chips).getByRole("status", { name: /^Confidence\./ })).toBeInTheDocument();
+    const cardMatrix = screen.getByTestId("split-run-intent-verdict-analyzing");
     expect(cardMatrix.querySelector(".t-matrix")).not.toBeNull();
     expect(cardMatrix).not.toHaveTextContent("Analyzing");
     const planMatrix = within(chips).getByTestId("split-run-intent-plan-chip-analyzing");
     expect(planMatrix.querySelector(".t-matrix")).not.toBeNull();
     expect(planMatrix).not.toHaveTextContent("Analyzing");
-    expect(within(chips).queryByText(CREATE_WITH_AGENT_COPY.planReady)).not.toBeInTheDocument();
+    expect(within(chips).queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "analyzing");
   });
 
   it("attaches, pastes, caps, and sends composer images", async () => {

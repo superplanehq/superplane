@@ -13,23 +13,23 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 
-import { START_CONFIRM_COPY, startConfirmBody } from "./startConfirm";
+import { START_CONFIRM_COPY, startConfirmBody, type StartConfirmScores } from "./startConfirm";
 
 const ACTION_CLASS = "rounded-md";
 
 export function StartConfirmDialog({
   open,
-  score,
+  scores,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
-  score?: number;
+  scores: StartConfirmScores;
   onOpenChange: (open: boolean) => void;
   onConfirm: (skipNext: boolean) => void;
 }) {
   const [skipNext, setSkipNext] = useState(false);
-  const body = startConfirmBody(score) ?? START_CONFIRM_COPY.missing;
+  const body = startConfirmBody(scores) ?? START_CONFIRM_COPY.missing;
 
   useEffect(() => {
     if (open) {

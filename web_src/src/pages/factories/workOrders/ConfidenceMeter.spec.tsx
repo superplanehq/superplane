@@ -43,7 +43,7 @@ describe("ScorePairMeter", () => {
 
     const group = screen.getByTestId("pair");
     expect(group).toHaveAttribute("role", "group");
-    expect(group).toHaveAttribute("aria-label", "Clarity and Confidence");
+    expect(group).toHaveAttribute("aria-label", "Clarity and Confidence. Review before you start");
     const clarity = screen.getByTestId("pair-clarity");
     const confidence = screen.getByTestId("pair-confidence");
     expect(clarity).toHaveAttribute("aria-label", "Clarity score");
@@ -56,13 +56,14 @@ describe("ScorePairMeter", () => {
     expect(clarity.compareDocumentPosition(confidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("lists both scores in one tooltip", async () => {
+  it("leads the tooltip with the verdict, then both scores", async () => {
     const user = userEvent.setup();
     render(<ScorePairMeter clarity={4} confidence={2} testId="pair" />);
 
     await user.hover(screen.getByTestId("pair"));
 
     const tip = await screen.findByRole("tooltip");
+    expect(tip.textContent?.startsWith("Review before you start")).toBe(true);
     expect(tip).toHaveTextContent("Clarity score");
     expect(tip).toHaveTextContent("4/5");
     expect(tip).toHaveTextContent("Confidence score");
@@ -76,6 +77,19 @@ describe("ScorePairMeter", () => {
     expect(confidence).not.toHaveAttribute("aria-valuenow");
     expect(confidence).toHaveAttribute("aria-valuetext", "No score yet");
     expect(confidence.querySelectorAll("[data-filled='true']")).toHaveLength(0);
+    expect(screen.getByTestId("pair")).toHaveAttribute(
+      "aria-label",
+      "Clarity and Confidence. Review the plan before you start",
+    );
+  });
+
+  it("calls a pair of high scores ready", () => {
+    render(<ScorePairMeter clarity={5} confidence={4} testId="pair" />);
+
+    expect(screen.getByTestId("pair")).toHaveAttribute(
+      "aria-label",
+      "Clarity and Confidence. This task is ready to start",
+    );
   });
 });
 

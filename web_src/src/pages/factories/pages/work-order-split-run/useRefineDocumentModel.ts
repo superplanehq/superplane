@@ -132,8 +132,6 @@ function bindRefineChat({
       layout.togglePlan();
     },
     canTogglePlan: hasPlan,
-    openSummary: layout.openSummary,
-    onToggleSummary: layout.toggleSummary,
     clarity,
     confidence,
     planStatus,

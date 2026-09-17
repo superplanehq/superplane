@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
   analysisChat,
@@ -24,7 +25,15 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   }),
 }));
 
-describe("WorkOrderIntentDocument score summaries", () => {
+const WAITING_WITH_PLAN = {
+  machineStatus: "waiting" as const,
+  canvasId: "canvas-1",
+  canvasRunId: "run-1",
+  executionId: "exec-1",
+  messages: [{ id: "plan-1", kind: "plan" as const, role: "plan" as const, score: 4 }],
+};
+
+describe("WorkOrderIntentDocument score evidence", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
@@ -36,46 +45,75 @@ describe("WorkOrderIntentDocument score summaries", () => {
     resetStreamMemoryForTests();
   });
 
-  it("shows the Clarity summary in the status card", () => {
+  it("leads with the verdict and keeps both scores as evidence", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
         clarity={HIGH_CLARITY}
         confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
       />,
     );
 
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
+    const verdict = within(card).getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "ready");
+    expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.ready.headline);
+    expect(verdict).not.toHaveTextContent(DRAFT_READINESS_NOTES.ready.text);
+    const clarity = within(card).getByTestId("split-run-intent-composer-score");
+    const confidence = within(card).getByTestId("split-run-intent-composer-confidence");
+    expect(clarity).toHaveAccessibleName("Clarity 4/5");
+    expect(clarity).toHaveAttribute("aria-expanded", "false");
+    expect(confidence).toHaveAccessibleName("Confidence 4/5");
     expect(
-      within(card).getByTestId("split-run-intent-composer-chips").closest("[data-slot=frame-panel-header]"),
-    ).not.toBeNull();
-    const drawer = within(card).getByTestId("split-run-intent-summary-drawer");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(drawer).toHaveAttribute("data-kind", "clarity");
-    expect(drawer.className).toContain("transition-[grid-template-rows]");
-    expect(within(card).getByTestId("split-run-intent-summary-copy").closest("[data-slot=frame-panel]")).not.toBeNull();
-    expect(within(card).getByTestId("split-run-intent-summary-copy")).toHaveTextContent(HIGH_CLARITY.summary);
-    expect(within(card).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
-    expect(within(card).getByTestId("split-run-intent-composer-score")).toHaveAttribute("aria-expanded", "true");
-    expect(within(card).getByTestId("split-run-intent-composer-confidence")).toHaveAccessibleName("Confidence 4/5");
-    expect(within(card).getByTestId("split-run-intent-composer-confidence")).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByTestId("split-run-intent-composer-card")).not.toContainElement(
-      screen.getByTestId("split-run-intent-summary-copy"),
-    );
+      within(clarity).getByTestId("split-run-intent-composer-score-meter").querySelectorAll("[data-filled='true']"),
+    ).toHaveLength(4);
+    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
   });
 
-  it("switches the shared drawer between Clarity and Confidence", async () => {
+  it("warns in the verdict when Clarity is low and explains what to do", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={{ ...HIGH_CLARITY, score: 2 }}
+        confidence={HIGH_CONFIDENCE}
+        analysis={analysisChat({
+          view: {
+            ...WAITING_WITH_PLAN,
+            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 2 }],
+          },
+        })}
+      />,
+    );
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "blocked");
+    expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.unclear.headline);
+    expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.unclear.text);
+  });
+
+  it("cautions in the verdict when Confidence is low", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={{ ...HIGH_CONFIDENCE, score: 2 }}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
+      />,
+    );
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "caution");
+    expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.agentFit.headline);
+    expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.agentFit.text);
+  });
+
+  it("peeks a score summary on hover and pins it on click", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
@@ -83,44 +121,36 @@ describe("WorkOrderIntentDocument score summaries", () => {
         artifacts={[INTENT]}
         clarity={HIGH_CLARITY}
         confidence={{ ...HIGH_CONFIDENCE, score: 3, summary: "The change crosses billing and the API." }}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
       />,
     );
 
-    const clarity = screen.getByTestId("split-run-intent-composer-score");
     const confidence = screen.getByTestId("split-run-intent-composer-confidence");
-    const drawer = screen.getByTestId("split-run-intent-summary-drawer");
     expect(confidence).toHaveAccessibleName("Confidence 3/5");
-    expect(drawer).toHaveAttribute("data-kind", "clarity");
 
-    await user.click(confidence);
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(drawer).toHaveAttribute("data-kind", "confidence");
-    expect(screen.getByTestId("split-run-intent-summary-copy")).toHaveTextContent(
+    await user.hover(confidence);
+    expect(await screen.findByTestId("split-run-intent-composer-confidence-copy")).toHaveTextContent(
       "The change crosses billing and the API.",
     );
     expect(confidence).toHaveAttribute("aria-expanded", "true");
-    expect(clarity).toHaveAttribute("aria-expanded", "false");
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      openSummary: "confidence",
-      planOpen: false,
-    });
+    expect(confidence).toHaveAttribute("aria-pressed", "false");
 
-    await user.click(clarity);
-    expect(drawer).toHaveAttribute("data-kind", "clarity");
-    expect(screen.getByTestId("split-run-intent-summary-copy")).toHaveTextContent(HIGH_CLARITY.summary);
+    await user.unhover(confidence);
+    await user.click(confidence);
+    expect(confidence).toHaveAttribute("aria-pressed", "true");
+    expect(confidence).toHaveAttribute("aria-expanded", "true");
+    await user.unhover(confidence);
+    expect(screen.getByTestId("split-run-intent-composer-confidence-copy")).toBeInTheDocument();
+
+    await user.click(confidence);
+    expect(confidence).toHaveAttribute("aria-pressed", "false");
+
+    await user.hover(screen.getByTestId("split-run-intent-composer-score"));
+    expect(await screen.findByTestId("split-run-intent-composer-score-copy")).toHaveTextContent(HIGH_CLARITY.summary);
+    expect(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY)).toBeNull();
   });
 
-  it("falls back to the Confidence summary when Clarity has none", async () => {
-    const user = userEvent.setup();
+  it("shows a dash for a score the analysis has not published", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -137,105 +167,37 @@ describe("WorkOrderIntentDocument score summaries", () => {
       />,
     );
 
-    const drawer = screen.getByTestId("split-run-intent-summary-drawer");
-    const confidence = screen.getByTestId("split-run-intent-composer-confidence");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(drawer).toHaveAttribute("data-kind", "confidence");
-    expect(screen.getByTestId("split-run-intent-composer-score")).not.toHaveAttribute("aria-expanded");
-    expect(confidence).toHaveAttribute("aria-expanded", "true");
-
-    await user.click(confidence);
-    expect(drawer).toHaveAttribute("data-state", "closed");
-    expect(confidence).toHaveAttribute("aria-expanded", "false");
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      openSummary: null,
-      planOpen: false,
-    });
-
-    await user.click(confidence);
-    expect(drawer).toHaveAttribute("data-kind", "confidence");
-    expect(drawer).toHaveAttribute("data-state", "open");
-  });
-
-  it("toggles the Clarity summary from the Clarity button", async () => {
-    const user = userEvent.setup();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        clarity={HIGH_CLARITY}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
-      />,
-    );
-
     const clarity = screen.getByTestId("split-run-intent-composer-score");
-    const drawer = screen.getByTestId("split-run-intent-summary-drawer");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(screen.getByTestId("split-run-intent-summary-copy")).toBeInTheDocument();
-    await user.click(clarity);
-    expect(clarity).toHaveAttribute("aria-expanded", "false");
-    expect(drawer).toHaveAttribute("data-state", "closed");
-    expect(drawer).toHaveAttribute("aria-hidden", "true");
-    await user.click(clarity);
-    expect(clarity).toHaveAttribute("aria-expanded", "true");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(drawer).not.toHaveAttribute("aria-hidden");
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      openSummary: "clarity",
-      planOpen: false,
-    });
+    expect(clarity).toHaveTextContent("–");
+    expect(clarity).not.toHaveAttribute("aria-expanded");
+    expect(screen.getByTestId("split-run-intent-composer-confidence")).toHaveAccessibleName("Confidence 4/5");
+    expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "ready");
   });
 
-  it("restores Clarity and plan pane from localStorage", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ openSummary: null, planOpen: true }));
+  it("restores the plan pane from localStorage and ignores legacy summary keys", () => {
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ openSummary: "clarity", planOpen: true }));
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
         clarity={HIGH_CLARITY}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
       />,
     );
 
-    expect(screen.getByTestId("split-run-intent-summary-drawer")).toHaveAttribute("data-state", "closed");
-    expect(screen.getByTestId("split-run-intent-composer-score")).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(true);
     expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "open");
-    expect(screen.getByTestId("split-run-intent-plan-status")).toHaveTextContent(CREATE_WITH_AGENT_COPY.planReady);
+    expect(screen.queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
   });
 
   it("does not open the plan pane from storage before a spec exists", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ openSummary: "clarity", planOpen: true }));
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ planOpen: true }));
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[]}
         confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
       />,
     );
 
