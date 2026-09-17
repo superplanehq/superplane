@@ -58,7 +58,11 @@ type IssueChangelogItem struct {
 // IssueEvent is the event SuperPlane emits for each matching issue webhook.
 type IssueEvent struct {
 	Action string `json:"action"`
-	Issue  *Issue `json:"issue"`
+	// URL is the issue page (`<site>/browse/<key>`). Origin sniffing prefers
+	// this key over nested `self` addresses, which point at the API proxy.
+	// The field is omitted when the site address is unknown.
+	URL   string `json:"url,omitempty"`
+	Issue *Issue `json:"issue"`
 	// Description is the issue description as plain text. Jira Cloud holds a
 	// description in Atlassian Document Format, which reads as a Go map when a
 	// template interpolates it, so the event carries a readable copy next to
@@ -71,14 +75,29 @@ type IssueEvent struct {
 
 // NewIssueEvent builds the event for one issue, so every emitter - the issue
 // and incident webhooks, and the intake seed - reports the same shape.
-func NewIssueEvent(action string, issue *Issue, user *User, changelog *IssueChangelog) IssueEvent {
+func NewIssueEvent(action string, issue *Issue, user *User, changelog *IssueChangelog, siteURL string) IssueEvent {
+	key := ""
+	if issue != nil {
+		key = issue.Key
+	}
 	return IssueEvent{
 		Action:      action,
+		URL:         IssueURL(siteURL, key),
 		Issue:       issue,
 		Description: IssueDescriptionText(issue),
 		User:        user,
 		Changelog:   changelog,
 	}
+}
+
+// IssueURL builds the issue page address from the site and the issue key.
+func IssueURL(siteURL, issueKey string) string {
+	siteURL = strings.TrimRight(strings.TrimSpace(siteURL), "/")
+	issueKey = strings.TrimSpace(issueKey)
+	if siteURL == "" || issueKey == "" {
+		return ""
+	}
+	return siteURL + "/browse/" + issueKey
 }
 
 // IssueDescriptionText reads the description of an issue as plain text.
@@ -124,6 +143,7 @@ This is provisioned automatically. Jira's dynamic webhook registration API (` + 
 
 Emits one event per matching issue webhook with:
 - **action**: ` + "`created`" + `, ` + "`updated`" + `, or ` + "`deleted`" + `
+- **url**: The issue page (` + "`<site>/browse/<key>`" + `). Present when the Jira site address is known
 - **issue**: The full issue (id, key, self, fields)
 - **description**: The issue description as plain text. Use this instead of ` + "`issue.fields.description`" + `, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
@@ -280,7 +300,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		}
 	}
 
-	event := NewIssueEvent(action, issue, payload.User, payload.Changelog)
+	event := NewIssueEvent(action, issue, payload.User, payload.Changelog, siteURLFromIntegration(ctx.Integration))
 
 	if err := ctx.Events.Emit(IssueEventPayloadType, event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
