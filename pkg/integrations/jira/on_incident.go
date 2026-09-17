@@ -68,6 +68,7 @@ This is provisioned automatically, sharing the same webhook registration ` + "`j
 
 Emits one event per matching incident webhook with:
 - **action**: ` + "`created`" + `, ` + "`updated`" + `, or ` + "`deleted`" + `
+- **url**: The issue page (` + "`<site>/browse/<key>`" + `). Present when the Jira site address is known
 - **issue**: The full issue (id, key, self, fields)
 - **description**: The issue description as plain text. Use this instead of ` + "`issue.fields.description`" + `, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
