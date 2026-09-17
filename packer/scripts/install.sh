@@ -89,12 +89,22 @@ apt-get install -qy nodejs
 CLAUDE_CODE_VERSION=2.1.212
 OPENCODE_VERSION=1.18.3
 CODEX_VERSION=0.144.5
+PLAYWRIGHT_VERSION=1.63.0
 npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 npm install -g "opencode-ai@${OPENCODE_VERSION}"
 npm install -g "@openai/codex@${CODEX_VERSION}"
+npm install -g "playwright@${PLAYWRIGHT_VERSION}"
+export PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+playwright install --with-deps chromium
+chmod -R a+rX /opt/ms-playwright
 claude --version
 opencode --version
 codex --version
+playwright --version
+playwright cli --help >/dev/null
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright playwright screenshot about:blank /tmp/playwright-smoke.png
+test -s /tmp/playwright-smoke.png
+rm /tmp/playwright-smoke.png
 
 # AWS CLI v2
 AWS_CLI_ARCH=$([ "$ARCH" = "arm64" ] && echo "aarch64" || echo "x86_64")
@@ -141,6 +151,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/home/ubuntu
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 EnvironmentFile=/etc/default/superplane-runner
 PrivateUsers=no
 RestrictNamespaces=no
