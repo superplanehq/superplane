@@ -149,6 +149,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
 	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
@@ -158,6 +159,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
+	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,

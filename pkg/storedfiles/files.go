@@ -19,10 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	maxIngestBytes     = models.MaxFileBytes
-	ingestFetchTimeout = 30 * time.Second
-)
+const ingestFetchTimeout = 30 * time.Second
 
 type BindResult struct {
 	StaleKeys  []string
@@ -250,19 +247,20 @@ func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, fi
 	}
 
 	hasher := sha256.New()
-	limited := &limitedReader{r: io.TeeReader(body, hasher), n: models.MaxFileBytes}
+	maxBytes := file.MaxBytes()
+	limited := &limitedReader{r: io.TeeReader(body, hasher), n: maxBytes}
 	if err := provider.Put(ctx, file.StorageKey, limited, blob.PutOptions{ContentType: file.ContentType}); err != nil {
 		_ = provider.Delete(ctx, file.StorageKey)
 		_ = file.MarkFailed(tx)
 		if errors.Is(err, errFileTooLarge) {
-			return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, models.MaxFileBytes)
+			return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
 		}
 		return err
 	}
 	if limited.exceeded {
 		_ = provider.Delete(ctx, file.StorageKey)
 		_ = file.MarkFailed(tx)
-		return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, models.MaxFileBytes)
+		return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
 	}
 
 	info, err := provider.Head(ctx, file.StorageKey)
@@ -498,7 +496,7 @@ func ingestOneImage(
 		return nil, false, nil
 	}
 
-	if err := CompleteUpload(fetchCtx, tx, provider, file, io.LimitReader(resp.Body, maxIngestBytes+1)); err != nil {
+	if err := CompleteUpload(fetchCtx, tx, provider, file, io.LimitReader(resp.Body, models.MaxFileBytes+1)); err != nil {
 		_ = DeleteObjectAndRow(fetchCtx, tx, provider, file)
 		return nil, false, nil
 	}
