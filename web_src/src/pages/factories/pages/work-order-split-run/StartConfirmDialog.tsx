@@ -40,7 +40,7 @@ export function StartConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="overflow-hidden p-0 ring-0">
-        <Frame variant="inverse" dense className="border-0" data-testid="split-run-start-confirm">
+        <Frame variant="inverse" dense className="border-0 bg-popover" data-testid="split-run-start-confirm">
           <FrameHeader>
             <div className="flex items-start gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-amber-100 bg-amber-50 text-amber-500 dark:bg-amber-950 dark:text-amber-300">
