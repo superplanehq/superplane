@@ -385,6 +385,8 @@ func writeRunnerPlanningError(w http.ResponseWriter, err error) {
 		http.Error(w, "planning session not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		http.Error(w, "planning session has no draft work order", http.StatusConflict)
 	default:
 		log.WithError(err).Error("runner planning session failed")
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
