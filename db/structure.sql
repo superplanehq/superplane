@@ -1235,7 +1235,11 @@ CREATE TABLE public.user_notification_settings (
     workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    event_types jsonb DEFAULT '[]'::jsonb NOT NULL
+    event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_workspace_scope character varying(50) DEFAULT 'none'::character varying NOT NULL,
+    browser_workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_show_while_viewing boolean DEFAULT true NOT NULL
 );
 
 
@@ -4582,7 +4586,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260916205338	f
+20260917090912	f
 \.
 
 

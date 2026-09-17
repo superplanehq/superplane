@@ -47,27 +47,55 @@ func defaultNotificationSettingsProto() *pb.NotificationSettings {
 }
 
 func serializeNotificationSettings(settings *models.UserNotificationSettings) *pb.NotificationSettings {
-	filters := []*pb.NotificationSettings_WorkspaceFilter{}
-	if settings.WorkspaceScope == models.NotificationWorkspaceScopeFiltered {
-		for _, filter := range settings.WorkspaceFilters.Data() {
-			filters = append(filters, &pb.NotificationSettings_WorkspaceFilter{
+	return &pb.NotificationSettings{
+		Workspaces: serializeWorkspaces(
+			settings.WorkspaceScope,
+			settings.WorkspaceFilters.Data(),
+			settings.EventTypes.Data(),
+		),
+		Browser: serializeBrowser(settings),
+	}
+}
+
+func serializeWorkspaces(
+	scope string,
+	filters []models.NotificationWorkspaceFilter,
+	eventTypes []string,
+) *pb.NotificationSettings_Workspaces {
+	serializedFilters := []*pb.NotificationSettings_WorkspaceFilter{}
+	if scope == models.NotificationWorkspaceScopeFiltered {
+		for _, filter := range filters {
+			serializedFilters = append(serializedFilters, &pb.NotificationSettings_WorkspaceFilter{
 				WorkspaceId: filter.WorkspaceID,
 				EventTypes:  serializeEventTypes(filter.EventTypes),
 			})
 		}
 	}
 
-	var eventTypes []pb.NotificationSettings_Type
-	if settings.WorkspaceScope == models.NotificationWorkspaceScopeAll {
-		eventTypes = serializeEventTypes(settings.EventTypes.Data())
+	var serializedEventTypes []pb.NotificationSettings_Type
+	if scope == models.NotificationWorkspaceScopeAll {
+		serializedEventTypes = serializeEventTypes(eventTypes)
 	}
 
-	return &pb.NotificationSettings{
-		Workspaces: &pb.NotificationSettings_Workspaces{
-			Scope:      notificationScopeToProto(settings.WorkspaceScope),
-			Filters:    filters,
-			EventTypes: eventTypes,
-		},
+	return &pb.NotificationSettings_Workspaces{
+		Scope:      notificationScopeToProto(scope),
+		Filters:    serializedFilters,
+		EventTypes: serializedEventTypes,
+	}
+}
+
+func serializeBrowser(settings *models.UserNotificationSettings) *pb.NotificationSettings_Browser {
+	scope := settings.BrowserWorkspaceScope
+	if scope == "" {
+		scope = models.NotificationWorkspaceScopeNone
+	}
+
+	workspaces := serializeWorkspaces(scope, settings.BrowserWorkspaceFilters.Data(), settings.BrowserEventTypes.Data())
+	return &pb.NotificationSettings_Browser{
+		Scope:            workspaces.Scope,
+		Filters:          workspaces.Filters,
+		EventTypes:       workspaces.EventTypes,
+		ShowWhileViewing: settings.BrowserShowWhileViewing,
 	}
 }
 
