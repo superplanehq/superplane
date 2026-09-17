@@ -111,6 +111,39 @@ func Test__Sync_emptyCredentialsShowAppSetupWithoutHostedEnv(t *testing.T) {
 	assert.Contains(t, integrationCtx.BrowserAction.Description, "Create an OAuth 2.0 (3LO) app")
 }
 
+func Test__callbackRedirectURL(t *testing.T) {
+	integrationID := "11111111-1111-1111-1111-111111111111"
+	settingsURL := "https://app.example/org-1/settings/integrations/" + integrationID
+
+	t.Run("appends the connection id to a stored return path", func(t *testing.T) {
+		got := callbackRedirectURL(core.HTTPRequestContext{
+			BaseURL: "https://app.example",
+			Integration: &contexts.IntegrationContext{
+				IntegrationID: integrationID,
+				Metadata: Metadata{
+					SetupReturnPath: "/org-1/workspaces/acme/lines/line-1?jiraIntake=1",
+				},
+			},
+		}, settingsURL)
+
+		assert.Equal(t,
+			"https://app.example/org-1/workspaces/acme/lines/line-1?jiraIntake=1&jiraIntegrationId="+integrationID,
+			got,
+		)
+	})
+
+	t.Run("falls back to settings when no return path is stored", func(t *testing.T) {
+		got := callbackRedirectURL(core.HTTPRequestContext{
+			BaseURL: "https://app.example",
+			Integration: &contexts.IntegrationContext{
+				IntegrationID: integrationID,
+			},
+		}, settingsURL)
+
+		assert.Equal(t, settingsURL, got)
+	})
+}
+
 func Test__isSafeIntegrationSetupReturnPath(t *testing.T) {
 	assert.True(t, isSafeIntegrationSetupReturnPath("/org-1/workspaces/acme/lines/line-1"))
 	assert.True(t, isSafeIntegrationSetupReturnPath("/onboarding?attempt=1"))

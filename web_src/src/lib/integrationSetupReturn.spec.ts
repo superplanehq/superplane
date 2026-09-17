@@ -10,6 +10,7 @@ import {
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
   withGitHubSetupRequest,
+  configurationWithSetupReturnPath,
 } from "./integrationSetupReturn";
 
 function setupReturnCookie(): string | undefined {
@@ -125,6 +126,16 @@ describe("integration setup return", () => {
     rememberIntegrationSetupReturn("org-1", "/onboarding?attempt=attempt-1&step=vcs&pick=newest");
 
     expect(peekIntegrationSetupReturn("org-1")).toBe("/onboarding?attempt=attempt-1&step=vcs&pick=newest");
+  });
+
+  it("adds setupReturnPath when a return path is present", () => {
+    expect(
+      configurationWithSetupReturnPath({ clientId: "id" }, "/org-1/workspaces/sp/lines/line-1?jiraIntake=1"),
+    ).toEqual({
+      clientId: "id",
+      setupReturnPath: "/org-1/workspaces/sp/lines/line-1?jiraIntake=1",
+    });
+    expect(configurationWithSetupReturnPath({ clientId: "id" })).toEqual({ clientId: "id" });
   });
 
   it("expires a return path after fifteen minutes", () => {
