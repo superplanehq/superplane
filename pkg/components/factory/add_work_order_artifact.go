@@ -63,7 +63,7 @@ Markdown and link types accept a free-form ` + "`data`" + ` list of ` + "`{name,
 
 Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this task. Keys are unique per factory.
 
-If you set a key, later runs of this step update the same artifact. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
+If you set a key, later runs update that artifact when ` + "`orderId`" + ` identifies the task that owns it. A run that targets another task with the same key fails. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
 
 ` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
@@ -182,7 +182,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
-			Description: "Optional key, unique per factory. Later runs update this artifact and replace its data. The first run sets the type.",
+			Description: "Optional key, unique per factory. Later runs update this artifact when Task ID matches the owner. A different task with this key fails.",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,

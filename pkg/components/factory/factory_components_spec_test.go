@@ -646,7 +646,9 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
 	c := &AddWorkOrderArtifact{}
 	docs := c.Documentation()
-	assert.Contains(t, docs, "later runs of this step update the same artifact")
+	assert.Contains(t, docs, "later runs update that artifact when")
+	assert.Contains(t, docs, "orderId")
+	assert.Contains(t, docs, "A run that targets another task with the same key fails")
 	assert.Contains(t, docs, "values that you leave blank are cleared")
 	assert.Contains(t, docs, "The first run sets the type")
 	assert.Contains(t, docs, "A later run with a different type fails")
@@ -661,8 +663,8 @@ func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
 		}
 	}
 	require.NotNil(t, artifactKey)
-	assert.True(t, strings.Contains(artifactKey.Description, "Later runs update this artifact"))
-	assert.True(t, strings.Contains(artifactKey.Description, "The first run sets the type"))
+	assert.True(t, strings.Contains(artifactKey.Description, "Later runs update this artifact when Task ID matches the owner"))
+	assert.True(t, strings.Contains(artifactKey.Description, "A different task with this key fails"))
 }
 
 func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {

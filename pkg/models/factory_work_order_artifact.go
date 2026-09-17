@@ -201,81 +201,6 @@ func (o *FactoryWorkOrder) UpsertArtifact(
 	return artifact, created, nil
 }
 
-func (o *FactoryWorkOrder) replaceKeyedArtifactAfterConflict(
-	tx *gorm.DB,
-	params FactoryWorkOrderArtifactParams,
-) (*FactoryWorkOrderArtifact, error) {
-	existing, err := findFactoryWorkOrderArtifactByKey(tx, o.OrganizationID, o.FactoryID, params.Key)
-	if err != nil {
-		if errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
-			return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
-		}
-		return nil, err
-	}
-	if existing.WorkOrderID != o.ID {
-		return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
-	}
-
-	return o.replaceArtifactData(tx, existing, params)
-}
-
-func (o *FactoryWorkOrder) replaceArtifactData(
-	tx *gorm.DB,
-	artifact *FactoryWorkOrderArtifact,
-	params FactoryWorkOrderArtifactParams,
-) (*FactoryWorkOrderArtifact, error) {
-	requestedType := strings.TrimSpace(params.Type)
-	if artifact.Type != requestedType {
-		return nil, fmt.Errorf(
-			"%w: stored type is %q, requested type is %q",
-			ErrFactoryWorkOrderArtifactInvalid,
-			artifact.Type,
-			requestedType,
-		)
-	}
-
-	if err := validateArtifactData(artifact.Type, params.Data); err != nil {
-		return nil, err
-	}
-
-	dataJSON, err := encodeGuardedArtifactData(params.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
-		return nil, err
-	}
-	artifact.Data = dataJSON
-
-	return artifact, nil
-}
-
-func findFactoryWorkOrderArtifactByKey(
-	tx *gorm.DB,
-	organizationID, factoryID uuid.UUID,
-	key string,
-) (*FactoryWorkOrderArtifact, error) {
-	trimmedKey := strings.TrimSpace(key)
-	if trimmedKey == "" {
-		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
-	}
-
-	var artifact FactoryWorkOrderArtifact
-	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND key = ?", organizationID, factoryID, trimmedKey).
-		First(&artifact).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderArtifactNotFound
-		}
-		return nil, err
-	}
-
-	return &artifact, nil
-}
-
 // UpdateArtifactData resolves the artifact tagged with `key` under this
 // work order (the same key an earlier CreateArtifact call set via
 // FactoryWorkOrderArtifactParams.Key, typically the PR's URL), shallow-
@@ -365,6 +290,81 @@ func IsValidWorkOrderArtifactType(t string) bool {
 		return true
 	}
 	return false
+}
+
+func (o *FactoryWorkOrder) replaceKeyedArtifactAfterConflict(
+	tx *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	existing, err := findFactoryWorkOrderArtifactByKey(tx, o.OrganizationID, o.FactoryID, params.Key)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+		}
+		return nil, err
+	}
+	if existing.WorkOrderID != o.ID {
+		return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+	}
+
+	return o.replaceArtifactData(tx, existing, params)
+}
+
+func (o *FactoryWorkOrder) replaceArtifactData(
+	tx *gorm.DB,
+	artifact *FactoryWorkOrderArtifact,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	requestedType := strings.TrimSpace(params.Type)
+	if artifact.Type != requestedType {
+		return nil, fmt.Errorf(
+			"%w: stored type is %q, requested type is %q",
+			ErrFactoryWorkOrderArtifactInvalid,
+			artifact.Type,
+			requestedType,
+		)
+	}
+
+	if err := validateArtifactData(artifact.Type, params.Data); err != nil {
+		return nil, err
+	}
+
+	dataJSON, err := encodeGuardedArtifactData(params.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
+		return nil, err
+	}
+	artifact.Data = dataJSON
+
+	return artifact, nil
+}
+
+func findFactoryWorkOrderArtifactByKey(
+	tx *gorm.DB,
+	organizationID, factoryID uuid.UUID,
+	key string,
+) (*FactoryWorkOrderArtifact, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key = ?", organizationID, factoryID, trimmedKey).
+		First(&artifact).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactNotFound
+		}
+		return nil, err
+	}
+
+	return &artifact, nil
 }
 
 // validateArtifactData enforces the required-field rules for each
