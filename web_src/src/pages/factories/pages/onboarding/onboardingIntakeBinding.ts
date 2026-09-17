@@ -13,10 +13,7 @@ function storageKey(intakeId: string): string {
   return `${STORAGE_PREFIX}:${intakeId}`;
 }
 
-export function rememberOnboardingIntakeBinding(
-  intakeId: string | undefined,
-  binding: OnboardingIntakeBinding,
-): void {
+export function rememberOnboardingIntakeBinding(intakeId: string | undefined, binding: OnboardingIntakeBinding): void {
   if (!intakeId) return;
   sessionStorage.setItem(storageKey(intakeId), JSON.stringify(binding));
 }

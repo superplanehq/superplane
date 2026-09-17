@@ -21,17 +21,13 @@ describe("useOnboardingJiraBinding", () => {
   it("restores the stored project when setup mounts with a ready Jira connection", () => {
     writeOnboardingJiraProject("factory-1", "jira-1", "PAY");
 
-    const { result } = renderHook(() =>
-      useOnboardingJiraBinding("org-1", "factory-1", { id: "jira-1", ready: true }),
-    );
+    const { result } = renderHook(() => useOnboardingJiraBinding("org-1", "factory-1", { id: "jira-1", ready: true }));
 
     expect(result.current.jiraProjectId).toBe("PAY");
   });
 
   it("persists a project chosen during setup", () => {
-    const { result } = renderHook(() =>
-      useOnboardingJiraBinding("org-1", "factory-1", { id: "jira-1", ready: true }),
-    );
+    const { result } = renderHook(() => useOnboardingJiraBinding("org-1", "factory-1", { id: "jira-1", ready: true }));
 
     act(() => {
       result.current.setJiraProjectId("CORE");
