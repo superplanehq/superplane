@@ -17,7 +17,7 @@ export const runTriggerMapper: ComponentBaseMapper = {
 function runTriggerMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as { ref?: string } | undefined;
-  const nodeMetadata = node.metadata as any;
+  const nodeMetadata = node.metadata as { triggerName?: string } | undefined;
 
   if (nodeMetadata?.triggerName) {
     metadata.push({ icon: "zap", label: nodeMetadata.triggerName });
