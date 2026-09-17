@@ -96,6 +96,62 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 	})
 }
 
+func Test__IntakeTriggerIntegrationReady(t *testing.T) {
+	t.Run("an unbound trigger stays ready", func(t *testing.T) {
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "github.onIssue"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+		assert.True(t, graph.TriggerIntegrationReady(spec, nil))
+	})
+
+	t.Run("a ready integration stays ready", func(t *testing.T) {
+		integrationID := "int-ready"
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNodeWithIntegration(intakeTriggerNodeID, "sentry.onIssue", integrationID),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, spec)
+		assert.True(t, graph.TriggerIntegrationReady(spec, map[string]struct{}{integrationID: {}}))
+	})
+
+	t.Run("a missing integration is not ready", func(t *testing.T) {
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNodeWithIntegration(intakeTriggerNodeID, "sentry.onIssue", "int-deleted"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, spec)
+		assert.False(t, graph.TriggerIntegrationReady(spec, map[string]struct{}{}))
+	})
+
+	t.Run("a not-ready integration is not ready", func(t *testing.T) {
+		integrationID := "int-pending"
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNodeWithIntegration(intakeTriggerNodeID, "sentry.onIssue", integrationID),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, spec)
+		assert.False(t, graph.TriggerIntegrationReady(spec, map[string]struct{}{"other": {}}))
+	})
+}
+
 func Test__BuildBacklogCanvas(t *testing.T) {
 	t.Run("the item follows the refinement feature snapshot", func(t *testing.T) {
 		canvas := buildBacklogCanvas(backlogCanvasRequest{})
@@ -284,6 +340,12 @@ func triggerNode(nodeID, component string) models.Node {
 		Type: models.NodeTypeTrigger,
 		Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: component}},
 	}
+}
+
+func triggerNodeWithIntegration(nodeID, component, integrationID string) models.Node {
+	node := triggerNode(nodeID, component)
+	node.IntegrationID = &integrationID
+	return node
 }
 
 func componentNode(nodeID, component string) models.Node {

@@ -289,7 +289,7 @@ export function lineIntakeListenTitle(source: LineIntakeSource): string {
 
 export const LINE_INTAKE_COPY = {
   needsRepair: "Needs repair",
-  needsRepairHelper: "The automation can no longer create tasks. Open it to repair the steps.",
+  needsRepairHelper: "This automation cannot create tasks. Connect the integration or repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",

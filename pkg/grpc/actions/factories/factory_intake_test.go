@@ -341,6 +341,54 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "Crash triage", intake.GetName())
 	})
 
+	t.Run("a listed Sentry intake stays healthy while its integration is ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.True(t, response.GetIntakes()[0].GetHealthy())
+	})
+
+	t.Run("a listed Sentry intake is unhealthy after its integration is deleted", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(integrationID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+	})
+
+	t.Run("an unbound GitHub intake stays healthy when listed", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.True(t, response.GetIntakes()[0].GetHealthy())
+	})
+
 	t.Run("an unspecified source is rejected", func(t *testing.T) {
 		factory := newFactory(t)
 		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
@@ -671,7 +719,7 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{}, nil)
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
