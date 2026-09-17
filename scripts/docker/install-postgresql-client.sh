@@ -16,28 +16,14 @@ PG_CLIENT_VERSION="17.11-1.pgdg22.04+2"
 
 echo "Installing PostgreSQL Client ${PG_CLIENT_VERSION}"
 
-install_packages() {
-  attempt=1
-  max_attempts=5
-  while [ "$attempt" -le "$max_attempts" ]; do
-    if apt-get update -y && apt-get install --no-install-recommends -y "$@"; then
-      return 0
-    fi
-    if [ "$attempt" -eq "$max_attempts" ]; then
-      echo "apt-get install failed after ${max_attempts} attempts" >&2
-      return 1
-    fi
-    sleep "$attempt"
-    attempt=$((attempt + 1))
-  done
-}
-
-install_packages ca-certificates curl gnupg
+apt-get update -y
+apt-get install --no-install-recommends -y ca-certificates curl gnupg
 
 . /etc/os-release
 echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
 
-install_packages "postgresql-client-17=${PG_CLIENT_VERSION}"
+apt-get update -y
+apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
