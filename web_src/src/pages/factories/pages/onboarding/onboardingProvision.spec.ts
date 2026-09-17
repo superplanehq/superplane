@@ -5,9 +5,11 @@ import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
 import {
   DEFAULT_LINE_NAME,
   GITHUB_INTAKE_SOURCE,
+  JIRA_INTAKE_SOURCE,
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionOnboardingIntake,
 } from "./onboardingProvision";
 
 describe("provisionLine", () => {
@@ -220,5 +222,49 @@ describe("provisionGithubIntake", () => {
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(intake.id).toBe("intake-2");
+  });
+});
+
+describe("provisionOnboardingIntake", () => {
+  it("creates the GitHub intake when the ticket source is GitHub", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      issuesChoice: "vcs",
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(intake?.id).toBe("intake-1");
+  });
+
+  it("does not create a GitHub intake when the ticket source is Jira", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn();
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      issuesChoice: "jira",
+    });
+
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(intake).toBeUndefined();
+  });
+
+  it("leaves an existing Jira intake alone so a retry adds no second copy", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-jira", source: JIRA_INTAKE_SOURCE }]);
+    const createIntake = vi.fn();
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      issuesChoice: "jira",
+    });
+
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(intake?.id).toBe("intake-jira");
   });
 });
