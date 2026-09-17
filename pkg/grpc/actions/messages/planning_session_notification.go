@@ -11,10 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func init() {
-	models.NotifyPlanningSessionEnded = publishPlanningPlanReady
-}
-
 var publishWorkOrderNotification = func(message FactoryWorkOrderNotificationMessage) error {
 	return message.Publish()
 }
@@ -33,6 +29,15 @@ func PublishPlanningAgentQuestion(session *models.FactoryPlanningSession) {
 	if err := publishWorkOrderNotification(message); err != nil {
 		log.WithError(err).Warnf("Failed to publish agent question notification for session %s", session.ID)
 	}
+}
+
+func PublishPlanningPlanReady(tx *gorm.DB, session *models.FactoryPlanningSession) {
+	publishPlanningPlanReady(tx, session)
+}
+
+func HasPlanningReadyPlan(tx *gorm.DB, session *models.FactoryPlanningSession) bool {
+	_, ok, err := planningPlanReadyMessage(tx, session)
+	return err == nil && ok
 }
 
 func publishPlanningPlanReady(tx *gorm.DB, session *models.FactoryPlanningSession) {

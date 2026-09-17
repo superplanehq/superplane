@@ -166,6 +166,16 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderStatusOwned))
 	})
 
+	t.Run("all scope with none selected keeps every current type off", func(t *testing.T) {
+		settings := models.UserNotificationSettings{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeNoneSelected}),
+		}
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAgentQuestion))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderPlanReady))
+	})
+
 	t.Run("all scope with a type list can opt out of status notes alone", func(t *testing.T) {
 		settings := models.UserNotificationSettings{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,

@@ -29,8 +29,20 @@ describe("notificationSettings", () => {
 
   it("treats a missing all-scope type list as every type on", () => {
     expect(togglesFromAllScopeEventTypes(undefined).TYPE_WORK_ORDER_STATUS_OWNED).toBe(true);
-    expect(togglesFromAllScopeEventTypes([]).TYPE_WORK_ORDER_PLAN_READY).toBe(true);
+    expect(togglesFromAllScopeEventTypes([]).TYPE_WORK_ORDER_PLAN_READY).toBe(false);
     expect(togglesFromAllScopeEventTypes(["TYPE_WORK_ORDER_STATUS_OWNED"]).TYPE_WORK_ORDER_AGENT_QUESTION).toBe(false);
+  });
+
+  it("keeps default events on when a channel is off", () => {
+    expect(
+      accountNotificationsFromSettings({ workspaces: { scope: "WORKSPACE_SCOPE_NONE" } }).events
+        .TYPE_WORK_ORDER_PLAN_READY,
+    ).toBe(true);
+    expect(
+      accountNotificationsFromSettings({
+        workspaces: { scope: "WORKSPACE_SCOPE_ALL", eventTypes: [] },
+      }).events.TYPE_WORK_ORDER_PLAN_READY,
+    ).toBe(false);
   });
 
   it("treats a missing filtered type as off", () => {

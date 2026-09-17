@@ -23,6 +23,12 @@ const (
 	NotificationTypeWorkOrderStatusNoteOwned = "work_order_status_note_owned"
 	NotificationTypeWorkOrderAgentQuestion   = "work_order_agent_question"
 	NotificationTypeWorkOrderPlanReady       = "work_order_plan_ready"
+
+	// NotificationTypeNoneSelected is stored when an all-workspaces list has
+	// no current types. Delivery ignores unknown names, so every current
+	// type stays off. Serialize drops this name, so the API returns an
+	// empty list rather than the empty-list default.
+	NotificationTypeNoneSelected = "none"
 )
 
 // NotificationTypes lists every configurable notification type.

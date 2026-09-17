@@ -115,7 +115,7 @@ export function togglesFromEventTypes(eventTypes: MeNotificationSettingsType[] |
 export function togglesFromAllScopeEventTypes(
   eventTypes: MeNotificationSettingsType[] | undefined,
 ): NotificationTypeToggles {
-  if (!eventTypes || eventTypes.length === 0) {
+  if (!eventTypes) {
     return defaultNotificationTypeToggles(true);
   }
   return togglesFromEventTypes(eventTypes);
@@ -191,9 +191,11 @@ function channelFormFromSettings(
     workspaceScope: scope === "filtered" ? "selected" : "all",
     workspaceIds: filters.flatMap((filter) => (filter.workspaceId ? [filter.workspaceId] : [])),
     events:
-      scope === "filtered"
-        ? togglesFromEventTypes(filters[0]?.eventTypes)
-        : togglesFromAllScopeEventTypes(channel?.eventTypes),
+      scope === "none"
+        ? defaultNotificationTypeToggles(true)
+        : scope === "filtered"
+          ? togglesFromEventTypes(filters[0]?.eventTypes)
+          : togglesFromAllScopeEventTypes(channel?.eventTypes),
   };
 }
 

@@ -208,7 +208,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-		if err := beginPlanningWaitAndNotify(session, database.DB(r.Context())); err != nil {
+		if err := beginPlanningWaitAndNotify(database.DB(r.Context()), session); err != nil {
 			writeRunnerPlanningError(w, err)
 			return
 		}
@@ -240,7 +240,7 @@ func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	if err := session.ProposeSpec(database.DB(r.Context()), req.Body); err != nil {
+	if err := proposePlanningSpecAndNotify(database.DB(r.Context()), session, req.Body); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}
@@ -323,7 +323,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
-func beginPlanningWaitAndNotify(session *models.FactoryPlanningSession, db *gorm.DB) error {
+func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSession) error {
 	alreadyWaiting := session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved
 	if err := session.BeginWait(db); err != nil {
 		return err
@@ -331,8 +331,27 @@ func beginPlanningWaitAndNotify(session *models.FactoryPlanningSession, db *gorm
 	if alreadyWaiting || session.WaitState != models.PlanningWaitPending {
 		return nil
 	}
+	if !hasOutstandingPlanningQuestion(session) {
+		return nil
+	}
 	messages.PublishPlanningAgentQuestion(session)
 	return nil
+}
+
+func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSession, body string) error {
+	hadSpec := messages.HasPlanningReadyPlan(db, session)
+	if err := session.ProposeSpec(db, body); err != nil {
+		return err
+	}
+	if hadSpec {
+		return nil
+	}
+	messages.PublishPlanningPlanReady(db, session)
+	return nil
+}
+
+func hasOutstandingPlanningQuestion(session *models.FactoryPlanningSession) bool {
+	return len(session.CurrentSurvey().Questions) > 0
 }
 
 func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {

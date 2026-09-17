@@ -51,11 +51,6 @@ var (
 	ErrFactoryPlanningWaitIdle        = errors.New("planning session is not waiting")
 )
 
-// NotifyPlanningSessionEnded publishes the plan-ready notification after
-// a session actually ends. Callers outside this package set it so models
-// do not import the message publisher.
-var NotifyPlanningSessionEnded func(tx *gorm.DB, session *FactoryPlanningSession)
-
 type PlanningSessionDraft struct {
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -402,13 +397,7 @@ func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
 	if s.WaitState == PlanningWaitPending {
 		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindEnded})
 	}
-	if err := s.saveEndedState(tx); err != nil {
-		return err
-	}
-	if NotifyPlanningSessionEnded != nil {
-		NotifyPlanningSessionEnded(tx, s)
-	}
-	return nil
+	return s.saveEndedState(tx)
 }
 
 func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {

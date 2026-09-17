@@ -29,3 +29,16 @@ func TestPublishPlanningAgentQuestion_SkipsSessionWithoutTask(t *testing.T) {
 	PublishPlanningAgentQuestion(&models.FactoryPlanningSession{})
 	assert.Empty(t, published)
 }
+
+func TestPublishPlanningPlanReady_SkipsSessionWithoutTask(t *testing.T) {
+	published := []FactoryWorkOrderNotificationMessage{}
+	restore := SetWorkOrderNotificationPublisherForTest(func(message FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	PublishPlanningPlanReady(nil, &models.FactoryPlanningSession{})
+	assert.Empty(t, published)
+	assert.False(t, HasPlanningReadyPlan(nil, &models.FactoryPlanningSession{}))
+}

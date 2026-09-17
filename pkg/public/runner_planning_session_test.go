@@ -578,18 +578,90 @@ func TestBeginPlanningWaitAndNotify_PublishesAfterWaitCommits(t *testing.T) {
 	})
 	defer restore()
 
-	require.NoError(t, beginPlanningWaitAndNotify(session, db))
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 	require.Len(t, published, 1)
 	assert.Equal(t, factoryevents.EventTypeOrderAgentQuestion, published[0].EventType)
 	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].OrderID)
 	assert.Equal(t, "Which service owns retries?", published[0].QuestionPrompt)
 	assert.Empty(t, published[0].ActorUserID)
 
-	require.NoError(t, beginPlanningWaitAndNotify(session, db))
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 	require.Len(t, published, 1)
 }
 
 func TestBeginPlanningWaitAndNotify_SkipsSessionWithoutTask(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{
+			{Prompt: "Which service owns retries?", Options: []string{"Payments", "Billing"}},
+		},
+	}))
+	session.DraftWorkOrderID = nil
+	session.WaitWorkOrderID = nil
+	require.NoError(t, db.Model(session).Updates(map[string]any{
+		"draft_work_order_id": nil,
+		"wait_work_order_id":  nil,
+	}).Error)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.Empty(t, published)
+}
+
+func TestBeginPlanningWaitAndNotify_SkipsFollowUpWaitWithoutQuestion(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.Empty(t, published)
+	assert.Equal(t, models.PlanningWaitPending, session.WaitState)
+}
+
+func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	orderID := *session.DraftWorkOrderID
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n"))
+	require.Len(t, published, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[0].EventType)
+	assert.Equal(t, orderID.String(), published[0].OrderID)
+	assert.Equal(t, factoryModel.ID.String(), published[0].FactoryID)
+	assert.Empty(t, published[0].ActorUserID)
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges again.\n"))
+	require.Len(t, published, 1)
+
+	require.NoError(t, session.End(db))
+	require.Len(t, published, 1)
+}
+
+func TestProposePlanningSpecAndNotify_SilentWithoutTask(t *testing.T) {
 	r := support.Setup(t)
 	_, session, _, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
@@ -607,49 +679,8 @@ func TestBeginPlanningWaitAndNotify_SkipsSessionWithoutTask(t *testing.T) {
 	})
 	defer restore()
 
-	require.NoError(t, beginPlanningWaitAndNotify(session, db))
-	assert.Empty(t, published)
-}
-
-func TestNotifyPlanningSessionEnded_PublishesOnceWhenPlanExists(t *testing.T) {
-	r := support.Setup(t)
-	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-	require.NotNil(t, session.DraftWorkOrderID)
-	orderID := *session.DraftWorkOrderID
-
-	published := []messages.FactoryWorkOrderNotificationMessage{}
-	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
-		published = append(published, message)
-		return nil
-	})
-	defer restore()
-
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.End(db))
-	require.Len(t, published, 1)
-	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[0].EventType)
-	assert.Equal(t, orderID.String(), published[0].OrderID)
-	assert.Equal(t, factoryModel.ID.String(), published[0].FactoryID)
-	assert.Empty(t, published[0].ActorUserID)
-
-	require.NoError(t, session.End(db))
-	require.Len(t, published, 1)
-}
-
-func TestNotifyPlanningSessionEnded_SilentWithoutPlan(t *testing.T) {
-	r := support.Setup(t)
-	_, session, _, _ := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-
-	published := []messages.FactoryWorkOrderNotificationMessage{}
-	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
-		published = append(published, message)
-		return nil
-	})
-	defer restore()
-
-	require.NoError(t, session.End(db))
+	err := proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n")
+	require.Error(t, err)
 	assert.Empty(t, published)
 }
 

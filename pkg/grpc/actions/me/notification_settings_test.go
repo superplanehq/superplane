@@ -26,6 +26,12 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 		require.NotNil(t, resp.Settings.Workspaces)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Workspaces.Scope)
 		assert.Empty(t, resp.Settings.Workspaces.Filters)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
+			pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
+			pb.NotificationSettings_TYPE_WORK_ORDER_AGENT_QUESTION,
+			pb.NotificationSettings_TYPE_WORK_ORDER_PLAN_READY,
+		}, resp.Settings.Workspaces.EventTypes)
 		require.NotNil(t, resp.Settings.Browser)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)
 		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
@@ -138,6 +144,40 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.Equal(t, []pb.NotificationSettings_Type{
 			pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
 		}, resp.Settings.Workspaces.EventTypes)
+	})
+
+	t.Run("legacy only removed types round-trip without enabling current types", func(t *testing.T) {
+		_, err := models.UpsertUserNotificationSettings(database.DB(t.Context()), r.Organization.ID, r.User, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			EventTypes:            []string{"work_order_mention"},
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+			BrowserEventTypes:     []string{"work_order_mention"},
+		})
+		require.NoError(t, err)
+
+		described, err := DescribeNotificationSettings(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, described.Settings.Workspaces.Scope)
+		assert.Empty(t, described.Settings.Workspaces.EventTypes)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, described.Settings.Browser.Scope)
+		assert.Empty(t, described.Settings.Browser.EventTypes)
+
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: described.Settings,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, resp.Settings.Workspaces.EventTypes)
+		assert.Empty(t, resp.Settings.Browser.EventTypes)
+
+		settings, err := models.FindUserNotificationSettings(database.DB(t.Context()), r.Organization.ID, r.User)
+		require.NoError(t, err)
+		assert.False(t, settings.Notifies(factoryModel.ID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.Notifies(factoryModel.ID, models.NotificationTypeWorkOrderPlanReady))
+		assert.False(t, settings.NotifiesChannel(
+			models.NotificationChannelBrowser,
+			factoryModel.ID,
+			models.NotificationTypeWorkOrderAgentQuestion,
+		))
 	})
 
 	t.Run("filtered scope requires a workspace", func(t *testing.T) {
