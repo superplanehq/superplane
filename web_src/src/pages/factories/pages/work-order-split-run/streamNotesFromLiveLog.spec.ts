@@ -197,6 +197,53 @@ describe("notesFromLiveLogSections", () => {
     expect(notes.some((note) => note.componentName.startsWith("Turn "))).toBe(false);
   });
 
+  it("maps version 2 activity onto stream notes", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [],
+        activities: [
+          {
+            id: "act-1",
+            provider: "claude",
+            status: "running",
+            sequence: 4,
+            items: [
+              {
+                type: "content",
+                id: "c1",
+                kind: "assistant",
+                text: "I will verify the seams.",
+                status: "passed",
+                truncated: false,
+              },
+              {
+                type: "tool",
+                id: "t1",
+                kind: "bash",
+                name: "bash",
+                input: '{"command":"git status"}',
+                output: "",
+                outputStreams: [],
+                status: "passed",
+                durationMs: 549,
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ],
+      },
+    ]);
+
+    expect(notes.map((note) => note.componentName)).toEqual([
+      "You are implementing a fix",
+      "I will verify the seams.",
+      "git status",
+    ]);
+    expect(notes.some((note) => note.componentName.includes("schema_version"))).toBe(false);
+  });
+
   it("maps grep stdout after a late cmd_start to one tool detail, not note titles", () => {
     let state = startToolOnLatestSection(emptyLiveLogState(), "grep", "rootTriggerRenderer", "toolu_grep");
     for (const line of GREP_STDOUT) {
@@ -243,6 +290,22 @@ describe("notesForLiveStream", () => {
       nodeId: "agent",
       sections: [],
       orphanLines: ["Claude Code ready", '{"type":"turn","turn":1,"usage":{"input_tokens":900,"output_tokens":100}}'],
+      error: null,
+      isStreaming: true,
+      nodeStatus: "running",
+    });
+
+    expect(notes?.map((note) => note.componentName)).toEqual(["Claude Code ready"]);
+  });
+
+  it("hides orphan serialized activity records", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [],
+      orphanLines: [
+        "Claude Code ready",
+        '{"type":"line","text":"I","channel":"assistant","schema_version":2,"event_id":"e1:3","activity_id":"e1"}',
+      ],
       error: null,
       isStreaming: true,
       nodeStatus: "running",

@@ -1,8 +1,9 @@
-import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { LiveLogAgentActivity } from "./LiveLogAgentActivity";
 import { sectionTitle } from "./liveLogSections";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
@@ -116,12 +117,17 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
     return null;
   }
 
-  if (section.events.length > 0) {
+  const activities = section.activities ?? [];
+  const hasActivities = activities.some((activity) => activity.items.length > 0);
+  const visibleLines = section.lines.filter((line) => line.trim() !== "" && !isHiddenAgentLiveLogText(line));
+
+  if (section.events.length > 0 || hasActivities) {
     return (
       <div className="border-t border-slate-200 bg-white px-4 py-2 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        {hasActivities ? <LiveLogAgentActivity activities={activities} /> : null}
         {section.events.map((event, index) =>
           event.kind === "note" ? (
-            isRawAgentTurnLiveLogText(event.text) ? null : (
+            isHiddenAgentLiveLogText(event.text) ? null : (
               <p key={`note-${index}`} className="whitespace-pre-wrap">
                 {event.text}
               </p>
@@ -148,9 +154,13 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
     );
   }
 
+  if (visibleLines.length === 0) {
+    return null;
+  }
+
   return (
     <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200 dark:text-gray-200 dark:bg-gray-900 dark:border-gray-800">
-      {section.lines.filter((line) => line.trim() !== "" && !isRawAgentTurnLiveLogText(line)).join("\n")}
+      {visibleLines.join("\n")}
     </pre>
   );
 }

@@ -173,4 +173,108 @@ describe("LiveLogStreamView", () => {
     expect(screen.getByText("pkg/foo.go")).toBeInTheDocument();
     expect(screen.getByText("package workers")).toBeInTheDocument();
   });
+
+  it("renders version 2 agent activity as text and a tool row", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 5,
+          text: "Implementation",
+          kind: "prompt",
+          preview: "You are implementing a fix",
+          lines: [],
+          events: [],
+          activities: [
+            {
+              id: "act-1",
+              provider: "claude",
+              status: "running",
+              sequence: 5,
+              items: [
+                {
+                  type: "content",
+                  id: "c1",
+                  kind: "assistant",
+                  text: "I will verify the seams before updating the plan.",
+                  status: "passed",
+                  truncated: false,
+                },
+                {
+                  type: "tool",
+                  id: "t1",
+                  kind: "bash",
+                  name: "bash",
+                  input: '{"command":"git status"}',
+                  output: "",
+                  outputStreams: [],
+                  status: "passed",
+                  durationMs: 549,
+                  truncated: false,
+                },
+              ],
+              truncated: false,
+            },
+          ],
+          status: "running",
+          duration_ms: null,
+          started_at: 1,
+          collapsed: false,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    const { container } = render(<LiveLogStreamView execution={startedExecution} />);
+    const text = container.textContent ?? "";
+
+    expect(screen.getByText("I will verify the seams before updating the plan.")).toBeInTheDocument();
+    expect(screen.getByText("bash")).toBeInTheDocument();
+    expect(screen.getByText("git status")).toBeInTheDocument();
+    expect(text).toContain("Passed");
+    expect(text).not.toContain("schema_version");
+    expect(text).not.toContain("event_id");
+    expect(text).not.toContain("activity_id");
+  });
+
+  it("hides a plain line that is a serialized activity record", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 5,
+          text: "Implementation",
+          kind: "prompt",
+          preview: "You are implementing a fix",
+          lines: [
+            '{"type":"content_start","id":"msg-1","channel":"assistant","schema_version":2,"event_id":"e1:2","activity_id":"e1"}',
+          ],
+          events: [],
+          status: "running",
+          duration_ms: null,
+          started_at: 1,
+          collapsed: false,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isLoading: false,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      retry: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    const { container } = render(<LiveLogStreamView execution={startedExecution} />);
+    const text = container.textContent ?? "";
+
+    expect(text).not.toContain("schema_version");
+    expect(text).not.toContain("event_id");
+    expect(text).not.toContain("activity_id");
+    expect(text).not.toContain("content_start");
+  });
 });
