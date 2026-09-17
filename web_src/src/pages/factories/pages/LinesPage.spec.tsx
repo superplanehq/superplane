@@ -1122,7 +1122,7 @@ describe("LinesPage board extras", () => {
   it("reopens Jira intake setup when the OAuth return query is present", () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&pick=newest`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
       vi.fn(),
       REFUND_FACTORY,
       LANE_BANNERS,

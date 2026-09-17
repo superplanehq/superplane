@@ -11,13 +11,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 export type JiraSetupStep = "connection" | "project" | "complete";
 
-export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean, selectNewest = false) {
+export function useJiraIntakeSetup(
+  organizationId: string,
+  factoryId: string,
+  open: boolean,
+  selectIntegrationId = "",
+) {
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
   const [error, setError] = useState<string>();
-  const pickedNewest = useRef(false);
+  const pickedReturnedConnection = useRef(false);
 
   const { connectedQuery, jiraIntegrations, jiraConnections, jiraDefinition, existingNames } =
     useJiraConnections(organizationId);
@@ -27,7 +32,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
 
   useEffect(() => {
     if (!open) {
-      pickedNewest.current = false;
+      pickedReturnedConnection.current = false;
       return;
     }
     setStep("connection");
@@ -37,24 +42,22 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
   }, [open]);
 
   useEffect(() => {
-    if (!open || !selectNewest || pickedNewest.current) return;
+    if (!open || !selectIntegrationId || pickedReturnedConnection.current) return;
 
-    const newest = newestJiraConnection(jiraConnections);
-    if (!newest || newest.status?.state !== "ready") return;
-    const id = newest.metadata?.id;
-    if (!id) return;
+    const returned = jiraConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
+    if (!returned || returned.status?.state !== "ready") return;
 
-    pickedNewest.current = true;
-    setIntegrationId(id);
+    pickedReturnedConnection.current = true;
+    setIntegrationId(selectIntegrationId);
     setStep("project");
-  }, [open, selectNewest, jiraConnections]);
+  }, [open, selectIntegrationId, jiraConnections]);
 
   useEffect(() => {
-    if (selectNewest) return;
+    if (selectIntegrationId) return;
     if (!integrationId && jiraIntegrations.length === 1) {
       setIntegrationId(jiraIntegrations[0].metadata?.id ?? "");
     }
-  }, [integrationId, jiraIntegrations, selectNewest]);
+  }, [integrationId, jiraIntegrations, selectIntegrationId]);
 
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
@@ -98,14 +101,6 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
     completeConnection,
     createBoundIntake,
   };
-}
-
-function newestJiraConnection(integrations: OrganizationsIntegration[]): OrganizationsIntegration | undefined {
-  return [...integrations].sort((left, right) => {
-    const leftAt = left.metadata?.createdAt ?? "";
-    const rightAt = right.metadata?.createdAt ?? "";
-    return rightAt.localeCompare(leftAt);
-  })[0];
 }
 
 function useJiraConnections(organizationId: string) {

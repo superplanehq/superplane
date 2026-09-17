@@ -136,7 +136,7 @@ import {
   isIntakeSearchOpen,
   isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
-  shouldPickNewestIntegration,
+  jiraIntakeIntegrationIdFromSearch,
   withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
@@ -286,7 +286,7 @@ export function LinesPage() {
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
-  const selectNewestJiraConnection = shouldPickNewestIntegration(search);
+  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -529,8 +529,8 @@ export function LinesPage() {
         open={jiraIntakeSetupOpen}
         organizationId={organizationId}
         factoryId={factoryId}
-        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id, { pickNewest: true })}
-        selectNewest={selectNewestJiraConnection}
+        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
+        selectIntegrationId={returnedJiraIntegrationId}
         onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
       />
       <AddPRFeedbackPicker

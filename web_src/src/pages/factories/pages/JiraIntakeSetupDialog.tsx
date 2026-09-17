@@ -13,11 +13,11 @@ interface JiraIntakeSetupDialogProps {
   factoryId: string;
   onClose: () => void;
   setupReturnTo: string;
-  selectNewest?: boolean;
+  selectIntegrationId?: string;
 }
 
 export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
-  const setup = useJiraIntakeSetup(props.organizationId, props.factoryId, props.open, props.selectNewest);
+  const setup = useJiraIntakeSetup(props.organizationId, props.factoryId, props.open, props.selectIntegrationId);
   return (
     <>
       <JiraSetupView open={props.open && !setup.connectOpen} setup={setup} onClose={props.onClose} />

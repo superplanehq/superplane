@@ -2,13 +2,17 @@ package jira
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const setupReturnPathKey = "setupReturnPath"
+const (
+	setupReturnPathKey             = "setupReturnPath"
+	setupReturnedIntegrationParam  = "jiraIntegrationId"
+)
 
 // oauthApp is the Atlassian 3LO app SuperPlane uses for this connection.
 type oauthApp struct {
@@ -87,7 +91,25 @@ func callbackRedirectURL(ctx core.HTTPRequestContext, settingsURL string) string
 		return settingsURL
 	}
 
-	return strings.TrimRight(ctx.BaseURL, "/") + path
+	return strings.TrimRight(ctx.BaseURL, "/") + withReturnedIntegrationID(path, ctx.Integration.ID().String())
+}
+
+func withReturnedIntegrationID(path, integrationID string) string {
+	if integrationID == "" {
+		return path
+	}
+
+	pathname, existing, _ := strings.Cut(path, "?")
+	params, err := url.ParseQuery(existing)
+	if err != nil {
+		params = url.Values{}
+	}
+	params.Set(setupReturnedIntegrationParam, integrationID)
+	encoded := params.Encode()
+	if encoded == "" {
+		return pathname
+	}
+	return pathname + "?" + encoded
 }
 
 func firstSafeSetupReturnPath(paths ...string) string {

@@ -22,7 +22,7 @@ import {
   isIntakeSearchOpen,
   isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
-  shouldPickNewestIntegration,
+  jiraIntakeIntegrationIdFromSearch,
   withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
@@ -135,27 +135,32 @@ describe("factoryJiraIntakeSetupPath", () => {
     );
   });
 
-  it("asks the dialog to select the newest connection after OAuth", () => {
-    expect(factoryJiraIntakeSetupPath("org-1", "SP", "line-plan", { pickNewest: true })).toBe(
-      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&pick=newest",
+  it("asks the dialog to select the returned connection after OAuth", () => {
+    expect(
+      factoryJiraIntakeSetupPath("org-1", "SP", "line-plan", { integrationId: "11111111-1111-1111-1111-111111111111" }),
+    ).toBe(
+      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&jiraIntegrationId=11111111-1111-1111-1111-111111111111",
     );
   });
 
   it("reads the Jira intake resume query", () => {
     expect(isJiraIntakeSetupSearchOpen("?jiraIntake=1")).toBe(true);
-    expect(isJiraIntakeSetupSearchOpen("jiraIntake=1&pick=newest")).toBe(true);
+    expect(isJiraIntakeSetupSearchOpen("jiraIntake=1&jiraIntegrationId=int-1")).toBe(true);
     expect(isJiraIntakeSetupSearchOpen("")).toBe(false);
   });
 
-  it("reads pick=newest from the search string", () => {
-    expect(shouldPickNewestIntegration("?jiraIntake=1&pick=newest")).toBe(true);
-    expect(shouldPickNewestIntegration("jiraIntake=1")).toBe(false);
+  it("reads the returned Jira connection from the search string", () => {
+    expect(jiraIntakeIntegrationIdFromSearch("?jiraIntake=1&jiraIntegrationId=int-new")).toBe("int-new");
+    expect(jiraIntakeIntegrationIdFromSearch("jiraIntake=1")).toBe("");
   });
 
   it("drops the Jira intake resume query from the line URL", () => {
-    expect(withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&pick=newest")).toBe(
-      "/org-1/workspaces/sp/lines/line-plan",
-    );
+    expect(
+      withoutJiraIntakeSetupSearch(
+        "/org-1/workspaces/sp/lines/line-plan",
+        "?jiraIntake=1&jiraIntegrationId=int-new",
+      ),
+    ).toBe("/org-1/workspaces/sp/lines/line-plan");
     expect(
       withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&automations=backlog"),
     ).toBe("/org-1/workspaces/sp/lines/line-plan?automations=backlog");

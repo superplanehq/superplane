@@ -5,7 +5,7 @@ import type { OrganizationsIntegration } from "@/api-client";
 
 import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 
-const SETUP_RETURN_TO = "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&pick=newest";
+const SETUP_RETURN_TO = "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
@@ -55,14 +55,14 @@ vi.mock("@/ui/IntegrationCreateDialog", () => ({
     ) : null,
 }));
 
-function jiraConnection(id: string, name: string, createdAt: string, state = "ready"): OrganizationsIntegration {
+function jiraConnection(id: string, name: string, state = "ready"): OrganizationsIntegration {
   return {
-    metadata: { id, name, integrationName: "jira", createdAt },
+    metadata: { id, name, integrationName: "jira" },
     status: { state },
   };
 }
 
-function renderDialog(options?: { selectNewest?: boolean }) {
+function renderDialog(options?: { selectIntegrationId?: string }) {
   return render(
     <JiraIntakeSetupDialog
       open
@@ -70,7 +70,7 @@ function renderDialog(options?: { selectNewest?: boolean }) {
       factoryId="factory-1"
       onClose={vi.fn()}
       setupReturnTo={SETUP_RETURN_TO}
-      selectNewest={options?.selectNewest}
+      selectIntegrationId={options?.selectIntegrationId}
     />,
   );
 }
@@ -82,7 +82,7 @@ describe("JiraIntakeSetupDialog", () => {
     mocks.connected.splice(
       0,
       mocks.connected.length,
-      jiraConnection("integration-1", "Acme Jira", "2026-01-01T00:00:00Z"),
+      jiraConnection("integration-1", "Acme Jira"),
     );
   });
 
@@ -143,14 +143,14 @@ describe("JiraIntakeSetupDialog", () => {
     expect(screen.getByTestId("jira-project-ENG")).toBeInTheDocument();
   });
 
-  it("selects the newest ready connection after OAuth and opens the project step", async () => {
+  it("selects the returned connection after OAuth and opens the project step", async () => {
     mocks.connected.splice(
       0,
       mocks.connected.length,
-      jiraConnection("integration-1", "Acme Jira", "2026-01-01T00:00:00Z"),
-      jiraConnection("integration-new", "New Jira", "2026-09-16T00:00:00Z"),
+      jiraConnection("integration-1", "Acme Jira"),
+      jiraConnection("integration-new", "New Jira"),
     );
-    renderDialog({ selectNewest: true });
+    renderDialog({ selectIntegrationId: "integration-new" });
 
     expect(await screen.findByTestId("jira-project-ENG")).toBeInTheDocument();
 
@@ -167,14 +167,14 @@ describe("JiraIntakeSetupDialog", () => {
     });
   });
 
-  it("waits for the newest connection to become ready before opening projects", () => {
+  it("does not select an older ready connection while the returned one is pending", () => {
     mocks.connected.splice(
       0,
       mocks.connected.length,
-      jiraConnection("integration-1", "Acme Jira", "2026-01-01T00:00:00Z"),
-      jiraConnection("integration-new", "New Jira", "2026-09-16T00:00:00Z", "pending"),
+      jiraConnection("integration-1", "Acme Jira"),
+      jiraConnection("integration-new", "New Jira", "pending"),
     );
-    renderDialog({ selectNewest: true });
+    renderDialog({ selectIntegrationId: "integration-new" });
 
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
     expect(screen.queryByTestId("jira-project-ENG")).not.toBeInTheDocument();
