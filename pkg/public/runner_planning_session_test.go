@@ -661,6 +661,36 @@ func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testi
 	require.Len(t, published, 1)
 }
 
+func TestProposePlanningSpecAndNotify_PublishesAgainAfterResume(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	require.NotNil(t, session.CanvasID)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n"))
+	require.Len(t, published, 1)
+
+	require.NoError(t, session.End(db))
+	require.NoError(t, session.Reopen(db))
+	run, err := models.CreateCanvasRunInTransaction(db, *session.CanvasID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, run.ID, ""))
+	requireLaterPlanningRun(t, db, factoryModel, *session.DraftWorkOrderID, run)
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges again.\n"))
+	require.Len(t, published, 2)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[1].EventType)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[1].OrderID)
+}
+
 func TestProposePlanningSpecAndNotify_SilentWithoutTask(t *testing.T) {
 	r := support.Setup(t)
 	_, session, _, _ := mustPlanningRunnerSession(t, r)
@@ -682,6 +712,26 @@ func TestProposePlanningSpecAndNotify_SilentWithoutTask(t *testing.T) {
 	err := proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n")
 	require.Error(t, err)
 	assert.Empty(t, published)
+}
+
+func requireLaterPlanningRun(
+	t *testing.T,
+	db *gorm.DB,
+	factoryModel *models.Factory,
+	orderID uuid.UUID,
+	run *models.CanvasRun,
+) {
+	t.Helper()
+	order, err := factoryModel.FindWorkOrder(db, orderID)
+	require.NoError(t, err)
+	artifact, err := order.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+orderID.String())
+	require.NoError(t, err)
+	if run.CreatedAt != nil && run.CreatedAt.After(artifact.CreatedAt) {
+		return
+	}
+	startedAt := artifact.CreatedAt.Add(time.Second)
+	require.NoError(t, db.Model(run).Update("created_at", startedAt).Error)
+	run.CreatedAt = &startedAt
 }
 
 func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {

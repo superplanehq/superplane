@@ -180,6 +180,31 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		))
 	})
 
+	t.Run("empty all-scope types stay off", func(t *testing.T) {
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				},
+				Browser: &pb.NotificationSettings_Browser{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, resp.Settings.Workspaces.EventTypes)
+		assert.Empty(t, resp.Settings.Browser.EventTypes)
+
+		settings, err := models.FindUserNotificationSettings(database.DB(t.Context()), r.Organization.ID, r.User)
+		require.NoError(t, err)
+		assert.False(t, settings.Notifies(factoryModel.ID, models.NotificationTypeWorkOrderStatusOwned))
+		assert.False(t, settings.NotifiesChannel(
+			models.NotificationChannelBrowser,
+			factoryModel.ID,
+			models.NotificationTypeWorkOrderPlanReady,
+		))
+	})
+
 	t.Run("filtered scope requires a workspace", func(t *testing.T) {
 		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{

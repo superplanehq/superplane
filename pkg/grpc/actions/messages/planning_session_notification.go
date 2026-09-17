@@ -3,6 +3,7 @@ package messages
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -36,8 +37,15 @@ func PublishPlanningPlanReady(tx *gorm.DB, session *models.FactoryPlanningSessio
 }
 
 func HasPlanningReadyPlan(tx *gorm.DB, session *models.FactoryPlanningSession) bool {
-	_, ok, err := planningPlanReadyMessage(tx, session)
-	return err == nil && ok
+	artifact, ok, err := planningReadyPlanArtifact(tx, session)
+	if err != nil || !ok {
+		return false
+	}
+	startedAt, ok := planningSessionRunStartedAt(tx, session)
+	if !ok {
+		return true
+	}
+	return !artifact.CreatedAt.Before(startedAt)
 }
 
 func publishPlanningPlanReady(tx *gorm.DB, session *models.FactoryPlanningSession) {
@@ -67,21 +75,51 @@ func planningPlanReadyMessage(tx *gorm.DB, session *models.FactoryPlanningSessio
 	if !ok {
 		return FactoryWorkOrderNotificationMessage{}, false, nil
 	}
-	factoryModel, err := models.FindFactory(tx, session.OrganizationID, session.FactoryID)
+	_, ok, err := planningReadyPlanArtifact(tx, session)
 	if err != nil {
 		return FactoryWorkOrderNotificationMessage{}, false, err
+	}
+	if !ok {
+		return FactoryWorkOrderNotificationMessage{}, false, nil
+	}
+	return planningSessionNotificationMessage(session, orderID, factory.EventTypeOrderPlanReady, ""), true, nil
+}
+
+func planningReadyPlanArtifact(
+	tx *gorm.DB,
+	session *models.FactoryPlanningSession,
+) (*models.FactoryWorkOrderArtifact, bool, error) {
+	orderID, ok := planningSessionTaskID(session)
+	if !ok {
+		return nil, false, nil
+	}
+	factoryModel, err := models.FindFactory(tx, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		return nil, false, err
 	}
 	order, err := factoryModel.FindWorkOrder(tx, orderID)
 	if err != nil {
-		return FactoryWorkOrderNotificationMessage{}, false, err
+		return nil, false, err
 	}
-	if _, err := order.FindArtifactByKey(tx, planningSpecArtifactKey(orderID)); err != nil {
+	artifact, err := order.FindArtifactByKey(tx, planningSpecArtifactKey(orderID))
+	if err != nil {
 		if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
-			return FactoryWorkOrderNotificationMessage{}, false, nil
+			return nil, false, nil
 		}
-		return FactoryWorkOrderNotificationMessage{}, false, err
+		return nil, false, err
 	}
-	return planningSessionNotificationMessage(session, orderID, factory.EventTypeOrderPlanReady, ""), true, nil
+	return artifact, true, nil
+}
+
+func planningSessionRunStartedAt(tx *gorm.DB, session *models.FactoryPlanningSession) (time.Time, bool) {
+	if session.CanvasID == nil || session.CanvasRunID == nil {
+		return time.Time{}, false
+	}
+	run, err := models.FindCanvasRunInTransaction(tx, *session.CanvasID, *session.CanvasRunID)
+	if err != nil || run.CreatedAt == nil {
+		return time.Time{}, false
+	}
+	return *run.CreatedAt, true
 }
 
 func planningSessionNotificationMessage(

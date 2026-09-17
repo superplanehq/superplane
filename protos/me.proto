@@ -225,14 +225,14 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
   }
 
   message Browser {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
     bool show_while_viewing = 4;
   }
