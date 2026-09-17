@@ -136,6 +136,12 @@ type ExecutionStateContext interface {
 	 * No payloads are emitted.
 	 */
 	Fail(reason, message string) error
+
+	/*
+	 * Cancels the execution.
+	 * No payloads are emitted.
+	 */
+	Cancel() error
 }
 
 /*
