@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -135,6 +136,83 @@ func Test__FactoryAgentResource(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, id)
 	})
+
+	t.Run("resets oauth when the MCP URL changes", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin-url", true, models.FactoryAgentResourceConfig{
+			Transport: "http",
+			URL:       "https://api.mobbin.com/mcp",
+			Auth:      models.FactoryAgentResourceAuthOAuth,
+		})
+		require.NoError(t, err)
+		require.NoError(t, resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+		require.NoError(t, resource.SetOAuthMetadata(db, models.FactoryAgentResourceOAuthMetadata{
+			ClientID:           "old-client",
+			RevocationEndpoint: "https://auth.example/revoke",
+		}))
+		require.NoError(t, resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, []byte("refresh")))
+
+		next := models.FactoryAgentResourceConfig{
+			Transport: "http",
+			URL:       "https://other.example/mcp",
+			Auth:      models.FactoryAgentResourceAuthOAuth,
+		}
+		require.NoError(t, resource.Update(db, nil, nil, &next))
+		assert.Equal(t, models.FactoryAgentResourceOAuthNotConnected, resource.OAuthState())
+		assert.Empty(t, resource.OAuthMetadata.Data().ClientID)
+		_, err = resource.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
+
+		reloaded, err := factory.FindAgentResource(db, resource.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "https://other.example/mcp", reloaded.Config.Data().URL)
+		assert.Equal(t, models.FactoryAgentResourceOAuthNotConnected, reloaded.OAuthState())
+		assert.Empty(t, reloaded.OAuthMetadata.Data().ClientID)
+	})
+
+	t.Run("keeps oauth when the URL does not change", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin-keep", true, models.FactoryAgentResourceConfig{
+			Transport: "http",
+			URL:       "https://api.mobbin.com/mcp",
+			Auth:      models.FactoryAgentResourceAuthOAuth,
+		})
+		require.NoError(t, err)
+		require.NoError(t, resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+		require.NoError(t, resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, []byte("refresh")))
+
+		same := resource.Config.Data()
+		require.NoError(t, resource.Update(db, nil, nil, &same))
+		assert.Equal(t, models.FactoryAgentResourceOAuthConnected, resource.OAuthState())
+		secret, err := resource.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("refresh"), secret.Value)
+	})
+
+	t.Run("rejects a 21st enabled MCP connection", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		for i := range models.MaxEnabledFactoryMCPServers {
+			_, err = factory.CreateAgentResource(
+				db,
+				models.FactoryAgentResourceKindMCPServer,
+				fmt.Sprintf("mcp-%02d", i),
+				true,
+				headerConfig,
+			)
+			require.NoError(t, err)
+		}
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mcp-over", true, headerConfig)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceMCPCapReached)
+
+		extra, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mcp-over", false, headerConfig)
+		require.NoError(t, err)
+		enabled := true
+		err = extra.Update(db, nil, &enabled, nil)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceMCPCapReached)
+	})
 }
 
 func Test__ValidateFactoryAgentResourceName(t *testing.T) {
@@ -161,6 +239,25 @@ func Test__FactoryAgentResourceConfigValidateMCP(t *testing.T) {
 		Auth: "basic",
 	}.ValidateMCP()
 	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceAuthInvalid)
+
+	oauth := models.FactoryAgentResourceConfig{
+		URL:  "https://api.mobbin.com/mcp",
+		Auth: models.FactoryAgentResourceAuthOAuth,
+	}
+	assert.True(t, oauth.InvalidatesOAuth(models.FactoryAgentResourceConfig{
+		URL:  "https://other.example/mcp",
+		Auth: models.FactoryAgentResourceAuthOAuth,
+	}))
+	assert.True(t, oauth.InvalidatesOAuth(models.FactoryAgentResourceConfig{
+		URL:  "https://api.mobbin.com/mcp",
+		Auth: models.FactoryAgentResourceAuthHeaders,
+		Headers: []models.FactoryAgentResourceHeader{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	}))
+	assert.False(t, oauth.InvalidatesOAuth(oauth))
 
 	_ = uuid.Nil
 }

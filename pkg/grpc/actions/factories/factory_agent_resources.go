@@ -74,6 +74,7 @@ func CreateFactoryAgentResource(
 
 func UpdateFactoryAgentResource(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.UpdateFactoryAgentResourceRequest,
 ) (*pb.UpdateFactoryAgentResourceResponse, error) {
@@ -123,6 +124,9 @@ func UpdateFactoryAgentResource(
 		config = &merged
 	}
 
+	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
+		revokeResourceOAuth(ctx, deps, db, resource)
+	}
 	if err := resource.Update(db, name, enabled, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
@@ -131,6 +135,7 @@ func UpdateFactoryAgentResource(
 
 func DeleteFactoryAgentResource(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.DeleteFactoryAgentResourceRequest,
 ) (*pb.DeleteFactoryAgentResourceResponse, error) {
@@ -151,6 +156,7 @@ func DeleteFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
+	revokeResourceOAuth(ctx, deps, db, resource)
 	if err := resource.Delete(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}

@@ -141,10 +141,7 @@ func DisconnectFactoryAgentResourceOAuth(
 		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
 	}
 
-	httpClient := mcp.DoerFromCore(deps.Registry.HTTPContext())
-	oauthCtx, cancel := mcp.TimeoutContext(ctx)
-	defer cancel()
-	revokeStoredOAuthTokens(oauthCtx, httpClient, deps.Encryptor, db, resource)
+	revokeResourceOAuth(ctx, deps, db, resource)
 	if err := resource.DeleteSecrets(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
 	}
@@ -272,6 +269,24 @@ func CompleteFactoryAgentResourceOAuth(
 	return redirectPath, 302, ""
 }
 
+func revokeResourceOAuth(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+) {
+	if resource == nil || deps.Encryptor == nil {
+		return
+	}
+	httpClient := mcp.DoerFromCore(nil)
+	if deps.Registry != nil {
+		httpClient = mcp.DoerFromCore(deps.Registry.HTTPContext())
+	}
+	oauthCtx, cancel := mcp.TimeoutContext(ctx)
+	defer cancel()
+	revokeStoredOAuthTokens(oauthCtx, httpClient, deps.Encryptor, db, resource)
+}
+
 func revokeStoredOAuthTokens(
 	ctx context.Context,
 	httpClient mcp.HTTPDoer,
@@ -279,6 +294,9 @@ func revokeStoredOAuthTokens(
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
 ) {
+	if resource == nil || encryptor == nil || httpClient == nil {
+		return
+	}
 	metadata := resource.OAuthMetadata.Data()
 	if metadata.RevocationEndpoint == "" {
 		return

@@ -148,6 +148,16 @@ func (c FactoryAgentResourceConfig) MCPAuth() string {
 	return auth
 }
 
+// InvalidatesOAuth reports whether the next MCP config cannot reuse stored
+// OAuth tokens. A URL or auth change points at a different authorization
+// server, so SuperPlane must drop the previous grant.
+func (c FactoryAgentResourceConfig) InvalidatesOAuth(next FactoryAgentResourceConfig) bool {
+	if strings.TrimSpace(c.URL) != strings.TrimSpace(next.URL) {
+		return true
+	}
+	return c.MCPAuth() != next.MCPAuth()
+}
+
 func (c FactoryAgentResourceConfig) ValidateMCP() error {
 	if strings.TrimSpace(c.URL) == "" {
 		return ErrFactoryAgentResourceURLRequired
@@ -207,12 +217,6 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 	if err := config.ValidateMCP(); err != nil {
 		return nil, err
 	}
-	if enabled {
-		if err := f.ensureEnabledMCPCapacity(tx, uuid.Nil); err != nil {
-			return nil, err
-		}
-	}
-
 	now := time.Now()
 	resource := &FactoryAgentResource{
 		ID:             uuid.New(),
@@ -229,8 +233,19 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		resource.OAuthStatus = FactoryAgentResourceOAuthNotConnected
 	}
 
-	if err := tx.Clauses(clause.Returning{}).Create(resource).Error; err != nil {
-		return nil, mapFactoryAgentResourceNameError(err)
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if enabled {
+			if err := f.ensureEnabledMCPCapacity(inner, uuid.Nil); err != nil {
+				return err
+			}
+		}
+		if err := inner.Clauses(clause.Returning{}).Create(resource).Error; err != nil {
+			return mapFactoryAgentResourceNameError(err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return resource, nil
 }
@@ -275,48 +290,80 @@ func (f *Factory) ListEnabledMCPServers(tx *gorm.DB) ([]FactoryAgentResource, er
 }
 
 func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, config *FactoryAgentResourceConfig) error {
-	updates := map[string]any{
-		"updated_at": time.Now(),
-	}
-	if name != nil {
-		normalized := NormalizeFactoryAgentResourceName(*name)
-		if err := ValidateFactoryAgentResourceName(normalized); err != nil {
-			return err
+	return tx.Transaction(func(inner *gorm.DB) error {
+		updates := map[string]any{
+			"updated_at": time.Now(),
 		}
-		updates["name"] = normalized
-		r.Name = normalized
-	}
-	if enabled != nil {
-		if *enabled {
-			factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
-			if err := factory.ensureEnabledMCPCapacity(tx, r.ID); err != nil {
+		if name != nil {
+			normalized := NormalizeFactoryAgentResourceName(*name)
+			if err := ValidateFactoryAgentResourceName(normalized); err != nil {
 				return err
 			}
+			updates["name"] = normalized
+			r.Name = normalized
 		}
-		updates["enabled"] = *enabled
-		r.Enabled = *enabled
-	}
-	if config != nil {
-		if r.Kind == FactoryAgentResourceKindMCPServer {
-			if err := config.ValidateMCP(); err != nil {
-				return err
+		if enabled != nil {
+			if *enabled {
+				factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
+				if err := factory.ensureEnabledMCPCapacity(inner, r.ID); err != nil {
+					return err
+				}
 			}
+			updates["enabled"] = *enabled
+			r.Enabled = *enabled
 		}
-		updates["config"] = datatypes.NewJSONType(*config)
-		r.Config = datatypes.NewJSONType(*config)
-		if config.MCPAuth() != FactoryAgentResourceAuthOAuth {
-			updates["oauth_status"] = ""
-			updates["oauth_error"] = ""
-			r.OAuthStatus = ""
-			r.OAuthError = ""
-		} else if r.OAuthStatus == "" {
-			updates["oauth_status"] = FactoryAgentResourceOAuthNotConnected
-			r.OAuthStatus = FactoryAgentResourceOAuthNotConnected
+		if config != nil {
+			if r.Kind == FactoryAgentResourceKindMCPServer {
+				if err := config.ValidateMCP(); err != nil {
+					return err
+				}
+			}
+			if r.Config.Data().InvalidatesOAuth(*config) {
+				if err := r.DeleteSecrets(inner); err != nil {
+					return err
+				}
+				for key, value := range r.oauthResetUpdates(config.MCPAuth()) {
+					updates[key] = value
+				}
+			} else if config.MCPAuth() != FactoryAgentResourceAuthOAuth {
+				updates["oauth_status"] = ""
+				updates["oauth_error"] = ""
+				r.OAuthStatus = ""
+				r.OAuthError = ""
+			} else if r.OAuthStatus == "" {
+				updates["oauth_status"] = FactoryAgentResourceOAuthNotConnected
+				r.OAuthStatus = FactoryAgentResourceOAuthNotConnected
+			}
+			updates["config"] = datatypes.NewJSONType(*config)
+			r.Config = datatypes.NewJSONType(*config)
 		}
-	}
 
-	err := tx.Model(r).Clauses(clause.Returning{}).Updates(updates).Error
-	return mapFactoryAgentResourceNameError(err)
+		err := inner.Model(r).Clauses(clause.Returning{}).Updates(updates).Error
+		return mapFactoryAgentResourceNameError(err)
+	})
+}
+
+func (r *FactoryAgentResource) oauthResetUpdates(nextAuth string) map[string]any {
+	status := ""
+	if nextAuth == FactoryAgentResourceAuthOAuth {
+		status = FactoryAgentResourceOAuthNotConnected
+	}
+	r.OAuthStatus = status
+	r.OAuthError = ""
+	r.OAuthConnectedBy = nil
+	r.OAuthConnectedAt = nil
+	r.OAuthMetadata = datatypes.NewJSONType(FactoryAgentResourceOAuthMetadata{})
+	r.OAuthPendingState = ""
+	r.OAuthPendingExpiry = nil
+	return map[string]any{
+		"oauth_status":         status,
+		"oauth_error":          "",
+		"oauth_connected_by":   nil,
+		"oauth_connected_at":   nil,
+		"oauth_metadata":       r.OAuthMetadata,
+		"oauth_pending_state":  "",
+		"oauth_pending_expiry": nil,
+	}
 }
 
 func (r *FactoryAgentResource) Delete(tx *gorm.DB) error {
@@ -452,7 +499,22 @@ func (r *FactoryAgentResource) DeleteSecrets(tx *gorm.DB) error {
 	return tx.Where("resource_id = ?", r.ID).Delete(&FactoryAgentResourceSecret{}).Error
 }
 
+func (f *Factory) lockAgentResourceCapacity(tx *gorm.DB) error {
+	var locked Factory
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
+		First(&locked).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrFactoryNotFound
+	}
+	return err
+}
+
 func (f *Factory) ensureEnabledMCPCapacity(tx *gorm.DB, exceptID uuid.UUID) error {
+	if err := f.lockAgentResourceCapacity(tx); err != nil {
+		return err
+	}
 	query := tx.Model(&FactoryAgentResource{}).Where(
 		"factory_id = ? AND kind = ? AND enabled = ?",
 		f.ID,

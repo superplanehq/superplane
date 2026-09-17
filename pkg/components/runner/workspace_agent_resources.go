@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -39,6 +40,16 @@ func AttachWorkspaceAgentResources(
 ) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
+		return environment, files
+	}
+	enabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgentResources)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.WithError(err).Warn("skip workspace agent resources: feature check failed")
+		}
+		return environment, files
+	}
+	if !enabled {
 		return environment, files
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))

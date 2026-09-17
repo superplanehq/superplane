@@ -340,12 +340,12 @@ func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb
 
 func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryAgentResource(ctx, organizationID, req)
+	return actions.UpdateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) DeleteFactoryAgentResource(ctx context.Context, req *pb.DeleteFactoryAgentResourceRequest) (*pb.DeleteFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DeleteFactoryAgentResource(ctx, organizationID, req)
+	return actions.DeleteFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) StartFactoryAgentResourceOAuth(ctx context.Context, req *pb.StartFactoryAgentResourceOAuthRequest) (*pb.StartFactoryAgentResourceOAuthResponse, error) {

@@ -179,16 +179,25 @@ function workspaceMCPConfigOverrides(env = process.env) {
     if (!name || name === "superplane" || !url) {
       continue;
     }
-    args.push("-c", `mcp_servers.${name}.url=${tomlString(url)}`);
+    const serverKey = tomlKey(name);
+    args.push("-c", `mcp_servers.${serverKey}.url=${tomlString(url)}`);
     const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
     for (const [headerName, headerValue] of Object.entries(headers)) {
       if (!headerName) {
         continue;
       }
-      args.push("-c", `mcp_servers.${name}.http_headers.${headerName}=${tomlString(String(headerValue))}`);
+      args.push("-c", `mcp_servers.${serverKey}.http_headers.${tomlKey(headerName)}=${tomlString(String(headerValue))}`);
     }
   }
   return args;
+}
+
+function tomlKey(value) {
+  const key = String(value);
+  if (/^[A-Za-z0-9_]+$/.test(key)) {
+    return key;
+  }
+  return tomlString(key);
 }
 
 function tomlString(value) {
