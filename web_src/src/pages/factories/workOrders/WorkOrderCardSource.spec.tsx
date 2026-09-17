@@ -60,9 +60,9 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("target", "_blank");
     expect(icon).toHaveAttribute("rel", "noopener noreferrer");
     expect(icon).toHaveAttribute("aria-label", "GitHub issues acme/payments#12");
+    expect(icon).toHaveAttribute("data-slot", "button");
+    expect(icon).toHaveAttribute("data-size", "icon-xs");
     expect(icon.className).toContain("size-6");
-    expect(icon.className).toContain("hover:bg-accent");
-    expect(icon.className).toContain("focus-visible:ring-2");
     expect(icon.querySelector("img")?.className).toContain("size-3.5");
   });
 
