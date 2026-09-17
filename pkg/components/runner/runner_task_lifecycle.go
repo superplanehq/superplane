@@ -145,7 +145,7 @@ func processBrokerTaskStatus(
 		return nil
 	}
 
-	if brokerTaskCanceled(task) {
+	if brokerTaskCanceled(task) && isAnalysisSessionExecution(state) {
 		return state.Cancel()
 	}
 
@@ -166,6 +166,17 @@ func processBrokerTaskStatus(
 
 func brokerTaskCanceled(task *Task) bool {
 	return strings.EqualFold(strings.TrimSpace(task.Status), "canceled")
+}
+
+func markAnalysisSession(state core.ExecutionStateContext) {
+	if state == nil {
+		return
+	}
+	_ = state.SetKV(executionKVAnalysisSession, "true")
+}
+
+func isAnalysisSessionExecution(state core.ExecutionStateContext) bool {
+	return executionKV(state, executionKVAnalysisSession) == "true"
 }
 
 func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
