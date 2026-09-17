@@ -2,6 +2,7 @@ package factory
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +40,11 @@ type fakeFactoryContext struct {
 	setStatusNoteResult *core.WorkOrderStatusNote
 	setStatusNoteErr    error
 
+	addArtifactCalls  int
+	addArtifactParams core.AddWorkOrderArtifactParams
+	addArtifactResult *core.WorkOrderArtifact
+	addArtifactErr    error
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -68,8 +74,16 @@ func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParam
 	return nil
 }
 
-func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	return nil, nil
+func (f *fakeFactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	f.addArtifactCalls++
+	f.addArtifactParams = params
+	if f.addArtifactErr != nil {
+		return nil, f.addArtifactErr
+	}
+	if f.addArtifactResult != nil {
+		return f.addArtifactResult, nil
+	}
+	return &core.WorkOrderArtifact{ID: "art-1", Type: params.Type, Data: params.Data}, nil
 }
 
 func (f *fakeFactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
@@ -627,6 +641,56 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
+	c := &AddWorkOrderArtifact{}
+	docs := c.Documentation()
+	assert.Contains(t, docs, "later runs of this step update the same artifact")
+	assert.Contains(t, docs, "values that you leave blank are cleared")
+	assert.Contains(t, docs, "The first run sets the type")
+	assert.Contains(t, docs, "A later run with a different type fails")
+	assert.Contains(t, docs, "Keys are unique per factory")
+
+	var artifactKey *configuration.Field
+	fields := c.Configuration()
+	for i := range fields {
+		if fields[i].Name == "artifactKey" {
+			artifactKey = &fields[i]
+			break
+		}
+	}
+	require.NotNil(t, artifactKey)
+	assert.True(t, strings.Contains(artifactKey.Description, "Later runs update this artifact"))
+	assert.True(t, strings.Contains(artifactKey.Description, "The first run sets the type"))
+}
+
+func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {
+	component := &AddWorkOrderArtifact{}
+	factoryCtx := &fakeFactoryContext{
+		addArtifactResult: &core.WorkOrderArtifact{
+			ID:   "art-1",
+			Type: "link",
+			Data: map[string]any{"url": "https://preview.example.com/v2"},
+		},
+	}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId":      "wo-1",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/v2",
+			"artifactKey":  "storybook-preview",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, factoryCtx.addArtifactCalls)
+	assert.Equal(t, "storybook-preview", factoryCtx.addArtifactParams.Key)
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	assert.Equal(t, "workOrder.artifactAdded", stateCtx.Type)
 }
 
 func TestResolvePrArtifactState_Precedence(t *testing.T) {
