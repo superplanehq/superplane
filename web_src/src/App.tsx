@@ -24,7 +24,6 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
-import { ChooseAccount } from "./pages/auth/ChooseAccount";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -230,7 +229,6 @@ function AppRouter() {
             <GlobalCommandPalette />
             <Routes>
               <Route path="login" element={<Login />} />
-              <Route path="login/choose-account" element={<ChooseAccount />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
