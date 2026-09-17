@@ -1,7 +1,7 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { fetchFactoryAutomations, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
-import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
@@ -43,6 +43,7 @@ import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnbo
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingGithubRepos } from "./useOnboardingGithubRepos";
+import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import {
   useOnboardingSetupState,
   type InitialOnboardingSetupState,
@@ -51,7 +52,7 @@ import {
 import { persistSelectedGithubConnection } from "./onboardingGithubCleanup";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
-const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
+const ONBOARDING_INTEGRATIONS = ["github", "jira", ...AGENT_PROVIDER_IDS];
 
 // Onboarding never adopts an existing organization GitHub or agent
 // connection on its own. GitHub repositories must come from the account the
@@ -72,6 +73,7 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
+    if (selections.jira?.ready) ready.add("jira");
     for (const name of AGENT_PROVIDER_IDS) {
       if (selections[name]?.ready) ready.add(name);
     }
@@ -345,6 +347,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
   };
 }
@@ -390,9 +393,10 @@ export function useOnboardingPageModel(args: {
 
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
-  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, installer } =
+  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
+  const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, integrations.selections.jira);
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
     reresolveWorkspace: args.reresolveWorkspace ?? null,
@@ -438,6 +442,7 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
+    deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
@@ -445,6 +450,7 @@ export function useOnboardingPageModel(args: {
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
     githubOwner,
+    jiraProjectId: jira.jiraProjectId,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
@@ -508,5 +514,6 @@ export function useOnboardingPageModel(args: {
     provisionedDestination,
     // Names the finished organization row on the GitHub stepper card.
     githubOwner,
+    ...jira,
   };
 }
