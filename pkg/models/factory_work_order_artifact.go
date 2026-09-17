@@ -20,6 +20,7 @@ const (
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
 	FactoryWorkOrderArtifactTypeLink     = factory.ArtifactTypeLink
+	FactoryWorkOrderArtifactTypeFile     = factory.ArtifactTypeFile
 
 	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
 	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
@@ -385,6 +386,23 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 		if extractArtifactString(data, "url") == "" {
 			return fmt.Errorf("%w: link artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
 		}
+	case FactoryWorkOrderArtifactTypeFile:
+		if extractArtifactString(data, "fileId") == "" ||
+			extractArtifactString(data, "filename") == "" ||
+			extractArtifactString(data, "contentType") == "" ||
+			extractArtifactString(data, "title") == "" ||
+			extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: file artifacts require fileId, filename, contentType, title, and url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if _, err := uuid.Parse(extractArtifactString(data, "fileId")); err != nil {
+			return fmt.Errorf("%w: file artifacts require a valid fileId", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if !IsAllowedArtifactContentType(extractArtifactString(data, "contentType")) {
+			return fmt.Errorf("%w: file artifact content type is not supported", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if size, ok := extractArtifactSize(data); !ok || size <= 0 || size > int64(MaxArtifactFileBytes) {
+			return fmt.Errorf("%w: file artifacts require a valid sizeBytes", ErrFactoryWorkOrderArtifactInvalid)
+		}
 	default:
 		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)
 	}
@@ -465,6 +483,27 @@ func extractArtifactString(data map[string]any, key string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+func extractArtifactSize(data map[string]any) (int64, bool) {
+	switch value := data["sizeBytes"].(type) {
+	case int:
+		return int64(value), true
+	case int32:
+		return int64(value), true
+	case int64:
+		return value, true
+	case float64:
+		if value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	case json.Number:
+		size, err := value.Int64()
+		return size, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func validateOptionalTimestamp(data map[string]any, key string) error {

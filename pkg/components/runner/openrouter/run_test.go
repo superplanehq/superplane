@@ -129,6 +129,18 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
+func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	command, _ := superplane["command"].([]any)
+
+	assert.Equal(t, []any{"node", "/task/task_artifact_mcp.js"}, command)
+	assert.Equal(t, true, superplane["enabled"])
+}
+
 func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
