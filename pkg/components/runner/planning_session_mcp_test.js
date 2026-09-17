@@ -29,9 +29,14 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /this is a continuation/);
   assert.match(pack, /does not publish the specification or the score/);
   assert.match(pack, /only after those calls/);
+  assert.match(pack, /Do not name files/);
+  assert.match(pack, /Answer the questions in this session/);
+  assert.match(pack, /Do not describe agent fit/);
+  assert.match(pack, /Do not write a test or an acceptance check/);
+  assert.match(pack, /Do not add an Open questions section/);
   assert.doesNotMatch(pack, /Talk like a colleague/);
   assert.doesNotMatch(pack, /## Proposed outcome/);
-  assert.doesNotMatch(pack, /## Workflow/);
+  assert.doesNotMatch(pack, /## 1\. Research/);
   assert.doesNotMatch(pack, /Why not start/);
   assert.doesNotMatch(pack, /you must ask/);
   assert.doesNotMatch(pack, /## Executive summary/);
@@ -42,13 +47,13 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
 test("analysis user prompt covers tone, score rules, and plan shape", () => {
   const pack = fs.readFileSync(path.join(__dirname, "analysis_user_prompt.md"), "utf8");
   assert.match(pack, /Talk like a colleague/);
+  assert.match(pack, /## 1\. Research/);
+  assert.match(pack, /## 2\. Decide or ask/);
+  assert.match(pack, /## 3\. Score/);
+  assert.match(pack, /## 4\. Write the plan/);
   assert.match(pack, /how well you understand the task/);
   assert.match(pack, /why Clarity is not 5/);
-  assert.match(pack, /Do not name files/);
-  assert.match(pack, /Answer the questions in this session/);
-  assert.match(pack, /Do not describe agent fit/);
   assert.doesNotMatch(pack, /how suitable the work is for an agent/);
-  assert.match(pack, /Do not write a test or an acceptance check/);
   assert.match(pack, /2 to 4 short sentences/);
   assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /If the score is 1 or 2/);
@@ -62,8 +67,10 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /## Constraints/);
   assert.match(pack, /## Scope/);
   assert.match(pack, /Do not repeat the goal/);
-  assert.match(pack, /Do not add an Open questions section/);
   assert.doesNotMatch(pack, /propose_spec/);
+  assert.doesNotMatch(pack, /in chat, survey, or the Clarity summary/);
+  assert.doesNotMatch(pack, /Do not describe agent fit/);
+  assert.doesNotMatch(pack, /Do not add an Open questions section/);
   assert.doesNotMatch(pack, /## Executive summary/);
   assert.doesNotMatch(pack, /## Files and seams/);
   assert.doesNotMatch(pack, /at least five/);
