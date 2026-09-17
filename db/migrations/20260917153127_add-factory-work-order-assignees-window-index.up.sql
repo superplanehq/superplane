@@ -1,0 +1,2 @@
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_factory_work_order_assignees_work_order_created_user
+ON factory_work_order_assignees (work_order_id, created_at, user_id);
