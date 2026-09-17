@@ -13,7 +13,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ListLogEntriesResponse, LogEntry } from "./types";
+import type { ListLogEntriesConfiguration, ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -93,13 +93,13 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
 function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   if (!node) return metadata;
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as unknown as ListLogEntriesConfiguration | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.limit) {
+  if (configuration?.limit) {
     metadata.push({ icon: "hash", label: `Limit: ${configuration.limit}` });
   }
 

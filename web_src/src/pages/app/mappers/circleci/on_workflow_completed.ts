@@ -65,7 +65,7 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnWorkflowCompletedMetadata;
-    const configuration = node.configuration as any;
+    const configuration = node.configuration as { projectSlug?: string } | undefined;
     const metadataItems = [];
 
     const projectLabel = metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
