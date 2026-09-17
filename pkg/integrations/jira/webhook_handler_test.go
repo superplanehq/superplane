@@ -498,3 +498,20 @@ func Test__WebhookMetadata__SurvivesJSONMetadataRoundTrip(t *testing.T) {
 	require.NotNil(t, restored.WebhookID)
 	assert.Equal(t, webhookID, *restored.WebhookID)
 }
+
+func TestIssueURL(t *testing.T) {
+	assert.Equal(t, "https://acme.atlassian.net/browse/ENG-42", IssueURL("https://acme.atlassian.net", "ENG-42"))
+	assert.Equal(t, "https://acme.atlassian.net/browse/ENG-42", IssueURL("https://acme.atlassian.net/", "ENG-42"))
+	assert.Empty(t, IssueURL("", "ENG-42"))
+	assert.Empty(t, IssueURL("https://acme.atlassian.net", ""))
+}
+
+func TestWebhookIssueEventCarriesBrowseURL(t *testing.T) {
+	issue := &Issue{
+		Key:  "ENG-42",
+		Self: "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/issue/10001",
+	}
+
+	event := NewIssueEvent("created", issue, nil, nil, "https://acme.atlassian.net")
+	assert.Equal(t, "https://acme.atlassian.net/browse/ENG-42", event.URL)
+}
