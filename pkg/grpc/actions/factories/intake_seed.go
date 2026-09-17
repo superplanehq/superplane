@@ -270,7 +270,7 @@ func seedSentryIssues(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
@@ -279,16 +279,16 @@ func seedSentryIssues(
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook
 // the trigger emits, so the rest of the graph cannot tell a seeded issue from
 // a received one.
-func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
+func sentryIssueEvents(client *sentry.Client, issues []sentry.Issue) []map[string]any {
 	events := make([]map[string]any, 0, len(issues))
 	for _, issue := range issues {
-		events = append(events, sentryIssueEvent(issue))
+		events = append(events, sentryIssueEvent(client, issue))
 	}
 	slices.Reverse(events)
 	return events
 }
 
-func sentryIssueEvent(issue sentry.Issue) map[string]any {
+func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
 		payload := map[string]any{"id": issue.ID, "title": issue.Title}
@@ -296,7 +296,7 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 			"resource":    "issue",
 			"action":      "created",
 			"data":        map[string]any{"issue": payload},
-			"description": sentry.IssueDescription(payload),
+			"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
 		}
 	}
 
@@ -315,7 +315,7 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 		"action":      "created",
 		"data":        map[string]any{"issue": payload},
 		"timestamp":   timestamp,
-		"description": sentry.IssueDescription(payload),
+		"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
 	}
 }
 
