@@ -13,7 +13,8 @@ import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestI
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { ComposerPlanStack } from "./ComposerPlanControls";
+import { ComposerPlanStack, type ComposerScore } from "./ComposerPlanControls";
+import type { RefineSummaryKind } from "./refineLayoutPreference";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -44,10 +45,10 @@ export type IntentAnalysisChat = {
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
-  clarityExpanded?: boolean;
-  onToggleClarity?: () => void;
-  latestPlanScore?: number;
-  latestPlanSummary?: string;
+  openSummary?: RefineSummaryKind | null;
+  onToggleSummary?: (kind: RefineSummaryKind) => void;
+  clarity?: ComposerScore;
+  confidence?: ComposerScore;
   planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
@@ -110,7 +111,7 @@ function AnalysisRequestChat({
   });
   const chipsWorking = composerChipsWorking({
     isAnalyzing: analysis.isAnalyzing,
-    score: analysis.latestPlanScore,
+    score: analysis.clarity?.score ?? analysis.confidence?.score,
     machineStatus: analysis.view.machineStatus,
   });
   const images = useAnalysisComposerImages({
@@ -216,14 +217,14 @@ function AnalysisComposer({
         <div className="flex flex-col gap-2">
           <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
-            score={analysis.latestPlanScore}
-            scoreSummary={analysis.latestPlanSummary}
+            clarity={analysis.clarity}
+            confidence={analysis.confidence}
             isAnalyzing={chipsWorking}
             canTogglePlan={Boolean(analysis.canTogglePlan)}
             planStatus={analysis.planStatus}
             onToggle={analysis.onTogglePlan}
-            summaryOpen={analysis.clarityExpanded}
-            onToggleSummary={analysis.onToggleClarity}
+            openSummary={analysis.openSummary}
+            onToggleSummary={analysis.onToggleSummary}
             actions={analysis.closedDecision}
           />
           <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">

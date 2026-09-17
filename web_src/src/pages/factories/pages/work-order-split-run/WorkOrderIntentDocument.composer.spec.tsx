@@ -88,7 +88,7 @@ describe("WorkOrderIntentDocument composer", () => {
 
     await user.click(showPlan);
     expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      clarityExpanded: true,
+      openSummary: "clarity",
       planOpen: true,
     });
     expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
@@ -147,9 +147,10 @@ describe("WorkOrderIntentDocument composer", () => {
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     expect(card).toHaveAttribute("data-slot", "frame");
     expect(card).toContainElement(chips);
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-confidence-drawer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
     expect(within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.confidence })).toBeInTheDocument();
     expect(within(chips).getByTestId("split-run-review")).toHaveTextContent("Ready");
   });
 
@@ -195,6 +196,7 @@ describe("WorkOrderIntentDocument composer", () => {
     );
 
     expect(screen.getByTestId("split-run-intent-composer-score")).toHaveTextContent("–");
+    expect(screen.getByTestId("split-run-intent-composer-confidence")).toHaveTextContent("–");
     expect(screen.queryByTestId("split-run-intent-plan-analyzing")).not.toBeInTheDocument();
   });
 
@@ -266,7 +268,7 @@ describe("WorkOrderIntentDocument composer", () => {
     );
 
     await user.hover(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(CREATE_WITH_AGENT_COPY.clarityAnalyzing);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(CREATE_WITH_AGENT_COPY.scoreAnalyzing);
   });
 
   it("replaces Clarity and the plan badge with the matrix while the agent works", () => {
@@ -297,132 +299,6 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(planMatrix).not.toHaveTextContent("Analyzing");
     expect(within(chips).queryByText(CREATE_WITH_AGENT_COPY.planReady)).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
-  });
-
-  it("shows the Clarity summary in the status card", () => {
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
-      />,
-    );
-
-    const card = screen.getByTestId("split-run-intent-status-card");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(
-      within(card).getByTestId("split-run-intent-composer-chips").closest("[data-slot=frame-panel-header]"),
-    ).not.toBeNull();
-    expect(within(card).getByTestId("split-run-intent-confidence-drawer")).toHaveAttribute("data-state", "open");
-    expect(within(card).getByTestId("split-run-intent-confidence-drawer").className).toContain(
-      "transition-[grid-template-rows]",
-    );
-    expect(
-      within(card).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
-    ).not.toBeNull();
-    expect(within(card).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
-      "This issue is a good fit for an agent on this factory line.",
-    );
-    expect(within(card).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
-    expect(within(card).getByTestId("split-run-intent-composer-score")).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByTestId("split-run-intent-composer-card")).not.toContainElement(
-      screen.getByTestId("split-run-intent-confidence-copy"),
-    );
-  });
-
-  it("toggles the Clarity summary from the Clarity button", async () => {
-    const user = userEvent.setup();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
-      />,
-    );
-
-    const clarity = screen.getByTestId("split-run-intent-composer-score");
-    const drawer = screen.getByTestId("split-run-intent-confidence-drawer");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(screen.getByTestId("split-run-intent-confidence-copy")).toBeInTheDocument();
-    await user.click(clarity);
-    expect(clarity).toHaveAttribute("aria-expanded", "false");
-    expect(drawer).toHaveAttribute("data-state", "closed");
-    expect(drawer).toHaveAttribute("aria-hidden", "true");
-    await user.click(clarity);
-    expect(clarity).toHaveAttribute("aria-expanded", "true");
-    expect(drawer).toHaveAttribute("data-state", "open");
-    expect(drawer).not.toHaveAttribute("aria-hidden");
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      clarityExpanded: true,
-      planOpen: false,
-    });
-  });
-
-  it("restores Clarity and plan pane from localStorage", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: false, planOpen: true }));
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
-      />,
-    );
-
-    expect(screen.getByTestId("split-run-intent-confidence-drawer")).toHaveAttribute("data-state", "closed");
-    expect(screen.getByTestId("split-run-intent-composer-score")).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(true);
-    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "open");
-    expect(screen.getByTestId("split-run-intent-plan-status")).toHaveTextContent(CREATE_WITH_AGENT_COPY.planReady);
-  });
-
-  it("does not open the plan pane from storage before a spec exists", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: true, planOpen: true }));
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[]}
-        confidence={HIGH_CONFIDENCE}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "waiting",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-            messages: [{ id: "plan-1", kind: "plan", role: "plan", score: 4 }],
-          },
-        })}
-      />,
-    );
-
-    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(false);
   });
 
   it("attaches, pastes, caps, and sends composer images", async () => {

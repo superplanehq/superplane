@@ -138,10 +138,20 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toHaveAttribute("aria-valuenow", "5");
+      expect(screen.getByTestId("work-order-card-score-wo-review-pay-842-confidence")).toHaveAttribute(
+        "aria-valuenow",
+        "5",
+      );
     });
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-844")).toHaveAttribute("aria-valuenow", "4");
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("aria-valuenow", "3");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-842-clarity")).toHaveAttribute("aria-valuenow", "5");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-844-confidence")).toHaveAttribute(
+      "aria-valuenow",
+      "4",
+    );
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveAttribute(
+      "aria-valuenow",
+      "3",
+    );
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
     expect(

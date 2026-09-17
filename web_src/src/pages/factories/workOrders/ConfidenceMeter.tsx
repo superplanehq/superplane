@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { prefersReducedMotion } from "@/lib/streamWords";
@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 
 import {
   clampConfidenceScore,
-  CLARITY_SCORE_LABEL,
+  CLARITY_CHECK_NAME,
+  CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   type ConfidenceBand,
@@ -20,8 +21,32 @@ const FILLED_TONE: Record<ConfidenceBand, string> = {
   Low: "bg-red-500",
 };
 
+type MeterSize = "sm" | "lg" | "xs";
+
+const BAR_CLASS: Record<MeterSize, string> = {
+  lg: "h-2.5 w-2 rounded-[2px]",
+  sm: "h-2 w-1.5 rounded-[1px]",
+  xs: "h-[3px] w-1.5 rounded-[1px]",
+};
+
+function MeterBars({ value, size }: { value: number; size: MeterSize }) {
+  const band = confidenceBandForScore(value);
+  return (
+    <>
+      {Array.from({ length: CONFIDENCE_SCORE_MAX }, (_, index) => (
+        <span
+          key={index}
+          data-filled={index < value ? "true" : "false"}
+          className={cn("sp-meter-bar", BAR_CLASS[size], index < value ? FILLED_TONE[band] : "bg-muted-foreground/25")}
+        />
+      ))}
+    </>
+  );
+}
+
 export function ConfidenceMeter({
   score,
+  label = CONFIDENCE_CHECK_NAME,
   className,
   testId,
   showTooltip = true,
@@ -29,6 +54,8 @@ export function ConfidenceMeter({
   size = "sm",
 }: {
   score: number;
+  /** Check name read by screen readers and the tooltip. */
+  label?: string;
   className?: string;
   testId?: string;
   showTooltip?: boolean;
@@ -36,15 +63,13 @@ export function ConfidenceMeter({
   size?: "sm" | "lg";
 }) {
   const value = clampConfidenceScore(score);
-  const band = confidenceBandForScore(value);
   const scoreLabel = `${value}/${CONFIDENCE_SCORE_MAX}`;
-  const barClass = size === "lg" ? "h-2.5 w-2 rounded-[2px]" : "h-2 w-1.5 rounded-[1px]";
 
   const meter = (
     <span
       role={decorative ? undefined : "meter"}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : CLARITY_SCORE_LABEL}
+      aria-label={decorative ? undefined : label}
       aria-valuemin={decorative ? undefined : 0}
       aria-valuemax={decorative ? undefined : CONFIDENCE_SCORE_MAX}
       aria-valuenow={decorative ? undefined : value}
@@ -52,13 +77,7 @@ export function ConfidenceMeter({
       data-testid={testId}
       className={cn("pointer-events-auto inline-flex items-center gap-0.5", size === "lg" && "gap-1", className)}
     >
-      {Array.from({ length: CONFIDENCE_SCORE_MAX }, (_, index) => (
-        <span
-          key={index}
-          data-filled={index < value ? "true" : "false"}
-          className={cn("sp-meter-bar", barClass, index < value ? FILLED_TONE[band] : "bg-muted-foreground/25")}
-        />
-      ))}
+      <MeterBars value={value} size={size} />
     </span>
   );
 
@@ -70,8 +89,83 @@ export function ConfidenceMeter({
     <Tooltip>
       <TooltipTrigger asChild>{meter}</TooltipTrigger>
       <TooltipContent>
-        <span>{CLARITY_SCORE_LABEL}</span>
+        <span>{label}</span>
         <span className="ml-1.5 tabular-nums">{scoreLabel}</span>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export const SCORE_PAIR_LABEL = "Clarity and Confidence";
+
+/**
+ * Two stacked 5-bar rows in the footprint of one meter: Clarity on top,
+ * Confidence below. Board cards use this left of Start. One tooltip lists
+ * both scores.
+ */
+export function ScorePairMeter({
+  clarity,
+  confidence,
+  className,
+  testId,
+  showTooltip = true,
+}: {
+  clarity?: number;
+  confidence?: number;
+  className?: string;
+  testId?: string;
+  showTooltip?: boolean;
+}) {
+  const rows: Array<{ key: string; label: string; score?: number }> = [
+    { key: "clarity", label: CLARITY_CHECK_NAME, score: clarity },
+    { key: "confidence", label: CONFIDENCE_CHECK_NAME, score: confidence },
+  ];
+  const meter = (
+    <span
+      role="group"
+      aria-label={SCORE_PAIR_LABEL}
+      data-testid={testId}
+      className={cn("pointer-events-auto inline-flex flex-col items-start justify-center gap-[3px]", className)}
+    >
+      {rows.map((row) => {
+        const value = row.score == null ? undefined : clampConfidenceScore(row.score);
+        return (
+          <span
+            key={row.key}
+            role="meter"
+            aria-label={row.label}
+            aria-valuemin={0}
+            aria-valuemax={CONFIDENCE_SCORE_MAX}
+            aria-valuenow={value}
+            aria-valuetext={value == null ? "No score yet" : `${value} of ${CONFIDENCE_SCORE_MAX}`}
+            data-testid={testId ? `${testId}-${row.key}` : undefined}
+            className="inline-flex items-center gap-0.5"
+          >
+            <MeterBars value={value ?? 0} size="xs" />
+          </span>
+        );
+      })}
+    </span>
+  );
+
+  if (!showTooltip) {
+    return meter;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{meter}</TooltipTrigger>
+      <TooltipContent>
+        <span className="grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+          {rows.map((row) => (
+            <Fragment key={row.key}>
+              <span>{row.label}</span>
+              <span className="tabular-nums">
+                {row.score == null ? "–" : `${clampConfidenceScore(row.score)}/${CONFIDENCE_SCORE_MAX}`}
+              </span>
+            </Fragment>
+          ))}
+        </span>
       </TooltipContent>
     </Tooltip>
   );

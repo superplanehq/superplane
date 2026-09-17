@@ -370,7 +370,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={5}
+            clarityScore={5}
+            confidenceScore={3}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -378,10 +379,15 @@ describe("WorkOrderCard scores", () => {
     );
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
-    expect(score).toHaveAttribute("aria-valuenow", "5");
-    expect(score).toHaveAttribute("aria-valuemax", "5");
-    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
-    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
+    expect(score).toHaveAttribute("role", "group");
+    const clarity = screen.getByTestId("work-order-card-score-wo-draft-scored-clarity");
+    expect(clarity).toHaveAttribute("aria-valuenow", "5");
+    expect(clarity).toHaveAttribute("aria-valuemax", "5");
+    expect(clarity.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(clarity.querySelectorAll("[data-filled='false']")).toHaveLength(0);
+    const confidence = screen.getByTestId("work-order-card-score-wo-draft-scored-confidence");
+    expect(confidence).toHaveAttribute("aria-valuenow", "3");
+    expect(confidence.querySelectorAll("[data-filled='true']")).toHaveLength(3);
     const start = screen.getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
     expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -417,7 +423,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={4}
+            clarityScore={4}
+            confidenceScore={2}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -432,6 +439,8 @@ describe("WorkOrderCard scores", () => {
     const tip = await screen.findByRole("tooltip");
     expect(tip).toHaveTextContent("Clarity score");
     expect(tip).toHaveTextContent("4/5");
+    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("2/5");
   });
 });
 

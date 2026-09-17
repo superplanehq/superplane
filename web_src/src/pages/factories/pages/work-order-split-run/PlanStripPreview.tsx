@@ -17,6 +17,8 @@ const TASK_TITLE = "Duplicate a task";
 const REVIEW_HEADLINE = "Review the plan before you start";
 const REVIEW_TEXT = "The work is still uncertain. Add more context, or start if you accept the risk.";
 const SCORE = 2;
+const CONFIDENCE_SCORE = 4;
+const CONFIDENCE_TEXT = "The change is small and a similar action already exists to copy.";
 
 export function PlanStripPreview({ look }: { look: PlanStripLook }) {
   return (
@@ -80,8 +82,8 @@ function ChipStrip({ open, onToggle }: { open: boolean; onToggle?: () => void })
   return (
     <ComposerPlanStack
       open={open}
-      score={SCORE}
-      scoreSummary={REVIEW_TEXT}
+      clarity={{ score: SCORE, summary: REVIEW_TEXT }}
+      confidence={{ score: CONFIDENCE_SCORE, summary: CONFIDENCE_TEXT }}
       onToggle={onToggle}
       actions={<DraftActions />}
     />

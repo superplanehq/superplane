@@ -27,6 +27,7 @@ type WorkOrderIntentDocumentProps = {
   title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing?: boolean;
   files?: FilesFile[];
@@ -43,6 +44,7 @@ export function WorkOrderIntentDocument({
   title,
   description,
   artifacts,
+  clarity,
   confidence,
   isAnalyzing = false,
   files,
@@ -70,6 +72,7 @@ export function WorkOrderIntentDocument({
     title,
     description,
     artifacts,
+    clarity,
     confidence,
     isAnalyzing,
     resultFooter,
@@ -106,6 +109,7 @@ export function WorkOrderIntentDocument({
             isAnalyzing={isAnalyzing}
             resultAfterBody={resultAfterBody}
             resultFooter={resultFooter}
+            clarity={clarity}
             confidence={confidence}
             refineOpen={refineOpen}
             collapsed={chatSolo}
@@ -211,6 +215,7 @@ function IntentSpecColumn({
   isAnalyzing,
   resultAfterBody,
   resultFooter,
+  clarity,
   confidence,
   refineOpen,
   collapsed = false,
@@ -227,6 +232,7 @@ function IntentSpecColumn({
   isAnalyzing: boolean;
   resultAfterBody?: ReactNode;
   resultFooter?: ReactNode;
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   refineOpen: boolean;
   collapsed?: boolean;
@@ -284,6 +290,7 @@ function IntentSpecColumn({
         </div>
         {refineOpen ? null : (
           <IntentSpecFooter
+            clarity={clarity}
             confidence={confidence}
             isAnalyzing={isAnalyzing}
             resultFooter={resultFooter}
@@ -296,11 +303,13 @@ function IntentSpecColumn({
 }
 
 function IntentSpecFooter({
+  clarity,
   confidence,
   isAnalyzing,
   resultFooter,
   contextSidebar,
 }: {
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
@@ -311,7 +320,7 @@ function IntentSpecFooter({
   }
   return (
     <>
-      <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+      <WorkOrderIntentConfidenceFooter clarity={clarity} confidence={confidence} isAnalyzing={isAnalyzing} />
       {resultFooter}
     </>
   );

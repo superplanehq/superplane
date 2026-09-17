@@ -3,12 +3,15 @@ import { describe, expect, it } from "bun:test";
 import {
   boardCardLoadsConfidenceChecks,
   clampConfidenceScore,
+  clarityScoreFromChecks,
   confidenceBandForScore,
   confidenceCheckLevel,
   confidenceScoreFromChecks,
   confidenceScoreFromPercent,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
+  isScoreCheckName,
+  scoreFromChecks,
 } from "./confidenceScore";
 import { workOrderCheckStatus } from "./workOrderChecks";
 
@@ -30,6 +33,24 @@ describe("confidenceScore", () => {
     ).toBe(4);
     expect(confidenceScoreFromChecks([{ name: "Code quality", score: 82 }])).toBeUndefined();
     expect(confidenceScoreFromChecks([])).toBeUndefined();
+  });
+
+  it("reads Clarity and Confidence as separate checks", () => {
+    const checks = [
+      { name: "Clarity score", score: 5 },
+      { name: "Confidence score", score: 3 },
+    ];
+    expect(clarityScoreFromChecks(checks)).toBe(5);
+    expect(confidenceScoreFromChecks(checks)).toBe(3);
+    expect(scoreFromChecks(checks, "Clarity score")).toBe(5);
+    expect(clarityScoreFromChecks([{ name: "Confidence score", score: 3 }])).toBeUndefined();
+  });
+
+  it("names both score checks", () => {
+    expect(isScoreCheckName("Clarity score")).toBe(true);
+    expect(isScoreCheckName("Confidence score")).toBe(true);
+    expect(isScoreCheckName("Risk score")).toBe(false);
+    expect(isScoreCheckName(undefined)).toBe(false);
   });
 
   it("clamps scores to 0 through 5", () => {
@@ -58,6 +79,7 @@ describe("confidenceScore", () => {
   it("labels a confidence check High Medium or Low, not Healthy", () => {
     expect(workOrderCheckStatus({ name: "Confidence score", score: 5, level: "positive" }).label).toBe("High");
     expect(workOrderCheckStatus({ name: "Confidence score", score: 3, level: "neutral" }).label).toBe("Medium");
+    expect(workOrderCheckStatus({ name: "Clarity score", score: 2, level: "critical" }).label).toBe("Low");
     expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Needs attention");
   });
 

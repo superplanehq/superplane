@@ -970,7 +970,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary-copy")).not.toBeInTheDocument();
     const chips = screen.getByTestId("split-run-intent-composer-chips");
     expect(within(chips).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(chips).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
@@ -1027,7 +1027,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary-copy")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     const chips = screen.getByTestId("split-run-intent-composer-chips");
@@ -1111,16 +1111,18 @@ describe("WorkOrderSplitRunPopup", () => {
     const tab = screen.getByTestId("split-run-work-order-tab");
     expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(within(tab).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+    // Demo intake scores Confidence only. The drawer falls back to the summary that exists.
+    expect(within(tab).getByTestId("split-run-intent-summary-drawer")).toHaveAttribute("data-kind", "confidence");
+    expect(within(tab).getByTestId("split-run-intent-summary-copy")).toHaveTextContent(
       "This issue is a good fit for an agent on this factory line.",
     );
+    expect(within(tab).getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(within(tab).getByRole("button", { name: "Confidence" })).toHaveAttribute("aria-expanded", "true");
     expect(within(tab).getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     expect(within(tab).getByTestId("split-run-intent-status-card")).toContainElement(
-      within(tab).getByTestId("split-run-intent-confidence-copy"),
+      within(tab).getByTestId("split-run-intent-summary-copy"),
     );
-    expect(
-      within(tab).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
-    ).not.toBeNull();
+    expect(within(tab).getByTestId("split-run-intent-summary-copy").closest("[data-slot=frame-panel]")).not.toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: /^Model/ })).toBeInTheDocument();

@@ -39,12 +39,12 @@ const LOOKS: { look: PlanStripLook; label: string; note: string }[] = [
   {
     look: "chips",
     label: "Chips",
-    note: "Clarity, Show plan, Archive, and Start chips.",
+    note: "Clarity, Confidence, Show plan, Archive, and Start chips. One drawer shows the open summary.",
   },
   {
     look: "chipsOpen",
     label: "Chips, plan open",
-    note: "Hide plan stays on the chips. Clarity, Archive, and Start stay.",
+    note: "Hide plan stays on the chips. Clarity, Confidence, Archive, and Start stay.",
   },
 ];
 

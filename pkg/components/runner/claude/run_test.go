@@ -26,6 +26,7 @@ func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 	assert.Contains(t, tools, "Edit")
 	assert.Contains(t, tools, "Write")
@@ -46,6 +47,7 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_spec")
+	assert.Contains(t, tools, "mcp__superplane__propose_clarity")
 	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.Contains(t, tools, "mcp__superplane__survey")
@@ -60,6 +62,7 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	assert.Contains(t, analysis, "propose_spec")
+	assert.Contains(t, analysis, "propose_clarity")
 	assert.Contains(t, analysis, "propose_confidence")
 	assert.NotContains(t, analysis, "propose_plan")
 	assert.Contains(t, analysis, "Follow the task prompt")

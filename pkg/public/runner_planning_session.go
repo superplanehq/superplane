@@ -37,7 +37,9 @@ type planningSpecRequest struct {
 	Body string `json:"body"`
 }
 
-type planningConfidenceRequest struct {
+// planningScoreRequest is the body for both the Clarity and the Confidence
+// score endpoints.
+type planningScoreRequest struct {
 	Score   float64 `json:"score"`
 	Summary string  `json:"summary"`
 }
@@ -247,12 +249,24 @@ func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
+func (s *Server) handleRunnerPlanningClarity(w http.ResponseWriter, r *http.Request) {
+	s.handleRunnerPlanningScore(w, r, (*models.FactoryPlanningSession).ProposeClarity)
+}
+
 func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.Request) {
+	s.handleRunnerPlanningScore(w, r, (*models.FactoryPlanningSession).ProposeConfidence)
+}
+
+func (s *Server) handleRunnerPlanningScore(
+	w http.ResponseWriter,
+	r *http.Request,
+	propose func(*models.FactoryPlanningSession, *gorm.DB, float64, string) error,
+) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
 		return
 	}
-	var req planningConfidenceRequest
+	var req planningScoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -262,7 +276,7 @@ func (s *Server) handleRunnerPlanningConfidence(w http.ResponseWriter, r *http.R
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	if err := session.ProposeConfidence(database.DB(r.Context()), req.Score, req.Summary); err != nil {
+	if err := propose(session, database.DB(r.Context()), req.Score, req.Summary); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}

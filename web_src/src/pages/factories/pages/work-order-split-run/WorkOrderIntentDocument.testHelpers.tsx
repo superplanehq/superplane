@@ -5,7 +5,7 @@ import { vi } from "vitest";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
+import { CLARITY_CHECK_NAME, CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 
@@ -54,6 +54,15 @@ export const HIGH_CONFIDENCE = {
   maxScore: 5,
   level: "positive" as const,
   summary: confidenceSuitabilitySummary("High"),
+};
+
+export const HIGH_CLARITY = {
+  id: "check-clarity",
+  name: CLARITY_CHECK_NAME,
+  score: 4,
+  maxScore: 5,
+  level: "positive" as const,
+  summary: "One decision is still open. Confirm the empty state copy.",
 };
 
 const EMPTY_ANALYSIS_VIEW: CreateWithAgentView = {

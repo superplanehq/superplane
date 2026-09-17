@@ -228,6 +228,48 @@ export const DraftAnalyzingWithScore: Story = {
     ),
     pullRequests: [],
     isAnalyzing: true,
+    clarityScore: 4,
+    confidenceScore: 3,
+  },
+};
+
+/** Refine finished: Clarity on top, Confidence below, in one meter footprint. */
+export const DraftScoredPair: Story = {
+  name: "Draft with Clarity and Confidence",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-pair",
+        number: "3",
+        title: "Retry webhook delivery after provider timeouts",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 3,
+  },
+};
+
+/** Intake only: one Confidence meter until a refine session scores Clarity. */
+export const DraftScoredIntakeOnly: Story = {
+  name: "Draft with Confidence only",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-intake",
+        number: "4",
+        title: "Reconcile settled ledger entries",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
     confidenceScore: 4,
   },
 };
