@@ -48,13 +48,13 @@ export const resolveIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { incidentId?: string; resolution?: string } | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.resolution) {
+  if (configuration?.resolution) {
     metadata.push({ icon: "message-square", label: `Resolution: ${truncate(configuration.resolution, 50)}` });
   }
 

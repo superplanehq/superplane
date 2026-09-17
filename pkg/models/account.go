@@ -247,19 +247,34 @@ func (a *Account) FindAccountProviderByID(provider, providerID string) (*Account
 	return &account, nil
 }
 
-func FindAccountByProvider(provider, providerID string) (*Account, error) {
-	var accountProvider AccountProvider
-	err := database.Conn().
-		Where("provider = ?", provider).
-		Where("provider_id = ?", providerID).
-		First(&accountProvider).
-		Error
-
+// FindAccountsByProvider returns every account that holds the provider
+// identity, oldest first so account-choice screens stay stable.
+func FindAccountsByProvider(tx *gorm.DB, provider, providerID string) ([]Account, error) {
+	var accounts []Account
+	err := tx.
+		Joins("JOIN account_providers ON account_providers.account_id = accounts.id").
+		Where("account_providers.provider = ?", provider).
+		Where("account_providers.provider_id = ?", providerID).
+		Order("accounts.created_at ASC, accounts.id ASC").
+		Find(&accounts).Error
 	if err != nil {
 		return nil, err
 	}
+	return accounts, nil
+}
 
-	return FindAccountByID(accountProvider.AccountID.String())
+// FindAccountByProvider returns the oldest account that holds the provider
+// identity. GitHub identities can belong to more than one account; use
+// FindAccountsByProvider when you need the full set.
+func FindAccountByProvider(tx *gorm.DB, provider, providerID string) (*Account, error) {
+	accounts, err := FindAccountsByProvider(tx, provider, providerID)
+	if err != nil {
+		return nil, err
+	}
+	if len(accounts) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &accounts[0], nil
 }
 
 func CountActiveInstallationAdmins(tx *gorm.DB) (int64, error) {

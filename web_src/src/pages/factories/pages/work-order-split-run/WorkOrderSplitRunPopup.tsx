@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
@@ -44,6 +45,11 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
+  const fileUpload = useWorkOrderFileUpload({
+    organizationId: organizationId ?? "",
+    factoryId: factoryId ?? "",
+    orderId,
+  });
   const analysis = useAnalysisPlanningSession({
     organizationId,
     factoryId,
@@ -51,6 +57,8 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     enabled: canLookupSession,
     pollForSession: refinementEnabled && isAnalyzing,
     canUpdate,
+    isUploading: fileUpload.isUploading,
+    uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({
       checks: fixture.checks,
       artifacts: popupData.artifacts,

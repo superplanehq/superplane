@@ -341,6 +341,11 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
   return sourceId === "checks" ? "checks" : "comments";
 }
 
+/** Dedicated setup page for Sentry exception intake. */
+export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
 export function automationsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }

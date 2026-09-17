@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -20,6 +21,7 @@ import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
@@ -49,6 +51,8 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
+  /** Opens guided Sentry intake setup. Hidden when unset. */
+  onSetupSentry?: () => void;
   /** Opens guided Jira intake setup. Hidden when unset. */
   onSetupJira?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
@@ -88,6 +92,7 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   onSetupJira,
   automations,
   automationRowCount,
@@ -151,7 +156,7 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={<BacklogColumnBanner panel={intakePanel} onSetupJira={onSetupJira} />}
+        banner={<BacklogColumnBanner panel={intakePanel} onSetupSentry={onSetupSentry} onSetupJira={onSetupJira} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
@@ -226,8 +231,16 @@ function BacklogColumnHeaderActions({
   );
 }
 
-function BacklogColumnBanner({ panel, onSetupJira }: { panel?: BacklogIntakePanel; onSetupJira?: () => void }) {
-  if (!panel && !onSetupJira) {
+function BacklogColumnBanner({
+  panel,
+  onSetupSentry,
+  onSetupJira,
+}: {
+  panel?: BacklogIntakePanel;
+  onSetupSentry?: () => void;
+  onSetupJira?: () => void;
+}) {
+  if (!panel && !onSetupSentry && !onSetupJira) {
     return null;
   }
 
@@ -241,8 +254,25 @@ function BacklogColumnBanner({ panel, onSetupJira }: { panel?: BacklogIntakePane
           onAddIntake={panel.onAddIntake}
         />
       ) : null}
+      {onSetupSentry ? <BacklogSetupSentryButton onClick={onSetupSentry} /> : null}
       {onSetupJira ? <BacklogSetupJiraButton onClick={onSetupJira} /> : null}
     </>
+  );
+}
+
+function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      data-testid="lines-backlog-setup-sentry"
+      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
+    >
+      <img src={sentryIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      {SENTRY_INTAKE_SETUP_COPY.setupButton}
+    </Button>
   );
 }
 

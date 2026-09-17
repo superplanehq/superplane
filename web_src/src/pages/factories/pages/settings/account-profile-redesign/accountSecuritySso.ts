@@ -7,7 +7,8 @@ export const SSO_PROVIDERS = [
 
 export type SsoProviderItem = (typeof SSO_PROVIDERS)[number];
 
-const GITHUB_PURPOSE = "Used to sign in and to credit pull requests.";
+const GITHUB_PURPOSE =
+  "Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.";
 
 export function ssoProviderDescription(
   provider: AccountRedesignSsoAccount["provider"],
