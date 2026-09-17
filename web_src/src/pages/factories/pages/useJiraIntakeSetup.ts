@@ -6,36 +6,52 @@ import {
   useIntegrationResources,
 } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type JiraSetupStep = "connection" | "project" | "complete";
 
-export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean) {
+export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean, selectIntegrationId = "") {
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
   const [error, setError] = useState<string>();
+  const pickedReturnedConnection = useRef(false);
 
-  const { connectedQuery, jiraIntegrations, jiraDefinition, existingNames } = useJiraConnections(organizationId);
+  const { connectedQuery, jiraIntegrations, jiraConnections, jiraDefinition, existingNames } =
+    useJiraConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project");
 
   useEffect(() => {
-    if (open) {
-      setStep("connection");
-      setIntegrationId("");
-      setProjectId("");
-      setError(undefined);
+    if (!open) {
+      pickedReturnedConnection.current = false;
+      return;
     }
+    setStep("connection");
+    setIntegrationId("");
+    setProjectId("");
+    setError(undefined);
   }, [open]);
 
   useEffect(() => {
+    if (!open || !selectIntegrationId || pickedReturnedConnection.current) return;
+
+    const returned = jiraConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
+    if (!returned || returned.status?.state !== "ready") return;
+
+    pickedReturnedConnection.current = true;
+    setIntegrationId(selectIntegrationId);
+    setStep("project");
+  }, [open, selectIntegrationId, jiraConnections]);
+
+  useEffect(() => {
+    if (selectIntegrationId) return;
     if (!integrationId && jiraIntegrations.length === 1) {
       setIntegrationId(jiraIntegrations[0].metadata?.id ?? "");
     }
-  }, [integrationId, jiraIntegrations]);
+  }, [integrationId, jiraIntegrations, selectIntegrationId]);
 
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
@@ -85,15 +101,16 @@ function useJiraConnections(organizationId: string) {
   const connectedQuery = useConnectedIntegrations(organizationId);
   const availableQuery = useAvailableIntegrations({ organizationId });
 
-  const jiraIntegrations = useMemo(
+  const jiraConnections = useMemo(
     () =>
       (connectedQuery.data ?? []).filter(
-        (integration) =>
-          integration.metadata?.integrationName === "jira" &&
-          integration.status?.state === "ready" &&
-          integration.metadata.id,
+        (integration) => integration.metadata?.integrationName === "jira" && integration.metadata.id,
       ),
     [connectedQuery.data],
+  );
+  const jiraIntegrations = useMemo(
+    () => jiraConnections.filter((integration) => integration.status?.state === "ready"),
+    [jiraConnections],
   );
   const existingNames = useMemo(
     () =>
@@ -108,6 +125,7 @@ function useJiraConnections(organizationId: string) {
   return {
     connectedQuery,
     jiraIntegrations,
+    jiraConnections,
     jiraDefinition: availableQuery.data?.find((integration) => integration.name === "jira"),
     existingNames,
   };

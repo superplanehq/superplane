@@ -123,6 +123,7 @@ import {
   factoryAppRunPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -133,7 +134,10 @@ import {
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
+  isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
+  jiraIntakeIntegrationIdFromSearch,
+  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -232,7 +236,7 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { search, state: locationState } = useLocation();
+  const { pathname, search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -281,7 +285,8 @@ export function LinesPage() {
   const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddJiraIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
-  const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
+  const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
+  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -432,7 +437,7 @@ export function LinesPage() {
       return;
     }
     if (template.id === "jira-issues") {
-      setJiraIntakeSetupOpen(true);
+      navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       return;
     }
     if (!isLineIntakeSourceId(template.id)) {
@@ -524,7 +529,9 @@ export function LinesPage() {
         open={jiraIntakeSetupOpen}
         organizationId={organizationId}
         factoryId={factoryId}
-        onClose={() => setJiraIntakeSetupOpen(false)}
+        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
+        selectIntegrationId={returnedJiraIntegrationId}
+        onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -622,7 +629,11 @@ export function LinesPage() {
                 ? () => navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, sentrySetupLineId))
                 : undefined
             }
-            onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
+            onSetupJira={
+              canSetupJira
+                ? () => navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id))
+                : undefined
+            }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
