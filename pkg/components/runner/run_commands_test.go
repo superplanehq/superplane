@@ -602,7 +602,7 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
+func TestRunnerProcessTaskStatusCanceledCancelsExecution(t *testing.T) {
 	t.Parallel()
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -612,7 +612,10 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 		ExitCode: &exit,
 	}
 	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
-	require.Equal(t, FailedOutputChannel, state.Channel)
+	assert.True(t, state.Cancelled)
+	assert.True(t, state.Finished)
+	assert.False(t, state.Passed)
+	assert.Empty(t, state.Channel)
 }
 
 func TestBrokerCancelTaskSuccess(t *testing.T) {
