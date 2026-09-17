@@ -63,6 +63,7 @@ The On Issue Event trigger starts a workflow execution when Sentry sends issue w
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object
+- **description**: The delivered issue as a formatted JSON block, with the issue link above it. Use this instead of interpolating `data.issue`, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ### Setup
@@ -105,6 +106,7 @@ This trigger uses issue webhooks from the connected Sentry organization. SuperPl
         "web_url": "https://your-org.sentry.io/issues/123/"
       }
     },
+    "description": "https://your-org.sentry.io/issues/123/\n\n```json\n{\n  \"assignedTo\": {\n    \"id\": \"789\",\n    \"name\": \"Person\",\n    \"type\": \"user\"\n  },\n  \"culprit\": \"SentryCustomError(frontend/src/util)\",\n  \"firstSeen\": \"2022-04-04T18:17:18.320000Z\",\n  \"id\": \"123\",\n  \"lastSeen\": \"2022-04-04T18:17:18.320000Z\",\n  \"level\": \"error\",\n  \"permalink\": \"https://your-org.sentry.io/issues/123/\",\n  \"project\": {\n    \"id\": \"456\",\n    \"name\": \"ipe\",\n    \"slug\": \"ipe\"\n  },\n  \"shortId\": \"IPE-1\",\n  \"status\": \"unresolved\",\n  \"substatus\": \"new\",\n  \"title\": \"Error #1: This is a test error!\",\n  \"web_url\": \"https://your-org.sentry.io/issues/123/\"\n}\n```",
     "installation": {
       "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
     },
