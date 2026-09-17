@@ -145,6 +145,10 @@ func processBrokerTaskStatus(
 		return nil
 	}
 
+	if brokerTaskCanceled(task) {
+		return state.Cancel()
+	}
+
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
 		channel = PassedOutputChannel
@@ -158,6 +162,10 @@ func processBrokerTaskStatus(
 		out["result"] = v
 	}
 	return state.Emit(channel, finishedEventType, []any{out})
+}
+
+func brokerTaskCanceled(task *Task) bool {
+	return strings.EqualFold(strings.TrimSpace(task.Status), "canceled")
 }
 
 func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {

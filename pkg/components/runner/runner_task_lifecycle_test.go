@@ -144,7 +144,8 @@ func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
 	require.Len(t, recorder.records, 1)
 	assert.Equal(t, int64(1280), recorder.records[0].TotalTokens)
 	require.Len(t, recorder.computes, 1)
-	assert.Equal(t, FailedOutputChannel, state.Channel)
+	assert.True(t, state.Cancelled)
+	assert.Empty(t, state.Channel)
 }
 
 func TestCancelBrokerTaskSchedulesPollWhenBrokerNotTerminal(t *testing.T) {
