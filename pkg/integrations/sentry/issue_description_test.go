@@ -99,9 +99,10 @@ func Test__IssueDescription(t *testing.T) {
 
 	t.Run("full issue and event follow sentry sections", func(t *testing.T) {
 		body := IssueDescription(fullIssue, event)
-		assert.Contains(t, body, "https://your-org.sentry.io/issues/123/")
+		assert.Contains(t, body, "[View in Sentry](https://your-org.sentry.io/issues/123/events/evt-1/)")
 		assert.Contains(t, body, "## Highlights")
 		assert.Contains(t, body, "**Title:** Error #1: This is a test error!")
+		assert.Contains(t, body, "**Short ID:** IPE-1")
 		assert.Contains(t, body, "**Environment:** production")
 		assert.Contains(t, body, "**Status:** unresolved (new)")
 		assert.Contains(t, body, "## Stack Trace")
@@ -118,6 +119,7 @@ func Test__IssueDescription(t *testing.T) {
 		assert.Contains(t, body, "sentry.javascript.browser 8.0.0")
 		assert.Contains(t, body, "**Replay ID:** rep-9")
 		assert.Contains(t, body, "**Trace ID:** abc123")
+		assert.NotContains(t, body, "## Message")
 		assert.NotContains(t, body, "```json")
 		assert.NotContains(t, body, "TODO")
 		assert.NotContains(t, body, "Root Cause")
@@ -130,7 +132,7 @@ func Test__IssueDescription(t *testing.T) {
 		}, nil)
 		assert.Equal(
 			t,
-			"https://your-org.sentry.io/issues/9/\n\n## Highlights\n\n- **Title:** Broken deploy",
+			"[View in Sentry](https://your-org.sentry.io/issues/9/)\n\n## Highlights\n\n- **Title:** Broken deploy",
 			body,
 		)
 		assert.NotContains(t, body, "## Stack Trace")
@@ -152,6 +154,97 @@ func Test__IssueDescription(t *testing.T) {
 		})
 		assert.NotContains(t, body, "## Stack Trace")
 		require.Contains(t, body, "## Highlights")
+		assert.Contains(t, body, "**Event type:** default")
+		assert.Contains(t, body, "## Message")
+		assert.Contains(t, body, "json body")
+	})
+
+	t.Run("prefers the event web URL", func(t *testing.T) {
+		body := IssueDescription(fullIssue, &IssueEventDetail{
+			WebURL: "https://your-org.sentry.io/issues/123/events/abc/",
+		})
+		assert.Contains(t, body, "[View in Sentry](https://your-org.sentry.io/issues/123/events/abc/)")
+		assert.NotContains(t, body, "events/evt-1")
+	})
+
+	t.Run("adds extra highlights and a message-only body", func(t *testing.T) {
+		issue := map[string]any{
+			"title":     "HTTP 500 /api/v1/runner/planning-sessions/specs",
+			"shortId":   "PRODUCTION-98",
+			"priority":  "high",
+			"userCount": 3,
+			"permalink": "https://your-org.sentry.io/issues/7738363580/",
+			"tags": []any{
+				map[string]any{"key": "release", "value": "from-tag"},
+			},
+		}
+		body := IssueDescription(issue, &IssueEventDetail{
+			Type:    "default",
+			Message: "HTTP 500 POST /api/v1/runner/planning-sessions/specs",
+			Release: "2026.09.17",
+			User: map[string]any{
+				"username": "runner",
+				"email":    "runner@example.com",
+				"id":       "42",
+			},
+			Entries: []IssueEventEntry{
+				{Type: "message", Data: map[string]any{"formatted": "HTTP 500 POST /api/v1/runner/planning-sessions/specs"}},
+			},
+		})
+		assert.Contains(t, body, "**Short ID:** PRODUCTION-98")
+		assert.Contains(t, body, "**Priority:** high")
+		assert.Contains(t, body, "**Users affected:** 3")
+		assert.Contains(t, body, "**Event type:** default")
+		assert.Contains(t, body, "**Message:** HTTP 500 POST /api/v1/runner/planning-sessions/specs")
+		assert.Contains(t, body, "**Release:** 2026.09.17")
+		assert.NotContains(t, body, "**Release:** from-tag")
+		assert.Contains(t, body, "## Message")
+		assert.Contains(t, body, "## User")
+		assert.Contains(t, body, "**username:** runner")
+		assert.Contains(t, body, "**email:** runner@example.com")
+		assert.Contains(t, body, "**id:** 42")
+	})
+
+	t.Run("uses the release tag when the event has no release field", func(t *testing.T) {
+		body := IssueDescription(map[string]any{
+			"title": "Broken deploy",
+			"tags": []any{
+				map[string]any{"key": "release", "value": "1.2.3"},
+			},
+		}, nil)
+		assert.Contains(t, body, "**Release:** 1.2.3")
+	})
+
+	t.Run("writes safe request headers and body and omits secrets", func(t *testing.T) {
+		body := IssueDescription(fullIssue, &IssueEventDetail{
+			Entries: []IssueEventEntry{
+				{
+					Type: "request",
+					Data: map[string]any{
+						"method": "POST",
+						"url":    "https://app.example.com/checkout",
+						"headers": []any{
+							[]any{"Content-Type", "application/json"},
+							[]any{"Authorization", "Bearer secret-token"},
+							[]any{"Cookie", "session=abc"},
+							[]any{"X-Api-Key", "super-secret"},
+							[]any{"User-Agent", "Go-http-client/1.1"},
+						},
+						"data": map[string]any{"spec": "draft"},
+					},
+				},
+			},
+		})
+		assert.Contains(t, body, "POST https://app.example.com/checkout")
+		assert.Contains(t, body, "**Content-Type:** application/json")
+		assert.Contains(t, body, "**User-Agent:** Go-http-client/1.1")
+		assert.Contains(t, body, `"spec":"draft"`)
+		assert.NotContains(t, body, "secret-token")
+		assert.NotContains(t, body, "session=abc")
+		assert.NotContains(t, body, "super-secret")
+		assert.NotContains(t, body, "Authorization")
+		assert.NotContains(t, body, "Cookie")
+		assert.NotContains(t, body, "X-Api-Key")
 	})
 }
 
@@ -159,12 +252,14 @@ func Test__FetchedIssueDescription(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			sentryMockResponse(http.StatusOK, `{"id":"123","title":"TypeError: boom","permalink":"https://sentry.io/issues/123/","count":"3"}`),
-			sentryMockResponse(http.StatusOK, `{"eventID":"latest","entries":[{"type":"exception","data":{"values":[{"type":"TypeError","value":"boom","stacktrace":{"frames":[{"filename":"main.go","function":"Run","lineNo":10,"inApp":true}]}}]}}]}`),
+			sentryMockResponse(http.StatusOK, `{"eventID":"evt-latest","release":"1.4.2","web_url":"https://sentry.io/issues/123/events/evt-latest/","entries":[{"type":"exception","data":{"values":[{"type":"TypeError","value":"boom","stacktrace":{"frames":[{"filename":"main.go","function":"Run","lineNo":10,"inApp":true}]}}]}}]}`),
 		},
 	}
 
 	body := FetchedIssueDescription(testIssueClient(httpCtx), map[string]any{"id": "123", "title": "TypeError: boom"}, nil)
 	assert.Contains(t, body, "**Count:** 3")
+	assert.Contains(t, body, "**Release:** 1.4.2")
+	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/events/evt-latest/)")
 	assert.Contains(t, body, "Run (main.go:10) [in app]")
 	assert.NotContains(t, body, "```json")
 }
