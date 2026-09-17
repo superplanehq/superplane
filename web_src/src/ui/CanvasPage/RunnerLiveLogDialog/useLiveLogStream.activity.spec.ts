@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
-import { useLiveLogStream } from "./useLiveLogStream";
+import { liveLogScrollTrigger, useLiveLogStream } from "./useLiveLogStream";
 
 const { captureExceptionMock, pumpMock, stopMock } = vi.hoisted(() => ({
   captureExceptionMock: vi.fn(),
@@ -145,5 +145,55 @@ describe("useLiveLogStream agent activity", () => {
     expect(result.current.sections).toHaveLength(1);
     expect(result.current.sections[0]?.activities).toHaveLength(1);
     expect(result.current.sections[0]?.activities?.[0]?.items).toHaveLength(2);
+  });
+
+  it("changes the scroll trigger when activity sequence advances without new items", () => {
+    const section = {
+      index: 0,
+      text: "Implementation",
+      lines: [] as string[],
+      events: [],
+      activities: [
+        {
+          id: "act-1",
+          provider: "claude",
+          status: "running" as const,
+          sequence: 3,
+          items: [
+            {
+              type: "content" as const,
+              id: "msg",
+              kind: "assistant" as const,
+              text: "Hello",
+              status: "running" as const,
+              truncated: false,
+            },
+          ],
+          truncated: false,
+        },
+      ],
+      status: "running" as const,
+      duration_ms: null,
+      started_at: 1,
+      collapsed: false,
+    };
+    const before = liveLogScrollTrigger({ sections: [section], orphanLines: [] });
+    const after = liveLogScrollTrigger({
+      sections: [
+        {
+          ...section,
+          activities: [
+            {
+              ...section.activities[0],
+              sequence: 4,
+              items: [{ ...section.activities[0].items[0], text: "Hello world" }],
+            },
+          ],
+        },
+      ],
+      orphanLines: [],
+    });
+
+    expect(before).not.toEqual(after);
   });
 });

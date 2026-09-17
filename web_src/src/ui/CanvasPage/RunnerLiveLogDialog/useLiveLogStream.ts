@@ -436,6 +436,15 @@ async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
   }
 }
 
+export function liveLogScrollTrigger(state: Pick<LogState, "sections" | "orphanLines">): string {
+  const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
+  const activityProgress = state.sections
+    .flatMap((section) => section.activities ?? [])
+    .map((activity) => `${activity.id}:${activity.sequence}`)
+    .join(",");
+  return `${state.sections.length}:${state.orphanLines.length}:${lineCount}:${activityProgress}`;
+}
+
 export type LiveLogStreamSession = {
   organizationId?: string;
   canvasId?: string;
@@ -457,15 +466,10 @@ export function useLiveLogStream(
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const sessionKeyRef = useRef<string | null>(null);
 
-  const scrollTrigger = useMemo(() => {
-    const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
-    const activityCount = state.sections.reduce(
-      (count, section) =>
-        count + (section.activities?.reduce((items, activity) => items + activity.items.length, 0) ?? 0),
-      0,
-    );
-    return `${state.sections.length}:${state.orphanLines.length}:${lineCount}:${activityCount}`;
-  }, [state.sections, state.orphanLines]);
+  const scrollTrigger = useMemo(
+    () => liveLogScrollTrigger({ sections: state.sections, orphanLines: state.orphanLines }),
+    [state.sections, state.orphanLines],
+  );
 
   const { scrollRef } = useScrollToBottom(scrollTrigger);
 
