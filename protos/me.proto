@@ -198,8 +198,8 @@ message RevokeTokenRequest {
 message RevokeTokenResponse {}
 
 // NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. A missing row defaults to all
-// workspace events. Nested `workspaces` leaves room for other levels later.
+// work order notifications. A missing row defaults to email for all
+// workspace events and keeps the browser channel off.
 message NotificationSettings {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -232,7 +232,16 @@ message NotificationSettings {
     repeated Type event_types = 3;
   }
 
+  message Browser {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means every type.
+    repeated Type event_types = 3;
+    bool show_while_viewing = 4;
+  }
+
   Workspaces workspaces = 1;
+  Browser browser = 2;
 }
 
 message DescribeNotificationSettingsRequest {}

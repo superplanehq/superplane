@@ -10,15 +10,19 @@ import {
   settingsFromAccountNotifications,
   togglesFromAllScopeEventTypes,
   togglesFromEventTypes,
+  workspaceScopeFromChannel,
   workspaceScopeFromSettings,
 } from "./notificationSettings";
 
 describe("notificationSettings", () => {
-  it("defaults to all workspaces", () => {
+  it("defaults to all workspaces and an off browser channel", () => {
     const settings = defaultNotificationSettings();
     expect(settings.workspaces?.scope).toBe("WORKSPACE_SCOPE_ALL");
     expect(settings.workspaces?.filters).toEqual([]);
+    expect(settings.browser?.scope).toBe("WORKSPACE_SCOPE_NONE");
+    expect(settings.browser?.showWhileViewing).toBe(true);
     expect(workspaceScopeFromSettings(undefined)).toBe("all");
+    expect(workspaceScopeFromChannel(undefined, "none")).toBe("none");
     expect(defaultNotificationTypeToggles().TYPE_WORK_ORDER_MENTIONED).toBe(true);
   });
 
@@ -62,6 +66,8 @@ describe("notificationSettings", () => {
     expect(accountNotificationsFromSettings({ workspaces: { scope: "WORKSPACE_SCOPE_NONE" } })).toMatchObject({
       emailEnabled: false,
       workspaceScope: "all",
+      browserEnabled: false,
+      browserShowWhileViewing: true,
     });
     expect(
       accountNotificationsFromSettings({
@@ -81,8 +87,36 @@ describe("notificationSettings", () => {
         workspaceScope: "all",
         workspaceIds: [],
         events: defaultNotificationTypeToggles(true),
+        browserEnabled: false,
+        browserWorkspaceScope: "all",
+        browserWorkspaceIds: [],
+        browserEvents: defaultNotificationTypeToggles(true),
+        browserShowWhileViewing: true,
       }).workspaces?.scope,
     ).toBe("WORKSPACE_SCOPE_NONE");
+  });
+
+  it("round-trips browser channel fields", () => {
+    const form = accountNotificationsFromSettings({
+      workspaces: { scope: "WORKSPACE_SCOPE_ALL" },
+      browser: {
+        scope: "WORKSPACE_SCOPE_FILTERED",
+        showWhileViewing: false,
+        filters: [{ workspaceId: "ws-2", eventTypes: ["TYPE_WORK_ORDER_MENTIONED"] }],
+      },
+    });
+    expect(form).toMatchObject({
+      browserEnabled: true,
+      browserWorkspaceScope: "selected",
+      browserWorkspaceIds: ["ws-2"],
+      browserShowWhileViewing: false,
+    });
+    expect(form.browserEvents.TYPE_WORK_ORDER_MENTIONED).toBe(true);
+    expect(form.browserEvents.TYPE_WORK_ORDER_ASSIGNED).toBe(false);
+    expect(settingsFromAccountNotifications(form).browser).toMatchObject({
+      scope: "WORKSPACE_SCOPE_FILTERED",
+      showWhileViewing: false,
+    });
   });
 });
 
