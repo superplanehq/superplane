@@ -3,11 +3,11 @@ import { MoreHorizontal } from "lucide-react";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Switch } from "@/ui/switch";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
