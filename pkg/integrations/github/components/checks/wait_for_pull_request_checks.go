@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -213,6 +215,7 @@ func (c *WaitForPullRequestChecks) Execute(ctx core.ExecutionContext) error {
 		ExecutionState: ctx.ExecutionState,
 		Requests:       ctx.Requests,
 		Integration:    ctx.Integration,
+		Logger:         ctx.Logger,
 	}, now)
 }
 
@@ -249,6 +252,7 @@ func (c *WaitForPullRequestChecks) HandleHook(ctx core.ActionHookContext) error 
 		ExecutionState: ctx.ExecutionState,
 		Requests:       ctx.Requests,
 		Integration:    ctx.Integration,
+		Logger:         ctx.Logger,
 	}, time.Now())
 }
 
@@ -277,22 +281,30 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 	}
 
 	repository, sha := waitChecksRefFromPayload(payload)
+	incomingName, incomingState := waitChecksNameFromPayload(eventType, payload)
+	fields := waitChecksWebhookFields(config, eventType, repository, sha, incomingName, incomingState)
+
 	if repository == "" || sha == "" {
+		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - missing repository or commit SHA")
 		return http.StatusOK, nil, nil
 	}
 	if !repositoryMatches(config.Repository, repository) {
+		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - repository does not match")
 		return http.StatusOK, nil, nil
 	}
 
 	if ctx.FindExecutionByKV == nil {
+		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - no waiting execution for this commit")
 		return http.StatusOK, nil, nil
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV(waitChecksRefKV, waitChecksRefValue(config.Repository, sha))
-	if err != nil {
+	if err != nil || executionCtx == nil {
+		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - no waiting execution for this commit")
 		return http.StatusOK, nil, nil
 	}
 	if waitChecksStopped(executionCtx.ExecutionState) {
+		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - execution already stopped")
 		return http.StatusOK, nil, nil
 	}
 
@@ -300,6 +312,7 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusInternalServerError, nil, err
 	}
 
+	logWaitChecks(ctx.Logger, fields, "Scheduling pull request checks evaluate")
 	return http.StatusOK, nil, nil
 }
 
@@ -318,6 +331,7 @@ type waitChecksRuntime struct {
 	ExecutionState core.ExecutionStateContext
 	Requests       core.RequestContext
 	Integration    core.IntegrationContext
+	Logger         *log.Entry
 }
 
 func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) error {
@@ -344,6 +358,7 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	sha := resolvedWaitChecksSHA(ctx.Configuration.Ref, checkRuns, combined)
 	timedOut := !now.Before(metadata.TimeoutAt)
 	evaluation := evaluatePullRequestChecks(checks, ctx.Configuration.CheckNames, timedOut)
+	logWaitChecksEvaluation(ctx.Logger, ctx.Configuration, sha, evaluation, timedOut)
 
 	if metadata.Fingerprint != "" && metadata.Fingerprint != evaluation.Fingerprint {
 		metadata.LastChangeAt = now
@@ -599,6 +614,153 @@ func waitChecksRefFromPayload(payload map[string]any) (string, string) {
 		sha = firstNonEmpty(sha, stringValue(checkSuite["head_sha"]))
 	}
 	return repository, sha
+}
+
+func waitChecksNameFromPayload(eventType string, payload map[string]any) (string, string) {
+	switch eventType {
+	case "status":
+		return stringValue(payload["context"]), stringValue(payload["state"])
+	case "check_run":
+		checkRun, ok := payload["check_run"].(map[string]any)
+		if !ok {
+			return "", ""
+		}
+		return stringValue(checkRun["name"]), firstNonEmpty(
+			stringValue(checkRun["conclusion"]),
+			stringValue(checkRun["status"]),
+		)
+	default:
+		return "", ""
+	}
+}
+
+func waitChecksWebhookFields(
+	config WaitForPullRequestChecksConfiguration,
+	eventType, repository, sha, incomingName, incomingState string,
+) log.Fields {
+	return log.Fields{
+		"event_type":                eventType,
+		"incoming_repository":       repository,
+		"incoming_sha":              sha,
+		"incoming_check":            incomingName,
+		"incoming_state":            incomingState,
+		"incoming_check_configured": incomingCheckConfigured(incomingName, config.CheckNames),
+		"configured_repository":     config.Repository,
+		"configured":                logStringList(config.CheckNames),
+		"wait_ref":                  waitChecksRefValue(config.Repository, sha),
+	}
+}
+
+func incomingCheckConfigured(incoming string, configured []string) bool {
+	incoming = strings.ToLower(strings.TrimSpace(incoming))
+	if incoming == "" {
+		return false
+	}
+	return slices.ContainsFunc(configured, func(name string) bool {
+		return strings.ToLower(strings.TrimSpace(name)) == incoming
+	})
+}
+
+func logWaitChecksEvaluation(
+	logger *log.Entry,
+	config WaitForPullRequestChecksConfiguration,
+	sha string,
+	evaluation waitChecksEvaluation,
+	timedOut bool,
+) {
+	fields := log.Fields{
+		"repository": config.Repository,
+		"ref":        config.Ref,
+		"sha":        sha,
+		"configured": logStringList(config.CheckNames),
+		"observed":   formatObservedChecks(evaluation.Checks),
+		"selected":   checkNames(evaluation.SelectedChecks),
+		"missing":    logStringList(evaluation.MissingSelected),
+		"pending":    pendingCheckNames(evaluation.SelectedChecks),
+		"failed":     checkNames(evaluation.FailedChecks),
+		"outcome":    evaluation.Outcome,
+		"timed_out":  timedOut,
+	}
+	if reason := waitChecksPendingReason(evaluation); reason != "" {
+		fields["reason"] = reason
+	}
+	logWaitChecks(logger, fields, waitChecksEvaluationMessage(evaluation.Outcome))
+}
+
+func waitChecksEvaluationMessage(outcome string) string {
+	switch outcome {
+	case waitChecksOutcomeFailed:
+		return "Wait for pull request checks failed"
+	case waitChecksOutcomeTimedOut:
+		return "Wait for pull request checks timed out"
+	case waitChecksOutcomePassed:
+		return "Wait for pull request checks passed"
+	default:
+		return "Wait for pull request checks still pending"
+	}
+}
+
+func waitChecksPendingReason(evaluation waitChecksEvaluation) string {
+	missing := len(evaluation.MissingSelected) > 0
+	pending := hasPending(evaluation.SelectedChecks)
+	switch {
+	case missing && pending:
+		return "missing and pending configured checks"
+	case missing:
+		return "missing configured checks"
+	case pending:
+		return "selected checks still pending"
+	default:
+		return ""
+	}
+}
+
+func formatObservedChecks(checks []PullRequestCheck) []string {
+	observed := make([]string, 0, len(checks))
+	for _, check := range checks {
+		if check.Conclusion == "" {
+			observed = append(observed, fmt.Sprintf("%s (%s/%s)", check.Name, check.Kind, check.Status))
+			continue
+		}
+		observed = append(observed, fmt.Sprintf("%s (%s/%s/%s)", check.Name, check.Kind, check.Status, check.Conclusion))
+	}
+	return observed
+}
+
+func checkNames(checks []PullRequestCheck) []string {
+	names := make([]string, 0, len(checks))
+	for _, check := range checks {
+		names = append(names, check.Name)
+	}
+	return names
+}
+
+func pendingCheckNames(checks []PullRequestCheck) []string {
+	names := make([]string, 0, len(checks))
+	for _, check := range checks {
+		if check.Status != checkStatusCompleted {
+			names = append(names, check.Name)
+			continue
+		}
+		if check.Conclusion != "" && !nonFailingConclusions[check.Conclusion] && !failingConclusions[check.Conclusion] {
+			names = append(names, check.Name)
+		}
+	}
+	return names
+}
+
+func logStringList(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
+}
+
+func logWaitChecks(logger *log.Entry, fields log.Fields, message string) {
+	if logger == nil {
+		return
+	}
+	logger.WithFields(fields).Info(message)
 }
 
 func repositoryMatches(configured, incoming string) bool {
