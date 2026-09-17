@@ -950,6 +950,7 @@ func (f *fakeExecutionState) EmitAndContinue(channel, payloadType string, payloa
 }
 func (f *fakeExecutionState) Pass() error                       { return nil }
 func (f *fakeExecutionState) Fail(reason, message string) error { return nil }
+func (f *fakeExecutionState) Cancel() error                     { return nil }
 
 func TestSSHCommand_CommandSourceOrDefault(t *testing.T) {
 	t.Run("empty defaults to inline", func(t *testing.T) {

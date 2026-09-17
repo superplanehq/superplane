@@ -146,6 +146,10 @@ func (s *ExecutionStateContext) Fail(reason, message string) error {
 	return nil
 }
 
+func (s *ExecutionStateContext) Cancel() error {
+	return s.execution.CancelInTransaction(s.tx, s.execution.CancelledBy)
+}
+
 func (s *ExecutionStateContext) SetKV(key, value string) error {
 	return models.CreateNodeExecutionKVInTransaction(s.tx, s.execution.WorkflowID, s.execution.NodeID, s.execution.ID, key, value)
 }
