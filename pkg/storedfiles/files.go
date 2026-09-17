@@ -238,6 +238,46 @@ func deleteObjects(ctx context.Context, provider blob.Provider, keys []string) (
 	return leftover, first
 }
 
+type PendingUpload struct {
+	SizeBytes int64
+	Checksum  string
+}
+
+func StorePendingUpload(ctx context.Context, provider blob.Provider, file *models.File, body io.Reader) (*PendingUpload, error) {
+	if provider == nil {
+		return nil, blob.ErrProviderNotConfigured
+	}
+	if file.State != models.FileStatePending {
+		return nil, fmt.Errorf("%w: file is not pending", models.ErrFileInvalid)
+	}
+
+	hasher := sha256.New()
+	maxBytes := file.MaxBytes()
+	limited := &limitedReader{r: io.TeeReader(body, hasher), n: maxBytes}
+	if err := provider.Put(ctx, file.StorageKey, limited, blob.PutOptions{ContentType: file.ContentType}); err != nil {
+		_ = provider.Delete(ctx, file.StorageKey)
+		if errors.Is(err, errFileTooLarge) {
+			return nil, fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
+		}
+		return nil, err
+	}
+	if limited.exceeded {
+		_ = provider.Delete(ctx, file.StorageKey)
+		return nil, fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
+	}
+
+	info, err := provider.Head(ctx, file.StorageKey)
+	if err != nil {
+		_ = provider.Delete(ctx, file.StorageKey)
+		return nil, err
+	}
+	size := info.Size
+	if size <= 0 {
+		size = limited.read
+	}
+	return &PendingUpload{SizeBytes: size, Checksum: hex.EncodeToString(hasher.Sum(nil))}, nil
+}
+
 func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, file *models.File, body io.Reader) error {
 	if provider == nil {
 		return blob.ErrProviderNotConfigured
@@ -246,33 +286,12 @@ func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, fi
 		return fmt.Errorf("%w: file is not pending", models.ErrFileInvalid)
 	}
 
-	hasher := sha256.New()
-	maxBytes := file.MaxBytes()
-	limited := &limitedReader{r: io.TeeReader(body, hasher), n: maxBytes}
-	if err := provider.Put(ctx, file.StorageKey, limited, blob.PutOptions{ContentType: file.ContentType}); err != nil {
-		_ = provider.Delete(ctx, file.StorageKey)
-		_ = file.MarkFailed(tx)
-		if errors.Is(err, errFileTooLarge) {
-			return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
-		}
-		return err
-	}
-	if limited.exceeded {
-		_ = provider.Delete(ctx, file.StorageKey)
-		_ = file.MarkFailed(tx)
-		return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
-	}
-
-	info, err := provider.Head(ctx, file.StorageKey)
+	upload, err := StorePendingUpload(ctx, provider, file, body)
 	if err != nil {
 		_ = file.MarkFailed(tx)
 		return err
 	}
-	size := info.Size
-	if size <= 0 {
-		size = limited.read
-	}
-	if err := file.MarkReady(tx, size, hex.EncodeToString(hasher.Sum(nil))); err != nil {
+	if err := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); err != nil {
 		_ = provider.Delete(ctx, file.StorageKey)
 		_ = file.MarkFailed(tx)
 		return err

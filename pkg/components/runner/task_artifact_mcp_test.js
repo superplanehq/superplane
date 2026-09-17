@@ -82,8 +82,9 @@ test("resolveArtifactFile rejects unsupported extensions", () => {
 test("uploadArtifact streams metadata and records the returned artifact", async () => {
   const value = fixture();
   const calls = [];
+  const title = "Checkout → success";
   const result = await uploadArtifact(
-    { path: value.file, title: "Checkout" },
+    { path: value.file, title },
     value.env,
     async (url, options) => {
       calls.push({ url, options });
@@ -99,9 +100,12 @@ test("uploadArtifact streams metadata and records the returned artifact", async 
   assert.equal(calls[0].options.headers.Authorization, "Bearer token");
   assert.equal(calls[0].options.headers["Content-Length"], "3");
   assert.equal(
-    calls[0].options.headers["X-SuperPlane-Artifact-Title"],
-    "Checkout",
+    decodeURIComponent(
+      calls[0].options.headers["X-SuperPlane-Artifact-Title"],
+    ),
+    title,
   );
+  assert.doesNotThrow(() => new Headers(calls[0].options.headers));
   assert.equal(readManifest(value.env).status, "captured");
   assert.equal(readManifest(value.env).artifacts.length, 1);
 
