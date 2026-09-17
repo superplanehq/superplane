@@ -98,3 +98,63 @@ func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 	_, err = resource.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
 	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
 }
+
+func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "taken", false, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Headers: []models.FactoryAgentResourceHeader{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	})
+	require.NoError(t, err)
+
+	var revoked atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		revoked.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://api.mobbin.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthOAuth,
+	})
+	require.NoError(t, err)
+	require.NoError(t, resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+	require.NoError(t, resource.SetOAuthMetadata(db, models.FactoryAgentResourceOAuthMetadata{
+		ClientID:           "client-1",
+		RevocationEndpoint: server.URL,
+	}))
+	encrypted, err := mcp.EncryptResourceSecret(t.Context(), r.Encryptor, resource.ID, "refresh-token")
+	require.NoError(t, err)
+	require.NoError(t, resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, encrypted))
+
+	taken := "taken"
+	nextURL := "https://other.example/mcp"
+	_, err = UpdateFactoryAgentResource(t.Context(), IntakeDependencies{Encryptor: r.Encryptor}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+		Name:       &taken,
+		Url:        &nextURL,
+	})
+	require.Error(t, err)
+	assert.False(t, revoked.Load())
+
+	reloaded, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "mobbin", reloaded.Name)
+	assert.Equal(t, "https://api.mobbin.com/mcp", reloaded.Config.Data().URL)
+	assert.Equal(t, models.FactoryAgentResourceOAuthConnected, reloaded.OAuthState())
+	secret, err := resource.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+	require.NoError(t, err)
+	assert.NotEmpty(t, secret.Value)
+}

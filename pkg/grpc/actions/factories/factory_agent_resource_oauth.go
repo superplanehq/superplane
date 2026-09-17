@@ -141,7 +141,7 @@ func DisconnectFactoryAgentResourceOAuth(
 		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
 	}
 
-	revokeResourceOAuth(ctx, deps, db, resource)
+	captureOAuthRevocation(ctx, deps, db, resource).run(ctx, deps)
 	if err := resource.DeleteSecrets(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
 	}
@@ -269,13 +269,38 @@ func CompleteFactoryAgentResourceOAuth(
 	return redirectPath, 302, ""
 }
 
-func revokeResourceOAuth(
+type oauthRevocation struct {
+	endpoint string
+	clientID string
+	refresh  string
+}
+
+func captureOAuthRevocation(
 	ctx context.Context,
 	deps IntakeDependencies,
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
-) {
+) *oauthRevocation {
 	if resource == nil || deps.Encryptor == nil {
+		return nil
+	}
+	metadata := resource.OAuthMetadata.Data()
+	if metadata.RevocationEndpoint == "" {
+		return nil
+	}
+	refresh, _ := mcp.DecryptedResourceSecret(ctx, deps.Encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken)
+	if refresh == "" {
+		return nil
+	}
+	return &oauthRevocation{
+		endpoint: metadata.RevocationEndpoint,
+		clientID: metadata.ClientID,
+		refresh:  refresh,
+	}
+}
+
+func (r *oauthRevocation) run(ctx context.Context, deps IntakeDependencies) {
+	if r == nil {
 		return
 	}
 	httpClient := mcp.DoerFromCore(nil)
@@ -284,25 +309,5 @@ func revokeResourceOAuth(
 	}
 	oauthCtx, cancel := mcp.TimeoutContext(ctx)
 	defer cancel()
-	revokeStoredOAuthTokens(oauthCtx, httpClient, deps.Encryptor, db, resource)
-}
-
-func revokeStoredOAuthTokens(
-	ctx context.Context,
-	httpClient mcp.HTTPDoer,
-	encryptor crypto.Encryptor,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-) {
-	if resource == nil || encryptor == nil || httpClient == nil {
-		return
-	}
-	metadata := resource.OAuthMetadata.Data()
-	if metadata.RevocationEndpoint == "" {
-		return
-	}
-	refresh, _ := mcp.DecryptedResourceSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken)
-	if refresh != "" {
-		mcp.RevokeToken(ctx, httpClient, metadata.RevocationEndpoint, metadata.ClientID, refresh)
-	}
+	mcp.RevokeToken(oauthCtx, httpClient, r.endpoint, r.clientID, r.refresh)
 }

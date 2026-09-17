@@ -124,12 +124,14 @@ func UpdateFactoryAgentResource(
 		config = &merged
 	}
 
+	var revocation *oauthRevocation
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
-		revokeResourceOAuth(ctx, deps, db, resource)
+		revocation = captureOAuthRevocation(ctx, deps, db, resource)
 	}
 	if err := resource.Update(db, name, enabled, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
+	revocation.run(ctx, deps)
 	return &pb.UpdateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
 }
 
@@ -156,10 +158,11 @@ func DeleteFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
-	revokeResourceOAuth(ctx, deps, db, resource)
+	revocation := captureOAuthRevocation(ctx, deps, db, resource)
 	if err := resource.Delete(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
+	revocation.run(ctx, deps)
 	return &pb.DeleteFactoryAgentResourceResponse{}, nil
 }
 
