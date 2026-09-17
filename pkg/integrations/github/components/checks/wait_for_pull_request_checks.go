@@ -281,8 +281,8 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 	}
 
 	repository, sha := waitChecksRefFromPayload(payload)
-	incomingName, incomingState := waitChecksNameFromPayload(eventType, payload)
-	fields := waitChecksWebhookFields(config, eventType, repository, sha, incomingName, incomingState)
+	name, state := waitChecksNameFromPayload(eventType, payload)
+	fields := waitChecksWebhookFields(config, eventType, repository, sha, name, state)
 
 	if repository == "" || sha == "" {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - missing repository or commit SHA")
@@ -636,28 +636,26 @@ func waitChecksNameFromPayload(eventType string, payload map[string]any) (string
 
 func waitChecksWebhookFields(
 	config WaitForPullRequestChecksConfiguration,
-	eventType, repository, sha, incomingName, incomingState string,
+	event, repository, sha, name, state string,
 ) log.Fields {
 	return log.Fields{
-		"event_type":                eventType,
-		"incoming_repository":       repository,
-		"incoming_sha":              sha,
-		"incoming_check":            incomingName,
-		"incoming_state":            incomingState,
-		"incoming_check_configured": incomingCheckConfigured(incomingName, config.CheckNames),
-		"configured_repository":     config.Repository,
-		"configured":                logStringList(config.CheckNames),
-		"wait_ref":                  waitChecksRefValue(config.Repository, sha),
+		"event":      event,
+		"repository": repository,
+		"sha":        sha,
+		"name":       name,
+		"state":      state,
+		"matched":    checkNameConfigured(name, config.CheckNames),
+		"configured": logStringList(config.CheckNames),
 	}
 }
 
-func incomingCheckConfigured(incoming string, configured []string) bool {
-	incoming = strings.ToLower(strings.TrimSpace(incoming))
-	if incoming == "" {
+func checkNameConfigured(name string, configured []string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
 		return false
 	}
-	return slices.ContainsFunc(configured, func(name string) bool {
-		return strings.ToLower(strings.TrimSpace(name)) == incoming
+	return slices.ContainsFunc(configured, func(configuredName string) bool {
+		return strings.ToLower(strings.TrimSpace(configuredName)) == name
 	})
 }
 
