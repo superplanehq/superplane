@@ -19,24 +19,24 @@ const (
 	NotificationChannelEmail   = "email"
 	NotificationChannelBrowser = "browser"
 
-	NotificationTypeWorkOrderAssigned        = "work_order_assigned"
-	NotificationTypeWorkOrderCommentOwned    = "work_order_comment_owned"
-	NotificationTypeWorkOrderCommentCreated  = "work_order_comment_created"
 	NotificationTypeWorkOrderStatusOwned     = "work_order_status_owned"
-	NotificationTypeWorkOrderArtifactOwned   = "work_order_artifact_owned"
-	NotificationTypeWorkOrderMention         = "work_order_mention"
 	NotificationTypeWorkOrderStatusNoteOwned = "work_order_status_note_owned"
+	NotificationTypeWorkOrderAgentQuestion   = "work_order_agent_question"
+	NotificationTypeWorkOrderPlanReady       = "work_order_plan_ready"
+
+	// NotificationTypeNoneSelected is stored when an all-workspaces list has
+	// no current types. Delivery ignores unknown names, so every current
+	// type stays off. Serialize drops this name, so the API returns an
+	// empty list rather than the empty-list default.
+	NotificationTypeNoneSelected = "none"
 )
 
 // NotificationTypes lists every configurable notification type.
 var NotificationTypes = []string{
-	NotificationTypeWorkOrderAssigned,
-	NotificationTypeWorkOrderCommentOwned,
-	NotificationTypeWorkOrderCommentCreated,
 	NotificationTypeWorkOrderStatusOwned,
-	NotificationTypeWorkOrderArtifactOwned,
-	NotificationTypeWorkOrderMention,
 	NotificationTypeWorkOrderStatusNoteOwned,
+	NotificationTypeWorkOrderAgentQuestion,
+	NotificationTypeWorkOrderPlanReady,
 }
 
 var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all, filtered, or none")
