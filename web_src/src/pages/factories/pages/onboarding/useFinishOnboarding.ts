@@ -15,7 +15,7 @@ import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboarding
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   provisionEventApps,
-  provisionGithubIntake,
+  provisionOnboardingIntake,
   provisionLine,
   type CreateFactoryIntake,
   type InstallOnboardingApp,
@@ -170,9 +170,10 @@ export async function provisionWorkspace(args: {
     listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
-  await provisionGithubIntake({
+  await provisionOnboardingIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    issuesChoice: args.issuesChoice,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
