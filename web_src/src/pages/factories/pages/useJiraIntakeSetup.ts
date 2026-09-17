@@ -1,4 +1,3 @@
-import type { OrganizationsIntegration } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
   useAvailableIntegrations,
@@ -11,12 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 export type JiraSetupStep = "connection" | "project" | "complete";
 
-export function useJiraIntakeSetup(
-  organizationId: string,
-  factoryId: string,
-  open: boolean,
-  selectIntegrationId = "",
-) {
+export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean, selectIntegrationId = "") {
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");

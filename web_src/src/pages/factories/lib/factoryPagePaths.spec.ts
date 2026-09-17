@@ -138,9 +138,7 @@ describe("factoryJiraIntakeSetupPath", () => {
   it("asks the dialog to select the returned connection after OAuth", () => {
     expect(
       factoryJiraIntakeSetupPath("org-1", "SP", "line-plan", { integrationId: "11111111-1111-1111-1111-111111111111" }),
-    ).toBe(
-      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&jiraIntegrationId=11111111-1111-1111-1111-111111111111",
-    );
+    ).toBe("/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&jiraIntegrationId=11111111-1111-1111-1111-111111111111");
   });
 
   it("reads the Jira intake resume query", () => {
@@ -156,10 +154,7 @@ describe("factoryJiraIntakeSetupPath", () => {
 
   it("drops the Jira intake resume query from the line URL", () => {
     expect(
-      withoutJiraIntakeSetupSearch(
-        "/org-1/workspaces/sp/lines/line-plan",
-        "?jiraIntake=1&jiraIntegrationId=int-new",
-      ),
+      withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&jiraIntegrationId=int-new"),
     ).toBe("/org-1/workspaces/sp/lines/line-plan");
     expect(
       withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&automations=backlog"),

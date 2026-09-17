@@ -79,11 +79,7 @@ describe("JiraIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
-    mocks.connected.splice(
-      0,
-      mocks.connected.length,
-      jiraConnection("integration-1", "Acme Jira"),
-    );
+    mocks.connected.splice(0, mocks.connected.length, jiraConnection("integration-1", "Acme Jira"));
   });
 
   it("creates the intake once a connection and a project are chosen", async () => {

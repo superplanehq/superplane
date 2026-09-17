@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	setupReturnPathKey             = "setupReturnPath"
-	setupReturnedIntegrationParam  = "jiraIntegrationId"
+	setupReturnPathKey            = "setupReturnPath"
+	setupReturnedIntegrationParam = "jiraIntegrationId"
 )
 
 // oauthApp is the Atlassian 3LO app SuperPlane uses for this connection.
