@@ -2,6 +2,7 @@ import { useCallback, useState, type ChangeEvent, type FormEvent, type KeyboardE
 import { ArrowUp, ClipboardList, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -162,7 +163,7 @@ function TaskSection({
       className="flex max-h-[45%] min-h-0 shrink-0 flex-col overflow-hidden px-3 py-2"
       aria-label={BUILT_IN_AGENT_COPY.tasksHeading}
     >
-      <h3 className="mb-2 text-[13px] font-medium text-foreground">{BUILT_IN_AGENT_COPY.tasksHeading}</h3>
+      <h3 className="mb-2 shrink-0 text-[13px] font-medium text-foreground">{BUILT_IN_AGENT_COPY.tasksHeading}</h3>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tasks.length === 0 ? (
           <EmptyState
@@ -179,11 +180,10 @@ function TaskSection({
             ))}
           </ul>
         )}
+        <CreateTaskRow onCreateTask={onCreateTask} />
+        {pendingPlan ? <PlanProposal tasks={tasks} plan={pendingPlan} /> : null}
       </div>
-      <CreateTaskRow onCreateTask={onCreateTask} />
-      {pendingPlan ? (
-        <PlanProposal tasks={tasks} plan={pendingPlan} onAccept={onAcceptPlan} onDismiss={onDismissPlan} />
-      ) : null}
+      {pendingPlan ? <PlanProposalActions onAccept={onAcceptPlan} onDismiss={onDismissPlan} /> : null}
     </section>
   );
 }
@@ -234,11 +234,14 @@ function CreateTaskRow({ onCreateTask }: { onCreateTask: (title: string) => void
         submit();
       }}
     >
+      <Label htmlFor="built-in-agent-create-title" className="sr-only">
+        {BUILT_IN_AGENT_COPY.createTaskPlaceholder}
+      </Label>
       <Input
+        id="built-in-agent-create-title"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder={BUILT_IN_AGENT_COPY.createTaskPlaceholder}
-        aria-label={BUILT_IN_AGENT_COPY.createTaskPlaceholder}
       />
       <Button type="submit" size="xs">
         {BUILT_IN_AGENT_COPY.createTask}
@@ -247,17 +250,7 @@ function CreateTaskRow({ onCreateTask }: { onCreateTask: (title: string) => void
   );
 }
 
-function PlanProposal({
-  tasks,
-  plan,
-  onAccept,
-  onDismiss,
-}: {
-  tasks: BuiltInAgentTask[];
-  plan: BuiltInAgentProposedPlan;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
+function PlanProposal({ tasks, plan }: { tasks: BuiltInAgentTask[]; plan: BuiltInAgentProposedPlan }) {
   const ordered = plan.taskIds
     .map((taskId) => tasks.find((task) => task.id === taskId))
     .filter((task): task is BuiltInAgentTask => Boolean(task));
@@ -267,20 +260,25 @@ function PlanProposal({
       <p className="text-[13px] font-medium text-foreground">{BUILT_IN_AGENT_COPY.planTitle}</p>
       <p className="mt-1 text-[12px] text-muted-foreground">{plan.reason}</p>
       <ol className="mt-2 list-decimal space-y-1 pl-4">
-        {ordered.map((task) => (
-          <li key={task.id} className="text-[13px] text-foreground">
-            {task.title}
+        {ordered.map((item) => (
+          <li key={item.id} className="text-[13px] text-foreground">
+            {item.title}
           </li>
         ))}
       </ol>
-      <div className="mt-2 flex items-center gap-2">
-        <Button type="button" size="xs" onClick={onAccept}>
-          {BUILT_IN_AGENT_COPY.acceptPlan}
-        </Button>
-        <Button type="button" variant="outline" size="xs" onClick={onDismiss}>
-          {BUILT_IN_AGENT_COPY.dismissPlan}
-        </Button>
-      </div>
+    </div>
+  );
+}
+
+function PlanProposalActions({ onAccept, onDismiss }: { onAccept: () => void; onDismiss: () => void }) {
+  return (
+    <div className="mt-2 flex shrink-0 items-center gap-2">
+      <Button type="button" size="xs" onClick={onAccept}>
+        {BUILT_IN_AGENT_COPY.acceptPlan}
+      </Button>
+      <Button type="button" variant="outline" size="xs" onClick={onDismiss}>
+        {BUILT_IN_AGENT_COPY.dismissPlan}
+      </Button>
     </div>
   );
 }
@@ -313,8 +311,12 @@ function Composer({ onSend, disabled }: { onSend: (content: string) => void; dis
 
   return (
     <footer className="px-3 pb-3 pt-2">
+      <Label htmlFor="built-in-agent-composer" className="sr-only">
+        {BUILT_IN_AGENT_COPY.composerPlaceholder}
+      </Label>
       <div className="overflow-hidden rounded-lg bg-card shadow-sm outline outline-1 outline-border">
         <Textarea
+          id="built-in-agent-composer"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

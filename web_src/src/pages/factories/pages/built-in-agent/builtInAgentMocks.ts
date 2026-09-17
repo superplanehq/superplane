@@ -1,20 +1,4 @@
-import type { FactoriesWorkOrder } from "@/api-client";
-
-import { factoryAgentChatMessages } from "../../__fixtures__/factoryAgentChatMessages";
-import {
-  CLOSED_WORK_ORDER,
-  DRAFT_WORK_ORDER,
-  INGEST_DRAFT_WORK_ORDER,
-  OPEN_WORK_ORDER,
-  OPEN_WORK_ORDER_SECONDARY,
-  RUNNING_WORK_ORDER,
-} from "../../__fixtures__/factoryPageWorkOrders";
-import {
-  WORK_ORDER_BOARD_LANES,
-  getWorkOrderDisplayStatus,
-  type WorkOrderBoardLaneId,
-  type WorkOrderDisplayStatus,
-} from "../../lib/workOrderProgress";
+import type { WorkOrderBoardLaneId, WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 
 export type BuiltInAgentLane = WorkOrderBoardLaneId;
 export type BuiltInAgentTaskState = WorkOrderDisplayStatus;
@@ -72,55 +56,6 @@ export const BUILT_IN_AGENT_COPY = {
   retryReply: "Ready. Send a message to continue.",
   planReason: "Do waiting work first, then backlog, then running work.",
 } as const;
-
-const LANE_BY_STATUS = new Map<WorkOrderDisplayStatus, BuiltInAgentLane>(
-  WORK_ORDER_BOARD_LANES.flatMap((lane) => lane.statuses.map((status) => [status, lane.id] as const)),
-);
-
-function taskFromWorkOrder(order: FactoriesWorkOrder): BuiltInAgentTask {
-  const displayStatus = getWorkOrderDisplayStatus(order);
-  return {
-    id: order.id ?? "",
-    title: order.title?.trim() || "Untitled task",
-    state: displayStatus,
-    lane: LANE_BY_STATUS.get(displayStatus) ?? "backlog",
-    owner: order.assignees?.[0]?.name ?? null,
-    updatedAt: order.updatedAt ?? order.createdAt ?? new Date().toISOString(),
-  };
-}
-
-export const SEED_TASKS: BuiltInAgentTask[] = [
-  DRAFT_WORK_ORDER,
-  INGEST_DRAFT_WORK_ORDER,
-  OPEN_WORK_ORDER,
-  OPEN_WORK_ORDER_SECONDARY,
-  RUNNING_WORK_ORDER,
-  CLOSED_WORK_ORDER,
-].map(taskFromWorkOrder);
-
-const chatFixture = factoryAgentChatMessages();
-
-export const SEED_TRANSCRIPT: BuiltInAgentMessage[] = chatFixture.messages.map((message, index) => ({
-  id: message.id,
-  role: message.role as BuiltInAgentMessageRole,
-  content:
-    index === 0
-      ? "Create a task for the duplicate refund work."
-      : "Created the task. Tell me if you want a plan for the board.",
-  createdAt: message.createdAt,
-}));
-
-export const SAMPLE_PLAN: BuiltInAgentProposedPlan = {
-  taskIds: [
-    OPEN_WORK_ORDER_SECONDARY.id ?? "",
-    OPEN_WORK_ORDER.id ?? "",
-    INGEST_DRAFT_WORK_ORDER.id ?? "",
-    DRAFT_WORK_ORDER.id ?? "",
-    RUNNING_WORK_ORDER.id ?? "",
-    CLOSED_WORK_ORDER.id ?? "",
-  ],
-  reason: BUILT_IN_AGENT_COPY.planReason,
-};
 
 const LANE_PLAN_RANK: Record<BuiltInAgentLane, number> = {
   review: 0,

@@ -2,8 +2,6 @@ import { useCallback, useReducer } from "react";
 
 import {
   BUILT_IN_AGENT_COPY,
-  SEED_TASKS,
-  SEED_TRANSCRIPT,
   applyPlanOrder,
   buildProposedPlan,
   findTaskByTitle,
@@ -52,8 +50,8 @@ const PLAN_PATTERN = /^(?:propose\s+(?:a\s+|an\s+ordered\s+)?plan|plan)$/i;
 export function createBuiltInAgentPrototypeState(seed: BuiltInAgentPrototypeSeed = {}): BuiltInAgentPrototypeState {
   return {
     panelOpen: seed.panelOpen ?? true,
-    tasks: seed.tasks ?? SEED_TASKS,
-    transcript: seed.transcript ?? SEED_TRANSCRIPT,
+    tasks: seed.tasks ?? [],
+    transcript: seed.transcript ?? [],
     pendingDeleteId: seed.pendingDeleteId ?? null,
     pendingPlan: seed.pendingPlan ?? null,
     hasError: seed.hasError ?? false,
@@ -84,7 +82,7 @@ function reducer(state: BuiltInAgentPrototypeState, action: PrototypeAction): Bu
     case "closePanel":
       return { ...state, panelOpen: false };
     case "createTask":
-      return { ...state, tasks: [action.task, ...state.tasks] };
+      return { ...state, tasks: [action.task, ...state.tasks], pendingPlan: null };
     case "requestDelete":
       return { ...state, pendingDeleteId: action.taskId };
     case "confirmDelete":
