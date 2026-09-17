@@ -1,4 +1,7 @@
+import { commandText, isCommandTool, toolFilePaths } from "@/lib/agentToolLabels";
 import type { AgentActivityItem, AgentToolItem } from "./agentActivity";
+
+export { commandDisplayText, commandText, isCommandTool, toolFilePaths } from "@/lib/agentToolLabels";
 
 export type ToolActivityGroup = {
   type: "tool_activity_group";
@@ -97,48 +100,6 @@ export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
   }
 
   return grouped;
-}
-
-export function isCommandTool(item: AgentActivityItem): boolean {
-  return item.type === "tool" && ["bash", "command_execution"].includes(item.kind.toLowerCase());
-}
-
-export function commandDisplayText(input: string): string | undefined {
-  const command = commandText(input).trim().replace(/\r?\n/g, " ");
-  return command || undefined;
-}
-
-export function commandText(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed.startsWith("{")) return input;
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const command = (parsed as Record<string, unknown>).command;
-      if (typeof command === "string") return command;
-    }
-  } catch {
-    // A live tool input is often incomplete. Read the available command below.
-  }
-
-  return commandFromPartialJSON(trimmed) ?? input;
-}
-
-export function toolFilePaths(input: string): string[] {
-  const trimmed = input.trim();
-  if (!trimmed) return [];
-
-  const jsonPaths = pathsFromJSON(trimmed);
-  if (jsonPaths.length > 0) return unique(jsonPaths);
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return [];
-
-  return unique(
-    trimmed
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(looksLikeFilePath),
-  );
 }
 
 function countActivities(tools: AgentToolItem[]): ActivityCounts {
@@ -299,77 +260,4 @@ function isMCPTool(tool: AgentToolItem): boolean {
     const normalized = value.toLowerCase();
     return normalized === "mcp" || normalized === "mcp_tool_call" || normalized.startsWith("mcp__");
   });
-}
-
-function pathsFromJSON(input: string): string[] {
-  if (!input.startsWith("{") && !input.startsWith("[")) return [];
-  try {
-    const paths: string[] = [];
-    collectJSONPaths(JSON.parse(input) as unknown, paths);
-    return paths;
-  } catch {
-    return [];
-  }
-}
-
-function collectJSONPaths(value: unknown, paths: string[]): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry) => collectJSONPaths(entry, paths));
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-  for (const [key, entry] of Object.entries(value)) {
-    if (
-      ["path", "file", "filePath", "file_path", "filename", "notebookPath", "notebook_path"].includes(key) &&
-      typeof entry === "string"
-    ) {
-      paths.push(entry);
-      continue;
-    }
-    if (["changes", "files"].includes(key)) collectJSONPaths(entry, paths);
-  }
-}
-
-function looksLikeFilePath(value: string): boolean {
-  if (!value || value.length > 2048 || /[|;&`]/.test(value)) return false;
-  return value.includes("/") || /^\.?[\w -]+\.[a-z0-9]{1,12}$/i.test(value);
-}
-
-function unique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
-}
-
-function commandFromPartialJSON(input: string): string | undefined {
-  const property = /"command"\s*:\s*"/g.exec(input);
-  if (!property) return undefined;
-
-  let command = "";
-  for (let index = property.index + property[0].length; index < input.length; index += 1) {
-    const character = input[index];
-    if (character === '"') return command;
-    if (character !== "\\") {
-      command += character;
-      continue;
-    }
-
-    const escaped = input[index + 1];
-    if (escaped === undefined) return command;
-    command += decodeJSONEscape(escaped);
-    index += 1;
-  }
-  return command;
-}
-
-function decodeJSONEscape(character: string): string {
-  const escapes: Record<string, string> = {
-    '"': '"',
-    "\\": "\\",
-    "/": "/",
-    b: "\b",
-    f: "\f",
-    n: "\n",
-    r: "\r",
-    t: "\t",
-  };
-  return escapes[character] ?? character;
 }
