@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "bun:test";
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
@@ -91,12 +92,25 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("aria-label", "Sentry exceptions");
   });
 
-  it("renders no source icon and no pill row for a manual task", () => {
+  it("renders a SuperPlane source mark for a manual task", () => {
     renderCard({ ...baseOrder, state: "STATE_DRAFT" });
 
-    expect(screen.queryByTestId("work-order-card-source-wo-1")).not.toBeInTheDocument();
-    const card = screen.getByTestId("work-order-card-wo-1");
-    expect(card.querySelector(".flex-wrap")).toBeNull();
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon).not.toHaveAttribute("href");
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneIcon);
+    expect(icon).toHaveAttribute("aria-label", "Created manually");
+  });
+
+  it("names the creator on a manual source mark", () => {
+    renderCard({
+      ...baseOrder,
+      createdBy: { user: { id: "user-1", name: "Ada Lovelace" } },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon).toHaveAttribute("aria-label", "Created manually by Ada Lovelace");
   });
 
   it("does not open the task when the source icon is clicked", async () => {
