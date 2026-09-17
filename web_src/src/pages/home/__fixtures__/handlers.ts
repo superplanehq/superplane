@@ -196,6 +196,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Task Refinement",
               description: "Refine draft work orders with an agent",
             },
+            {
+              id: "workspace_agent_resources",
+              label: "Agent Resources",
+              description: "Add MCP connections for workspace agents",
+            },
           ],
         },
       }),
