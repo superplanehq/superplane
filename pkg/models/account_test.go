@@ -32,7 +32,7 @@ func TestFindAccountByProvider(t *testing.T) {
 		err = database.Conn().Create(provider).Error
 		require.NoError(t, err)
 
-		foundAccount, err := FindAccountByProvider("github", "12345")
+		foundAccount, err := FindAccountByProvider(database.Conn(), "github", "12345")
 		require.NoError(t, err)
 		assert.Equal(t, account.ID, foundAccount.ID)
 		assert.Equal(t, account.Email, foundAccount.Email)
@@ -40,7 +40,7 @@ func TestFindAccountByProvider(t *testing.T) {
 	})
 
 	t.Run("should return error when provider not found", func(t *testing.T) {
-		account, err := FindAccountByProvider("nonexistent", "99999")
+		account, err := FindAccountByProvider(database.Conn(), "nonexistent", "99999")
 		assert.Error(t, err)
 		assert.Nil(t, account)
 	})
@@ -68,9 +68,41 @@ func TestFindAccountByProvider(t *testing.T) {
 		err = database.Conn().Delete(deletedAccount).Error
 		require.NoError(t, err)
 
-		account, err := FindAccountByProvider("google", "67890")
+		account, err := FindAccountByProvider(database.Conn(), "google", "67890")
 		assert.Error(t, err)
 		assert.Nil(t, account)
+	})
+
+	t.Run("should return every account that holds the same GitHub identity", func(t *testing.T) {
+		first, err := CreateAccount("First Shared", "first-shared-github@example.com")
+		require.NoError(t, err)
+		second, err := CreateAccount("Second Shared", "second-shared-github@example.com")
+		require.NoError(t, err)
+
+		require.NoError(t, database.Conn().Create(&AccountProvider{
+			AccountID:  first.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "shared-123",
+			Email:      first.Email,
+			Name:       first.Name,
+		}).Error)
+		require.NoError(t, database.Conn().Create(&AccountProvider{
+			AccountID:  second.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "shared-123",
+			Email:      second.Email,
+			Name:       second.Name,
+		}).Error)
+
+		accounts, err := FindAccountsByProvider(database.Conn(), ProviderGitHub, "shared-123")
+		require.NoError(t, err)
+		require.Len(t, accounts, 2)
+		assert.Equal(t, first.ID, accounts[0].ID)
+		assert.Equal(t, second.ID, accounts[1].ID)
+
+		found, err := FindAccountByProvider(database.Conn(), ProviderGitHub, "shared-123")
+		require.NoError(t, err)
+		assert.Equal(t, first.ID, found.ID)
 	})
 }
 

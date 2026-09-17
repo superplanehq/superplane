@@ -15,10 +15,10 @@ import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboarding
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   provisionEventApps,
-  provisionGithubIntake,
-  provisionJiraIntake,
+  provisionOnboardingIntake,
   provisionLine,
   type CreateFactoryIntake,
+  type DeleteFactoryIntake,
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
@@ -121,6 +121,7 @@ export async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
@@ -178,7 +179,13 @@ export async function provisionWorkspace(args: {
     listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
-  await provisionOnboardingIntake(args);
+  await provisionOnboardingIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+    deleteIntake: args.deleteIntake,
+    issuesChoice: args.issuesChoice,
+    jira: args.jira,
+  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
@@ -201,29 +208,6 @@ function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: Integr
   return selections[plan.integrationName]?.id;
 }
 
-async function provisionOnboardingIntake(args: {
-  issuesChoice: IssuesChoiceId | null;
-  listIntakes: ListFactoryIntakes;
-  createIntake: CreateFactoryIntake;
-  jira?: { integrationId: string; projectId: string };
-}): Promise<unknown> {
-  if (args.issuesChoice !== "jira") {
-    return provisionGithubIntake({
-      listIntakes: args.listIntakes,
-      createIntake: args.createIntake,
-    });
-  }
-  if (!args.jira?.integrationId || !args.jira.projectId) {
-    throw new Error("Connect Jira, then choose a project.");
-  }
-  return provisionJiraIntake({
-    listIntakes: args.listIntakes,
-    createIntake: args.createIntake,
-    integrationId: args.jira.integrationId,
-    resourceId: args.jira.projectId,
-  });
-}
-
 export function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -238,6 +222,7 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];

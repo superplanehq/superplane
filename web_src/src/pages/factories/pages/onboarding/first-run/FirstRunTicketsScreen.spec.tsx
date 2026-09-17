@@ -138,6 +138,30 @@ describe("FirstRunTicketsScreen", () => {
     expect(analyze).toBeDisabled();
   });
 
+  it("locks the Jira project picker while setup is saving", async () => {
+    const user = userEvent.setup();
+    const onSelectJiraProject = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        saving
+        jiraConnected
+        jiraProjects={[
+          { id: "PAY", name: "Payments" },
+          { id: "CORE", name: "Core" },
+        ]}
+        jiraProjectId="PAY"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+        onSelectJiraProject={onSelectJiraProject}
+      />,
+    );
+
+    await user.click(screen.getByTestId("jira-project-CORE"));
+    expect(onSelectJiraProject).not.toHaveBeenCalled();
+  });
+
   it("uses the next-step label when setup names the coding agent step", () => {
     render(
       <FirstRunTicketsScreen

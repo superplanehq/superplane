@@ -21,6 +21,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -87,7 +88,11 @@ func CreateCanvasWithSeedFiles(
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	createdBy := uuid.MustParse(userID)
+	createdBy, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, grpcerrors.Unauthenticated(err, "user not authenticated")
+	}
+
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to count organization canvases")
@@ -102,7 +107,7 @@ func CreateCanvasWithSeedFiles(
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, classifyCanvasCreateError(err)
 	}
 
 	canvasID := uuid.New()
@@ -212,7 +217,7 @@ func CreateCanvasWithSeedFiles(
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, classifyCanvasCreateError(err)
 	}
 
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
@@ -223,7 +228,7 @@ func CreateCanvasWithSeedFiles(
 	if canvas.CreatedBy != nil {
 		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
 		if err != nil {
-			return nil, err
+			return nil, classifyCanvasCreateError(err)
 		}
 	}
 
@@ -234,12 +239,24 @@ func CreateCanvasWithSeedFiles(
 
 	proto, err := serializePreparedCanvas(database.DB(ctx), &canvas, liveVersion, user, nil)
 	if err != nil {
-		return nil, err
+		return nil, classifyCanvasCreateError(err)
 	}
 
 	return &pb.CreateCanvasResponse{
 		Canvas: proto,
 	}, nil
+}
+
+func classifyCanvasCreateError(err error) error {
+	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+		return err
+	}
+
+	if grpcerrors.Code(err) == codes.ResourceExhausted {
+		return grpcerrors.ResourceExhausted(err, grpcerrors.StatusMessage(err))
+	}
+
+	return grpcerrors.Internal(err, "failed to create canvas")
 }
 
 func validateCanvasFactoryID(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) error {

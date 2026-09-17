@@ -181,15 +181,56 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
-	t.Run("ignores an event missing project info rather than fanning it out to every trigger", func(t *testing.T) {
+	commentWithoutFields := []byte(`{
+		"webhookEvent": "comment_created",
+		"comment": {"id": "10019", "body": "test"},
+		"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+	}`)
+
+	t.Run("emits a created event when the issue key names the project and fields are empty", func(t *testing.T) {
 		events := &contexts.EventContext{}
-		bodyWithoutProject := []byte(`{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          commentWithoutFields,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(IssueCommentEvent)
+		assert.Equal(t, "ENG-42", event.Issue.Key)
+	})
+
+	t.Run("ignores an empty-fields comment whose issue key names a different project", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		metadata := &contexts.MetadataContext{Metadata: OnIssueCommentMetadata{Project: &Project{Key: "OTHER"}}}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          commentWithoutFields,
+			Events:        events,
+			Metadata:      metadata,
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	// The webhook is shared by every jira.onIssueComment trigger on the integration,
+	// so a payload with neither a project field nor an issue key must not fail open.
+	t.Run("ignores an event with no issue key and no project field", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		bodyWithoutIdentity := []byte(`{
 			"webhookEvent": "comment_created",
 			"comment": {"id": "10019", "body": "test"},
-			"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+			"issue": {"id": "10001", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
 		}`)
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          bodyWithoutProject,
+			Body:          bodyWithoutIdentity,
 			Events:        events,
 			Metadata:      meta(),
 			Configuration: map[string]any{"events": []string{"created"}},

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -356,4 +358,31 @@ func issueEventTitle(t *testing.T, event map[string]any) string {
 	require.True(t, ok)
 
 	return title
+}
+
+func Test__SentryIssueEvents(t *testing.T) {
+	now := time.Now().UTC()
+	issues := []sentry.Issue{
+		{ID: "1", Title: "Newest timeout", LastSeen: now.Format(time.RFC3339)},
+		{ID: "2", Title: "Older null pointer", LastSeen: now.Add(-time.Hour).Format(time.RFC3339)},
+	}
+
+	events := sentryIssueEvents(issues)
+	require.Len(t, events, 2)
+	assert.Equal(t, "created", events[0]["action"])
+	assert.Equal(t, "issue", events[0]["resource"])
+
+	firstData, ok := events[0]["data"].(map[string]any)
+	require.True(t, ok)
+	firstIssue, ok := firstData["issue"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Older null pointer", firstIssue["title"])
+	assert.Equal(t, sentry.IssueDescription(firstIssue), events[0]["description"])
+
+	secondData, ok := events[1]["data"].(map[string]any)
+	require.True(t, ok)
+	secondIssue, ok := secondData["issue"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Newest timeout", secondIssue["title"])
+	assert.Equal(t, sentry.IssueDescription(secondIssue), events[1]["description"])
 }

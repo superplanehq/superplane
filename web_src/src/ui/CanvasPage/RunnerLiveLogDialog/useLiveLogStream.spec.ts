@@ -185,6 +185,12 @@ describe("runner live log state", () => {
 });
 
 describe("useLiveLogStream", () => {
+  it("does not start a session when organization or canvas ids are missing", () => {
+    renderHook(() => useLiveLogStream("execution-1", false, "failed", null));
+
+    expect(pumpMock).not.toHaveBeenCalled();
+  });
+
   it("stops loading after the live log response opens", async () => {
     let openStream: (() => void) | undefined;
     pumpMock.mockImplementation(

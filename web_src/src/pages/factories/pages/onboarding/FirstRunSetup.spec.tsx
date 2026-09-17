@@ -519,6 +519,51 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 
+  it("returns to the ticket screen when a restored Jira source has no project", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+
+    renderSetup(
+      pageModel({
+        hostedAgentReady: false,
+        openSection: "agent",
+        setup: result.current,
+        jiraProjectId: "",
+      }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
+
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  it("stays on the agent screen when a restored Jira project is present", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+
+    renderSetup(
+      pageModel({
+        hostedAgentReady: false,
+        openSection: "agent",
+        setup: result.current,
+        jiraProjectId: "PAY",
+      }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
+
+    expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
   it("goes back through every screen to the welcome screen", async () => {
     const user = userEvent.setup();
     const model = pageModel({

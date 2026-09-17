@@ -1,8 +1,8 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { fetchFactoryAutomations, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
-import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import { resolveGithubDefaultBranch, useIntegrationResources } from "@/hooks/useIntegrations";
+import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -43,6 +43,7 @@ import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnbo
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingGithubRepos } from "./useOnboardingGithubRepos";
+import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import {
   useOnboardingSetupState,
   type InitialOnboardingSetupState,
@@ -346,26 +347,8 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
-  };
-}
-
-function useOnboardingJiraBinding(organizationId: string, jiraSelection?: { id: string; ready: boolean }) {
-  const jiraIntegrationId = jiraSelection?.ready ? jiraSelection.id : "";
-  const [jiraProjectId, setJiraProjectId] = useState("");
-  const jiraProjectsQuery = useIntegrationResources(organizationId, jiraIntegrationId, "project", undefined, {
-    enabled: Boolean(jiraIntegrationId),
-  });
-  return {
-    jiraIntegrationId,
-    jiraProjectId,
-    setJiraProjectId,
-    jiraProjects: jiraProjectsQuery.data ?? [],
-    jiraProjectsLoading: jiraProjectsQuery.isPending,
-    jiraProjectsError: jiraProjectsQuery.isError,
-    retryJiraProjects: () => {
-      void jiraProjectsQuery.refetch();
-    },
   };
 }
 
@@ -410,10 +393,10 @@ export function useOnboardingPageModel(args: {
 
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
-  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, installer } =
+  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
-  const jira = useOnboardingJiraBinding(args.organizationId, integrations.selections.jira);
+  const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, integrations.selections.jira);
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
     reresolveWorkspace: args.reresolveWorkspace ?? null,
@@ -459,6 +442,7 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
+    deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),

@@ -251,6 +251,8 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		for _, email := range sent {
 			recipients = append(recipients, email.ToEmail)
 			assert.Contains(t, email.Subject, "closed as completed")
+			assert.Contains(t, email.Subject, "Task")
+			assert.NotContains(t, email.Subject, "Work order")
 		}
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
@@ -352,6 +354,82 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
 	})
+
+	t.Run("browser channel publishes title body and task path", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+		require.Len(t, *published, 1)
+		assert.Equal(t, owner.ID.String(), (*published)[0].UserID)
+		assert.Contains(t, (*published)[0].Title, "New comment")
+		assert.Contains(t, (*published)[0].Body, factoryModel.WorkOrderKey(order.Number))
+		assert.Equal(t, order.URLPath(factoryModel.Key), (*published)[0].URLPath)
+		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), (*published)[0].OrderKey)
+		assert.Equal(t, factoryModel.Key, (*published)[0].FactoryKey)
+	})
+
+	t.Run("browser channel excludes the actor", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		require.Len(t, *published, 1)
+		assert.Equal(t, owner.ID.String(), (*published)[0].UserID)
+	})
+
+	t.Run("email channel stays unaffected when browser is off", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
+		assert.Empty(t, *published)
+	})
+
+	t.Run("browser channel off publishes nothing", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, commentMessage(creator.ID.String()))
+
+		assert.Empty(t, *published)
+	})
+}
+
+func capturingConsumer(consumer *FactoryNotificationConsumer) (*FactoryNotificationConsumer, *[]messages.UserNotificationMessage) {
+	published := []messages.UserNotificationMessage{}
+	consumer.publishUserNotification = func(message messages.UserNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	}
+	return consumer, &published
 }
 
 func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messages.FactoryWorkOrderNotificationMessage) {
@@ -360,4 +438,36 @@ func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messag
 	payload, err := json.Marshal(message)
 	require.NoError(t, err)
 	require.NoError(t, consumer.Consume(tackle.NewFakeDelivery(payload)))
+}
+
+func TestBuildWorkOrderNotificationContent_SubjectsUseTask(t *testing.T) {
+	factoryModel := &models.Factory{Key: "SP"}
+	order := &models.FactoryWorkOrder{Number: 42, Title: "Fix login"}
+
+	t.Run("status change", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{
+				EventType: factoryevents.EventTypeOrderStatusUpdated,
+				ToState:   models.FactoryWorkOrderStateClosed,
+				Result:    models.FactoryWorkOrderResultCompleted,
+			},
+			"Ana",
+			models.NotificationTypeWorkOrderStatusOwned,
+		)
+		assert.Equal(t, "[SP-42] Task closed as completed", content.Subject)
+		assert.NotContains(t, content.Subject, "Work order")
+	})
+
+	t.Run("unknown event type", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{EventType: "order.unknown"},
+			"Ana",
+			"",
+		)
+		assert.Equal(t, "[SP-42] Task update", content.Subject)
+	})
 }

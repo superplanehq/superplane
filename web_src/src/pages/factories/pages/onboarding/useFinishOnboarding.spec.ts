@@ -68,6 +68,7 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+      deleteIntake: vi.fn().mockResolvedValue({}),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
@@ -137,6 +138,16 @@ describe("provisionWorkspace", () => {
 
   it("does not create a comments handler during workspace setup", async () => {
     await provisionWorkspace(provisionArgs());
+  });
+
+  it("does not create a GitHub intake when the ticket source is Jira without a project", async () => {
+    const createIntake = vi.fn();
+
+    await expect(provisionWorkspace(provisionArgs({ issuesChoice: "jira", createIntake }))).rejects.toThrow(
+      "Connect Jira, then choose a project.",
+    );
+
+    expect(createIntake).not.toHaveBeenCalled();
   });
 });
 

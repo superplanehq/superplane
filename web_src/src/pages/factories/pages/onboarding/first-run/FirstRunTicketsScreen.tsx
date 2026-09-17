@@ -90,14 +90,16 @@ export function FirstRunTicketsScreen({
           {jiraSelected && jiraConnected ? (
             <div className="mt-4 border-t border-border pt-4" data-testid="first-run-jira-projects">
               <p className="mb-3 text-[13px] font-medium">{copy.jiraProjectHeading}</p>
-              <JiraProjectStep
-                projects={jiraProjects}
-                selectedId={jiraProjectId}
-                loading={jiraProjectsLoading}
-                error={jiraProjectsError}
-                onSelect={(id) => onSelectJiraProject?.(id)}
-                onRetry={() => onRetryJiraProjects?.()}
-              />
+              <fieldset disabled={saving} className="contents">
+                <JiraProjectStep
+                  projects={jiraProjects}
+                  selectedId={jiraProjectId}
+                  loading={jiraProjectsLoading}
+                  error={jiraProjectsError}
+                  onSelect={(id) => onSelectJiraProject?.(id)}
+                  onRetry={() => onRetryJiraProjects?.()}
+                />
+              </fieldset>
             </div>
           ) : null}
         </FirstRunPanel>

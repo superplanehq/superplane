@@ -23,7 +23,15 @@ const READY = ["PLACEMENT_BACKLOG", "PLACEMENT_PROGRESSED"];
 export function firstRunBacklogIntake(
   intakes: FactoriesFactoryIntake[] | undefined,
 ): FactoriesFactoryIntake | undefined {
-  return intakes?.find((intake) => intake.source === "SOURCE_GITHUB_ISSUES" || intake.source === "SOURCE_JIRA_ISSUES");
+  const backlog = intakes?.filter(
+    (intake) => intake.source === "SOURCE_GITHUB_ISSUES" || intake.source === "SOURCE_JIRA_ISSUES",
+  );
+  if (!backlog?.length) return undefined;
+  return backlog.reduce((latest, intake) => {
+    if (!latest.createdAt) return intake;
+    if (!intake.createdAt) return latest;
+    return intake.createdAt > latest.createdAt ? intake : latest;
+  });
 }
 
 export function initialImportFailed(

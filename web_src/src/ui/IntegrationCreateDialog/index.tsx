@@ -9,6 +9,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { hiddenFieldsForHostedJira } from "@/lib/integrations";
+import { configurationWithSetupReturnPath } from "@/lib/integrationSetupReturn";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -223,14 +224,20 @@ export function IntegrationCreateDialog({
     setCreateError(null);
     setIsCreatePending(true);
     try {
+      const createConfiguration = configurationWithSetupReturnPath(configuration, setupReturnTo);
       const created = isGitHub
         ? await createWithGeneratedName({
             baseName: githubBaseName,
             takenNames: existingIntegrationNames,
-            create: (name) => onCreateIntegration({ integrationName: definitionName, name, configuration }),
+            create: (name) =>
+              onCreateIntegration({ integrationName: definitionName, name, configuration: createConfiguration }),
           })
         : {
-            result: await onCreateIntegration({ integrationName: definitionName, name: nextName, configuration }),
+            result: await onCreateIntegration({
+              integrationName: definitionName,
+              name: nextName,
+              configuration: createConfiguration,
+            }),
             name: nextName,
           };
 
@@ -288,6 +295,7 @@ export function IntegrationCreateDialog({
     onCapabilitySetupRequired,
     setCreateIntegrationBrowserAction,
     setCreatedName,
+    setupReturnTo,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {

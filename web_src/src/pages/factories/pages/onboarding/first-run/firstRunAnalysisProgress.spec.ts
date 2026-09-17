@@ -123,6 +123,15 @@ describe("firstRunBacklogIntake", () => {
 
     expect(firstRunBacklogIntake(intakes)?.id).toBe("jira-1");
   });
+
+  it("selects the newest backlog intake when GitHub and Jira both exist", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "github-1", source: "SOURCE_GITHUB_ISSUES", createdAt: "2026-09-16T10:00:00.000Z" },
+      { id: "jira-1", source: "SOURCE_JIRA_ISSUES", createdAt: "2026-09-16T11:00:00.000Z" },
+    ];
+
+    expect(firstRunBacklogIntake(intakes)?.id).toBe("jira-1");
+  });
 });
 
 describe("initialImportFailed", () => {

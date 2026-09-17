@@ -174,6 +174,16 @@ function requestedOrganizations(
   return account ? [account] : [];
 }
 
+function screenWithoutIncompleteJira(
+  screen: FirstRunScreen,
+  issuesChoice: IssuesChoiceId | null,
+  jiraProjectId: string,
+): FirstRunScreen {
+  if (screen !== "agent") return screen;
+  if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
+  return screen;
+}
+
 function useFirstRunNavigation(
   model: OnboardingPageModel,
   skipAgentScreen: boolean,
@@ -200,7 +210,11 @@ function useFirstRunNavigation(
   };
 
   return {
-    screen: screenWithoutAgent(openedScreen, skipAgentScreen),
+    screen: screenWithoutIncompleteJira(
+      screenWithoutAgent(openedScreen, skipAgentScreen),
+      model.setup.issuesChoice,
+      model.jiraProjectId,
+    ),
     pickerShowing: pickerOpen && Boolean(connection.accountPicker),
     pickerLoading: pickerOpen && !connection.accountPicker && connection.sourcesLoading,
     closePicker: () => setPickerOpen(false),

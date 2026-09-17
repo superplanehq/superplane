@@ -123,8 +123,10 @@ import {
   factoryAppRunPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -132,7 +134,10 @@ import {
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
+  isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
+  jiraIntakeIntegrationIdFromSearch,
+  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -231,7 +236,7 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { search, state: locationState } = useLocation();
+  const { pathname, search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -260,6 +265,7 @@ export function LinesPage() {
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddJiraIntake = hasExperimentalFeature(FEATURE_FACTORY_JIRA_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const hasSentryIntake = configuredIntakes.some((intake) => intake.source.id === "sentry-exceptions");
   const hasJiraIntake = configuredIntakes.some((intake) => intake.source.id === "jira-issues");
   const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const addIntakeTemplates = useMemo(() => {
@@ -279,7 +285,8 @@ export function LinesPage() {
   const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddJiraIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
-  const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
+  const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
+  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -307,6 +314,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const canSetupSentry = canUpdate && canAddSentryIntake && !hasSentryIntake;
   const canSetupJira = canUpdate && canAddJiraIntake && !hasJiraIntake;
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
@@ -354,6 +362,7 @@ export function LinesPage() {
   }
 
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
+  const sentrySetupLineId = selectedLine.id;
 
   const intakePanel: BacklogIntakePanel | undefined = showColumnAutomations
     ? undefined
@@ -417,12 +426,18 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (template.id === "sentry-exceptions") {
+      if (selectedLine.id) {
+        navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
     if (template.id === "productive-tasks") {
       setProductiveIntakeSetupOpen(true);
       return;
     }
     if (template.id === "jira-issues") {
-      setJiraIntakeSetupOpen(true);
+      navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       return;
     }
     if (!isLineIntakeSourceId(template.id)) {
@@ -514,7 +529,9 @@ export function LinesPage() {
         open={jiraIntakeSetupOpen}
         organizationId={organizationId}
         factoryId={factoryId}
-        onClose={() => setJiraIntakeSetupOpen(false)}
+        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
+        selectIntegrationId={returnedJiraIntegrationId}
+        onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -607,7 +624,16 @@ export function LinesPage() {
             onAddIntake={
               showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
             }
-            onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
+            onSetupSentry={
+              canSetupSentry && sentrySetupLineId
+                ? () => navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, sentrySetupLineId))
+                : undefined
+            }
+            onSetupJira={
+              canSetupJira
+                ? () => navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id))
+                : undefined
+            }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
@@ -763,6 +789,7 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   onSetupJira,
   verifyListeners,
   onAddPRFeedback,
@@ -790,6 +817,7 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupSentry?: () => void;
   onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
@@ -894,6 +922,7 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupSentry={onSetupSentry}
           onSetupJira={onSetupJira}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
@@ -1139,6 +1168,7 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
   onSetupJira,
   verifyListeners,
   onAddPRFeedback,
@@ -1165,6 +1195,7 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
+  onSetupSentry?: () => void;
   onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
@@ -1306,6 +1337,7 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onSetupSentry={onSetupSentry}
           onSetupJira={onSetupJira}
           automations={backlogAutomations}
           automationRowCount={automationRowCount}

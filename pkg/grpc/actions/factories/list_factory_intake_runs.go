@@ -335,6 +335,9 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		if key != "" && summary != "" {
 			return key + ": " + summary
 		}
+		if key != "" {
+			return key
+		}
 		return summary
 	default:
 		return ""
