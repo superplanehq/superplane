@@ -7,9 +7,13 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 func writeGatewayHTTPError(ctx context.Context, w http.ResponseWriter, err error) {
+	telemetry.RecordServerError(ctx, err)
+
 	sanitized := SanitizeError(ctx, err)
 	s := status.Convert(sanitized)
 

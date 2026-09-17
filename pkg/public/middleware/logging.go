@@ -13,6 +13,8 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
@@ -21,6 +23,14 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			start := time.Now()
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+			//
+			// Error responses are sanitized before they are written, so the
+			// status code is all we would otherwise know about a failure.
+			// The recorder lets the handlers hand us the original error.
+			//
+			ctx, serverError := telemetry.WithServerErrorRecorder(r.Context())
+			r = r.WithContext(ctx)
 
 			defer func() {
 				recovered := recover()
@@ -50,6 +60,11 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 					fields["user_agent"] = r.UserAgent()
 				}
 
+				handlerErr := serverError.Err()
+				if handlerErr != nil && shouldCaptureHTTPError(status) {
+					fields["error"] = handlerErr
+				}
+
 				logger.WithFields(fields).Info("handled request")
 
 				if recovered != nil {
@@ -58,7 +73,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 				}
 
 				if shouldCaptureHTTPError(status) {
-					captureHTTPError(r, status)
+					captureHTTPError(r, status, handlerErr)
 				}
 			}()
 
@@ -107,7 +122,12 @@ func shouldCaptureHTTPError(status int) bool {
 	return true
 }
 
-func captureHTTPError(r *http.Request, status int) {
+// captureHTTPError forwards a server error to Sentry. When the handler recorded
+// the error behind the response, we send that error so the issue carries a
+// message and a stacktrace pointing at the failing code. Without it there is
+// nothing to report but the status code and the path, which is not enough to
+// tell a schema mismatch from a nil dereference.
+func captureHTTPError(r *http.Request, status int, handlerErr error) {
 	hub := sentry.CurrentHub()
 	if hub == nil || hub.Client() == nil {
 		return
@@ -116,7 +136,17 @@ func captureHTTPError(r *http.Request, status int) {
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetRequest(r)
 		scope.SetTag("status", strconv.Itoa(status))
-		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+
+		if handlerErr == nil {
+			//
+			// Responses written outside the gRPC error paths (static assets,
+			// websocket upgrades, http.Error calls) have no recorded error.
+			//
+			hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+			return
+		}
+
+		hub.CaptureException(handlerErr)
 	})
 }
 
