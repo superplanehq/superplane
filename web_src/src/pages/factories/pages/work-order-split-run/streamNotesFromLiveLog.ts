@@ -1,6 +1,8 @@
-import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import type { AgentActivity, AgentActivityItem } from "@/lib/agentActivity";
+import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
+import { commandDisplayText } from "./agentActivitySummary";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
@@ -40,61 +42,158 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push({
-      id: stepId,
-      nodeId,
-      at: "",
-      note: true,
-      componentType: section.kind,
-      componentName: section.preview?.trim() || section.text,
-      status: streamStatus(section.status),
-      detail:
-        section.kind === "prompt"
-          ? undefined
-          : section.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n"),
-      ...orderKeyProps(orderKey),
-    });
-    for (const [eventIndex, event] of section.events.entries()) {
-      if (event.kind === "note") {
-        if (!event.text.trim() || isRawAgentTurnLiveLogText(event.text)) {
-          continue;
-        }
-        notes.push({
-          id: `${stepId}-note-${eventIndex}`,
-          nodeId,
-          at: "",
-          note: true,
-          noteParentId: stepId,
-          noteDepth: 1,
-          componentType: "note",
-          componentName: event.text,
-          status: "passed",
-          ...orderKeyProps(orderKey),
-        });
+    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section));
+    notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
+    notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
+  }
+  return notes;
+}
+
+function noteFromCommandSection(
+  nodeId: string,
+  stepId: string,
+  orderKey: number | undefined,
+  section: CommandSection,
+): SplitRunStreamLine {
+  return {
+    id: stepId,
+    nodeId,
+    at: "",
+    note: true,
+    componentType: section.kind,
+    componentName: section.preview?.trim() || section.text,
+    status: streamStatus(section.status),
+    detail:
+      section.kind === "prompt"
+        ? undefined
+        : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n"),
+    ...orderKeyProps(orderKey),
+  };
+}
+
+function notesFromSectionEvents(
+  nodeId: string,
+  stepId: string,
+  orderKey: number | undefined,
+  section: CommandSection,
+): SplitRunStreamLine[] {
+  const notes: SplitRunStreamLine[] = [];
+  for (const [eventIndex, event] of section.events.entries()) {
+    if (event.kind === "note") {
+      if (!event.text.trim() || isHiddenAgentLiveLogText(event.text)) {
         continue;
       }
-      for (const tool of event.tools) {
-        notes.push({
-          id: tool.id,
-          nodeId,
-          at: "",
-          note: true,
-          noteParentId: stepId,
-          noteDepth: 1,
-          componentType: tool.kind,
-          componentName: tool.text,
-          status: streamStatus(tool.status),
-          detail: tool.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n") || undefined,
-          ...orderKeyProps(orderKey),
-        });
+      notes.push({
+        id: `${stepId}-note-${eventIndex}`,
+        nodeId,
+        at: "",
+        note: true,
+        noteParentId: stepId,
+        noteDepth: 1,
+        componentType: "note",
+        componentName: event.text,
+        status: "passed",
+        ...orderKeyProps(orderKey),
+      });
+      continue;
+    }
+    for (const tool of event.tools) {
+      notes.push({
+        id: tool.id,
+        nodeId,
+        at: "",
+        note: true,
+        noteParentId: stepId,
+        noteDepth: 1,
+        componentType: tool.kind,
+        componentName: tool.text,
+        status: streamStatus(tool.status),
+        detail: tool.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n") || undefined,
+        ...orderKeyProps(orderKey),
+      });
+    }
+  }
+  return notes;
+}
+
+function notesFromAgentActivities(
+  nodeId: string,
+  stepId: string,
+  orderKey: number | undefined,
+  activities: AgentActivity[],
+): SplitRunStreamLine[] {
+  const notes: SplitRunStreamLine[] = [];
+  for (const activity of activities) {
+    for (const item of activity.items) {
+      const note = noteFromAgentActivityItem(nodeId, stepId, orderKey, item);
+      if (note) {
+        notes.push(note);
       }
     }
   }
   return notes;
 }
 
+function noteFromAgentActivityItem(
+  nodeId: string,
+  stepId: string,
+  orderKey: number | undefined,
+  item: AgentActivityItem,
+): SplitRunStreamLine | undefined {
+  if (item.type === "content") {
+    const text = item.text.trim();
+    if (!text || isHiddenAgentLiveLogText(text)) {
+      return undefined;
+    }
+    return {
+      id: item.id,
+      nodeId,
+      at: "",
+      note: true,
+      noteParentId: stepId,
+      noteDepth: 1,
+      componentType: "note",
+      componentName: text,
+      status: item.status === "running" ? "running" : "passed",
+      ...orderKeyProps(orderKey),
+    };
+  }
+  if (item.type === "tool") {
+    const output = item.output.trim();
+    return {
+      id: item.id,
+      nodeId,
+      at: "",
+      note: true,
+      noteParentId: stepId,
+      noteDepth: 1,
+      componentType: item.kind,
+      componentName: commandDisplayText(item.input) ?? item.name,
+      status: streamStatus(item.status),
+      detail: output && !isHiddenAgentLiveLogText(output) ? output : undefined,
+      ...orderKeyProps(orderKey),
+    };
+  }
+  const text = item.text.trim();
+  if (!text || isHiddenAgentLiveLogText(text)) {
+    return undefined;
+  }
+  return {
+    id: item.id,
+    nodeId,
+    at: "",
+    note: true,
+    noteParentId: stepId,
+    noteDepth: 1,
+    componentType: "note",
+    componentName: text,
+    status: "passed",
+    ...orderKeyProps(orderKey),
+  };
+}
+
 function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): SplitRunStreamLine[] | undefined {
-  if (section.kind !== "prompt" || section.events.length > 0) {
+  if (section.kind !== "prompt" || section.events.length > 0 || (section.activities?.length ?? 0) > 0) {
     return undefined;
   }
   if (!section.lines.some((line) => TOOL_LINE.test(line))) {
@@ -206,7 +305,7 @@ export function notesForLiveStream(input: {
 function notesFromOrphanLiveLogLines(nodeId: string, lines: string[]): SplitRunStreamLine[] {
   return lines.flatMap((line, index) => {
     const text = line.trim();
-    if (!text || isRawAgentTurnLiveLogText(text)) {
+    if (!text || isHiddenAgentLiveLogText(text)) {
       return [];
     }
     return [
