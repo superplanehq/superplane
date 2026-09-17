@@ -268,7 +268,9 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	issue := payload.Issue
-	if issueFieldsIncomplete(issue) {
+	// jira:issue_deleted payloads often carry only id and key. GetIssue would
+	// 404, so skip hydration and emit the original payload.
+	if action != "deleted" && issueFieldsIncomplete(issue) {
 		fullIssue, err := loadIssueForWebhook(ctx, issue.Key)
 		if err != nil {
 			return http.StatusInternalServerError, nil, err

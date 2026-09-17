@@ -249,6 +249,58 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/rest/api/3/issue/ENG-42")
 	})
+
+	deletedWithoutFields := []byte(`{
+		"webhookEvent": "jira:issue_deleted",
+		"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+	}`)
+
+	t.Run("emits a deleted event when the issue key names the project and fields are empty", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          deletedWithoutFields,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created", "updated", "deleted"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(IssueEvent)
+		assert.Equal(t, "deleted", event.Action)
+		assert.Equal(t, "ENG-42", event.Issue.Key)
+	})
+
+	t.Run("does not reload a deleted issue when fields are empty", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"errorMessages":["Issue does not exist"]}`)),
+				},
+			},
+		}
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          deletedWithoutFields,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"deleted"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+			HTTP:          httpCtx,
+			Integration:   newAuthorizedIntegration(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(IssueEvent)
+		assert.Equal(t, "deleted", event.Action)
+		assert.Equal(t, "ENG-42", event.Issue.Key)
+		assert.Empty(t, httpCtx.Requests)
+	})
 }
 
 func TestProjectKeyFromIssueKey(t *testing.T) {
