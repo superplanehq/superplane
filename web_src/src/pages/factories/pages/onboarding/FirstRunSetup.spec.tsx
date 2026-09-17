@@ -97,6 +97,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     provisionedDestination: null,
     githubOwner: undefined,
+    jiraIntegrationId: "",
+    jiraProjectId: "",
+    setJiraProjectId: vi.fn(),
+    jiraProjects: [],
+    jiraProjectsLoading: false,
+    jiraProjectsError: false,
+    retryJiraProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -458,6 +465,44 @@ describe("FirstRunSetup", () => {
     expect(model.finish).not.toHaveBeenCalled();
   });
 
+  it("connects Jira from the ticket screen", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true, requestConnect: vi.fn().mockResolvedValue(true) });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: "Connect Jira" }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.requestConnect).toHaveBeenCalledWith("jira"));
+  });
+
+  it("finishes setup with Jira after a project is chosen", async () => {
+    const user = userEvent.setup();
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+    const model = pageModel({
+      hostedAgentReady: true,
+      setup: result.current,
+      jiraIntegrationId: "jira-1",
+      jiraProjectId: "PAY",
+      jiraProjects: [{ id: "PAY", name: "Payments" }],
+    });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("jira"));
+    expect(model.finish).not.toHaveBeenCalledWith("vcs");
+  });
+
   // Setup saved the ticket answer, then provisioning did not finish. The user
   // returns to the screen that carries the action, not to a screen with no
   // question left to answer.
@@ -470,6 +515,51 @@ describe("FirstRunSetup", () => {
 
   it("resumes on the agent screen when the agent still needs a connected provider", () => {
     renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
+
+    expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("returns to the ticket screen when a restored Jira source has no project", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+
+    renderSetup(
+      pageModel({
+        hostedAgentReady: false,
+        openSection: "agent",
+        setup: result.current,
+        jiraProjectId: "",
+      }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
+
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  it("stays on the agent screen when a restored Jira project is present", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+
+    renderSetup(
+      pageModel({
+        hostedAgentReady: false,
+        openSection: "agent",
+        setup: result.current,
+        jiraProjectId: "PAY",
+      }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });

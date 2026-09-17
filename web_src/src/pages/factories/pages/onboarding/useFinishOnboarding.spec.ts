@@ -29,6 +29,23 @@ describe("finishOnboardingError", () => {
       }),
     ).toBeNull();
   });
+
+  it("requires a Jira connection and project when the ticket source is Jira", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        githubReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+        issuesChoice: "jira",
+        jiraReady: false,
+        jiraProjectId: "",
+      }),
+    ).toBe("Connect Jira, then choose a project.");
+  });
 });
 
 // Regression: provisioning used to read the issues answer off `setup`, which
@@ -51,6 +68,7 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+      deleteIntake: vi.fn().mockResolvedValue({}),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
@@ -71,9 +89,11 @@ describe("provisionWorkspace", () => {
 
   it("saves the issues choice it was given, not a value read off setup state", async () => {
     const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
 
-    await provisionWorkspace(provisionArgs({ issuesChoice: "vcs", updateOnboarding }));
+    await provisionWorkspace(provisionArgs({ issuesChoice: "vcs", updateOnboarding, createIntake }));
 
+    expect(createIntake).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
     const issuesSourceCalls = updateOnboarding.mock.calls
       .map(([input]) => input.issuesSource)
       .filter((value) => value !== undefined);
@@ -92,14 +112,40 @@ describe("provisionWorkspace", () => {
     expect(completeCall?.[0]).toMatchObject({ complete: true });
   });
 
+  it("creates a Jira intake instead of GitHub issues when the ticket source is Jira", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" });
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        issuesChoice: "jira",
+        createIntake,
+        updateOnboarding,
+        jira: { integrationId: "jira-1", projectId: "PAY" },
+      }),
+    );
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_JIRA_ISSUES",
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    const issuesSourceCalls = updateOnboarding.mock.calls
+      .map(([input]) => input.issuesSource)
+      .filter((value) => value !== undefined);
+    expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_JIRA"]);
+  });
+
   it("does not create a comments handler during workspace setup", async () => {
     await provisionWorkspace(provisionArgs());
   });
 
-  it("does not create a GitHub intake when the ticket source is Jira", async () => {
+  it("does not create a GitHub intake when the ticket source is Jira without a project", async () => {
     const createIntake = vi.fn();
 
-    await provisionWorkspace(provisionArgs({ issuesChoice: "jira", createIntake }));
+    await expect(provisionWorkspace(provisionArgs({ issuesChoice: "jira", createIntake }))).rejects.toThrow(
+      "Connect Jira, then choose a project.",
+    );
 
     expect(createIntake).not.toHaveBeenCalled();
   });
