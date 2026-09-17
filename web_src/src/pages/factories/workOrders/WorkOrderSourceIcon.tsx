@@ -11,7 +11,10 @@ export function WorkOrderSourceIcon({ entryId, source }: { entryId: string; sour
     <img
       src={source.iconSrc}
       alt=""
-      className={cn("size-3.5 shrink-0 object-contain", source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert")}
+      className={cn(
+        "size-3.5 shrink-0 object-contain",
+        (source.iconAlt === "GitHub" || source.iconAlt === "SuperPlane") && "dark:brightness-0 dark:invert",
+      )}
     />
   );
   const testId = `work-order-card-source-${entryId}`;
