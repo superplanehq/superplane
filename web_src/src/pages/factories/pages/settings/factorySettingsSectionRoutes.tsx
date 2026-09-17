@@ -2,13 +2,18 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_WORKSPACE_AGENT_RESOURCES,
+  FEATURE_WORKSPACE_MODELS,
+} from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
   FactorySettingsModelsPage,
+  FactorySettingsAgentResourcesPage,
   FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
@@ -79,6 +84,17 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="factories" action="update">
         <FactorySettingsRepositoryPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-agent-resources"
+    path="workspace/agent-resources"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT_RESOURCES}>
+          <FactorySettingsAgentResourcesPage />
+        </RequireExperimentalFeature>
       </RequirePermission>
     }
   />,
