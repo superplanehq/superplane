@@ -11,6 +11,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
+  FactoriesFactoryAgentResource,
   FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
@@ -362,6 +363,8 @@ export interface FactoriesFixture {
   planningSessionsByWorkOrderId?: Record<string, PlanningSessionPayload>;
   /** Storybook-only intake items for the Backlog create search. */
   intakeItemCatalog?: BacklogIntakeItemCatalog;
+  /** Workspace agent resources (MCP connections and skill shells). */
+  agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
