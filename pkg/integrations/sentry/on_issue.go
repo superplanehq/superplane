@@ -53,7 +53,7 @@ func (t *OnIssue) Documentation() string {
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: Markdown of the Sentry issue and latest event (stack, request, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
+- **description**: Markdown of the Sentry issue and preferred event (event link, highlights, message, stack, request, user, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
