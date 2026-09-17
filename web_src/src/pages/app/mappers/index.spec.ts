@@ -60,7 +60,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerBash")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -92,7 +92,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerJS")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -124,7 +124,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerPython")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -160,7 +160,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
@@ -196,7 +196,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
@@ -232,7 +232,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerSuperPlane")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
@@ -268,7 +268,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerOpenRouter")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });

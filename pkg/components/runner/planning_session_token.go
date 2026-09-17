@@ -107,6 +107,7 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	if !session.IsAnalysisSession() {
 		return environment
 	}
+	markAnalysisSession(ctx.ExecutionState)
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {

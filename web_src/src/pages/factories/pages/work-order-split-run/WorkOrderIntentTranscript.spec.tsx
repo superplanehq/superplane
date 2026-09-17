@@ -127,7 +127,7 @@ describe("WorkOrderIntentTranscript", () => {
     expect(answer).toHaveTextContent("Reviewer approves by taste");
     expect(answer).toHaveClass("sp-survey-card");
     expect(answer.className).toContain("border");
-    expect(answer.parentElement).toHaveClass("justify-end");
+    expect(answer.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
   });
 
@@ -145,9 +145,26 @@ describe("WorkOrderIntentTranscript", () => {
     );
     expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
-    expect(note.parentElement).toHaveClass("justify-end");
+    expect(note.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps a 12px gap for user-to-agent and user-to-user turns", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." },
+      { id: "user-1", kind: "text", role: "user", origin: "survey", text: "Add separate lists per animal." },
+      { id: "user-2", kind: "text", role: "user", text: "Keep the current dark theme." },
+      { id: "agent-2", kind: "text", role: "agent", text: "I will keep that theme." },
+    ]);
+
+    const survey = screen.getByTestId("split-run-intent-survey-answer").parentElement;
+    const note = screen.getByTestId("split-run-intent-user-note").parentElement;
+    expect(survey).toHaveClass("pt-2.5", "pb-1.5");
+    expect(note).toHaveClass("pt-1.5", "pb-2.5");
+    for (const agent of screen.getAllByTestId("split-run-intent-agent-message")) {
+      expect(agent).toHaveClass("py-0.5");
+    }
   });
 
   it("shows two senders on the same session as different people", () => {

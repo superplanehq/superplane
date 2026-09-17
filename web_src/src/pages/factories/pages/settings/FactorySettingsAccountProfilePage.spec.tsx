@@ -53,22 +53,24 @@ function renderPage(path = "/settings/account/profile") {
   );
 }
 
-describe("FactorySettingsAccountProfilePage GitHub sign-in", () => {
+describe("FactorySettingsAccountProfilePage associated accounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("credits pull requests through the GitHub sign-in row", () => {
+  it("shows Associated accounts for GitHub PR credit", () => {
     renderPage();
 
-    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Used to sign in and to credit pull requests.",
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
+      "Velocity uses this GitHub account to credit your pull requests.",
     );
-    expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-github")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in with GitHub" })).not.toBeInTheDocument();
   });
 
-  it("reports an identity another account already uses", async () => {
+  it("reports when another account already uses the GitHub link", async () => {
     renderPage("/settings/account/profile?auth_error=linked_account_in_use");
 
     await waitFor(() => {
@@ -76,11 +78,11 @@ describe("FactorySettingsAccountProfilePage GitHub sign-in", () => {
     });
   });
 
-  it("confirms a completed GitHub sign-in link and reloads the account", async () => {
-    renderPage("/settings/account/profile?auth_link_result=connected&provider=github");
+  it("confirms a completed GitHub link and reloads the account", async () => {
+    renderPage("/settings/account/profile?linked_account=linked");
 
     await waitFor(() => {
-      expect(showSuccessToast).toHaveBeenCalledWith("GitHub connected.");
+      expect(showSuccessToast).toHaveBeenCalledWith("GitHub account linked.");
     });
     expect(refreshAccount).toHaveBeenCalled();
   });

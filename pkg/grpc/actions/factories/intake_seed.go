@@ -201,7 +201,8 @@ func seedJiraIssues(
 	}
 
 	projectKey, _ := binding.Configuration["project"].(string)
-	payloads, err := newestJiraIssueEvents(client, projectKey, intakeSeedSize)
+	siteURL := jira.SiteURLFromMetadata(installation.Metadata.Data())
+	payloads, err := newestJiraIssueEvents(client, projectKey, siteURL, intakeSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
@@ -270,7 +271,7 @@ func seedSentryIssues(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
@@ -279,22 +280,24 @@ func seedSentryIssues(
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook
 // the trigger emits, so the rest of the graph cannot tell a seeded issue from
 // a received one.
-func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
+func sentryIssueEvents(client *sentry.Client, issues []sentry.Issue) []map[string]any {
 	events := make([]map[string]any, 0, len(issues))
 	for _, issue := range issues {
-		events = append(events, sentryIssueEvent(issue))
+		events = append(events, sentryIssueEvent(client, issue))
 	}
 	slices.Reverse(events)
 	return events
 }
 
-func sentryIssueEvent(issue sentry.Issue) map[string]any {
+func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
+		payload := map[string]any{"id": issue.ID, "title": issue.Title}
 		return map[string]any{
-			"resource": "issue",
-			"action":   "created",
-			"data":     map[string]any{"issue": map[string]any{"id": issue.ID, "title": issue.Title}},
+			"resource":    "issue",
+			"action":      "created",
+			"data":        map[string]any{"issue": payload},
+			"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
 		}
 	}
 
@@ -309,10 +312,11 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 	}
 
 	return map[string]any{
-		"resource":  "issue",
-		"action":    "created",
-		"data":      map[string]any{"issue": payload},
-		"timestamp": timestamp,
+		"resource":    "issue",
+		"action":      "created",
+		"data":        map[string]any{"issue": payload},
+		"timestamp":   timestamp,
+		"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
 	}
 }
 
@@ -439,7 +443,7 @@ func gitHubIssueEvents(issues []*github.Issue, repository string) ([]map[string]
 // gitHubIssueEvent converts an issue from the API into the body of an "issues"
 // webhook. The generated graph reads titles, bodies, labels, and assignees out
 // of that shape.
-func newestJiraIssueEvents(client *jira.Client, projectKey string, limit int) ([]map[string]any, error) {
+func newestJiraIssueEvents(client *jira.Client, projectKey, siteURL string, limit int) ([]map[string]any, error) {
 	projectKey = strings.TrimSpace(projectKey)
 	if projectKey == "" {
 		return nil, fmt.Errorf("project is required")
@@ -451,7 +455,7 @@ func newestJiraIssueEvents(client *jira.Client, projectKey string, limit int) ([
 		return nil, fmt.Errorf("failed to list the issues of project %s: %w", projectKey, err)
 	}
 
-	return jiraIssueEvents(client.GetIssue, hits)
+	return jiraIssueEvents(client.GetIssue, hits, siteURL)
 }
 
 // jiraIssueLoader reads one issue by key. The seed takes the read as a
@@ -464,11 +468,11 @@ type jiraIssueLoader func(issueKey string) (*jira.Issue, error)
 // logged and that issue is left out. A batch where every issue failed still
 // reports an error, because that points at the connection rather than at one
 // issue.
-func jiraIssueEvents(load jiraIssueLoader, hits []jira.IssueSearchHit) ([]map[string]any, error) {
+func jiraIssueEvents(load jiraIssueLoader, hits []jira.IssueSearchHit, siteURL string) ([]map[string]any, error) {
 	events := make([]map[string]any, 0, len(hits))
 	var lastErr error
 	for _, hit := range hits {
-		event, err := jiraIssueEvent(load, hit.Key)
+		event, err := jiraIssueEvent(load, hit.Key, siteURL)
 		if err != nil {
 			lastErr = err
 			log.Warnf("intake seed: issue %s stays out of the first batch: %v", hit.Key, err)
@@ -486,13 +490,13 @@ func jiraIssueEvents(load jiraIssueLoader, hits []jira.IssueSearchHit) ([]map[st
 	return events, nil
 }
 
-func jiraIssueEvent(load jiraIssueLoader, issueKey string) (map[string]any, error) {
+func jiraIssueEvent(load jiraIssueLoader, issueKey, siteURL string) (map[string]any, error) {
 	issue, err := load(issueKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
 	}
 
-	event := jira.NewIssueEvent("created", issue, nil, nil)
+	event := jira.NewIssueEvent("created", issue, nil, nil, siteURL)
 
 	encoded, err := json.Marshal(event)
 	if err != nil {

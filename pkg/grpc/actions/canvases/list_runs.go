@@ -222,6 +222,10 @@ func serializeCanvasRunWithQueueItemInputs(
 		serialized.CancelledAt = timestamppb.New(*run.CancelledAt)
 	}
 
+	if run.CancelledBy != nil {
+		serialized.CancelledBy = cancelledByRef(run.CancelledBy, map[uuid.UUID]models.User{})
+	}
+
 	return serialized, nil
 }
 

@@ -135,6 +135,7 @@ This is provisioned automatically, sharing the same webhook registration `jira.o
 
 Emits one event per matching incident webhook with:
 - **action**: `created`, `updated`, or `deleted`
+- **url**: The issue page (`<site>/browse/<key>`). Present when the Jira site address is known
 - **issue**: The full issue (id, key, self, fields)
 - **description**: The issue description as plain text. Use this instead of `issue.fields.description`, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
@@ -204,6 +205,7 @@ Emits one event per matching incident webhook with:
       "key": "ENG-42",
       "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
     },
+    "url": "https://your-domain.atlassian.net/browse/ENG-42",
     "user": {
       "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
       "displayName": "Bob Jones",
@@ -242,6 +244,7 @@ This is provisioned automatically. Jira's dynamic webhook registration API (`POS
 
 Emits one event per matching issue webhook with:
 - **action**: `created`, `updated`, or `deleted`
+- **url**: The issue page (`<site>/browse/<key>`). Present when the Jira site address is known
 - **issue**: The full issue (id, key, self, fields)
 - **description**: The issue description as plain text. Use this instead of `issue.fields.description`, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
@@ -311,6 +314,7 @@ Emits one event per matching issue webhook with:
       "key": "ENG-42",
       "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
     },
+    "url": "https://your-domain.atlassian.net/browse/ENG-42",
     "user": {
       "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
       "displayName": "Bob Jones",

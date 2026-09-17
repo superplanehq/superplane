@@ -259,6 +259,7 @@ type ExecutionStateContext struct {
 	Finished       bool
 	Cancelling     bool
 	Passed         bool
+	Cancelled      bool
 	FailureReason  string
 	FailureMessage string
 	Channel        string
@@ -323,6 +324,13 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Passed = false
 	c.FailureReason = reason
 	c.FailureMessage = message
+	return nil
+}
+
+func (c *ExecutionStateContext) Cancel() error {
+	c.Finished = true
+	c.Passed = false
+	c.Cancelled = true
 	return nil
 }
 

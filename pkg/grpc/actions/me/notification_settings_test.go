@@ -26,6 +26,9 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 		require.NotNil(t, resp.Settings.Workspaces)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Workspaces.Scope)
 		assert.Empty(t, resp.Settings.Workspaces.Filters)
+		require.NotNil(t, resp.Settings.Browser)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)
+		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
@@ -62,6 +65,9 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 			pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
 			pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
 		}, resp.Settings.Workspaces.EventTypes)
+		require.NotNil(t, resp.Settings.Browser)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)
+		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
@@ -216,6 +222,98 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("persists browser channel settings", func(t *testing.T) {
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_NONE,
+				},
+				Browser: &pb.NotificationSettings_Browser{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+					EventTypes: []pb.NotificationSettings_Type{
+						pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+					},
+					ShowWhileViewing: false,
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.Settings.Browser)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Browser.Scope)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+		}, resp.Settings.Browser.EventTypes)
+		assert.False(t, resp.Settings.Browser.ShowWhileViewing)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Workspaces.Scope)
+
+		described, err := DescribeNotificationSettings(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, resp.Settings.Browser.Scope, described.Settings.Browser.Scope)
+		assert.Equal(t, resp.Settings.Browser.EventTypes, described.Settings.Browser.EventTypes)
+		assert.Equal(t, resp.Settings.Browser.ShowWhileViewing, described.Settings.Browser.ShowWhileViewing)
+	})
+
+	t.Run("browser filtered scope stores workspace id and event types", func(t *testing.T) {
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				},
+				Browser: &pb.NotificationSettings_Browser{
+					Scope:            pb.NotificationSettings_WORKSPACE_SCOPE_FILTERED,
+					ShowWhileViewing: true,
+					Filters: []*pb.NotificationSettings_WorkspaceFilter{{
+						WorkspaceId: factoryModel.ID.String(),
+						EventTypes: []pb.NotificationSettings_Type{
+							pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
+						},
+					}},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Settings.Browser.Filters, 1)
+		assert.Equal(t, factoryModel.ID.String(), resp.Settings.Browser.Filters[0].WorkspaceId)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
+		}, resp.Settings.Browser.Filters[0].EventTypes)
+		assert.True(t, resp.Settings.Browser.ShowWhileViewing)
+	})
+
+	t.Run("omitted browser channel keeps stored browser settings", func(t *testing.T) {
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_NONE,
+				},
+				Browser: &pb.NotificationSettings_Browser{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+					EventTypes: []pb.NotificationSettings_Type{
+						pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+					},
+					ShowWhileViewing: false,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.Settings.Browser)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Workspaces.Scope)
+		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Browser.Scope)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+		}, resp.Settings.Browser.EventTypes)
+		assert.False(t, resp.Settings.Browser.ShowWhileViewing)
 	})
 }
 

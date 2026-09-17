@@ -15,6 +15,17 @@ export const GITHUB_SETUP_ORG_PARAM = "githubOrg";
 /** GitHub connection that received the installation request callback. */
 export const GITHUB_SETUP_INTEGRATION_PARAM = "githubIntegrationId";
 
+/** Stored on the integration so the provider callback can redirect in one hop. */
+export const INTEGRATION_SETUP_RETURN_PATH_KEY = "setupReturnPath";
+
+export function configurationWithSetupReturnPath(
+  configuration: Record<string, unknown>,
+  setupReturnTo?: string,
+): Record<string, unknown> {
+  if (!setupReturnTo) return configuration;
+  return { ...configuration, [INTEGRATION_SETUP_RETURN_PATH_KEY]: setupReturnTo };
+}
+
 interface StoredReturn {
   path: string;
   createdAt: number;

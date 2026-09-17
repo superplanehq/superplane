@@ -287,6 +287,19 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 	})
 }
 
+func attachGitHubIdentity(t *testing.T, account *models.Account, providerID string) {
+	t.Helper()
+	require.NoError(t, database.Conn().Create(&models.AccountProvider{
+		AccountID:   account.ID,
+		Provider:    models.ProviderGitHub,
+		ProviderID:  providerID,
+		Email:       account.Email,
+		Name:        account.Name,
+		AvatarURL:   "https://avatars.example/" + providerID + ".png",
+		AccessToken: "token-" + account.ID.String(),
+	}).Error)
+}
+
 func TestGetRedirectURL(t *testing.T) {
 	t.Run("should return home page when no redirect parameter", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/login", nil)
@@ -481,6 +494,85 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		_, err := models.FindAccountByEmail(googleUser.Email)
 		assert.Error(t, err)
 	})
+
+	t.Run("should sign in directly when one GitHub account matches", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		account, err := models.CreateAccount("Solo GitHub", "solo-github@example.com")
+		require.NoError(t, err)
+		attachGitHubIdentity(t, account, "solo-github-id")
+
+		githubUser := goth.User{
+			UserID:      "solo-github-id",
+			Email:       account.Email,
+			Name:        account.Name,
+			NickName:    "solo",
+			Provider:    models.ProviderGitHub,
+			AccessToken: "solo-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
+			map[string]string{"provider": "github"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, githubUser)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+		assert.Equal(t, account.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
+	})
+
+	t.Run("should issue a session for the account that holds the identity, not an email match", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		identityAccount, err := models.CreateAccount("Identity Account", "identity-github@example.com")
+		require.NoError(t, err)
+		emailAccount, err := models.CreateAccount("Email Account", "shared-login-email@example.com")
+		require.NoError(t, err)
+		require.NotEmpty(t, emailAccount.ID)
+		attachGitHubIdentity(t, identityAccount, "email-mismatch-github-id")
+
+		githubUser := goth.User{
+			UserID:      "email-mismatch-github-id",
+			Email:       identityAccount.Email,
+			Name:        identityAccount.Name,
+			NickName:    "identity",
+			Provider:    models.ProviderGitHub,
+			AccessToken: "identity-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
+			map[string]string{"provider": "github"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, githubUser)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
+	})
+}
+
+func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {
+	t.Helper()
+	cookie := cookieValue(recorder, "account_token")
+	require.NotEmpty(t, cookie)
+	claims, err := signer.ValidateAndGetClaims(cookie)
+	require.NoError(t, err)
+	sub, _ := claims["sub"].(string)
+	require.NotEmpty(t, sub)
+	return sub
+}
+
+func sessionAccountIDOrEmpty(recorder *httptest.ResponseRecorder) string {
+	return cookieValue(recorder, "account_token")
+}
+
+func cookieValue(recorder *httptest.ResponseRecorder, name string) string {
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == name {
+			return cookie.Value
+		}
+	}
+	return ""
 }
 
 func TestHandler_checkSignupPolicy(t *testing.T) {

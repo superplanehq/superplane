@@ -52,7 +52,8 @@ func (t *OnIssue) Documentation() string {
 
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
-- **data.issue**: the Sentry issue object
+- **data.issue**: the Sentry issue object from the webhook
+- **description**: Markdown of the Sentry issue and latest event (stack, request, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
@@ -211,9 +212,26 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
+		"description":  t.issueDescription(ctx, message.Data["issue"]),
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
+}
+
+func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any) string {
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		return IssueDescription(issue, nil)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to create sentry client for issue enrichment: %v", err)
+		}
+		return IssueDescription(issue, nil)
+	}
+
+	return FetchedIssueDescription(client, issue, ctx.Logger)
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {

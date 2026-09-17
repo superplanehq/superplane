@@ -66,7 +66,7 @@ export const createDropletMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { region?: string; size?: string } | undefined;
 
   if (configuration?.region) {
     metadata.push({ icon: "map-pin", label: `Region: ${configuration.region}` });

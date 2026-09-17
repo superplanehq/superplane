@@ -12,48 +12,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import type { SsoProviderItem } from "./accountSecuritySso";
-
-export function DisconnectSsoDialog({
-  provider,
-  onOpenChange,
-  onConfirm,
-}: {
-  provider: SsoProviderItem | null;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  if (!provider) {
-    return null;
-  }
-
-  return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Disconnect {provider.label}</DialogTitle>
-          <DialogDescription>{disconnectSsoDescription(provider)}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Keep {provider.label}
-          </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm}>
-            Disconnect {provider.label}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function disconnectSsoDescription(provider: SsoProviderItem): string {
-  if (provider.provider === "github") {
-    return "You cannot sign in with GitHub until you connect it again. Velocity reports stop crediting your pull requests to you.";
-  }
-  return `You cannot sign in with ${provider.label} until you connect it again.`;
-}
-
 export function PasswordDialog({
   open,
   onOpenChange,

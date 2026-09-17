@@ -65,8 +65,10 @@ export function usePreparedCanvasGraph(
       queryClient,
       me,
       "live",
+      undefined,
+      organizationId,
     );
 
     return { nodes, edges, isLoading: false };
-  }, [canvas, catalog, isLoading, me, queryClient]);
+  }, [canvas, catalog, isLoading, me, organizationId, queryClient]);
 }

@@ -15,19 +15,9 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /propose_spec/);
   assert.match(pack, /propose_confidence/);
   assert.doesNotMatch(pack, /propose_plan/);
-  assert.match(pack, /how well you understand the task/);
-  assert.match(pack, /why Clarity is not 5/);
-  assert.match(pack, /Do not name files/);
-  assert.match(pack, /Answer the questions in this session/);
-  assert.match(pack, /Do not describe agent fit/);
-  assert.doesNotMatch(pack, /how suitable the work is for an agent/);
-  assert.match(pack, /Do not write a test or an acceptance check/);
-  assert.match(pack, /You may update the score without rewriting the specification/);
+  assert.match(pack, /Follow the task prompt/);
   assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the specification/);
-  assert.match(pack, /Talk like a colleague/);
-  assert.match(pack, /2 to 4 short sentences/);
-  assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /call survey with 2 to 4 options/);
   assert.match(
     pack,
@@ -35,23 +25,58 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   );
   assert.match(pack, /Do not use XML tags/);
   assert.match(pack, /If the survey tool is unavailable or fails, do not put the questions in chat/);
+  assert.match(pack, /You may update the score without rewriting the specification/);
+  assert.match(pack, /this is a continuation/);
+  assert.match(pack, /does not publish the specification or the score/);
+  assert.match(pack, /only after those calls/);
+  assert.match(pack, /Do not leave a written plan unpublished/);
+  assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
+  assert.match(pack, /Do not name files/);
+  assert.match(pack, /Answer the questions in this session/);
+  assert.match(pack, /Do not describe agent fit/);
+  assert.match(pack, /Do not write a test or an acceptance check/);
+  assert.match(pack, /Do not add an Open questions section/);
+  assert.doesNotMatch(pack, /Talk like a colleague/);
+  assert.doesNotMatch(pack, /## Proposed outcome/);
+  assert.doesNotMatch(pack, /## 1\. Research/);
+  assert.doesNotMatch(pack, /Why not start/);
+  assert.doesNotMatch(pack, /you must ask/);
+  assert.doesNotMatch(pack, /## Executive summary/);
+  assert.doesNotMatch(pack, /check copy/);
+  assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
+});
+
+test("analysis user prompt covers tone, score rules, and plan shape", () => {
+  const pack = fs.readFileSync(path.join(__dirname, "analysis_user_prompt.md"), "utf8");
+  assert.match(pack, /Talk like a colleague/);
+  assert.match(pack, /## 1\. Research/);
+  assert.match(pack, /## 2\. Decide or ask/);
+  assert.match(pack, /## 3\. Score/);
+  assert.match(pack, /## 4\. Write the plan/);
+  assert.match(pack, /how well you understand the task/);
+  assert.match(pack, /why Clarity is not 5/);
+  assert.doesNotMatch(pack, /how suitable the work is for an agent/);
+  assert.match(pack, /2 to 4 short sentences/);
+  assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /If the score is 1 or 2/);
   assert.match(pack, /do not have enough Clarity to write a plan/);
   assert.match(pack, /Keep asking until Clarity is 5/);
   assert.match(pack, /Scores 3 and 4/);
   assert.match(pack, /Review it and start if you are happy/);
-  assert.match(pack, /If the score is below 5, you must ask/);
-  assert.doesNotMatch(pack, /Why not start/);
-  assert.match(pack, /this is a continuation/);
-  assert.match(pack, /does not publish the specification or the score/);
-  assert.match(pack, /only after those calls/);
+  assert.match(pack, /A simple task can reach 5 with no survey/);
+  assert.match(pack, /Do not invent a survey to fill a quota/);
   assert.match(pack, /## Proposed outcome/);
   assert.match(pack, /## Constraints/);
-  assert.match(pack, /Do not add an Open questions section/);
+  assert.match(pack, /## Scope/);
+  assert.match(pack, /Do not repeat the goal/);
+  assert.doesNotMatch(pack, /propose_spec/);
+  assert.doesNotMatch(pack, /in chat, survey, or the Clarity summary/);
+  assert.doesNotMatch(pack, /Do not describe agent fit/);
+  assert.doesNotMatch(pack, /Do not add an Open questions section/);
   assert.doesNotMatch(pack, /## Executive summary/);
+  assert.doesNotMatch(pack, /## Files and seams/);
+  assert.doesNotMatch(pack, /at least five/);
   assert.doesNotMatch(pack, /Key architecture decisions/);
-  assert.doesNotMatch(pack, /check copy/);
-  assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
 });
 
 test("embedded analysis protocol is removed from the task prompt", () => {
@@ -207,16 +232,12 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     ["propose_spec", "propose_confidence", "survey"],
   );
   assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["body"]);
-  assert.match(replies[1].result.tools[1].description, /how well you understand the task/);
+  assert.match(replies[1].result.tools[1].description, /every turn/);
   assert.match(replies[1].result.tools[2].description, /short everyday options/);
-  assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /why Clarity is not 5/);
-  assert.match(replies[1].result.tools[0].description, /Clarity is 3 or higher/);
+  assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /Follow the task prompt/);
+  assert.match(replies[1].result.tools[0].description, /Do not leave a written plan unpublished/);
   assert.match(replies[1].result.tools[1].description, /without propose_spec/);
-  assert.match(replies[1].result.tools[1].description, /not enough Clarity to write a plan/);
-  assert.match(replies[1].result.tools[1].description, /Keep asking until Clarity is 5/);
-  assert.match(replies[1].result.tools[1].description, /Review it and start if you are happy/);
-  assert.match(replies[1].result.tools[2].description, /Clarity is below 5/);
-  assert.match(replies[1].result.tools[2].description, /two valid readings exist/);
+  assert.match(replies[1].result.tools[2].description, /task prompt says to ask/);
   assert.match(
     replies[1].result.tools[2].inputSchema.properties.questions.description,
     /JSON array/,
