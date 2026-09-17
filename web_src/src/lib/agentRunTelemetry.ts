@@ -370,6 +370,31 @@ export function isRawAgentTurnLiveLogText(text: string): boolean {
   return parseAgentTurnLiveLogText(text) != null;
 }
 
+export function isSerializedAgentActivityLiveLogText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) {
+    return false;
+  }
+  try {
+    const rec = JSON.parse(trimmed) as {
+      schema_version?: unknown;
+      type?: unknown;
+      activity_id?: unknown;
+      event_id?: unknown;
+    };
+    if (rec.schema_version !== 2 || typeof rec.type !== "string" || rec.type.length === 0) {
+      return false;
+    }
+    return typeof rec.activity_id === "string" || typeof rec.event_id === "string";
+  } catch {
+    return false;
+  }
+}
+
+export function isHiddenAgentLiveLogText(text: string): boolean {
+  return isRawAgentTurnLiveLogText(text) || isSerializedAgentActivityLiveLogText(text);
+}
+
 export type AgentPromptUsageSeries = {
   name: string;
   telemetry: AgentRunTelemetry;

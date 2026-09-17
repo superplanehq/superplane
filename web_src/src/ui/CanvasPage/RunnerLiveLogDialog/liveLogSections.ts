@@ -1,4 +1,4 @@
-import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 
 import type { CommandSection, CommandSectionEvent, CommandTool, LogState, PendingLiveLogRecord } from "./types";
 
@@ -18,6 +18,7 @@ export function emptyCommandSection(start: CommandStart): CommandSection {
     preview: start.preview?.trim() || undefined,
     lines: [],
     events: [],
+    activities: [],
     status: "running",
     duration_ms: null,
     started_at: start.startedAtMs ?? Date.now(),
@@ -71,7 +72,7 @@ export function appendLineToLatestSection(
   replayLineSkip?: Map<number, number>,
   commandIndex?: number,
 ): LogState {
-  if (isRawAgentTurnLiveLogText(text)) {
+  if (isHiddenAgentLiveLogText(text)) {
     return state;
   }
   const destination = liveLogRecordDestination(state, commandIndex);

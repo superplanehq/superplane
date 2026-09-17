@@ -1,7 +1,18 @@
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
+import { emptyAgentActivityState } from "@/lib/agentActivity";
+import {
+  applyPromptUsageRecord,
+  emptyAgentRunTelemetry,
+  emptyPromptUsageState,
+  promptUsageSeries,
+  startPromptUsageSeries,
+  type AgentPromptUsageState,
+} from "@/lib/agentRunTelemetry";
+import { Sentry } from "@/sentry";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
+import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { applyLiveLogActivityRecord } from "./liveLogActivity";
 import {
   appendLineToLatestSection,
   closeOpenTool,
@@ -12,18 +23,9 @@ import {
   startToolOnLatestSection,
   type CommandStart,
 } from "./liveLogSections";
+import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
-import type { ExecutionInfo } from "../../../pages/app/mappers/types";
-import { Sentry } from "@/sentry";
-import {
-  applyPromptUsageRecord,
-  emptyAgentRunTelemetry,
-  emptyPromptUsageState,
-  promptUsageSeries,
-  startPromptUsageSeries,
-  type AgentPromptUsageState,
-} from "@/lib/agentRunTelemetry";
 
 const RECONNECT_DELAY_MS = 2000;
 
@@ -39,6 +41,7 @@ const initialLogState: LogState = {
   sections: [],
   orphanLines: [],
   pendingRecords: [],
+  activityState: emptyAgentActivityState,
   error: null,
   isLoading: false,
   isStreaming: false,
@@ -177,6 +180,13 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
         setUsage(emptyPromptUsageState());
       }
       setState((prev) => logStateAfterStreamOpen(prev, reconnecting, resetParsedLogs));
+    },
+    onRecord: (record) => {
+      if (record.schema_version !== 2) {
+        return;
+      }
+      const index = commandCursor.index;
+      setState((prev) => applyLiveLogActivityRecord(prev, record, index, reconnecting));
     },
     onLogLine: (text, commandIndex) => {
       const index = commandIndex ?? commandCursor.index;
@@ -449,7 +459,12 @@ export function useLiveLogStream(
 
   const scrollTrigger = useMemo(() => {
     const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
-    return `${state.sections.length}:${state.orphanLines.length}:${lineCount}`;
+    const activityCount = state.sections.reduce(
+      (count, section) =>
+        count + (section.activities?.reduce((items, activity) => items + activity.items.length, 0) ?? 0),
+      0,
+    );
+    return `${state.sections.length}:${state.orphanLines.length}:${lineCount}:${activityCount}`;
   }, [state.sections, state.orphanLines]);
 
   const { scrollRef } = useScrollToBottom(scrollTrigger);
