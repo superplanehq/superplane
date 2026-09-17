@@ -147,14 +147,12 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 }
 
 func LinkProviderToAccount(tx *gorm.DB, encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
-	if gothUser.Provider != models.ProviderGitHub {
-		existing, err := models.FindAccountByProvider(tx, gothUser.Provider, gothUser.UserID)
-		if err == nil && existing.ID != account.ID {
-			return models.ErrSignInIdentityInUse
-		}
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
+	existing, err := models.FindAccountByProvider(tx, gothUser.Provider, gothUser.UserID)
+	if err == nil && existing.ID != account.ID {
+		return models.ErrSignInIdentityInUse
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
 	return updateAccountProviders(encryptor, account, gothUser)

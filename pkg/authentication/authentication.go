@@ -116,8 +116,6 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/auth/config", a.handleAuthConfig).Methods("GET")
-	router.HandleFunc("/auth/choose-account", a.handleListAccountChoice).Methods("GET")
-	router.HandleFunc("/auth/choose-account", a.completeAccountChoice).Methods("POST")
 	if a.passwordLoginEnabled {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
 		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
@@ -280,18 +278,12 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	accounts, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
+	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
 	}
 
-	if len(accounts) > 1 {
-		a.redirectToAccountChoice(w, r, gothUser)
-		return
-	}
-
-	account := accounts[0]
 	err = updateAccountProviders(a.encryptor, account, gothUser)
 	if err != nil {
 		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
@@ -991,47 +983,39 @@ func (a *Handler) parseMagicLinkToken(tokenString string) (email string, code st
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
-	accounts, _, err := a.findOrCreateAccountForProvider(gothUser, a.SignupsEnabled())
-	if err != nil {
-		return nil, err
-	}
-	if len(accounts) == 0 {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return accounts[0], nil
+	account, _, err := a.findOrCreateAccountForProvider(gothUser, a.SignupsEnabled())
+	return account, err
 }
 
-func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) ([]*models.Account, bool, error) {
-	accounts, err := models.FindAccountsByProvider(database.Conn(), gothUser.Provider, gothUser.UserID)
-	if err != nil {
-		return nil, false, err
-	}
+func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, bool, error) {
+	account, err := models.FindAccountByProvider(database.Conn(), gothUser.Provider, gothUser.UserID)
 
-	candidates := unblockedAccounts(accounts)
-	if len(candidates) > 0 {
-		if len(candidates) == 1 {
-			account := candidates[0]
-			if account.Email != utils.NormalizeEmail(gothUser.Email) {
-				log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
-				err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
-				if err != nil {
-					log.Errorf("Failed to update account email: %v", err)
-					return nil, false, fmt.Errorf("failed to update account email: %w", err)
-				}
-			}
-		}
-		return candidates, false, nil
-	}
-	if len(accounts) > 0 {
-		return nil, false, models.ErrAccountBlocked
-	}
-
-	account, err := models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
 		if account.IsBlocked() {
 			return nil, false, models.ErrAccountBlocked
 		}
-		return []*models.Account{account}, false, nil
+
+		if account.Email != utils.NormalizeEmail(gothUser.Email) {
+			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
+			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
+			if err != nil {
+				log.Errorf("Failed to update account email: %v", err)
+				return nil, false, fmt.Errorf("failed to update account email: %w", err)
+			}
+		}
+		return account, false, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, err
+	}
+
+	account, err = models.FindAccountByEmail(gothUser.Email)
+	if err == nil {
+		if account.IsBlocked() {
+			return nil, false, models.ErrAccountBlocked
+		}
+		return account, false, nil
 	}
 
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1048,18 +1032,7 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 		return nil, false, err
 	}
 
-	return []*models.Account{account}, true, nil
-}
-
-func unblockedAccounts(accounts []models.Account) []*models.Account {
-	candidates := make([]*models.Account, 0, len(accounts))
-	for i := range accounts {
-		if accounts[i].IsBlocked() {
-			continue
-		}
-		candidates = append(candidates, &accounts[i])
-	}
-	return candidates
+	return account, true, nil
 }
 
 func (a *Handler) canCreateAccountFromRequest(r *http.Request) bool {
@@ -1262,7 +1235,7 @@ func getRedirectURL(r *http.Request) string {
 		return "/"
 	}
 
-	if strings.HasPrefix(redirectParam, authSelectStatePrefix) {
+	if strings.HasPrefix(redirectParam, authConnectStatePrefix) {
 		return "/"
 	}
 

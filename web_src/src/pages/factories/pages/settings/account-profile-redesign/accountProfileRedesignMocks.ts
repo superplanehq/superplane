@@ -37,6 +37,7 @@ export interface AccountRedesignProfile {
   name: string;
   email: string;
   passwordSet: boolean;
+  linkedGithubUsername: string | null;
   tokens: AccountRedesignToken[];
   ssoAccounts: AccountRedesignSsoAccount[];
   notifications: AccountRedesignNotifications;
@@ -46,6 +47,7 @@ export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
   name: "Ada Lovelace",
   email: "ada@example.com",
   passwordSet: true,
+  linkedGithubUsername: null,
   tokens: [],
   ssoAccounts: [
     { provider: "github", identity: "ada", email: "ada@example.com" },
@@ -56,6 +58,7 @@ export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
 
 export const ACCOUNT_REDESIGN_SECURE_PROFILE: AccountRedesignProfile = {
   ...ACCOUNT_REDESIGN_PROFILE,
+  linkedGithubUsername: "ada",
   ssoAccounts: [
     { provider: "github", identity: "ada", email: "ada@users.noreply.github.com" },
     { provider: "google", identity: "ada@example.com", email: "ada@example.com" },
