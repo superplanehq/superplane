@@ -149,4 +149,43 @@ describe("agent activity reducer", () => {
       sequence: 4,
     });
   });
+
+  it("keeps the current tool input when a later delta is empty", () => {
+    const base = { schema_version: 2, activity_id: "activity-1", provider: "claude" } as const;
+    const state = reduceAgentActivityRecords(emptyAgentActivityState, [
+      { ...base, type: "tool_start", event_id: "1", sequence: 1, id: "tool-1", kind: "bash", name: "Bash", input: "" },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "2",
+        sequence: 2,
+        id: "tool-1",
+        partial_json: '{"command":"git status"}',
+      },
+      { ...base, type: "tool_input_delta", event_id: "3", sequence: 3, id: "tool-1", partial_json: "" },
+    ]);
+
+    expect(state.activities[0].items).toMatchObject([{ id: "tool-1", input: '{"command":"git status"}' }]);
+  });
+
+  it("fills an empty bash start from later input deltas", () => {
+    const base = { schema_version: 2, activity_id: "activity-1", provider: "claude" } as const;
+    const started = reduceAgentActivityRecords(emptyAgentActivityState, [
+      { ...base, type: "tool_start", event_id: "1", sequence: 1, id: "tool-1", kind: "bash", name: "Bash", input: "" },
+    ]);
+    const filled = reduceAgentActivityRecords(started, [
+      { ...base, type: "tool_input_delta", event_id: "2", sequence: 2, id: "tool-1", partial_json: '{"command":"' },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "3",
+        sequence: 3,
+        id: "tool-1",
+        partial_json: '{"command":"git status"}',
+      },
+    ]);
+
+    expect(started.activities[0].items).toMatchObject([{ id: "tool-1", input: "" }]);
+    expect(filled.activities[0].items).toMatchObject([{ id: "tool-1", input: '{"command":"git status"}' }]);
+  });
 });

@@ -117,6 +117,57 @@ describe("useLiveLogStream agent activity", () => {
     ]);
   });
 
+  it("fills empty bash start input from later tool_input_delta records", async () => {
+    pumpMock.mockImplementation(async (handlers: ActivityHandlers) => {
+      handlers.onOpen?.();
+      handlers.onCmdStart?.(5, "Implementation", 1, "prompt", "You are implementing");
+      const base = {
+        schema_version: 2,
+        activity_id: "act-1",
+        provider: "claude",
+        turn: 1,
+      };
+      handlers.onRecord?.({
+        ...base,
+        type: "tool_start",
+        id: "tool-1",
+        kind: "bash",
+        name: "Bash",
+        input: "",
+        event_id: "act-1:2",
+        sequence: 2,
+      });
+      handlers.onRecord?.({
+        ...base,
+        type: "tool_input_delta",
+        id: "tool-1",
+        partial_json: '{"command":"git status"}',
+        event_id: "act-1:3",
+        sequence: 3,
+      });
+      handlers.onRecord?.({
+        ...base,
+        type: "tool_input_delta",
+        id: "tool-1",
+        partial_json: "",
+        event_id: "act-1:4",
+        sequence: 4,
+      });
+    });
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.sections[0]?.activities?.[0]?.items).toHaveLength(1));
+    expect(result.current.sections[0]?.activities?.[0]?.items).toMatchObject([
+      { type: "tool", kind: "bash", name: "Bash", input: '{"command":"git status"}' },
+    ]);
+  });
+
   it("does not duplicate version 2 activity after a reconnect replay", async () => {
     const play = (handlers: ActivityHandlers) => {
       handlers.onOpen?.();

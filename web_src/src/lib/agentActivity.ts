@@ -291,9 +291,20 @@ function startTool(activity: AgentActivity, record: AgentActivityRecord): AgentA
 function updateToolInput(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {
   return updateItem(activity, record.id, (item) =>
     item.type === "tool"
-      ? { ...item, input: record.partial_json ?? item.input, truncated: item.truncated || Boolean(record.truncated) }
+      ? {
+          ...item,
+          input: nextToolInput(item.input, record.partial_json),
+          truncated: item.truncated || Boolean(record.truncated),
+        }
       : item,
   );
+}
+
+function nextToolInput(current: string, partialJson: string | undefined): string {
+  if (partialJson == null || partialJson === "") {
+    return current;
+  }
+  return partialJson;
 }
 
 function endTool(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {
