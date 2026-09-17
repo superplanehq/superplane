@@ -190,7 +190,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
 	assert.Contains(t, text, "Follow the task prompt")
-	assert.Contains(t, text, "Call propose_spec when the task prompt says")
+	assert.Contains(t, text, "Do not leave a written plan unpublished")
 	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
 	assert.Contains(t, text, "4/5")

@@ -67,6 +67,8 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Contains(t, analysis, "call survey with 2 to 4 options")
 	assert.Contains(t, analysis, "Do not paste the specification")
 	assert.Contains(t, analysis, "does not publish the specification or the score")
+	assert.Contains(t, analysis, "Do not leave a written plan unpublished")
+	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
 	assert.Contains(t, analysis, "Do not name files")
 	assert.Contains(t, analysis, "Do not add an Open questions section")
 	assert.NotContains(t, analysis, "Talk like a colleague")
