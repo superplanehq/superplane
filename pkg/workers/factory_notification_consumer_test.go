@@ -251,6 +251,8 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		for _, email := range sent {
 			recipients = append(recipients, email.ToEmail)
 			assert.Contains(t, email.Subject, "closed as completed")
+			assert.Contains(t, email.Subject, "Task")
+			assert.NotContains(t, email.Subject, "Work order")
 		}
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
@@ -436,4 +438,36 @@ func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messag
 	payload, err := json.Marshal(message)
 	require.NoError(t, err)
 	require.NoError(t, consumer.Consume(tackle.NewFakeDelivery(payload)))
+}
+
+func TestBuildWorkOrderNotificationContent_SubjectsUseTask(t *testing.T) {
+	factoryModel := &models.Factory{Key: "SP"}
+	order := &models.FactoryWorkOrder{Number: 42, Title: "Fix login"}
+
+	t.Run("status change", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{
+				EventType: factoryevents.EventTypeOrderStatusUpdated,
+				ToState:   models.FactoryWorkOrderStateClosed,
+				Result:    models.FactoryWorkOrderResultCompleted,
+			},
+			"Ana",
+			models.NotificationTypeWorkOrderStatusOwned,
+		)
+		assert.Equal(t, "[SP-42] Task closed as completed", content.Subject)
+		assert.NotContains(t, content.Subject, "Work order")
+	})
+
+	t.Run("unknown event type", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{EventType: "order.unknown"},
+			"Ana",
+			"",
+		)
+		assert.Equal(t, "[SP-42] Task update", content.Subject)
+	})
 }

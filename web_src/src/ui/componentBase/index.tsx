@@ -65,6 +65,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
   customField?: React.ReactNode | (() => React.ReactNode);
+  /** Compact factory header action, such as the runner logs icon. */
+  headerAction?: React.ReactNode;
   /** Extra body content for the larger factory node card. */
   factoryBody?: React.ReactNode;
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
@@ -106,36 +108,66 @@ export interface ComponentBaseProps extends ComponentActionsProps {
 
 export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
   if (props.isFactoryApp) {
-    return (
-      <FactoryNodeCard
-        title={props.title}
-        componentLabel={props.componentLabel}
-        nodeName={props.nodeName}
-        iconSrc={props.iconSrc}
-        iconSlug={props.iconSlug}
-        iconColor={props.iconColor}
-        selected={props.selected}
-        metadata={Array.isArray(props.metadata) ? props.metadata : undefined}
-        eventSections={Array.isArray(props.eventSections) ? props.eventSections : undefined}
-        error={typeof props.error === "string" ? props.error : undefined}
-        warning={typeof props.warning === "string" ? props.warning : undefined}
-        draftDiffStatus={props.draftDiffStatus}
-        dimBodyBelowHeader={props.dimBodyBelowHeader}
-        showHeader={props.showHeader}
-        onDuplicate={props.onDuplicate}
-        onDelete={props.onDelete}
-        onToggleView={props.onToggleView}
-        isCompactView={props.isCompactView}
-        canvasMode={props.canvasMode}
-        showRuntimeStatus={props.showRuntimeStatus}
-        runIsActive={props.runIsActive}
-        eventStateMap={props.eventStateMap}
-        body={props.factoryBody}
-      />
-    );
+    return <FactoryComponentBase {...props} />;
   }
 
   return <ClassicComponentBase {...props} />;
+};
+
+function resolveCustomFieldContent(customField: ComponentBaseProps["customField"]): React.ReactNode {
+  if (typeof customField === "function") {
+    try {
+      return customField() ?? null;
+    } catch (renderError) {
+      console.error("[ComponentBase] customField threw during render:", renderError);
+      return null;
+    }
+  }
+
+  return customField ?? null;
+}
+
+function shouldShowCustomField(
+  visibility: ComponentBaseProps["customFieldVisibility"],
+  canvasMode: ComponentBaseProps["canvasMode"],
+): boolean {
+  return visibility !== "live-only" || canvasMode !== "edit";
+}
+
+const FactoryComponentBase: React.FC<ComponentBaseProps> = (props) => {
+  const customField = shouldShowCustomField(props.customFieldVisibility, props.canvasMode ?? "live")
+    ? resolveCustomFieldContent(props.customField)
+    : null;
+
+  return (
+    <FactoryNodeCard
+      title={props.title}
+      componentLabel={props.componentLabel}
+      nodeName={props.nodeName}
+      iconSrc={props.iconSrc}
+      iconSlug={props.iconSlug}
+      iconColor={props.iconColor}
+      selected={props.selected}
+      metadata={Array.isArray(props.metadata) ? props.metadata : undefined}
+      eventSections={Array.isArray(props.eventSections) ? props.eventSections : undefined}
+      error={typeof props.error === "string" ? props.error : undefined}
+      warning={typeof props.warning === "string" ? props.warning : undefined}
+      draftDiffStatus={props.draftDiffStatus}
+      dimBodyBelowHeader={props.dimBodyBelowHeader}
+      showHeader={props.showHeader}
+      onDuplicate={props.onDuplicate}
+      onDelete={props.onDelete}
+      onToggleView={props.onToggleView}
+      isCompactView={props.isCompactView}
+      canvasMode={props.canvasMode}
+      showRuntimeStatus={props.showRuntimeStatus}
+      runIsActive={props.runIsActive}
+      eventStateMap={props.eventStateMap}
+      body={props.factoryBody}
+      customField={customField}
+      headerAction={props.headerAction}
+    />
+  );
 };
 
 const ClassicComponentBase: React.FC<ComponentBaseProps> = ({

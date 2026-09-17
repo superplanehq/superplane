@@ -54,13 +54,13 @@ export const createEventMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { alertType?: string; priority?: string } | undefined;
 
-  if (configuration.alertType) {
+  if (configuration?.alertType) {
     metadata.push({ icon: "activity", label: `Type: ${configuration.alertType}` });
   }
 
-  if (configuration.priority) {
+  if (configuration?.priority) {
     metadata.push({ icon: "flag", label: `Priority: ${configuration.priority}` });
   }
 

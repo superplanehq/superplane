@@ -143,6 +143,7 @@ import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { usePreparedCanvasData } from "./usePreparedCanvasData";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
 import { useGetSidebarData } from "./useGetSidebarData";
@@ -185,7 +186,6 @@ import {
   isCanvasPrepLoading,
   isValidRunId,
   prepareCanvasLogNodes,
-  prepareData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
@@ -1470,38 +1470,21 @@ export function AppPage({
     componentsLoading,
     integrationsLoading,
   );
-  const { nodes: preparedNodes, edges: preparedEdges } = useMemo(() => {
-    if (dataLoading || !canvasForPrep) {
-      return { nodes: [], edges: [] };
-    }
-
-    return prepareData(
-      canvasForPrep,
-      allTriggers,
-      allComponents,
-      visibleNodeEventsMap,
-      visibleNodeExecutionsMap,
-      visibleNodeQueueItemsMap,
-      canvasId!,
-      queryClient,
-      me,
-      canvasMode,
-      openTriggerModal,
-    );
-  }, [
-    canvasForPrep,
-    allTriggers,
-    allComponents,
-    visibleNodeEventsMap,
-    visibleNodeExecutionsMap,
-    visibleNodeQueueItemsMap,
+  const { nodes: preparedNodes, edges: preparedEdges } = usePreparedCanvasData({
+    canvas: canvasForPrep,
+    triggers: allTriggers,
+    components: allComponents,
+    nodeEventsMap: visibleNodeEventsMap,
+    nodeExecutionsMap: visibleNodeExecutionsMap,
+    nodeQueueItemsMap: visibleNodeQueueItemsMap,
     canvasId,
     queryClient,
-    dataLoading,
-    me,
+    user: me,
     canvasMode,
-    openTriggerModal,
-  ]);
+    openModal: openTriggerModal,
+    organizationId,
+    enabled: !dataLoading,
+  });
 
   const draftVisualDiff = useDraftVisualDiff({
     isViewingDraftVersion: isEditing && isEditBootstrapReady,

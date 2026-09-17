@@ -4,6 +4,9 @@ export type RunnerLiveLogDialogProps = {
   title: string;
   canvasMode: "live" | "edit";
   execution: ExecutionInfo | null;
+  component?: string;
+  iconSlug?: string;
+  session?: { organizationId?: string; canvasId?: string };
 };
 
 export function isExecutionInFlight(execution: ExecutionInfo): boolean {
