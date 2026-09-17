@@ -7,6 +7,7 @@ import {
   checksPassedWorkOrderIds,
   fixesPausedWorkOrderIds,
   prFeedbackActivityAttemptLabel,
+  prFeedbackActivityDescription,
   prFeedbackActivityKind,
   prFeedbackActivityLabel,
   waitingOnChecksWorkOrderIds,
@@ -61,7 +62,7 @@ export function prFeedbackLogRunsFromPullRequests(
     ),
   );
 
-  return pullRequests.flatMap((pullRequest) => {
+  const entries = pullRequests.flatMap((pullRequest) => {
     const usageByRunId = new Map(
       (pullRequest.runs ?? []).flatMap((linked) =>
         linked.run?.id
@@ -83,7 +84,10 @@ export function prFeedbackLogRunsFromPullRequests(
                 canvasId: run.canvasId,
                 handlerName: handlerNameByCanvasId.get(run.canvasId),
                 pullRequestNumber: pullRequest.number,
-                description: prFeedbackActivityLabel(activity),
+                pullRequest,
+                revision: activity.revision,
+                title: prFeedbackActivityLabel(activity),
+                description: prFeedbackActivityDescription(activity),
                 attemptLabel: prFeedbackActivityAttemptLabel(activity),
                 costCents: firstPositiveWorkOrderMetric(activity.costCents, usage?.costCents),
                 totalTokens: firstPositiveWorkOrderMetric(activity.totalTokens, usage?.totalTokens),
@@ -102,6 +106,9 @@ export function prFeedbackLogRunsFromPullRequests(
                 canvasId: run.canvasId,
                 handlerName: handlerNameByCanvasId.get(run.canvasId),
                 pullRequestNumber: pullRequest.number,
+                pullRequest,
+                revision: pullRequest.currentRevision,
+                title: linked.title,
                 description: linked.description,
                 costCents: linked.costCents,
                 totalTokens: linked.totalTokens,
@@ -110,8 +117,10 @@ export function prFeedbackLogRunsFromPullRequests(
             ];
           });
 
-    return entries.sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+    return entries;
   });
+
+  return entries.sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
 }
 
 export { prFeedbackRunTitle };

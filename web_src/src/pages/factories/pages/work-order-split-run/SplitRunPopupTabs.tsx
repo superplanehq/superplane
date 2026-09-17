@@ -34,6 +34,7 @@ type SplitRunPopupTabsProps = {
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
+  sidebarNote?: ReactNode;
   analysis?: IntentAnalysisChat;
   sessionLookupError?: string;
   header: (views: ReactNode) => ReactNode;
@@ -55,6 +56,7 @@ export function SplitRunPopupTabs({
   canUpdate,
   footerActions,
   resultFooter,
+  sidebarNote,
   analysis,
   sessionLookupError,
   header,
@@ -87,6 +89,7 @@ export function SplitRunPopupTabs({
         onDescriptionSave={edits.saveDescription}
         source={fixture.source}
         sessionLookupError={sessionLookupError}
+        sidebarNote={sidebarNote}
       />
     ) : (
       <WorkOrderSplitRunOverview
@@ -109,6 +112,7 @@ export function SplitRunPopupTabs({
         analysis={analysis}
         source={fixture.source}
         showContextSidebar={fixture.footer.kind !== "draft"}
+        sidebarNote={sidebarNote}
       />
     );
   const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind });

@@ -5,6 +5,7 @@ import type {
   FactoriesFactoryPrFeedbackHandlerSource,
   FactoriesFactoryPullRequest,
   FactoriesFactoryPullRequestActivity,
+  FactoriesFactoryPullRequestRevision,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
@@ -270,7 +271,7 @@ export function isWaitingOnChecksActivity(activity: FactoriesFactoryPullRequestA
   if (!activity || !isActivePRFeedbackActivity(activity)) {
     return false;
   }
-  return WAITING_ON_CHECKS_DESCRIPTION.test(activity.description ?? "");
+  return WAITING_ON_CHECKS_DESCRIPTION.test(prFeedbackActivityText(activity));
 }
 
 export function isAddressingFeedbackActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
@@ -322,11 +323,11 @@ function addressingFeedbackCardLabel(
   activity: FactoriesFactoryPullRequestActivity,
   builtInCanvasIds?: ReadonlySet<string>,
 ): string {
-  const description = activity.description?.trim() ?? "";
-  if (isCustomPRActivityLabel(activity, builtInCanvasIds) && description) {
-    return description;
+  const text = prFeedbackActivityText(activity);
+  if (isCustomPRActivityLabel(activity, builtInCanvasIds) && text) {
+    return text;
   }
-  if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(description)) {
+  if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(text)) {
     return prFeedbackActivityLabel(activity);
   }
   return "Addressing user feedback";
@@ -351,7 +352,7 @@ export function isChecksPassedActivity(activity: FactoriesFactoryPullRequestActi
   if (!activity || isActivePRFeedbackActivity(activity)) {
     return false;
   }
-  return CHECKS_PASSED_DESCRIPTION.test(activity.description ?? "");
+  return CHECKS_PASSED_DESCRIPTION.test(prFeedbackActivityText(activity));
 }
 
 /** Latest finished passed check wait. Active waits and repairs win. */
@@ -409,12 +410,16 @@ function isCheckRelatedActivity(activity: FactoriesFactoryPullRequestActivity): 
   if (activity.state === "limit_reached" || activity.revision) {
     return true;
   }
-  const description = activity.description ?? "";
+  const text = prFeedbackActivityText(activity);
   return (
-    WAITING_ON_CHECKS_DESCRIPTION.test(description) ||
-    CHECKS_PASSED_DESCRIPTION.test(description) ||
-    FIXING_CHECKS_DESCRIPTION.test(description)
+    WAITING_ON_CHECKS_DESCRIPTION.test(text) ||
+    CHECKS_PASSED_DESCRIPTION.test(text) ||
+    FIXING_CHECKS_DESCRIPTION.test(text)
   );
+}
+
+function prFeedbackActivityText(activity: FactoriesFactoryPullRequestActivity): string {
+  return activity.title?.trim() || activity.description?.trim() || "";
 }
 
 /** Tasks with an active discussion or exclusive-repair run. */
@@ -454,13 +459,22 @@ export function prFeedbackActivityLabel(activity: FactoriesFactoryPullRequestAct
   if (activity.state === "limit_reached") {
     const limit = activity.attemptLimit ?? activity.attempt ?? 3;
     return (
-      activity.description?.trim() || `Automatic fixes paused after ${limit} ${limit === 1 ? "attempt" : "attempts"}`
+      activity.title?.trim() ||
+      activity.description?.trim() ||
+      `Automatic fixes paused after ${limit} ${limit === 1 ? "attempt" : "attempts"}`
     );
   }
   if (activity.access === "waiting") {
     return PR_FEEDBACK_SETTINGS_COPY.waitingForAccess;
   }
-  return activity.description?.trim() || "Pull request activity";
+  return activity.title?.trim() || activity.description?.trim() || "Pull request activity";
+}
+
+export function prFeedbackActivityDescription(activity: FactoriesFactoryPullRequestActivity): string | undefined {
+  if (!activity.title?.trim()) {
+    return undefined;
+  }
+  return activity.description?.trim() || undefined;
 }
 
 export function prFeedbackActivityAttemptLabel(activity: FactoriesFactoryPullRequestActivity): string | undefined {
@@ -477,6 +491,9 @@ export type PRFeedbackLogRun = {
   canvasId: string;
   handlerName?: string;
   pullRequestNumber?: string;
+  pullRequest?: FactoriesFactoryPullRequest;
+  revision?: FactoriesFactoryPullRequestRevision;
+  title?: string;
   description?: string;
   attemptLabel?: string;
   costCents?: string;

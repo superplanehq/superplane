@@ -41,6 +41,8 @@ const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
 const STREAM_NOTE_MARKDOWN =
   "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
+const ACTIVITY_MARKDOWN_LINK =
+  "font-medium text-sky-700 !underline !decoration-current underline-offset-2 dark:text-sky-300";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -70,7 +72,7 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
   return "text-muted-foreground";
 }
 
-const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
+const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)] dark:hover:bg-muted";
 const LOG_ROW_H = "h-[1.375rem]";
 const STREAM_SECTION = "bg-muted px-2";
 const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
@@ -397,6 +399,9 @@ function isNestedHeaderControl(target: EventTarget | null): boolean {
 type PhaseLogCardProps = {
   phase: SplitRunPhase;
   expanded: boolean;
+  headerLeading?: ReactNode;
+  markdownName?: boolean;
+  showMarkdownDescription?: boolean;
   stream?: SplitRunStreamLine[];
   selectedNodeId?: string | null;
   onToggle?: () => void;
@@ -424,6 +429,9 @@ function phaseExpectsUsage(groups: StreamNodeGroup[]): boolean {
 export function PhaseLogCard({
   phase,
   expanded,
+  headerLeading,
+  markdownName = false,
+  showMarkdownDescription = false,
   stream,
   selectedNodeId,
   onToggle,
@@ -493,19 +501,35 @@ export function PhaseLogCard({
           }
         >
           {compactSessionLog ? null : (
-            <AutomationHeader
-              phase={phase}
-              expanded={expanded}
-              collapsible={collapsible}
-              producedArtifacts={producedArtifacts}
-              producedPullRequests={producedPullRequests}
-              onToggle={onToggle}
-              onStop={onStop}
-              onRerun={onRerun}
-              runHref={runHref}
-              actionBusy={actionBusy}
-              onUsageOpenChange={onUsageOpenChange}
-            />
+            <>
+              <AutomationHeader
+                phase={phase}
+                expanded={expanded}
+                collapsible={collapsible}
+                headerLeading={headerLeading}
+                markdownName={markdownName}
+                producedArtifacts={producedArtifacts}
+                producedPullRequests={producedPullRequests}
+                onToggle={onToggle}
+                onStop={onStop}
+                onRerun={onRerun}
+                runHref={runHref}
+                actionBusy={actionBusy}
+                onUsageOpenChange={onUsageOpenChange}
+                files={files}
+              />
+              {showMarkdownDescription && expanded && phase.description ? (
+                <MarkdownContent
+                  content={phase.description}
+                  files={files}
+                  variant="workspace"
+                  openLinksInNewTab
+                  linkClassName={ACTIVITY_MARKDOWN_LINK}
+                  className="max-w-none px-2 pt-1 font-sans text-[13px] leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+                  data-testid={`split-run-phase-description-${phase.id}`}
+                />
+              ) : null}
+            </>
           )}
 
           {expanded ? (
@@ -538,6 +562,8 @@ function AutomationHeader({
   phase,
   expanded,
   collapsible,
+  headerLeading,
+  markdownName,
   producedArtifacts,
   producedPullRequests,
   onToggle,
@@ -546,10 +572,13 @@ function AutomationHeader({
   runHref,
   actionBusy,
   onUsageOpenChange,
+  files,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
   collapsible: boolean;
+  headerLeading?: ReactNode;
+  markdownName: boolean;
   producedArtifacts: FactoriesWorkOrderArtifact[];
   producedPullRequests: FactoriesFactoryPullRequest[];
   onToggle?: () => void;
@@ -558,6 +587,7 @@ function AutomationHeader({
   runHref?: string;
   actionBusy: boolean;
   onUsageOpenChange?: (open: boolean) => void;
+  files?: FilesFile[];
 }) {
   return (
     <div
@@ -570,11 +600,44 @@ function AutomationHeader({
         collapsible && onToggle && "cursor-pointer",
       )}
     >
-      {collapsible ? (
+      {headerLeading}
+      {collapsible && markdownName ? (
+        <div className={PHASE_NAME_FACE}>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${phase.name}`}
+            className="shrink-0"
+          >
+            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          </button>
+          <MarkdownContent
+            content={phase.name}
+            files={files}
+            variant="workspace"
+            openLinksInNewTab
+            linkClassName={ACTIVITY_MARKDOWN_LINK}
+            className="min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline"
+          />
+        </div>
+      ) : collapsible ? (
         <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
           <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </button>
+      ) : markdownName ? (
+        <div className={PHASE_NAME_FACE}>
+          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <MarkdownContent
+            content={phase.name}
+            files={files}
+            variant="workspace"
+            openLinksInNewTab
+            linkClassName={ACTIVITY_MARKDOWN_LINK}
+            className="min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline"
+          />
+        </div>
       ) : (
         <div className={PHASE_NAME_FACE}>
           <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />

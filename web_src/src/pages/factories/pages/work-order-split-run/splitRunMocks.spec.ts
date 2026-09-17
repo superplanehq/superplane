@@ -1557,14 +1557,15 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("pr-feedback-run-new");
   });
 
-  it("uses the linked run description as the PR feedback phase name", () => {
+  it("uses the activity title and keeps its description", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
         {
           canvasId: "canvas-fb",
           handlerName: "Address PR feedback",
           pullRequestNumber: "6812",
-          description: "Please add tests for the retry path.",
+          title: "Address **review** comment",
+          description: "Please add [tests](https://example.com/tests).",
           costCents: "45",
           totalTokens: "1200",
           run: {
@@ -1579,7 +1580,8 @@ describe("line board work-order examples", () => {
       ],
     });
     expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-comment")).toMatchObject({
-      name: "Please add tests for the retry path.",
+      name: "Address **review** comment",
+      description: "Please add [tests](https://example.com/tests).",
       costCents: "45",
       totalTokens: "1200",
     });

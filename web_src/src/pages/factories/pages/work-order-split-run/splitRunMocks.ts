@@ -1,6 +1,7 @@
 import type {
   FactoriesAutomationRef,
   FactoriesFactoryPullRequest,
+  FactoriesFactoryPullRequestRevision,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
@@ -116,8 +117,12 @@ export interface SplitRunStreamLine {
 export interface SplitRunPhase {
   id: SplitRunPhaseId;
   name: string;
+  /** Markdown details shown below the activity title. */
+  description?: string;
   status: SplitRunPhaseStatus;
   duration: string;
+  /** When this automation started. */
+  startedAt?: string;
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -141,6 +146,12 @@ export interface SplitRunPhase {
   totalTokens?: string;
   /** Runner model this automation used. Hidden when empty. */
   model?: string;
+  /** Pull request and revision that started this activity. */
+  pullRequestActivity?: {
+    pullRequest?: FactoriesFactoryPullRequest;
+    revision?: FactoriesFactoryPullRequestRevision;
+    startedAt?: string;
+  };
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -703,6 +714,7 @@ function analysisRunToPhase(
     name: "Analysis",
     status,
     duration,
+    startedAt: entry.run.createdAt,
     componentName,
     artifacts: [],
     checks,
@@ -766,12 +778,15 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const status = statusForCanvasRun(entry.run);
+  const title = entry.title?.trim();
   const description = entry.description?.trim();
-  const baseName = description
-    ? description
-    : entry.pullRequestNumber
-      ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
-      : "Activity on PR";
+  const baseName = title
+    ? title
+    : description
+      ? description
+      : entry.pullRequestNumber
+        ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
+        : "Activity on PR";
   const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
@@ -795,8 +810,10 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   return {
     id: `pr-feedback-${entry.run.id}`,
     name,
+    description: title ? description : undefined,
     status,
     duration,
+    startedAt: entry.run.createdAt,
     componentName,
     artifacts: [],
     stream: [line],
@@ -805,6 +822,11 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    pullRequestActivity: {
+      pullRequest: entry.pullRequest ?? (entry.pullRequestNumber ? { number: entry.pullRequestNumber } : undefined),
+      revision: entry.revision,
+      startedAt: entry.run.createdAt,
+    },
   };
 }
 
@@ -933,6 +955,7 @@ function automationBacklogPhase(
     name,
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName,
     artifacts: [description],
     stream: [
@@ -964,6 +987,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
     name: "Backlog",
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName: "Created manually",
     artifacts: [description],
     stream: [
@@ -1036,6 +1060,7 @@ function executionToPhase(
     name,
     status,
     duration,
+    startedAt: execution.createdAt,
     componentName,
     artifacts,
     checks: checksForLineExecution(execution, apiChecks, demoArtifacts),

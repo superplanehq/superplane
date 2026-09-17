@@ -86,7 +86,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
 						"revision":      prFeedbackPRHeadSHAExpression(),
 						"access":        "concurrent",
-						"description":   prFeedbackChecksWaitingDescriptionExpression(),
+						"title":         prFeedbackChecksWaitingDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 500, Y: 260},
 				},
@@ -105,7 +105,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"description": prFeedbackChecksPassedDescriptionExpression(),
+						"title": prFeedbackChecksPassedDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 80},
 				},
@@ -115,8 +115,8 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"access":      "exclusive",
-						"description": prFeedbackChecksRepairDescriptionExpression(),
+						"access": "exclusive",
+						"title":  prFeedbackChecksRepairDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 260},
 				},
@@ -134,7 +134,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"description": prFeedbackChecksLimitDescriptionExpression(request.MaximumAttempts),
+						"title": prFeedbackChecksLimitDescriptionExpression(request.MaximumAttempts),
 					},
 					Position: yaml.Position{X: 1000, Y: 400},
 				},
@@ -152,7 +152,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"description": prFeedbackChecksTimeoutDescriptionExpression(),
+						"title": prFeedbackChecksTimeoutDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 440},
 				},

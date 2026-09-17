@@ -865,6 +865,7 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 
 	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
 		RunID:             c.execution.RunID,
+		Title:             params.Title,
 		Description:       params.Description,
 		RevisionSHA:       params.Revision,
 		Access:            access,
@@ -896,8 +897,8 @@ func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequest
 		return nil, err
 	}
 
-	if params.Description != nil {
-		if err := activity.UpdateDescription(c.tx, *params.Description); err != nil {
+	if params.Title != nil || params.Description != nil {
+		if err := activity.UpdateContent(c.tx, params.Title, params.Description); err != nil {
 			return nil, err
 		}
 	}
@@ -963,6 +964,7 @@ func (c *FactoryContext) activityResult(
 
 func pullRequestActivityToCore(activity *models.FactoryPullRequestRun, revision *models.FactoryPullRequestRevision) *core.PullRequestActivity {
 	item := &core.PullRequestActivity{
+		Title:        activity.Title,
 		Description:  activity.Description,
 		Access:       activity.Access,
 		State:        activity.State,
