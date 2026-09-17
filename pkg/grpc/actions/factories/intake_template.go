@@ -481,7 +481,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 }
 
 func intakeRefinementPrompt() string {
-	return runner.PlanningSessionProtocolMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
+	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
 func intakeAnalysisCloneCommand() string {

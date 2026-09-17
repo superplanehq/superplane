@@ -25,6 +25,9 @@ var analysisProtocolScript string
 //go:embed analysis_protocol.md
 var analysisProtocolMarkdown string
 
+//go:embed analysis_user_prompt.md
+var analysisUserPromptMarkdown string
+
 //go:embed mcp.json
 var planningSessionMCPConfig string
 
@@ -58,9 +61,16 @@ func PlanningSessionProtocolFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "analysis_protocol.js", Content: analysisProtocolScript, Mode: "0644"}
 }
 
-// PlanningSessionProtocolMarkdown returns the canonical refinement protocol.
+// PlanningSessionProtocolMarkdown returns the hardcoded refinement system
+// protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
 	return strings.TrimSpace(analysisProtocolMarkdown)
+}
+
+// PlanningSessionUserPromptMarkdown is the default Refine Task prompt: tone,
+// Clarity rules, and plan shape. Factories can edit that node prompt.
+func PlanningSessionUserPromptMarkdown() string {
+	return strings.TrimSpace(analysisUserPromptMarkdown)
 }
 
 // PlanningSessionProtocolMarkdownFile ships the canonical protocol to runners.
