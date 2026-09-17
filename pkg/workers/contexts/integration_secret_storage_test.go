@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -38,7 +39,31 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 		value, err = storage.Get("missing")
 		require.Error(t, err)
 		assert.Empty(t, value)
-		assert.Contains(t, err.Error(), "secret missing not found")
+		assert.ErrorIs(t, err, core.ErrIntegrationSecretNotFound)
+	})
+
+	t.Run("does not classify database failures as missing secrets", func(t *testing.T) {
+		tx := database.Conn().Begin()
+		require.NoError(t, tx.Rollback().Error)
+
+		storage := NewIntegrationSecretStorage(tx, crypto.NewNoOpEncryptor(), integration)
+		_, err := storage.Get("token")
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, core.ErrIntegrationSecretNotFound))
+	})
+
+	t.Run("does not classify decryption failures as missing secrets", func(t *testing.T) {
+		seedContextIntegrationSecret(t, integration, "encrypted-token", "not-encrypted")
+
+		storage := NewIntegrationSecretStorage(
+			database.Conn(),
+			crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef")),
+			integration,
+		)
+
+		_, err := storage.Get("encrypted-token")
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, core.ErrIntegrationSecretNotFound))
 	})
 
 	t.Run("creates and persists secrets", func(t *testing.T) {
@@ -124,7 +149,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 
 		err = storage.Update("missing", "value")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "secret missing not found")
+		assert.ErrorIs(t, err, core.ErrIntegrationSecretNotFound)
 	})
 
 	t.Run("deletes cached and persisted secrets", func(t *testing.T) {
@@ -133,7 +158,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 
 		_, err := storage.Get("many-two")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "secret many-two not found")
+		assert.ErrorIs(t, err, core.ErrIntegrationSecretNotFound)
 
 		var count int64
 		err = database.Conn().
@@ -146,7 +171,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 
 		err = storage.Delete("missing")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "secret missing not found")
+		assert.ErrorIs(t, err, core.ErrIntegrationSecretNotFound)
 	})
 }
 
