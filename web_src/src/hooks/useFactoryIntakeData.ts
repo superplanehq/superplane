@@ -1,5 +1,6 @@
 import {
   factoriesCreateFactoryIntake,
+  factoriesDeleteFactoryIntake,
   factoriesImportFactoryIntakeItem,
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
@@ -111,6 +112,26 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       // A new intake seeds the newest items of its source, so the Backlog
       // already holds tasks the cached list does not know about.
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactoryIntake(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (intakeId: string) => {
+      await factoriesDeleteFactoryIntake(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, intakeId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
     },
   });

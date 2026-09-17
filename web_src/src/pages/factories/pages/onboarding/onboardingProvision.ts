@@ -16,6 +16,11 @@ import {
 } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 import type { IssuesChoiceId } from "./onboardingFixtures";
+import {
+  forgetOnboardingIntakeBinding,
+  onboardingIntakeBinding,
+  rememberOnboardingIntakeBinding,
+} from "./onboardingIntakeBinding";
 
 export const DEFAULT_LINE_NAME = "implement";
 
@@ -157,7 +162,31 @@ export async function provisionEventApps(args: {
 
 export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
-export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+export type CreateFactoryIntake = (input: {
+  source: FactoriesFactoryIntakeSource;
+  integrationId?: string;
+  resourceId?: string;
+}) => Promise<FactoriesFactoryIntake>;
+
+export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
+
+function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
+  return intake.source === GITHUB_INTAKE_SOURCE || intake.source === JIRA_INTAKE_SOURCE;
+}
+
+function jiraIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, resourceId: string): boolean {
+  const binding = onboardingIntakeBinding(intake);
+  return binding.integrationId === integrationId && binding.resourceId === resourceId;
+}
+
+async function removeProvisionedIntake(
+  deleteIntake: DeleteFactoryIntake,
+  intake: FactoriesFactoryIntake,
+): Promise<void> {
+  if (!intake.id) return;
+  await deleteIntake(intake.id);
+  forgetOnboardingIntakeBinding(intake.id);
+}
 
 // The GitHub intake opens a task for each matching issue. The Backlog
 // canvas scores those tasks. The backend reads the connection and the
@@ -176,23 +205,65 @@ export async function provisionGithubIntake(args: {
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
-// Onboarding does not store a Jira project key, so a bound Jira intake cannot
-// be created here. Skip GitHub intake when the user chose Jira: a GitHub
-// intake would listen to the wrong source. The user adds Jira intake from
-// the Backlog column after setup.
+export async function provisionJiraIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  integrationId: string;
+  resourceId: string;
+}): Promise<FactoriesFactoryIntake> {
+  const intakes = await args.listIntakes();
+  const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  if (existing && jiraIntakeMatches(existing, args.integrationId, args.resourceId)) {
+    return existing;
+  }
+  if (existing) {
+    await removeProvisionedIntake(args.deleteIntake, existing);
+  }
+
+  const created = await args.createIntake({
+    source: JIRA_INTAKE_SOURCE,
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+  });
+  rememberOnboardingIntakeBinding(created.id, {
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+  });
+  return created;
+}
+
+// Create the selected backlog intake and remove a leftover intake from an
+// earlier failed finish, so analysis follows the source the user chose.
 export async function provisionOnboardingIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
   issuesChoice: IssuesChoiceId | null;
+  jira?: { integrationId: string; projectId: string };
 }): Promise<FactoriesFactoryIntake | undefined> {
-  if (args.issuesChoice === "jira") {
-    const intakes = await args.listIntakes();
-    return intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  const intakes = await args.listIntakes();
+  const desiredSource = args.issuesChoice === "jira" ? JIRA_INTAKE_SOURCE : GITHUB_INTAKE_SOURCE;
+  for (const intake of intakes) {
+    if (!isBacklogIntake(intake) || intake.source === desiredSource) continue;
+    await removeProvisionedIntake(args.deleteIntake, intake);
   }
 
-  return provisionGithubIntake({
+  if (args.issuesChoice !== "jira") {
+    return provisionGithubIntake({
+      listIntakes: args.listIntakes,
+      createIntake: args.createIntake,
+    });
+  }
+  if (!args.jira?.integrationId || !args.jira.projectId) {
+    throw new Error("Connect Jira, then choose a project.");
+  }
+  return provisionJiraIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    deleteIntake: args.deleteIntake,
+    integrationId: args.jira.integrationId,
+    resourceId: args.jira.projectId,
   });
 }
 
