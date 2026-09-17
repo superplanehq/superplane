@@ -71,12 +71,17 @@ export function shouldRaiseBrowserNotification({
   return !isWorkspaceBoardPath(pathname, factoryKey);
 }
 
+export function browserNotificationIconUrl(): string {
+  return new URL("/favicon.ico", window.location.origin).href;
+}
+
 export function raiseUserBrowserNotification(payload: UserNotificationPayload, navigate: (path: string) => void): void {
   if (!payload.title || typeof Notification === "undefined") {
     return;
   }
   const notification = new Notification(payload.title, {
     body: payload.body,
+    icon: browserNotificationIconUrl(),
     tag: payload.orderKey,
   });
   notification.onclick = () => {

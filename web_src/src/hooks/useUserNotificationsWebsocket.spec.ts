@@ -143,6 +143,7 @@ describe("useUserNotificationsWebsocket", () => {
     });
     expect(notificationSpy).toHaveBeenCalledWith("[SP-1] New comment", {
       body: "Ada commented on SP-1.",
+      icon: `${window.location.origin}/favicon.ico`,
       tag: "SP-1",
     });
   });

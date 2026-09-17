@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "bun:test";
 
 import {
+  browserNotificationIconUrl,
   isWorkspaceBoardPath,
   raiseUserBrowserNotification,
   shouldRaiseBrowserNotification,
@@ -89,5 +90,27 @@ describe("raiseUserBrowserNotification", () => {
     clickHandler?.();
     expect(navigate).toHaveBeenCalledWith("/org-1/workspaces/SP/work-order/1");
     expect(close).toHaveBeenCalled();
+  });
+
+  it("sets the SuperPlane icon", () => {
+    const constructed: NotificationOptions[] = [];
+    class FakeNotification {
+      constructor(
+        public title: string,
+        public options?: NotificationOptions,
+      ) {
+        constructed.push(options ?? {});
+      }
+      set onclick(_handler: (() => void) | null) {}
+      close = vi.fn();
+    }
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: FakeNotification,
+    });
+
+    raiseUserBrowserNotification({ title: "[SP-1] New comment" }, vi.fn());
+    expect(constructed[0]?.icon).toBe(browserNotificationIconUrl());
+    expect(constructed[0]?.icon).toContain("/favicon.ico");
   });
 });
