@@ -39,7 +39,8 @@ async function requestJSON(method, path, body) {
     }
   }
   if (!response.ok) {
-    const message = parsed.message || parsed.error || text || `HTTP ${response.status}`;
+    const message =
+      parsed.message || parsed.error || text || `HTTP ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
     throw error;
@@ -52,7 +53,9 @@ function surveyQuestions(input) {
   return raw.map((question) => ({
     prompt: String((question && question.prompt) || "").trim(),
     options: Array.isArray(question && question.options)
-      ? question.options.map((option) => String(option || "").trim()).filter(Boolean)
+      ? question.options
+          .map((option) => String(option || "").trim())
+          .filter(Boolean)
       : [],
   }));
 }
@@ -66,7 +69,9 @@ async function proposeSurvey(input) {
 function analysisOutputPaths(env = process.env) {
   return {
     spec: String(env.SUPERPLANE_ANALYSIS_SPEC_FILE || "/tmp/spec.md"),
-    score: String(env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json"),
+    score: String(
+      env.SUPERPLANE_ANALYSIS_SCORE_FILE || "/tmp/intake-analysis.json",
+    ),
   };
 }
 
@@ -88,7 +93,8 @@ function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
         paths.score,
         `${JSON.stringify({
           score: Math.round(Number(score) * 20),
-          summary: summary != null ? String(summary) : String(existing.summary || ""),
+          summary:
+            summary != null ? String(summary) : String(existing.summary || ""),
           reasons,
         })}\n`,
       );
@@ -103,7 +109,11 @@ async function proposeSpec(input) {
   if (!body) {
     throw new Error("body is required");
   }
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/specs", { body });
+  const result = await requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/specs",
+    { body },
+  );
   writeAnalysisOutputs({ spec: body });
   return result;
 }
@@ -114,10 +124,14 @@ async function proposeConfidence(input) {
     throw new Error("score is required");
   }
   const summary = String((input && input.summary) || "").trim();
-  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/confidence", {
-    score,
-    summary,
-  });
+  const result = await requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/confidence",
+    {
+      score,
+      summary,
+    },
+  );
   writeAnalysisOutputs({ score, summary });
   return result;
 }
@@ -127,13 +141,21 @@ async function recordAgentMessage(text) {
   if (!body) {
     return { status: "ignored" };
   }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/agent-messages", { text: body });
+  return requestJSON(
+    "POST",
+    "/api/v1/runner/planning-sessions/agent-messages",
+    {
+      text: body,
+      activity_id:
+        String(process.env.SUPERPLANE_ACTIVITY_ID || "").trim() || undefined,
+    },
+  );
 }
 
 const TOOLS = [
   {
     name: "propose_spec",
-    description: "Publish the full spec.md markdown for the open task. Include the title, Executive summary, and plan. Do not change the original request. Call this after you write the specification.",
+    description: "Publish the specification markdown for the open task. Call this before you stop whenever you write or update a specification this turn. Do not leave a written plan unpublished. Pass the full markdown body.",
     inputSchema: {
       type: "object",
       properties: {
@@ -145,18 +167,17 @@ const TOOLS = [
   {
     name: "propose_confidence",
     description:
-      "Publish the 0 through 5 confidence score and one sentence that explains why that score fits. Say how suitable the work is for an agent. Do not write a test or an acceptance check.",
+      "Publish the 1 through 5 Clarity score and a short summary. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
         score: {
           type: "number",
-          description: "Confidence from 0 through 5.",
+          description: "Clarity from 1 through 5.",
         },
         summary: {
           type: "string",
-          description:
-            "One sentence that explains the score. Example: This is a small bug fix with clear reproduction steps and an example in the repository, so an agent can complete it.",
+          description: "Short summary for the user. Follow the task prompt for length and shape.",
         },
       },
       required: ["score", "summary"],
@@ -165,17 +186,23 @@ const TOOLS = [
   {
     name: "survey",
     description:
-      "Ask the person a multiple-choice question when the task is unclear or two valid readings exist. Use 2 to 4 options. Then stop. Do not ask the same question in chat.",
+      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. Then stop and wait. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
         questions: {
           type: "array",
+          description:
+            "A JSON array of question objects. Do not pass XML or a JSON-encoded string.",
           items: {
             type: "object",
             properties: {
-              prompt: { type: "string" },
-              options: { type: "array", items: { type: "string" } },
+              prompt: { type: "string", description: "One plain question." },
+              options: {
+                type: "array",
+                items: { type: "string" },
+                description: "Short everyday options. Under 12 words each.",
+              },
             },
             required: ["prompt", "options"],
           },
@@ -217,7 +244,10 @@ async function handleRequest(message) {
     });
     return;
   }
-  if (method === "notifications/initialized" || method === "notifications/cancelled") {
+  if (
+    method === "notifications/initialized" ||
+    method === "notifications/cancelled"
+  ) {
     return;
   }
   if (method === "ping") {
@@ -249,7 +279,12 @@ async function handleRequest(message) {
       });
     } catch (err) {
       sendResult(id, {
-        content: [{ type: "text", text: err && err.message ? err.message : String(err) }],
+        content: [
+          {
+            type: "text",
+            text: err && err.message ? err.message : String(err),
+          },
+        ],
         isError: true,
       });
     }
@@ -296,7 +331,13 @@ function parseFrames(buffer) {
 
 function skipASCIIWhitespace(buffer) {
   let index = 0;
-  while (index < buffer.length && (buffer[index] === 0x09 || buffer[index] === 0x0a || buffer[index] === 0x0d || buffer[index] === 0x20)) {
+  while (
+    index < buffer.length &&
+    (buffer[index] === 0x09 ||
+      buffer[index] === 0x0a ||
+      buffer[index] === 0x0d ||
+      buffer[index] === 0x20)
+  ) {
     index += 1;
   }
   return index === 0 ? buffer : buffer.slice(index);
@@ -353,7 +394,11 @@ async function main() {
     for (const message of parsed.messages) {
       Promise.resolve(handleRequest(message)).catch((err) => {
         if (message && message.id != null) {
-          sendError(message.id, -32603, err && err.message ? err.message : String(err));
+          sendError(
+            message.id,
+            -32603,
+            err && err.message ? err.message : String(err),
+          );
         }
       });
     }

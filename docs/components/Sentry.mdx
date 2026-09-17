@@ -62,12 +62,13 @@ The On Issue Event trigger starts a workflow execution when Sentry sends issue w
 
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
-- **data.issue**: the Sentry issue object
+- **data.issue**: the Sentry issue object from the webhook
+- **description**: Markdown of the Sentry issue and latest event (stack, request, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating `data.issue`, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ### Setup
 
-This trigger uses the webhook URL configured on your Sentry internal integration. SuperPlane verifies each webhook signature using your Sentry client secret before routing the event to matching triggers.
+This trigger uses issue webhooks from the connected Sentry organization. SuperPlane verifies each webhook signature before it routes the event to matching triggers.
 
 ### Example Data
 
@@ -105,6 +106,7 @@ This trigger uses the webhook URL configured on your Sentry internal integration
         "web_url": "https://your-org.sentry.io/issues/123/"
       }
     },
+    "description": "https://your-org.sentry.io/issues/123/\n\n## Highlights\n\n- **Title:** Error #1: This is a test error!\n- **Culprit:** SentryCustomError(frontend/src/util)\n- **Project:** ipe\n- **Level:** error\n- **Environment:** production\n- **Status:** unresolved (new)\n- **First seen:** 2022-04-04T18:17:18.320000Z\n- **Last seen:** 2022-04-04T18:17:18.320000Z\n- **Count:** 42\n- **Assigned to:** Person\n\n## Stack Trace\n\nError: This is a test error!\n\n```\nSentryCustomError (frontend/src/util.ts:44) [in app]\nwrap (vendor.js:1)\n```\n\n## HTTP Request\n\nGET https://app.example.com/checkout\n\n## Tags\n\n- **environment:** production\n\n## Contexts\n\n- **browser:** Chrome 151.0\n- **os:** macOS 15.7\n\n## Breadcrumbs\n\n- info · auth: user logged in\n- warning · cart: qty parsed from query string\n\n## SDK\n\nsentry.javascript.browser 8.0.0\n\n**Replay ID:** rep-9\n**Trace ID:** abc123",
     "installation": {
       "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
     },

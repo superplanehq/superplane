@@ -5,9 +5,9 @@ import {
   canvasesListCanvases,
   canvasesPutCanvasStaging,
   factoriesMaterializeFactoryAppTemplate,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   type CanvasesCanvasSummary,
-  type FactoryApp,
+  type FactoryAutomation,
 } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -158,15 +158,17 @@ function presentNames(items: { name?: string }[]): string[] {
  */
 async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient, workspaceFactoryId?: string) {
   if (workspaceFactoryId) {
-    const cachedApps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, workspaceFactoryId));
+    const cachedApps = queryClient.getQueryData<FactoryAutomation[]>(
+      factoryAppsKey(organizationId, workspaceFactoryId),
+    );
     if (cachedApps) {
       return presentNames(cachedApps);
     }
 
-    const appsResponse = await factoriesListFactoryApps(
+    const appsResponse = await factoriesListFactoryAutomations(
       withOrganizationHeader({ organizationId, path: { factoryId: workspaceFactoryId } }),
     );
-    return presentNames(appsResponse.data?.apps ?? []);
+    return presentNames(appsResponse.data?.automations ?? []);
   }
 
   const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));

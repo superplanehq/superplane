@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
-import { CONFIDENCE_ANALYZING_TOOLTIP } from "./ConfidenceMeter";
 import { WorkOrderCard } from "./WorkOrderCard";
 
 const factory: FactoriesFactory = { id: "factory-1", name: "Refunds", key: "RF" };
@@ -22,6 +21,12 @@ const order: FactoriesWorkOrder = {
   lineDispatches: [],
   assignees: [],
 };
+
+function liveThinkingCopy(testId: string): string | undefined {
+  return [...screen.getByTestId(testId).querySelectorAll(".t-think-text")].find(
+    (el) => !el.classList.contains("is-exit"),
+  )?.textContent;
+}
 
 function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; hasAgentQuestion?: boolean }) {
   render(
@@ -45,12 +50,6 @@ function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; ha
   );
 }
 
-function liveThinkingCopy(testId: string): string | undefined {
-  return [...screen.getByTestId(testId).querySelectorAll(".t-think-text")].find(
-    (el) => !el.classList.contains("is-exit"),
-  )?.textContent;
-}
-
 describe("Confidence score on a backlog card", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -66,16 +65,14 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("explains the full analysis step on hover", async () => {
+  it("does not show an analyzing tooltip on the card", async () => {
     const user = userEvent.setup();
     renderCard({ isAnalyzing: true });
 
     await user.hover(screen.getByTestId("work-order-card-analyzing-wo-1"));
 
-    const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent(CONFIDENCE_ANALYZING_TOOLTIP);
-    expect(tip).not.toHaveTextContent("Confidence score");
-    expect(tip).not.toHaveTextContent("SuperPlane");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent is analyzing, refining, and planning this task.")).not.toBeInTheDocument();
   });
 
   it("cycles thinking copy while analysis runs", () => {

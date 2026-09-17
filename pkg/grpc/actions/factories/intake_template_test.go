@@ -16,6 +16,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
+			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -40,6 +41,40 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, intakeSuperplaneLabelCondition, filter.Configuration["expression"])
+	})
+
+	t.Run("Jira issues flow from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceJiraIssues})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+	})
+
+	t.Run("a Jira work order reads the plain text description, not the raw document", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceJiraIssues})
+		require.NoError(t, err)
+
+		// Jira holds a description in Atlassian Document Format, which reads
+		// as a Go map once a template interpolates it.
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "fields.description")
+	})
+
+	t.Run("a Sentry work order reads the formatted issue payload, not the permalink", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.data.issue.title }}", create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "permalink")
 	})
 
 	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {

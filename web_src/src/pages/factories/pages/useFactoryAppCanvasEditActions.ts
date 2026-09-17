@@ -1,4 +1,4 @@
-import { factoriesMaterializeFactoryAppDefaults, type CanvasesCanvas } from "@/api-client";
+import { factoriesMaterializeFactoryAutomationDefaults, type CanvasesCanvas } from "@/api-client";
 import {
   requestCanvasAgentSidebarClose,
   requestCanvasAgentSidebarOpen,
@@ -190,7 +190,7 @@ function useFactoryAppResetActions({
     if (!resetAvailable) return;
 
     try {
-      const response = await factoriesMaterializeFactoryAppDefaults(
+      const response = await factoriesMaterializeFactoryAutomationDefaults(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, appId },

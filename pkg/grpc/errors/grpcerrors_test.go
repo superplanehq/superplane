@@ -84,3 +84,9 @@ func TestCode(t *testing.T) {
 	assert.Equal(t, codes.Internal, Code(Internal(errors.New("db down"), "failed")))
 	assert.Equal(t, codes.PermissionDenied, Code(status.Error(codes.PermissionDenied, "nope")))
 }
+
+func TestStatusMessage(t *testing.T) {
+	assert.Equal(t, "user not found", StatusMessage(NotFound(gorm.ErrRecordNotFound, "user not found")))
+	assert.Equal(t, "organization canvas limit exceeded", StatusMessage(status.Error(codes.ResourceExhausted, "organization canvas limit exceeded")))
+	assert.Empty(t, StatusMessage(nil))
+}

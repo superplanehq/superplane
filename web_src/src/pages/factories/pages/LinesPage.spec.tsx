@@ -1,17 +1,21 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
-  FactoryApp,
+  FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CREATE_WITH_AGENT,
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_JIRA_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -25,6 +29,7 @@ import {
   factoryColumnAutomationViewPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -39,10 +44,13 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
+import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
@@ -74,9 +82,11 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
-const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
+const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
+const createFactoryAutomationMutateAsync = vi.fn();
+const deleteFactoryAutomationMutateAsync = vi.fn();
 const useFactoryPRFeedbackHandlers = vi.fn(
   (): {
     data?: { id?: string; source?: string; healthy?: boolean }[];
@@ -95,6 +105,7 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const refreshBacklogMutateAsync = vi.fn();
 
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
@@ -119,7 +130,7 @@ const CONFIGURED_INTAKES: FactoriesFactoryIntake[] = [
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => useFactoryApps(),
+  useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
     mutateAsync: updateFactoryLineMutateAsync,
@@ -131,6 +142,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => useFactoryPullRequests(),
+  useCreateFactoryAutomation: () => ({ mutateAsync: createFactoryAutomationMutateAsync, isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: deleteFactoryAutomationMutateAsync, isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -146,6 +159,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -162,6 +176,10 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: createFactoryPRFeedbackHandler, isPending: false }),
   useUpdateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -252,6 +270,10 @@ vi.mock("./ProductiveIntakeSetupDialog", () => ({
     open ? <div data-testid="productive-intake-setup" /> : null,
 }));
 
+vi.mock("./JiraIntakeSetupDialog", () => ({
+  JiraIntakeSetupDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="jira-intake-setup" /> : null),
+}));
+
 async function resetLinesBoardMocks() {
   const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
@@ -259,13 +281,16 @@ async function resetLinesBoardMocks() {
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryPullRequests.mockReturnValue({ data: [] });
-  useFactoryApps.mockReturnValue({ data: [] });
+  useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
+  createFactoryAutomationMutateAsync.mockReset();
+  deleteFactoryAutomationMutateAsync.mockReset();
   createFactoryPRFeedbackHandler.mockReset();
   useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
+  refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
   useWorkOrderChecks.mockReset();
   useWorkOrderChecks.mockImplementation(
@@ -395,14 +420,14 @@ describe("LinesPage board", () => {
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
       const dialog = screen.getByTestId("work-order-split-run");
-      expect(within(dialog).getByTestId("split-run-intent-decision-tip")).toHaveTextContent(
-        "SuperPlane is currently analyzing this task",
-      );
+      expect(within(dialog).queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+      expect(within(dialog).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
+      expect(within(dialog).getByTestId("split-run-intent-plan-analyzing")).toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-      expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+      expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
       expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);
@@ -484,6 +509,7 @@ describe("LinesPage board", () => {
   });
 
   it("shows the automations menu on every column and hides lane banners", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
@@ -532,7 +558,7 @@ describe("LinesPage board", () => {
   });
 
   it("opens an existing phase automation in the board view popup", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
@@ -546,6 +572,7 @@ describe("LinesPage board", () => {
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("column-automation-view")).getByRole("heading", { name: "Implement" }),
     ).toBeInTheDocument();
@@ -563,7 +590,7 @@ describe("LinesPage board", () => {
   });
 
   it("opens an existing analysis automation in the board view popup", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
@@ -579,7 +606,7 @@ describe("LinesPage board", () => {
   });
 
   it("opens the phase automation view from the header icon", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -607,7 +634,7 @@ describe("LinesPage board", () => {
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
       isPending: false,
     });
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
     const user = userEvent.setup();
     const { unmount } = renderLinesBoard();
 
@@ -839,7 +866,8 @@ describe("LinesPage board extras", () => {
     await resetLinesBoardMocks();
   });
 
-  it("hides Add automation on the Backlog, Verify, and Done column menus", async () => {
+  it("hides Add automation on Backlog and shows it on Verify and Done", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
       isPending: false,
@@ -847,11 +875,99 @@ describe("LinesPage board extras", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    for (const menuTestId of ["lines-backlog-menu", "lines-verify-menu", "lines-done-menu"]) {
-      await user.click(screen.getByTestId(menuTestId));
-      expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
-      await user.keyboard("{Escape}");
-    }
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
+  });
+
+  it("hides Add automation when custom automations are off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Verify plus when custom automations are off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+  });
+
+  it("opens the name dialog when Verify only has custom automation left", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+      isPending: false,
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-name-input")).toBeInTheDocument();
+  });
+
+  it("creates a custom Verify automation and opens the editor", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-custom"));
+    await user.type(screen.getByTestId("factory-app-name-input"), "Destroy ephemeral env");
+    await user.click(screen.getByTestId("factory-app-create-button"));
+
+    await waitFor(() => {
+      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith({
+        name: "Destroy ephemeral env",
+        columnKey: "verify",
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-custom`,
+      );
+    });
+  });
+
+  it("deletes a custom Verify automation from the view modal", async () => {
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+    });
+    deleteFactoryAutomationMutateAsync.mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-automation-rows-row-custom-app-create-env"));
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
+
+    await waitFor(() => {
+      expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith("app-create-env");
+    });
   });
 
   it("lists two intakes on the same source", () => {
@@ -882,7 +998,7 @@ describe("LinesPage board extras", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/apps/canvas-new`,
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-new`,
       );
     });
   });
@@ -895,9 +1011,34 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
   });
 
-  it("creates a Sentry intake from the overflow menu when the feature is on", async () => {
+  it("offers Refresh backlog when a readable intake exists", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    refreshBacklogMutateAsync.mockResolvedValueOnce({
+      archivedCount: 1,
+      failedItemCount: 0,
+      failedSourceCount: 0,
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-refresh-backlog"));
+
+    await waitFor(() => {
+      expect(refreshBacklogMutateAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("hides Refresh backlog when no readable intake exists", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
+  });
+
+  it("opens guided Sentry setup from the overflow menu when the feature is on", async () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
-    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
@@ -906,20 +1047,88 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
-    await waitFor(() => {
-      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_SENTRY_EXCEPTIONS" });
+    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Sentry setup from the backlog button when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.setupButton }));
+
+    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+  });
+
+  it("hides the backlog Sentry setup button when the feature is off", () => {
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
+  });
+
+  it("hides the backlog Sentry setup button after Sentry intake exists", () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    useFactoryIntakes.mockReturnValue({
+      data: [
+        {
+          id: SENTRY_INTAKE_ID,
+          canvasId: "app-sentry-intake",
+          name: "Sentry exceptions",
+          source: "SOURCE_SENTRY_EXCEPTIONS",
+          healthy: true,
+        },
+      ],
     });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/apps/canvas-new`,
-      );
-    });
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
+  });
+
+  it("opens guided Jira setup from the overflow menu when the feature is on", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
+    expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1`,
+    );
+  });
+
+  it("reopens Jira intake setup when the OAuth return query is present", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
+      vi.fn(),
+      REFUND_FACTORY,
+      LANE_BANNERS,
+    );
+
+    expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
   });
 
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {
@@ -933,14 +1142,16 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     expect(screen.getByTestId("productive-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("offers both extra sources when the Sentry and Productive.io features are on", async () => {
+  it("offers extra sources when the Sentry, Jira, and Productive.io features are on", async () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     enabledExperimentalFeatures.add("factory_productive_intake");
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
@@ -949,6 +1160,7 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
   });
@@ -1116,7 +1328,7 @@ describe("LinesPage board editing", () => {
   });
 
   it("opens the automation view from the header icon without an Edit menu", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1128,7 +1340,7 @@ describe("LinesPage board editing", () => {
   });
 
   it("stages and commits the canvas agent on Save Agent", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1370,5 +1582,109 @@ describe("LinesPage board editing", () => {
 
     expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();
+  });
+});
+
+function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+  return () => {
+    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+  };
+}
+
+function kickoffDraft(index: number): FactoriesWorkOrder {
+  const createdAt = new Date(Date.now() - (10 - index) * 1000).toISOString();
+  return {
+    id: `wo-kickoff-${index}`,
+    number: `${200 + index}`,
+    title: `Kickoff task ${index}`,
+    state: "STATE_DRAFT",
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function dispatchDraftToImplement(order: FactoriesWorkOrder, at: string): FactoriesWorkOrder {
+  return {
+    ...order,
+    state: "STATE_OPEN",
+    updatedAt: at,
+    lineDispatches: [
+      planLineActiveDispatch(order.id!, [
+        {
+          id: `exec-${order.id}`,
+          step: "Implement",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          createdAt: at,
+          updatedAt: at,
+          run: { id: `run-${order.id}`, appId: "app-refund-implementer", appName: "Implement" },
+        },
+      ]),
+    ],
+  };
+}
+
+function implementPhaseCards() {
+  return within(screen.getByTestId("lines-phase-column-0")).queryAllByTestId(/^lines-phase-run-/);
+}
+
+describe("LinesPage Implement phase window", () => {
+  let restoreHeights: (() => void) | undefined;
+
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  afterEach(() => {
+    restoreHeights?.();
+    restoreHeights = undefined;
+  });
+
+  it("keeps every Implement card after five consecutive dispatches", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 80, clientHeight: 400 });
+    const drafts = [0, 1, 2, 3, 4].map(kickoffDraft);
+    const orders = [...drafts];
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    const view = renderLinesBoard();
+
+    expect(implementPhaseCards()).toHaveLength(0);
+
+    for (let index = 0; index < drafts.length; index++) {
+      const at = new Date(Date.now() + index * 1000).toISOString();
+      orders[index] = dispatchDraftToImplement(drafts[index], at);
+      useFactoryWorkOrders.mockReturnValue({ data: [...orders] });
+      view.rerender(
+        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      );
+
+      await waitFor(() => {
+        expect(implementPhaseCards()).toHaveLength(index + 1);
+      });
+    }
+
+    expect(implementPhaseCards()).toHaveLength(5);
+    expect(screen.getByTestId("lines-phase-run-exec-wo-kickoff-4")).toBeInTheDocument();
+  });
+
+  it("starts an overflowing Implement column at the first page and loads more on scroll", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) =>
+      dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
+    );
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    renderLinesBoard();
+
+    expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE);
+
+    const scroller = screen.getByTestId("lines-phase-column-scroll-0");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+
+    await waitFor(() => {
+      expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE * 2);
+    });
   });
 });

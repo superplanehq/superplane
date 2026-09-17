@@ -21,11 +21,14 @@ import {
   ChecksPRFeedbackSetupPage,
   CreateWorkOrderComposeRedirect,
   DiscussionPRFeedbackSetupPage,
+  SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
+  LegacyFactoryAppRedirect,
+  LegacyFactoryAppSplitRunRedirect,
   FactoryLineEditPage,
   FactorySettingsLayout,
   LegacyWorkOrderDetailRedirect,
@@ -295,6 +298,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
                 <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+                <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
                 <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>
@@ -302,10 +306,11 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route index element={<AutomationsPage />} />
                 <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
                 <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
-                <Route path=":appId" element={<AutomationsPage />} />
+                <Route path=":appId" element={<FactoryAppCanvasPage />} />
+                <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
               </Route>
-              <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
-              <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
+              <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />
+              <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>

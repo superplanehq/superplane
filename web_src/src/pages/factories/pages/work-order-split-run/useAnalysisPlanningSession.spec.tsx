@@ -10,6 +10,7 @@ import {
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
+import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 import {
   analysisSessionPollInterval,
@@ -22,6 +23,10 @@ vi.mock("../planningSessionClient", () => ({
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
 }));
+
+function planningTalk(message: CreateWithAgentMessage) {
+  return { role: message.role, text: message.kind === "text" ? message.text : undefined };
+}
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -188,7 +193,9 @@ describe("useAnalysisPlanningSession", () => {
     invalidateQueries.mockClear();
 
     act(() => result.current.onComposerChange("Use this image."));
-    act(() => result.current.onSend());
+    await act(async () => {
+      await result.current.onSend();
+    });
 
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
   });
@@ -230,9 +237,7 @@ describe("useAnalysisPlanningSession", () => {
       expect(result.current.canSend).toBe(true);
       expect(result.current.isLive).toBe(false);
     });
-    expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual([
-      { role: "user", text: "Add a breed field." },
-    ]);
+    expect(result.current.view.messages.map(planningTalk)).toEqual([{ role: "user", text: "Add a breed field." }]);
 
     act(() => {
       result.current.onComposerChange("Use the existing puppy form.");
@@ -249,7 +254,7 @@ describe("useAnalysisPlanningSession", () => {
     );
     expect(result.current.view.machineStatus).toBe("starting");
     expect(result.current.showChat).toBe(true);
-    expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual(continued.messages);
+    expect(result.current.view.messages.map(planningTalk)).toEqual(continued.messages);
   });
 
   it("keeps prior messages when a restart response contains only the new turn", async () => {
@@ -282,10 +287,12 @@ describe("useAnalysisPlanningSession", () => {
 
     await waitFor(() => expect(result.current.canSend).toBe(true));
     act(() => result.current.onComposerChange("Also cover errors."));
-    act(() => result.current.onSend());
+    await act(async () => {
+      await result.current.onSend();
+    });
 
     await waitFor(() => {
-      expect(result.current.view.messages.map(({ role, text }) => ({ role, text }))).toEqual([
+      expect(result.current.view.messages.map(planningTalk)).toEqual([
         { role: "user", text: "Use the current form." },
         { role: "agent", text: "I updated the plan." },
         { role: "user", text: "Also cover errors." },
@@ -320,6 +327,76 @@ describe("useAnalysisPlanningSession", () => {
     await waitFor(() => {
       expect(answerPlanningSessionSurvey).toHaveBeenCalledWith("org-1", "factory-1", "session-1", "Priority? High");
     });
+    expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
+  });
+
+  it("sends image markdown with the follow-up note", async () => {
+    const session = {
+      id: "session-1",
+      state: "running",
+      messages: [{ id: "agent-1", role: "agent", text: "Share a screenshot." }],
+    };
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(session);
+    vi.mocked(sendPlanningSessionMessage).mockResolvedValue({
+      ...session,
+      messages: [
+        ...session.messages,
+        { id: "user-1", role: "user", text: "See this.\n\n![bug.png](sp-file://file-1)" },
+      ],
+    });
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.canSend).toBe(true));
+    act(() => result.current.onComposerChange("See this."));
+    await act(async () => {
+      await result.current.onSend("See this.\n\n![bug.png](sp-file://file-1)");
+    });
+
+    expect(sendPlanningSessionMessage).toHaveBeenCalledWith(
+      "org-1",
+      "factory-1",
+      "session-1",
+      "See this.\n\n![bug.png](sp-file://file-1)",
+    );
+  });
+
+  it("does not send while an upload is in progress", async () => {
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue({
+      id: "session-1",
+      state: "running",
+    });
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+          isUploading: true,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.showChat).toBe(true));
+    expect(result.current.canSend).toBe(false);
+    act(() => result.current.onComposerChange("See this."));
+    act(() => {
+      void result.current.onSend("See this.\n\n![bug.png](sp-file://file-1)");
+    });
+
     expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
   });
 });

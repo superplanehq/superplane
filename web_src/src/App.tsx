@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -23,6 +24,7 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
+import { ChooseAccount } from "./pages/auth/ChooseAccount";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -39,6 +41,8 @@ import {
   FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsLayout,
+  LegacyFactoryAppRedirect,
+  LegacyFactoryAppSplitRunRedirect,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
@@ -54,6 +58,7 @@ import {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
@@ -156,15 +161,17 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+              <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
-              <Route path=":appId" element={<AutomationsPage />} />
+              <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
+              <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
-            <Route path="apps/:appId" element={<FactoryCanvasConfigureGate />} />
-            <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
+            <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />
+            <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
           </Route>
         </Route>
         <Route
@@ -223,6 +230,7 @@ function AppRouter() {
             <GlobalCommandPalette />
             <Routes>
               <Route path="login" element={<Login />} />
+              <Route path="login/choose-account" element={<ChooseAccount />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
@@ -319,6 +327,7 @@ export function OrganizationScope() {
 
   return (
     <PermissionsProvider>
+      <UserNotificationsListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>
   );

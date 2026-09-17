@@ -68,6 +68,32 @@ func (File) TableName() string {
 	return "files"
 }
 
+func (f File) IsDispatchable(organizationID, factoryID, workOrderID uuid.UUID) bool {
+	if f.State != FileStateReady {
+		return false
+	}
+	if f.OrganizationID == nil || *f.OrganizationID != organizationID {
+		return false
+	}
+	if f.FactoryID == nil || *f.FactoryID != factoryID {
+		return false
+	}
+	switch f.Scope {
+	case blob.ScopeWorkspace:
+		return true
+	case blob.ScopeTask:
+		if f.WorkOrderID == nil {
+			return false
+		}
+		if workOrderID == uuid.Nil {
+			return true
+		}
+		return *f.WorkOrderID == workOrderID
+	default:
+		return false
+	}
+}
+
 type CreateFileParams struct {
 	Scope          string
 	OrganizationID uuid.UUID
@@ -201,6 +227,45 @@ func ListFilesByIDs(tx *gorm.DB, ids []uuid.UUID) ([]File, error) {
 	var files []File
 	err := tx.Where("id IN ?", ids).Find(&files).Error
 	return files, err
+}
+
+func RestoreFileRefs(tx *gorm.DB, organizationID, factoryID, workOrderID uuid.UUID, markdown string) (string, error) {
+	urls := blob.SignedFileURLs(markdown)
+	if len(urls) == 0 {
+		return markdown, nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(urls))
+	seen := map[uuid.UUID]struct{}{}
+	for _, raw := range urls {
+		id, ok := blob.FileIDFromSignedURL(raw)
+		if !ok {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	files, err := ListFilesByIDs(tx, ids)
+	if err != nil {
+		return markdown, err
+	}
+	allowed := map[uuid.UUID]struct{}{}
+	for _, file := range files {
+		if file.IsDispatchable(organizationID, factoryID, workOrderID) {
+			allowed[file.ID] = struct{}{}
+		}
+	}
+
+	return blob.RewriteSignedFileURLs(markdown, func(id uuid.UUID) (string, bool) {
+		if _, ok := allowed[id]; !ok {
+			return "", false
+		}
+		return blob.FileRef(id), true
+	}), nil
 }
 
 func ListFilesForFactory(tx *gorm.DB, factoryID uuid.UUID, limit int) ([]File, error) {

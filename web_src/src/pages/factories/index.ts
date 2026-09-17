@@ -20,6 +20,8 @@ export {
   FactorySettingsModelsPage,
   FACTORY_SETTINGS_NAV_GROUPS,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LegacyFactoryAppRedirect,
+  LegacyFactoryAppSplitRunRedirect,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
@@ -40,4 +42,5 @@ export {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  SentryIntakeSetupPage,
 } from "./pages";

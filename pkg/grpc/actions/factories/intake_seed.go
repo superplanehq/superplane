@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -23,9 +26,19 @@ const (
 	// with few open items gives fewer, so the seed is an upper bound.
 	intakeSeedSize = 30
 
+	// intakeSentrySeedSize is how many unresolved Sentry issues a new intake
+	// imports. The wizard tells the user this number.
+	intakeSentrySeedSize = 10
+
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
+
+	// intakeSentryIssuePayloadType is the payload type the Sentry trigger emits.
+	intakeSentryIssuePayloadType = "sentry.issue"
+
+	// intakeJiraIssuePayloadType is the payload type the Jira trigger emits.
+	intakeJiraIssuePayloadType = jira.IssueEventPayloadType
 )
 
 type intakeSeedResult struct {
@@ -56,6 +69,10 @@ func seedIntake(
 		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceProductiveTasks:
 		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceSentryExceptions:
+		return seedSentryIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceJiraIssues:
+		return seedJiraIssues(deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -171,6 +188,30 @@ func seedGitHubIssues(
 	return intakeSeedResult{itemCount: len(payloads)}, nil
 }
 
+func seedJiraIssues(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeJiraClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	projectKey, _ := binding.Configuration["project"].(string)
+	payloads, err := newestJiraIssueEvents(client, projectKey, intakeSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	if err := emitIntakeEvents(tx, canvasID, intakeJiraIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
 func seedProductiveTasks(
 	deps IntakeDependencies,
 	tx *gorm.DB,
@@ -211,6 +252,95 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	return events
 }
 
+func seedSentryIssues(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeSentryClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	project, _ := binding.Configuration["project"].(string)
+	issues, err := client.ListNewestUnresolvedIssues(project, intakeSentrySeedSize)
+	if err != nil {
+		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
+	}
+
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(issues)}, nil
+}
+
+// sentryIssueEvents shapes each issue of a newest-first page like the webhook
+// the trigger emits, so the rest of the graph cannot tell a seeded issue from
+// a received one.
+func sentryIssueEvents(client *sentry.Client, issues []sentry.Issue) []map[string]any {
+	events := make([]map[string]any, 0, len(issues))
+	for _, issue := range issues {
+		events = append(events, sentryIssueEvent(client, issue))
+	}
+	slices.Reverse(events)
+	return events
+}
+
+func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any {
+	encoded, err := json.Marshal(issue)
+	if err != nil {
+		payload := map[string]any{"id": issue.ID, "title": issue.Title}
+		return map[string]any{
+			"resource":    "issue",
+			"action":      "created",
+			"data":        map[string]any{"issue": payload},
+			"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
+		}
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		payload = map[string]any{"id": issue.ID, "title": issue.Title}
+	}
+
+	timestamp := strings.TrimSpace(issue.LastSeen)
+	if timestamp == "" {
+		timestamp = strings.TrimSpace(issue.FirstSeen)
+	}
+
+	return map[string]any{
+		"resource":    "issue",
+		"action":      "created",
+		"data":        map[string]any{"issue": payload},
+		"timestamp":   timestamp,
+		"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
+	}
+}
+
+func newIntakeSentryClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*sentry.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := sentry.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Sentry client: %w", err)
+	}
+
+	return client, nil
+}
+
 func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*common.Client, error) {
 	if deps.Registry == nil {
 		return nil, fmt.Errorf("integration registry is unavailable")
@@ -224,6 +354,28 @@ func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *mo
 	client, err := common.NewClient(integrationContext, deps.Registry.HTTPContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to build GitHub client: %w", err)
+	}
+
+	return client, nil
+}
+
+func newIntakeJiraClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*jira.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := jira.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Jira client: %w", err)
 	}
 
 	return client, nil
@@ -290,6 +442,79 @@ func gitHubIssueEvents(issues []*github.Issue, repository string) ([]map[string]
 // gitHubIssueEvent converts an issue from the API into the body of an "issues"
 // webhook. The generated graph reads titles, bodies, labels, and assignees out
 // of that shape.
+func newestJiraIssueEvents(client *jira.Client, projectKey string, limit int) ([]map[string]any, error) {
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		return nil, fmt.Errorf("project is required")
+	}
+
+	jql := fmt.Sprintf(`project = "%s" AND resolution = Unresolved ORDER BY created DESC`, jiraQuotedProjectKey(projectKey))
+	hits, err := client.SearchIssues(jql, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list the issues of project %s: %w", projectKey, err)
+	}
+
+	return jiraIssueEvents(client.GetIssue, hits)
+}
+
+// jiraIssueLoader reads one issue by key. The seed takes the read as a
+// function so a test can fail a single issue of a batch.
+type jiraIssueLoader func(issueKey string) (*jira.Issue, error)
+
+// jiraIssueEvents loads the full issue behind each search hit. One unreadable
+// issue - deleted between the search and the fetch, or hidden from the
+// connection - must not discard the rest of the first batch, so a failure is
+// logged and that issue is left out. A batch where every issue failed still
+// reports an error, because that points at the connection rather than at one
+// issue.
+func jiraIssueEvents(load jiraIssueLoader, hits []jira.IssueSearchHit) ([]map[string]any, error) {
+	events := make([]map[string]any, 0, len(hits))
+	var lastErr error
+	for _, hit := range hits {
+		event, err := jiraIssueEvent(load, hit.Key)
+		if err != nil {
+			lastErr = err
+			log.Warnf("intake seed: issue %s stays out of the first batch: %v", hit.Key, err)
+			continue
+		}
+
+		events = append(events, event)
+	}
+
+	if len(events) == 0 && lastErr != nil {
+		return nil, lastErr
+	}
+
+	slices.Reverse(events)
+	return events, nil
+}
+
+func jiraIssueEvent(load jiraIssueLoader, issueKey string) (map[string]any, error) {
+	issue, err := load(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
+	}
+
+	event := jira.NewIssueEvent("created", issue, nil, nil)
+
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode issue event: %w", err)
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return nil, fmt.Errorf("failed to read issue event: %w", err)
+	}
+
+	return payload, nil
+}
+
+func jiraQuotedProjectKey(projectKey string) string {
+	escaped := strings.ReplaceAll(projectKey, `\`, `\\`)
+	return strings.ReplaceAll(escaped, `"`, `\"`)
+}
+
 func gitHubIssueEvent(issue *github.Issue, repository string) (map[string]any, error) {
 	encoded, err := json.Marshal(issue)
 	if err != nil {

@@ -160,11 +160,6 @@ const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
-const START_BLOCKED: SplitRunFooterAction = {
-  ...START,
-  disabled: true,
-  tooltip: "Confidence is too low to start.",
-};
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 const BACK_TO_DRAFT: SplitRunFooterAction = {
   id: "back-to-draft",
@@ -319,7 +314,7 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
- * Draft always keeps Archive. Start follows the confidence band. Closed
+ * Draft keeps Archive in the header. Build follows the confidence band. Closed
  * failed keeps Reopen. Completed and rejected explain the result only.
  */
 type FooterInput = {
@@ -369,10 +364,7 @@ function draftReadinessNote(score?: number, isAnalyzing?: boolean): SplitRunFoot
   return { ...SPLIT_RUN_DRAFT_NOTE };
 }
 
-function draftDecisionActions(score?: number): SplitRunFooterAction[] {
-  if (score != null && score <= 1) {
-    return [ARCHIVE, START_BLOCKED];
-  }
+function draftDecisionActions(): SplitRunFooterAction[] {
   return [ARCHIVE, START];
 }
 
@@ -394,7 +386,7 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
     note:
       analyzing || score != null ? draftReadinessNote(score, input.isAnalyzing) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
     attentionCard: true,
-    actions: draftDecisionActions(score),
+    actions: draftDecisionActions(),
   });
 }
 

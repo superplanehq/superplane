@@ -45,3 +45,47 @@ func TestFileAccessURLStaysStableInsideExpiryBucket(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, StableExpiry(time.Hour).Unix(), expires)
 }
+
+func TestFileIDFromSignedURLReadsHMACAndGCSPaths(t *testing.T) {
+	fileID := uuid.MustParse("471f6c01-c28c-49da-afb9-c48964ac9a1d")
+	workOrderID := uuid.MustParse("2ecbe7d5-d0f8-4564-b6c1-a04e6c69b178")
+
+	hmacURL := "https://app.example/api/v1/public/files/" + fileID.String() + "?expires=1&sig=abc&sp_file=1"
+	id, ok := FileIDFromSignedURL(hmacURL)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
+	gcsURL := "https://storage.googleapis.com/superplane-prod-global/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/9155053b-45c3-4a96-b4bc-63820b0f9a98/tasks/" + workOrderID.String() + "/" + fileID.String() + "?X-Goog-Algorithm=GOOG4-RSA-SHA256&sp_file=1"
+	id, ok = FileIDFromSignedURL(gcsURL)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
+	virtualHost := "https://superplane-prod-global.storage.googleapis.com/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/9155053b-45c3-4a96-b4bc-63820b0f9a98/tasks/" + workOrderID.String() + "/" + fileID.String() + "?sp_file=1"
+	id, ok = FileIDFromSignedURL(virtualHost)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
+	_, ok = FileIDFromSignedURL("https://example.com/" + fileID.String())
+	assert.False(t, ok)
+
+	_, ok = FileIDFromSignedURL("https://example.test/" + fileID.String() + "?sp_file=1")
+	assert.False(t, ok)
+}
+
+func TestRewriteSignedFileURLsRestoresRefsAndDropsUnknown(t *testing.T) {
+	fileID := uuid.MustParse("471f6c01-c28c-49da-afb9-c48964ac9a1d")
+	foreign := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	known := "https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/" + fileID.String() + "?sp_file=1"
+	unknown := "https://app.example/api/v1/public/files/" + foreign.String() + "?expires=1&sig=abc&sp_file=1"
+	markdown := "See ![](" + known + ") and ![](" + unknown + ")"
+
+	rewritten := RewriteSignedFileURLs(markdown, func(id uuid.UUID) (string, bool) {
+		if id == fileID {
+			return FileRef(id), true
+		}
+		return "", false
+	})
+	assert.Contains(t, rewritten, FileRef(fileID))
+	assert.NotContains(t, rewritten, "sp_file=1")
+	assert.NotContains(t, rewritten, foreign.String())
+}

@@ -135,15 +135,38 @@ service Factories {
     };
   }
 
-  // Factory app APIs
+  // Factory automation APIs
 
-  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+  rpc ListFactoryAutomations(ListFactoryAutomationsRequest) returns (ListFactoryAutomationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/apps"
+      get: "/api/v1/factories/{factory_id}/automations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory apps";
+      summary: "List factory automations";
       description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryAutomation(CreateFactoryAutomationRequest) returns (CreateFactoryAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory automation";
+      description: "Creates a blank factory canvas and optionally attaches it to Verify or Done";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryAutomation(DeleteFactoryAutomationRequest) returns (DeleteFactoryAutomationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory automation";
+      description: "Deletes a factory canvas";
       tags: "Factory";
     };
   }
@@ -160,14 +183,14 @@ service Factories {
     };
   }
 
-  rpc MaterializeFactoryAppDefaults(MaterializeFactoryAppDefaultsRequest) returns (MaterializeFactoryAppDefaultsResponse) {
+  rpc MaterializeFactoryAutomationDefaults(MaterializeFactoryAutomationDefaultsRequest) returns (MaterializeFactoryAutomationDefaultsResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"
+      post: "/api/v1/factories/{factory_id}/automations/{automation_id}:defaults"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Materialize factory app defaults";
-      description: "Builds the bundled defaults for an installed factory app and preserves its connections";
+      summary: "Materialize factory automation defaults";
+      description: "Builds the bundled defaults for an installed factory automation and preserves its connections";
       tags: "Factory";
     };
   }
@@ -360,6 +383,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Import factory intake item";
       description: "Creates a backlog work order from an intake item";
+      tags: "Factory";
+    };
+  }
+
+  rpc RefreshBacklog(RefreshBacklogRequest) returns (RefreshBacklogResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/backlog/refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Refresh the backlog";
+      description: "Archives backlog work orders whose intake items are closed or no longer available";
       tags: "Factory";
     };
   }
@@ -791,12 +826,16 @@ message FactoryOnboarding {
 }
 
 message Factory {
-  message App {
+  message Automation {
     string id = 1;
     string name = 2;
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
+    // Board column this event automation is shown on. Empty when the
+    // automation is not attached to Verify or Done. Allowed values:
+    // "verify", "done".
+    string column_key = 6;
   }
 
   string id = 1;
@@ -862,13 +901,32 @@ message UpdateFactoryLineResponse {
   FactoryLine line = 1;
 }
 
-message ListFactoryAppsRequest {
+message ListFactoryAutomationsRequest {
   string factory_id = 1;
 }
 
-message ListFactoryAppsResponse {
-  repeated Factory.App apps = 1;
+message ListFactoryAutomationsResponse {
+  repeated Factory.Automation automations = 1;
 }
+
+message CreateFactoryAutomationRequest {
+  string factory_id = 1;
+  // Defaults to "Custom automation" when empty.
+  string name = 2;
+  // Attach the canvas to Verify or Done. Empty leaves it off the board.
+  string column_key = 3;
+}
+
+message CreateFactoryAutomationResponse {
+  Factory.Automation automation = 1;
+}
+
+message DeleteFactoryAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DeleteFactoryAutomationResponse {}
 
 message FactoryAppTemplateIntegration {
   string type = 1;
@@ -899,12 +957,12 @@ message MaterializeFactoryAppTemplateResponse {
   string console_yaml = 3;
 }
 
-message MaterializeFactoryAppDefaultsRequest {
+message MaterializeFactoryAutomationDefaultsRequest {
   string factory_id = 1;
-  string app_id = 2;
+  string automation_id = 2;
 }
 
-message MaterializeFactoryAppDefaultsResponse {
+message MaterializeFactoryAutomationDefaultsResponse {
   string template_id = 1;
   string canvas_yaml = 2;
   string console_yaml = 3;
@@ -919,6 +977,7 @@ message FactoryIntake {
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
+    SOURCE_JIRA_ISSUES = 5;
   }
 
   enum InitialImportStatus {
@@ -1302,6 +1361,16 @@ message ImportFactoryIntakeItemRequest {
 
 message ImportFactoryIntakeItemResponse {
   WorkOrder order = 1;
+}
+
+message RefreshBacklogRequest {
+  string factory_id = 1;
+}
+
+message RefreshBacklogResponse {
+  int32 archived_count = 1;
+  int32 failed_item_count = 2;
+  int32 failed_source_count = 3;
 }
 
 // Work orders
@@ -2150,6 +2219,43 @@ message PlanningSessionMessage {
   string text = 3;
   google.protobuf.Timestamp created_at = 4;
   string user_id = 5;
+  string activity_id = 6;
+}
+
+message PlanningSessionActivityOutput {
+  string stream = 1;
+  string text = 2;
+}
+
+message PlanningSessionActivityItem {
+  string type = 1;
+  string id = 2;
+  string kind = 3;
+  string text = 4;
+  string name = 5;
+  string input = 6;
+  string output = 7;
+  repeated PlanningSessionActivityOutput output_streams = 8;
+  string status = 9;
+  string code = 10;
+  google.protobuf.Timestamp started_at = 11;
+  int64 duration_ms = 12;
+  optional int32 exit_code = 13;
+  string signal = 14;
+  bool truncated = 15;
+}
+
+message PlanningSessionActivity {
+  string id = 1;
+  int32 schema_version = 2;
+  string provider = 3;
+  string status = 4;
+  int64 last_sequence = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  repeated PlanningSessionActivityItem items = 8;
+  bool truncated = 9;
+  int32 turn = 10;
 }
 
 message PlanningSessionSurveyQuestion {
@@ -2177,6 +2283,7 @@ message PlanningSession {
   PlanningSessionSurvey survey = 12;
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
+  repeated PlanningSessionActivity activities = 15;
 }
 
 enum PlanningSessionKind {

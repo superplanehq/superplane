@@ -5,6 +5,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -35,7 +36,12 @@ import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
 export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
-export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents" | "productive-tasks";
+export type LineIntakeSourceId =
+  | "github-issues"
+  | "jira-issues"
+  | "sentry-exceptions"
+  | "pagerduty-incidents"
+  | "productive-tasks";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -87,9 +93,28 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     },
   },
   {
+    id: "jira-issues",
+    name: "Jira issues",
+    description: "Creates tasks from Jira issues.",
+    iconSrc: jiraIcon,
+    iconAlt: "Jira",
+    listen: {
+      kind: "webhook",
+      label: "On Jira issue",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Jira issue becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
     listen: {
@@ -181,6 +206,7 @@ export interface ConfiguredLineIntakeSource {
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
   SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_JIRA_ISSUES: "jira-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
@@ -188,6 +214,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
   "github-issues": "SOURCE_GITHUB_ISSUES",
+  "jira-issues": "SOURCE_JIRA_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",

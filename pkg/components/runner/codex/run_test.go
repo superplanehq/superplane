@@ -120,6 +120,8 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
 	assert.Contains(t, joined, "propose_spec")
+	assert.Contains(t, joined, "propose_confidence")
+	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
@@ -151,8 +153,8 @@ func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 		`{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc git status"}}`,
 		`{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"bash -lc git status","aggregated_output":"On branch main\n","exit_code":0,"status":"completed"}}`,
 		`{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"Working tree is clean."}}`,
-		`{"type":"item.started","item":{"id":"item_3","type":"file_change","changes":[{"path":"pkg/foo.go","kind":"update"}]}}`,
-		`{"type":"item.completed","item":{"id":"item_3","type":"file_change","changes":[{"path":"pkg/foo.go","kind":"update"}]}}`,
+		`{"type":"item.started","item":{"id":"item_3","type":"file_change","changes":[{"path":"pkg/foo.go","kind":"update"},{"path":"pkg/bar.go","kind":"update"}]}}`,
+		`{"type":"item.completed","item":{"id":"item_3","type":"file_change","changes":[{"path":"pkg/foo.go","kind":"update"},{"path":"pkg/bar.go","kind":"update"}]}}`,
 	})
 
 	assert.NotContains(t, output, `"type":"item.started"`)
@@ -167,7 +169,7 @@ func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_end", records[1]["type"])
 	assert.Equal(t, "passed", records[1]["status"])
 	assert.Equal(t, "edit", records[2]["kind"])
-	assert.Equal(t, "pkg/foo.go", records[2]["text"])
+	assert.Equal(t, "pkg/foo.go\npkg/bar.go", records[2]["text"])
 	assert.Equal(t, float64(2), records[2]["turn"])
 	assert.Contains(t, output, `"type":"turn"`)
 }
@@ -212,12 +214,38 @@ func TestFormatCodexJsonLinesKeepsOverlappingOutputOnTheRightTool(t *testing.T) 
 
 	records := liveLogRecords(t, output)
 	require.Len(t, records, 4)
-	assert.Equal(t, "item_b", records[0]["id"])
-	assert.Equal(t, "tool_end", records[1]["type"])
+	assert.Equal(t, "item_a", records[0]["id"])
+	assert.Equal(t, "tool_start", records[0]["type"])
 	assert.Equal(t, "item_b", records[1]["id"])
-	assert.Equal(t, "item_a", records[2]["id"])
+	assert.Equal(t, "tool_start", records[1]["type"])
+	assert.Equal(t, "item_b", records[2]["id"])
+	assert.Equal(t, "tool_end", records[2]["type"])
 	assert.Equal(t, "item_a", records[3]["id"])
-	assert.Regexp(t, `(?s)"id":"item_b".*bbb.*"type":"tool_end".*"id":"item_a".*aaa`, output)
+	assert.Equal(t, "tool_end", records[3]["type"])
+	assert.Regexp(t, `(?s)"id":"item_a".*"id":"item_b".*bbb.*"type":"tool_end".*aaa`, output)
+}
+
+func TestFormatCodexJsonLinesEmitsReasoningAndOrderedActivity(t *testing.T) {
+	output := runCodexFormatterWithActivity(t, []string{
+		`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":"Inspect the retry path."}}`,
+		`{"type":"item.started","item":{"id":"tool-a","type":"command_execution","command":"echo a"}}`,
+		`{"type":"item.started","item":{"id":"tool-b","type":"command_execution","command":"echo b"}}`,
+		`{"type":"item.completed","item":{"id":"tool-b","type":"command_execution","command":"echo b","aggregated_output":"b","exit_code":0}}`,
+		`{"type":"item.completed","item":{"id":"tool-a","type":"command_execution","command":"echo a","aggregated_output":"a","exit_code":0}}`,
+	})
+
+	records := activityRecords(t, output)
+	require.NotEmpty(t, records)
+	assert.Equal(t, "activity_start", records[0]["type"])
+	assert.Equal(t, "content_start", records[1]["type"])
+	assert.Equal(t, "reasoning", records[1]["channel"])
+	starts := []string{}
+	for _, record := range records {
+		if record["type"] == "tool_start" {
+			starts = append(starts, record["id"].(string))
+		}
+	}
+	assert.Equal(t, []string{"tool-a", "tool-b"}, starts)
 }
 
 func codexExecArgsFromScript(t *testing.T, env map[string]string, model, mcpScriptPath string) []string {
@@ -296,6 +324,34 @@ func runCodexFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func runCodexFormatterWithActivity(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatCodexJsonLines } = require(process.argv[1]); formatCodexJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func activityRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["schema_version"] == float64(2) {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 func liveLogRecords(t *testing.T, output string) []map[string]any {

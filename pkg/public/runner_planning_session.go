@@ -5,20 +5,27 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 const (
-	minPlanningHoldSeconds = 1
-	maxPlanningHoldSeconds = 60
+	minPlanningHoldSeconds   = 1
+	maxPlanningHoldSeconds   = 60
+	maxPlanningActivityBytes = 256 * 1024
 )
 
 type planningSurveyRequest struct {
@@ -35,7 +42,79 @@ type planningConfidenceRequest struct {
 }
 
 type planningAgentMessageRequest struct {
-	Text string `json:"text"`
+	Text       string `json:"text"`
+	ActivityID string `json:"activity_id"`
+}
+
+func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	activityID, err := uuid.Parse(mux.Vars(r)["activity_id"])
+	if err != nil {
+		http.Error(w, "Invalid activity ID", http.StatusBadRequest)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPlanningActivityBytes)
+	var snapshot models.PlanningSessionActivitySnapshot
+	if err := json.NewDecoder(r.Body).Decode(&snapshot); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if snapshot.ActivityID != activityID.String() || snapshot.SchemaVersion != 2 || snapshot.Turn < 1 || snapshot.Sequence < 1 || snapshot.StartedAt < 1 {
+		http.Error(w, "Invalid activity snapshot", http.StatusBadRequest)
+		return
+	}
+	if !validPlanningActivityStatus(snapshot.Status) {
+		http.Error(w, "Invalid activity status", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	startedAt := time.UnixMilli(snapshot.StartedAt)
+	var completedAt *time.Time
+	if snapshot.CompletedAt != nil {
+		value := time.UnixMilli(*snapshot.CompletedAt)
+		completedAt = &value
+	}
+	now := time.Now()
+	activity := models.PlanningSessionActivity{
+		ID:            activityID,
+		SessionID:     session.ID,
+		SchemaVersion: snapshot.SchemaVersion,
+		Provider:      strings.TrimSpace(snapshot.Provider),
+		Status:        snapshot.Status,
+		LastSequence:  snapshot.Sequence,
+		Snapshot:      datatypes.NewJSONType(snapshot),
+		StartedAt:     startedAt,
+		CompletedAt:   completedAt,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if activity.Provider == "" {
+		http.Error(w, "Invalid activity provider", http.StatusBadRequest)
+		return
+	}
+	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
+		writeRunnerPlanningError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
+}
+
+func validPlanningActivityStatus(status string) bool {
+	return slices.Contains([]string{
+		models.PlanningSessionActivityStatusRunning,
+		models.PlanningSessionActivityStatusPassed,
+		models.PlanningSessionActivityStatusFailed,
+		models.PlanningSessionActivityStatusCancelled,
+		models.PlanningSessionActivityStatusTimedOut,
+		models.PlanningSessionActivityStatusInterrupted,
+	}, status)
 }
 
 func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *http.Request) (*runneraction.PlanningSessionScope, bool) {
@@ -111,9 +190,15 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 					return
 				}
+				text, err := mintPlanningWaitText(r.Context(), session, result)
+				if err != nil {
+					restorePlanningWait(session, result)
+					writeRunnerPlanningError(w, err)
+					return
+				}
 				if err := writeJSON(w, http.StatusOK, map[string]any{
 					"status":         result.Kind,
-					"text":           result.Text,
+					"text":           text,
 					"work_order_id":  result.WorkOrderID,
 					"work_order_key": result.WorkOrderKey,
 				}); err != nil {
@@ -222,11 +307,45 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	if err := session.RecordAgentMessage(database.DB(r.Context()), req.Text); err != nil {
+	activityID := uuid.Nil
+	if strings.TrimSpace(req.ActivityID) != "" {
+		activityID, err = uuid.Parse(req.ActivityID)
+		if err != nil {
+			http.Error(w, "Invalid activity ID", http.StatusBadRequest)
+			return
+		}
+	}
+	if err := session.RecordAgentMessageForActivity(database.DB(r.Context()), req.Text, activityID); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {
+	if result.Kind != models.PlanningWaitKindMessage {
+		return result.Text, nil
+	}
+	if session.DraftWorkOrderID == nil {
+		return result.Text, nil
+	}
+	if len(blob.FileIDsInMarkdown(result.Text)) == 0 {
+		return result.Text, nil
+	}
+	rewritten, _, err := storedfiles.DescriptionForDispatch(
+		ctx,
+		database.DB(ctx),
+		blob.Current(),
+		session.OrganizationID,
+		session.FactoryID,
+		*session.DraftWorkOrderID,
+		result.Text,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return "", err
+	}
+	return rewritten, nil
 }
 
 func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {

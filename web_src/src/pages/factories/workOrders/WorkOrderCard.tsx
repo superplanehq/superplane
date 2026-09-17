@@ -5,6 +5,7 @@ import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
+import { workOrderCardSource, type WorkOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
@@ -12,6 +13,7 @@ import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter
 import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
 
@@ -76,8 +78,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional pills sit on a middle row: an attached pull
- * request, then attention such as Waiting on status checks. The
+ * to the title. Optional pills sit on a middle row: a source icon,
+ * an attached pull request, then attention such as Waiting on
+ * status checks. The
  * footer shows when the task was created on the left, and the owner
  * given name plus avatar on the right (except on drafts). Drafts show
  * a Start button. Reviewed drafts also show a score to the left of
@@ -112,6 +115,7 @@ export function WorkOrderCard({
   const isDraft = entry.displayStatus === "draft";
   const { showAgentQuestion, agentWorking, showStart } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
+  const source = workOrderCardSource(entry.order);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
       addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
@@ -144,6 +148,7 @@ export function WorkOrderCard({
 
         <WorkOrderCardStatusRow
           entryId={entry.id}
+          source={source}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
@@ -187,23 +192,26 @@ function WorkOrderCardOpenControl({
 
 function WorkOrderCardStatusRow({
   entryId,
+  source,
   reasons,
   feedbackLabel,
   cardPullRequest,
   hasAgentQuestion,
 }: {
   entryId: string;
+  source: WorkOrderCardSource | null;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  if (!source && reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
       {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
@@ -308,7 +316,14 @@ function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQu
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
   if (isAnalyzing) {
-    return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+    return (
+      <ConfidenceAnalyzingIndicator
+        className="shrink-0"
+        testId={`work-order-card-analyzing-${entryId}`}
+        showThinkingStates
+        showTooltip={false}
+      />
+    );
   }
   if (score != null) {
     return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;

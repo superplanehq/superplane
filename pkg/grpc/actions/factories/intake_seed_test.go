@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -188,6 +191,87 @@ func Test__GitHubIssueEvents(t *testing.T) {
 	})
 }
 
+func Test__JiraIssueEvents(t *testing.T) {
+	issue := func(key, description string) *jira.Issue {
+		return &jira.Issue{
+			Key: key,
+			Fields: map[string]any{
+				"summary":     "Summary of " + key,
+				"description": jira.WrapInADF(description),
+			},
+		}
+	}
+
+	t.Run("the newest issue ends up on top of the intake", func(t *testing.T) {
+		load := func(issueKey string) (*jira.Issue, error) {
+			return issue(issueKey, "Description of "+issueKey), nil
+		}
+
+		events, err := jiraIssueEvents(load, []jira.IssueSearchHit{{Key: "ENG-2"}, {Key: "ENG-1"}})
+		require.NoError(t, err)
+		require.Len(t, events, 2)
+
+		// Events are emitted oldest first, so the newest issue ends up on top
+		// of the intake list.
+		assert.Equal(t, "ENG-1", jiraEventIssueKey(t, events[0]))
+		assert.Equal(t, "ENG-2", jiraEventIssueKey(t, events[1]))
+	})
+
+	t.Run("an event carries the description as plain text", func(t *testing.T) {
+		load := func(issueKey string) (*jira.Issue, error) {
+			return issue(issueKey, "A retried refund charges twice."), nil
+		}
+
+		events, err := jiraIssueEvents(load, []jira.IssueSearchHit{{Key: "ENG-1"}})
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		assert.Equal(t, "created", events[0]["action"])
+		assert.Equal(t, "A retried refund charges twice.", events[0]["description"])
+	})
+
+	t.Run("one unreadable issue does not discard the batch", func(t *testing.T) {
+		load := func(issueKey string) (*jira.Issue, error) {
+			if issueKey == "ENG-2" {
+				return nil, fmt.Errorf("issue was deleted")
+			}
+			return issue(issueKey, "Description of "+issueKey), nil
+		}
+
+		events, err := jiraIssueEvents(load, []jira.IssueSearchHit{{Key: "ENG-3"}, {Key: "ENG-2"}, {Key: "ENG-1"}})
+		require.NoError(t, err)
+		require.Len(t, events, 2)
+		assert.Equal(t, "ENG-1", jiraEventIssueKey(t, events[0]))
+		assert.Equal(t, "ENG-3", jiraEventIssueKey(t, events[1]))
+	})
+
+	t.Run("a batch where every issue fails reports the failure", func(t *testing.T) {
+		load := func(string) (*jira.Issue, error) {
+			return nil, fmt.Errorf("the connection lost its access")
+		}
+
+		_, err := jiraIssueEvents(load, []jira.IssueSearchHit{{Key: "ENG-1"}})
+		require.ErrorContains(t, err, "the connection lost its access")
+	})
+
+	t.Run("an empty search reports no events", func(t *testing.T) {
+		events, err := jiraIssueEvents(nil, nil)
+		require.NoError(t, err)
+		assert.Empty(t, events)
+	})
+}
+
+func jiraEventIssueKey(t *testing.T, event map[string]any) string {
+	t.Helper()
+
+	payload, ok := event["issue"].(map[string]any)
+	require.True(t, ok)
+	key, ok := payload["key"].(string)
+	require.True(t, ok)
+
+	return key
+}
+
 func Test__ProductiveTaskEvents(t *testing.T) {
 	t.Run("the newest task ends up on top of the intake", func(t *testing.T) {
 		events := productiveTaskEvents(productiveTaskPage([]string{"Newest task", "Older task"}))
@@ -274,4 +358,31 @@ func issueEventTitle(t *testing.T, event map[string]any) string {
 	require.True(t, ok)
 
 	return title
+}
+
+func Test__SentryIssueEvents(t *testing.T) {
+	now := time.Now().UTC()
+	issues := []sentry.Issue{
+		{ID: "1", Title: "Newest timeout", LastSeen: now.Format(time.RFC3339)},
+		{ID: "2", Title: "Older null pointer", LastSeen: now.Add(-time.Hour).Format(time.RFC3339)},
+	}
+
+	events := sentryIssueEvents(nil, issues)
+	require.Len(t, events, 2)
+	assert.Equal(t, "created", events[0]["action"])
+	assert.Equal(t, "issue", events[0]["resource"])
+
+	firstData, ok := events[0]["data"].(map[string]any)
+	require.True(t, ok)
+	firstIssue, ok := firstData["issue"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Older null pointer", firstIssue["title"])
+	assert.Equal(t, sentry.IssueDescription(firstIssue, nil), events[0]["description"])
+
+	secondData, ok := events[1]["data"].(map[string]any)
+	require.True(t, ok)
+	secondIssue, ok := secondData["issue"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Newest timeout", secondIssue["title"])
+	assert.Equal(t, sentry.IssueDescription(secondIssue, nil), events[1]["description"])
 }

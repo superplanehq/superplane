@@ -536,7 +536,7 @@ func materializeIntakeDefaults(
 	if err != nil {
 		return nil, err
 	}
-	settings := intakeSettingsFromGraph(graph, spec)
+	settings := intakeSettingsFromGraph(intake.Source, graph, spec)
 	for i := range defaults.Spec.Nodes {
 		node := &defaults.Spec.Nodes[i]
 		if node.ID == intakeFilterNodeID {

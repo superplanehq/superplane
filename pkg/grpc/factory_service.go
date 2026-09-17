@@ -87,9 +87,19 @@ func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFa
 	return actions.UpdateFactoryLine(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactoryAppsRequest) (*pb.ListFactoryAppsResponse, error) {
+func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.ListFactoryAutomationsRequest) (*pb.ListFactoryAutomationsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListFactoryApps(ctx, organizationID, req)
+	return actions.ListFactoryAutomations(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.CreateFactoryAutomationRequest) (*pb.CreateFactoryAutomationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (*pb.DeleteFactoryAutomationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryAutomation(ctx, organizationID, req)
 }
 
 func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req *pb.MaterializeFactoryAppTemplateRequest) (*pb.MaterializeFactoryAppTemplateResponse, error) {
@@ -97,9 +107,9 @@ func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req 
 	return actions.MaterializeFactoryAppTemplate(ctx, organizationID, req)
 }
 
-func (s *FactoryService) MaterializeFactoryAppDefaults(ctx context.Context, req *pb.MaterializeFactoryAppDefaultsRequest) (*pb.MaterializeFactoryAppDefaultsResponse, error) {
+func (s *FactoryService) MaterializeFactoryAutomationDefaults(ctx context.Context, req *pb.MaterializeFactoryAutomationDefaultsRequest) (*pb.MaterializeFactoryAutomationDefaultsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.MaterializeFactoryAppDefaults(ctx, organizationID, req)
+	return actions.MaterializeFactoryAutomationDefaults(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFactoryIntakesRequest) (*pb.ListFactoryIntakesResponse, error) {
@@ -175,6 +185,11 @@ func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.S
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) RefreshBacklog(ctx context.Context, req *pb.RefreshBacklogRequest) (*pb.RefreshBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RefreshBacklog(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {

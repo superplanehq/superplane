@@ -17,13 +17,14 @@ export type CreateWithAgentRightPane =
   | { kind: "draft"; draft: CreateWithAgentDraft }
   | { kind: "preview"; order: CreateWithAgentCreatedOrder };
 
-export type CreateWithAgentMessage = {
+export type CreateWithAgentTextMessage = {
   id: string;
   kind: "text";
   role: "user" | "agent";
   text: string;
   origin?: "survey";
   userId?: string;
+  activityId?: string;
   /**
    * Epoch ms this message was created, when known. Lets the transcript
    * merge order this message against agent notes by true chronology
@@ -31,6 +32,16 @@ export type CreateWithAgentMessage = {
    */
   createdAtMs?: number;
 };
+
+export type CreateWithAgentPlanMessage = {
+  id: string;
+  kind: "plan";
+  role: "plan";
+  score: number;
+  createdAtMs?: number;
+};
+
+export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentPlanMessage;
 
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;
@@ -56,4 +67,6 @@ export type CreateWithAgentView = {
   endConfirmOpen: boolean;
   selectableModelKey: string;
   refining: boolean;
+  activities?: AgentActivity[];
 };
+import type { AgentActivity } from "./work-order-split-run/agentActivity";

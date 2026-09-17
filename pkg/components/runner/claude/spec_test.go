@@ -143,10 +143,11 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
 	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 8)
+	require.Len(t, task.Files, 9)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
 	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, task.Files, "turn_telemetry.js").Content)
+	assert.Equal(t, runner.ActivityStreamScript, requireTaskFile(t, task.Files, "activity_stream.js").Content)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")
@@ -178,6 +179,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "mcp__superplane__propose_draft")
 	assert.Contains(t, runScript, "mcp__superplane__propose_spec")
 	assert.Contains(t, runScript, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, runScript, "mcp__superplane__propose_plan")
 	assert.Contains(t, runScript, "mcp__superplane__survey")
 	assert.NotContains(t, runScript, "mcp__superplane__say")
 	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")

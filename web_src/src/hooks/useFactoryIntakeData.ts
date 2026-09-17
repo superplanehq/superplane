@@ -1,8 +1,10 @@
 import {
   factoriesCreateFactoryIntake,
+  factoriesDeleteFactoryIntake,
   factoriesImportFactoryIntakeItem,
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
+  factoriesRefreshBacklog,
   factoriesSearchFactoryIntakeItems,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
@@ -110,6 +112,26 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       // A new intake seeds the newest items of its source, so the Backlog
       // already holds tasks the cached list does not know about.
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactoryIntake(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (intakeId: string) => {
+      await factoriesDeleteFactoryIntake(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, intakeId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
     },
   });
@@ -233,4 +255,34 @@ function upsertImportedWorkOrder(
     return current.map((existing) => (existing.id === order.id ? order : existing));
   }
   return [order, ...current];
+}
+
+export type RefreshBacklogResult = {
+  archivedCount: number;
+  failedItemCount: number;
+  failedSourceCount: number;
+};
+
+export function useRefreshBacklog(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<RefreshBacklogResult> => {
+      const response = await factoriesRefreshBacklog(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {},
+        }),
+      );
+      return {
+        archivedCount: response.data?.archivedCount ?? 0,
+        failedItemCount: response.data?.failedItemCount ?? 0,
+        failedSourceCount: response.data?.failedSourceCount ?? 0,
+      };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+    },
+  });
 }

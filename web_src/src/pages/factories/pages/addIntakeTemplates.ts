@@ -1,4 +1,5 @@
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -23,9 +24,15 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconSrc: githubIcon,
   },
   {
+    id: "jira-issues",
+    name: "Jira issues",
+    description: "Creates tasks from Jira issues.",
+    iconSrc: jiraIcon,
+  },
+  {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: sentryIcon,
   },
   {

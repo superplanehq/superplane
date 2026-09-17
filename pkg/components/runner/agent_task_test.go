@@ -82,6 +82,7 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
 	assert.Equal(t, TurnTelemetryScript, requireBrokerFile(t, files, "turn_telemetry.js").Content)
+	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
 }
 
 func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
@@ -277,4 +278,25 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	assert.Equal(t, "Implement", commands[2].Name)
 	assert.Contains(t, commands[2].Preview, "sp-file://"+fileID)
 	assert.NotContains(t, commands[2].Preview, "sp_file=1")
+}
+
+func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	description := "See ![shot.png](sp-file://" + fileID + ")"
+	spec := "# Retry refunds\n\n![shot.png](sp-file://" + fileID + ")"
+	original := description + "\n\nSpec:\n" + spec
+	signed := "https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/" + fileID + "?sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Refine Task", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, dispatched[0].Prompt)
+	assert.Contains(t, original, "sp-file://"+fileID)
+	assert.Contains(t, *dispatched[0].Prompt, signed)
+	assert.NotContains(t, *dispatched[0].Prompt, "sp-file://")
 }

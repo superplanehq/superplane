@@ -20,7 +20,15 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactorySentryIntake, f.ID)
 		assert.Equal(t, "Factory Sentry Intake", f.Label)
-		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Add Sentry intake from the Backlog column", f.Description)
+	})
+
+	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryJiraIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
+		assert.Equal(t, "Factory Jira Intake", f.Label)
+		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
@@ -55,6 +63,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
 	})
 
+	t.Run("known id returns custom automations feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCustomAutomations)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
+		assert.Equal(t, "Custom Automations", f.Label)
+		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -71,10 +88,12 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
+	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

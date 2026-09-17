@@ -37,6 +37,12 @@ function renderTranscript(messages: CreateWithAgentMessage[], extras: { streamin
   return render(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={extras.streaming} />);
 }
 
+function expectAvatarBeforeGivenName(container: HTMLElement, avatarName: string, givenName: string) {
+  const avatar = within(container).getByRole("img", { name: avatarName });
+  const name = within(container).getByText(givenName);
+  expect(avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("WorkOrderIntentTranscript", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
@@ -56,7 +62,7 @@ describe("WorkOrderIntentTranscript", () => {
     );
 
     const transcript = screen.getByTestId("split-run-intent-transcript");
-    expect(transcript.querySelector(".sp-stream-text")).toBeNull();
+    expect(transcript.querySelector(".sp-stream-w")).toBeNull();
     expect(transcript.querySelector(".sp-text-reveal")).not.toBeNull();
   });
 
@@ -65,7 +71,38 @@ describe("WorkOrderIntentTranscript", () => {
       streaming: true,
     });
 
-    expect(screen.getByTestId("split-run-intent-transcript").querySelector(".sp-stream-text")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-transcript").querySelectorAll(".sp-stream-w")).not.toHaveLength(0);
+  });
+
+  it("streams a final agent line that arrives as the run becomes idle", () => {
+    const { rerender } = renderTranscript([]);
+
+    rerender(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        messages={[{ id: "agent-1", kind: "text", role: "agent", text: "The final answer is ready." }]}
+      />,
+    );
+
+    const words = screen.getByTestId("split-run-intent-transcript").querySelectorAll(".sp-stream-w");
+    expect(words).toHaveLength(5);
+    expect(words[0]).toHaveClass("is-streaming");
+  });
+
+  it("continues a final message animation after the parent stops streaming", () => {
+    const { rerender } = renderTranscript([]);
+    const messages: CreateWithAgentMessage[] = [
+      { id: "agent-1", kind: "text", role: "agent", text: "The final answer is ready." },
+    ];
+
+    rerender(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} />);
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    const firstWord = transcript.querySelector(".sp-stream-w");
+
+    rerender(<WorkOrderIntentTranscript organizationId="org-1" messages={messages} streaming={false} />);
+
+    expect(transcript.querySelector(".sp-stream-w")).toBe(firstWord);
+    expect(transcript.querySelectorAll(".sp-stream-w.is-streaming")).toHaveLength(5);
   });
 
   it("shows survey answers as question and answer in a stronger bubble", () => {
@@ -83,13 +120,14 @@ describe("WorkOrderIntentTranscript", () => {
     const answer = screen.getByTestId("split-run-intent-survey-answer");
     expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.answeredBy);
     expect(answer).toHaveTextContent("Ada");
+    expectAvatarBeforeGivenName(answer, "Ada Lovelace", "Ada");
     expect(answer).toHaveTextContent("What should the agent build?");
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
     expect(answer).toHaveTextContent("Reviewer approves by taste");
     expect(answer).toHaveClass("sp-survey-card");
     expect(answer.className).toContain("border");
-    expect(answer.parentElement).toHaveClass("justify-end");
+    expect(answer.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
   });
 
@@ -105,10 +143,28 @@ describe("WorkOrderIntentTranscript", () => {
       "src",
       "https://example.com/ada.png",
     );
+    expectAvatarBeforeGivenName(note, "Ada Lovelace", "Ada");
     expect(note).toHaveTextContent("Keep the current dark theme.");
-    expect(note.parentElement).toHaveClass("justify-end");
+    expect(note.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps a 12px gap for user-to-agent and user-to-user turns", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I asked one survey question." },
+      { id: "user-1", kind: "text", role: "user", origin: "survey", text: "Add separate lists per animal." },
+      { id: "user-2", kind: "text", role: "user", text: "Keep the current dark theme." },
+      { id: "agent-2", kind: "text", role: "agent", text: "I will keep that theme." },
+    ]);
+
+    const survey = screen.getByTestId("split-run-intent-survey-answer").parentElement;
+    const note = screen.getByTestId("split-run-intent-user-note").parentElement;
+    expect(survey).toHaveClass("pt-2.5", "pb-1.5");
+    expect(note).toHaveClass("pt-1.5", "pb-2.5");
+    for (const agent of screen.getAllByTestId("split-run-intent-agent-message")) {
+      expect(agent).toHaveClass("py-0.5");
+    }
   });
 
   it("shows two senders on the same session as different people", () => {
@@ -131,11 +187,45 @@ describe("WorkOrderIntentTranscript", () => {
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
   });
 
-  it("keeps agent lines on the left", () => {
-    renderTranscript([{ id: "agent-1", kind: "text", role: "agent", text: "I updated the plan." }]);
+  it("keeps agent lines on the left with a little side padding", () => {
+    render(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        messages={[
+          { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan.", activityId: "activity-1" },
+        ]}
+        activities={[
+          {
+            id: "activity-1",
+            provider: "codex",
+            status: "passed",
+            sequence: 1,
+            items: [
+              {
+                type: "tool",
+                id: "command-1",
+                kind: "bash",
+                name: "Bash",
+                input: "ls",
+                output: "",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ]}
+      />,
+    );
 
-    const agent = screen.getByText("I updated the plan.");
+    const agent = screen.getByTestId("split-run-intent-agent-message");
+    expect(agent).toHaveTextContent("I updated the plan.");
+    expect(agent).toHaveClass("px-2");
     expect(agent.closest(".justify-end")).toBeNull();
+    expect(screen.getByTestId("split-run-intent-transcript")).toHaveClass("space-y-0");
+    expect(screen.getByTestId("agent-activity-activity-1")).toHaveClass("px-2");
+    expect(screen.getByRole("button", { name: "Explored codebase" })).toBeInTheDocument();
   });
 
   it("collapses a long composer note and expands it on Show more", async () => {
@@ -173,5 +263,16 @@ describe("WorkOrderIntentTranscript", () => {
     );
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("hides plan-updated rows so the sticky control can own the latest plan", () => {
+    renderTranscript([
+      { id: "agent-1", kind: "text", role: "agent", text: "I published the spec." },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+    ]);
+
+    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated })).not.toBeInTheDocument();
+    expect(screen.getByText("I published the spec.")).toBeInTheDocument();
   });
 });

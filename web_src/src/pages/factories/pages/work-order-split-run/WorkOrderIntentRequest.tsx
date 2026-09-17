@@ -1,19 +1,30 @@
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Kbd } from "@/components/ui/kbd";
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
+import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
+import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
+import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { previousAgentStreamText, waitingForAgentReply } from "./analysisLiveWorkState";
+import { ComposerPlanStack } from "./ComposerPlanControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
+import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
+import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
-import { SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME } from "./splitRunPopupModel";
+import {
+  SPLIT_RUN_CHAT_COLUMN_CLASSNAME,
+  SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME,
+  SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
+} from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
@@ -25,9 +36,21 @@ export type IntentAnalysisChat = {
   composer: string;
   composerError?: string;
   canSend: boolean;
+  isUploading?: boolean;
   onComposerChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (text?: string) => void | Promise<boolean>;
+  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   onSubmitSurvey: (text: string) => void;
+  planPaneOpen?: boolean;
+  onTogglePlan?: () => void;
+  canTogglePlan?: boolean;
+  clarityExpanded?: boolean;
+  onToggleClarity?: () => void;
+  latestPlanScore?: number;
+  latestPlanSummary?: string;
+  planStatus?: PlanChipStatus;
+  isAnalyzing?: boolean;
+  closedDecision?: ReactNode;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -63,10 +86,11 @@ function RequestHeader({ title }: { title: string }) {
 function analysisRequestChatState(analysis: IntentAnalysisChat) {
   const stopped = analysis.view.machineStatus === "failed" || analysis.view.machineStatus === "passed";
   const active = analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running";
+  const latestMessage = analysis.view.messages.at(-1);
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: Boolean(analysis.view.survey && analysis.canSend),
+    showSurvey: Boolean(analysis.view.survey && analysis.canSend && !active && latestMessage?.role === "agent"),
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -79,15 +103,21 @@ function AnalysisRequestChat({
   source,
 }: WorkOrderIntentRequestProps & { analysis: IntentAnalysisChat }) {
   const state = analysisRequestChatState(analysis);
+  const chatSolo = !analysis.planPaneOpen;
+  const chatColumnClass = SPLIT_RUN_CHAT_COLUMN_CLASSNAME;
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
     resumeOnBottom: true,
   });
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    if (analysis.canSend) {
-      analysis.onSend();
-    }
-  };
+  const chipsWorking = composerChipsWorking({
+    isAnalyzing: analysis.isAnalyzing,
+    score: analysis.latestPlanScore,
+    machineStatus: analysis.view.machineStatus,
+  });
+  const images = useAnalysisComposerImages({
+    disabled: !analysis.canSend,
+    onUploadFiles: analysis.onUploadFiles,
+  });
+  const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -95,70 +125,155 @@ function AnalysisRequestChat({
         <div
           ref={follow.scrollRef}
           onScroll={follow.onScroll}
-          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          className={cn("absolute inset-0", SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME)}
           data-testid="split-run-intent-chat-log"
         >
-          <RequestMessage description={description} files={files} source={source} asChat />
-          <WorkOrderIntentTranscript
-            messages={analysis.view.messages}
-            organizationId={analysis.organizationId}
-            streaming={state.active}
-            files={files}
-          />
-          {state.active ? (
-            <AnalysisLiveWork
-              machineStatus={analysis.view.machineStatus}
+          <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
+            <RequestMessage description={description} files={files} source={source} asChat />
+            <WorkOrderIntentTranscript
+              messages={analysis.view.messages}
               organizationId={analysis.organizationId}
-              canvasId={analysis.view.canvasId}
-              executionId={analysis.view.executionId}
-              waitingForAgent={waitingForAgentReply(analysis.view.messages)}
-              previousAgentText={previousAgentStreamText(analysis.view.messages)}
+              streaming={state.active}
+              files={transcriptFiles}
+              activities={analysis.view.activities}
             />
-          ) : null}
-          {state.showSurvey && analysis.view.survey ? (
-            <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
-          ) : null}
+            {state.active ? (
+              <AnalysisLiveWork
+                machineStatus={analysis.view.machineStatus}
+                organizationId={analysis.organizationId}
+                canvasId={analysis.view.canvasId}
+                executionId={analysis.view.executionId}
+                activities={analysis.view.activities}
+              />
+            ) : null}
+            {state.showSurvey && analysis.view.survey ? (
+              <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
+            ) : null}
+          </div>
         </div>
-        {follow.following ? null : (
+        {follow.showJumpToLatest ? (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
-        )}
+        ) : null}
       </div>
+      <AnalysisComposer
+        analysis={analysis}
+        images={images}
+        placeholder={state.placeholder}
+        chipsWorking={chipsWorking}
+        chatSolo={chatSolo}
+        chatColumnClass={chatColumnClass}
+      />
+    </div>
+  );
+}
+
+function AnalysisComposer({
+  analysis,
+  images,
+  placeholder,
+  chipsWorking,
+  chatSolo,
+  chatColumnClass,
+}: {
+  analysis: IntentAnalysisChat;
+  images: ReturnType<typeof useAnalysisComposerImages>;
+  placeholder: string;
+  chipsWorking: boolean;
+  chatSolo: boolean;
+  chatColumnClass: string;
+}) {
+  const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
+  const send = async () => {
+    if (!canSubmit) {
+      return;
+    }
+    const pending = images.takePending();
+    const result = await analysis.onSend(appendUploadedWorkOrderImages(analysis.composer, pending));
+    if (result === false) {
+      images.restorePending(pending);
+    }
+  };
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void send();
+  };
+
+  return (
+    <div
+      className={cn(chatColumnClass, SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME, "shrink-0", chatSolo ? "pb-4" : "pb-2")}
+      data-testid="split-run-intent-chat-column"
+    >
       <form
-        className={cn(SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME, "w-full flex-col items-stretch justify-center")}
+        className={cn(
+          SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
+          "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0 pb-0",
+        )}
         onSubmit={handleSubmit}
       >
-        <label htmlFor="split-run-intent-composer" className="sr-only">
+        <Label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
-        </label>
-        <div className="sp-user-note flex min-h-[3.5rem] w-full items-center gap-2 rounded-2xl border">
-          <Textarea
-            id="split-run-intent-composer"
-            data-testid="split-run-intent-composer"
-            value={analysis.composer}
-            placeholder={state.placeholder}
-            disabled={!analysis.canSend}
-            onChange={(event) => analysis.onComposerChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (analysis.canSend) {
-                  analysis.onSend();
-                }
-              }
-            }}
-            className="min-h-[3.5rem] flex-1 resize-none rounded-2xl border-0 bg-transparent px-3.5 py-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
-            rows={2}
+        </Label>
+        <div className="flex flex-col gap-2">
+          <ComposerPlanStack
+            open={Boolean(analysis.planPaneOpen)}
+            score={analysis.latestPlanScore}
+            scoreSummary={analysis.latestPlanSummary}
+            isAnalyzing={chipsWorking}
+            canTogglePlan={Boolean(analysis.canTogglePlan)}
+            planStatus={analysis.planStatus}
+            onToggle={analysis.onTogglePlan}
+            summaryOpen={analysis.clarityExpanded}
+            onToggleSummary={analysis.onToggleClarity}
+            actions={analysis.closedDecision}
           />
-          <Button
-            type="submit"
-            size="icon"
-            className="mr-2 size-8 shrink-0 rounded-full"
-            disabled={!analysis.canSend || !analysis.composer.trim()}
-            aria-label={ANALYSIS_PLANNING_COPY.send}
-          >
-            <ArrowUp className="size-4" aria-hidden />
-            <span className="sr-only">{ANALYSIS_PLANNING_COPY.send}</span>
-          </Button>
+          <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
+            <InputGroupTextarea
+              id="split-run-intent-composer"
+              data-testid="split-run-intent-composer"
+              value={analysis.composer}
+              placeholder={placeholder}
+              disabled={!analysis.canSend}
+              onChange={(event) => analysis.onComposerChange(event.target.value)}
+              onPaste={images.handlePaste}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              className="min-h-[4.2rem] py-2 text-[13px]"
+              rows={2}
+            />
+            <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
+              <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+                {analysis.onUploadFiles ? (
+                  <CreateWorkOrderRequestAttachButton
+                    disabled={!images.canAttach}
+                    onAttach={(files) => void images.attach(files)}
+                  />
+                ) : null}
+                {images.previewImages.length > 0 ? (
+                  <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
+                  {ANALYSIS_PLANNING_COPY.sendShortcut}
+                </Kbd>
+                <InputGroupButton
+                  type="submit"
+                  variant="default"
+                  size="icon-sm"
+                  className="rounded-full"
+                  disabled={!canSubmit}
+                  aria-label={ANALYSIS_PLANNING_COPY.send}
+                  data-testid="split-run-intent-composer-send"
+                >
+                  <ArrowUp className="size-4" aria-hidden />
+                </InputGroupButton>
+              </div>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
         {analysis.composerError ? (
           <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
@@ -209,7 +324,7 @@ function RequestMessage({
   }
 
   return (
-    <div className="mb-4 flex w-full justify-end" data-testid="split-run-description">
+    <div className="mb-3 flex w-full justify-end" data-testid="split-run-description">
       <div className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5">
         {source ? (
           <div className="mb-1">

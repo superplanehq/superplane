@@ -31,6 +31,7 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -217,6 +218,7 @@ func NewServer(
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
+	sentry.EnableHostedInstallBind(encryptor)
 	server.InitRouter(middlewares...)
 	return server, nil
 }
@@ -393,6 +395,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -557,7 +560,8 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas, agent-session, and factory WebSocket endpoints.
+// RegisterWebSocketRoutes registers canvas, agent-session, factory, and
+// user-notification WebSocket endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
 
@@ -582,6 +586,13 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/factories/{factoryId}",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
+	)
+
+	// User notifications WebSocket: live alerts for the authenticated user.
+	s.Router.Handle(
+		"/ws/users/notifications",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleUserNotificationsWebSocket)),
 	)
 }
 
@@ -696,6 +707,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	sentryAppUserRoute := r.NewRoute().Subrouter()
+	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
@@ -819,6 +836,10 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		writeHostedGitHubAppAuthError(w, status)
 		return
 	}
+	if status := hostedSentryAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
+		writeHostedGitHubAppAuthError(w, status)
+		return
+	}
 
 	s.dispatchIntegrationRequest(w, r, integrationInstance)
 }
@@ -864,7 +885,8 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(integrationInstance).Error
 	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
+		logging.ForIntegration(*integrationInstance).WithError(err).Error("failed to save integration after request")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

@@ -57,10 +57,37 @@ type IssueChangelogItem struct {
 
 // IssueEvent is the event SuperPlane emits for each matching issue webhook.
 type IssueEvent struct {
-	Action    string          `json:"action"`
-	Issue     *Issue          `json:"issue"`
-	User      *User           `json:"user,omitempty"`
-	Changelog *IssueChangelog `json:"changelog,omitempty"`
+	Action string `json:"action"`
+	Issue  *Issue `json:"issue"`
+	// Description is the issue description as plain text. Jira Cloud holds a
+	// description in Atlassian Document Format, which reads as a Go map when a
+	// template interpolates it, so the event carries a readable copy next to
+	// the raw field. The key is always present: an absent key would resolve to
+	// "null" in a template.
+	Description string          `json:"description"`
+	User        *User           `json:"user,omitempty"`
+	Changelog   *IssueChangelog `json:"changelog,omitempty"`
+}
+
+// NewIssueEvent builds the event for one issue, so every emitter - the issue
+// and incident webhooks, and the intake seed - reports the same shape.
+func NewIssueEvent(action string, issue *Issue, user *User, changelog *IssueChangelog) IssueEvent {
+	return IssueEvent{
+		Action:      action,
+		Issue:       issue,
+		Description: IssueDescriptionText(issue),
+		User:        user,
+		Changelog:   changelog,
+	}
+}
+
+// IssueDescriptionText reads the description of an issue as plain text.
+func IssueDescriptionText(issue *Issue) string {
+	if issue == nil {
+		return ""
+	}
+
+	return ADFToText(issue.Fields["description"])
 }
 
 func (t *OnIssue) Name() string {
@@ -98,6 +125,7 @@ This is provisioned automatically. Jira's dynamic webhook registration API (` + 
 Emits one event per matching issue webhook with:
 - **action**: ` + "`created`" + `, ` + "`updated`" + `, or ` + "`deleted`" + `
 - **issue**: The full issue (id, key, self, fields)
+- **description**: The issue description as plain text. Use this instead of ` + "`issue.fields.description`" + `, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
 - **changelog**: The list of changed fields (only present for updates)`
 }
@@ -231,19 +259,28 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	// The webhook is shared by every jira.onIssue trigger on the integration (see
 	// JiraWebhookHandler), so this project check is the only thing keeping one trigger from
-	// reacting to another project's events - fail closed when the payload doesn't carry a
-	// project key to compare against, rather than letting an unidentifiable event through.
+	// reacting to another project's events. jira:issue_created payloads sometimes omit
+	// fields.project; the issue key still names the project (ENG-42). Fail closed only when
+	// neither source is present.
 	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
 		return http.StatusOK, nil, nil
 	}
 
-	event := IssueEvent{
-		Action:    action,
-		Issue:     payload.Issue,
-		User:      payload.User,
-		Changelog: payload.Changelog,
+	issue := payload.Issue
+	// jira:issue_deleted payloads often carry only id and key. GetIssue would
+	// 404, so skip hydration and emit the original payload.
+	if action != "deleted" && issueFieldsIncomplete(issue) {
+		fullIssue, err := loadIssueForWebhook(ctx, issue.Key)
+		if err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+		if fullIssue != nil {
+			issue = fullIssue
+		}
 	}
+
+	event := NewIssueEvent(action, issue, payload.User, payload.Changelog)
 
 	if err := ctx.Events.Emit(IssueEventPayloadType, event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
@@ -274,13 +311,54 @@ func issueEventAction(webhookEvent string) (string, bool) {
 }
 
 func issueProjectKey(issue *Issue) string {
-	if issue == nil || issue.Fields == nil {
+	if issue == nil {
 		return ""
 	}
-	project, ok := issue.Fields["project"].(map[string]any)
-	if !ok {
+	if issue.Fields != nil {
+		project, ok := issue.Fields["project"].(map[string]any)
+		if ok {
+			if key, _ := project["key"].(string); strings.TrimSpace(key) != "" {
+				return key
+			}
+		}
+	}
+	return ProjectKeyFromIssueKey(issue.Key)
+}
+
+// ProjectKeyFromIssueKey reads the project of an issue key such as ENG-42.
+// A key without the "<project>-<number>" shape reports an empty project.
+func ProjectKeyFromIssueKey(issueKey string) string {
+	issueKey = strings.TrimSpace(issueKey)
+	separator := strings.LastIndex(issueKey, "-")
+	if separator <= 0 {
 		return ""
 	}
-	key, _ := project["key"].(string)
-	return key
+	return issueKey[:separator]
+}
+
+func issueFieldsIncomplete(issue *Issue) bool {
+	if issue == nil || issue.Fields == nil || len(issue.Fields) == 0 {
+		return true
+	}
+	summary, _ := issue.Fields["summary"].(string)
+	return strings.TrimSpace(summary) == ""
+}
+
+func loadIssueForWebhook(ctx core.WebhookRequestContext, issueKey string) (*Issue, error) {
+	issueKey = strings.TrimSpace(issueKey)
+	if issueKey == "" || ctx.HTTP == nil || ctx.Integration == nil {
+		return nil, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
+	}
+
+	issue, err := client.GetIssue(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load issue %s: %w", issueKey, err)
+	}
+
+	return issue, nil
 }

@@ -2,9 +2,11 @@ import { describe, expect, it } from "bun:test";
 
 import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
+import { refineChatBoardFixture } from "./refineChatBoardFixture";
 import {
   CLOSED_WORK_ORDER,
   defaultFactoriesFixture,
+  DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -82,10 +84,37 @@ describe("matchFactoryPageFixture", () => {
     });
   });
 
-  it("returns factory apps for the populated factory", async () => {
-    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
+  it("deletes a factory automation by id", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      { method: "POST", body: JSON.stringify({ name: "Create env", columnKey: "verify" }) },
+      fixture,
+    );
+    const createdBody = (await created.json()) as { automation?: { id?: string } };
+    const automationId = createdBody.automation?.id;
+    expect(automationId).toBeTruthy();
+
+    const deleted = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations/${automationId}`,
+      { method: "DELETE" },
+      fixture,
+    );
+    expect(deleted.status).toBe(200);
+
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      undefined,
+      fixture,
+    );
+    const body = (await list.json()) as { automations?: Array<{ id?: string }> };
+    expect(body.automations?.some((entry) => entry.id === automationId)).toBe(false);
+  });
+
+  it("returns factory automations for the populated factory", async () => {
+    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`);
     await expect(apps.json()).resolves.toMatchObject({
-      apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+      automations: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
 
@@ -281,5 +310,39 @@ describe("matchFactoryPageFixture", () => {
     const body = (await response.json()) as { points?: unknown[] };
 
     expect(body.points).toHaveLength(7);
+  });
+
+  it("returns no planning session when the fixture does not seed one", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`,
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("serves a seeded planning session and stores a survey answer", async () => {
+    const fixture = refineChatBoardFixture();
+    const sessionPath = `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`;
+    const loaded = await fetchFactoryPageFixture(sessionPath, undefined, fixture);
+    const body = (await loaded.json()) as { session?: { id?: string; survey?: unknown } };
+
+    expect(loaded.status).toBe(200);
+    expect(body.session?.id).toBe("ps-draft-refunds");
+    expect(body.session?.survey).toBeTruthy();
+
+    const answered = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/planning-sessions/ps-draft-refunds/survey-answer`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text: "What should the first change include? Reactions on the task header only" }),
+      },
+      fixture,
+    );
+    const next = (await answered.json()) as {
+      session?: { survey?: unknown; messages?: Array<{ text?: string }> };
+    };
+
+    expect(next.session?.survey).toBeNull();
+    expect(next.session?.messages?.at(-1)?.text).toContain("Reactions on the task header only");
   });
 });

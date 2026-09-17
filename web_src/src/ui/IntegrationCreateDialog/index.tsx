@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { hiddenFieldsForHostedJira } from "@/lib/integrations";
+import { configurationWithSetupReturnPath } from "@/lib/integrationSetupReturn";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -120,12 +122,15 @@ export function IntegrationCreateDialog({
   }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
   const { createStepFields, webhookStepFields } = useMemo(() => {
-    const visibleFields = selectVisibleFields(integrationDefinition?.configuration, hiddenFieldNames);
+    const visibleFields = selectVisibleFields(
+      integrationDefinition?.configuration,
+      hiddenFieldsForHostedJira(integrationDefinition, hiddenFieldNames),
+    );
     return {
       createStepFields: selectCreateStepFields(visibleFields, initialStepFieldNames),
       webhookStepFields: selectWebhookStepFields(visibleFields, initialStepFieldNames),
     };
-  }, [integrationDefinition?.configuration, hiddenFieldNames, initialStepFieldNames]);
+  }, [integrationDefinition, hiddenFieldNames, initialStepFieldNames]);
 
   const isGitHub = integrationDefinition?.name === "github";
   const {
@@ -219,14 +224,20 @@ export function IntegrationCreateDialog({
     setCreateError(null);
     setIsCreatePending(true);
     try {
+      const createConfiguration = configurationWithSetupReturnPath(configuration, setupReturnTo);
       const created = isGitHub
         ? await createWithGeneratedName({
             baseName: githubBaseName,
             takenNames: existingIntegrationNames,
-            create: (name) => onCreateIntegration({ integrationName: definitionName, name, configuration }),
+            create: (name) =>
+              onCreateIntegration({ integrationName: definitionName, name, configuration: createConfiguration }),
           })
         : {
-            result: await onCreateIntegration({ integrationName: definitionName, name: nextName, configuration }),
+            result: await onCreateIntegration({
+              integrationName: definitionName,
+              name: nextName,
+              configuration: createConfiguration,
+            }),
             name: nextName,
           };
 
@@ -284,6 +295,7 @@ export function IntegrationCreateDialog({
     onCapabilitySetupRequired,
     setCreateIntegrationBrowserAction,
     setCreatedName,
+    setupReturnTo,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
@@ -188,6 +189,9 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
+	assert.Contains(t, text, "Follow the task prompt")
+	assert.Contains(t, text, "Do not leave a written plan unpublished")
+	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
 	assert.Contains(t, text, "4/5")
 	assert.Contains(t, text, "This issue is a good fit for an agent.")
@@ -308,6 +312,63 @@ func TestFactory_AttachAnalysisSession(t *testing.T) {
 	assert.Equal(t, session.ID, again.ID)
 }
 
+func TestFactoryPlanningSession_ProposeConfidenceWithoutSpec(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-score-only")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeConfidence(db, 2, "The request is still missing the failing path."))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, PlanningConfidenceCheckKey, checks[0].Key)
+	assert.Equal(t, 2.0, checks[0].Score)
+	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
+}
+
+func TestValidatePlanningConfidenceScoreRejectsZero(t *testing.T) {
+	err := validatePlanningConfidenceScore(0)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "1 through 5")
+}
+
+func TestValidatePlanningConfidenceScoreAcceptsOneAndFive(t *testing.T) {
+	require.NoError(t, validatePlanningConfidenceScore(1))
+	require.NoError(t, validatePlanningConfidenceScore(5))
+}
+
+func TestAnalysisConversationWindowSkipsPlanBanners(t *testing.T) {
+	messages := []PlanningSessionMessage{
+		{Role: PlanningSessionMessageRoleUser, Text: "Add refund retries."},
+		{Role: PlanningSessionMessageRolePlan, Text: `{"score":4,"summary":"Clear"}`},
+		{Role: PlanningSessionMessageRoleAgent, Text: "I updated the plan."},
+	}
+
+	window := analysisConversationWindow(messages, analysisMessagesContextCharacters(messages))
+
+	assert.Equal(t, []PlanningSessionMessage{messages[0], messages[2]}, window.Messages)
+	assert.Zero(t, window.Omitted)
+	assert.NotContains(t, window.Messages, messages[1])
+}
+
 func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-propose")
@@ -412,6 +473,133 @@ func TestFactoryPlanningSession_ProposeSpecDoesNotOverwriteTitleOnlyArtifact(t *
 		assert.Equal(t, planningSpecArtifactKey(order.ID), *artifact.Key)
 		assert.Contains(t, string(artifact.Data), "Follow-up write.")
 	}
+}
+
+func TestFactoryPlanningSession_ProposeSpecRestoresSignedFileURLs(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-restore")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	file := mustReadyTaskFile(t, db, org.ID, factoryModel.ID, order.ID, userID, "shot.png", "image/png")
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	gcsURL := "https://storage.googleapis.com/superplane-prod-global/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/" +
+		org.ID.String() + "/workspaces/" + factoryModel.ID.String() + "/tasks/" + order.ID.String() + "/" + file.ID.String() +
+		"?X-Goog-Algorithm=GOOG4-RSA-SHA256&sp_file=1"
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nSee ![shot.png]("+gcsURL+")\n"))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	stored := string(artifacts[0].Data)
+	assert.Contains(t, stored, "![shot.png]("+blob.FileRef(file.ID)+")")
+	assert.NotContains(t, stored, "sp_file=1")
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Stop double charges.", reloaded.Description)
+}
+
+func TestFactoryPlanningSession_ProposeSpecAppendsMissingDescriptionFileRefs(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-append")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	file := mustReadyTaskFile(t, db, org.ID, factoryModel.ID, order.ID, userID, "shot.png", "image/png")
+	description := "See ![shot.png](" + blob.FileRef(file.ID) + ")"
+	require.NoError(t, order.UpdateContent(db, nil, &description))
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	stored := string(artifacts[0].Data)
+	assert.Contains(t, stored, "![shot.png]("+blob.FileRef(file.ID)+")")
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, description, reloaded.Description)
+}
+
+func TestFactoryPlanningSession_ProposeSpecEscapesMarkdownFilenames(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-escape")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	file := mustReadyTaskFile(t, db, org.ID, factoryModel.ID, order.ID, userID, "shot](evil.com", "image/png")
+	description := "See ![orig](" + blob.FileRef(file.ID) + ")"
+	require.NoError(t, order.UpdateContent(db, nil, &description))
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	stored := string(artifacts[0].Data)
+	assert.Contains(t, stored, "![shot__evil.com]("+blob.FileRef(file.ID)+")")
+	assert.NotContains(t, stored, "shot](evil.com")
+}
+
+func TestFactoryPlanningSession_ProposeSpecDropsForeignSignedURLs(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-drop")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	foreign := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	signed := "https://app.example/api/v1/public/files/" + foreign.String() + "?expires=1&sig=abc&sp_file=1"
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nSee ![x]("+signed+")\n"))
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	stored := string(artifacts[0].Data)
+	assert.NotContains(t, stored, "sp_file=1")
+	assert.NotContains(t, stored, blob.FileRef(foreign))
 }
 
 func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.T) {
@@ -527,6 +715,27 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	assert.Equal(t, "The retry lives in billing/retry.ts.", session.Wait().Text)
 	assert.NotContains(t, session.Wait().Text, "propose_spec")
 	assert.NotContains(t, session.Wait().Text, "propose_draft")
+}
+
+func mustReadyTaskFile(
+	t *testing.T,
+	db *gorm.DB,
+	organizationID, factoryID, workOrderID, userID uuid.UUID,
+	filename, contentType string,
+) *File {
+	t.Helper()
+	file, err := CreatePendingFile(db, CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		Filename:       filename,
+		ContentType:    contentType,
+		CreatedByID:    userID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, file.MarkReady(db, 12, "abc"))
+	return file
 }
 
 func createAnalysisCanvas(t *testing.T, orgID, factoryID, userID uuid.UUID) *Canvas {

@@ -20,7 +20,7 @@ describe("AddIntakePicker", () => {
     expect(within(picker).getByTestId("add-intake-template-improve-ci-runtime")).toHaveTextContent(
       "Improve CI runtime",
     );
-    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(7);
+    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(ADD_INTAKE_TEMPLATES.length);
   });
 
   it("filters templates from the search field", async () => {

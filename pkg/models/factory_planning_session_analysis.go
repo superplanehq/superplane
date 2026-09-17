@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -136,13 +137,78 @@ func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 		if err != nil {
 			return err
 		}
-		return upsertPlanningSpecArtifact(inner, order, markdown)
+		stored, err := planningSpecMarkdownForStorage(inner, order, markdown)
+		if err != nil {
+			return err
+		}
+		return upsertPlanningSpecArtifact(inner, order, stored)
 	})
 }
 
+func planningSpecMarkdownForStorage(tx *gorm.DB, order *FactoryWorkOrder, markdown string) (string, error) {
+	restored, err := RestoreFileRefs(tx, order.OrganizationID, order.FactoryID, order.ID, markdown)
+	if err != nil {
+		return "", err
+	}
+	return appendMissingDescriptionFileRefs(tx, order, restored)
+}
+
+func appendMissingDescriptionFileRefs(tx *gorm.DB, order *FactoryWorkOrder, spec string) (string, error) {
+	present := map[uuid.UUID]struct{}{}
+	for _, id := range blob.FileIDsInMarkdown(spec) {
+		present[id] = struct{}{}
+	}
+	var missing []uuid.UUID
+	for _, id := range blob.FileIDsInMarkdown(order.Description) {
+		if _, ok := present[id]; ok {
+			continue
+		}
+		missing = append(missing, id)
+	}
+	if len(missing) == 0 {
+		return spec, nil
+	}
+
+	files, err := ListFilesByIDs(tx, missing)
+	if err != nil {
+		return "", err
+	}
+	byID := map[uuid.UUID]File{}
+	for _, file := range files {
+		byID[file.ID] = file
+	}
+
+	var b strings.Builder
+	b.WriteString(strings.TrimRight(spec, "\n"))
+	appended := false
+	for _, id := range missing {
+		file, ok := byID[id]
+		if !ok || !file.IsDispatchable(order.OrganizationID, order.FactoryID, order.ID) {
+			continue
+		}
+		b.WriteString("\n\n")
+		b.WriteString(markdownFileRef(file))
+		appended = true
+	}
+	if !appended {
+		return spec, nil
+	}
+	b.WriteByte('\n')
+	return b.String(), nil
+}
+
+func markdownFileRef(file File) string {
+	ref := blob.FileRef(file.ID)
+	label := blob.MarkdownLinkLabel(file.Filename)
+	if IsInlineImageContentType(file.ContentType) {
+		return fmt.Sprintf("![%s](%s)", label, ref)
+	}
+	return fmt.Sprintf("[%s](%s)", label, ref)
+}
+
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
-	if score < 0 || score > PlanningConfidenceScoreMax {
-		return fmt.Errorf("%w: confidence score must be 0 through 5", ErrFactoryPlanningSessionInvalid)
+	if err := validatePlanningConfidenceScore(score); err != nil {
+		return err
 	}
 	return s.withLockedSession(tx, func(inner *gorm.DB) error {
 		if err := s.guardOpen(); err != nil {
@@ -152,22 +218,33 @@ func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, s
 		if err != nil {
 			return err
 		}
-		var run *factory.RunRef
-		if s.CanvasRunID != nil {
-			run = &factory.RunRef{ID: *s.CanvasRunID}
-		}
-		_, err = order.ReportCheck(inner, FactoryWorkOrderCheckParams{
-			Key:      PlanningConfidenceCheckKey,
-			Name:     PlanningConfidenceCheckName,
-			Score:    score,
-			MaxScore: PlanningConfidenceScoreMax,
-			Format:   FactoryWorkOrderCheckFormatFraction,
-			Level:    planningConfidenceLevel(score),
-			Summary:  strings.TrimSpace(summary),
-			Run:      run,
-		})
-		return err
+		return reportPlanningConfidence(inner, s, order, score, summary)
 	})
+}
+
+func validatePlanningConfidenceScore(score float64) error {
+	if !isFiniteCheckNumber(score) || score < 1 || score > PlanningConfidenceScoreMax {
+		return fmt.Errorf("%w: confidence score must be 1 through 5", ErrFactoryPlanningSessionInvalid)
+	}
+	return nil
+}
+
+func reportPlanningConfidence(tx *gorm.DB, session *FactoryPlanningSession, order *FactoryWorkOrder, score float64, summary string) error {
+	var run *factory.RunRef
+	if session.CanvasRunID != nil {
+		run = &factory.RunRef{ID: *session.CanvasRunID}
+	}
+	_, err := order.ReportCheck(tx, FactoryWorkOrderCheckParams{
+		Key:      PlanningConfidenceCheckKey,
+		Name:     PlanningConfidenceCheckName,
+		Score:    score,
+		MaxScore: PlanningConfidenceScoreMax,
+		Format:   FactoryWorkOrderCheckFormatFraction,
+		Level:    planningConfidenceLevel(score),
+		Summary:  strings.TrimSpace(summary),
+		Run:      run,
+	})
+	return err
 }
 
 func (s *FactoryPlanningSession) analysisWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
@@ -237,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Update the current specification and the score when the new context changes them.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity rules, and specification shape. Update the score with propose_confidence when it changes. If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update the score without rewriting the specification. Apply the latest user message.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
@@ -274,6 +351,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 }
 
 func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
+	messages = filterPlanningRewindMessages(messages)
 	if len(messages) == 0 || hardLimit <= 0 {
 		return analysisMessageWindow{Omitted: len(messages)}
 	}
@@ -302,6 +380,17 @@ func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int
 	}
 	reversePlanningMessages(selected)
 	return analysisMessageWindow{Messages: selected}
+}
+
+func filterPlanningRewindMessages(messages []PlanningSessionMessage) []PlanningSessionMessage {
+	filtered := make([]PlanningSessionMessage, 0, len(messages))
+	for _, message := range messages {
+		if message.Role == PlanningSessionMessageRolePlan {
+			continue
+		}
+		filtered = append(filtered, message)
+	}
+	return filtered
 }
 
 func analysisMessagesContextCharacters(messages []PlanningSessionMessage) int {

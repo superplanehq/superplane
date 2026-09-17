@@ -1,6 +1,7 @@
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
+import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "./work-order-split-run/agentActivity";
 
 export type PlanningSessionPayload = {
   id?: string;
@@ -14,6 +15,7 @@ export type PlanningSessionPayload = {
   selectableModelKey?: string;
   kind?: "PLANNING_SESSION_KIND_TASK_CREATION" | "PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS";
   messages?: PlanningSessionMessagePayload[];
+  activities?: PlanningSessionActivityPayload[];
   draft?: { title?: string; description?: string; workOrderId?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
   survey?: PlanningSessionSurveyPayload | null;
@@ -26,6 +28,38 @@ export type PlanningSessionMessagePayload = {
   userId?: string;
   /** When the server persisted the message (ISO 8601). Both roles carry this. */
   createdAt?: string;
+  activityId?: string;
+};
+
+export type PlanningSessionActivityPayload = {
+  id?: string;
+  schemaVersion?: number;
+  provider?: string;
+  status?: string;
+  lastSequence?: number | string;
+  startedAt?: string;
+  completedAt?: string;
+  truncated?: boolean;
+  turn?: number;
+  items?: PlanningSessionActivityItemPayload[];
+};
+
+type PlanningSessionActivityItemPayload = {
+  type?: string;
+  id?: string;
+  kind?: string;
+  text?: string;
+  name?: string;
+  input?: string;
+  output?: string;
+  outputStreams?: Array<{ stream?: string; text?: string }>;
+  status?: string;
+  code?: string;
+  startedAt?: string;
+  durationMs?: number | string;
+  exitCode?: number;
+  signal?: string;
+  truncated?: boolean;
 };
 
 export type PlanningSessionSurveyPayload = {
@@ -45,7 +79,25 @@ export function mergePlanningSessionHistory(
   if (!previous || !next || !previous.id || previous.id !== next.id) {
     return next;
   }
-  return { ...next, messages: mergePlanningSessionMessages(previous.messages, next.messages) };
+  const activities = mergePlanningSessionActivities(previous.activities, next.activities);
+  return {
+    ...next,
+    messages: mergePlanningSessionMessages(previous.messages, next.messages),
+    ...(previous.activities || next.activities ? { activities } : {}),
+  };
+}
+
+function mergePlanningSessionActivities(
+  previous: PlanningSessionActivityPayload[] | undefined,
+  next: PlanningSessionActivityPayload[] | undefined,
+): PlanningSessionActivityPayload[] {
+  const activities = new Map((previous ?? []).flatMap((activity) => (activity.id ? [[activity.id, activity]] : [])));
+  for (const activity of next ?? []) {
+    if (activity.id) {
+      activities.set(activity.id, { ...activities.get(activity.id), ...activity });
+    }
+  }
+  return [...activities.values()].sort((left, right) => timestampMs(left.startedAt) - timestampMs(right.startedAt));
 }
 
 function mergePlanningSessionMessages(
@@ -99,6 +151,7 @@ export function createWithAgentViewFromSession(
     analysisDelivered?: boolean;
   },
 ): CreateWithAgentView {
+  const activities = (session.activities ?? []).flatMap(agentActivityFromPayload);
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session, extras.analysisDelivered),
@@ -113,6 +166,7 @@ export function createWithAgentViewFromSession(
     endConfirmOpen: extras.endConfirmOpen,
     selectableModelKey: session.selectableModelKey ?? "",
     refining: Boolean(session.draft?.workOrderId?.trim()),
+    ...(activities.length > 0 ? { activities } : {}),
   };
 }
 
@@ -237,21 +291,177 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
   if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
     return [];
   }
+  if (message.role === "plan") {
+    return planningPlanMessageFromPayload(message);
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
-    const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
-    return [
-      {
-        id: message.id ?? message.text,
-        kind: "text",
-        role: message.role,
-        text: message.text,
-        ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
-        ...(createdAtMs === undefined ? {} : { createdAtMs }),
-        ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
-      },
-    ];
+    return planningTextMessageFromPayload(message);
   }
   return [];
+}
+
+function planningTextMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const text = message.text;
+  if (!text) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? text,
+      kind: "text",
+      role: message.role === "agent" ? "agent" : "user",
+      text,
+      ...(message.role === "user" && isPlanningSurveyReply(text) ? { origin: "survey" as const } : {}),
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+      ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
+      ...(message.activityId?.trim() ? { activityId: message.activityId.trim() } : {}),
+    },
+  ];
+}
+
+function planningPlanMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const score = planningPlanScoreFromPayload(message.text);
+  if (score === undefined) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? message.text ?? "plan",
+      kind: "plan",
+      role: "plan",
+      score,
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+    },
+  ];
+}
+
+function planningPlanScoreFromPayload(text: string | undefined): number | undefined {
+  if (!text?.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(text) as { score?: unknown };
+    if (typeof parsed.score === "number" && Number.isFinite(parsed.score)) {
+      return parsed.score;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function agentActivityFromPayload(payload: PlanningSessionActivityPayload): AgentActivity[] {
+  const id = payload.id?.trim();
+  const status = parsedActivityStatus(payload.status);
+  if (!id || !status) {
+    return [];
+  }
+  return [
+    {
+      id,
+      provider: payload.provider?.trim() || "agent",
+      status,
+      turn: payload.turn,
+      sequence: numericValue(payload.lastSequence),
+      startedAtMs: optionalTimestampMs(payload.startedAt),
+      completedAtMs: optionalTimestampMs(payload.completedAt),
+      items: (payload.items ?? []).flatMap(agentActivityItemFromPayload),
+      truncated: Boolean(payload.truncated),
+    },
+  ];
+}
+
+function agentActivityItemFromPayload(payload: PlanningSessionActivityItemPayload): AgentActivityItem[] {
+  const id = payload.id?.trim();
+  if (!id) {
+    return [];
+  }
+  if (payload.type === "content" && (payload.kind === "reasoning" || payload.kind === "assistant")) {
+    return [contentActivityItem(payload, id, payload.kind)];
+  }
+  if (payload.type === "tool") {
+    return [toolActivityItem(payload, id)];
+  }
+  if (payload.type === "notice") {
+    return [{ type: "notice", id, code: payload.code ?? "notice", text: payload.text ?? "Agent activity notice" }];
+  }
+  return [];
+}
+
+function contentActivityItem(
+  payload: PlanningSessionActivityItemPayload,
+  id: string,
+  kind: "reasoning" | "assistant",
+): AgentActivityItem {
+  return {
+    type: "content",
+    id,
+    kind,
+    text: payload.text ?? "",
+    status: payload.status === "running" ? "running" : "passed",
+    startedAtMs: optionalTimestampMs(payload.startedAt),
+    durationMs: optionalNumericValue(payload.durationMs),
+    truncated: Boolean(payload.truncated),
+  };
+}
+
+function toolActivityItem(payload: PlanningSessionActivityItemPayload, id: string): AgentActivityItem {
+  const kind = payload.kind?.trim() || "tool";
+  return {
+    type: "tool",
+    id,
+    kind,
+    name: payload.name?.trim() || kind,
+    input: payload.input ?? "",
+    output: payload.output ?? "",
+    outputStreams: (payload.outputStreams ?? []).map((output) => ({
+      stream: output.stream ?? "stdout",
+      text: output.text ?? "",
+    })),
+    status: parsedActivityStatus(payload.status) ?? "failed",
+    startedAtMs: optionalTimestampMs(payload.startedAt),
+    durationMs: optionalNumericValue(payload.durationMs),
+    exitCode: payload.exitCode,
+    signal: payload.signal,
+    truncated: Boolean(payload.truncated),
+  };
+}
+
+function parsedActivityStatus(status: string | undefined): AgentActivityStatus | undefined {
+  if (
+    status === "running" ||
+    status === "passed" ||
+    status === "failed" ||
+    status === "cancelled" ||
+    status === "timed_out" ||
+    status === "interrupted"
+  ) {
+    return status;
+  }
+  return undefined;
+}
+
+function numericValue(value: number | string | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalNumericValue(value: number | string | undefined): number | undefined {
+  return value === undefined ? undefined : numericValue(value);
+}
+
+function timestampMs(value: string | undefined): number {
+  return optionalTimestampMs(value) ?? 0;
+}
+
+function optionalTimestampMs(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 function parsePlanningMessageCreatedAt(createdAt: string | undefined): number | undefined {

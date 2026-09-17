@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
 
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { CONFIDENCE_CHECK_NAME, confidenceSuitabilitySummary } from "../../lib/confidenceScore";
@@ -21,30 +22,23 @@ export const INTENT = {
     title: "intent.md",
     body: `# Clearer empty state
 
-## Executive summary
-
-### Goal
-
 A person can add a payment method from the empty billing page.
-
-The agent reads this as copy and an action on the current empty view. It does not read it as a new billing flow.
-
-### Done when
-
-- The empty view names the next action.
-- The action opens add-payment-method.
-
-### Out of scope
-
-- The page after a card exists.
-
-### Key architecture decisions
-
-- Reuse the current empty view. Do not add a new page.
 
 ## Problem
 
-The empty view only shows a title.
+The empty view only shows a title. It does not name the next action.
+
+## Proposed outcome
+
+The empty view names the next action. The action opens add-payment-method.
+
+## Constraints
+
+Do not build a new billing flow. Do not change the page after a card exists.
+
+## Scope
+
+Copy and an action on the current empty view.
 
 ## Outcome
 
@@ -108,3 +102,20 @@ export class IntentDocumentResizeObserver {
   unobserve() {}
   disconnect() {}
 }
+
+export function uploadedComposerImage(id: string, filename: string): UploadedWorkOrderFile {
+  return {
+    id,
+    filename,
+    contentType: "image/png",
+    ref: `sp-file://${id}`,
+    previewUrl: `https://cdn.example.com/${filename}`,
+    isImage: true,
+  };
+}
+
+export function composerPng(name: string) {
+  return new File(["img"], name, { type: "image/png" });
+}
+
+export const WAITING_COMPOSER_VIEW = { machineStatus: "waiting" as const };

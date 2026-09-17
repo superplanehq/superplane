@@ -9,8 +9,10 @@ import {
   factoryHomePath,
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factorySentryIntakeSetupPath,
   factoryColumnAutomationsPath,
   factoryColumnAutomationViewPath,
   columnAutomationsKeyFromSearch,
@@ -18,7 +20,10 @@ import {
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
+  isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
+  jiraIntakeIntegrationIdFromSearch,
+  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -123,6 +128,40 @@ describe("factoryIntakePath", () => {
   });
 });
 
+describe("factoryJiraIntakeSetupPath", () => {
+  it("opens Add Jira intake on the line board", () => {
+    expect(factoryJiraIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan?jiraIntake=1",
+    );
+  });
+
+  it("asks the dialog to select the returned connection after OAuth", () => {
+    expect(
+      factoryJiraIntakeSetupPath("org-1", "SP", "line-plan", { integrationId: "11111111-1111-1111-1111-111111111111" }),
+    ).toBe("/org-1/workspaces/sp/lines/line-plan?jiraIntake=1&jiraIntegrationId=11111111-1111-1111-1111-111111111111");
+  });
+
+  it("reads the Jira intake resume query", () => {
+    expect(isJiraIntakeSetupSearchOpen("?jiraIntake=1")).toBe(true);
+    expect(isJiraIntakeSetupSearchOpen("jiraIntake=1&jiraIntegrationId=int-1")).toBe(true);
+    expect(isJiraIntakeSetupSearchOpen("")).toBe(false);
+  });
+
+  it("reads the returned Jira connection from the search string", () => {
+    expect(jiraIntakeIntegrationIdFromSearch("?jiraIntake=1&jiraIntegrationId=int-new")).toBe("int-new");
+    expect(jiraIntakeIntegrationIdFromSearch("jiraIntake=1")).toBe("");
+  });
+
+  it("drops the Jira intake resume query from the line URL", () => {
+    expect(
+      withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&jiraIntegrationId=int-new"),
+    ).toBe("/org-1/workspaces/sp/lines/line-plan");
+    expect(
+      withoutJiraIntakeSetupSearch("/org-1/workspaces/sp/lines/line-plan", "?jiraIntake=1&automations=backlog"),
+    ).toBe("/org-1/workspaces/sp/lines/line-plan?automations=backlog");
+  });
+});
+
 describe("factoryPRFeedbackSetupPath", () => {
   it("opens the comments and checks setup pages on the line board", () => {
     expect(factoryPRFeedbackSetupPath("org-1", "SP", "line-plan", "comments")).toBe(
@@ -136,6 +175,14 @@ describe("factoryPRFeedbackSetupPath", () => {
   it("maps PR feedback source ids to setup path kinds", () => {
     expect(prFeedbackSetupKindFromSourceId("discussion")).toBe("comments");
     expect(prFeedbackSetupKindFromSourceId("checks")).toBe("checks");
+  });
+});
+
+describe("factorySentryIntakeSetupPath", () => {
+  it("opens the Sentry intake setup page on the line board", () => {
+    expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
   });
 });
 
@@ -272,7 +319,7 @@ describe("legacyWorkOrderDetailPath", () => {
 describe("factoryAppPath", () => {
   it("encodes orderNumber (not orderId) in the query string", () => {
     expect(factoryAppPath("org-1", "SP", "app-1", { from: "task", orderNumber: "42" })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?from=task&orderNumber=42",
+      "/org-1/workspaces/sp/automations/app-1?from=task&orderNumber=42",
     );
   });
 });
@@ -318,24 +365,26 @@ describe("factorySettingsSectionPath", () => {
 
 describe("factoryAppConfigurePath", () => {
   it("adds configure=1, opens the agent panel, and keeps the components panel closed", () => {
-    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/sp/apps/app-1?configure=1&agent=1");
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe(
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1",
+    );
   });
 
   it("keeps the run when entering edit from a run page", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?run=run-9&configure=1&agent=1&from=lines&lineId=line-1",
+      "/org-1/workspaces/sp/automations/app-1?run=run-9&configure=1&agent=1&from=lines&lineId=line-1",
     );
   });
 
   it("opens components only when blocks is requested", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { blocks: true })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?configure=1&agent=1&blocks=1",
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1&blocks=1",
     );
   });
 
   it("opens the component sidebar on the selected node", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { nodeId: "create-pr" })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr",
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1&sidebar=1&node=create-pr",
     );
   });
 
@@ -347,7 +396,9 @@ describe("factoryAppConfigurePath", () => {
         runId: "run-9",
         nodeId: "create-pr",
       }),
-    ).toBe("/org-1/workspaces/sp/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1");
+    ).toBe(
+      "/org-1/workspaces/sp/automations/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1",
+    );
   });
 });
 
@@ -362,7 +413,7 @@ describe("factoryAppSplitRunPath", () => {
         canvas: "implementation",
       }),
     ).toBe(
-      "/org-1/workspaces/sp/apps/app-1/split-run?run=run-9&from=lines&lineId=line-1&orderNumber=103&canvas=implementation",
+      "/org-1/workspaces/sp/automations/app-1/split-run?run=run-9&from=lines&lineId=line-1&orderNumber=103&canvas=implementation",
     );
   });
 });
@@ -370,7 +421,7 @@ describe("factoryAppSplitRunPath", () => {
 describe("factoryAppViewPath", () => {
   it("opens the canvas run inspector when a run id is present", () => {
     expect(factoryAppViewPath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?run=run-9&from=lines&lineId=line-1",
+      "/org-1/workspaces/sp/automations/app-1?run=run-9&from=lines&lineId=line-1",
     );
   });
 });
@@ -378,7 +429,7 @@ describe("factoryAppViewPath", () => {
 describe("factoryAppRunPath", () => {
   it("opens the canvas run inspector", () => {
     expect(factoryAppRunPath("org-1", "SP", "app-1", "run-9", { from: "lines", lineId: "line-1" })).toBe(
-      "/org-1/workspaces/sp/apps/app-1?run=run-9&from=lines&lineId=line-1",
+      "/org-1/workspaces/sp/automations/app-1?run=run-9&from=lines&lineId=line-1",
     );
   });
 });

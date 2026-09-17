@@ -110,25 +110,30 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, 0, len(canvases))
+func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automation {
+	result := make([]*pb.Factory_Automation, 0, len(canvases))
 	for _, canvas := range canvases {
-		name := canvas.Name
-		description := canvas.Description
-		app := &pb.Factory_App{
-			Id:          canvas.ID.String(),
-			Name:        name,
-			Description: description,
-		}
-		if canvas.CreatedAt != nil {
-			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
-		}
-		if canvas.UpdatedAt != nil {
-			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
-		}
-		result = append(result, app)
+		result = append(result, serializeFactoryAutomation(canvas))
 	}
 	return result
+}
+
+func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
+	automation := &pb.Factory_Automation{
+		Id:          canvas.ID.String(),
+		Name:        canvas.Name,
+		Description: canvas.Description,
+	}
+	if canvas.ColumnKey != nil {
+		automation.ColumnKey = *canvas.ColumnKey
+	}
+	if canvas.CreatedAt != nil {
+		automation.CreatedAt = timestamppb.New(*canvas.CreatedAt)
+	}
+	if canvas.UpdatedAt != nil {
+		automation.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
+	}
+	return automation
 }
 
 func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
@@ -148,7 +153,7 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
 		Healthy:             graph.Healthy(spec.Edges),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
@@ -191,6 +196,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
 	case models.FactoryIntakeSourceProductiveTasks:
 		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
+	case models.FactoryIntakeSourceJiraIssues:
+		return pb.FactoryIntake_SOURCE_JIRA_ISSUES
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -206,6 +213,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
 	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
 		return models.FactoryIntakeSourceProductiveTasks, nil
+	case pb.FactoryIntake_SOURCE_JIRA_ISSUES:
+		return models.FactoryIntakeSourceJiraIssues, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

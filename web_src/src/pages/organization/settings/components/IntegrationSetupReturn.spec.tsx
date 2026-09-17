@@ -148,7 +148,7 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.getByText("integration details")).toBeInTheDocument();
   });
 
-  it("opens onboarding when factories are on and no return path is stored", async () => {
+  it("opens onboarding when factories are on and a GitHub install request has no return path", async () => {
     featureHas.mockImplementation((featureId) => featureId === FEATURE_FACTORIES);
 
     renderAt("/org-1/settings/integrations/abc?githubSetup=request", <div>integration details</div>);
@@ -156,6 +156,15 @@ describe("IntegrationSetupReturn", () => {
     expect(await screen.findByText("onboarding")).toBeInTheDocument();
     expect(screen.getByText("githubSetup=request")).toBeInTheDocument();
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
+  it("stays on the integration page after Jira OAuth when no return path is stored", () => {
+    featureHas.mockImplementation((featureId) => featureId === FEATURE_FACTORIES);
+
+    renderAt("/org-1/settings/integrations/abc", <div>integration details</div>);
+
+    expect(screen.getByText("integration details")).toBeInTheDocument();
+    expect(screen.queryByText("onboarding")).not.toBeInTheDocument();
   });
 
   it("stays on factory organization integrations when no return path is stored", () => {

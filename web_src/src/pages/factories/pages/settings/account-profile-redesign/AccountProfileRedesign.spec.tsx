@@ -158,7 +158,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests.",
+      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
     expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests.",
+      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
 
@@ -195,7 +195,7 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
 
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Used to sign in and to credit pull requests.",
+      "Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
     );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
   });
@@ -215,7 +215,7 @@ describe("AccountProfileRedesignPlayground", () => {
       />,
     );
 
-    expect(screen.getByText("Choose which task emails SuperPlane sends you.")).toBeInTheDocument();
+    expect(screen.getByText("Choose which task emails and browser alerts SuperPlane sends you.")).toBeInTheDocument();
     expect(screen.getByText("Added as a task owner")).toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Send task emails" }));
@@ -233,6 +233,52 @@ describe("AccountProfileRedesignPlayground", () => {
 
     expect(screen.getByTestId("account-redesign-notifications-off")).toHaveTextContent("Task emails are off.");
     expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
+  });
+
+  it("keeps browser notifications off by default", () => {
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={ACCOUNT_REDESIGN_NOTIFICATIONS}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-off")).toHaveTextContent(
+      "Browser notifications are off.",
+    );
+    expect(screen.queryByTestId("account-redesign-notifications-browser-events")).not.toBeInTheDocument();
+  });
+
+  it("asks for permission when browser notifications are already on", async () => {
+    const user = userEvent.setup();
+    const requestPermission = vi.fn(async () => "granted" as NotificationPermission);
+    class FakeNotification {
+      static permission: NotificationPermission = "default";
+      static requestPermission = requestPermission;
+    }
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: FakeNotification,
+    });
+
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={{ ...ACCOUNT_REDESIGN_NOTIFICATIONS, browserEnabled: true }}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-allow")).toHaveTextContent(
+      "This browser needs permission before SuperPlane can show alerts.",
+    );
+    await user.click(screen.getByRole("button", { name: "Allow notifications" }));
+    expect(requestPermission).toHaveBeenCalled();
   });
 
   it("filters the settings nav", async () => {

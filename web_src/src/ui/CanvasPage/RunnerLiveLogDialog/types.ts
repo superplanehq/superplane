@@ -4,6 +4,9 @@ export type RunnerLiveLogDialogProps = {
   title: string;
   canvasMode: "live" | "edit";
   execution: ExecutionInfo | null;
+  component?: string;
+  iconSlug?: string;
+  session?: { organizationId?: string; canvasId?: string };
 };
 
 export function isExecutionInFlight(execution: ExecutionInfo): boolean {
@@ -46,9 +49,15 @@ export type CommandSection = {
   collapsed: boolean;
 };
 
+export type PendingLiveLogRecord =
+  | { type: "line"; text: string; commandIndex?: number }
+  | { type: "tool_start"; kind: string; text: string; sourceId?: string; commandIndex?: number }
+  | { type: "tool_end"; status: "passed" | "failed"; durationMs: number; sourceId?: string; commandIndex?: number };
+
 export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
+  pendingRecords?: PendingLiveLogRecord[];
   error: string | null;
   isLoading: boolean;
   isStreaming: boolean;

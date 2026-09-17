@@ -118,9 +118,9 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                 />
               </li>
             </ol>
-            {follow.following ? null : (
+            {follow.showJumpToLatest ? (
               <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
-            )}
+            ) : null}
           </div>
         </aside>
         <div

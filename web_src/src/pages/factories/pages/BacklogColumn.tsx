@@ -1,4 +1,11 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/usePermissions";
+import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -14,7 +21,10 @@ import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
+import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
+import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -41,6 +51,10 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
+  /** Opens guided Sentry intake setup. Hidden when unset. */
+  onSetupSentry?: () => void;
+  /** Opens guided Jira intake setup. Hidden when unset. */
+  onSetupJira?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
@@ -78,6 +92,8 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   onAddIntake,
+  onSetupSentry,
+  onSetupJira,
   automations,
   automationRowCount,
   onAutomationRowAction,
@@ -86,6 +102,10 @@ export function BacklogColumn({
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const { canAct } = usePermissions();
+  const canUpdateWorkOrders = canAct("work_orders", "update");
+  const intakesQuery = useFactoryIntakes(organizationId, factoryId);
+  const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -117,6 +137,14 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
+            onRefreshBacklog={
+              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
+                ? () => {
+                    void runBacklogRefresh(refreshBacklog.mutateAsync);
+                  }
+                : undefined
+            }
+            refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
@@ -128,7 +156,7 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
+        banner={<BacklogColumnBanner panel={intakePanel} onSetupSentry={onSetupSentry} onSetupJira={onSetupJira} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
@@ -159,6 +187,8 @@ function BacklogColumnHeaderActions({
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
+  onRefreshBacklog,
+  refreshBacklogPending,
   colorId,
   onColorChange,
 }: Pick<
@@ -173,6 +203,8 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -190,6 +222,8 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
+        onRefreshBacklog={onRefreshBacklog}
+        refreshBacklogPending={refreshBacklogPending}
         colorId={colorId}
         onColorChange={onColorChange}
       />
@@ -197,14 +231,64 @@ function BacklogColumnHeaderActions({
   );
 }
 
-function BacklogColumnIntakeBanner({ panel }: { panel: BacklogIntakePanel }) {
+function BacklogColumnBanner({
+  panel,
+  onSetupSentry,
+  onSetupJira,
+}: {
+  panel?: BacklogIntakePanel;
+  onSetupSentry?: () => void;
+  onSetupJira?: () => void;
+}) {
+  if (!panel && !onSetupSentry && !onSetupJira) {
+    return null;
+  }
+
   return (
-    <BacklogIntakeSources
-      intakes={panel.sources}
-      showAddIntake={panel.showAddIntake}
-      onOpenSettings={panel.onOpenSettings}
-      onAddIntake={panel.onAddIntake}
-    />
+    <>
+      {panel ? (
+        <BacklogIntakeSources
+          intakes={panel.sources}
+          showAddIntake={panel.showAddIntake}
+          onOpenSettings={panel.onOpenSettings}
+          onAddIntake={panel.onAddIntake}
+        />
+      ) : null}
+      {onSetupSentry ? <BacklogSetupSentryButton onClick={onSetupSentry} /> : null}
+      {onSetupJira ? <BacklogSetupJiraButton onClick={onSetupJira} /> : null}
+    </>
+  );
+}
+
+function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      data-testid="lines-backlog-setup-sentry"
+      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
+    >
+      <img src={sentryIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      {SENTRY_INTAKE_SETUP_COPY.setupButton}
+    </Button>
+  );
+}
+
+function BacklogSetupJiraButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      data-testid="lines-backlog-setup-jira"
+      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
+    >
+      <img src={jiraIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      {JIRA_INTAKE_SETUP_COPY.setupButton}
+    </Button>
   );
 }
 
@@ -241,6 +325,23 @@ function BacklogColumnOrderList({
 }
 
 type BacklogCreatePopoverProps = ReturnType<typeof backlogCreatePopoverProps>;
+
+async function runBacklogRefresh(run: () => Promise<RefreshBacklogResult>): Promise<void> {
+  try {
+    const toast = backlogRefreshToast(await run());
+    if (toast.kind === "error") {
+      showErrorToast(toast.message);
+      return;
+    }
+    if (toast.kind === "success") {
+      showSuccessToast(toast.message);
+      return;
+    }
+    showInfoToast(toast.message);
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, BACKLOG_REFRESH_COPY.failed));
+  }
+}
 
 function backlogCreatePopoverProps(args: {
   canAdd: boolean;
