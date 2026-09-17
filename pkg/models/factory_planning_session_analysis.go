@@ -314,7 +314,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Keep asking until Clarity is 5. Update the score with propose_confidence when it changes. If Clarity is still 1 or 2, do not write or update the specification. Say you do not have enough Clarity to write a plan. Ask questions first. If Clarity is 3 or 4, update the specification with propose_spec and ask questions that would raise Clarity. If Clarity is 5, update the specification if it changed and tell the user to review it and start if they are happy. You may update the score without rewriting the specification. If the score is below 5, the summary must say why Clarity is not 5 and what the user must add, decide, or answer. Write chat, survey, and the Clarity summary in short direct sentences. Use I and you. Do not name files.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity rules, and specification shape. Update the score with propose_confidence when it changes. Call propose_spec when the task prompt says to write or update the plan. Call survey only when the task prompt says to ask. You may update the score without rewriting the specification. Apply the latest user message.\n")
 	if spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(spec)
