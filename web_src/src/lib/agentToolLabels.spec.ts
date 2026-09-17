@@ -56,6 +56,46 @@ describe("agentToolLabel", () => {
       "rootTriggerRenderer",
     );
   });
+
+  it("reads search and fetch fields from JSON input", () => {
+    expect(agentToolLabel(tool({ kind: "grep", name: "Grep", input: '{"pattern":"rootTriggerRenderer"}' }))).toEqual({
+      action: "Searched",
+      detail: "rootTriggerRenderer",
+    });
+    expect(
+      agentToolLabel(tool({ kind: "glob", name: "Glob", input: '{"glob_pattern":"**/*.go","path":"pkg"}' })),
+    ).toEqual({
+      action: "Searched",
+      detail: "**/*.go",
+    });
+    expect(agentToolLabel(tool({ kind: "web_search", name: "WebSearch", input: '{"query":"analysis logs"}' }))).toEqual(
+      {
+        action: "Searched the web",
+        detail: "analysis logs",
+      },
+    );
+    expect(
+      agentToolLabel(tool({ kind: "web_fetch", name: "WebFetch", input: '{"url":"https://example.com/docs"}' })),
+    ).toEqual({
+      action: "Fetched page",
+      detail: "https://example.com/docs",
+    });
+  });
+
+  it("reads a search pattern from partial JSON", () => {
+    expect(
+      agentToolLabel(tool({ kind: "grep", name: "Grep", input: '{"pattern":"rootTrigger', status: "running" })),
+    ).toEqual({
+      action: "Searching",
+      detail: "rootTrigger",
+    });
+  });
+
+  it("does not show raw JSON when known fields are missing", () => {
+    expect(agentToolLabel(tool({ kind: "grep", name: "Grep", input: '{"path":"pkg"}' }))).toEqual({
+      action: "Searched",
+    });
+  });
 });
 
 describe("commandDisplayText", () => {

@@ -6,6 +6,7 @@ const FILE_KINDS = new Set(["read", "edit", "write"]);
 const SEARCH_KINDS = new Set(["search", "grep", "glob"]);
 const FETCH_KINDS = new Set(["web_search", "web_fetch"]);
 const COMMAND_KINDS = new Set(["bash", "command_execution"]);
+const SEARCH_FETCH_KEYS = ["pattern", "glob_pattern", "query", "url"];
 
 export type AgentToolLabel = {
   action: string;
@@ -22,25 +23,13 @@ export function isCommandTool(item: AgentActivityItem): boolean {
 }
 
 export function commandDisplayText(input: string): string | undefined {
-  const command = commandText(input).trim().replace(/\r?\n/g, " ");
-  return command || undefined;
+  return collapseWhitespace(commandText(input));
 }
 
 export function commandText(input: string): string {
   const trimmed = input.trim();
   if (!trimmed.startsWith("{")) return input;
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const command = (parsed as Record<string, unknown>).command;
-      if (typeof command === "string") return command;
-    }
-  } catch {
-    // A live tool input is often incomplete. Read the available command below.
-  }
-
-  return commandFromPartialJSON(trimmed) ?? input;
+  return stringFieldFromJSON(trimmed, ["command"]) ?? stringFromPartialJSON(trimmed, ["command"]) ?? input;
 }
 
 export function toolFilePaths(input: string): string[] {
@@ -95,10 +84,16 @@ export function fileToolLabel(tool: AgentToolItem): string | undefined {
 
 export function toolInputPreview(tool: AgentToolItem): string | undefined {
   if (!tool.input || FILE_KINDS.has(tool.kind.toLowerCase())) return undefined;
-  return tool.input
-    .split(/\r?\n/)
-    .find((line) => line.trim())
-    ?.trim();
+
+  const trimmed = tool.input.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return collapseWhitespace(
+      stringFieldFromJSON(trimmed, SEARCH_FETCH_KEYS) ?? stringFromPartialJSON(trimmed, SEARCH_FETCH_KEYS),
+    );
+  }
+
+  return collapseWhitespace(trimmed.split(/\r?\n/).find((line) => line.trim()));
 }
 
 export function displayFileName(path: string): string {
@@ -203,25 +198,53 @@ function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function commandFromPartialJSON(input: string): string | undefined {
-  const property = /"command"\s*:\s*"/g.exec(input);
+function stringFieldFromJSON(input: string, keys: string[]): string | undefined {
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const record = parsed as Record<string, unknown>;
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  } catch {
+    // A live tool input is often incomplete. Read known fields below.
+  }
+  return undefined;
+}
+
+function stringFromPartialJSON(input: string, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = stringPropertyFromPartialJSON(input, key);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function stringPropertyFromPartialJSON(input: string, key: string): string | undefined {
+  const property = new RegExp(`"${key}"\\s*:\\s*"`).exec(input);
   if (!property) return undefined;
 
-  let command = "";
+  let value = "";
   for (let index = property.index + property[0].length; index < input.length; index += 1) {
     const character = input[index];
-    if (character === '"') return command;
+    if (character === '"') return value || undefined;
     if (character !== "\\") {
-      command += character;
+      value += character;
       continue;
     }
 
     const escaped = input[index + 1];
-    if (escaped === undefined) return command;
-    command += decodeJSONEscape(escaped);
+    if (escaped === undefined) return value || undefined;
+    value += decodeJSONEscape(escaped);
     index += 1;
   }
-  return command;
+  return value || undefined;
+}
+
+function collapseWhitespace(value: string | undefined): string | undefined {
+  const collapsed = value?.trim().replace(/\r?\n/g, " ");
+  return collapsed || undefined;
 }
 
 function decodeJSONEscape(character: string): string {
