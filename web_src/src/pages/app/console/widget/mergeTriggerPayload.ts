@@ -1,8 +1,52 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client/types.gen";
 
 import { buildConsoleTriggerParameters } from "../consoleTriggerParameters";
-import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
+import { buildEnv, compileTemplate, evalTemplate, DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 import { deepMergeObjects, setNestedString } from "./nestedPayload";
+
+/**
+ * Resolve the default payload when an action does not specify explicit
+ * payloadTemplates. Prefers `row.payload` when present as an object (common for
+ * run/execution/event rows), or falls back to user-defined fields on `row`
+ * (stripping internal framework and metadata properties).
+ */
+export function resolveDefaultRowPayload(row: Record<string, unknown>): Record<string, unknown> {
+  if (row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)) {
+    return row.payload as Record<string, unknown>;
+  }
+  const {
+    id: _id,
+    namespace: _ns,
+    createdAt: _ca,
+    updatedAt: _ua,
+    finishedAt: _fa,
+    state: _st,
+    result: _res,
+    resultReason: _rr,
+    resultMessage: _rm,
+    nodeName: _nn,
+    status: _stat,
+    durationMs: _dur,
+    $: _dollar,
+    [DOLLAR_REWRITE_IDENTIFIER]: _dollarRewrite,
+    ...rest
+  } = row;
+  void _id;
+  void _ns;
+  void _ca;
+  void _ua;
+  void _fa;
+  void _st;
+  void _res;
+  void _rr;
+  void _rm;
+  void _nn;
+  void _stat;
+  void _dur;
+  void _dollar;
+  void _dollarRewrite;
+  return rest;
+}
 
 /**
  * Merge a Start trigger's template defaults with row-derived payload fields.
@@ -33,6 +77,9 @@ export function buildRowPayloadFromTemplates(
  * the top level (`{ template, ...rowPayload }`) so the backend can resolve
  * `{{ parameters.<dot.path> }}` placeholders declared in the template
  * configuration via `InvokeNodeTriggerHook`'s expression resolver.
+ *
+ * When `payloadTemplates` is omitted or empty, falls back to the row's
+ * selected payload so that row actions trigger with the clicked row's data.
  */
 export function mergeTriggerParameters(
   node: ComponentsNode | undefined,
@@ -42,6 +89,9 @@ export function mergeTriggerParameters(
   payloadTemplates?: Record<string, string>,
 ): Record<string, unknown> {
   const base = buildConsoleTriggerParameters(node, hookName, templateName);
-  const rowPayload = buildRowPayloadFromTemplates(payloadTemplates, row);
+  const rowPayload =
+    payloadTemplates && Object.keys(payloadTemplates).length > 0
+      ? buildRowPayloadFromTemplates(payloadTemplates, row)
+      : resolveDefaultRowPayload(row);
   return deepMergeObjects(base, rowPayload);
 }
