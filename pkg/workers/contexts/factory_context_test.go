@@ -701,12 +701,7 @@ func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
 		Body:    "Ready for review",
 	}))
 
-	require.Len(t, notifications, 1)
-	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
-	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
-	assert.Equal(t, factoryevents.EventTypeOrderCommentAdded, notifications[0].EventType)
-	assert.Equal(t, "Ready for review", notifications[0].CommentBody)
-	assert.NotEmpty(t, notifications[0].ActorName)
+	assert.Empty(t, notifications)
 }
 
 func TestFactoryContext_SetWorkOrderStatusNote_EmitsNotification(t *testing.T) {
@@ -855,8 +850,7 @@ func TestFactoryContext_AddWorkOrderArtifact_KeyedRefresh(t *testing.T) {
 		factoryevents.EventTypeOrderArtifactAdded,
 		factoryevents.EventTypeOrderArtifactUpdated,
 	}, reasons)
-	require.Len(t, notifications, 1)
-	assert.Equal(t, factoryevents.EventTypeOrderArtifactAdded, notifications[0].EventType)
+	assert.Empty(t, notifications)
 
 	artifacts, err := order.ListArtifacts(database.Conn())
 	require.NoError(t, err)

@@ -20,8 +20,9 @@ const (
 )
 
 const (
-	PlanningSpecArtifactKey   = "spec"
-	PlanningSpecArtifactTitle = "spec.md"
+	PlanningSpecArtifactKey         = "spec"
+	PlanningSpecArtifactTitle       = "spec.md"
+	PlanningSpecArtifactCanvasRunID = "canvasRunId"
 
 	PlanningConfidenceCheckKey  = "confidence"
 	PlanningConfidenceCheckName = "Confidence score"
@@ -141,7 +142,7 @@ func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 		if err != nil {
 			return err
 		}
-		return upsertPlanningSpecArtifact(inner, order, stored)
+		return upsertPlanningSpecArtifact(inner, order, stored, s.CanvasRunID)
 	})
 }
 
@@ -262,12 +263,15 @@ func planningSpecArtifactKey(orderID uuid.UUID) string {
 	return PlanningSpecArtifactKey + ":" + orderID.String()
 }
 
-func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body string) error {
+func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body string, runID *uuid.UUID) error {
 	key := planningSpecArtifactKey(order.ID)
 	data := map[string]any{
 		"name":  PlanningSpecArtifactTitle,
 		"title": PlanningSpecArtifactTitle,
 		"body":  body,
+	}
+	if runID != nil && *runID != uuid.Nil {
+		data[PlanningSpecArtifactCanvasRunID] = runID.String()
 	}
 	if _, err := order.UpdateArtifactData(tx, key, data); err == nil {
 		return nil

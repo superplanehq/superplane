@@ -124,6 +124,9 @@ func parseNotificationChannel(
 		if err != nil {
 			return parsedNotificationChannel{}, err
 		}
+		if len(names) == 0 {
+			names = []string{models.NotificationTypeNoneSelected}
+		}
 		parsed.eventTypes = names
 	}
 

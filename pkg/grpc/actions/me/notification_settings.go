@@ -74,7 +74,7 @@ func serializeWorkspaces(
 
 	var serializedEventTypes []pb.NotificationSettings_Type
 	if scope == models.NotificationWorkspaceScopeAll {
-		serializedEventTypes = serializeEventTypes(eventTypes)
+		serializedEventTypes = serializeAllScopeEventTypes(eventTypes)
 	}
 
 	return &pb.NotificationSettings_Workspaces{
@@ -99,6 +99,14 @@ func serializeBrowser(settings *models.UserNotificationSettings) *pb.Notificatio
 	}
 }
 
+func serializeAllScopeEventTypes(eventTypes []string) []pb.NotificationSettings_Type {
+	protoTypes := serializeEventTypes(eventTypes)
+	if len(protoTypes) == 0 && len(eventTypes) == 0 {
+		return allConfigurableNotificationTypes()
+	}
+	return protoTypes
+}
+
 func serializeEventTypes(eventTypes []string) []pb.NotificationSettings_Type {
 	protoTypes := make([]pb.NotificationSettings_Type, 0, len(eventTypes))
 	for _, eventType := range eventTypes {
@@ -109,6 +117,18 @@ func serializeEventTypes(eventTypes []string) []pb.NotificationSettings_Type {
 		protoTypes = append(protoTypes, protoType)
 	}
 	return protoTypes
+}
+
+func allConfigurableNotificationTypes() []pb.NotificationSettings_Type {
+	types := make([]pb.NotificationSettings_Type, 0, len(models.NotificationTypes))
+	for _, name := range models.NotificationTypes {
+		protoType, ok := notificationTypeToProto(name)
+		if !ok {
+			continue
+		}
+		types = append(types, protoType)
+	}
+	return types
 }
 
 func notificationTypesFromProto(eventTypes []pb.NotificationSettings_Type) ([]string, error) {
@@ -132,13 +152,10 @@ func notificationTypesFromProto(eventTypes []pb.NotificationSettings_Type) ([]st
 }
 
 var notificationTypeProto = map[string]pb.NotificationSettings_Type{
-	models.NotificationTypeWorkOrderAssigned:        pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
-	models.NotificationTypeWorkOrderCommentOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
-	models.NotificationTypeWorkOrderCommentCreated:  pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
 	models.NotificationTypeWorkOrderStatusOwned:     pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
-	models.NotificationTypeWorkOrderArtifactOwned:   pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
-	models.NotificationTypeWorkOrderMention:         pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
 	models.NotificationTypeWorkOrderStatusNoteOwned: pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
+	models.NotificationTypeWorkOrderAgentQuestion:   pb.NotificationSettings_TYPE_WORK_ORDER_AGENT_QUESTION,
+	models.NotificationTypeWorkOrderPlanReady:       pb.NotificationSettings_TYPE_WORK_ORDER_PLAN_READY,
 }
 
 func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {
