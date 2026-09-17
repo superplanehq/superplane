@@ -71,7 +71,7 @@ dev.down:
 doctor-local:
 	docker compose exec runner sh -c '\
 	  missing=0; \
-	  for cmd in claude codex opencode node git gh jq python3 bash; do \
+	  for cmd in claude codex opencode playwright node git gh jq python3 bash; do \
 	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
 	      echo "$$cmd missing" >&2; \
 	      missing=1; \
@@ -82,8 +82,14 @@ doctor-local:
 	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
 	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
 	  echo "opencode=$$(opencode --version 2>/dev/null | head -n1)"; \
+	  echo "playwright=$$(playwright --version 2>/dev/null | head -n1)"; \
+	  playwright cli --help >/dev/null 2>&1 || missing=1; \
 	  echo "node=$$(node --version 2>/dev/null)"; \
 	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
+	  shot=$$(mktemp /tmp/playwright-doctor.XXXXXX.png); \
+	  playwright screenshot about:blank "$$shot" >/dev/null 2>&1 || missing=1; \
+	  test -s "$$shot" || missing=1; \
+	  rm -f "$$shot"; \
 	  test "$$missing" -eq 0'
 
 # Long-running: run in its own terminal. Requires a JSON config; set FM_CONFIG_FILE.

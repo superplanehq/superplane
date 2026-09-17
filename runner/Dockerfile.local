@@ -25,6 +25,9 @@ FROM node:22-bookworm-slim
 ARG CLAUDE_CODE_VERSION=2.1.212
 ARG OPENCODE_VERSION=1.18.3
 ARG CODEX_VERSION=0.144.5
+ARG PLAYWRIGHT_VERSION=1.63.0
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -52,12 +55,20 @@ RUN apt-get update \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "opencode-ai@${OPENCODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}" \
+    "playwright@${PLAYWRIGHT_VERSION}" \
+  && playwright install --with-deps chromium \
+  && chmod -R a+rX /ms-playwright \
   && command -v claude \
   && command -v codex \
   && command -v opencode \
   && claude --version \
   && codex --version \
   && opencode --version \
+  && playwright --version \
+  && playwright cli --help >/dev/null \
+  && playwright screenshot about:blank /tmp/playwright-smoke.png \
+  && test -s /tmp/playwright-smoke.png \
+  && rm /tmp/playwright-smoke.png \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/runner /usr/local/bin/runner
