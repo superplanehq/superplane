@@ -39,6 +39,9 @@ describe("SplitRunReview start confirm", () => {
     expect(onStart).not.toHaveBeenCalled();
     const dialog = screen.getByTestId("split-run-start-confirm");
     expect(dialog).toHaveAttribute("data-slot", "frame");
+    expect(dialog.closest("[role=alertdialog]")).toHaveClass("bg-popover");
+    expect(dialog.closest("[role=alertdialog]")).not.toHaveClass("bg-transparent");
+    expect(dialog).toHaveClass("bg-popover", "p-0", "border-0");
     expect(
       within(dialog).getByRole("heading", { name: START_CONFIRM_COPY.title }).closest("[data-slot=frame-panel-header]"),
     ).not.toBeNull();
