@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { EyeOff, FileText, Sparkle } from "lucide-react";
+import { EyeOff, FileText, Gauge, Sparkle, type LucideIcon } from "lucide-react";
 
 import { CountButton } from "@/components/examples/c-button-38";
 import { Badge } from "@/components/reui/badge";
@@ -11,9 +11,17 @@ import { cn } from "@/lib/utils";
 import { CONFIDENCE_SCORE_MAX, confidenceBandForScore, type ConfidenceBand } from "../../lib/confidenceScore";
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import {
+  composerSummaryBodies,
+  resolveOpenSummary,
+  summaryToggleTarget,
+  type ComposerScore,
+} from "./composerScoreSummary";
 import type { PlanChipStatus } from "./planChipStatus";
+import type { RefineSummaryKind } from "./refineLayoutPreference";
 
-const FALLBACK_WHY = "The analysis scored how clear this work is.";
+export type { ComposerScore } from "./composerScoreSummary";
+
 const DRAWER_EASE = "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 const SCORE_TONE: Record<ConfidenceBand, string> = {
@@ -22,107 +30,108 @@ const SCORE_TONE: Record<ConfidenceBand, string> = {
   Low: "text-destructive",
 };
 
+type ScoreChipCopy = {
+  label: string;
+  icon: LucideIcon;
+  testId: string;
+};
+
+const SCORE_CHIP_COPY: Record<RefineSummaryKind, ScoreChipCopy> = {
+  clarity: {
+    label: CREATE_WITH_AGENT_COPY.clarity,
+    icon: Sparkle,
+    testId: "split-run-intent-composer-score",
+  },
+  confidence: {
+    label: CREATE_WITH_AGENT_COPY.confidence,
+    icon: Gauge,
+    testId: "split-run-intent-composer-confidence",
+  },
+};
+
+const SUMMARY_KINDS: readonly RefineSummaryKind[] = ["clarity", "confidence"];
+
+/** Uncontrolled fallback for previews. The refine model passes the stored preference. */
+function useOpenSummary(
+  controlled: RefineSummaryKind | null | undefined,
+  onToggle: ((kind: RefineSummaryKind) => void) | undefined,
+): [RefineSummaryKind | null, (kind: RefineSummaryKind) => void] {
+  const [local, setLocal] = useState<RefineSummaryKind | null>("clarity");
+  const toggleLocal = (kind: RefineSummaryKind) => setLocal((current) => (current === kind ? null : kind));
+  return [controlled === undefined ? local : controlled, onToggle ?? toggleLocal];
+}
+
 export function ComposerPlanStack({
   open,
-  score,
-  scoreSummary,
+  clarity,
+  confidence,
   isAnalyzing = false,
   canTogglePlan = true,
   planStatus,
   onToggle,
-  summaryOpen: summaryOpenProp,
+  openSummary: openSummaryProp,
   onToggleSummary,
   actions,
 }: {
   open: boolean;
-  score?: number;
-  scoreSummary?: string;
+  clarity?: ComposerScore;
+  confidence?: ComposerScore;
   isAnalyzing?: boolean;
   canTogglePlan?: boolean;
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
-  summaryOpen?: boolean;
-  onToggleSummary?: () => void;
+  openSummary?: RefineSummaryKind | null;
+  onToggleSummary?: (kind: RefineSummaryKind) => void;
   actions?: ReactNode;
 }) {
-  const [uncontrolledSummaryOpen, setUncontrolledSummaryOpen] = useState(true);
-  const summaryOpen = summaryOpenProp ?? uncontrolledSummaryOpen;
-  const toggleSummary = onToggleSummary ?? (() => setUncontrolledSummaryOpen((current) => !current));
-  const body = score == null ? undefined : scoreSummary?.trim() || FALLBACK_WHY;
+  const [openSummary, toggleSummary] = useOpenSummary(openSummaryProp, onToggleSummary);
+  const scores: Record<RefineSummaryKind, ComposerScore | undefined> = { clarity, confidence };
+  const bodies = composerSummaryBodies(clarity, confidence);
+  const shownSummary = resolveOpenSummary(openSummary, bodies);
+  const drawerBody = shownSummary ? bodies[shownSummary] : undefined;
+  const hasAnyBody = Boolean(bodies.clarity || bodies.confidence);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FrameHeader className="px-3 py-1.5" data-testid="split-run-intent-plan-updated">
-        <ComposerChipRow
-          open={open}
-          score={score}
-          isAnalyzing={isAnalyzing}
-          canTogglePlan={canTogglePlan}
-          planStatus={planStatus}
-          summaryOpen={summaryOpen}
-          body={body}
-          toggleSummary={toggleSummary}
-          onToggle={onToggle}
-          actions={actions}
-        />
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
+          {SUMMARY_KINDS.map((kind) => (
+            <ScoreChip
+              key={kind}
+              kind={kind}
+              score={scores[kind]?.score}
+              isAnalyzing={isAnalyzing}
+              expanded={Boolean(bodies[kind]) && shownSummary === kind}
+              onToggle={
+                bodies[kind] ? () => toggleSummary(summaryToggleTarget(kind, shownSummary, openSummary)) : undefined
+              }
+            />
+          ))}
+          {canTogglePlan ? (
+            <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
+          ) : null}
+          {actions ? (
+            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
+          ) : null}
+        </div>
       </FrameHeader>
-      {body ? <ClaritySummaryDrawer open={summaryOpen} body={body} /> : null}
+      {hasAnyBody ? <ScoreSummaryDrawer open={Boolean(drawerBody)} kind={shownSummary} body={drawerBody} /> : null}
     </Frame>
   );
 }
 
-function ComposerChipRow({
-  open,
-  score,
-  isAnalyzing,
-  canTogglePlan,
-  planStatus,
-  summaryOpen,
-  body,
-  toggleSummary,
-  onToggle,
-  actions,
-}: {
-  open: boolean;
-  score?: number;
-  isAnalyzing: boolean;
-  canTogglePlan: boolean;
-  planStatus?: PlanChipStatus;
-  summaryOpen: boolean;
-  body?: string;
-  toggleSummary: () => void;
-  onToggle?: () => void;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="split-run-intent-composer-chips">
-      <ScoreChip
-        score={score}
-        isAnalyzing={isAnalyzing}
-        expanded={Boolean(body) && summaryOpen}
-        onToggle={body ? toggleSummary : undefined}
-      />
-      {canTogglePlan ? (
-        <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
-      ) : null}
-      {actions ? (
-        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
-      ) : null}
-    </div>
-  );
-}
-
-function ClaritySummaryDrawer({ open, body }: { open: boolean; body: string }) {
+function ScoreSummaryDrawer({ open, kind, body }: { open: boolean; kind: RefineSummaryKind | null; body?: string }) {
   return (
     <div
       className={cn("grid transition-[grid-template-rows]", DRAWER_EASE, open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
-      data-testid="split-run-intent-confidence-drawer"
+      data-testid="split-run-intent-summary-drawer"
       data-state={open ? "open" : "closed"}
+      data-kind={kind ?? undefined}
       aria-hidden={open ? undefined : true}
       inert={open ? undefined : true}
     >
       <div className="min-h-0 overflow-hidden">
         <FramePanel fit>
-          <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-confidence-copy">
+          <p className="text-[13px] leading-5 text-muted-foreground" data-testid="split-run-intent-summary-copy">
             {body}
           </p>
         </FramePanel>
@@ -209,21 +218,22 @@ function PlanStatusMark({ isAnalyzing, planStatus }: { isAnalyzing: boolean; pla
 }
 
 function ScoreChip({
+  kind,
   score,
   isAnalyzing,
   expanded = false,
   onToggle,
 }: {
+  kind: RefineSummaryKind;
   score?: number;
   isAnalyzing: boolean;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
+  const copy = SCORE_CHIP_COPY[kind];
+  const Icon = copy.icon;
   const showMatrix = isAnalyzing;
-  const label =
-    showMatrix || score == null
-      ? CREATE_WITH_AGENT_COPY.clarity
-      : `${CREATE_WITH_AGENT_COPY.clarity} ${score}/${CONFIDENCE_SCORE_MAX}`;
+  const label = showMatrix || score == null ? copy.label : `${copy.label} ${score}/${CONFIDENCE_SCORE_MAX}`;
   const countClassName = showMatrix
     ? "min-w-7 self-stretch py-0"
     : score == null
@@ -238,12 +248,12 @@ function ScoreChip({
       aria-expanded={onToggle ? expanded : undefined}
       aria-pressed={onToggle ? expanded : undefined}
       onClick={onToggle}
-      data-testid={showMatrix ? undefined : "split-run-intent-composer-score"}
+      data-testid={showMatrix ? undefined : copy.testId}
       countClassName={countClassName}
       count={
         showMatrix ? (
           <ConfidenceAnalyzingIndicator
-            testId="split-run-intent-plan-analyzing"
+            testId={kind === "clarity" ? "split-run-intent-plan-analyzing" : undefined}
             showTooltip={false}
             decorative
             className="shrink-0"
@@ -255,8 +265,8 @@ function ScoreChip({
         )
       }
     >
-      <Sparkle aria-hidden="true" />
-      {CREATE_WITH_AGENT_COPY.clarity}
+      <Icon aria-hidden="true" />
+      {copy.label}
     </CountButton>
   );
   if (!showMatrix) {
@@ -265,7 +275,7 @@ function ScoreChip({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{chip}</TooltipTrigger>
-      <TooltipContent>{CREATE_WITH_AGENT_COPY.clarityAnalyzing}</TooltipContent>
+      <TooltipContent>{CREATE_WITH_AGENT_COPY.scoreAnalyzing}</TooltipContent>
     </Tooltip>
   );
 }

@@ -362,10 +362,15 @@ describe("LinesPage board", () => {
 
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
-    expect(cardScore).toHaveAttribute("role", "meter");
-    expect(cardScore).toHaveAttribute("aria-valuenow", "5");
-    expect(cardScore).toHaveAttribute("aria-valuemax", "5");
-    expect(cardScore.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(cardScore).toHaveAttribute("role", "group");
+    const cardClarity = within(card).getByTestId("work-order-card-score-wo-review-pay-842-clarity");
+    expect(cardClarity).toHaveAttribute("aria-valuenow", "5");
+    expect(cardClarity).toHaveAttribute("aria-valuemax", "5");
+    expect(cardClarity.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842-confidence")).toHaveAttribute(
+      "aria-valuenow",
+      "5",
+    );
     const start = within(card).getByRole("button", { name: "Start" });
     expect(cardScore.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -380,7 +385,8 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Clarity");
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();

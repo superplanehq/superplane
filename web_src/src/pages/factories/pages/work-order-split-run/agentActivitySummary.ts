@@ -178,7 +178,7 @@ function countMCPActivity(counts: ActivityCounts, tool: AgentToolItem): void {
     increment(counts.specifications, tool);
     return;
   }
-  if (identifier.includes("confidence")) {
+  if (identifier.includes("confidence") || identifier.includes("clarity")) {
     increment(counts.taskScores, tool);
     return;
   }

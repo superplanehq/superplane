@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
 import {
+  CLARITY_CHECK_NAME,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
@@ -14,7 +15,9 @@ import {
   CONFIDENCE_ANALYZING_TOOLTIP,
   ConfidenceAnalyzingIndicator,
   ConfidenceMeter,
+  SCORE_PAIR_LABEL,
 } from "../../workOrders/ConfidenceMeter";
+import { SCORE_FALLBACK_WHY } from "./composerScoreSummary";
 
 const CHIP_TONE: Record<ConfidenceBand, string> = {
   High: "border-emerald-500/30 bg-emerald-500/10",
@@ -22,26 +25,46 @@ const CHIP_TONE: Record<ConfidenceBand, string> = {
   Low: "border-red-500/30 bg-red-500/10",
 };
 
-const FALLBACK_WHY = "The analysis scored how clear this work is.";
+type ScoreKind = "clarity" | "confidence";
+
+const SCORE_COPY: Record<ScoreKind, { name: string; fallbackWhy: string; testId: string }> = {
+  clarity: {
+    name: CLARITY_CHECK_NAME,
+    fallbackWhy: SCORE_FALLBACK_WHY.clarity,
+    testId: "split-run-intent-clarity",
+  },
+  confidence: {
+    name: CONFIDENCE_CHECK_NAME,
+    fallbackWhy: SCORE_FALLBACK_WHY.confidence,
+    testId: "split-run-intent-confidence",
+  },
+};
 
 type WorkOrderIntentConfidenceFooterProps = {
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing: boolean;
   flush?: boolean;
 };
 
+/** Plan-pane footer: one why-chip per published score. */
 export function WorkOrderIntentConfidenceFooter({
+  clarity,
   confidence,
   isAnalyzing,
   flush = false,
 }: WorkOrderIntentConfidenceFooterProps) {
-  if (isAnalyzing && !confidence) {
+  const hasScore = Boolean(clarity || confidence);
+
+  if (isAnalyzing && !hasScore) {
     return (
-      <ConfidenceFooterShell flush={flush}>
-        <ConfidenceWhyChip
+      <ScoreFooterShell flush={flush}>
+        <ScoreWhyChip
           key="analyzing"
-          label={`${CONFIDENCE_CHECK_NAME}. Analyzing`}
+          name={SCORE_PAIR_LABEL}
+          label={`${SCORE_PAIR_LABEL}. Analyzing`}
           why={CONFIDENCE_ANALYZING_TOOLTIP}
+          testId="split-run-intent-confidence"
         >
           <ConfidenceAnalyzingIndicator
             testId="split-run-intent-confidence-meter"
@@ -49,55 +72,72 @@ export function WorkOrderIntentConfidenceFooter({
             decorative
             className="text-[13px]"
           />
-        </ConfidenceWhyChip>
-      </ConfidenceFooterShell>
+        </ScoreWhyChip>
+      </ScoreFooterShell>
     );
   }
 
-  if (!confidence) {
+  if (!hasScore) {
     return (
-      <ConfidenceFooterShell flush={flush}>
-        <p className="text-[13px] text-muted-foreground">No confidence score yet.</p>
-      </ConfidenceFooterShell>
+      <ScoreFooterShell flush={flush}>
+        <p className="text-[13px] text-muted-foreground">No scores yet.</p>
+      </ScoreFooterShell>
     );
   }
-
-  const maxScore = confidence.maxScore || CONFIDENCE_SCORE_MAX;
-  const scoreLabel = `${confidence.score}/${maxScore}`;
 
   return (
-    <ConfidenceFooterShell flush={flush}>
-      <ConfidenceWhyChip
-        key={`${confidence.score}-${confidence.summary ?? ""}`}
-        label={`${CONFIDENCE_CHECK_NAME} ${scoreLabel}`}
-        why={confidence.summary?.trim() || FALLBACK_WHY}
-        tone={confidenceBandForScore(confidence.score)}
-      >
-        <span className="flex items-baseline gap-0.5 leading-none">
-          <span className="text-[22px] font-semibold tabular-nums text-foreground">{confidence.score}</span>
-          <span className="text-[12px] text-muted-foreground">/{maxScore}</span>
-        </span>
-        <ConfidenceMeter
-          score={confidence.score}
-          testId="split-run-intent-confidence-meter"
-          showTooltip={false}
-          decorative
-          size="lg"
-        />
-      </ConfidenceWhyChip>
-    </ConfidenceFooterShell>
+    <ScoreFooterShell flush={flush}>
+      {clarity ? <ScoreChip kind="clarity" check={clarity} /> : null}
+      {confidence ? <ScoreChip kind="confidence" check={confidence} /> : null}
+    </ScoreFooterShell>
   );
 }
 
-function ConfidenceWhyChip({
+function ScoreChip({ kind, check }: { kind: ScoreKind; check: WorkOrderCheckPresentation }) {
+  const copy = SCORE_COPY[kind];
+  const maxScore = check.maxScore || CONFIDENCE_SCORE_MAX;
+  const scoreLabel = `${check.score}/${maxScore}`;
+  return (
+    <ScoreWhyChip
+      key={`${check.score}-${check.summary ?? ""}`}
+      name={copy.name}
+      label={`${copy.name} ${scoreLabel}`}
+      why={check.summary?.trim() || copy.fallbackWhy}
+      tone={confidenceBandForScore(check.score)}
+      testId={copy.testId}
+    >
+      <span className="flex flex-col leading-none">
+        <span className="text-[11px] text-muted-foreground">{copy.name.replace(/ score$/, "")}</span>
+        <span className="flex items-baseline gap-0.5">
+          <span className="text-[22px] font-semibold tabular-nums text-foreground">{check.score}</span>
+          <span className="text-[12px] text-muted-foreground">/{maxScore}</span>
+        </span>
+      </span>
+      <ConfidenceMeter
+        score={check.score}
+        label={copy.name}
+        testId={`${copy.testId}-meter`}
+        showTooltip={false}
+        decorative
+        size="lg"
+      />
+    </ScoreWhyChip>
+  );
+}
+
+function ScoreWhyChip({
+  name,
   label,
   why,
   tone,
+  testId,
   children,
 }: {
+  name: string;
   label: string;
   why: string;
   tone?: ConfidenceBand;
+  testId: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -128,7 +168,7 @@ function ConfidenceWhyChip({
           type="button"
           aria-expanded={open}
           aria-label={label}
-          data-testid="split-run-intent-confidence-chip"
+          data-testid={`${testId}-chip`}
           className={cn(
             "sp-stream-text inline-flex min-h-[3.25rem] items-center gap-2.5 rounded-xl border px-3 py-2 text-left",
             tone ? CHIP_TONE[tone] : "border-border bg-muted/40",
@@ -148,8 +188,8 @@ function ConfidenceWhyChip({
         avoidCollisions={false}
         className="sp-confidence-why z-[80] w-80 p-3"
       >
-        <p className="text-[12px] text-muted-foreground">{CONFIDENCE_CHECK_NAME}</p>
-        <p className="mt-1 text-[13px] leading-5 text-foreground" data-testid="split-run-intent-confidence-copy">
+        <p className="text-[12px] text-muted-foreground">{name}</p>
+        <p className="mt-1 text-[13px] leading-5 text-foreground" data-testid={`${testId}-copy`}>
           {why}
         </p>
       </HoverCardContent>
@@ -157,12 +197,15 @@ function ConfidenceWhyChip({
   );
 }
 
-function ConfidenceFooterShell({ children, flush }: { children: ReactNode; flush?: boolean }) {
+function ScoreFooterShell({ children, flush }: { children: ReactNode; flush?: boolean }) {
   return (
     <footer
-      className={flush ? undefined : "shrink-0 border-t border-border px-5 py-3"}
+      className={cn(
+        "flex flex-wrap items-center gap-2",
+        flush ? undefined : "shrink-0 border-t border-border px-5 py-3",
+      )}
       data-testid="split-run-overview-checks"
-      aria-label={CONFIDENCE_CHECK_NAME}
+      aria-label={SCORE_PAIR_LABEL}
     >
       {children}
     </footer>

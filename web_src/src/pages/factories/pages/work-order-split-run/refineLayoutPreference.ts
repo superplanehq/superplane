@@ -2,18 +2,39 @@ import { useCallback, useState } from "react";
 
 export const REFINE_LAYOUT_STORAGE_KEY = "sp:refine:layout";
 
+/** Which score summary is open in the composer stack. One drawer is shared. */
+export type RefineSummaryKind = "clarity" | "confidence";
+
 export type RefineLayoutPreference = {
-  clarityExpanded: boolean;
+  openSummary: RefineSummaryKind | null;
   planOpen: boolean;
 };
 
 const DEFAULT_LAYOUT: RefineLayoutPreference = {
-  clarityExpanded: true,
+  openSummary: "clarity",
   planOpen: false,
 };
 
 function isBoolean(value: unknown): value is boolean {
   return value === true || value === false;
+}
+
+function isSummaryKind(value: unknown): value is RefineSummaryKind {
+  return value === "clarity" || value === "confidence";
+}
+
+/**
+ * Read the stored summary choice. Older layouts stored `clarityExpanded`;
+ * map that to the Clarity drawer being open or closed.
+ */
+function readOpenSummary(record: Record<string, unknown>): RefineSummaryKind | null {
+  if (isSummaryKind(record.openSummary) || record.openSummary === null) {
+    return record.openSummary;
+  }
+  if (isBoolean(record.clarityExpanded)) {
+    return record.clarityExpanded ? "clarity" : null;
+  }
+  return DEFAULT_LAYOUT.openSummary;
 }
 
 /** Read the refine pane layout. Missing or invalid values use the defaults. */
@@ -29,7 +50,7 @@ export function readStoredRefineLayout(): RefineLayoutPreference {
     }
     const record = parsed as Record<string, unknown>;
     return {
-      clarityExpanded: isBoolean(record.clarityExpanded) ? record.clarityExpanded : DEFAULT_LAYOUT.clarityExpanded,
+      openSummary: readOpenSummary(record),
       planOpen: isBoolean(record.planOpen) ? record.planOpen : DEFAULT_LAYOUT.planOpen,
     };
   } catch {
@@ -45,18 +66,18 @@ function persistRefineLayout(layout: RefineLayoutPreference): void {
   }
 }
 
-/** Owns Clarity-summary and Plan-pane open state for refine chat. */
+/** Owns the open score summary and the Plan-pane open state for refine chat. */
 export function useRefineLayoutPreference(): {
-  clarityExpanded: boolean;
+  openSummary: RefineSummaryKind | null;
   planOpen: boolean;
-  toggleClarity: () => void;
+  toggleSummary: (kind: RefineSummaryKind) => void;
   togglePlan: () => void;
 } {
   const [layout, setLayout] = useState<RefineLayoutPreference>(readStoredRefineLayout);
 
-  const toggleClarity = useCallback(() => {
+  const toggleSummary = useCallback((kind: RefineSummaryKind) => {
     setLayout((current) => {
-      const next = { ...current, clarityExpanded: !current.clarityExpanded };
+      const next = { ...current, openSummary: current.openSummary === kind ? null : kind };
       persistRefineLayout(next);
       return next;
     });
@@ -71,9 +92,9 @@ export function useRefineLayoutPreference(): {
   }, []);
 
   return {
-    clarityExpanded: layout.clarityExpanded,
+    openSummary: layout.openSummary,
     planOpen: layout.planOpen,
-    toggleClarity,
+    toggleSummary,
     togglePlan,
   };
 }

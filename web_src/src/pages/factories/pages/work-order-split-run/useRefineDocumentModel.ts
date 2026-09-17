@@ -4,6 +4,7 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { analysisPlanBody, hasAnalysisPlan } from "../../lib/analysisOutcome";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
+import type { ComposerScore } from "./ComposerPlanControls";
 import { latestPlanScore } from "./latestPlanScore";
 import { usePlanChipStatus } from "./planChipStatus";
 import { useRefineLayoutPreference } from "./refineLayoutPreference";
@@ -17,11 +18,20 @@ import {
 
 const SESSION_TITLE_FALLBACK = "Task";
 
-function refineClarityScore(analysis: IntentAnalysisChat | undefined, confidence?: WorkOrderCheckPresentation) {
-  if (!analysis) {
-    return confidence?.score;
-  }
-  return latestPlanScore(analysis.view.messages) ?? confidence?.score;
+/** Clarity prefers the live plan message; the check is the durable fallback. */
+function refineClarity(analysis: IntentAnalysisChat | undefined, clarity?: WorkOrderCheckPresentation): ComposerScore {
+  const liveScore = analysis ? latestPlanScore(analysis.view.messages) : undefined;
+  return {
+    score: liveScore ?? clarity?.score,
+    summary: clarity?.summary?.trim(),
+  };
+}
+
+function refineConfidence(confidence?: WorkOrderCheckPresentation): ComposerScore {
+  return {
+    score: confidence?.score,
+    summary: confidence?.summary?.trim(),
+  };
 }
 
 function refinePaneLayout(refineOpen: boolean, planPaneOpen: boolean, percent: number) {
@@ -39,6 +49,7 @@ export function useRefineDocumentModel({
   title,
   description,
   artifacts,
+  clarity,
   confidence,
   isAnalyzing,
   resultFooter,
@@ -48,6 +59,7 @@ export function useRefineDocumentModel({
   title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
@@ -65,7 +77,6 @@ export function useRefineDocumentModel({
     maxPercent: 68,
   });
   const panes = refinePaneLayout(refineOpen, planPaneOpen, split.percent);
-  const clarityScore = refineClarityScore(analysis, confidence);
   const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planOpenedHere && planPaneOpen);
 
   return {
@@ -81,8 +92,8 @@ export function useRefineDocumentModel({
       hasPlan,
       layout,
       planStatus,
-      clarityScore,
-      confidence,
+      clarity: refineClarity(analysis, clarity),
+      confidence: refineConfidence(confidence),
       isAnalyzing,
       onOpenPlan: () => setPlanOpenedHere(true),
     }),
@@ -95,7 +106,7 @@ function bindRefineChat({
   hasPlan,
   layout,
   planStatus,
-  clarityScore,
+  clarity,
   confidence,
   isAnalyzing,
   onOpenPlan,
@@ -105,8 +116,8 @@ function bindRefineChat({
   hasPlan: boolean;
   layout: ReturnType<typeof useRefineLayoutPreference>;
   planStatus: ReturnType<typeof usePlanChipStatus>;
-  clarityScore?: number;
-  confidence?: WorkOrderCheckPresentation;
+  clarity: ComposerScore;
+  confidence: ComposerScore;
   isAnalyzing: boolean;
   onOpenPlan: () => void;
 }): IntentAnalysisChat | undefined {
@@ -121,10 +132,10 @@ function bindRefineChat({
       layout.togglePlan();
     },
     canTogglePlan: hasPlan,
-    clarityExpanded: layout.clarityExpanded,
-    onToggleClarity: layout.toggleClarity,
-    latestPlanScore: clarityScore,
-    latestPlanSummary: confidence?.summary?.trim(),
+    openSummary: layout.openSummary,
+    onToggleSummary: layout.toggleSummary,
+    clarity,
+    confidence,
     planStatus,
     isAnalyzing,
   };

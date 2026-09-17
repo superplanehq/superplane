@@ -28,7 +28,12 @@ function liveThinkingCopy(testId: string): string | undefined {
   )?.textContent;
 }
 
-function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; hasAgentQuestion?: boolean }) {
+function renderCard(props: {
+  isAnalyzing?: boolean;
+  clarityScore?: number;
+  confidenceScore?: number;
+  hasAgentQuestion?: boolean;
+}) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -94,12 +99,30 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows the meter after analysis finishes", () => {
+  it("shows one Confidence meter after an intake-only analysis", () => {
     renderCard({ confidenceScore: 4 });
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
+    const meter = screen.getByTestId("work-order-card-score-wo-1");
+    expect(meter).toHaveAttribute("aria-valuenow", "4");
+    expect(meter).toHaveAttribute("aria-label", "Confidence score");
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+  });
+
+  it("shows one Clarity meter when only Clarity exists", () => {
+    renderCard({ clarityScore: 3 });
+
+    const meter = screen.getByTestId("work-order-card-score-wo-1");
+    expect(meter).toHaveAttribute("aria-valuenow", "3");
+    expect(meter).toHaveAttribute("aria-label", "Clarity score");
+  });
+
+  it("stacks both meters after a refine session scores twice", () => {
+    renderCard({ clarityScore: 5, confidenceScore: 3 });
+
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("role", "group");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveAttribute("aria-valuenow", "5");
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveAttribute("aria-valuenow", "3");
   });
 
   it("stays quiet when no automation analyzes the task", () => {

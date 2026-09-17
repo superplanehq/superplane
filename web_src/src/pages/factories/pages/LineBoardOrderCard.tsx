@@ -5,7 +5,11 @@ import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
+import {
+  boardCardLoadsConfidenceChecks,
+  clarityScoreFromChecks,
+  confidenceScoreFromChecks,
+} from "../lib/confidenceScore";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { useWorkOrderPlanningActivity } from "./useWorkOrderPlanningSurvey";
@@ -84,6 +88,7 @@ export function LineBoardWorkOrderCard({
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
+      clarityScore={showConfidence ? clarityScoreFromChecks(checks) : undefined}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
       isAnalyzing={showConfidence && agentWorking}
       hasAgentQuestion={session.hasAgentQuestion}
