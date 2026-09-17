@@ -781,6 +781,69 @@ func Test__Sentry__HandleWebhook(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 }
 
+func Test__Sentry__HandleWebhook__SubscriberFailureDoesNotFailAck(t *testing.T) {
+	impl := &Sentry{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"baseUrl":      "https://sentry.io",
+			"userToken":    "auth-token",
+			"clientSecret": "client-secret",
+		},
+		Subscriptions: []contexts.Subscription{
+			{
+				Configuration:  SubscriptionConfiguration{Resources: []string{"issue"}},
+				SendMessageErr: assert.AnError,
+			},
+		},
+	}
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	signature := computeWebhookSignature("client-secret", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+	request.Header.Set("Sentry-Hook-Resource", "issue")
+	request.Header.Set("Sentry-Hook-Signature", signature)
+	response := httptest.NewRecorder()
+
+	impl.HandleRequest(core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     request,
+		Response:    response,
+		HTTP:        &contexts.HTTPContext{},
+		Integration: integrationCtx,
+	})
+
+	require.Equal(t, http.StatusOK, response.Code)
+}
+
+func Test__Sentry__HandleWebhook__ListSubscriptionsFailure(t *testing.T) {
+	impl := &Sentry{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"baseUrl":      "https://sentry.io",
+			"userToken":    "auth-token",
+			"clientSecret": "client-secret",
+		},
+		ListSubscriptionsErr: assert.AnError,
+	}
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	signature := computeWebhookSignature("client-secret", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+	request.Header.Set("Sentry-Hook-Resource", "issue")
+	request.Header.Set("Sentry-Hook-Signature", signature)
+	response := httptest.NewRecorder()
+
+	impl.HandleRequest(core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     request,
+		Response:    response,
+		HTTP:        &contexts.HTTPContext{},
+		Integration: integrationCtx,
+	})
+
+	require.Equal(t, http.StatusInternalServerError, response.Code)
+}
+
 func Test__Sentry__HandleWebhook__HostedInstallMustMatch(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")

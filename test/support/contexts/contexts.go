@@ -103,6 +103,8 @@ type IntegrationContext struct {
 	Subscriptions     []Subscription
 	// ScheduleActionCallErr, when set, is returned from ScheduleActionCall after recording the request.
 	ScheduleActionCallErr error
+	// ListSubscriptionsErr, when set, is returned from ListSubscriptions.
+	ListSubscriptionsErr error
 }
 
 type ActionRequest struct {
@@ -112,8 +114,9 @@ type ActionRequest struct {
 }
 
 type Subscription struct {
-	ID            uuid.UUID
-	Configuration any
+	ID             uuid.UUID
+	Configuration  any
+	SendMessageErr error
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
@@ -212,9 +215,16 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 }
 
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	if c.ListSubscriptionsErr != nil {
+		return nil, c.ListSubscriptionsErr
+	}
+
 	subscriptions := make([]core.IntegrationSubscriptionContext, 0, len(c.Subscriptions))
 	for _, subscription := range c.Subscriptions {
-		subscriptions = append(subscriptions, &SubscriptionContext{config: subscription.Configuration})
+		subscriptions = append(subscriptions, &SubscriptionContext{
+			config:         subscription.Configuration,
+			sendMessageErr: subscription.SendMessageErr,
+		})
 	}
 	return subscriptions, nil
 }
@@ -242,8 +252,9 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 }
 
 type SubscriptionContext struct {
-	config   any
-	messages []any
+	config         any
+	messages       []any
+	sendMessageErr error
 }
 
 func (s *SubscriptionContext) Configuration() any {
@@ -251,6 +262,10 @@ func (s *SubscriptionContext) Configuration() any {
 }
 
 func (s *SubscriptionContext) SendMessage(message any) error {
+	if s.sendMessageErr != nil {
+		return s.sendMessageErr
+	}
+
 	s.messages = append(s.messages, message)
 	return nil
 }
