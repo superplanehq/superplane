@@ -12,6 +12,7 @@ import {
   confidenceBandForScore,
   type ConfidenceBand,
 } from "../lib/confidenceScore";
+import { draftReadiness } from "../lib/draftReadiness";
 
 import "./confidence-analyzing.css";
 
@@ -120,10 +121,11 @@ export function ScorePairMeter({
     { key: "clarity", label: CLARITY_CHECK_NAME, score: clarity },
     { key: "confidence", label: CONFIDENCE_CHECK_NAME, score: confidence },
   ];
+  const verdict = draftReadiness({ clarity, confidence }).headline;
   const meter = (
     <span
       role="group"
-      aria-label={SCORE_PAIR_LABEL}
+      aria-label={`${SCORE_PAIR_LABEL}. ${verdict}`}
       data-testid={testId}
       className={cn("pointer-events-auto inline-flex flex-col items-start justify-center gap-[3px]", className)}
     >
@@ -156,7 +158,10 @@ export function ScorePairMeter({
     <Tooltip>
       <TooltipTrigger asChild>{meter}</TooltipTrigger>
       <TooltipContent>
-        <span className="grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+        <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
+          {verdict}
+        </span>
+        <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
           {rows.map((row) => (
             <Fragment key={row.key}>
               <span>{row.label}</span>

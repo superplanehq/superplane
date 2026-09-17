@@ -69,6 +69,9 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /Do not push Confidence to 5/);
   assert.match(pack, /Do not ask a survey question to raise it/);
   assert.match(pack, /Confidence is provisional/);
+  assert.strictEqual(pack.match(/Do not repeat the number in the summary/g)?.length, 2);
+  assert.doesNotMatch(pack, /Good: Clarity is \d because/);
+  assert.doesNotMatch(pack, /Good: Confidence is \d because/);
   assert.match(pack, /Blast radius/);
   assert.match(pack, /Skip Risks only when Clarity is 5 and Confidence is 4 or higher/);
   assert.doesNotMatch(pack, /how suitable the work is for an agent/);

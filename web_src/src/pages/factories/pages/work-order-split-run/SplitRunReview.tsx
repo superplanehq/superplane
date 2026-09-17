@@ -17,6 +17,7 @@ import { StartConfirmDialog } from "./StartConfirmDialog";
 import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
   splitRunDecisionTone,
+  splitRunFooterScores,
   type SplitRunFooter,
   type SplitRunFooterAction,
   type SplitRunStopChoice,
@@ -99,7 +100,7 @@ export function SplitRunReview({
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
     : [];
   const requestStart = () => {
-    if (confirmUnclearStart && needsStartConfirm(footer.confidenceScore)) {
+    if (confirmUnclearStart && needsStartConfirm(splitRunFooterScores(footer))) {
       setConfirmOpen(true);
       return;
     }
@@ -162,7 +163,7 @@ export function SplitRunReview({
       {confirmUnclearStart ? (
         <StartConfirmDialog
           open={confirmOpen}
-          score={footer.confidenceScore}
+          scores={splitRunFooterScores(footer)}
           onOpenChange={setConfirmOpen}
           onConfirm={confirmStart}
         />

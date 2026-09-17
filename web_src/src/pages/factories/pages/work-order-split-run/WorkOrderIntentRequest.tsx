@@ -14,7 +14,6 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { ComposerPlanStack, type ComposerScore } from "./ComposerPlanControls";
-import type { RefineSummaryKind } from "./refineLayoutPreference";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -45,8 +44,6 @@ export type IntentAnalysisChat = {
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
-  openSummary?: RefineSummaryKind | null;
-  onToggleSummary?: (kind: RefineSummaryKind) => void;
   clarity?: ComposerScore;
   confidence?: ComposerScore;
   planStatus?: PlanChipStatus;
@@ -223,8 +220,6 @@ function AnalysisComposer({
             canTogglePlan={Boolean(analysis.canTogglePlan)}
             planStatus={analysis.planStatus}
             onToggle={analysis.onTogglePlan}
-            openSummary={analysis.openSummary}
-            onToggleSummary={analysis.onToggleSummary}
             actions={analysis.closedDecision}
           />
           <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">

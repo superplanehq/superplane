@@ -33,7 +33,7 @@ If Clarity is 5, write the specification.
 
 ### Clarity summary
 
-Use you. Use two short sentences or fewer. Do not write a semicolon chain. Do not talk about agent fit here.
+Use you. Use two short sentences or fewer. Do not write a semicolon chain. Do not talk about agent fit here. Do not repeat the number in the summary. The UI shows it next to the text.
 
 For Clarity 5: The plan is ready. Review it and start if you are happy.
 
@@ -41,7 +41,7 @@ If Clarity is below 5:
 1. Say why Clarity is not 5. Name the missing fact or decision.
 2. Say what the user must add, decide, or answer now.
 
-Good: Clarity is 2 because a different prompt and the copy scope are not defined. Answer the questions in this session so I know what to duplicate and what the new agent setup must cover.
+Good: A different prompt and the copy scope are not defined. Answer the questions in this session so I know what to duplicate and what the new agent setup must cover.
 
 ## 4. Score Confidence
 
@@ -65,7 +65,7 @@ Do not raise Confidence for a long task description or a confident tone. Do not 
 
 ### Confidence summary
 
-Use you. Use two short sentences or fewer. Do not name missing decisions here. That is Clarity.
+Use you. Use two short sentences or fewer. Do not name missing decisions here. That is Clarity. Do not repeat the number in the summary. The UI shows it next to the text.
 
 For Confidence 4 or 5: say in one sentence why an agent can do this in one run.
 
@@ -73,7 +73,7 @@ For Confidence 3 or lower: name the one factor that lowers it. Say what would ra
 
 If Clarity is 1 or 2, say Confidence is provisional until the task is clear.
 
-Good: Confidence is 3 because the change crosses billing and the API and there is no test for the refund path. Add a failing test first, or split the API change into its own task.
+Good: The change crosses billing and the API and there is no test for the refund path. Add a failing test first, or split the API change into its own task.
 
 ## 5. Write the plan
 
