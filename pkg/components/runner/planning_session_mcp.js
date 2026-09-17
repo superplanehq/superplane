@@ -155,7 +155,7 @@ async function recordAgentMessage(text) {
 const TOOLS = [
   {
     name: "propose_spec",
-    description: "Publish the specification markdown for the open task. Call this after you write or update a specification, when the task prompt says to write a plan. Pass the full markdown body.",
+    description: "Publish the specification markdown for the open task. Call this before you stop whenever you write or update a specification this turn. Do not leave a written plan unpublished. Pass the full markdown body.",
     inputSchema: {
       type: "object",
       properties: {

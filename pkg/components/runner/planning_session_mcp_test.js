@@ -29,6 +29,8 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /this is a continuation/);
   assert.match(pack, /does not publish the specification or the score/);
   assert.match(pack, /only after those calls/);
+  assert.match(pack, /Do not leave a written plan unpublished/);
+  assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
   assert.match(pack, /Do not name files/);
   assert.match(pack, /Answer the questions in this session/);
   assert.match(pack, /Do not describe agent fit/);
@@ -233,7 +235,7 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.match(replies[1].result.tools[1].description, /every turn/);
   assert.match(replies[1].result.tools[2].description, /short everyday options/);
   assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /Follow the task prompt/);
-  assert.match(replies[1].result.tools[0].description, /task prompt says to write a plan/);
+  assert.match(replies[1].result.tools[0].description, /Do not leave a written plan unpublished/);
   assert.match(replies[1].result.tools[1].description, /without propose_spec/);
   assert.match(replies[1].result.tools[2].description, /task prompt says to ask/);
   assert.match(
