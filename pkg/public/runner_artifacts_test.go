@@ -189,6 +189,14 @@ func TestValidateArtifactUploadRequestEnforcesSizeAndMediaType(t *testing.T) {
 func TestArtifactMarkdownRendersImagesInlineAndVideosAsLinks(t *testing.T) {
 	assert.Equal(t, "![Checkout](https://files.example/shot.png)", artifactMarkdown("Checkout", "image/png", "https://files.example/shot.png"))
 	assert.Equal(t, "[Watch Checkout](https://files.example/demo.webm)", artifactMarkdown("Checkout", "video/webm", "https://files.example/demo.webm"))
+	assert.Equal(t, `![Checkout\\](https://files.example/shot.png)`, artifactMarkdown(`Checkout\`, "image/png", "https://files.example/shot.png"))
+	assert.Equal(t, `![Checkout\\\]](https://files.example/shot.png)`, artifactMarkdown(`Checkout\]`, "image/png", "https://files.example/shot.png"))
+}
+
+func TestDecodeArtifactTitleSupportsUTF8(t *testing.T) {
+	assert.Equal(t, "Checkout → success", decodeArtifactTitle("Checkout%20%E2%86%92%20success"))
+	assert.Equal(t, "注文確認", decodeArtifactTitle("%E6%B3%A8%E6%96%87%E7%A2%BA%E8%AA%8D"))
+	assert.Equal(t, "100% complete", decodeArtifactTitle("100% complete"))
 }
 
 func TestArtifactFilenameMatchesContentType(t *testing.T) {

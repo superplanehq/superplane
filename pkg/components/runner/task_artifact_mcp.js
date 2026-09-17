@@ -101,7 +101,7 @@ async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
     "Content-Length": String(file.sizeBytes),
     "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
   };
-  if (title) headers["X-SuperPlane-Artifact-Title"] = title;
+  if (title) headers["X-SuperPlane-Artifact-Title"] = encodeURIComponent(title);
 
   const response = await fetchImpl(`${baseURL}/api/v1/runner/artifacts`, {
     method: "POST",

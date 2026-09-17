@@ -2,6 +2,7 @@ package public
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +28,10 @@ import (
 	"gorm.io/gorm"
 )
 
-const artifactRedirectTTL = 5 * time.Minute
+const (
+	artifactRedirectTTL = 5 * time.Minute
+	artifactCleanupTTL  = 10 * time.Second
+)
 
 type runnerArtifactResponse struct {
 	ArtifactID  string `json:"artifact_id"`
@@ -67,7 +71,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 
 	db := database.DB(r.Context())
-	context, err := loadRunnerArtifactContext(db, scope)
+	artifactContext, err := loadRunnerArtifactContext(db, scope)
 	if err != nil {
 		logger.WithError(err).Warn("rejected runner artifact scope")
 		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
@@ -90,34 +94,33 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 	provider := blob.Current()
 	if provider == nil {
-		_ = file.Delete(db)
+		cleanupRunnerArtifact(nil, file, logger)
 		logger.Error("failed to store runner artifact: blob storage is not configured")
 		http.Error(w, "File storage is not configured", http.StatusInternalServerError)
 		return
 	}
-	if err := storedfiles.CompleteUpload(r.Context(), db, provider, file, reader); err != nil {
-		if cleanupErr := storedfiles.DeleteObjectAndRow(r.Context(), db, provider, file); cleanupErr != nil {
-			logger.WithError(cleanupErr).Warn("failed to clean up rejected runner artifact")
-		}
+	upload, err := storedfiles.StorePendingUpload(r.Context(), provider, file, reader)
+	if err != nil {
+		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Warn("failed to store runner artifact")
 		writeArtifactUploadError(w, err)
 		return
 	}
-	if file.SizeBytes != r.ContentLength {
-		_ = storedfiles.DeleteObjectAndRow(r.Context(), db, provider, file)
-		logger.WithField("stored_size_bytes", file.SizeBytes).Warn("rejected incomplete runner artifact upload")
+	if upload.SizeBytes != r.ContentLength {
+		cleanupRunnerArtifact(provider, file, logger)
+		logger.WithField("stored_size_bytes", upload.SizeBytes).Warn("rejected incomplete runner artifact upload")
 		http.Error(w, "Artifact body does not match Content-Length", http.StatusBadRequest)
 		return
 	}
 
 	publicURL, err := artifactPublicURL(file)
 	if err != nil {
-		_ = storedfiles.DeleteObjectAndRow(r.Context(), db, provider, file)
+		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to create runner artifact URL")
 		http.Error(w, "Failed to create artifact URL", http.StatusInternalServerError)
 		return
 	}
-	title := strings.TrimSpace(r.Header.Get("X-SuperPlane-Artifact-Title"))
+	title := decodeArtifactTitle(r.Header.Get("X-SuperPlane-Artifact-Title"))
 	if title == "" {
 		title = file.Filename
 	}
@@ -125,18 +128,25 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		"fileId":      file.ID.String(),
 		"filename":    file.Filename,
 		"contentType": file.ContentType,
-		"sizeBytes":   file.SizeBytes,
+		"sizeBytes":   upload.SizeBytes,
 		"title":       title,
 		"url":         publicURL,
 	}
-	artifact, err := context.Order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
-		Type:       models.FactoryWorkOrderArtifactTypeFile,
-		Data:       data,
-		Automation: artifactAutomationRef(context),
-		Run:        &factory.RunRef{ID: scope.CanvasRunID},
+	var artifact *models.FactoryWorkOrderArtifact
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if readyErr := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); readyErr != nil {
+			return readyErr
+		}
+		artifact, err = artifactContext.Order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+			Type:       models.FactoryWorkOrderArtifactTypeFile,
+			Data:       data,
+			Automation: artifactAutomationRef(artifactContext),
+			Run:        &factory.RunRef{ID: scope.CanvasRunID},
+		})
+		return err
 	})
 	if err != nil {
-		_ = storedfiles.DeleteObjectAndRow(r.Context(), db, provider, file)
+		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to attach runner artifact")
 		http.Error(w, "Failed to attach artifact", http.StatusInternalServerError)
 		return
@@ -164,6 +174,30 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.WithError(err).Warn("failed to encode runner artifact response")
 	}
+}
+
+func cleanupRunnerArtifact(provider blob.Provider, file *models.File, logger *log.Entry) {
+	cleanupContext, cancel := context.WithTimeout(context.Background(), artifactCleanupTTL)
+	defer cancel()
+	cleanupDB := database.DB(cleanupContext)
+	var err error
+	if provider == nil {
+		err = file.Delete(cleanupDB)
+	} else {
+		err = storedfiles.DeleteObjectAndRow(cleanupContext, cleanupDB, provider, file)
+	}
+	if err != nil {
+		logger.WithError(err).Warn("failed to clean up rejected runner artifact")
+	}
+}
+
+func decodeArtifactTitle(value string) string {
+	trimmed := strings.TrimSpace(value)
+	decoded, err := url.PathUnescape(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	return strings.TrimSpace(decoded)
 }
 
 func (s *Server) authenticateArtifactRunner(w http.ResponseWriter, r *http.Request) (*runneraction.ArtifactUploadScope, bool) {
@@ -302,7 +336,7 @@ func artifactPublicURL(file *models.File) (string, error) {
 }
 
 func artifactMarkdown(title, contentType, publicURL string) string {
-	label := strings.NewReplacer("[", "\\[", "]", "\\]").Replace(title)
+	label := strings.NewReplacer("\\", "\\\\", "[", "\\[", "]", "\\]").Replace(title)
 	if strings.HasPrefix(contentType, "image/") {
 		return fmt.Sprintf("![%s](%s)", label, publicURL)
 	}
