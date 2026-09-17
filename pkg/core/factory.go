@@ -90,6 +90,11 @@ type AddWorkOrderArtifactParams struct {
 	Data    map[string]any
 	// Key optionally tags the artifact with a queryable key so a later
 	// FindWorkOrder(by: artifactKey) can resolve the work order from it.
+	// When set, AddWorkOrderArtifact creates the artifact on the first
+	// call and replaces its data on later calls. Replacement is
+	// wholesale: fields absent from the later call are cleared. The
+	// first call sets the type; a later call with a different type
+	// fails. Keys are unique per factory.
 	Key string
 }
 

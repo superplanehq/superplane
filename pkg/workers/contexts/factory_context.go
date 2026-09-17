@@ -393,7 +393,7 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
 		Key:        params.Key,
@@ -404,15 +404,19 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderArtifactAdded,
-		ActorName:      c.automationName(),
-		ArtifactType:   artifact.Type,
-	})
+	if created {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+		c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID: order.OrganizationID.String(),
+			FactoryID:      order.FactoryID.String(),
+			OrderID:        order.ID.String(),
+			EventType:      factory.EventTypeOrderArtifactAdded,
+			ActorName:      c.automationName(),
+			ArtifactType:   artifact.Type,
+		})
+	} else {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
+	}
 	return artifactToCore(artifact)
 }
 
