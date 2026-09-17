@@ -136,15 +136,23 @@ func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	return automation
 }
 
-func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryIntakes(
+	intakes []models.FactoryIntake,
+	specs map[uuid.UUID]models.LiveCanvasSpec,
+	readyIDs map[string]struct{},
+) []*pb.FactoryIntake {
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID], readyIDs)
 	}
 	return result
 }
 
-func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(
+	intake *models.FactoryIntake,
+	spec models.LiveCanvasSpec,
+	readyIDs map[string]struct{},
+) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
 
 	serialized := &pb.FactoryIntake{
@@ -154,7 +162,7 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
 		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
-		Healthy:             graph.Healthy(spec.Edges),
+		Healthy:             graph.Healthy(spec.Edges) && graph.TriggerIntegrationReady(spec, readyIDs),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
@@ -169,6 +177,22 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func readyIntegrationIDs(db *gorm.DB, orgID uuid.UUID) (map[string]struct{}, error) {
+	integrations, err := models.ListIntegrations(db, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	readyIDs := make(map[string]struct{}, len(integrations))
+	for i := range integrations {
+		if integrations[i].State != models.IntegrationStateReady {
+			continue
+		}
+		readyIDs[integrations[i].ID.String()] = struct{}{}
+	}
+	return readyIDs, nil
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {

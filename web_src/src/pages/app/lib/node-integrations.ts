@@ -33,17 +33,47 @@ export function getNodeIntegrationName(
   return undefined;
 }
 
-function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
-  const map = new Map<string, { state?: string; description?: string }>();
+const MISSING_INTEGRATION_ERROR = "This integration does not exist. Choose another integration.";
+
+function integrationById(integrations: OrganizationsIntegration[]): Map<string, OrganizationsIntegration> {
+  const map = new Map<string, OrganizationsIntegration>();
   for (const integration of integrations) {
-    if (integration.metadata?.id && integration.status?.state !== "ready") {
-      map.set(integration.metadata.id, {
-        state: integration.status?.state,
-        description: integration.status?.stateDescription,
-      });
+    const id = integration.metadata?.id;
+    if (id) {
+      map.set(id, integration);
     }
   }
   return map;
+}
+
+function integrationOverlayError(integration: OrganizationsIntegration | undefined): string | undefined {
+  if (!integration) {
+    return MISSING_INTEGRATION_ERROR;
+  }
+
+  const state = integration.status?.state;
+  if (state === "ready") {
+    return undefined;
+  }
+  if (state === "error") {
+    const description = integration.status?.stateDescription;
+    return description ? `Integration error: ${description}` : "Integration error";
+  }
+  return `Integration is ${state ?? "not ready"}`;
+}
+
+function withNodeError(canvasNode: CanvasNode, message: string): CanvasNode {
+  const data = canvasNode.data as Record<string, unknown>;
+  const component = data.component as Record<string, unknown> | undefined;
+  const trigger = data.trigger as Record<string, unknown> | undefined;
+
+  if (component && !component.error) {
+    return { ...canvasNode, data: { ...data, component: { ...component, error: message } } };
+  }
+  if (trigger && !trigger.error) {
+    return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: message } } };
+  }
+  return canvasNode;
 }
 
 function stripNodeWarnings(
@@ -90,44 +120,22 @@ export function overlayIntegrationWarnings(
   integrations: OrganizationsIntegration[],
   canvasNodes: ComponentsNode[] | undefined,
 ): CanvasNode[] {
-  if (!integrations.length || !canvasNodes) {
+  if (!canvasNodes) {
     return nodes;
   }
 
-  const nonReadyIntegrations = buildNonReadyIntegrationMap(integrations);
-  if (nonReadyIntegrations.size === 0) {
-    return nodes;
-  }
-
+  const integrationsById = integrationById(integrations);
   const canvasNodeMap = new Map(canvasNodes.map((node) => [node.id, node]));
   return nodes.map((canvasNode) => {
-    const sourceNode = canvasNodeMap.get(canvasNode.id);
-    const integrationId = sourceNode?.integration?.id;
+    const integrationId = canvasNodeMap.get(canvasNode.id)?.integration?.id;
     if (!integrationId) {
       return canvasNode;
     }
 
-    const status = nonReadyIntegrations.get(integrationId);
-    if (!status) {
+    const error = integrationOverlayError(integrationsById.get(integrationId));
+    if (!error) {
       return canvasNode;
     }
-
-    const data = canvasNode.data as Record<string, unknown>;
-    const warningMessage =
-      status.state === "error"
-        ? `Integration error${status.description ? `: ${status.description}` : ""}`
-        : `Integration is ${status.state ?? "not ready"}`;
-
-    const component = data.component as Record<string, unknown> | undefined;
-    const trigger = data.trigger as Record<string, unknown> | undefined;
-
-    if (component && !component.error) {
-      return { ...canvasNode, data: { ...data, component: { ...component, error: warningMessage } } };
-    }
-    if (trigger && !trigger.error) {
-      return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: warningMessage } } };
-    }
-
-    return canvasNode;
+    return withNodeError(canvasNode, error);
   });
 }

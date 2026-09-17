@@ -75,8 +75,13 @@ func UpdateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
 	}
 
+	readyIDs, err := readyIntegrationIDs(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory intake")
+	}
+
 	return &pb.UpdateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, specs[intake.CanvasID]),
+		Intake: serializeFactoryIntake(intake, specs[intake.CanvasID], readyIDs),
 	}, nil
 }
 
