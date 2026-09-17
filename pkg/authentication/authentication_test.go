@@ -145,10 +145,8 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		err = database.Conn().Create(otherProvider).Error
 		require.NoError(t, err)
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
 		require.NoError(t, err)
-		require.Len(t, resultAccounts, 1)
-		resultAccount := resultAccounts[0]
 
 		assert.Equal(t, account.ID, resultAccount.ID)
 		assert.False(t, wasCreated)
@@ -189,10 +187,8 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "google",
 		}
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
 		require.NoError(t, err)
-		require.Len(t, resultAccounts, 1)
-		resultAccount := resultAccounts[0]
 
 		assert.Equal(t, account.ID, resultAccount.ID)
 		assert.False(t, wasCreated)
@@ -214,7 +210,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		}).Error)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
 			UserID:   "blocked-provider-id",
 			Email:    "updated-blocked-provider@example.com",
 			Name:     account.Name,
@@ -222,7 +218,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		}, false)
 
 		require.ErrorIs(t, err, models.ErrAccountBlocked)
-		assert.Nil(t, resultAccounts)
+		assert.Nil(t, resultAccount)
 		assert.False(t, wasCreated)
 
 		account, err = models.FindAccountByID(account.ID.String())
@@ -237,7 +233,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
 			UserID:   "new-provider-id",
 			Email:    account.Email,
 			Name:     account.Name,
@@ -245,7 +241,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		}, false)
 
 		require.ErrorIs(t, err, models.ErrAccountBlocked)
-		assert.Nil(t, resultAccounts)
+		assert.Nil(t, resultAccount)
 		assert.False(t, wasCreated)
 	})
 
@@ -259,10 +255,8 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, true)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, true)
 		require.NoError(t, err)
-		require.Len(t, resultAccounts, 1)
-		resultAccount := resultAccounts[0]
 
 		assert.NotNil(t, resultAccount)
 		assert.True(t, wasCreated)
@@ -285,57 +279,11 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errSignupDisabled)
-		assert.Nil(t, resultAccounts)
+		assert.Nil(t, resultAccount)
 		assert.False(t, wasCreated)
-	})
-
-	t.Run("should return every account that holds the GitHub identity", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-
-		first, err := models.CreateAccount("First GitHub User", "first-github-choice@example.com")
-		require.NoError(t, err)
-		second, err := models.CreateAccount("Second GitHub User", "second-github-choice@example.com")
-		require.NoError(t, err)
-		attachGitHubIdentity(t, first, "shared-github-id")
-		attachGitHubIdentity(t, second, "shared-github-id")
-
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
-			UserID:   "shared-github-id",
-			Email:    "first-github-choice@example.com",
-			Name:     "GitHub User",
-			Provider: models.ProviderGitHub,
-		}, false)
-		require.NoError(t, err)
-		assert.False(t, wasCreated)
-		require.Len(t, resultAccounts, 2)
-		assert.Equal(t, first.ID, resultAccounts[0].ID)
-		assert.Equal(t, second.ID, resultAccounts[1].ID)
-	})
-
-	t.Run("should drop blocked accounts from the GitHub candidate set", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-
-		open, err := models.CreateAccount("Open GitHub User", "open-github-choice@example.com")
-		require.NoError(t, err)
-		blocked, err := models.CreateAccount("Blocked GitHub User", "blocked-github-choice@example.com")
-		require.NoError(t, err)
-		attachGitHubIdentity(t, open, "mixed-github-id")
-		attachGitHubIdentity(t, blocked, "mixed-github-id")
-		require.NoError(t, blocked.Block(database.Conn(), time.Now()))
-
-		resultAccounts, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
-			UserID:   "mixed-github-id",
-			Email:    "open-github-choice@example.com",
-			Name:     "GitHub User",
-			Provider: models.ProviderGitHub,
-		}, false)
-		require.NoError(t, err)
-		assert.False(t, wasCreated)
-		require.Len(t, resultAccounts, 1)
-		assert.Equal(t, open.ID, resultAccounts[0].ID)
 	})
 }
 
@@ -573,44 +521,6 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, account.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
 
-	t.Run("should redirect to account choice when two GitHub accounts match", func(t *testing.T) {
-		handler, _ := setupAuthHandler(t, false)
-		first, err := models.CreateAccount("Choice One", "choice-one@example.com")
-		require.NoError(t, err)
-		second, err := models.CreateAccount("Choice Two", "choice-two@example.com")
-		require.NoError(t, err)
-		attachGitHubIdentity(t, first, "choice-github-id")
-		attachGitHubIdentity(t, second, "choice-github-id")
-
-		githubUser := goth.User{
-			UserID:      "choice-github-id",
-			Email:       first.Email,
-			Name:        "GitHub User",
-			NickName:    "choice",
-			Provider:    models.ProviderGitHub,
-			AvatarURL:   "https://avatars.example/choice.png",
-			AccessToken: "choice-token",
-		}
-		req := mux.SetURLVars(
-			httptest.NewRequest(http.MethodGet, "/auth/github?redirect=%2Fcanvases", nil),
-			map[string]string{"provider": "github"},
-		)
-		recorder := httptest.NewRecorder()
-
-		handler.completeProviderAuth(recorder, req, githubUser)
-
-		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		location := recorder.Header().Get("Location")
-		assert.True(t, strings.HasPrefix(location, "/login/choose-account?token="))
-		parsed, err := url.Parse(location)
-		require.NoError(t, err)
-		token := parsed.Query().Get("token")
-		require.NotEmpty(t, token)
-		assert.NotContains(t, token, ".")
-		assert.NotContains(t, location, githubUser.AccessToken)
-		assert.Empty(t, sessionAccountIDOrEmpty(recorder))
-	})
-
 	t.Run("should issue a session for the account that holds the identity, not an email match", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		identityAccount, err := models.CreateAccount("Identity Account", "identity-github@example.com")
@@ -639,165 +549,6 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
-}
-
-func TestHandler_accountChoice(t *testing.T) {
-	githubUser := goth.User{
-		UserID:      "select-github-id",
-		Email:       "select-one@example.com",
-		Name:        "GitHub User",
-		NickName:    "select",
-		Provider:    models.ProviderGitHub,
-		AvatarURL:   "https://avatars.example/select.png",
-		AccessToken: "select-token",
-	}
-
-	setupChoiceAccounts := func(t *testing.T) (*Handler, *models.Account, *models.Account) {
-		t.Helper()
-		handler, _ := setupAuthHandler(t, false)
-		first, err := models.CreateAccount("Select One", "select-one@example.com")
-		require.NoError(t, err)
-		second, err := models.CreateAccount("Select Two", "select-two@example.com")
-		require.NoError(t, err)
-		attachGitHubIdentity(t, first, githubUser.UserID)
-		attachGitHubIdentity(t, second, githubUser.UserID)
-		return handler, first, second
-	}
-
-	t.Run("should list candidate accounts for a valid selection token", func(t *testing.T) {
-		handler, first, second := setupChoiceAccounts(t)
-		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
-		require.NoError(t, err)
-
-		req := httptest.NewRequest(http.MethodGet, "/auth/choose-account?token="+url.QueryEscape(token), nil)
-		recorder := httptest.NewRecorder()
-		handler.handleListAccountChoice(recorder, req)
-
-		require.Equal(t, http.StatusOK, recorder.Code)
-		var payload struct {
-			Accounts []accountChoiceItem `json:"accounts"`
-		}
-		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&payload))
-		require.Len(t, payload.Accounts, 2)
-		assert.Equal(t, first.ID.String(), payload.Accounts[0].ID)
-		assert.Equal(t, first.Name, payload.Accounts[0].Name)
-		assert.Equal(t, first.Email, payload.Accounts[0].Email)
-		assert.Equal(t, "https://avatars.example/select-github-id.png", payload.Accounts[0].AvatarURL)
-		assert.Equal(t, second.ID.String(), payload.Accounts[1].ID)
-
-		again := httptest.NewRecorder()
-		handler.handleListAccountChoice(again, req)
-		require.Equal(t, http.StatusOK, again.Code)
-	})
-
-	t.Run("should issue a session for the chosen account", func(t *testing.T) {
-		handler, _, second := setupChoiceAccounts(t)
-		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
-		require.NoError(t, err)
-
-		form := url.Values{
-			"token":      {token},
-			"account_id": {second.ID.String()},
-		}
-		req := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		recorder := httptest.NewRecorder()
-		handler.completeAccountChoice(recorder, req)
-
-		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		assert.Equal(t, "/canvases", recorder.Header().Get("Location"))
-		assert.Equal(t, second.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
-	})
-
-	t.Run("should refuse a reused selection token", func(t *testing.T) {
-		handler, _, second := setupChoiceAccounts(t)
-		token, err := handler.storeSelectState(t.Context(), githubUser, "/canvases")
-		require.NoError(t, err)
-
-		form := url.Values{
-			"token":      {token},
-			"account_id": {second.ID.String()},
-		}
-		firstReq := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		first := httptest.NewRecorder()
-		handler.completeAccountChoice(first, firstReq)
-		require.Equal(t, http.StatusSeeOther, first.Code)
-
-		replayReq := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		replayReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		replay := httptest.NewRecorder()
-		handler.completeAccountChoice(replay, replayReq)
-		assert.Equal(t, http.StatusBadRequest, replay.Code)
-		assert.Empty(t, sessionAccountIDOrEmpty(replay))
-	})
-
-	t.Run("should refuse an expired selection token", func(t *testing.T) {
-		handler, first, _ := setupChoiceAccounts(t)
-		token := storeExpiredSelectState(t, githubUser)
-
-		form := url.Values{
-			"token":      {token},
-			"account_id": {first.ID.String()},
-		}
-		req := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		recorder := httptest.NewRecorder()
-		handler.completeAccountChoice(recorder, req)
-
-		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.Empty(t, sessionAccountIDOrEmpty(recorder))
-	})
-
-	t.Run("should refuse an altered selection token", func(t *testing.T) {
-		handler, first, _ := setupChoiceAccounts(t)
-		token, err := handler.storeSelectState(t.Context(), githubUser, "/")
-		require.NoError(t, err)
-
-		form := url.Values{
-			"token":      {token + "tampered"},
-			"account_id": {first.ID.String()},
-		}
-		req := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		recorder := httptest.NewRecorder()
-		handler.completeAccountChoice(recorder, req)
-
-		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-	})
-
-	t.Run("should refuse an account outside the candidate set", func(t *testing.T) {
-		handler, _, _ := setupChoiceAccounts(t)
-		outsider, err := models.CreateAccount("Outsider", "select-outsider@example.com")
-		require.NoError(t, err)
-		token, err := handler.storeSelectState(t.Context(), githubUser, "/")
-		require.NoError(t, err)
-
-		form := url.Values{
-			"token":      {token},
-			"account_id": {outsider.ID.String()},
-		}
-		req := httptest.NewRequest(http.MethodPost, "/auth/choose-account", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		recorder := httptest.NewRecorder()
-		handler.completeAccountChoice(recorder, req)
-
-		assert.Equal(t, http.StatusForbidden, recorder.Code)
-		assert.Empty(t, sessionAccountIDOrEmpty(recorder))
-	})
-}
-
-func storeExpiredSelectState(t *testing.T, githubUser goth.User) string {
-	t.Helper()
-	token, err := crypto.Base64String(32)
-	require.NoError(t, err)
-	require.NoError(t, models.CreateAccountChoiceState(database.Conn(), &models.AccountChoiceState{
-		TokenHash:  crypto.HashToken(token),
-		Provider:   githubUser.Provider,
-		ProviderID: githubUser.UserID,
-		ExpiresAt:  time.Now().Add(-time.Minute),
-	}))
-	return token
 }
 
 func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {
