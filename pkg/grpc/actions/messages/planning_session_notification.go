@@ -1,9 +1,9 @@
 package messages
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -41,11 +41,11 @@ func HasPlanningReadyPlan(tx *gorm.DB, session *models.FactoryPlanningSession) b
 	if err != nil || !ok {
 		return false
 	}
-	startedAt, ok := planningSessionRunStartedAt(tx, session)
-	if !ok {
+	if session.CanvasRunID == nil || *session.CanvasRunID == uuid.Nil {
 		return true
 	}
-	return !artifact.CreatedAt.Before(startedAt)
+	runID, ok := planningSpecArtifactRunID(artifact)
+	return ok && runID == *session.CanvasRunID
 }
 
 func publishPlanningPlanReady(tx *gorm.DB, session *models.FactoryPlanningSession) {
@@ -111,15 +111,17 @@ func planningReadyPlanArtifact(
 	return artifact, true, nil
 }
 
-func planningSessionRunStartedAt(tx *gorm.DB, session *models.FactoryPlanningSession) (time.Time, bool) {
-	if session.CanvasID == nil || session.CanvasRunID == nil {
-		return time.Time{}, false
+func planningSpecArtifactRunID(artifact *models.FactoryWorkOrderArtifact) (uuid.UUID, bool) {
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return uuid.Nil, false
 	}
-	run, err := models.FindCanvasRunInTransaction(tx, *session.CanvasID, *session.CanvasRunID)
-	if err != nil || run.CreatedAt == nil {
-		return time.Time{}, false
+	raw, _ := data[models.PlanningSpecArtifactCanvasRunID].(string)
+	runID, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil, false
 	}
-	return *run.CreatedAt, true
+	return runID, true
 }
 
 func planningSessionNotificationMessage(
