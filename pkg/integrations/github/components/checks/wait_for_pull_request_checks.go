@@ -282,7 +282,7 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 
 	repository, sha := waitChecksRefFromPayload(payload)
 	name, state := waitChecksNameFromPayload(eventType, payload)
-	fields := waitChecksWebhookFields(config, eventType, repository, sha, name, state)
+	fields := waitChecksWebhookFields(config, eventType, sha, name, state)
 
 	if repository == "" || sha == "" {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - missing repository or commit SHA")
@@ -358,7 +358,7 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	sha := resolvedWaitChecksSHA(ctx.Configuration.Ref, checkRuns, combined)
 	timedOut := !now.Before(metadata.TimeoutAt)
 	evaluation := evaluatePullRequestChecks(checks, ctx.Configuration.CheckNames, timedOut)
-	logWaitChecksEvaluation(ctx.Logger, ctx.Configuration, sha, evaluation, timedOut)
+	logWaitChecksEvaluation(ctx.Logger, sha, evaluation)
 
 	if metadata.Fingerprint != "" && metadata.Fingerprint != evaluation.Fingerprint {
 		metadata.LastChangeAt = now
@@ -636,16 +636,14 @@ func waitChecksNameFromPayload(eventType string, payload map[string]any) (string
 
 func waitChecksWebhookFields(
 	config WaitForPullRequestChecksConfiguration,
-	event, repository, sha, name, state string,
+	event, sha, name, state string,
 ) log.Fields {
 	return log.Fields{
-		"event":      event,
-		"repository": repository,
-		"sha":        sha,
-		"name":       name,
-		"state":      state,
-		"matched":    checkNameConfigured(name, config.CheckNames),
-		"configured": logStringList(config.CheckNames),
+		"event":   event,
+		"sha":     sha,
+		"name":    name,
+		"state":   state,
+		"matched": checkNameConfigured(name, config.CheckNames),
 	}
 }
 
@@ -659,30 +657,11 @@ func checkNameConfigured(name string, configured []string) bool {
 	})
 }
 
-func logWaitChecksEvaluation(
-	logger *log.Entry,
-	config WaitForPullRequestChecksConfiguration,
-	sha string,
-	evaluation waitChecksEvaluation,
-	timedOut bool,
-) {
-	fields := log.Fields{
-		"repository": config.Repository,
-		"ref":        config.Ref,
-		"sha":        sha,
-		"configured": logStringList(config.CheckNames),
-		"observed":   formatObservedChecks(evaluation.Checks),
-		"selected":   checkNames(evaluation.SelectedChecks),
-		"missing":    logStringList(evaluation.MissingSelected),
-		"pending":    pendingCheckNames(evaluation.SelectedChecks),
-		"failed":     checkNames(evaluation.FailedChecks),
-		"outcome":    evaluation.Outcome,
-		"timed_out":  timedOut,
-	}
-	if reason := waitChecksPendingReason(evaluation); reason != "" {
-		fields["reason"] = reason
-	}
-	logWaitChecks(logger, fields, waitChecksEvaluationMessage(evaluation.Outcome))
+func logWaitChecksEvaluation(logger *log.Entry, sha string, evaluation waitChecksEvaluation) {
+	logWaitChecks(logger, log.Fields{
+		"sha":     sha,
+		"outcome": evaluation.Outcome,
+	}, waitChecksEvaluationMessage(evaluation.Outcome))
 }
 
 func waitChecksEvaluationMessage(outcome string) string {
@@ -696,62 +675,6 @@ func waitChecksEvaluationMessage(outcome string) string {
 	default:
 		return "Wait for pull request checks still pending"
 	}
-}
-
-func waitChecksPendingReason(evaluation waitChecksEvaluation) string {
-	missing := len(evaluation.MissingSelected) > 0
-	pending := hasPending(evaluation.SelectedChecks)
-	switch {
-	case missing && pending:
-		return "missing and pending configured checks"
-	case missing:
-		return "missing configured checks"
-	case pending:
-		return "selected checks still pending"
-	default:
-		return ""
-	}
-}
-
-func formatObservedChecks(checks []PullRequestCheck) []string {
-	observed := make([]string, 0, len(checks))
-	for _, check := range checks {
-		if check.Conclusion == "" {
-			observed = append(observed, fmt.Sprintf("%s (%s/%s)", check.Name, check.Kind, check.Status))
-			continue
-		}
-		observed = append(observed, fmt.Sprintf("%s (%s/%s/%s)", check.Name, check.Kind, check.Status, check.Conclusion))
-	}
-	return observed
-}
-
-func checkNames(checks []PullRequestCheck) []string {
-	names := make([]string, 0, len(checks))
-	for _, check := range checks {
-		names = append(names, check.Name)
-	}
-	return names
-}
-
-func pendingCheckNames(checks []PullRequestCheck) []string {
-	names := make([]string, 0, len(checks))
-	for _, check := range checks {
-		if check.Status != checkStatusCompleted {
-			names = append(names, check.Name)
-			continue
-		}
-		if check.Conclusion != "" && !nonFailingConclusions[check.Conclusion] && !failingConclusions[check.Conclusion] {
-			names = append(names, check.Name)
-		}
-	}
-	return names
-}
-
-func logStringList(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
 }
 
 func logWaitChecks(logger *log.Entry, fields log.Fields, message string) {
