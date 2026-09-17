@@ -242,3 +242,22 @@ export const OpenOwned: Story = {
     pullRequests: [],
   },
 };
+
+/**
+ * GitHub origin on the card. The source icon is first in the pill
+ * row and opens the issue in a new tab.
+ */
+export const GitHubOrigin: Story = {
+  name: "GitHub origin",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        origin: {
+          url: "https://github.com/acme/payments/issues/12",
+          label: "acme/payments#12",
+        },
+      }),
+      factory,
+    ),
+  },
+};
