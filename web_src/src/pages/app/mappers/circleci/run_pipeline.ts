@@ -160,7 +160,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
 
 function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { projectSlug?: string; branch?: string; tag?: string } | undefined;
   const nodeMetadata = node.metadata as
     | {
         projectName?: string;
@@ -189,7 +189,7 @@ function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
 
 function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { parameters?: unknown } | undefined;
 
   const parameters = configuration?.parameters as Array<{ name: string; value: string }> | undefined;
   if (parameters && parameters.length > 0) {

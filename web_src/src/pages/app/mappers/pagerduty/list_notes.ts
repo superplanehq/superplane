@@ -13,7 +13,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ListNotesResponse, Note } from "./types";
+import type { ListNotesConfiguration, ListNotesResponse, Note } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -93,9 +93,9 @@ export const listNotesMapper: ComponentBaseMapper = {
 function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   if (!node) return metadata;
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as unknown as ListNotesConfiguration | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
