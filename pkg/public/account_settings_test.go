@@ -300,7 +300,7 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
-	_, err = models.FindAccountByProvider(models.ProviderGitHub, "testuser")
+	_, err = models.FindAccountByProvider(database.Conn(), models.ProviderGitHub, "testuser")
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	replacement, err := models.CreateAccount("Other", originalEmail)
@@ -511,22 +511,65 @@ func TestLinkProviderToAccount_RefusesForeignIdentity(t *testing.T) {
 	other, err := models.CreateAccount("Other", "other-sso@example.com")
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(r.Encryptor, other, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, other, testGothUser("google", "google-1", "other-sso@example.com"))
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(r.Encryptor, r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
 	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
 func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 	r := support.Setup(t)
 
-	err := authentication.LinkProviderToAccount(r.Encryptor, r.Account, testGothUser("google", "google-2", "ada@example.com"))
+	err := authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-2", "ada@example.com"))
 	require.NoError(t, err)
 
-	linked, err := models.FindAccountByProvider(models.ProviderGoogle, "google-2")
+	linked, err := models.FindAccountByProvider(database.Conn(), models.ProviderGoogle, "google-2")
 	require.NoError(t, err)
 	assert.Equal(t, r.Account.ID, linked.ID)
+}
+
+func TestLinkProviderToAccount_AllowsSharedGitHubIdentity(t *testing.T) {
+	r := support.Setup(t)
+	first, err := models.CreateAccount("First GitHub", "first-github-sso@example.com")
+	require.NoError(t, err)
+	second, err := models.CreateAccount("Second GitHub", "second-github-sso@example.com")
+	require.NoError(t, err)
+
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, first, testGothUser(models.ProviderGitHub, "github-shared", first.Email))
+	require.NoError(t, err)
+
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, second, testGothUser(models.ProviderGitHub, "github-shared", second.Email))
+	require.NoError(t, err)
+
+	accounts, err := models.FindAccountsByProvider(database.Conn(), models.ProviderGitHub, "github-shared")
+	require.NoError(t, err)
+	require.Len(t, accounts, 2)
+}
+
+func TestDisconnectAccountProvider_LeavesGitHubOnOtherAccount(t *testing.T) {
+	r := support.Setup(t)
+	hash, err := crypto.HashPassword("current-pass-123")
+	require.NoError(t, err)
+	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
+	require.NoError(t, err)
+
+	other, err := models.CreateAccount("Other GitHub", "other-github-keep@example.com")
+	require.NoError(t, err)
+	require.NoError(t, authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, other, testGothUser(models.ProviderGitHub, "testuser", other.Email)))
+
+	server, account, token := setupTestServer(r, t)
+	req, _ := http.NewRequest(http.MethodDelete, "/account/providers/github", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+	_, err = account.GetAccountProvider(models.ProviderGitHub)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	kept, err := other.GetAccountProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	assert.Equal(t, "testuser", kept.ProviderID)
 }
 
 func testGothUser(provider, providerID, email string) goth.User {

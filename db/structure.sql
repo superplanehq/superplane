@@ -38,6 +38,29 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_choice_states; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_choice_states (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    provider character varying(64) NOT NULL,
+    provider_id text NOT NULL,
+    redirect text DEFAULT ''::text NOT NULL,
+    email text DEFAULT ''::text NOT NULL,
+    name text DEFAULT ''::text NOT NULL,
+    nickname text DEFAULT ''::text NOT NULL,
+    avatar_url text DEFAULT ''::text NOT NULL,
+    access_token bytea,
+    refresh_token bytea,
+    token_expires_at timestamp with time zone,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: account_linked_accounts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1508,6 +1531,22 @@ ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
+-- Name: account_choice_states account_choice_states_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_choice_states
+    ADD CONSTRAINT account_choice_states_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: account_choice_states account_choice_states_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_choice_states
+    ADD CONSTRAINT account_choice_states_token_hash_key UNIQUE (token_hash);
+
+
+--
 -- Name: account_linked_accounts account_linked_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1553,14 +1592,6 @@ ALTER TABLE ONLY public.account_providers
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
 
 
 --
@@ -2340,6 +2371,13 @@ ALTER TABLE ONLY public.workspace_usage_events
 
 
 --
+-- Name: account_providers_non_github_provider_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX account_providers_non_github_provider_id_key ON public.account_providers USING btree (provider, provider_id) WHERE ((provider)::text <> 'github'::text);
+
+
+--
 -- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2379,6 +2417,13 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
+
+
+--
+-- Name: idx_account_choice_states_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_choice_states_expires_at ON public.account_choice_states USING btree (expires_at);
 
 
 --
@@ -2435,6 +2480,13 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_account_providers_provider_provider_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_providers_provider_provider_id ON public.account_providers USING btree (provider, provider_id);
 
 
 --
@@ -4530,7 +4582,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260916172910	f
+20260916205338	f
 \.
 
 
