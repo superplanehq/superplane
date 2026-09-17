@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/datatypes"
@@ -207,7 +208,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-		if err := session.BeginWait(database.DB(r.Context())); err != nil {
+		if err := beginPlanningWaitAndNotify(session, database.DB(r.Context())); err != nil {
 			writeRunnerPlanningError(w, err)
 			return
 		}
@@ -320,6 +321,18 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func beginPlanningWaitAndNotify(session *models.FactoryPlanningSession, db *gorm.DB) error {
+	alreadyWaiting := session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved
+	if err := session.BeginWait(db); err != nil {
+		return err
+	}
+	if alreadyWaiting || session.WaitState != models.PlanningWaitPending {
+		return nil
+	}
+	messages.PublishPlanningAgentQuestion(session)
+	return nil
 }
 
 func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {
