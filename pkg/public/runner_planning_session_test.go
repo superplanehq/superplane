@@ -75,6 +75,32 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	assert.Equal(t, 4.0, checks[0].Score)
 }
 
+func TestRunnerPlanningSessionSpecAndConfidenceWithoutDraft(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	require.NoError(t, db.Model(session).Update("draft_work_order_id", nil).Error)
+
+	spec := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
+		`{"body":"# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"}`,
+	)))
+	spec.Header.Set("Authorization", "Bearer "+token)
+	specRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(specRec, spec)
+	require.Equal(t, http.StatusConflict, specRec.Code, specRec.Body.String())
+	assert.Equal(t, "planning session has no draft work order\n", specRec.Body.String())
+
+	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
+	)))
+	confidence.Header.Set("Authorization", "Bearer "+token)
+	confidenceRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(confidenceRec, confidence)
+	require.Equal(t, http.StatusConflict, confidenceRec.Code, confidenceRec.Body.String())
+	assert.Equal(t, "planning session has no draft work order\n", confidenceRec.Body.String())
+}
+
 func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
