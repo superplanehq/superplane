@@ -43,7 +43,7 @@ export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   {
     key: "TYPE_WORK_ORDER_STATUS_OWNED",
     label: "Status changes on your tasks",
-    description: "A task you created opens, closes, or moves back to draft.",
+    description: "A task you created opens or closes.",
   },
   {
     key: "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",

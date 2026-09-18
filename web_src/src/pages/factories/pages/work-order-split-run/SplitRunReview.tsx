@@ -61,7 +61,6 @@ export function SplitRunReview({
   onStart,
   onArchive,
   onReject,
-  onBackToDraft,
   onStop,
   startBusy = false,
   actionBusy = false,
@@ -80,7 +79,6 @@ export function SplitRunReview({
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
-  onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
@@ -115,7 +113,6 @@ export function SplitRunReview({
   const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
     archive: onArchive,
     reject: onReject,
-    "back-to-draft": onBackToDraft,
   };
   const onAction = (action: SplitRunFooterAction) => {
     if (action.kind === "start") {
