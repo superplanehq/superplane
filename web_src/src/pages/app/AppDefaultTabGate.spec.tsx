@@ -175,6 +175,14 @@ describe("AppDefaultTabGate — stored-tab redirect", () => {
     // and useWorkflowViewSearchParams cleans up the leftover legacy value.
     expect(getLocation().search).toBe("?view=console");
   });
+
+  it("pins legacy view=files so a stored Console tab does not steal the Canvas landing", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+    renderGate({ initialEntry: "/apps/canvas-1?view=files" });
+
+    expect(getLocation().search).toBe("?view=files");
+    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+  });
 });
 
 describe("AppDefaultTabGate — factory apps", () => {
