@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -207,14 +209,20 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		for _, gateID := range []string{prFeedbackEvidenceGateNodeID, prFeedbackReviewEvidenceGateNodeID, prFeedbackReplyEvidenceGateNodeID} {
 			gate := findSpecNode(t, canvas, gateID)
-			assert.Contains(t, gate.Configuration["expression"], "previous().data.result.visualEvidence.status")
+			expression, ok := gate.Configuration["expression"].(string)
+			require.True(t, ok)
+			assert.Contains(t, expression, "previous().data.result.visualEvidence.status")
+			require.NoError(t, expressionvalidation.ValidateExpression(expression, nil))
 		}
 
 		for _, commentID := range []string{prFeedbackEvidenceCommentNodeID, prFeedbackReviewEvidenceCommentNodeID, prFeedbackReplyEvidenceCommentNodeID} {
 			comment := findSpecNode(t, canvas, commentID)
 			assert.Equal(t, "github.createIssueComment", comment.Component)
-			assert.Contains(t, comment.Configuration["body"], "substring(previous(2).data.result.headSha, 0, 7)")
-			assert.Contains(t, comment.Configuration["body"], "fromBase64(previous(2).data.result.visualEvidence.markdown)")
+			body, ok := comment.Configuration["body"].(string)
+			require.True(t, ok)
+			assert.Contains(t, body, "previous(2).data.result.headSha[:7]")
+			assert.Contains(t, body, "fromBase64(previous(2).data.result.visualEvidence.markdown)")
+			requireValidTemplateExpressions(t, body)
 		}
 	})
 
@@ -570,4 +578,15 @@ func prFeedbackChecksSpecFromTemplate(t *testing.T, repository string) models.Li
 		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
 	})
 	return models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
+}
+
+func requireValidTemplateExpressions(t *testing.T, value string) {
+	t.Helper()
+
+	matches := configuration.ExpressionPlaceholderRegex.FindAllString(value, -1)
+	require.NotEmpty(t, matches)
+	for _, match := range matches {
+		source := match[2 : len(match)-2]
+		require.NoError(t, expressionvalidation.ValidateExpression(source, nil), match)
+	}
 }
