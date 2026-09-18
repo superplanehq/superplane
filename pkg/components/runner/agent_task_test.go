@@ -40,6 +40,17 @@ func TestWrapCommandInWorkingDirectoryAllowsAbsolutePath(t *testing.T) {
 	assert.Equal(t, `cd '/tmp/workspace' && node run.js`, got)
 }
 
+func TestWrapPromptCommandInWorkingDirectoryCopiesSkills(t *testing.T) {
+	t.Parallel()
+
+	got := WrapPromptCommandInWorkingDirectory("repo", `node run.js`)
+	assert.Contains(t, got, `cd "$_sp_root"/'repo'`)
+	assert.Contains(t, got, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
+	assert.Contains(t, got, `cp -a "$SUPERPLANE_TASK_DIR/.agents/skills/." .agents/skills/`)
+	assert.Contains(t, got, "node run.js")
+	assert.True(t, strings.Index(got, "cp -a") < strings.Index(got, "node run.js"))
+}
+
 func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T) {
 	t.Parallel()
 
@@ -107,6 +118,8 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Contains(t, commands[2].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[2].Command, `cd "$_sp_root"/'repo'`)
 	assert.Contains(t, commands[2].Command, "node run.js 02-implement.txt")
+	assert.Contains(t, commands[2].Command, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
+	assert.NotContains(t, commands[1].Command, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
 	assertAgentStepMergesUsage(t, commands[2].Command, "node run.js 02-implement.txt")
 	assert.Contains(t, commands[3].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[3].Command, `cd "$_sp_root"/'repo'`)

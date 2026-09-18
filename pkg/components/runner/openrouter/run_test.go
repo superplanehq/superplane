@@ -129,6 +129,35 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
+func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	docs, ok := mcp["docs"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", docs["type"])
+	assert.Equal(t, "https://mcp.example.com/mcp", docs["url"])
+}
+
+func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	config := jsBuildConfig(t, taskDir, map[string]string{
+		"SUPERPLANE_TASK_DIR":             taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": "/task/workspace_mcp.json",
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	deepwiki, ok := mcp["deepwiki"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", deepwiki["type"])
+	assert.Equal(t, "https://mcp.deepwiki.com/mcp", deepwiki["url"])
+}
+
 func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",

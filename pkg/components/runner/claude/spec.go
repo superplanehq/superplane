@@ -186,7 +186,7 @@ func planningFollowUpCommand(spec RunClaudeCodeSpec) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
 				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),
@@ -279,7 +279,7 @@ func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, workingD
 	return runner.BrokerCommand{
 		Name: runner.AgentStepLabel(stepName, promptName),
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workingDirectory,
 				fmt.Sprintf(
 					`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,

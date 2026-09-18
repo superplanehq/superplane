@@ -147,7 +147,7 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(original.Name, promptName),
-				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
+				Command: WrapAgentStepCommand(WrapPromptCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
 				Preview: LiveLogText(prompt),
 			}
@@ -184,6 +184,36 @@ func WrapCommandInWorkingDirectory(dir, command string) string {
 	}
 	return `_sp_root=$(cat "$SUPERPLANE_TASK_DIR/task_cwd")
 cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
+}
+
+// WrapPromptCommandInWorkingDirectory cds into dir, then copies workspace
+// skills into that directory before it runs the prompt command. Claude, Codex,
+// and OpenCode load SKILL.md from the working directory, not from the task dir.
+func WrapPromptCommandInWorkingDirectory(dir, command string) string {
+	return WrapCommandInWorkingDirectory(dir, InstallWorkspaceSkillFilesCommand()+command)
+}
+
+// InstallWorkspaceSkillFilesCommand copies attached SKILL.md files from the
+// task dir into the current working directory and excludes them from git.
+func InstallWorkspaceSkillFilesCommand() string {
+	return `if [ -d "$SUPERPLANE_TASK_DIR/.claude/skills" ]; then
+  mkdir -p .claude/skills
+  cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/
+fi
+if [ -d "$SUPERPLANE_TASK_DIR/.agents/skills" ]; then
+  mkdir -p .agents/skills
+  cp -a "$SUPERPLANE_TASK_DIR/.agents/skills/." .agents/skills/
+fi
+if [ -d .git ]; then
+  mkdir -p .git/info
+  if [ ! -f .git/info/exclude ] || ! grep -qxF '.claude/skills/' .git/info/exclude; then
+    printf '%s\n' '.claude/skills/' >> .git/info/exclude
+  fi
+  if [ ! -f .git/info/exclude ] || ! grep -qxF '.agents/skills/' .git/info/exclude; then
+    printf '%s\n' '.agents/skills/' >> .git/info/exclude
+  fi
+fi
+`
 }
 
 // WrapAgentStepCommand runs command, then merges accumulated LLM usage into
