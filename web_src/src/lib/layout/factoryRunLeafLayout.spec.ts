@@ -106,6 +106,76 @@ describe("layoutFactoryRunLeafGraph", () => {
     expect(secondGutter).toBe(firstGutter);
   });
 
+  const twoColumnIfMergeNodes = [
+    { id: "ifA", position: { x: 100, y: 0 } },
+    { id: "ifB", position: { x: 500, y: 0 } },
+    { id: "aTrue" },
+    { id: "aJoin" },
+    { id: "bTrue" },
+    { id: "bJoin" },
+    { id: "shared" },
+  ];
+  const twoColumnIfMergeEdges = [
+    { source: "ifA", target: "aTrue", sourceHandle: "true" },
+    { source: "aTrue", target: "aJoin", sourceHandle: "default" },
+    { source: "ifA", target: "aJoin", sourceHandle: "false" },
+    { source: "ifB", target: "bTrue", sourceHandle: "true" },
+    { source: "bTrue", target: "bJoin", sourceHandle: "default" },
+    { source: "ifB", target: "bJoin", sourceHandle: "false" },
+    { source: "aJoin", target: "shared", sourceHandle: "default" },
+    { source: "bJoin", target: "shared", sourceHandle: "default" },
+  ];
+
+  it("assigns overlapping merge edges to separate right gutters", () => {
+    const result = layoutFactoryRunLeafGraph(twoColumnIfMergeNodes, twoColumnIfMergeEdges);
+
+    const mergeKeys = [factoryRunLeafEdgeKey("ifA", "aJoin", "false"), factoryRunLeafEdgeKey("ifB", "bJoin", "false")];
+    const gutters = mergeKeys.map((key) => result.edgeRouteGutters.get(key));
+    const yOffsets = mergeKeys.map((key) => result.edgeRouteOffsetsY.get(key));
+    const graphRight = Math.max(...[...result.positions.values()].map((position) => position.x)) + 280 + 48;
+
+    expect(new Set(gutters).size).toBe(2);
+    expect(yOffsets).toEqual([0, 16]);
+    expect(gutters[0]).toBe(graphRight);
+    expect(gutters[1]).toBe(graphRight + 48);
+    expectNoOverlaps(result.positions);
+  });
+
+  it("keeps node positions unchanged when assigning merge gutters", () => {
+    const result = layoutFactoryRunLeafGraph(twoColumnIfMergeNodes, twoColumnIfMergeEdges);
+
+    expect(Object.fromEntries(result.positions)).toEqual({
+      ifA: { x: 120, y: 0 },
+      aTrue: { x: 120, y: 208 },
+      aJoin: { x: 120, y: 416 },
+      shared: { x: 120, y: 624 },
+      ifB: { x: 496, y: 0 },
+      bTrue: { x: 496, y: 208 },
+      bJoin: { x: 496, y: 416 },
+    });
+  });
+
+  it("reuses a forward gutter when vertical intervals do not overlap", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [{ id: "if1" }, { id: "t1" }, { id: "t2" }, { id: "if2" }, { id: "u1" }, { id: "u2" }],
+      [
+        { source: "if1", target: "t1", sourceHandle: "true" },
+        { source: "t1", target: "t2", sourceHandle: "default" },
+        { source: "if1", target: "t2", sourceHandle: "false" },
+        { source: "t2", target: "if2", sourceHandle: "default" },
+        { source: "if2", target: "u1", sourceHandle: "true" },
+        { source: "u1", target: "u2", sourceHandle: "default" },
+        { source: "if2", target: "u2", sourceHandle: "false" },
+      ],
+    );
+
+    const firstGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("if1", "t2", "false"));
+    const secondGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("if2", "u2", "false"));
+
+    expect(firstGutter).toBeDefined();
+    expect(secondGutter).toBe(firstGutter);
+  });
+
   it("keeps the longest non-leaf path on the spine and parks leaves to the right", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "a" }, { id: "b" }, { id: "leaf1" }, { id: "leaf2" }, { id: "d" }, { id: "e" }],
