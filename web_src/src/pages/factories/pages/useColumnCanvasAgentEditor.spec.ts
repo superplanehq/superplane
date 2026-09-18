@@ -68,6 +68,18 @@ const backlogCanvas: CanvasesCanvas = {
   },
 };
 
+const prFeedbackCanvas: CanvasesCanvas = {
+  metadata: { id: "pr-feedback", liveVersionId: "version-live" },
+  spec: {
+    nodes: [
+      { ...implementerNode, id: "address-pr-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "address-pr-review-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "address-pr-review-reply-feedback", name: "Address PR feedback" },
+    ],
+    edges: [],
+  },
+};
+
 const draft: PlanningReviewDraft = {
   title: "Implement From Task Description",
   components: [
@@ -145,6 +157,26 @@ describe("useColumnCanvasAgentEditor", () => {
     rerender({ appId: "backlog" });
     expect(result.current.showVisualEvidenceSetting).toBe(false);
   });
+
+  it("shows visual evidence for discussion feedback when requested", () => {
+    hookState.canvas.current = prFeedbackCanvas;
+
+    const { result } = renderHook(
+      () =>
+        useColumnCanvasAgentEditor("organization-1", "pr-feedback", {
+          showVisualEvidenceSetting: true,
+          synchronizeAgentNodes: true,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current.showVisualEvidenceSetting).toBe(true);
+    expect(result.current.agentNodeIds).toEqual([
+      "address-pr-feedback",
+      "address-pr-review-feedback",
+      "address-pr-review-reply-feedback",
+    ]);
+  });
 });
 
 describe("persistColumnAgent", () => {
@@ -192,5 +224,29 @@ describe("persistColumnAgent", () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalled();
+  });
+
+  it("updates every synchronized discussion runner", async () => {
+    const stageYaml = vi.fn().mockResolvedValue({});
+    const commit = vi.fn().mockResolvedValue({});
+    const invalidate = vi.fn().mockResolvedValue({});
+
+    await persistColumnAgent({
+      appId: "pr-feedback",
+      canvas: prFeedbackCanvas,
+      agentNodeIds: ["address-pr-feedback", "address-pr-review-feedback", "address-pr-review-reply-feedback"],
+      draft,
+      stageYaml,
+      commit,
+      invalidate,
+    });
+
+    const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
+    const runners = serialized.nodes?.filter((node) => node.component === "runnerClaudeCode") ?? [];
+    expect(runners).toHaveLength(3);
+    for (const runner of runners) {
+      expect(runner.configuration?.includeVisualEvidence).toBe(true);
+      expect(runner.configuration?.model).toBe("opus");
+    }
   });
 });

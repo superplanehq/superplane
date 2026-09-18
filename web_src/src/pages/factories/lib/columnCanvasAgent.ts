@@ -88,6 +88,26 @@ export function applyPlanningReviewDraftToCanvas(
   };
 }
 
+/** Patch one logical agent that is represented by multiple canvas nodes. */
+export function applyPlanningReviewDraftToCanvasNodes(
+  canvas: CanvasesCanvas,
+  agentNodeIds: readonly string[],
+  draft: PlanningReviewDraft,
+): CanvasesCanvas {
+  const component = draft.components[0];
+  if (!component) {
+    return canvas;
+  }
+  const targetNodeIds = new Set(agentNodeIds);
+  const nodes = (canvas.spec?.nodes ?? []).map((node) =>
+    node.id && targetNodeIds.has(node.id) ? applyPlanningReviewComponentToNode(node, component) : node,
+  );
+  return {
+    ...canvas,
+    spec: { ...canvas.spec, nodes },
+  };
+}
+
 /** Patch the agent node and serialize canvas.yaml for staging. */
 export function serializeColumnAgentCanvas(
   canvas: CanvasesCanvas,
@@ -95,4 +115,12 @@ export function serializeColumnAgentCanvas(
   draft: PlanningReviewDraft,
 ): string {
   return materializeCanvasSpec(applyPlanningReviewDraftToCanvas(canvas, agentNodeId, draft));
+}
+
+export function serializeColumnAgentCanvasNodes(
+  canvas: CanvasesCanvas,
+  agentNodeIds: readonly string[],
+  draft: PlanningReviewDraft,
+): string {
+  return materializeCanvasSpec(applyPlanningReviewDraftToCanvasNodes(canvas, agentNodeIds, draft));
 }

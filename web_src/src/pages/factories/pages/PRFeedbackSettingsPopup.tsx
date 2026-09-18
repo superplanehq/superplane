@@ -131,6 +131,7 @@ export function PRFeedbackSettingsPopup({
           isLoading={agent.isLoading}
           showAutomationNote={false}
           showCancel={false}
+          showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
         />
       ) : (
         <PRFeedbackGeneralTab

@@ -17,9 +17,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -34,23 +36,7 @@ func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
 	t.Cleanup(func() { blob.SetCurrent(nil) })
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(
-		r.Encryptor,
-		r.Registry,
-		signer,
-		support.NewOIDCProvider(),
-		r.GitProvider,
-		"",
-		"http://localhost",
-		"http://localhost",
-		"test",
-		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
-	)
-	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+	server := newRunnerArtifactTestServer(t, r, signer)
 
 	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -138,6 +124,142 @@ func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
 	assert.Equal(t, http.StatusOK, download.Code)
 	assert.Equal(t, "image/png", download.Header().Get("Content-Type"))
 	assert.Equal(t, png, download.Body.Bytes())
+}
+
+func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	signer := jwt.NewSigner("test")
+	server := newRunnerArtifactTestServer(t, r, signer)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Adjust checkout", "Update the checkout UI", &r.User, nil, nil)
+	require.NoError(t, err)
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Adjust checkout",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	const nodeID = "address-pr-feedback"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "Address PR feedback",
+		Type:   models.NodeTypeComponent,
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+	require.NoError(t, err)
+	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+	_, err = runneraction.ResolveArtifactRunContext(db, run.ID)
+	assert.ErrorIs(t, err, runneraction.ErrArtifactRunScopeNotFound)
+
+	handler, err := factoryModel.CreatePRFeedbackHandler(
+		db,
+		canvas.ID,
+		models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+		models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+	)
+	require.NoError(t, err)
+	_, err = pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+		RunID:             run.ID,
+		FeedbackHandlerID: &handler.ID,
+		Access:            models.FactoryPullRequestAccessExclusive,
+	})
+	require.NoError(t, err)
+
+	runContext, err := runneraction.ResolveArtifactRunContext(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, runContext.WorkOrderID)
+	assert.Nil(t, runContext.LineExecution)
+
+	t.Setenv("JWT_SECRET", "test")
+	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
+		ID:         nodeExecution.ID,
+		RunID:      run.ID,
+		WorkflowID: canvas.ID.String(),
+		NodeID:     nodeID,
+		BaseURL:    "http://files.test",
+	}, nil, 60, true)
+	require.True(t, runneraction.HasArtifactUploadToken(environment))
+	var token string
+	for _, variable := range environment {
+		if variable.Name == runneraction.EnvSuperplaneArtifactToken {
+			token = variable.Value
+			break
+		}
+	}
+	require.NotEmpty(t, token)
+
+	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts", bytes.NewReader(png))
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Content-Type", "image/png")
+	request.Header.Set("Content-Disposition", `attachment; filename="checkout-feedback.png"`)
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusCreated, response.Code, response.Body.String())
+
+	events, err := order.ListEvents(db, 20, nil)
+	require.NoError(t, err)
+	var artifactAdded factory.WorkOrderArtifactAdded
+	for _, event := range events {
+		if event.Type != factory.EventTypeOrderArtifactAdded {
+			continue
+		}
+		require.NoError(t, json.Unmarshal(event.Data, &artifactAdded))
+		break
+	}
+	require.NotNil(t, artifactAdded.Automation)
+	assert.Equal(t, canvas.ID, artifactAdded.Automation.AppID)
+	assert.Equal(t, nodeID, artifactAdded.Automation.NodeID)
+	assert.Equal(t, uuid.Nil, artifactAdded.Automation.LineID)
+	assert.Nil(t, artifactAdded.Automation.StepIndex)
+	require.NotNil(t, artifactAdded.Run)
+	assert.Equal(t, run.ID, artifactAdded.Run.ID)
+
+	require.NoError(t, db.Model(handler).Update("source", models.FactoryPRFeedbackHandlerSourcePullRequestChecks).Error)
+	_, err = runneraction.ResolveArtifactRunContext(db, run.ID)
+	assert.ErrorIs(t, err, runneraction.ErrArtifactRunScopeNotFound)
+}
+
+func newRunnerArtifactTestServer(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	signer *jwt.Signer,
+) *Server {
+	t.Helper()
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+	return server
 }
 
 func TestArtifactSignatureMatchesSupportedTypes(t *testing.T) {

@@ -133,13 +133,19 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
+			"passed:" + prFeedbackRunnerNodeID + "->" + prFeedbackEvidenceGateNodeID,
+			"true:" + prFeedbackEvidenceGateNodeID + "->" + prFeedbackEvidenceCommentNodeID,
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
+			"passed:" + prFeedbackReviewRunnerNodeID + "->" + prFeedbackReviewEvidenceGateNodeID,
+			"true:" + prFeedbackReviewEvidenceGateNodeID + "->" + prFeedbackReviewEvidenceCommentNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
+			"passed:" + prFeedbackReplyRunnerNodeID + "->" + prFeedbackReplyEvidenceGateNodeID,
+			"true:" + prFeedbackReplyEvidenceGateNodeID + "->" + prFeedbackReplyEvidenceCommentNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -182,6 +188,34 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Equal(t, `{{ $["Find Pull Request For Review Reply"].data.pullRequest.id }}`, replyActivity.Configuration["pullRequestId"])
 		assert.Equal(t, prFeedbackReplyActivityTitleExpression(), replyActivity.Configuration["title"])
 		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), replyActivity.Configuration["description"])
+	})
+
+	t.Run("discussion runners default visual evidence off and publish captured evidence", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    prFeedbackDefaultMention,
+			IgnoreBots: true,
+		})
+
+		for _, nodeID := range []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID} {
+			runner := findSpecNode(t, canvas, nodeID)
+			assert.Equal(t, false, runner.Configuration["includeVisualEvidence"])
+			output := runnerStepCommand(t, runner, "Publish Visual Evidence")
+			assert.Contains(t, output, "git rev-parse HEAD")
+			assert.Contains(t, output, "visual-evidence.json")
+		}
+
+		for _, gateID := range []string{prFeedbackEvidenceGateNodeID, prFeedbackReviewEvidenceGateNodeID, prFeedbackReplyEvidenceGateNodeID} {
+			gate := findSpecNode(t, canvas, gateID)
+			assert.Contains(t, gate.Configuration["expression"], "previous().data.result.visualEvidence.status")
+		}
+
+		for _, commentID := range []string{prFeedbackEvidenceCommentNodeID, prFeedbackReviewEvidenceCommentNodeID, prFeedbackReplyEvidenceCommentNodeID} {
+			comment := findSpecNode(t, canvas, commentID)
+			assert.Equal(t, "github.createIssueComment", comment.Component)
+			assert.Contains(t, comment.Configuration["body"], "substring(previous(2).data.result.headSha, 0, 7)")
+			assert.Contains(t, comment.Configuration["body"], "fromBase64(previous(2).data.result.visualEvidence.markdown)")
+		}
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -235,6 +269,9 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request?.head?.ref")
 
 		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
+		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
+		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
+		assert.NotContains(t, checkout, "x-access-token")
 		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)
 		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
 		assert.NotContains(t, checkout, "pr-feedback")
@@ -417,6 +454,13 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, push, "REMOTE_HEAD")
 		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
 		assert.Contains(t, push, `git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`)
+
+		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
+		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
+		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
+		assert.NotContains(t, checkout, "x-access-token")
+		_, hasVisualEvidence := runner.Configuration["includeVisualEvidence"]
+		assert.False(t, hasVisualEvidence)
 	})
 
 	t.Run("action nodes serialize per pull request", func(t *testing.T) {
