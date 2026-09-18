@@ -92,7 +92,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
 
   // Workspace · Agent resources
   entry("workspace", "agent-resources", "Agent resources", undefined, [
-    "connection",
+    "mcp server",
     "mcp",
     "skill",
     "oauth",

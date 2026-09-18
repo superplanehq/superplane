@@ -56,7 +56,7 @@ describe("FactorySettingsAgentResourcesPage", () => {
     expect(screen.queryByTestId("factory-settings-agent-resources")).not.toBeInTheDocument();
   }, 10000);
 
-  it("shows the connections empty state", async () => {
+  it("shows the MCP servers empty state", async () => {
     render(
       <FactoriesHarness
         pathSuffix={connectionsPath}
@@ -68,11 +68,12 @@ describe("FactorySettingsAgentResourcesPage", () => {
     expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent(
       "Agent resources",
     );
-    expect(await screen.findByTestId("agent-resources-connections-empty")).toHaveTextContent("No MCP connections yet.");
-    expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Add connection");
+    expect(screen.getByTestId("agent-resources-tab-connections")).toHaveTextContent("MCP servers");
+    expect(await screen.findByTestId("agent-resources-connections-empty")).toHaveTextContent("No MCP servers yet.");
+    expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Add MCP server");
   }, 10000);
 
-  it("lists a header connection", async () => {
+  it("lists a header MCP server", async () => {
     render(
       <FactoriesHarness
         pathSuffix={connectionsPath}
@@ -90,7 +91,7 @@ describe("FactorySettingsAgentResourcesPage", () => {
     expect(screen.getByText("Header")).toBeInTheDocument();
   }, 10000);
 
-  it("opens the add connection dialog from the query string", async () => {
+  it("opens the add MCP server dialog from the query string", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`${connectionsPath}?dialog=add`}

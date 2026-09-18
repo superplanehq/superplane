@@ -170,7 +170,7 @@ export function AgentResourceConnectionDialog({
       <DialogContent data-testid="agent-resource-connection-dialog">
         <DialogHeader>
           <DialogTitle>{isEdit ? AGENT_RESOURCES_COPY.editConnection : AGENT_RESOURCES_COPY.addConnection}</DialogTitle>
-          <DialogDescription>Agents on every run in this workspace can use this connection.</DialogDescription>
+          <DialogDescription>{AGENT_RESOURCES_COPY.dialogDescription}</DialogDescription>
         </DialogHeader>
         <ConnectionDialogFields
           organizationId={organizationId}

@@ -13,8 +13,8 @@ runner attach path serve both kinds.
    Kinds are `mcp_server` and `skill`. One attach function injects enabled
    rows. Do not add a second table or settings page for skills later.
 2. **One settings page named Agent resources.** The page lives under
-   Workspace settings. Permission is `factories:update`. Tabs are
-   **Connections** (MCP) and **Skills**. v1 implements Connections. The
+   Workspace settings.    Permission is `factories:update`. Tabs are
+   **MCP servers** and **Skills**. v1 implements MCP servers. The
    Skills tab ships as a shell with an empty state. Skills later fill that
    tab. They do not add a new route family.
 3. **MCP v1 auth is headers or OAuth.** SuperPlane completes OAuth in the
@@ -135,16 +135,16 @@ Follow factory settings chrome. Page title: **Agent resources**.
 ```
 Workspace settings
   Agent resources
-    [ Connections ] [ Skills ]
+    [ MCP servers ] [ Skills ]
     helper text
     list OR empty state
-    primary action: Add connection | Add skill
+    primary action: Add MCP server | Add skill
 ```
 
 Helper text: Agents on every run in this workspace can use these
 resources. One signed-in account is shared by every agent.
 
-Connections row: name, URL, auth (Header or Sign-in), status
+MCP server row: name, URL, auth (Header or Sign-in), status
 (Connected / Not connected / Reconnect), enable switch, menu (Edit,
 Disconnect, Delete).
 
@@ -152,13 +152,13 @@ Skills row (shell and later product): name, source (`owner/repo@ref`),
 status (Ready / Failed to fetch), enable switch. Add skill form: GitHub
 repository, ref, optional subpath.
 
-Empty Connections: No MCP connections yet. Add a connection so agents can
+Empty MCP servers: No MCP servers yet. Add an MCP server so agents can
 use it on every run.
 
 Empty Skills (v1): Skills are not available yet. SuperPlane will load
 skill packages from GitHub on this tab.
 
-Copy uses SuperPlane, workspace, connection, skill, and agent as stable
+Copy uses SuperPlane, workspace, MCP server, skill, and agent as stable
 nouns. Do not put MCP-only words in the nav label.
 
 ## OAuth
@@ -254,7 +254,7 @@ File: `web_src/src/pages/factories/pages/settings/FactorySettingsAgentResources.
 
 Title: `Factories/Pages/Settings/Agent resources`
 
-Connections tab:
+MCP servers tab:
 
 - `Empty`
 - `HeaderAuth`

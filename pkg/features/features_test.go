@@ -77,7 +77,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureWorkspaceAgentResources, f.ID)
 		assert.Equal(t, "Agent Resources", f.Label)
-		assert.Equal(t, "Add MCP connections for workspace agents", f.Description)
+		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {

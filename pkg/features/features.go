@@ -54,7 +54,7 @@ const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 // FeatureWorkspaceAgentResources gates the workspace Agent resources settings
-// page until MCP connections are ready for general use.
+// page until MCP servers are ready for general use.
 const FeatureWorkspaceAgentResources = "workspace_agent_resources"
 
 func released() *bool {
@@ -73,7 +73,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
-	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP connections for workspace agents"},
+	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
 }
 
 func All() []Feature {

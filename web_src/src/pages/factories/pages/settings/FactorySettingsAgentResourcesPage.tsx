@@ -120,8 +120,8 @@ function AgentResourcePageDialogs({ page }: { page: ReturnType<typeof useAgentRe
       <FactoryDeleteDialog
         open={Boolean(page.pendingDelete)}
         factoryName={page.pendingDelete?.name ?? ""}
-        title={`Delete "${page.pendingDelete?.name ?? "connection"}"?`}
-        description="This removes the connection for every agent in this workspace."
+        title={`Delete "${page.pendingDelete?.name ?? AGENT_RESOURCES_COPY.unnamedResource}"?`}
+        description={AGENT_RESOURCES_COPY.deleteDescription}
         canDelete={page.canUpdate}
         isDeleting={page.isDeleting}
         onClose={() => page.setPendingDelete(undefined)}
@@ -211,7 +211,7 @@ function ConnectionRow({
   onToggleEnabled: (enabled: boolean) => void;
   onConnect: () => void;
 }) {
-  const name = resource.name?.trim() || "connection";
+  const name = resource.name?.trim() || AGENT_RESOURCES_COPY.unnamedResource;
   const status = connectionStatusLabel(resource);
   const needsOAuth = connectionNeedsOAuthAction(resource);
   const reconnect =

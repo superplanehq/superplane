@@ -199,7 +199,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             {
               id: "workspace_agent_resources",
               label: "Agent Resources",
-              description: "Add MCP connections for workspace agents",
+              description: "Add MCP servers for workspace agents",
             },
           ],
         },
