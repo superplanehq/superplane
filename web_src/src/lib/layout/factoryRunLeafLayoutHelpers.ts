@@ -13,6 +13,7 @@ export const VERTICAL_GAP = 104;
 const SIDE_COLUMN_EXTRA_GAP = 88;
 export const COMPONENT_GAP_X = 120;
 export const GUTTER_PAD = 48;
+export const EDGE_ROUTE_LANE_SPACING = 48;
 export const SIDE_X_THRESHOLD = SIDE_GAP / 2;
 
 const SPINE_CHANNEL_PRIORITY: Record<string, number> = {
