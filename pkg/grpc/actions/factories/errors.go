@@ -128,6 +128,26 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has ended")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrFactoryAgentResourceNotFound):
+		return grpcerrors.NotFound(err, "agent resource not found")
+	case errors.Is(err, models.ErrFactoryAgentResourceKindInvalid):
+		return grpcerrors.InvalidArgument(err, "agent resource kind is not valid")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameInvalid):
+		return grpcerrors.InvalidArgument(err, "name must be lowercase letters, digits, and dashes")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameReserved):
+		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
+		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
+		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):
+		return grpcerrors.InvalidArgument(err, "MCP URL is required")
+	case errors.Is(err, models.ErrFactoryAgentResourceHeaderInvalid):
+		return grpcerrors.InvalidArgument(err, "each header needs a name, secret, and key")
+	case errors.Is(err, models.ErrFactoryAgentResourceKindNotSupported):
+		return grpcerrors.FailedPrecondition(err, "skills are not available yet")
+	case errors.Is(err, models.ErrFactoryAgentResourceMCPCapReached):
+		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 enabled MCP connections")
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):

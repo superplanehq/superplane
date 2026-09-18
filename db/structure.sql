@@ -385,6 +385,44 @@ CREATE TABLE public.factories (
 
 
 --
+-- Name: factory_agent_resource_secrets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resource_secrets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    resource_id uuid NOT NULL,
+    name text NOT NULL,
+    value bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_agent_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    kind text NOT NULL,
+    name text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oauth_status text DEFAULT ''::text NOT NULL,
+    oauth_error text DEFAULT ''::text NOT NULL,
+    oauth_connected_by uuid,
+    oauth_connected_at timestamp with time zone,
+    oauth_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oauth_pending_state text DEFAULT ''::text NOT NULL,
+    oauth_pending_expiry timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1732,6 +1770,22 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_secrets
+    ADD CONSTRAINT factory_agent_resource_secrets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2590,6 +2644,34 @@ CREATE INDEX idx_factories_deleted_at ON public.factories USING btree (deleted_a
 --
 
 CREATE INDEX idx_factories_organization_id ON public.factories USING btree (organization_id);
+
+
+--
+-- Name: idx_factory_agent_resource_secrets_resource_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resource_secrets_resource_name ON public.factory_agent_resource_secrets USING btree (resource_id, name);
+
+
+--
+-- Name: idx_factory_agent_resources_factory_kind; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_resources_factory_kind ON public.factory_agent_resources USING btree (factory_id, kind);
+
+
+--
+-- Name: idx_factory_agent_resources_factory_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resources_factory_name ON public.factory_agent_resources USING btree (factory_id, name);
+
+
+--
+-- Name: idx_factory_agent_resources_oauth_pending_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resources_oauth_pending_state ON public.factory_agent_resources USING btree (oauth_pending_state) WHERE (oauth_pending_state <> ''::text);
 
 
 --
@@ -3570,6 +3652,38 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 
 --
+-- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_secrets
+    ADD CONSTRAINT factory_agent_resource_secrets_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.factory_agent_resources(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_oauth_connected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_oauth_connected_by_fkey FOREIGN KEY (oauth_connected_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4545,7 +4659,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918140954	f
+20260918201800	f
 \.
 
 
