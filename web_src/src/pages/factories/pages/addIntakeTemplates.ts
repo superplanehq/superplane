@@ -1,7 +1,7 @@
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
-import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 export interface AddIntakeTemplate {
@@ -10,11 +10,20 @@ export interface AddIntakeTemplate {
   description: string;
   /** Optional integration icon. Letter glyph when omitted. */
   iconSrc?: string;
+  /** True when SuperPlane does not create this intake yet. */
+  soon?: boolean;
 }
 
+export const ADD_INTAKE_COPY = {
+  pickerTitle: "Add intake",
+  pickerDescription: "Choose a source for new backlog tasks.",
+  sourceTaken: "Already set up.",
+  comingSoon: "Coming soon.",
+} as const;
+
 /**
- * Templates in the Add intake picker. Source-based intakes and a few
- * common improvement automations.
+ * Sources in the Add intake picker. Live sources create an intake.
+ * Coming-soon sources stay visible and disabled.
  */
 export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
@@ -36,41 +45,17 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconSrc: sentryIcon,
   },
   {
-    id: "pagerduty-incidents",
-    name: "PagerDuty incidents",
-    description: "Firing incidents that need a task.",
-    iconSrc: pagerdutyIcon,
+    id: "datadog",
+    name: "DataDog",
+    description: "Creates tasks from DataDog monitors.",
+    iconSrc: datadogIcon,
+    soon: true,
   },
   {
-    id: "productive-tasks",
-    name: "Productive.io tasks",
-    description: "Create tasks from Productive.io tasks.",
-    iconSrc: productiveIcon,
-  },
-  {
-    id: "improve-ci-runtime",
-    name: "Improve CI runtime",
-    description: "Find slow jobs and cut pipeline wait time.",
-  },
-  {
-    id: "improve-page-performance",
-    name: "Improve page performance",
-    description: "Track slow pages and open work to speed them up.",
-  },
-  {
-    id: "flaky-tests",
-    name: "Flaky tests",
-    description: "Catch unstable tests and create fix tasks.",
+    id: "notion",
+    name: "Notion",
+    description: "Creates tasks from Notion pages.",
+    iconSrc: notionIcon,
+    soon: true,
   },
 ];
-
-export function filterAddIntakeTemplates(query: string): AddIntakeTemplate[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) {
-    return ADD_INTAKE_TEMPLATES;
-  }
-  return ADD_INTAKE_TEMPLATES.filter((template) => {
-    const haystack = `${template.name} ${template.description}`.toLowerCase();
-    return haystack.includes(needle);
-  });
-}

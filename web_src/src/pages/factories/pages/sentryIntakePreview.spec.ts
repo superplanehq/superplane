@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sentryIntakePreviewCaption, sentryIntakePreviewRows } from "./sentryIntakePreview";
+import { sentryIntakePreviewCaption, sentryIntakePreviewRows, sentryIntakePreviewTitle } from "./sentryIntakePreview";
 import { SENTRY_INTAKE_SEED_SIZE, SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 
 describe("sentryIntakePreviewRows", () => {
@@ -17,6 +17,13 @@ describe("sentryIntakePreviewRows", () => {
     const overflow = sentryIntakePreviewRows(Array.from({ length: 15 }, (_, index) => `Issue ${index + 1}`));
     expect(overflow).toHaveLength(SENTRY_INTAKE_SEED_SIZE);
     expect(overflow.at(-1)?.title).toBe("Issue 10");
+  });
+
+  it("strips a Sentry short ID from catalog titles", () => {
+    expect(sentryIntakePreviewTitle("PRODUCTION-98 · HTTP 500 /api/v1/refunds")).toBe("HTTP 500 /api/v1/refunds");
+    expect(sentryIntakePreviewRows(["PRODUCTION-98 · HTTP 500 /api/v1/refunds"])[0]?.title).toBe(
+      "HTTP 500 /api/v1/refunds",
+    );
   });
 });
 
