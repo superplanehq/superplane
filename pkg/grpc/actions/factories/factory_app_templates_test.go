@@ -48,29 +48,18 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
+	assert.Equal(t, false, agent.Configuration["includeVisualEvidence"])
 	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
 	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
 	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
-	assert.Contains(t, result.canvasYAML, "task().visual_evidence_enabled")
-	assert.Contains(t, result.canvasYAML, "For a visual-only change, capture and upload at least one screenshot.")
-	assert.Contains(t, result.canvasYAML, "record and upload a short WebM video that shows the interaction works")
-	assert.Contains(t, result.canvasYAML, "Rendered markup, styles, layout, and interaction behavior are UI changes.")
-	assert.Contains(t, result.canvasYAML, "Use an existing Storybook story or component preview first.")
-	assert.Contains(t, result.canvasYAML, "Open the direct Storybook iframe or the focused preview route.")
-	assert.Contains(t, result.canvasYAML, "Poll the preview URL with a bounded timeout")
-	assert.Contains(t, result.canvasYAML, "Use `snapshot` or `find`, then use the returned element references")
-	assert.Contains(t, result.canvasYAML, "Call `inspect_screenshot` for every screenshot")
-	assert.Contains(t, result.canvasYAML, "Do not use file size, custom PNG decoding, or pixel-color counting")
-	assert.Contains(t, result.canvasYAML, "Close the Playwright session and stop temporary preview processes")
-	assert.Contains(t, result.canvasYAML, "A signed-in application is not required when an isolated preview can show the change.")
-	assert.Contains(t, result.canvasYAML, "Unit tests do not replace visual evidence.")
-	assert.Contains(t, result.canvasYAML, "Set each attempt type to preview, playwright, or upload.")
-	assert.Contains(t, result.canvasYAML, "report_visual_evidence_unavailable")
-	assert.Contains(t, result.canvasYAML, "$SUPERPLANE_TASK_DIR/evidence")
+	assert.NotContains(t, result.canvasYAML, "task().visual_evidence_enabled")
+	assert.NotContains(t, result.canvasYAML, "For a visual-only change")
+	assert.NotContains(t, result.canvasYAML, "report_visual_evidence_unavailable")
 	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")
 	assert.NotContains(t, result.canvasYAML, "x-access-token")
-	assert.Contains(t, result.canvasYAML, "Captured for commit `\" + $commit + \"`.")
+	assert.NotContains(t, result.canvasYAML, `git rev-parse '@{upstream}'`)
+	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -88,6 +77,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	commentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence")
 	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
+	assert.Contains(t, commentEvidence.Configuration["body"], `substring($["Create Pull Request"].data.head.sha, 0, 7)`)
+	assert.Contains(t, commentEvidence.Configuration["body"], "## Visual evidence")
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
 	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
 	assert.Equal(
@@ -101,6 +92,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		`$["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
 		hasUpdatedEvidence.Configuration["expression"],
 	)
+	updatedCommentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence-updated")
+	assert.Contains(t, updatedCommentEvidence.Configuration["body"], `substring($["Update Pull Request"].data.head.sha, 0, 7)`)
 
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)

@@ -40,6 +40,40 @@ func TestWrapCommandInWorkingDirectoryAllowsAbsolutePath(t *testing.T) {
 	assert.Equal(t, `cd '/tmp/workspace' && node run.js`, got)
 }
 
+func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T) {
+	t.Parallel()
+
+	firstPrompt := "implement the change"
+	secondPrompt := "review the change"
+	command := "git status"
+	steps := []AgentStep{
+		{Name: "Prepare", Type: AgentStepBash, Command: &command},
+		{Name: "Implement", Type: AgentStepPrompt, Prompt: &firstPrompt},
+		{Name: "Review", Type: AgentStepPrompt, Prompt: &secondPrompt},
+	}
+
+	got := AppendVisualEvidenceProtocol(steps, true)
+
+	require.Len(t, got, len(steps))
+	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
+	assert.Contains(t, *got[1].Prompt, firstPrompt)
+	assert.Contains(t, *got[1].Prompt, "Visual evidence protocol")
+	assert.Contains(t, *got[1].Prompt, "posterPath")
+	assert.Equal(t, secondPrompt, *got[2].Prompt)
+	assert.Equal(t, command, *got[0].Command)
+	twice := AppendVisualEvidenceProtocol(got, true)
+	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Visual evidence protocol"))
+}
+
+func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	prompt := "implement the change"
+	steps := []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt}}
+
+	assert.Equal(t, steps, AppendVisualEvidenceProtocol(steps, false))
+}
+
 func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	t.Parallel()
 

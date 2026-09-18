@@ -103,8 +103,8 @@ func HasArtifactUploadToken(environment []BrokerEnvironmentVariable) bool {
 	return false
 }
 
-func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int) []BrokerEnvironmentVariable {
-	if HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
+func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int, enabled bool) []BrokerEnvironmentVariable {
+	if !enabled || HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
 		return environment
 	}
 	db := database.DB(context.Background())
