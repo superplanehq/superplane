@@ -47,8 +47,8 @@ export const NotificationsFiltered: Story = {
                 workspaceId: defaultFactoriesFixture.factories[0]?.id ?? "",
                 eventTypes: eventTypesFromToggles({
                   ...defaultNotificationTypeToggles(),
-                  TYPE_WORK_ORDER_COMMENT_CREATED: false,
-                  TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
+                  TYPE_WORK_ORDER_AGENT_QUESTION: false,
+                  TYPE_WORK_ORDER_PLAN_READY: false,
                 }),
               },
             ],

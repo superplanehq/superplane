@@ -39,6 +39,14 @@ const (
 	// same way status changes and comments do. Clearing rides on
 	// `order.status.updated`.
 	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
+	// EventTypeOrderAgentQuestion is a notification-only reason: the
+	// planning agent is waiting for an answer on a task. It does not
+	// back a timeline event.
+	EventTypeOrderAgentQuestion = "order.agent_question"
+	// EventTypeOrderPlanReady is a notification-only reason: refinement
+	// ended and the planning spec artifact exists. It does not back a
+	// timeline event.
+	EventTypeOrderPlanReady = "order.plan_ready"
 
 	// Factory line events
 	EventTypeLineStepExecutionQueued   = "step.execution.queued"
