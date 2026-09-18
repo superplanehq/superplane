@@ -126,6 +126,8 @@ export function SplitRunAttentionNote({
     tone,
     actions,
     actionBusy,
+    compact,
+    actionsOnly,
     onAction,
   });
   if (pullRequestNote) {
@@ -222,7 +224,9 @@ function CompactAttentionNote({
           className="sp-stream-text min-w-0 flex-1"
           data-testid="split-run-intent-decision-tip"
         >
-          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
+          <h3 className="text-[13px] font-medium leading-5 text-foreground">
+            <StoppedHeadline note={note} />
+          </h3>
           {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
         </div>
       )}

@@ -514,8 +514,7 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
-    expect(screen.getByLabelText("Status checks passed")).toBeInTheDocument();
-    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+    expect(screen.getByText("Status checks passed")).toBeInTheDocument();
     expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
   });
 
@@ -551,25 +550,6 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
-  });
-
-  it("shows the check-fix activity on the card while the fixer runs", () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <WorkOrderCard
-            entry={buildWorkOrderListEntry(waitingOrder, factory)}
-            {...cardProps}
-            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
-            addressingFeedbackLabels={new Map([["wo-waiting", "Fixing failed checks on d8b80c2"]])}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    expect(screen.getByText("Fixing failed checks on d8b80c2")).toBeInTheDocument();
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });

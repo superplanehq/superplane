@@ -76,6 +76,7 @@ export function FactoryAutomationRunsSidebar({
       addressingFeedbackLabels: attention.addressingFeedbackLabels,
       waitingOnChecksOrderIds: attention.waitingOnChecksOrderIds,
       checksPassedOrderIds: attention.checksPassedOrderIds,
+      checksPassedLabels: attention.checksPassedLabels,
       fixesPausedOrderIds: attention.fixesPausedOrderIds,
       pullRequests,
       ...cardActions,

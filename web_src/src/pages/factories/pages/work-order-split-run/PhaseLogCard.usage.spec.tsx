@@ -78,9 +78,11 @@ describe("PhaseLogCard usage", () => {
 
     const showUsage = await screen.findByRole("button", { name: "Show usage" });
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("210");
+    expect(showUsage).toHaveClass("font-semibold", "text-current", "!underline");
     await user.click(showUsage);
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(await screen.findByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Usage" })).toHaveClass("sr-only");
+    expect(screen.queryByText("Token usage and tool calls for each agent in this automation.")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Live. The run is not finished. New turns will appear here.");
   });
 
@@ -112,11 +114,10 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByText("1 turn · 2 tool calls · 210 input")).toBeInTheDocument();
+    expect(await screen.findByText("1 turn · 2 tool calls · 210 input")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Agent - Plan for GH Issue" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("heading", { name: "Plan usage" })).not.toBeInTheDocument();
+    expect(screen.queryByText("1 turn · 2 tool calls · 210 input")).not.toBeInTheDocument();
   });
 
   it("shows a separate chart for each agent", async () => {
@@ -159,9 +160,9 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Implement usage" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Implement the change" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Implement the change" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Write the pull request" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Implement usage" })).not.toBeInTheDocument();
     expect(screen.getByText("1 turn · 1 tool call · 180 input")).toBeInTheDocument();
     expect(screen.getByText("1 turn · 1 tool call · 40 input")).toBeInTheDocument();
   });
@@ -198,9 +199,9 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Implement usage" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Implementation" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Implementation" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Generate PR title and description" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Implement usage" })).not.toBeInTheDocument();
     expect(screen.getByText("1 turn · 1 tool call · 180 input")).toBeInTheDocument();
     expect(screen.getByText("1 turn · 1 tool call · 40 input")).toBeInTheDocument();
   });
@@ -230,8 +231,45 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(await screen.findByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("loads the chart when the expanded card hides the run stream", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: usageTelemetry(210, [{ kind: "bash", text: "git status" }]),
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          name: "[@lucaspin](https://github.com/lucaspin) left a [review](https://example.com/review)",
+          costCents: "45",
+          totalTokens: "210",
+        }}
+        expanded
+        showExpandedStream={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(screen.queryByText("[@lucaspin](")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "@lucaspin" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
   });
 
@@ -260,8 +298,7 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(await screen.findByRole("status")).toHaveTextContent("Loading usage...");
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
   });
 
@@ -291,8 +328,7 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(await screen.findByRole("status")).toHaveTextContent("Loading usage...");
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
   });
 
@@ -309,8 +345,7 @@ describe("PhaseLogCard usage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Show usage" }));
-    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(await screen.findByRole("status")).toHaveTextContent("Loading usage...");
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
   });
 

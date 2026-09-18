@@ -1,6 +1,7 @@
 import type {
   FactoriesAutomationRef,
   FactoriesFactoryPullRequest,
+  FactoriesFactoryPullRequestRevision,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
@@ -116,8 +117,12 @@ export interface SplitRunStreamLine {
 export interface SplitRunPhase {
   id: SplitRunPhaseId;
   name: string;
+  /** Markdown details shown below the activity title. */
+  description?: string;
   status: SplitRunPhaseStatus;
   duration: string;
+  /** When this automation started. */
+  startedAt?: string;
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -141,6 +146,13 @@ export interface SplitRunPhase {
   totalTokens?: string;
   /** Runner model this automation used. Hidden when empty. */
   model?: string;
+  /** Pull request and revision that started this activity. */
+  pullRequestActivity?: {
+    pullRequest?: FactoriesFactoryPullRequest;
+    revision?: FactoriesFactoryPullRequestRevision;
+    startedAt?: string;
+    waitingForAccess?: boolean;
+  };
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -703,6 +715,7 @@ function analysisRunToPhase(
     name: "Analysis",
     status,
     duration,
+    startedAt: entry.run.createdAt,
     componentName,
     artifacts: [],
     checks,
@@ -764,21 +777,75 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
   )?.id;
 }
 
-function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+function prFeedbackActivityBaseName(entry: PRFeedbackLogRun): string {
+  const title = entry.title?.trim();
+  if (title) {
+    return title;
+  }
   const description = entry.description?.trim();
-  const baseName = description
-    ? description
-    : entry.pullRequestNumber
-      ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
-      : "Activity on PR";
-  const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
+  if (description) {
+    return description;
+  }
+  if (entry.pullRequestNumber) {
+    return `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`;
+  }
+  return "Activity on PR";
+}
+
+function prFeedbackActivityName(entry: PRFeedbackLogRun): string {
+  const attempt = entry.attemptLabel?.trim();
+  const baseName = prFeedbackActivityBaseName(entry);
+  return attempt ? `${baseName} ${attempt}` : baseName;
+}
+
+function prFeedbackPhaseStatus(entry: PRFeedbackLogRun): SplitRunPhaseStatus {
+  if (entry.waitingForAccess && isActiveCanvasRun(entry.run)) {
+    return "waiting";
+  }
+  return statusForCanvasRun(entry.run);
+}
+
+function prFeedbackStreamAction(status: SplitRunPhaseStatus): string {
+  if (status === "passed") {
+    return "passed";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "running") {
+    return "running";
+  }
+  return "—";
+}
+
+function prFeedbackUpdatedAt(entry: PRFeedbackLogRun) {
+  return entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt;
+}
+
+function prFeedbackAttachedPullRequest(entry: PRFeedbackLogRun) {
+  if (entry.pullRequest) {
+    return entry.pullRequest;
+  }
+  if (entry.pullRequestNumber) {
+    return { number: entry.pullRequestNumber };
+  }
+  return undefined;
+}
+
+function prFeedbackPhaseDescription(entry: PRFeedbackLogRun) {
+  const title = entry.title?.trim();
+  if (!title) {
+    return undefined;
+  }
+  return entry.description?.trim();
+}
+
+function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
+  const status = prFeedbackPhaseStatus(entry);
+  const name = prFeedbackActivityName(entry);
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
-    {
-      createdAt: entry.run.createdAt,
-      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
-    },
+    { createdAt: entry.run.createdAt, updatedAt: prFeedbackUpdatedAt(entry) },
     status,
   );
   const line: SplitRunStreamLine = {
@@ -789,14 +856,16 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     duration,
     kind: "action",
     componentType: componentName,
-    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    action: prFeedbackStreamAction(status),
     iconSlug: "box",
   };
   return {
     id: `pr-feedback-${entry.run.id}`,
     name,
+    description: prFeedbackPhaseDescription(entry),
     status,
     duration,
+    startedAt: entry.run.createdAt,
     componentName,
     artifacts: [],
     stream: [line],
@@ -805,6 +874,12 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    pullRequestActivity: {
+      pullRequest: prFeedbackAttachedPullRequest(entry),
+      revision: entry.revision,
+      startedAt: entry.run.createdAt,
+      waitingForAccess: entry.waitingForAccess,
+    },
   };
 }
 
@@ -933,6 +1008,7 @@ function automationBacklogPhase(
     name,
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName,
     artifacts: [description],
     stream: [
@@ -964,6 +1040,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
     name: "Backlog",
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName: "Created manually",
     artifacts: [description],
     stream: [
@@ -1036,6 +1113,7 @@ function executionToPhase(
     name,
     status,
     duration,
+    startedAt: execution.createdAt,
     componentName,
     artifacts,
     checks: checksForLineExecution(execution, apiChecks, demoArtifacts),

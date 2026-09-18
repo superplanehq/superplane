@@ -24,6 +24,13 @@ type prFeedbackGraph struct {
 	RunnerNodeID             string
 }
 
+type resolvedPRFeedbackDiscussionFlow struct {
+	TriggerNodeID  string
+	FindNodeID     string
+	ActivityNodeID string
+	RunnerNodeID   string
+}
+
 func (g prFeedbackGraph) isChecks() bool {
 	return g.PullRequestTriggerNodeID != ""
 }
@@ -46,25 +53,11 @@ func (g prFeedbackGraph) healthyDiscussion(spec models.LiveCanvasSpec) bool {
 	if g.CommentTriggerNodeID == "" || g.ReviewTriggerNodeID == "" || g.ReplyTriggerNodeID == "" {
 		return false
 	}
-	if g.FindNodeID == "" || g.ActivityNodeID == "" || g.RunnerNodeID == "" {
-		return false
-	}
 
 	for _, triggerID := range g.triggerNodeIDs() {
-		if !hasCanvasPath(spec.Edges, triggerID, g.FindNodeID) {
+		if _, ok := resolvePRFeedbackDiscussionFlow(spec, triggerID); !ok {
 			return false
 		}
-	}
-	if !hasCanvasPath(spec.Edges, g.FindNodeID, g.ActivityNodeID) {
-		return false
-	}
-	if !hasCanvasPath(spec.Edges, g.ActivityNodeID, g.RunnerNodeID) {
-		return false
-	}
-
-	runner := findIntakeNode(spec.Nodes, g.RunnerNodeID)
-	if runner == nil || !slices.Contains(intakeAnalysisComponents, runner.ComponentName()) {
-		return false
 	}
 
 	for _, triggerID := range g.triggerNodeIDs() {
@@ -74,6 +67,70 @@ func (g prFeedbackGraph) healthyDiscussion(spec models.LiveCanvasSpec) bool {
 	}
 
 	return true
+}
+
+func (g prFeedbackGraph) discussionFlows(spec models.LiveCanvasSpec) []resolvedPRFeedbackDiscussionFlow {
+	flows := make([]resolvedPRFeedbackDiscussionFlow, 0, len(g.triggerNodeIDs()))
+	for _, triggerID := range g.triggerNodeIDs() {
+		if flow, ok := resolvePRFeedbackDiscussionFlow(spec, triggerID); ok {
+			flows = append(flows, flow)
+		}
+	}
+	return flows
+}
+
+func (g prFeedbackGraph) discussionRunnerNodeIDs(spec models.LiveCanvasSpec) map[string]bool {
+	runnerIDs := map[string]bool{}
+	for _, flow := range g.discussionFlows(spec) {
+		runnerIDs[flow.RunnerNodeID] = true
+	}
+	return runnerIDs
+}
+
+func (g prFeedbackGraph) hasIndependentDiscussionFlows(spec models.LiveCanvasSpec) bool {
+	flows := g.discussionFlows(spec)
+	if len(flows) != len(g.triggerNodeIDs()) {
+		return false
+	}
+
+	activityIDs := map[string]bool{}
+	for _, flow := range flows {
+		activityIDs[flow.ActivityNodeID] = true
+	}
+	return len(activityIDs) == len(flows)
+}
+
+func resolvePRFeedbackDiscussionFlow(
+	spec models.LiveCanvasSpec,
+	triggerID string,
+) (resolvedPRFeedbackDiscussionFlow, bool) {
+	for i := range spec.Nodes {
+		find := &spec.Nodes[i]
+		if find.ComponentName() != prFeedbackFindComponent || !hasCanvasPath(spec.Edges, triggerID, find.ID) {
+			continue
+		}
+		for j := range spec.Nodes {
+			activity := &spec.Nodes[j]
+			if activity.ComponentName() != prFeedbackActivityComponent ||
+				!hasCanvasPath(spec.Edges, find.ID, activity.ID) {
+				continue
+			}
+			for k := range spec.Nodes {
+				runner := &spec.Nodes[k]
+				if !slices.Contains(intakeAnalysisComponents, runner.ComponentName()) ||
+					!hasCanvasPath(spec.Edges, activity.ID, runner.ID) {
+					continue
+				}
+				return resolvedPRFeedbackDiscussionFlow{
+					TriggerNodeID:  triggerID,
+					FindNodeID:     find.ID,
+					ActivityNodeID: activity.ID,
+					RunnerNodeID:   runner.ID,
+				}, true
+			}
+		}
+	}
+	return resolvedPRFeedbackDiscussionFlow{}, false
 }
 
 func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
