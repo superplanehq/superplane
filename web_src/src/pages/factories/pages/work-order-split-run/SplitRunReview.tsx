@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
@@ -103,8 +104,11 @@ export function SplitRunReview({
   footer,
   className,
   organizationId,
+  factoryId,
   factoryKey,
+  orderId,
   orderNumber,
+  pullRequests,
   canAct = true,
   onStart,
   onArchive,
@@ -122,8 +126,11 @@ export function SplitRunReview({
   footer: SplitRunFooter;
   className?: string;
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
   canAct?: boolean;
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
@@ -181,6 +188,11 @@ export function SplitRunReview({
         compact={compact}
         actionsOnly={actionsOnly}
         startEmphasis={startEmphasis}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        pullRequests={pullRequests}
+        canAct={canAct}
         onAction={onAction}
       />
       {confirmUnclearStart ? (
