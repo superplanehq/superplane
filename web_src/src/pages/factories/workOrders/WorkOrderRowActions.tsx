@@ -1,12 +1,10 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
-import type { StartEmphasis } from "../lib/draftReadiness";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
 /** Actions callable from list and table rows. Cards do not change the owner. */
@@ -93,86 +91,6 @@ export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGr
         className="rounded-full ring-2 ring-background"
       />
     </span>
-  );
-}
-
-/** Line to start on: the preferred line when it exists, else the only line. */
-function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
-  const names = lines.map((line) => line.name?.trim()).filter((name): name is string => Boolean(name));
-  if (preferredLineName && names.includes(preferredLineName)) {
-    return preferredLineName;
-  }
-  if (names.length === 1) {
-    return names[0];
-  }
-  return undefined;
-}
-
-interface StartDraftButtonProps {
-  entry: WorkOrderListEntry;
-  lines: FactoriesFactoryLine[];
-  preferredLineName?: string;
-  canDispatch: boolean;
-  isDispatching: boolean;
-  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
-  /** Filled when the verdict says go. Outline keeps Start available but quiet. */
-  emphasis?: StartEmphasis;
-}
-
-/**
- * Persistent Start control on a draft card. One click sends the task
- * to the preferred line, or opens the line picker when more than one line
- * exists.
- */
-export function StartDraftButton({
-  entry,
-  lines,
-  preferredLineName,
-  canDispatch,
-  isDispatching,
-  onDispatch,
-  emphasis = "filled",
-}: StartDraftButtonProps) {
-  if (entry.displayStatus !== "draft") {
-    return null;
-  }
-
-  const lineName = resolveStartLineName(lines, preferredLineName);
-  const disabled = !canDispatch || lines.length === 0;
-
-  const startButton = (
-    <LoadingButton
-      type="button"
-      size="xs"
-      variant={emphasis === "filled" ? "default" : "outline"}
-      disabled={disabled}
-      loading={isDispatching}
-      loadingText="Starting..."
-      data-testid={`work-order-card-start-${entry.id}`}
-      onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
-    >
-      Start
-    </LoadingButton>
-  );
-
-  return (
-    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this task.">
-        {lineName ? (
-          startButton
-        ) : (
-          <DispatchWorkOrderPopover
-            lines={lines}
-            isSaving={isDispatching}
-            canDispatch={canDispatch}
-            submitLabel="Start"
-            onDispatch={(input) => onDispatch(entry.id, input)}
-          >
-            {startButton}
-          </DispatchWorkOrderPopover>
-        )}
-      </PermissionTooltip>
-    </div>
   );
 }
 

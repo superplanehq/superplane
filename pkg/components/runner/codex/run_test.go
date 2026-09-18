@@ -85,13 +85,24 @@ func TestCodexExecArgsQuotesUnsafeWorkspaceMCPKeys(t *testing.T) {
 }
 
 func TestCodexExecArgsResumesExactSession(t *testing.T) {
-	args := codexExecArgsFromScriptWithSession(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
-		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
-	}, "gpt-5", "/task/planning_session_mcp.js", "019ce0d1-cb1e-7e60-8745-fba83baea3a7")
+	args := codexExecArgsFromScriptWithSession(t, map[string]string{}, "gpt-5", "/task/planning_session_mcp.js", "019ce0d1-cb1e-7e60-8745-fba83baea3a7")
 
 	assert.Equal(t, []string{"exec", "resume", "019ce0d1-cb1e-7e60-8745-fba83baea3a7"}, args[:3])
 	assert.NotContains(t, args, "--last")
+}
+
+func TestCodexPlanningFollowUpDoesNotResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexSessionForPrompt } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexSessionForPrompt(4, "019ce0d1-cb1e-7e60-8745-fba83baea3a7", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, `""`, strings.TrimSpace(string(out)))
 }
 
 func TestCodexSessionForPromptRejectsMissingSession(t *testing.T) {

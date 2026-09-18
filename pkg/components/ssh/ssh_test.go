@@ -1,8 +1,6 @@
 package ssh
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -15,10 +13,8 @@ import (
 )
 
 // Legacy SSH nodes were saved before the commandSource field existed, so their
-// stored configuration omits it entirely. ValidateConfiguration does not apply
-// Field.Default, so commandSource must stay optional at the schema level or
-// re-validating/patching such a node would fail even though inline commands are
-// valid (the worker defaults the source to inline via commandSourceOrDefault).
+// stored configuration omits it. The schema now always requires commands and
+// no longer exposes a source picker.
 func TestSSHCommand_ValidateConfiguration_LegacyConfigWithoutCommandSource(t *testing.T) {
 	c := &SSHCommand{}
 	fields := c.Configuration()
@@ -49,38 +45,6 @@ func (m *testMetadataContext) Get() any {
 func (m *testMetadataContext) Set(value any) error {
 	m.value = value
 	return nil
-}
-
-// fakeFilesContext is an in-memory core.RepositoryFilesContext used to drive
-// file-mode SSH tests without spinning up a git provider.
-type fakeFilesContext struct {
-	files    map[string]string
-	listErr  error
-	readErr  error
-	readPath string
-}
-
-func (f *fakeFilesContext) List() ([]string, error) {
-	if f.listErr != nil {
-		return nil, f.listErr
-	}
-	paths := make([]string, 0, len(f.files))
-	for path := range f.files {
-		paths = append(paths, path)
-	}
-	return paths, nil
-}
-
-func (f *fakeFilesContext) Read(path string) (io.ReadCloser, error) {
-	f.readPath = path
-	if f.readErr != nil {
-		return nil, f.readErr
-	}
-	content, ok := f.files[path]
-	if !ok {
-		return nil, fmt.Errorf("file %q not found", path)
-	}
-	return io.NopCloser(strings.NewReader(content)), nil
 }
 
 func authConfig(method string, privateKey, password any) map[string]any {
@@ -263,109 +227,28 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	})
 }
 
-func TestSSHCommand_Setup_FileMode(t *testing.T) {
+func TestSSHCommand_Setup_RejectsRepositoryCommandFiles(t *testing.T) {
 	c := &SSHCommand{}
 	authWithKey := authConfig(AuthMethodSSHKey, map[string]any{"secret": "my-secret", "key": "private_key"}, nil)
-	baseConfig := func(extra map[string]any) map[string]any {
-		cfg := map[string]any{
+
+	err := c.Setup(core.SetupContext{
+		Configuration: map[string]any{
 			"host":           "example.com",
 			"username":       "root",
 			"authentication": authWithKey,
 			"commandSource":  CommandSourceFile,
+			"commandFile":    "scripts/deploy.sh",
 			"timeout":        60,
-		}
-		for key, value := range extra {
-			cfg[key] = value
-		}
-		return cfg
-	}
-
-	t.Run("missing command file", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(nil),
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "command file is required")
+		},
 	})
-
-	t.Run("invalid command file path", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "../escape.sh"}),
-			Files:         &fakeFilesContext{files: map[string]string{}},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid command file")
-	})
-
-	t.Run("no files context available", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "scripts/deploy.sh"}),
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "file access is not available")
-	})
-
-	t.Run("file not in repository", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "scripts/missing.sh"}),
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not found in app repository")
-	})
-
-	t.Run("list error surfaced", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "scripts/deploy.sh"}),
-			Files:         &fakeFilesContext{listErr: errors.New("boom")},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to list repository files")
-	})
-
-	t.Run("valid file with leading slash is normalized", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "/scripts/deploy.sh"}),
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
-		})
-		require.NoError(t, err)
-	})
-
-	t.Run("valid file in file mode passes", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "scripts/deploy.sh"}),
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
-		})
-		require.NoError(t, err)
-	})
-
-	t.Run("whitespace-only file content is rejected at setup", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{"commandFile": "scripts/deploy.sh"}),
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "  \n\t"}},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "empty")
-	})
-
-	t.Run("file mode ignores stale inline commands field", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: baseConfig(map[string]any{
-				"commandFile": "scripts/deploy.sh",
-				"commands":    "",
-			}),
-			Files: &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
-		})
-		require.NoError(t, err)
-	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errRepositoryCommandFileRemoved)
 }
 
-func TestSSHCommand_Execute_FileMode(t *testing.T) {
+func TestSSHCommand_Execute_RejectsRepositoryCommandFiles(t *testing.T) {
 	c := &SSHCommand{}
-
-	baseExecConfig := func(extra map[string]any) map[string]any {
-		cfg := map[string]any{
+	err := c.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
 			"host":          "example.com",
 			"port":          22,
 			"username":      "root",
@@ -375,129 +258,37 @@ func TestSSHCommand_Execute_FileMode(t *testing.T) {
 			"authentication": map[string]any{
 				"authMethod": "invalid",
 			},
-		}
-		for key, value := range extra {
-			cfg[key] = value
-		}
-		return cfg
-	}
-
-	t.Run("stores only the file path in metadata", func(t *testing.T) {
-		fileContent := "echo hello\nls -la"
-		files := &fakeFilesContext{
-			files: map[string]string{"scripts/deploy.sh": fileContent},
-		}
-		metadata := &testMetadataContext{}
-
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(nil),
-			Metadata:      metadata,
-			Files:         files,
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported authentication method")
-		// Execute reads the file once at start to validate it is reachable
-		// and non-empty (matches Setup's publish-time guard).
-		assert.Equal(t, "scripts/deploy.sh", files.readPath)
-
-		saved, ok := metadata.Get().(ExecutionMetadata)
-		require.True(t, ok)
-		assert.Equal(t, CommandSourceFile, saved.CommandSource)
-		assert.Equal(t, "scripts/deploy.sh", saved.CommandFile)
-		// File contents must NOT be persisted in metadata — the worker
-		// re-reads the file from the canvas repository on every attempt
-		// (initial + retries) so the script content never lives in the
-		// database.
-		assert.Empty(t, saved.Commands)
-		assert.NotContains(t, fmt.Sprintf("%v", metadata.Get()), fileContent)
+		},
+		Metadata: &testMetadataContext{},
 	})
-
-	t.Run("inline mode still stores commands in metadata", func(t *testing.T) {
-		metadata := &testMetadataContext{}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(map[string]any{
-				"commandSource": CommandSourceInline,
-				"commandFile":   "",
-				"commands":      "echo hi",
-			}),
-			Metadata: metadata,
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported authentication method")
-
-		saved, ok := metadata.Get().(ExecutionMetadata)
-		require.True(t, ok)
-		assert.Equal(t, CommandSourceInline, saved.CommandSource)
-		assert.Equal(t, "echo hi", saved.Commands)
-	})
-
-	t.Run("missing file context is reported", func(t *testing.T) {
-		metadata := &testMetadataContext{}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(nil),
-			Metadata:      metadata,
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "file access is not available")
-	})
-
-	t.Run("missing command file path is reported", func(t *testing.T) {
-		metadata := &testMetadataContext{}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(map[string]any{"commandFile": "  "}),
-			Metadata:      metadata,
-			Files:         &fakeFilesContext{},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "command file is required")
-	})
-
-	t.Run("empty file content is rejected", func(t *testing.T) {
-		metadata := &testMetadataContext{}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(nil),
-			Metadata:      metadata,
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "   \n  "}},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "empty")
-	})
-
-	t.Run("read error is reported", func(t *testing.T) {
-		metadata := &testMetadataContext{}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(nil),
-			Metadata:      metadata,
-			Files:         &fakeFilesContext{readErr: errors.New("disk gone")},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "read command file")
-	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errRepositoryCommandFileRemoved)
 }
 
-func TestLoadCommandFile_NormalizesLineEndings(t *testing.T) {
-	t.Run("normalizes Windows CRLF line endings", func(t *testing.T) {
-		files := &fakeFilesContext{
-			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\r\nprintf ok\r\n"},
-		}
-
-		body, err := loadCommandFile(files, "scripts/deploy.sh")
-		require.NoError(t, err)
-		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
-		assert.NotContains(t, body, "\r")
+func TestSSHCommand_Execute_StoresInlineCommandsInMetadata(t *testing.T) {
+	c := &SSHCommand{}
+	metadata := &testMetadataContext{}
+	err := c.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"host":          "example.com",
+			"port":          22,
+			"username":      "root",
+			"timeout":       60,
+			"commandSource": CommandSourceInline,
+			"commands":      "echo hi",
+			"authentication": map[string]any{
+				"authMethod": "invalid",
+			},
+		},
+		Metadata: metadata,
 	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported authentication method")
 
-	t.Run("normalizes lone carriage returns", func(t *testing.T) {
-		files := &fakeFilesContext{
-			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\rprintf ok\r"},
-		}
-
-		body, err := loadCommandFile(files, "scripts/deploy.sh")
-		require.NoError(t, err)
-		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
-		assert.NotContains(t, body, "\r")
-	})
+	saved, ok := metadata.Get().(ExecutionMetadata)
+	require.True(t, ok)
+	assert.Equal(t, CommandSourceInline, saved.CommandSource)
+	assert.Equal(t, "echo hi", saved.Commands)
 }
 
 func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
@@ -708,7 +499,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			CommandSource: CommandSourceInline,
 			Commands:      "echo 1\necho 2",
 		}
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
@@ -724,7 +515,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			Commands:      "echo 1 && echo 2",
 		}
 
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "echo 1 && echo 2", command)
 		assert.Nil(t, stdin)
@@ -744,7 +535,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			Commands:      script,
 		}
 
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
@@ -767,7 +558,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			Commands:      script,
 		}
 
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
@@ -783,7 +574,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			Commands:      "false\necho should-not-run",
 		}
 
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
@@ -798,97 +589,34 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			CommandSource: CommandSourceInline,
 			Commands:      "  \n  ",
 		}
-		_, _, err := c.buildExecutionCommand(meta, "")
+		_, _, err := c.buildExecutionCommand(meta)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "commands is required")
 	})
 
-	t.Run("file mode streams the pre-loaded script as stdin", func(t *testing.T) {
-		script := "#!/usr/bin/env bash\n# header\necho hi"
+	t.Run("file mode metadata is rejected", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceFile,
 			CommandFile:   "scripts/deploy.sh",
 		}
-
-		command, stdin, err := c.buildExecutionCommand(meta, script)
-		require.NoError(t, err)
-		assert.Equal(t, "bash -s", command)
-		require.NotNil(t, stdin)
-		assert.NotContains(t, command, " && ")
-
-		body, readErr := io.ReadAll(stdin)
-		require.NoError(t, readErr)
-		assert.Equal(t, script, string(body))
-	})
-
-	t.Run("file mode normalizes CRLF before streaming stdin", func(t *testing.T) {
-		script := "set -eo pipefail\r\necho hi\r\n"
-		meta := ExecutionMetadata{
-			CommandSource: CommandSourceFile,
-			CommandFile:   "scripts/deploy.sh",
-		}
-
-		command, stdin, err := c.buildExecutionCommand(meta, script)
-		require.NoError(t, err)
-		assert.Equal(t, "bash -s", command)
-		require.NotNil(t, stdin)
-
-		body, readErr := io.ReadAll(stdin)
-		require.NoError(t, readErr)
-		assert.Equal(t, "set -eo pipefail\necho hi\n", string(body))
-		assert.NotContains(t, string(body), "\r")
-	})
-
-	t.Run("file mode prepends working directory to the streamed script", func(t *testing.T) {
-		script := "echo hi"
-		meta := ExecutionMetadata{
-			CommandSource:    CommandSourceFile,
-			CommandFile:      "scripts/deploy.sh",
-			WorkingDirectory: "/opt/app",
-			Environment: []EnvironmentVariable{
-				{Name: "NAME", Value: "world"},
-			},
-		}
-
-		command, stdin, err := c.buildExecutionCommand(meta, script)
-		require.NoError(t, err)
-		assert.Equal(t, "env NAME='world' bash -s", command)
-
-		body, readErr := io.ReadAll(stdin)
-		require.NoError(t, readErr)
-		assert.Equal(t, "cd '/opt/app' || exit 1\necho hi", string(body))
-	})
-
-	t.Run("file mode rejects an empty script body", func(t *testing.T) {
-		meta := ExecutionMetadata{
-			CommandSource: CommandSourceFile,
-			CommandFile:   "scripts/deploy.sh",
-		}
-		_, _, err := c.buildExecutionCommand(meta, "")
+		_, _, err := c.buildExecutionCommand(meta)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "command file body is required")
+		assert.ErrorIs(t, err, errRepositoryCommandFileRemoved)
 	})
 
 	t.Run("legacy inline metadata (empty CommandSource) keeps old behavior", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			Commands: "echo legacy",
 		}
-		command, stdin, err := c.buildExecutionCommand(meta, "")
+		command, stdin, err := c.buildExecutionCommand(meta)
 		require.NoError(t, err)
 		assert.Equal(t, "echo legacy", command)
 		assert.Nil(t, stdin)
 	})
 }
 
-// Regression for the metadata-leak fix: the retry hook must re-read the
-// command file from the canvas repository on every retry, surface file
-// errors before any SSH work, and never fall back to script content from
-// stored metadata.
-func TestSSHCommand_HandleHook_FileModeRetryRereadsFile(t *testing.T) {
+func TestSSHCommand_HandleHook_RejectsRepositoryCommandFiles(t *testing.T) {
 	c := &SSHCommand{}
-	files := &fakeFilesContext{
-		files: map[string]string{"scripts/deploy.sh": "echo hi"},
-	}
 	metadata := &testMetadataContext{
 		value: ExecutionMetadata{
 			Host:          "example.com",
@@ -906,36 +634,11 @@ func TestSSHCommand_HandleHook_FileModeRetryRereadsFile(t *testing.T) {
 	err := c.HandleHook(core.ActionHookContext{
 		Name:           "executionRetry",
 		Metadata:       metadata,
-		Files:          files,
 		ExecutionState: &fakeExecutionState{},
 	})
 
 	require.Error(t, err)
-	// We get past the file load (which proves the retry re-read it) and
-	// only fail on the auth setup, which is the next step.
-	assert.Contains(t, err.Error(), "unsupported authentication method")
-	assert.Equal(t, "scripts/deploy.sh", files.readPath)
-}
-
-func TestSSHCommand_HandleHook_FileModeRetryReportsMissingFile(t *testing.T) {
-	c := &SSHCommand{}
-	files := &fakeFilesContext{readErr: errors.New("file gone")}
-	metadata := &testMetadataContext{
-		value: ExecutionMetadata{
-			CommandSource: CommandSourceFile,
-			CommandFile:   "scripts/deploy.sh",
-		},
-	}
-
-	err := c.HandleHook(core.ActionHookContext{
-		Name:           "executionRetry",
-		Metadata:       metadata,
-		Files:          files,
-		ExecutionState: &fakeExecutionState{},
-	})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read command file")
+	assert.ErrorIs(t, err, errRepositoryCommandFileRemoved)
 }
 
 type fakeExecutionState struct{ finished bool }
@@ -966,14 +669,9 @@ func TestSSHCommand_CommandSourceOrDefault(t *testing.T) {
 		assert.Equal(t, CommandSourceInline, Spec{CommandSource: "inline"}.commandSourceOrDefault())
 	})
 
-	// Regression: a non-empty padded value must be returned verbatim (NOT
-	// trimmed to a known source). The UI evaluates the commandFile/commands
-	// visibility and required conditions with an exact string comparison, so
-	// trimming "\tfile\n" to "file" here would run file mode on the worker
-	// while the UI had hidden and dropped commandFile from the saved payload.
-	// Returning it verbatim makes validateCommandSource/resolveCommands reject
-	// it loudly as an invalid command source instead.
-	t.Run("non-empty padded values are returned verbatim to match the UI's exact matching", func(t *testing.T) {
+	// A padded leftover value must stay verbatim so validateCommands rejects
+	// it as an invalid command source instead of treating it as file mode.
+	t.Run("non-empty padded values are returned verbatim", func(t *testing.T) {
 		assert.Equal(t, "file ", Spec{CommandSource: "file "}.commandSourceOrDefault())
 		assert.Equal(t, " inline", Spec{CommandSource: " inline"}.commandSourceOrDefault())
 		assert.Equal(t, "\tfile\n", Spec{CommandSource: "\tfile\n"}.commandSourceOrDefault())
@@ -984,9 +682,6 @@ func TestSSHCommand_Setup_RejectsPaddedCommandSource(t *testing.T) {
 	c := &SSHCommand{}
 	authWithKey := authConfig(AuthMethodSSHKey, map[string]any{"secret": "my-secret", "key": "private_key"}, nil)
 
-	// A padded "file" value must not silently run in file mode: the UI would
-	// have hidden and dropped commandFile, so Setup must reject it instead of
-	// letting the node publish in an inconsistent state.
 	err := c.Setup(core.SetupContext{
 		Configuration: map[string]any{
 			"host":           "example.com",
@@ -996,7 +691,6 @@ func TestSSHCommand_Setup_RejectsPaddedCommandSource(t *testing.T) {
 			"commandFile":    "scripts/deploy.sh",
 			"timeout":        60,
 		},
-		Files: &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid command source")

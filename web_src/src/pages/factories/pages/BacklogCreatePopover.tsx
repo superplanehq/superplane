@@ -1,6 +1,7 @@
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { FilePlus, Loader2, Plus, type LucideIcon } from "lucide-react";
@@ -114,7 +115,11 @@ function IntakeSourceIcon({ source }: { source: BacklogIntakeSource }) {
         src={source.iconSrc}
         alt=""
         data-testid={`lines-backlog-create-icon-${source.intakeId}`}
-        className={cn("size-4 shrink-0 object-contain", source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert")}
+        className={cn(
+          "size-4 shrink-0 object-contain",
+          source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+          logoDarkInvertClass(source.iconSrc),
+        )}
       />
     );
   }

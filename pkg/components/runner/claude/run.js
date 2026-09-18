@@ -275,7 +275,10 @@ function writeSessionID(taskDir, sessionID) {
   }
 }
 
-function claudeContinuationArgs(promptCount, sessionID) {
+function claudeContinuationArgs(promptCount, sessionID, env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+    return [];
+  }
   if (Number(promptCount) < 1) {
     return [];
   }
@@ -317,15 +320,16 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
     Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const sessionID = readSessionID(sp);
+  const continuationArgs = claudeContinuationArgs(promptCount, sessionID);
   let prompt = applyAnalysisContinuation(
     sp,
-    promptCount,
+    continuationArgs.length > 0 ? promptCount : 0,
     fs.readFileSync(promptFile, "utf8"),
   );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
-  const sessionID = readSessionID(sp);
   const planningToolsEnabled = planningMCPEnabled();
   const toolsEnabled = mcpToolsEnabled();
   configureArtifactOutput(sp);
@@ -363,7 +367,7 @@ async function runPrompt(promptFile, model) {
   if (model) {
     claudeArgs.push("--model", model);
   }
-  claudeArgs.push(...claudeContinuationArgs(promptCount, sessionID));
+  claudeArgs.push(...continuationArgs);
   claudeArgs.push("--", prompt);
 
   let command = "claude";

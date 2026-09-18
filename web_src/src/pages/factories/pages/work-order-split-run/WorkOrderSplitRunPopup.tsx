@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
@@ -17,7 +18,6 @@ import { SplitRunReview } from "./SplitRunReview";
 import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
-import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -115,7 +115,6 @@ function AnalysisWorkOrderPopup({
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
-  const modelLabel = useImplementationRunnerModel(organizationId, fixture.phases);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
@@ -140,7 +139,9 @@ function AnalysisWorkOrderPopup({
     organizationId,
     factoryId,
     factoryKey,
+    orderId,
     orderNumber,
+    pullRequests: popupData.pullRequests,
     canUpdate,
     draftStart,
     mutations,
@@ -201,8 +202,9 @@ function AnalysisWorkOrderPopup({
           >
             <OwnerTimeCostRow
               fixture={{ ...fixture, owner: edits.owner }}
-              modelLabel={modelLabel}
               assigneeIds={edits.assigneeIds}
+              usageByModel={fixture.usageByModel}
+              usageByMachineType={fixture.usageByMachineType}
             />
           </PopupHeader>
         )}
@@ -237,7 +239,9 @@ function analysisPopupReview(args: {
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
   canUpdate: boolean;
   draftStart: ReturnType<typeof draftStartAction>;
   mutations: ReturnType<typeof footerMutationHandlers>;
@@ -252,8 +256,11 @@ function analysisPopupReview(args: {
     <SplitRunReview
       footer={args.fixture.footer}
       organizationId={args.organizationId}
+      factoryId={args.factoryId}
       factoryKey={args.factoryKey}
+      orderId={args.orderId}
       orderNumber={args.orderNumber}
+      pullRequests={args.pullRequests}
       canAct={args.canUpdate}
       onStart={args.draftStart}
       onArchive={args.mutations.onArchive}

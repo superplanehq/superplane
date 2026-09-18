@@ -165,7 +165,10 @@ function writeSessionID(taskDir, sessionID) {
   }
 }
 
-function codexSessionForPrompt(promptCount, sessionID) {
+function codexSessionForPrompt(promptCount, sessionID, env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+    return "";
+  }
   if (Number(promptCount) < 1) {
     return "";
   }
@@ -293,15 +296,15 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
     Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
   let prompt = applyAnalysisContinuation(
     sp,
-    promptCount,
+    sessionID ? promptCount : 0,
     fs.readFileSync(promptFile, "utf8"),
   );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
-  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
   if (artifactEnabled()) {
@@ -326,7 +329,7 @@ async function runPrompt(promptFile, model) {
     writeStdout("Planning session tools enabled\n");
     writeStdout("sandbox: read-only\n");
   }
-  if (promptCount > 0) {
+  if (sessionID) {
     writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);

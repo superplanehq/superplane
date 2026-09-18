@@ -335,6 +335,37 @@ func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
 	assert.Equal(t, parentCanvas.ID.String(), childResponse.Run.Parent.CanvasId)
 }
 
+func Test__ListRuns__IncludesUsageTotalsAndModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "score", "start")
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, entry, "default", nil, map[string]any{
+		"workOrder": map[string]any{"id": uuid.New().String()},
+	})
+	run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	response, err := ListRuns(context.Background(), db, canvas, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 1)
+	assert.Equal(t, run.ID.String(), response.Runs[0].GetId())
+	assert.EqualValues(t, 1_000_000, response.Runs[0].GetTotalTokens())
+	assert.Positive(t, response.Runs[0].GetCostCents())
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, response.Runs[0].GetModels())
+}
+
 func createStartedRun(t *testing.T, rootEvent *models.CanvasEvent) *models.CanvasRun {
 	var run *models.CanvasRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {

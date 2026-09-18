@@ -217,6 +217,7 @@ function ColumnAutomationViewBody({
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
+        showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
       />
     );
   }
@@ -277,6 +278,7 @@ export function ColumnAutomationViewHost({
               isLoading: agent.isLoading || !agent.draft,
               organizationId,
               onSave: agent.save,
+              showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
           : undefined
       }

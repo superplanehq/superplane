@@ -7,7 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
+const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation, isCompactStatusText } = require("./analysis_protocol");
 const {
   proposeSpec,
   proposeClarity,
@@ -15,6 +15,7 @@ const {
   createTask,
   recordAgentMessage,
   writeAnalysisOutputs,
+  parseFrames,
 } = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
@@ -223,6 +224,28 @@ test("proposeSpec, proposeClarity, and proposeConfidence publish on separate rou
   }
 });
 
+test("compact status text is not a user-facing reply", () => {
+  assert.equal(isCompactStatusText("Compactions remaining: 0"), true);
+  assert.equal(isCompactStatusText("  Compactions remaining: 2 \n"), true);
+  assert.equal(isCompactStatusText("The plan is ready."), false);
+});
+
+test("recordAgentMessage ignores Claude compact status", async () => {
+  const previousFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => '{"status":"shown"}' };
+  };
+  try {
+    const result = await recordAgentMessage("Compactions remaining: 0");
+    assert.deepEqual(result, { status: "ignored" });
+    assert.equal(calls.length, 0);
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
 test("recordAgentMessage publishes the final reply outside the MCP tool list", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
   const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
@@ -374,6 +397,72 @@ test("createTask posts the new task with the activity id and rejects empty input
     else process.env.SUPERPLANE_ACTIVITY_ID = previousActivityID;
   }
 });
+
+test("parseFrames keeps a partial Content-Length header", () => {
+  const ping = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ping",
+  };
+  const frame = Buffer.from(encodeMCP("lsp", ping));
+  const partial = frame.subarray(0, 8);
+  const parsed = parseFrames(partial);
+  assert.equal(parsed.messages.length, 0);
+  assert.deepEqual(parsed.rest, partial);
+});
+
+test("parseFrames reads LSP frames that arrive in small chunks", () => {
+  const ping = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ping",
+  };
+  const list = {
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/list",
+    params: {},
+  };
+  const frame = Buffer.concat([
+    Buffer.from(encodeMCP("lsp", ping)),
+    Buffer.from(encodeMCP("lsp", list)),
+  ]);
+  for (const chunkSize of [1, 8, 15, 16, 64]) {
+    const fed = feedParseFrames(frame, chunkSize);
+    assert.deepEqual(
+      fed.messages.map((message) => message.method),
+      ["ping", "tools/list"],
+      `chunk size ${chunkSize}`,
+    );
+    assert.equal(fed.rest.length, 0, `chunk size ${chunkSize}`);
+  }
+});
+
+test("parseFrames still recovers NDJSON after a stray byte", () => {
+  const ping = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ping",
+  };
+  const parsed = parseFrames(Buffer.from(`x${encodeMCP("ndjson", ping)}`));
+  assert.equal(parsed.messages.length, 1);
+  assert.equal(parsed.messages[0].method, "ping");
+});
+
+function feedParseFrames(frame, chunkSize) {
+  let buffer = Buffer.alloc(0);
+  const messages = [];
+  for (let index = 0; index < frame.length; index += chunkSize) {
+    buffer = Buffer.concat([
+      buffer,
+      frame.subarray(index, index + chunkSize),
+    ]);
+    const parsed = parseFrames(buffer);
+    buffer = parsed.rest;
+    messages.push(...parsed.messages);
+  }
+  return { messages, rest: buffer };
+}
 
 async function exchangeMCP(format, messages) {
   const child = spawn(

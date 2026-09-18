@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
 )
 
@@ -128,14 +127,6 @@ func (a *RunCodeAgent) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{Resource: &configuration.ResourceTypeOptions{Type: "model"}},
 		},
 		{
-			Name: "files", Label: "Files", Type: configuration.FieldTypeList, Required: false,
-			Description: "Files from the Files tab to mount into the agent's workspace.",
-			TypeOptions: &configuration.TypeOptions{List: &configuration.ListTypeOptions{
-				ItemLabel:      "File path",
-				ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeRepositoryFile},
-			}},
-		},
-		{
 			Name: "networking", Label: "Networking", Type: configuration.FieldTypeSelect, Required: false, Default: networkingUnrestricted,
 			Description: "Sandbox outbound access.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
@@ -174,9 +165,6 @@ func (a *RunCodeAgent) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	if err := validateSpec(spec); err != nil {
-		return err
-	}
-	if err := validateConfiguredFiles(ctx, spec.Files); err != nil {
 		return err
 	}
 	if err := structuredoutput.ValidateAtSetup(spec.OutputSchema); err != nil {
@@ -236,12 +224,11 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 		meta.PrURL = pr.HTMLURL
 	}
 
-	resources, err := a.provisionResources(ctx, client, spec, string(token), meta)
-	if err != nil {
+	if err := a.provisionResources(ctx, client, spec, string(token), meta); err != nil {
 		return err
 	}
 
-	if err := a.startSession(ctx, client, spec, pr, attribution, meta, resources, schema); err != nil {
+	if err := a.startSession(ctx, client, spec, pr, attribution, meta, schema); err != nil {
 		return err
 	}
 
@@ -273,12 +260,11 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 // On any failure it reclaims all provisioned resources — always, regardless of
 // "Keep Session After Run": the run never started, so there is no transcript
 // worth keeping, and no poll exists to reclaim it later.
-func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.Client, spec Spec, pr *pullRequestInfo, attribution commitAttribution, meta *ExecutionMetadata, resources []runagent.FileResource, schema map[string]any) error {
+func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.Client, spec Spec, pr *pullRequestInfo, attribution commitAttribution, meta *ExecutionMetadata, schema map[string]any) error {
 	session, err := client.CreateManagedSession(runagent.CreateManagedSessionRequest{
 		Agent:         meta.AgentID,
 		EnvironmentID: meta.EnvironmentID,
 		VaultIDs:      []string{meta.VaultID},
-		Resources:     resources,
 	})
 	if err != nil {
 		a.teardown(client, meta, false, false, ctx.Logger.Warnf)
@@ -290,7 +276,7 @@ func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	message := buildPrompt(spec, pr, meta.Branch, len(spec.Files) > 0, attribution, schema)
+	message := buildPrompt(spec, pr, meta.Branch, attribution, schema)
 	if err := client.SendManagedSessionUserMessage(session.ID, message); err != nil {
 		a.teardown(client, meta, true, false, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to send task to agent: %w", err)
@@ -300,44 +286,36 @@ func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.
 
 func (a *RunCodeAgent) Cleanup(ctx core.SetupContext) error { return nil }
 
-// provisionResources creates the agent, environment, uploaded files, and vault,
+// provisionResources creates the agent, environment, and vault,
 // recording each in metadata so cleanup can always reclaim them. On any failure
 // it tears down what was created and returns the error.
-func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *runagent.Client, spec Spec, token string, meta *ExecutionMetadata) ([]runagent.FileResource, error) {
+func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *runagent.Client, spec Spec, token string, meta *ExecutionMetadata) error {
 	agentID, err := client.CreateAgent(runagent.CreateAgentRequest{
 		Name:   fmt.Sprintf("superplane-%s", shortID(ctx.ID.String())),
 		Model:  modelForRun(spec),
 		System: defaultSystemPrompt,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create agent: %w", err)
+		return fmt.Errorf("failed to create agent: %w", err)
 	}
 	meta.AgentID = agentID
 
 	envID, err := client.CreateEnvironment(fmt.Sprintf("superplane-%s", shortID(ctx.ID.String())), buildEnvironmentConfig(spec))
 	if err != nil {
 		a.teardown(client, meta, false, false, ctx.Logger.Warnf)
-		return nil, fmt.Errorf("failed to create environment: %w", err)
+		return fmt.Errorf("failed to create environment: %w", err)
 	}
 	meta.EnvironmentID = envID
-
-	resources, err := uploadFiles(client, ctx, spec.Files)
-	if err != nil {
-		meta.FileIDs = fileIDsOf(resources)
-		a.teardown(client, meta, false, false, ctx.Logger.Warnf)
-		return nil, err
-	}
-	meta.FileIDs = fileIDsOf(resources)
 
 	vaultID, err := provisionVault(client, ctx, spec, token)
 	if err != nil {
 		meta.VaultID = vaultID // may be set even on partial failure
 		a.teardown(client, meta, false, false, ctx.Logger.Warnf)
-		return nil, err
+		return err
 	}
 	meta.VaultID = vaultID
 
-	return resources, nil
+	return nil
 }
 
 // teardown best-effort reclaims every provisioned resource. Safe to call with a
@@ -363,7 +341,6 @@ func (a *RunCodeAgent) teardown(client *runagent.Client, meta *ExecutionMetadata
 	if !keepSession {
 		warnErr(logWarn, client.DeleteEnvironment(meta.EnvironmentID), "delete environment %s", meta.EnvironmentID)
 	}
-	client.CleanupFiles(meta.FileIDs, logWarn)
 	warnErr(logWarn, client.DeleteVault(meta.VaultID), "delete vault %s", meta.VaultID)
 	warnErr(logWarn, client.ArchiveAgent(meta.AgentID), "archive agent %s", meta.AgentID)
 }
@@ -422,33 +399,6 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	return true, nil
 }
 
-func uploadFiles(client *runagent.Client, ctx core.ExecutionContext, files []string) ([]runagent.FileResource, error) {
-	if len(files) == 0 {
-		return nil, nil
-	}
-	if ctx.Files == nil {
-		return nil, fmt.Errorf("files configured but file access is not available")
-	}
-	resources := make([]runagent.FileResource, 0, len(files))
-	for _, path := range files {
-		normalized, err := gitprovider.ValidateUserPath(path)
-		if err != nil {
-			return resources, fmt.Errorf("invalid file path %q: %w", path, err)
-		}
-		reader, err := ctx.Files.Read(normalized)
-		if err != nil {
-			return resources, fmt.Errorf("read file %q: %w", path, err)
-		}
-		fileID, err := client.UploadFile(reader, normalized)
-		reader.Close()
-		if err != nil {
-			return resources, fmt.Errorf("upload file %q: %w", path, err)
-		}
-		resources = append(resources, runagent.FileResource{FileID: fileID, MountPath: attachmentsMountDir + "/" + normalized})
-	}
-	return resources, nil
-}
-
 func provisionVault(client *runagent.Client, ctx core.ExecutionContext, spec Spec, token string) (string, error) {
 	vaultID, err := client.CreateVault(fmt.Sprintf("superplane-%s", shortID(ctx.ID.String())), map[string]string{"superplane_execution": ctx.ID.String()})
 	if err != nil {
@@ -504,9 +454,6 @@ func decodeSpec(config any) (Spec, error) {
 		return spec, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 	if raw, ok := config.(map[string]any); ok {
-		if v, ok := raw["files"]; ok {
-			spec.Files = decodeStringList(v)
-		}
 		if v, ok := raw["allowedHosts"]; ok {
 			spec.AllowedHosts = decodeStringList(v)
 		}
@@ -561,35 +508,6 @@ func validateSpec(spec Spec) error {
 		}
 	default:
 		return fmt.Errorf("invalid sourceMode %q", spec.SourceMode)
-	}
-	return nil
-}
-
-func validateConfiguredFiles(ctx core.SetupContext, files []string) error {
-	if len(files) == 0 {
-		return nil
-	}
-	if ctx.Files == nil {
-		return fmt.Errorf("files configured but file access is not available")
-	}
-	available, err := ctx.Files.List()
-	if err != nil {
-		return fmt.Errorf("failed to list repository files: %v", err)
-	}
-	fileSet := make(map[string]bool, len(available))
-	for _, f := range available {
-		if norm, err := gitprovider.NormalizePath(f); err == nil {
-			fileSet[norm] = true
-		}
-	}
-	for _, f := range files {
-		norm, err := gitprovider.ValidateUserPath(f)
-		if err != nil {
-			return fmt.Errorf("invalid file path %q: %v", f, err)
-		}
-		if !fileSet[norm] {
-			return fmt.Errorf("file %q not found in app repository", f)
-		}
 	}
 	return nil
 }
@@ -698,17 +616,6 @@ func branchForRun(spec Spec, pr *pullRequestInfo, id uuid.UUID) string {
 		return b
 	}
 	return "claude/agent-" + shortID(id.String())
-}
-
-func fileIDsOf(resources []runagent.FileResource) []string {
-	if len(resources) == 0 {
-		return nil
-	}
-	ids := make([]string, len(resources))
-	for i, r := range resources {
-		ids[i] = r.FileID
-	}
-	return ids
 }
 
 func shortID(id string) string {

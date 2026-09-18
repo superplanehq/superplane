@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "console" | "memory";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version";
 
-const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory", "files"]);
+const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory"]);
 
 export function normalizeCanvasHeaderMode(headerMode: CanvasPageHeaderMode | undefined): WorkflowHeaderMode {
   if (!headerMode || headerMode === "default") {
@@ -37,7 +37,7 @@ export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined
 /**
  * True when the runs sidebar (and its toggle icon) may be shown for the given
  * tab. The runs sidebar is available on the main workflow Canvas tab and on the
- * Console tab, but not on the Memory or Files surfaces. The Console overlay is
+ * Console tab, but not on the Memory surface. The Console overlay is
  * laid out beside the left sidebars, so an open runs sidebar coexists with it.
  */
 export function allowsRunsSidebar(headerMode: CanvasPageHeaderMode | undefined): boolean {
@@ -52,7 +52,7 @@ function isConsoleViewParam(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
 }
 
-/** True when the URL points at the main workflow canvas tab (not Console, Memory, Files, or Versions). */
+/** True when the URL points at the main workflow canvas tab (not Console, Memory, or Versions). */
 export function isWorkflowCanvasViewParam(view: string): boolean {
   return view === "" || view === LEGACY_RUNS_VIEW;
 }
@@ -60,7 +60,6 @@ export function isWorkflowCanvasViewParam(view: string): boolean {
 export type WorkflowUrlViewFlags = {
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   isConsoleMode: boolean;
 };
 
@@ -72,23 +71,21 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
   return {
     isRunInspectionMode,
     isMemoryMode: view === "memory",
-    isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
   };
 }
 
-/** Factory apps are canvas-only — no Console / Memory / Files surfaces. */
+/** Factory apps are canvas-only — no Console / Memory surfaces. */
 export function clampWorkflowViewFlagsForFactoryApp(flags: WorkflowUrlViewFlags): WorkflowUrlViewFlags {
   return {
     ...flags,
     isMemoryMode: false,
-    isFilesMode: false,
     isConsoleMode: false,
   };
 }
 
 export function isNonCanvasAppViewParam(view: string): boolean {
-  return isConsoleViewParam(view) || view === "memory" || view === "files";
+  return isConsoleViewParam(view) || view === "memory";
 }
 
 export function useWorkflowUrlViewFlags(searchParams: URLSearchParams) {
@@ -189,11 +186,9 @@ export function applyRunInspectionNavigationSearchParams(
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isMemoryMode,
-  isFilesMode,
 }: {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isConsoleMode) {
     return "console";
@@ -201,10 +196,6 @@ export function getWorkflowHeaderMode({
 
   if (isMemoryMode) {
     return "memory";
-  }
-
-  if (isFilesMode) {
-    return "files";
   }
 
   return "version-live";
@@ -232,28 +223,26 @@ export function getWorkflowViewPresentation({
   isConsoleMode,
   isRunInspectionMode,
   isMemoryMode,
-  isFilesMode,
   hasEditableVersion,
   isViewingCurrentLiveVersion,
 }: {
   isConsoleMode: boolean;
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   hasEditableVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingCurrentLiveVersion,
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunInspectionMode || isFilesMode,
+    readOnlyViewModes: isRunInspectionMode,
   };
 }
 

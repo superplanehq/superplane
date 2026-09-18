@@ -177,6 +177,16 @@ func (s *FactoryService) UpdateFactoryPullRequest(ctx context.Context, req *pb.U
 	return actions.UpdateFactoryPullRequest(ctx, organizationID, req)
 }
 
+func (s *FactoryService) DescribeFactoryPullRequestMergeability(ctx context.Context, req *pb.DescribeFactoryPullRequestMergeabilityRequest) (*pb.DescribeFactoryPullRequestMergeabilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribeFactoryPullRequestMergeability(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.MergeFactoryPullRequestRequest) (*pb.MergeFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MergeFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)

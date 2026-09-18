@@ -1,7 +1,12 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import superplaneIcon from "@/assets/superplane.svg";
 
-import { CREATED_MANUALLY, splitRunSourceForOrder } from "../pages/work-order-split-run/splitRunSource";
+import {
+  CREATED_MANUALLY,
+  INTAKE_PRESENTATION,
+  splitRunSourceForOrder,
+  type SplitRunIntakeKind,
+} from "../pages/work-order-split-run/splitRunSource";
 
 export interface WorkOrderCardSource {
   name: string;
@@ -31,6 +36,26 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
     iconAlt: source.iconAlt,
     ticket: source.ticket,
   };
+}
+
+/** Sentinel source filter value that matches tasks created by a person. */
+export const MANUAL_FILTER_VALUE = "manual";
+
+export function workOrderListSource(order: FactoriesWorkOrder): { id: string; label: string } {
+  const source = splitRunSourceForOrder(order);
+  if (source.kind === "manual") {
+    return { id: MANUAL_FILTER_VALUE, label: CREATED_MANUALLY };
+  }
+  const intakeKind = intakeKindForPresentationName(source.name);
+  return {
+    id: intakeKind ?? source.name,
+    label: source.name,
+  };
+}
+
+function intakeKindForPresentationName(name: string): SplitRunIntakeKind | undefined {
+  const kinds = Object.keys(INTAKE_PRESENTATION) as SplitRunIntakeKind[];
+  return kinds.find((kind) => INTAKE_PRESENTATION[kind].name === name);
 }
 
 export function workOrderCardSourceLabel(source: WorkOrderCardSource): string {

@@ -9,6 +9,7 @@ const {
   FOLLOW_UP_CMD_INDEX_BASE,
   interpretWaitResponse,
   nextAction,
+  persistAnalysisContinuation,
   runLoop,
   runPromptFile,
   safeWaitRequest,
@@ -54,6 +55,42 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-continuation-"));
+  persistAnalysisContinuation(dir, {
+    continuation: "Continue this SuperPlane analysis session.",
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
+  persistAnalysisContinuation(dir, { status: "message", text: "ok" });
+  assert.equal(fs.existsSync(path.join(dir, "analysis_continuation.md")), false);
+});
+
+test("runLoop writes wait continuation before the follow-up prompt", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-continuation-"));
+  const results = [
+    {
+      status: "message",
+      text: "Narrow the spec",
+      continuation: "Continue this SuperPlane analysis session.",
+    },
+    { status: "ended" },
+  ];
+  await runLoop({
+    waitOnce: async () => results.shift(),
+    taskDir: dir,
+    runPrompt: async () => 0,
+    sleep: async () => {},
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
 });
 
 test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {
@@ -376,13 +413,14 @@ test("runPromptFile forwards extra argv to run.js", async () => {
   const argvFile = path.join(taskDir, "argv.json");
   fs.writeFileSync(
     path.join(taskDir, "run.js"),
-    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify({argv: process.argv.slice(2), rewind: process.env.SUPERPLANE_ANALYSIS_REWIND}));\n`,
   );
   const promptFile = path.join(taskDir, "prompt.txt");
   fs.writeFileSync(promptFile, "hello\n");
 
   const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
   assert.equal(code, 0);
-  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
-  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
+  const recorded = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(recorded.argv, [promptFile, "openai/gpt-4.1", "64"]);
+  assert.equal(recorded.rewind, "yes");
 });

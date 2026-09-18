@@ -19,6 +19,7 @@ import {
   usageTokenSpendMicros,
   usageVmSpendCents,
   usageVmSpendMicros,
+  workOrderSpendBreakdownRows,
 } from "./workOrderUsage";
 
 describe("firstPositiveWorkOrderMetric", () => {
@@ -226,5 +227,28 @@ describe("formatUsageOccurredAt", () => {
   it("returns an em dash for missing or invalid values", () => {
     expect(formatUsageOccurredAt(undefined)).toBe("—");
     expect(formatUsageOccurredAt("not-a-date")).toBe("—");
+  });
+});
+
+describe("workOrderSpendBreakdownRows", () => {
+  it("lists models with spend and one machine time row", () => {
+    expect(
+      workOrderSpendBreakdownRows(
+        [
+          { provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" },
+          { provider: "openai", model: "gpt-4.1", totalTokens: "10", costCents: "0" },
+        ],
+        [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
+      ),
+    ).toEqual([
+      { label: "claude-sonnet-4-6", detail: "2.7k tokens", spend: "$0.45" },
+      { label: "Machine time", detail: "1 min 30 s", spend: "$0.28" },
+    ]);
+  });
+
+  it("returns no rows when nothing has spend", () => {
+    expect(
+      workOrderSpendBreakdownRows([{ model: "claude-sonnet-4-6", totalTokens: "10", costCents: "0" }], []),
+    ).toEqual([]);
   });
 });

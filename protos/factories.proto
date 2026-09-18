@@ -364,6 +364,33 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryPullRequestMergeability(
+    DescribeFactoryPullRequestMergeabilityRequest
+  ) returns (DescribeFactoryPullRequestMergeabilityResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs/{pr_id}/mergeability"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory pull request mergeability";
+      description: "Returns whether a tracked factory pull request can merge from SuperPlane";
+      tags: "Factory";
+    };
+  }
+
+  rpc MergeFactoryPullRequest(
+    MergeFactoryPullRequestRequest
+  ) returns (MergeFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Merge factory pull request";
+      description: "Merges a tracked GitHub pull request with a method the repository allows";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -1406,6 +1433,51 @@ message UpdateFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
+message FactoryPullRequestMergeability {
+  enum BlockedReason {
+    BLOCKED_REASON_UNSPECIFIED = 0;
+    BLOCKED_REASON_ACTIVE_RUN = 1;
+    BLOCKED_REASON_CHECKS_UNFINISHED = 2;
+    BLOCKED_REASON_CHECK_FAILED = 3;
+    BLOCKED_REASON_DRAFT = 4;
+    BLOCKED_REASON_CONFLICTING = 5;
+    BLOCKED_REASON_MISSING_INTEGRATION = 6;
+  }
+
+  enum MergeMethod {
+    MERGE_METHOD_UNSPECIFIED = 0;
+    MERGE_METHOD_SQUASH = 1;
+    MERGE_METHOD_MERGE = 2;
+    MERGE_METHOD_REBASE = 3;
+  }
+
+  bool can_merge = 1;
+  BlockedReason blocked_reason = 2;
+  string message = 3;
+  repeated MergeMethod allowed_methods = 4;
+  string head_sha = 5;
+}
+
+message DescribeFactoryPullRequestMergeabilityRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message DescribeFactoryPullRequestMergeabilityResponse {
+  FactoryPullRequestMergeability mergeability = 1;
+}
+
+message MergeFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  FactoryPullRequestMergeability.MergeMethod merge_method = 3;
+  string expected_head_sha = 4;
+}
+
+message MergeFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -1536,6 +1608,11 @@ message WorkOrder {
   // Canvas run that created this task, when Create Task produced it.
   // Empty for tasks opened in the UI or imported without a source run.
   string source_run_id = 19;
+  // Model spend for this task, one row per model. UI hides empty rows.
+  repeated UsageByModel usage_by_model = 20;
+  // Runner machine time for this task, one row per machine type.
+  // UI hides empty rows and may collapse them into one machine-time line.
+  repeated UsageByMachineType usage_by_machine_type = 21;
 }
 
 message WorkOrderOrigin {
@@ -1680,6 +1757,9 @@ message WorkOrderExecution {
   // When the execution finished (set for finished executions only).
   google.protobuf.Timestamp finished_at = 11;
   int64 duration_seconds = 12;
+  // Models that recorded spend on this step. Distinct ledger model ids,
+  // oldest first. UI prefers these over the Start override.
+  repeated string models = 13;
 }
 
 message WorkOrderExecutionStep {

@@ -1,6 +1,6 @@
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 
-const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations", "/apps/install/preview", "/apps/install"]);
+const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations"]);
 
 let interceptorFetch: typeof globalThis.fetch | undefined;
 
