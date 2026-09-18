@@ -13,7 +13,8 @@ import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestI
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
-import { ComposerPlanStack } from "./ComposerPlanControls";
+import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
+import { ComposerPlanStack, type ComposerScore } from "./ComposerPlanControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -44,13 +45,13 @@ export type IntentAnalysisChat = {
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
-  clarityExpanded?: boolean;
-  onToggleClarity?: () => void;
-  latestPlanScore?: number;
-  latestPlanSummary?: string;
+  clarity?: ComposerScore;
+  confidence?: ComposerScore;
   planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
+  /** Model select for Start. The strip shows it on the settings row. */
+  modelSelect?: ReactNode;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -110,7 +111,7 @@ function AnalysisRequestChat({
   });
   const chipsWorking = composerChipsWorking({
     isAnalyzing: analysis.isAnalyzing,
-    score: analysis.latestPlanScore,
+    score: analysis.clarity?.score ?? analysis.confidence?.score,
     machineStatus: analysis.view.machineStatus,
   });
   const images = useAnalysisComposerImages({
@@ -216,15 +217,14 @@ function AnalysisComposer({
         <div className="flex flex-col gap-2">
           <ComposerPlanStack
             open={Boolean(analysis.planPaneOpen)}
-            score={analysis.latestPlanScore}
-            scoreSummary={analysis.latestPlanSummary}
+            clarity={analysis.clarity}
+            confidence={analysis.confidence}
             isAnalyzing={chipsWorking}
             canTogglePlan={Boolean(analysis.canTogglePlan)}
             planStatus={analysis.planStatus}
             onToggle={analysis.onTogglePlan}
-            summaryOpen={analysis.clarityExpanded}
-            onToggleSummary={analysis.onToggleClarity}
             actions={analysis.closedDecision}
+            modelSelect={analysis.modelSelect}
           />
           <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
             <InputGroupTextarea
@@ -301,7 +301,7 @@ function RequestMessage({
       description={description}
       files={files}
       previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
-      fadeClassName="sp-user-note-fade"
+      fadeClassName={asChat ? REQUEST_CARD_FADE_CLASSNAME : undefined}
     />
   ) : (
     <p className="text-[13px] text-muted-foreground">No request yet.</p>
@@ -312,7 +312,7 @@ function RequestMessage({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="max-w-[92%]">
           <div
-            className="sp-user-note rounded-2xl border px-3.5 py-3"
+            className="rounded-2xl border bg-card px-3.5 py-3"
             data-testid="split-run-description"
             aria-label="Request"
           >
@@ -325,9 +325,9 @@ function RequestMessage({
 
   return (
     <div className="mb-3 flex w-full justify-end" data-testid="split-run-description">
-      <div className="sp-user-note max-w-[92%] rounded-2xl border px-3.5 py-2.5">
+      <div className={cn(REQUEST_CARD_CLASSNAME, "max-w-[85%]")}>
         {source ? (
-          <div className="mb-1">
+          <div className="mb-2">
             <WorkOrderSplitRunSource source={source} compact />
           </div>
         ) : null}

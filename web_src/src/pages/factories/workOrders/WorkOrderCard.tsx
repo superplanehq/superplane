@@ -9,7 +9,9 @@ import { workOrderCardSource, type WorkOrderCardSource } from "../lib/workOrderC
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
+import { draftReadiness, startEmphasisForTone } from "../lib/draftReadiness";
+import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
+import { CardScoreBadges } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
@@ -62,6 +64,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
+  /** Clarity score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  clarityScore?: number;
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
   /**
@@ -107,6 +111,7 @@ export function WorkOrderCard({
   onDispatch,
   href,
   onOpen,
+  clarityScore,
   confidenceScore,
   isAnalyzing = false,
   className,
@@ -170,6 +175,7 @@ export function WorkOrderCard({
           createdAt={createdAt}
           isDraft={isDraft}
           showStart={showStart}
+          clarityScore={clarityScore}
           confidenceScore={confidenceScore}
           isAnalyzing={agentWorking}
         />
@@ -272,6 +278,7 @@ function WorkOrderCardMetaRow({
   createdAt,
   isDraft,
   showStart,
+  clarityScore,
   confidenceScore,
   isAnalyzing,
 }: {
@@ -285,11 +292,13 @@ function WorkOrderCardMetaRow({
   createdAt: Date | null;
   isDraft: boolean;
   showStart: boolean;
+  clarityScore?: number;
   confidenceScore?: number;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
-  const showActions = confidenceScore != null || isAnalyzing || showStart;
+  const hasScore = clarityScore != null || confidenceScore != null;
+  const showActions = hasScore || isAnalyzing || showStart;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -303,7 +312,12 @@ function WorkOrderCardMetaRow({
         {isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
-            <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
+            <CardScores
+              entryId={entry.id}
+              clarity={clarityScore}
+              confidence={confidenceScore}
+              isAnalyzing={isAnalyzing}
+            />
             {showStart ? (
               <StartDraftButton
                 entry={entry}
@@ -312,6 +326,9 @@ function WorkOrderCardMetaRow({
                 canDispatch={canDispatch}
                 isDispatching={isDispatching}
                 onDispatch={onDispatch}
+                emphasis={startEmphasisForTone(
+                  draftReadiness({ clarity: clarityScore, confidence: confidenceScore }).tone,
+                )}
               />
             ) : null}
           </>
@@ -329,9 +346,21 @@ function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQu
 
 /**
  * Thinking states while the agent still works, even after a score exists.
- * The meter returns when the agent waits for the user.
+ * When the agent waits for the user the card shows one verdict word with a
+ * tone dot. The two scores stay in the tooltip. Intake-only drafts have
+ * Confidence alone; the verdict uses the scores that exist.
  */
-function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
+function CardScores({
+  entryId,
+  clarity,
+  confidence,
+  isAnalyzing,
+}: {
+  entryId: string;
+  clarity?: number;
+  confidence?: number;
+  isAnalyzing: boolean;
+}) {
   if (isAnalyzing) {
     return (
       <ConfidenceAnalyzingIndicator
@@ -342,8 +371,8 @@ function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; scor
       />
     );
   }
-  if (score != null) {
-    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
+  if (clarity == null && confidence == null) {
+    return null;
   }
-  return null;
+  return <CardScoreBadges clarity={clarity} confidence={confidence} testId={`work-order-card-score-${entryId}`} />;
 }

@@ -13,9 +13,13 @@ import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
 import { DRAFT_WORK_ORDER, STORYBOOK_ME_USER_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
+import { clarityCheck } from "./workOrderCheckFixtures";
 
 const SESSION_ID = "ps-draft-refunds";
+/** Clarity: the storage path is still open. */
 const PLAN_SCORE = 2;
+/** Confidence: the header change is small once the path is decided. */
+const CONFIDENCE_SCORE = 4;
 
 function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
@@ -29,25 +33,25 @@ const LEVEL_FOR_CHECK: Record<ReturnType<typeof confidenceCheckLevel>, Factories
 };
 
 function draftConfidenceCheck(): FactoriesWorkOrderCheck {
-  const band = confidenceBandForScore(PLAN_SCORE);
+  const band = confidenceBandForScore(CONFIDENCE_SCORE);
   return {
     id: "check-confidence-wo-draft-refunds",
     key: "confidence",
     name: CONFIDENCE_CHECK_NAME,
-    score: PLAN_SCORE,
+    score: CONFIDENCE_SCORE,
     maxScore: CONFIDENCE_SCORE_MAX,
-    level: LEVEL_FOR_CHECK[confidenceCheckLevel(PLAN_SCORE)],
+    level: LEVEL_FOR_CHECK[confidenceCheckLevel(CONFIDENCE_SCORE)],
     summary: confidenceSuitabilitySummary(band),
     analysis: confidenceSuitabilityAnalysis({
       source: "GitHub",
       reasons: [
-        "The request names reactions on the task, but the storage path is still open.",
-        "The first change is limited to the task header.",
-        "The agent still needs one answer before the score can rise.",
+        "The first change is limited to the task header and a similar control exists to copy.",
+        "The reaction store has tests the agent can extend.",
+        "The score is not 5 because the storage path needs one human look.",
       ],
     }),
-    automation: { appId: "app-line-confidence", appName: "Line Confidence" },
-    runId: "run-confidence-wo-draft-refunds",
+    automation: { appId: "app-line-refine", appName: "Refine Task" },
+    runId: "run-refine-wo-draft-refunds",
     updatedAt: minutesAgo(6),
   };
 }
@@ -160,7 +164,7 @@ export function refineChatBoardFixture(): FactoriesFixture {
     ...lineMetricsFactoriesFixture,
     checksByOrderId: {
       ...lineMetricsFactoriesFixture.checksByOrderId,
-      [orderId]: [draftConfidenceCheck()],
+      [orderId]: [clarityCheck(orderId, PLAN_SCORE, 6), draftConfidenceCheck()],
     },
     artifactsByOrderId: {
       ...lineMetricsFactoriesFixture.artifactsByOrderId,

@@ -31,18 +31,18 @@ export function PlanningSessionSurveyForm({
 
   return (
     <div className="sp-survey-enter mt-3 mb-1" data-testid="create-with-agent-survey">
-      <div className="sp-survey-card rounded-2xl border px-3 py-3" data-testid="create-with-agent-survey-card">
-        <div className="flex items-center justify-between gap-3">
-          <p className="sp-survey-accent text-[11px] font-medium">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
+      <div className="rounded-2xl border bg-card px-3.5 py-3 shadow-xs" data-testid="create-with-agent-survey-card">
+        <div className="flex items-center justify-between gap-3 text-[11px] leading-4 text-muted-foreground">
+          <p className="font-medium">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
           {questionCount > 1 ? (
-            <span className="shrink-0 text-[11px] text-muted-foreground">
+            <span className="shrink-0 tabular-nums">
               {currentIndex + 1} of {questionCount}
             </span>
           ) : null}
         </div>
         <div key={question.prompt} className="sp-survey-page">
           <p className="mt-2 text-[14px] font-medium leading-5 text-foreground">{question.prompt}</p>
-          <div className="mt-3 flex flex-col gap-1">
+          <div className="mt-3 flex flex-col gap-1.5">
             {question.options.map((option, optionIndex) => {
               const selected = answers[currentIndex] === option;
               const keyLabel = String.fromCharCode(65 + optionIndex);
@@ -54,10 +54,10 @@ export function PlanningSessionSurveyForm({
                   size="sm"
                   aria-pressed={selected}
                   className={cn(
-                    "h-auto justify-start gap-2.5 whitespace-normal rounded-lg px-2 py-2 text-left text-[13px]",
+                    "h-auto justify-start gap-2.5 whitespace-normal rounded-xl border px-2.5 py-2 text-left text-[13px] leading-5 shadow-none",
                     selected
-                      ? "sp-survey-option-selected text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                      : "border-border bg-background text-foreground hover:bg-muted",
                   )}
                   onClick={() => {
                     setAnswers((current) => replaceAtIndex(current, currentIndex, option));
@@ -65,8 +65,8 @@ export function PlanningSessionSurveyForm({
                 >
                   <span
                     className={cn(
-                      "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold",
-                      selected ? "sp-survey-pick" : "border-border bg-background text-muted-foreground",
+                      "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                      selected ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-muted-foreground",
                     )}
                     aria-hidden
                   >
@@ -81,7 +81,7 @@ export function PlanningSessionSurveyForm({
               value={customInputs[currentIndex] ?? ""}
               placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
               aria-label={`${question.prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
-              className="mt-1 h-9 rounded-lg border-0 bg-background text-[13px] shadow-none"
+              className="mt-0.5 h-9 rounded-xl border-dashed bg-background text-[13px] shadow-none"
               onChange={(event) => {
                 const value = event.target.value;
                 setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));

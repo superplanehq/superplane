@@ -105,7 +105,7 @@ describe("WorkOrderIntentTranscript", () => {
     expect(transcript.querySelectorAll(".sp-stream-w.is-streaming")).toHaveLength(5);
   });
 
-  it("shows survey answers as question and answer in a stronger bubble", () => {
+  it("shows survey answers as question labels with primary pick bubbles", () => {
     renderTranscript([
       {
         id: "user-1",
@@ -125,8 +125,12 @@ describe("WorkOrderIntentTranscript", () => {
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
     expect(answer).toHaveTextContent("Reviewer approves by taste");
-    expect(answer).toHaveClass("sp-survey-card");
-    expect(answer.className).toContain("border");
+    const picks = within(answer).getAllByTestId("split-run-intent-survey-pick");
+    expect(picks.map((pick) => pick.textContent)).toEqual(["Custom styled modal", "Reviewer approves by taste"]);
+    for (const pick of picks) {
+      expect(pick).toHaveClass("sp-chat-outgoing");
+    }
+    expect(answer).toHaveClass("items-end");
     expect(answer.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
   });
@@ -137,7 +141,8 @@ describe("WorkOrderIntentTranscript", () => {
     ]);
 
     const note = screen.getByTestId("split-run-intent-user-note");
-    expect(note).toHaveClass("sp-user-note");
+    expect(note.querySelector(".sp-chat-outgoing")).not.toBeNull();
+    expect(note.querySelector(".sp-chat-outgoing")).not.toHaveClass("border");
     expect(note).toHaveTextContent("Ada");
     expect(within(note).getByRole("img", { name: "Ada Lovelace" })).toHaveAttribute(
       "src",
@@ -176,6 +181,20 @@ describe("WorkOrderIntentTranscript", () => {
     const notes = screen.getAllByTestId("split-run-intent-user-note");
     expect(notes[0]).toHaveTextContent("Ada");
     expect(notes[1]).toHaveTextContent("Alan");
+  });
+
+  it("shows the sender once for consecutive turns from the same person", () => {
+    renderTranscript([
+      { id: "user-1", kind: "text", role: "user", userId: "user-ada", text: "Keep the current dark theme." },
+      { id: "user-2", kind: "text", role: "user", origin: "survey", userId: "user-ada", text: "Scope? One file" },
+      { id: "agent-1", kind: "text", role: "agent", text: "Noted." },
+      { id: "user-3", kind: "text", role: "user", userId: "user-ada", text: "Also keep the retry helper." },
+    ]);
+
+    const notes = screen.getAllByTestId("split-run-intent-user-note");
+    expect(notes[0]).toHaveTextContent("Ada");
+    expect(screen.getByTestId("split-run-intent-survey-answer")).not.toHaveTextContent("Ada");
+    expect(notes[1]).toHaveTextContent("Ada");
   });
 
   it("omits the sender header when the message has no user id", () => {

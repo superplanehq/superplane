@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
   analysisChat,
+  HIGH_CLARITY,
   HIGH_CONFIDENCE,
   INTENT,
   INTENT_DOC,
@@ -50,7 +50,14 @@ describe("WorkOrderIntentDocument", () => {
   });
 
   it("shows the original request and the generated summary", () => {
-    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={HIGH_CONFIDENCE}
+      />,
+    );
 
     expect(screen.getByTestId("split-run-intent-session")).toHaveTextContent("Show a clearer empty state");
     expect(screen.queryByText("Original request")).not.toBeInTheDocument();
@@ -67,23 +74,51 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(summary).getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
     expect(within(summary).queryByRole("heading", { name: "Scope" })).not.toBeInTheDocument();
     const result = screen.getByTestId("split-run-intent-result");
-    const chip = within(result).getByTestId("split-run-intent-confidence-chip");
-    expect(chip).toHaveAccessibleName(`${CONFIDENCE_CHECK_NAME} 4/5`);
-    expect(chip).toHaveTextContent("4/5");
+    const clarityChip = within(result).getByTestId("split-run-intent-clarity");
+    expect(clarityChip).toHaveAccessibleName("Clarity 4/5");
+    expect(clarityChip).toHaveTextContent("Clarity");
+    expect(clarityChip).toHaveTextContent("4");
+    expect(
+      within(clarityChip).getByTestId("split-run-intent-clarity-meter").querySelectorAll("[data-filled='true']"),
+    ).toHaveLength(4);
+    const chip = within(result).getByTestId("split-run-intent-confidence");
+    expect(chip).toHaveAccessibleName("Confidence 4/5");
+    expect(chip).toHaveTextContent("Confidence");
+    expect(
+      within(chip).getByTestId("split-run-intent-confidence-meter").querySelectorAll("[data-filled='true']"),
+    ).toHaveLength(4);
+    expect(screen.queryByTestId("split-run-intent-clarity-copy")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-overview-checks"),
     ).toBeNull();
   });
 
-  it("reveals the confidence why when the chip is opened", async () => {
+  it("reveals each score why on hover and pins it on click", async () => {
     const user = userEvent.setup();
-    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={HIGH_CONFIDENCE}
+      />,
+    );
 
-    await user.click(screen.getByTestId("split-run-intent-confidence-chip"));
+    await user.hover(screen.getByTestId("split-run-intent-confidence"));
     expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
       "This issue is a good fit for an agent on this factory line.",
     );
+    await user.click(screen.getByTestId("split-run-intent-clarity"));
+    expect(await screen.findByTestId("split-run-intent-clarity-copy")).toHaveTextContent(HIGH_CLARITY.summary);
+    expect(screen.getByTestId("split-run-intent-clarity")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows a dash for Clarity when only Confidence exists", () => {
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
+
+    expect(screen.getByTestId("split-run-intent-confidence")).toHaveAccessibleName("Confidence 4/5");
+    expect(screen.getByTestId("split-run-intent-clarity")).toHaveTextContent("–");
   });
 
   it("puts source context on the left after Start and hides confidence", () => {
@@ -99,7 +134,7 @@ describe("WorkOrderIntentDocument", () => {
     const request = screen.getByTestId("split-run-intent-request");
     const result = screen.getByTestId("split-run-intent-result");
     expect(within(request).getByTestId("split-run-overview-sidebar")).toHaveTextContent("Source");
-    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
@@ -160,8 +195,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
   });
 
-  it("shows the request as the first chat message on the right", async () => {
-    const user = userEvent.setup();
+  it("shows the request as the first chat message on the right", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -178,21 +212,17 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByTestId("split-run-source")).toHaveTextContent("acme/payments-service#842");
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
-    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
+    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-chat-outgoing")).not.toBeNull();
     expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity })).toBeInTheDocument();
+    expect(within(pendingChips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
     expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
-    expect(
-      within(pendingChips).getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix"),
-    ).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(
       within(pendingChips).getByTestId("split-run-intent-plan-chip-analyzing").querySelector(".t-matrix"),
     ).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    await user.click(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.clarity }));
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
