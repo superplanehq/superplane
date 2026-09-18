@@ -143,7 +143,9 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			logger.Errorf("failed to publish canvas event created RabbitMQ message for event %s in canvas %s: %v", event.ID, event.WorkflowID, err)
+		}
 	}
 
 	for _, update := range pendingFactoryWorkOrderUpdates {
