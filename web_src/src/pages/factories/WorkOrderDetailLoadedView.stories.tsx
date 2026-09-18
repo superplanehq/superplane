@@ -171,7 +171,7 @@ export const WithChecks: Story = {
   }),
 };
 
-/** Failing boolean check — CI reads Fail next to two scored checks while the line retries. Status notes stay visible; Update manually matches the header (Complete and Reject, no Back to draft). */
+/** Failing boolean check — CI reads Fail next to two scored checks while the line retries. Status notes stay visible; Update manually matches the header (Complete and Reject). */
 export const WithFailingCICheck: Story = {
   name: "With Failing CI Check",
   args: {

@@ -24,12 +24,7 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import {
-  draftStartAction,
-  footerMutationHandlers,
-  popupWorkOrderUrl,
-  returnToBacklogAction,
-} from "./workOrderPopupActions";
+import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
@@ -139,7 +134,6 @@ function AnalysisWorkOrderPopup({
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
-  const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const reviewArgs = {
@@ -151,7 +145,6 @@ function AnalysisWorkOrderPopup({
     canUpdate,
     draftStart,
     mutations,
-    backToDraft,
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
@@ -228,7 +221,6 @@ function analysisPopupReview(args: {
   canUpdate: boolean;
   draftStart: ReturnType<typeof draftStartAction>;
   mutations: ReturnType<typeof footerMutationHandlers>;
-  backToDraft: ReturnType<typeof returnToBacklogAction>;
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
@@ -247,7 +239,6 @@ function analysisPopupReview(args: {
       onStart={args.draftStart}
       onArchive={args.mutations.onArchive}
       onReject={args.mutations.onReject}
-      onBackToDraft={args.backToDraft}
       onStop={args.mutations.onStop}
       startBusy={args.isDispatching}
       actionBusy={args.footerBusy}

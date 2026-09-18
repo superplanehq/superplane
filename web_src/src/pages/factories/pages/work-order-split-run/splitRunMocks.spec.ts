@@ -188,7 +188,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -209,7 +209,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task needs a decision");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -609,7 +609,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task needs a decision");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
   });
 
   it("marks a failed implement step as failed", () => {
@@ -633,7 +633,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -654,7 +654,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.status).toBe("cancelled");
     expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Canceled");
     expect(fixture.footerTone).toBe("stopped");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.footer.note?.cta).toBeUndefined();
     expect(fixture.waitingNotes[0]?.cta).toBeUndefined();
   });
