@@ -138,6 +138,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", task.Commands[2].Preview)
 	assert.Contains(t, task.Commands[2].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
+	assert.Contains(t, task.Commands[2].Command, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 	assert.Equal(t, "Fix tests", task.Commands[3].Name)
 	assert.Contains(t, task.Commands[3].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`)

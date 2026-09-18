@@ -208,7 +208,9 @@ Each runner component already calls `ResolveEnvironment` and
 5. Each `run.js` merges those remote servers with the SuperPlane stdio
    MCP when planning is on.
 6. Write each inline skill to `.claude/skills/<name>/SKILL.md` and
-   `.agents/skills/<name>/SKILL.md`. Both files hold the same markdown.
+   `.agents/skills/<name>/SKILL.md` under `SUPERPLANE_TASK_DIR`. Prompt
+   steps copy those files into the agent working directory before the
+   CLI starts.
 
 | CLI | Merge |
 | --- | --- |

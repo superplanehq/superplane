@@ -175,14 +175,14 @@ func assembleWorkspaceMCPServer(
 	case models.FactoryAgentResourceAuthHeaders:
 		for _, header := range config.Headers {
 			if ctx.Secrets == nil {
-				logger.WithField("mcp", resource.Name).Warn("skip workspace MCP header: secrets context missing")
-				break
+				logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: secrets context missing")
+				return workspaceMCPServer{}, false
 			}
 			value, err := ctx.Secrets.GetKey(header.SecretName, header.SecretKey)
 			if err != nil {
 				logger.WithError(err).WithField("mcp", resource.Name).WithField("header", header.Name).
-					Warn("skip workspace MCP header: secret missing")
-				continue
+					Warn("skip workspace MCP: secret missing")
+				return workspaceMCPServer{}, false
 			}
 			headers[header.Name] = string(value)
 		}
