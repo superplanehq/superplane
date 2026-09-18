@@ -5,7 +5,12 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import superplaneIcon from "@/assets/superplane.svg";
 
 import { CREATED_MANUALLY } from "../pages/work-order-split-run/splitRunSource";
-import { workOrderCardSource, workOrderCardSourceLabel } from "./workOrderCardSource";
+import {
+  MANUAL_FILTER_VALUE,
+  workOrderCardSource,
+  workOrderCardSourceLabel,
+  workOrderListSource,
+} from "./workOrderCardSource";
 
 const baseOrder: FactoriesWorkOrder = {
   id: "wo-1",
@@ -57,6 +62,27 @@ describe("workOrderCardSource", () => {
       iconSrc: githubIcon,
       iconAlt: "GitHub",
       ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+    });
+  });
+});
+
+describe("workOrderListSource", () => {
+  it("uses the manual sentinel for a hand-created task", () => {
+    expect(workOrderListSource(baseOrder)).toEqual({
+      id: MANUAL_FILTER_VALUE,
+      label: CREATED_MANUALLY,
+    });
+  });
+
+  it("uses the intake kind for a GitHub origin", () => {
+    expect(
+      workOrderListSource({
+        ...baseOrder,
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      }),
+    ).toEqual({
+      id: "github-issues",
+      label: "GitHub issues",
     });
   });
 });
