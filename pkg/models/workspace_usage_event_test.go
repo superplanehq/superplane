@@ -494,6 +494,70 @@ func Test__SumUsageForWorkOrders__IncludesModelTokensAndCompute(t *testing.T) {
 	assert.Greater(t, total.CostCents(), pricebook.MicrosToCents(computeEvent.CostMicros))
 }
 
+func Test__ListModelsForWorkOrderExecutions__GroupsLedgerModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000,
+		TotalTokens:     1_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenAI,
+		Model:           "gpt-4.1",
+		InputTokens:     500,
+		TotalTokens:     500,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	names, err := models.ListModelsForWorkOrderExecutions(db, []uuid.UUID{execution.ID})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6", "openai/gpt-4.1"}, names[execution.ID])
+}
+
+func Test__ListModelsForRunTrees__IncludesDescendantModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	parent := startFactoryCanvasRun(t, r, factory.ID, nil)
+	now := parent.CreatedAt
+	if now == nil {
+		created := time.Now()
+		now = &created
+	}
+	child := models.CanvasRun{
+		ID:               uuid.New(),
+		WorkflowID:       parent.WorkflowID,
+		NodeID:           parent.NodeID,
+		VersionID:        parent.VersionID,
+		ParentRunID:      &parent.ID,
+		ParentWorkflowID: &parent.WorkflowID,
+		State:            models.CanvasRunStateStarted,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	require.NoError(t, db.Create(&child).Error)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, child.ID)))
+
+	names, err := models.ListModelsForRunTrees(db, []uuid.UUID{parent.ID})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, names[parent.ID])
+}
+
 func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
 	t.Helper()
 

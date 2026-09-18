@@ -203,6 +203,8 @@ function AnalysisWorkOrderPopup({
               fixture={{ ...fixture, owner: edits.owner }}
               modelLabel={modelLabel}
               assigneeIds={edits.assigneeIds}
+              usageByModel={fixture.usageByModel}
+              usageByMachineType={fixture.usageByMachineType}
             />
           </PopupHeader>
         )}

@@ -30,6 +30,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
+  usageByModel: [{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }],
+  usageByMachineType: [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
   lineName: "plan-and-implement",
   currentStepIndex: 0,
   lineStatus: "running",
