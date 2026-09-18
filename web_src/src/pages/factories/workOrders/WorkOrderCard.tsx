@@ -9,12 +9,11 @@ import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { draftReadiness, startEmphasisForTone } from "../lib/draftReadiness";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
 import { CardScoreBadges } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
-import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
@@ -64,9 +63,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** Clarity score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  /** Clarity score from ListWorkOrderChecks, 0 to 5. Shown in the footer. */
   clarityScore?: number;
-  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown in the footer. */
   confidenceScore?: number;
   /**
    * True while the agent still works on this draft. The card shows
@@ -89,18 +88,15 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * pills sit on a middle row: an attached pull request, then
  * attention such as Waiting on status checks. The
  * footer shows when the task was created on the left, and the owner
- * given name plus avatar on the right (except on drafts). Drafts show
- * a Start button. Reviewed drafts also show a score to the left of
- * Start. The owner is display-only on the card.
+ * given name plus avatar on the right (except on drafts). Reviewed
+ * drafts show Clarity and Confidence scores. The owner is display-only
+ * on the card.
  */
 export function WorkOrderCard({
   entry,
   organizationId,
   factoryKey,
   factoryLines,
-  preferredLineName,
-  canDispatch,
-  dispatchingOrderIds,
   addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
@@ -108,7 +104,6 @@ export function WorkOrderCard({
   checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   pullRequests = EMPTY_PULL_REQUESTS,
-  onDispatch,
   href,
   onOpen,
   clarityScore,
@@ -122,7 +117,7 @@ export function WorkOrderCard({
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
-  const { showAgentQuestion, agentWorking, showStart } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
+  const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
@@ -167,14 +162,8 @@ export function WorkOrderCard({
         <WorkOrderCardMetaRow
           entry={entry}
           organizationId={organizationId}
-          factoryLines={factoryLines}
-          preferredLineName={preferredLineName}
-          canDispatch={canDispatch}
-          isDispatching={dispatchingOrderIds.has(entry.id)}
-          onDispatch={onDispatch}
           createdAt={createdAt}
           isDraft={isDraft}
-          showStart={showStart}
           clarityScore={clarityScore}
           confidenceScore={confidenceScore}
           isAnalyzing={agentWorking}
@@ -289,35 +278,24 @@ function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
 function WorkOrderCardMetaRow({
   entry,
   organizationId,
-  factoryLines,
-  preferredLineName,
-  canDispatch,
-  isDispatching,
-  onDispatch,
   createdAt,
   isDraft,
-  showStart,
   clarityScore,
   confidenceScore,
   isAnalyzing,
 }: {
   entry: WorkOrderListEntry;
   organizationId: string;
-  factoryLines: FactoriesFactoryLine[];
-  preferredLineName?: string;
-  canDispatch: boolean;
-  isDispatching: boolean;
-  onDispatch: WorkOrderCardContext["onDispatch"];
   createdAt: Date | null;
   isDraft: boolean;
-  showStart: boolean;
   clarityScore?: number;
   confidenceScore?: number;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
   const hasScore = clarityScore != null || confidenceScore != null;
-  const showActions = hasScore || isAnalyzing || showStart;
+  const showActions = hasScore || isAnalyzing;
+  const ownerMark = isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -327,32 +305,19 @@ function WorkOrderCardMetaRow({
       >
         {createdLabel}
       </span>
-      <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-        {isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-        {showActions ? (
-          <>
+      {ownerMark || showActions ? (
+        <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
+          {ownerMark}
+          {showActions ? (
             <CardScores
               entryId={entry.id}
               clarity={clarityScore}
               confidence={confidenceScore}
               isAnalyzing={isAnalyzing}
             />
-            {showStart ? (
-              <StartDraftButton
-                entry={entry}
-                lines={factoryLines}
-                preferredLineName={preferredLineName}
-                canDispatch={canDispatch}
-                isDispatching={isDispatching}
-                onDispatch={onDispatch}
-                emphasis={startEmphasisForTone(
-                  draftReadiness({ clarity: clarityScore, confidence: confidenceScore }).tone,
-                )}
-              />
-            ) : null}
-          </>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -360,7 +325,7 @@ function WorkOrderCardMetaRow({
 function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
   const showAgentQuestion = hasAgentQuestion && isDraft;
   const agentWorking = isAnalyzing && !showAgentQuestion;
-  return { showAgentQuestion, agentWorking, showStart: isDraft && !agentWorking };
+  return { showAgentQuestion, agentWorking };
 }
 
 /**

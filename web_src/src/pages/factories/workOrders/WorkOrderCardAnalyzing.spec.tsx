@@ -99,7 +99,7 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("calls an intake-only draft ready and fills Start", () => {
+  it("calls an intake-only draft ready without a Start button", () => {
     renderCard({ confidenceScore: 4 });
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("Confidence score on a backlog card", () => {
       "aria-label",
       "This task is ready to start. Clarity score no score yet. Confidence score 4 of 5",
     );
-    expect(screen.getByRole("button", { name: "Start" })).toHaveClass("bg-primary");
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
   it("asks for a review when only a mid Clarity exists", () => {
@@ -139,15 +139,12 @@ describe("Confidence score on a backlog card", () => {
     );
   });
 
-  it("quiets Start to an outline when the verdict is not ready", () => {
+  it("keeps the blocked verdict without a Start button", () => {
     renderCard({ clarityScore: 2, confidenceScore: 5 });
 
     expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "blocked");
     expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveClass("text-red-700");
-    const start = screen.getByRole("button", { name: "Start" });
-    expect(start).not.toHaveClass("bg-primary");
-    expect(start).toHaveClass("border");
-    expect(start).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
   it("stays quiet when no automation analyzes the task", () => {
@@ -169,7 +166,7 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "ready");
-    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
   it("hides Agent question after the task leaves the backlog", () => {
