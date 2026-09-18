@@ -31,7 +31,7 @@ const (
 func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 	name := prFeedbackCanvasName(request, prFeedbackChecksDefaultName)
 
-	return &yaml.Canvas{
+	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
@@ -170,7 +170,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				},
 			},
 		},
-	}
+	})
 }
 
 func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[string]any {
