@@ -316,6 +316,37 @@ export const DraftScoredIntakeOnly: Story = {
   },
 };
 
+/**
+ * Runs sidebar at 240px minus row padding. Age text, both score
+ * numbers, and Start stay on one row. The title truncates.
+ */
+export const DraftScoresAtSidebarWidth: Story = {
+  name: "Draft scores at sidebar width",
+  decorators: [
+    (Story) => (
+      <div className="w-56">
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-sidebar",
+        number: "7",
+        title: "Reconcile duplicate refunds across the ledger before the Q1 audit closes",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 3,
+  },
+};
+
 export const OpenOwned: Story = {
   name: "Open with owner",
   args: {

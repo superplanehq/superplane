@@ -31,12 +31,12 @@ export function ReadinessDot({ tone, className }: { tone: DraftReadinessTone; cl
   );
 }
 
-type ScoreRow = { key: "clarity" | "confidence"; label: string; short: string; score?: number };
+type ScoreRow = { key: "clarity" | "confidence"; label: string; score?: number };
 
 function scoreRows(clarity?: number, confidence?: number): ScoreRow[] {
   return [
-    { key: "clarity", label: CLARITY_CHECK_NAME, short: "Clarity", score: clarity },
-    { key: "confidence", label: CONFIDENCE_CHECK_NAME, short: "Confidence", score: confidence },
+    { key: "clarity", label: CLARITY_CHECK_NAME, score: clarity },
+    { key: "confidence", label: CONFIDENCE_CHECK_NAME, score: confidence },
   ];
 }
 
@@ -49,9 +49,8 @@ const BADGE_TONE: Record<ConfidenceBand, string> = {
 const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
 
 /**
- * Board card scores as two light badges, name and number, tinted by band.
- * Same pill style as the Agent question chip. The tooltip carries the
- * verdict headline.
+ * Board card scores as two compact number badges, tinted by band.
+ * The tooltip carries the verdict headline and both score names.
  */
 export function CardScoreBadges({
   clarity,
@@ -76,19 +75,18 @@ export function CardScoreBadges({
           aria-label={speech}
           data-testid={testId}
           data-tone={readiness.tone}
-          className={cn("pointer-events-auto inline-flex shrink-0 items-center gap-1", className)}
+          className={cn("pointer-events-auto inline-flex shrink-0 items-center gap-0.5", className)}
         >
           {rows.map((row) => (
             <span
               key={row.key}
               data-testid={testId ? `${testId}-${row.key}` : undefined}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                "inline-flex min-w-4 items-center justify-center rounded-full border px-1 py-0.5 text-[10px] font-medium leading-none tabular-nums",
                 row.score == null ? BADGE_MUTED : BADGE_TONE[confidenceBandForScore(clampConfidenceScore(row.score))],
               )}
             >
-              <span>{row.short}</span>
-              <span className="tabular-nums">{row.score == null ? "–" : clampConfidenceScore(row.score)}</span>
+              {row.score == null ? "–" : clampConfidenceScore(row.score)}
             </span>
           ))}
         </span>
@@ -96,6 +94,14 @@ export function CardScoreBadges({
       <TooltipContent>
         <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
           {readiness.headline}
+        </span>
+        <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+          {rows.map((row) => (
+            <Fragment key={row.key}>
+              <span>{row.label}</span>
+              <span className="tabular-nums">{scoreText(row.score)}</span>
+            </Fragment>
+          ))}
         </span>
       </TooltipContent>
     </Tooltip>

@@ -65,14 +65,16 @@ describe("CardReadinessMark", () => {
 });
 
 describe("CardScoreBadges", () => {
-  it("shows a name and number badge per score, tinted by band", () => {
+  it("shows a number badge per score, tinted by band", () => {
     render(<CardScoreBadges clarity={5} confidence={2} testId="badges" />);
 
     const clarity = screen.getByTestId("badges-clarity");
     const confidence = screen.getByTestId("badges-confidence");
-    expect(clarity).toHaveTextContent("Clarity5");
+    expect(clarity).toHaveTextContent("5");
+    expect(clarity).not.toHaveTextContent("Clarity");
     expect(clarity).toHaveClass("text-emerald-700");
-    expect(confidence).toHaveTextContent("Confidence2");
+    expect(confidence).toHaveTextContent("2");
+    expect(confidence).not.toHaveTextContent("Confidence");
     expect(confidence).toHaveClass("text-red-700");
     expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
     expect(screen.getByTestId("badges")).toHaveAttribute(
@@ -85,18 +87,23 @@ describe("CardScoreBadges", () => {
     render(<CardScoreBadges confidence={4} testId="badges" />);
 
     const clarity = screen.getByTestId("badges-clarity");
-    expect(clarity).toHaveTextContent("Clarity–");
+    expect(clarity).toHaveTextContent("–");
+    expect(clarity).not.toHaveTextContent("Clarity");
     expect(clarity).toHaveClass("text-muted-foreground");
     expect(screen.getByTestId("badges-confidence")).toHaveClass("text-emerald-700");
   });
 
-  it("keeps the verdict headline in the tooltip", async () => {
+  it("keeps the verdict headline and score names in the tooltip", async () => {
     const user = userEvent.setup();
     render(<CardScoreBadges clarity={2} confidence={5} testId="badges" />);
 
     await user.hover(screen.getByTestId("badges"));
 
     const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("This task is not ready to start");
+    expect(tip.textContent?.startsWith("This task is not ready to start")).toBe(true);
+    expect(tip).toHaveTextContent("Clarity score");
+    expect(tip).toHaveTextContent("2/5");
+    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("5/5");
   });
 });
