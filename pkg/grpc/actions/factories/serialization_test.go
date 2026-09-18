@@ -369,3 +369,29 @@ func TestSerializeWorkOrder_IncludesUsageBreakdown(t *testing.T) {
 	require.Len(t, serialized.GetLineDispatches()[0].GetStepExecutions(), 1)
 	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, serialized.GetLineDispatches()[0].GetStepExecutions()[0].GetModels())
 }
+
+func TestAllocateCostCents_GivesTruncatedRemaindersToTheHeader(t *testing.T) {
+	cents := allocateCostCents([]int64{6_000, 6_000}, 1)
+	assert.Equal(t, []int64{1, 0}, cents)
+	assert.Equal(t, int64(1), cents[0]+cents[1])
+}
+
+func TestAllocateCostCents_KeepsExactCents(t *testing.T) {
+	cents := allocateCostCents([]int64{450_000, 280_000}, 73)
+	assert.Equal(t, []int64{45, 28}, cents)
+}
+
+func TestSerializeWorkOrder_ReconcilesSubCentBreakdownToHeader(t *testing.T) {
+	serialized, err := serializeWorkOrder(nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil, workOrderUsageView{
+		Totals: models.UsageTotals{CostMicros: 12_000},
+		ByModel: []models.UsageByModel{
+			{Provider: "anthropic", Model: "claude-sonnet-4-6", TotalTokens: 10, CostMicros: 6_000},
+			{Provider: "openai", Model: "gpt-4.1", TotalTokens: 10, CostMicros: 6_000},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, 1, serialized.GetTotalCostCents())
+	require.Len(t, serialized.GetUsageByModel(), 2)
+	assert.EqualValues(t, 1, serialized.GetUsageByModel()[0].GetCostCents()+serialized.GetUsageByModel()[1].GetCostCents())
+}

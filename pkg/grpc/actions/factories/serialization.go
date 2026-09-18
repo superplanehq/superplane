@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"sort"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -358,6 +360,9 @@ func serializeWorkOrder(
 		return nil, err
 	}
 
+	totalCostCents := usage.Totals.CostCents()
+	byModel, byMachineType := serializeWorkOrderUsageBreakdown(usage.ByModel, usage.ByMachineType, totalCostCents)
+
 	return &pb.WorkOrder{
 		Id:                   order.ID.String(),
 		Title:                order.Title,
@@ -372,14 +377,84 @@ func serializeWorkOrder(
 		LineDispatches:       serializedDispatches,
 		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
 		TotalTokens:          usage.Totals.TotalTokens,
-		TotalCostCents:       usage.Totals.CostCents(),
+		TotalCostCents:       totalCostCents,
 		TotalDurationSeconds: usage.Totals.DurationSeconds,
-		UsageByModel:         serializeUsageByModel(usage.ByModel),
-		UsageByMachineType:   serializeUsageByMachineType(usage.ByMachineType),
+		UsageByModel:         byModel,
+		UsageByMachineType:   byMachineType,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+const microsPerCent = 10_000
+
+func serializeWorkOrderUsageBreakdown(
+	byModel []models.UsageByModel,
+	byMachine []models.UsageByMachineType,
+	totalCents int64,
+) ([]*pb.UsageByModel, []*pb.UsageByMachineType) {
+	micros := make([]int64, 0, len(byModel)+len(byMachine))
+	for _, row := range byModel {
+		micros = append(micros, row.CostMicros)
+	}
+	for _, row := range byMachine {
+		micros = append(micros, row.CostMicros)
+	}
+	cents := allocateCostCents(micros, totalCents)
+
+	modelsOut := make([]*pb.UsageByModel, 0, len(byModel))
+	for i, row := range byModel {
+		modelsOut = append(modelsOut, &pb.UsageByModel{
+			Provider:    row.Provider,
+			Model:       row.Model,
+			TotalTokens: row.TotalTokens,
+			CostCents:   cents[i],
+		})
+	}
+	machinesOut := make([]*pb.UsageByMachineType, 0, len(byMachine))
+	offset := len(byModel)
+	for i, row := range byMachine {
+		machinesOut = append(machinesOut, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       cents[offset+i],
+		})
+	}
+	return modelsOut, machinesOut
+}
+
+type costRemainder struct {
+	index     int
+	remainder int64
+}
+
+func allocateCostCents(micros []int64, totalCents int64) []int64 {
+	cents := make([]int64, len(micros))
+	remainders := make([]costRemainder, 0, len(micros))
+	var sum int64
+	for i, value := range micros {
+		if value < 0 {
+			value = 0
+		}
+		cents[i] = value / microsPerCent
+		sum += cents[i]
+		remainders = append(remainders, costRemainder{index: i, remainder: value % microsPerCent})
+	}
+	gap := totalCents - sum
+	if gap <= 0 {
+		return cents
+	}
+	sort.SliceStable(remainders, func(i, j int) bool {
+		return remainders[i].remainder > remainders[j].remainder
+	})
+	for i := 0; i < int(gap) && i < len(remainders); i++ {
+		if remainders[i].remainder == 0 {
+			break
+		}
+		cents[remainders[i].index]++
+	}
+	return cents
 }
 
 func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {

@@ -420,20 +420,13 @@ func attachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
 		ids = append(ids, id)
 	}
 
-	usageByRun, err := models.SumUsageForRunTrees(db, ids)
+	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(db, ids)
 	if err != nil {
 		log.WithError(err).Warnf(
 			"canvas run listing: usage rollup unavailable for %d run(s), returning zero usage",
 			len(ids),
 		)
 		usageByRun = map[uuid.UUID]models.UsageTotals{}
-	}
-	modelsByRun, err := models.ListModelsForRunTrees(db, ids)
-	if err != nil {
-		log.WithError(err).Warnf(
-			"canvas run listing: model rollup unavailable for %d run(s)",
-			len(ids),
-		)
 		modelsByRun = map[uuid.UUID][]string{}
 	}
 

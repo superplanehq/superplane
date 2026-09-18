@@ -494,6 +494,78 @@ func Test__SumUsageForWorkOrders__IncludesModelTokensAndCompute(t *testing.T) {
 	assert.Greater(t, total.CostCents(), pricebook.MicrosToCents(computeEvent.CostMicros))
 }
 
+func Test__ListUsageByModelForWorkOrders__ReportsNothingForNoOrders(t *testing.T) {
+	byModel, err := models.ListUsageByModelForWorkOrders(nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, byModel)
+}
+
+func Test__ListUsageByMachineTypeForWorkOrders__ReportsNothingForNoOrders(t *testing.T) {
+	byMachine, err := models.ListUsageByMachineTypeForWorkOrders(nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, byMachine)
+}
+
+func Test__ListUsageByModelForWorkOrders__GroupsLedgerByOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, first := createFactoryOrder(t, r)
+	second, err := factory.CreateWorkOrder(db, "Two", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	firstRun := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": first.ID.String()},
+		},
+	})
+	secondRun := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": second.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, firstRun.ID)))
+	gpt := sonnetUsage(t, r, secondRun.ID)
+	gpt.Provider = models.UsageProviderOpenAI
+	gpt.Model = "gpt-4.1"
+	require.NoError(t, models.RecordUsage(db, gpt))
+
+	byModel, err := models.ListUsageByModelForWorkOrders(db, []uuid.UUID{first.ID, second.ID})
+	require.NoError(t, err)
+	require.Len(t, byModel[first.ID], 1)
+	assert.Equal(t, "claude-sonnet-4-6", byModel[first.ID][0].Model)
+	require.Len(t, byModel[second.ID], 1)
+	assert.Equal(t, "gpt-4.1", byModel[second.ID][0].Model)
+}
+
+func Test__ListUsageByMachineTypeForWorkOrders__GroupsLedgerByOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 90,
+		IdempotencyKey:  "runner:compute:" + uuid.New().String(),
+	}))
+
+	byMachine, err := models.ListUsageByMachineTypeForWorkOrders(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	require.Len(t, byMachine[order.ID], 1)
+	assert.Equal(t, "e1-large-amd64", byMachine[order.ID][0].MachineType)
+	assert.Equal(t, int64(90), byMachine[order.ID][0].DurationSeconds)
+}
+
 func Test__ListModelsForWorkOrderExecutions__GroupsLedgerModels(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

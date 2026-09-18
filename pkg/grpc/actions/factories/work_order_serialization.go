@@ -35,6 +35,7 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	if err != nil {
 		return nil, err
 	}
+	byModel, byMachineType := loadWorkOrderUsageBreakdowns(db, []uuid.UUID{order.ID})
 
 	serialized, err := serializeWorkOrder(
 		factory,
@@ -43,8 +44,8 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		creatorAutomations[order.ID],
 		workOrderUsageView{
 			Totals:            usageByOrder[order.ID],
-			ByModel:           loadWorkOrderModelUsage(db, order.ID),
-			ByMachineType:     loadWorkOrderComputeUsage(db, order.ID),
+			ByModel:           byModel[order.ID],
+			ByMachineType:     byMachineType[order.ID],
 			ModelsByExecution: loadModelsForDispatches(db, dispatchesByOrderID),
 		},
 	)
@@ -88,6 +89,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 	if err != nil {
 		return nil, err
 	}
+	byModel, byMachineType := loadWorkOrderUsageBreakdowns(db, workOrderIDs)
 	modelsByExecution := loadModelsForDispatches(db, dispatchesByOrderID)
 
 	result := make([]*pb.WorkOrder, len(orders))
@@ -99,8 +101,8 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 			creatorAutomations[orders[i].ID],
 			workOrderUsageView{
 				Totals:            usageByOrder[orders[i].ID],
-				ByModel:           loadWorkOrderModelUsage(db, orders[i].ID),
-				ByMachineType:     loadWorkOrderComputeUsage(db, orders[i].ID),
+				ByModel:           byModel[orders[i].ID],
+				ByMachineType:     byMachineType[orders[i].ID],
 				ModelsByExecution: modelsByExecution,
 			},
 		)
@@ -180,22 +182,27 @@ func attachWorkOrderFiles(ctx context.Context, db *gorm.DB, order *pb.WorkOrder,
 	return nil
 }
 
-func loadWorkOrderModelUsage(db *gorm.DB, workOrderID uuid.UUID) []models.UsageByModel {
-	_, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{WorkOrderID: &workOrderID})
+func loadWorkOrderUsageBreakdowns(
+	db *gorm.DB,
+	workOrderIDs []uuid.UUID,
+) (map[uuid.UUID][]models.UsageByModel, map[uuid.UUID][]models.UsageByMachineType) {
+	byModel, err := models.ListUsageByModelForWorkOrders(db, workOrderIDs)
 	if err != nil {
-		log.WithError(err).Warnf("work order %s: model usage breakdown unavailable", workOrderID)
-		return nil
+		log.WithError(err).Warnf(
+			"work order listing: model usage breakdown unavailable for %d order(s)",
+			len(workOrderIDs),
+		)
+		byModel = map[uuid.UUID][]models.UsageByModel{}
 	}
-	return byModel
-}
-
-func loadWorkOrderComputeUsage(db *gorm.DB, workOrderID uuid.UUID) []models.UsageByMachineType {
-	_, byMachine, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{WorkOrderID: &workOrderID})
+	byMachine, err := models.ListUsageByMachineTypeForWorkOrders(db, workOrderIDs)
 	if err != nil {
-		log.WithError(err).Warnf("work order %s: compute usage breakdown unavailable", workOrderID)
-		return nil
+		log.WithError(err).Warnf(
+			"work order listing: compute usage breakdown unavailable for %d order(s)",
+			len(workOrderIDs),
+		)
+		byMachine = map[uuid.UUID][]models.UsageByMachineType{}
 	}
-	return byMachine
+	return byModel, byMachine
 }
 
 func loadModelsForDispatches(
