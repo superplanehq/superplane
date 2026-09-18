@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ export function WorkOrderSourceIcon({ entryId, source }: { entryId: string; sour
       className={cn(
         "size-3.5 shrink-0 object-contain",
         (source.iconAlt === "GitHub" || source.iconAlt === "SuperPlane") && "dark:brightness-0 dark:invert",
+        logoDarkInvertClass(source.iconSrc),
       )}
     />
   );

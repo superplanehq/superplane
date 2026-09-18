@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -270,7 +272,11 @@ function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
       data-testid="lines-backlog-setup-sentry"
       className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
     >
-      <img src={sentryIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      <img
+        src={sentryIcon}
+        alt=""
+        className={cn("size-3.5 shrink-0 object-contain", logoDarkInvertClass(sentryIcon))}
+      />
       {SENTRY_INTAKE_SETUP_COPY.setupButton}
     </Button>
   );
