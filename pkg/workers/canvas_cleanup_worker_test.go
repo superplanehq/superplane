@@ -408,7 +408,7 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *t
 		Update("deleted_at", deletedAtOutsideGracePeriod).
 		Error)
 
-	canvases, err := models.ListDeletedCanvases(database.Conn())
+	canvases, err := models.ListDeletedCanvases(database.Conn(), workerPollBatchSize)
 	require.NoError(t, err)
 	require.Len(t, canvases, 1)
 	require.Equal(t, canvas.ID, canvases[0].ID)

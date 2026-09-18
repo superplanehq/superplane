@@ -39,7 +39,7 @@ func (w *FactoryCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case tickTime := <-ticker.C:
-			factories, err := models.ListDeletedFactories(database.Conn())
+			factories, err := models.ListDeletedFactories(database.Conn(), workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding deleted factories: %v", err)
 				continue

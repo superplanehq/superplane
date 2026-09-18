@@ -391,7 +391,11 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
+func ListDeletedFactories(tx *gorm.DB, limit int) ([]Factory, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
 	var factories []Factory
 	err := tx.
 		Model(&Factory{}).
@@ -410,6 +414,8 @@ func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
 			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
 		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		Order("LEAST(factories.deleted_at, organizations.deleted_at) ASC").
+		Limit(limit).
 		Find(&factories).
 		Error
 	if err != nil {

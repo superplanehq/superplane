@@ -43,7 +43,7 @@ func (w *OrganizationCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case tickTime := <-ticker.C:
-			organizations, err := models.ListDeletedOrganizations()
+			organizations, err := models.ListDeletedOrganizations(workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error finding deleted organizations: %v", err)
 				continue

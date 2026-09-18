@@ -114,7 +114,7 @@ func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T)
 	event := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	events, err := models.ListPendingCanvasEvents()
+	events, err := models.ListPendingCanvasEvents(workerPollBatchSize)
 	require.NoError(t, err)
 	for _, pending := range events {
 		assert.NotEqual(t, event.ID, pending.ID)

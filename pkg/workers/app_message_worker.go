@@ -44,7 +44,7 @@ func (w *AppMessageWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			appMessages, err := models.ListAppMessages(database.Conn())
+			appMessages, err := models.ListAppMessages(database.Conn(), workerPollBatchSize)
 			if err != nil {
 				w.logger.Errorf("Error listing pending app messages: %v", err)
 				continue
