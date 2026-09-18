@@ -424,9 +424,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
     Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const rewindPlanning = planningAnalysisEnabled(env);
   let prompt = applyAnalysisContinuation(
     sp,
-    promptCount,
+    rewindPlanning ? 0 : promptCount,
     fs.readFileSync(promptFile, "utf8"),
     env,
   );
@@ -470,7 +471,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let lastResult = {};
   let lastUsage = emptyUsage();
   let lastCost = 0;
-  let sessionID = readSessionID(sp);
+  let sessionID = rewindPlanning ? "" : readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
     printLiveLogLine(

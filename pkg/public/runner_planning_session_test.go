@@ -503,6 +503,28 @@ func TestRunnerPlanningWaitCancelDoesNotConsumeUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", delivered["text"])
 }
 
+func TestRunnerPlanningWaitIncludesAnalysisContinuation(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Narrow the retry plan.", uuid.Nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "Narrow the retry plan.", delivered["text"])
+	continuation, _ := delivered["continuation"].(string)
+	assert.Contains(t, continuation, "Continue this SuperPlane analysis session")
+	assert.Contains(t, continuation, "Narrow the retry plan.")
+}
+
 func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
