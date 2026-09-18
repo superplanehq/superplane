@@ -85,6 +85,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			assert.Equal(t, "issueComment", node.Configuration["target"])
 		}
 		assert.True(t, foundAcknowledge)
+		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 		var foundAcknowledgeEdge bool
 		for _, edge := range liveVersion.Edges {
 			if edge.SourceID == prFeedbackCommentTriggerNodeID &&
@@ -257,6 +258,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}
 		assert.True(t, foundWait)
 		assert.True(t, foundAnnounce)
+		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 	})
 
 	t.Run("checks creation rejects an invalid attempt limit", func(t *testing.T) {
@@ -386,4 +388,24 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		assert.Error(t, err)
 	})
+}
+
+func assertLivePRFeedbackConcurrency(t *testing.T, canvasID uuid.UUID, nodes []models.Node) {
+	t.Helper()
+
+	for _, node := range nodes {
+		if node.Type == models.NodeTypeTrigger {
+			assert.Nilf(t, node.Concurrency, "trigger %s caps its concurrency", node.ID)
+			continue
+		}
+
+		require.NotNilf(t, node.Concurrency, "version node %s has no concurrency", node.ID)
+		assert.Equalf(t, prFeedbackConcurrencyKey, node.Concurrency.Key, "version node %s", node.ID)
+
+		stored, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, node.ID)
+		require.NoError(t, err)
+		spec := stored.ConcurrencySpec()
+		require.NotNilf(t, spec, "node record %s has no concurrency", node.ID)
+		assert.Equalf(t, prFeedbackConcurrencyKey, spec.Key, "node record %s", node.ID)
+	}
 }
