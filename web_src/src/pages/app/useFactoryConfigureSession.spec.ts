@@ -41,14 +41,14 @@ function baseOptions(overrides: Partial<Parameters<typeof useFactoryConfigureSes
 }
 
 describe("useFactoryConfigureSession applyDraftSpec", () => {
-  it("applies the new spec onto the current workflow snapshot", () => {
+  it("applies the new spec onto the current workflow snapshot", async () => {
     const applyLocalWorkflowUpdate = vi.fn();
     const options = baseOptions({ applyLocalWorkflowUpdate });
     const { result } = renderHook(() => useFactoryConfigureSession(options));
     void result;
 
     const nextSpec = { nodes: [{ id: "new-node" }], edges: [] };
-    options.factoryConfigureActionsRef.current?.applyDraftSpec(nextSpec);
+    await options.factoryConfigureActionsRef.current?.applyDraftSpec(nextSpec);
 
     expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith({
       metadata: { id: "canvas-1", name: "Implement" },
@@ -56,7 +56,53 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     });
   });
 
-  it("does nothing without a current workflow snapshot", () => {
+  it("lays out the merged workflow before applying it", async () => {
+    const applyLocalWorkflowUpdate = vi.fn();
+    const laidOut = {
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "laid-out" }], edges: [] },
+    };
+    const layoutDraftWorkflow = vi.fn(async () => laidOut);
+    const options = baseOptions({ applyLocalWorkflowUpdate, layoutDraftWorkflow });
+    renderHook(() => useFactoryConfigureSession(options));
+
+    const nextSpec = { nodes: [{ id: "new-node" }], edges: [] };
+    await options.factoryConfigureActionsRef.current?.applyDraftSpec(nextSpec);
+
+    expect(layoutDraftWorkflow).toHaveBeenCalledWith({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: nextSpec,
+    });
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith(laidOut);
+  });
+
+  it("does not apply a layout result after the session changes", async () => {
+    const applyLocalWorkflowUpdate = vi.fn();
+    let releaseLayout: (workflow: CanvasesCanvas) => void = () => {};
+    const layoutDraftWorkflow = vi.fn(
+      () =>
+        new Promise<CanvasesCanvas>((resolve) => {
+          releaseLayout = resolve;
+        }),
+    );
+    const options = baseOptions({ applyLocalWorkflowUpdate, layoutDraftWorkflow });
+    renderHook(() => useFactoryConfigureSession(options));
+
+    const pending = options.factoryConfigureActionsRef.current?.applyDraftSpec({
+      nodes: [{ id: "new-node" }],
+      edges: [],
+    });
+    options.activeCanvasVersionIdRef.current = "version-other";
+    releaseLayout({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "laid-out" }], edges: [] },
+    });
+    await pending;
+
+    expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does nothing without a current workflow snapshot", async () => {
     const applyLocalWorkflowUpdate = vi.fn();
     const options = baseOptions({
       applyLocalWorkflowUpdate,
@@ -64,7 +110,7 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     });
     renderHook(() => useFactoryConfigureSession(options));
 
-    options.factoryConfigureActionsRef.current?.applyDraftSpec({ nodes: [], edges: [] });
+    await options.factoryConfigureActionsRef.current?.applyDraftSpec({ nodes: [], edges: [] });
 
     expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
   });
