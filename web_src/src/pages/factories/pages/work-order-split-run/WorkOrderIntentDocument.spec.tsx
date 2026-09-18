@@ -212,7 +212,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(within(chat).getByTestId("split-run-source")).toHaveTextContent("acme/payments-service#842");
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
     expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
-    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-user-note")).not.toBeNull();
+    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-chat-outgoing")).not.toBeNull();
     expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
     expect(within(pendingChips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();

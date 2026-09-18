@@ -218,7 +218,7 @@ function DraftActions() {
 
 function FakeComposer() {
   return (
-    <div className="sp-user-note flex min-h-[3.5rem] items-center rounded-2xl border px-3.5 text-[13px] text-muted-foreground">
+    <div className="flex min-h-[3.5rem] items-center rounded-xl border bg-background px-3.5 text-[13px] text-muted-foreground">
       {ANALYSIS_PLANNING_COPY.composerPlaceholder}
     </div>
   );
