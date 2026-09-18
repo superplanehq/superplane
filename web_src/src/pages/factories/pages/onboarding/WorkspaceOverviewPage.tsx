@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { useRainbowPaletteClass } from "../../lib/useRainbowPaletteClass";
+import { useRainbowPaletteClass } from "@/hooks/useRainbowPaletteClass";
 import { OverviewPage } from "../OverviewPage";
 import { GettingStartedWireframe } from "./GettingStartedWireframe";
 import { dismissWorkspaceGettingStarted, shouldShowWorkspaceGettingStarted } from "./gettingStartedState";
