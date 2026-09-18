@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { DRAFT_READINESS_NOTES, draftReadiness } from "./draftReadiness";
+import {
+  DRAFT_READINESS_NOTES,
+  DRAFT_READINESS_SHORT_LABEL,
+  draftReadiness,
+  liveDraftReadiness,
+  startEmphasisForTone,
+} from "./draftReadiness";
 
 describe("draftReadiness", () => {
   it("reports analyzing while no score exists and the agent works", () => {
@@ -43,5 +49,33 @@ describe("draftReadiness", () => {
 
   it("prefers the Clarity block over a low Confidence", () => {
     expect(draftReadiness({ clarity: 1, confidence: 1 }).tone).toBe("blocked");
+  });
+});
+
+describe("liveDraftReadiness", () => {
+  it("says analyzing while the agent works, even with older scores", () => {
+    expect(liveDraftReadiness({ clarity: 5, confidence: 5, isAnalyzing: true }).tone).toBe("analyzing");
+  });
+
+  it("falls back to the score verdict when the agent is idle", () => {
+    expect(liveDraftReadiness({ clarity: 5, confidence: 5 }).tone).toBe("ready");
+  });
+});
+
+describe("startEmphasisForTone", () => {
+  it("fills Start only when the verdict says go", () => {
+    expect(startEmphasisForTone("ready")).toBe("filled");
+    expect(startEmphasisForTone("pending")).toBe("filled");
+    expect(startEmphasisForTone("caution")).toBe("outline");
+    expect(startEmphasisForTone("blocked")).toBe("outline");
+    expect(startEmphasisForTone("analyzing")).toBe("outline");
+  });
+});
+
+describe("DRAFT_READINESS_SHORT_LABEL", () => {
+  it("keeps every card label to two words or fewer", () => {
+    for (const label of Object.values(DRAFT_READINESS_SHORT_LABEL)) {
+      expect(label.split(" ").length).toBeLessThanOrEqual(2);
+    }
   });
 });

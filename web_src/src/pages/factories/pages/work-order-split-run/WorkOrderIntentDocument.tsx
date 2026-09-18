@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, type PointerEvent, type ReactElement, typ
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 
+import { liveDraftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { useRefineDocumentModel } from "./useRefineDocumentModel";
@@ -125,6 +126,10 @@ export function WorkOrderIntentDocument({
   );
 }
 
+/**
+ * The strip verdict and the Start weight read the same scores, so the button
+ * agrees with the headline above it.
+ */
 function withClosedDecision(
   analysisChat: IntentAnalysisChat | undefined,
   showClosedDecision: boolean,
@@ -133,9 +138,17 @@ function withClosedDecision(
   if (!analysisChat) {
     return undefined;
   }
+  if (!showClosedDecision) {
+    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
+  }
+  const startTone = liveDraftReadiness({
+    clarity: analysisChat.clarity?.score,
+    confidence: analysisChat.confidence?.score,
+    isAnalyzing: analysisChat.isAnalyzing,
+  }).tone;
   return {
     ...analysisChat,
-    closedDecision: showClosedDecision ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
+    closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }
 
@@ -199,10 +212,13 @@ function IntentRequestPane({
   );
 }
 
-function ClosedPlanActions({ resultFooter }: { resultFooter?: ReactNode }) {
+function ClosedPlanActions({ resultFooter, startTone }: { resultFooter?: ReactNode; startTone: DraftReadinessTone }) {
   const actions =
     isValidElement(resultFooter) && typeof resultFooter.type !== "string"
-      ? cloneElement(resultFooter as ReactElement<{ actionsOnly?: boolean }>, { actionsOnly: true })
+      ? cloneElement(resultFooter as ReactElement<{ actionsOnly?: boolean; startTone?: DraftReadinessTone }>, {
+          actionsOnly: true,
+          startTone,
+        })
       : resultFooter;
   return <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>;
 }

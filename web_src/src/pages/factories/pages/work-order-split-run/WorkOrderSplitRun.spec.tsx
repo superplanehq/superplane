@@ -1097,8 +1097,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
+      within(screen.getByTestId("split-run-draft-action-group")).getByRole("button", { name: "Start" }),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Plan" }));
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
