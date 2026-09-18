@@ -118,12 +118,28 @@ async function proposeSpec(input) {
   return result;
 }
 
-async function proposeConfidence(input) {
+function scoreInput(input) {
   const score = Number(input && input.score);
   if (!Number.isFinite(score)) {
     throw new Error("score is required");
   }
   const summary = String((input && input.summary) || "").trim();
+  return { score, summary };
+}
+
+// Clarity: how well the task is defined. Publishes the clarity check only.
+async function proposeClarity(input) {
+  const { score, summary } = scoreInput(input);
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/clarity", {
+    score,
+    summary,
+  });
+}
+
+// Confidence: how likely a coding agent completes the task in one run. The
+// exit graph reads the score file as agent fit, so only Confidence writes it.
+async function proposeConfidence(input) {
+  const { score, summary } = scoreInput(input);
   const result = await requestJSON(
     "POST",
     "/api/v1/runner/planning-sessions/confidence",
@@ -165,9 +181,9 @@ const TOOLS = [
     },
   },
   {
-    name: "propose_confidence",
+    name: "propose_clarity",
     description:
-      "Publish the 1 through 5 Clarity score and a short summary. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -177,7 +193,26 @@ const TOOLS = [
         },
         summary: {
           type: "string",
-          description: "Short summary for the user. Follow the task prompt for length and shape.",
+          description: "Short Clarity summary for the user. Follow the task prompt for length and shape.",
+        },
+      },
+      required: ["score", "summary"],
+    },
+  },
+  {
+    name: "propose_confidence",
+    description:
+      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        score: {
+          type: "number",
+          description: "Confidence from 1 through 5.",
+        },
+        summary: {
+          type: "string",
+          description: "Short Confidence summary for the user. Follow the task prompt for length and shape.",
         },
       },
       required: ["score", "summary"],
@@ -265,6 +300,8 @@ async function handleRequest(message) {
       let result;
       if (name === "propose_spec") {
         result = await proposeSpec(args);
+      } else if (name === "propose_clarity") {
+        result = await proposeClarity(args);
       } else if (name === "propose_confidence") {
         result = await proposeConfidence(args);
       } else if (name === "survey") {
@@ -411,6 +448,7 @@ if (require.main === module) {
 
 module.exports = {
   proposeSpec,
+  proposeClarity,
   proposeConfidence,
   proposeSurvey,
   recordAgentMessage,

@@ -57,6 +57,14 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	server.Router.ServeHTTP(specRec, spec)
 	require.Equal(t, http.StatusOK, specRec.Code, specRec.Body.String())
 
+	clarity := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
+		`{"score":5,"summary":"The plan is ready."}`,
+	)))
+	clarity.Header.Set("Authorization", "Bearer "+token)
+	clarityRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(clarityRec, clarity)
+	require.Equal(t, http.StatusOK, clarityRec.Code, clarityRec.Body.String())
+
 	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
 		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
 	)))
@@ -73,11 +81,16 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, 4.0, checks[0].Score)
+	require.Len(t, checks, 2)
+	scores := map[string]float64{}
+	for _, check := range checks {
+		scores[check.Key] = check.Score
+	}
+	assert.Equal(t, 5.0, scores[models.PlanningClarityCheckKey])
+	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
 }
 
-func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
+func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
@@ -85,7 +98,7 @@ func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
 		`{"score":2,"summary":"The request is still missing the failing path."}`,
 	)))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -100,6 +113,7 @@ func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
+	assert.Equal(t, models.PlanningClarityCheckKey, checks[0].Key)
 	assert.Equal(t, 2.0, checks[0].Score)
 	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
 }
@@ -257,6 +271,7 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 	}{
 		{name: "wait", method: http.MethodGet, path: "/api/v1/runner/planning-sessions/wait?hold_seconds=1"},
 		{name: "spec", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Plan"}`},
+		{name: "clarity", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/clarity", body: `{"score":4,"summary":"Clear"}`},
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},

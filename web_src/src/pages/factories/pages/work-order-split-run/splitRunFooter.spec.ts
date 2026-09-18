@@ -8,6 +8,7 @@ import {
   doneFooterForStatus,
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
+  splitRunDecisionTone,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
 
@@ -66,31 +67,51 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
-  it("keeps Start available when confidence is 0 or 1", () => {
-    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 1 });
+  it("keeps Start available when Clarity is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 1, confidenceScore: 5 });
 
     expect(footer.note?.headline).toBe("This task is not ready to start");
+    expect(footer.note?.text).toBe("The task is not clear enough. Tell the agent more in the chat.");
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
     expect(footer.actions.find((action) => action.kind === "start")).toEqual(START);
-    expect(footer.confidenceScore).toBe(1);
+    expect(footer.clarityScore).toBe(1);
+    expect(footer.confidenceScore).toBe(5);
+    expect(splitRunDecisionTone(footer)).toBe("draft-blocked");
   });
 
-  it("warns before Start when confidence is 2 or 3", () => {
-    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 3 });
+  it("warns about agent fit when Confidence is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 5, confidenceScore: 2 });
+
+    expect(footer.note?.headline).toBe("Review before you start");
+    expect(footer.note?.text).toBe("An agent may need steering. Start if you accept the risk, or split the work.");
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("warns before Start when either score is 3", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 3, confidenceScore: 5 });
 
     expect(footer.note?.headline).toBe("Review the plan before you start");
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
   });
 
-  it("invites Start when confidence is 4 or 5", () => {
-    const footer = buildSplitRunFooter({ kind: "draft", confidenceScore: 5 });
+  it("invites Start when both scores are 4 or 5", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 4, confidenceScore: 5 });
 
     expect(footer.note?.headline).toBe("This task is ready to start");
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-ready");
+  });
+
+  it("scores an intake draft on Confidence alone", () => {
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 5 }).note?.headline).toBe(
+      "This task is ready to start",
+    );
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 1 }).note?.headline).toBe("Review before you start");
   });
 
   it("keeps Archive after analysis writes a score", () => {
-    const footer = buildSplitRunFooter({ kind: "draft", isAnalyzing: true, confidenceScore: 4 });
+    const footer = buildSplitRunFooter({ kind: "draft", isAnalyzing: true, clarityScore: 4, confidenceScore: 4 });
 
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
     expect(footer.note?.headline).toBe("This task is ready to start");

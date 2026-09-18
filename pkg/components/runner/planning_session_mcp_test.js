@@ -8,14 +8,23 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
-const { proposeSpec, proposeConfidence, recordAgentMessage, writeAnalysisOutputs } = require("./planning_session_mcp");
+const {
+  proposeSpec,
+  proposeClarity,
+  proposeConfidence,
+  recordAgentMessage,
+  writeAnalysisOutputs,
+} = require("./planning_session_mcp");
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
   assert.match(pack, /propose_spec/);
+  assert.match(pack, /propose_clarity/);
   assert.match(pack, /propose_confidence/);
+  assert.match(pack, /A question can raise Clarity or Confidence/);
+  assert.doesNotMatch(pack, /Do not ask a question to raise Confidence/);
   assert.doesNotMatch(pack, /propose_plan/);
-  assert.match(pack, /Follow the task prompt/);
+  assert.match(pack, /The task prompt owns the judgment/);
   assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the specification/);
   assert.match(pack, /call survey with 2 to 4 options/);
@@ -51,17 +60,33 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /Talk like a colleague/);
   assert.match(pack, /## 1\. Research/);
   assert.match(pack, /## 2\. Decide or ask/);
-  assert.match(pack, /## 3\. Score/);
-  assert.match(pack, /## 4\. Write the plan/);
-  assert.match(pack, /how well you understand the task/);
+  assert.match(pack, /## 3\. Score Clarity/);
+  assert.match(pack, /## 4\. Score Confidence/);
+  assert.match(pack, /## 5\. Write the plan/);
+  assert.match(pack, /how well the task is defined/);
+  assert.doesNotMatch(pack, /how likely implementation is to succeed/);
   assert.match(pack, /why Clarity is not 5/);
+  assert.match(pack, /how likely a coding agent finishes this task in one run/);
+  assert.match(pack, /### Calibration/);
+  assert.match(pack, /Start at 4 for a bounded change that has a pattern in the repository/);
+  assert.match(pack, /### Raise Confidence through refinement/);
+  assert.match(pack, /Split into two or three tasks that each fit one run/);
+  assert.match(pack, /Be direct when the task is too big or too complex for one run/);
+  assert.doesNotMatch(pack, /Do not push Confidence to 5/);
+  assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
+  assert.match(pack, /Confidence is provisional/);
+  assert.strictEqual(pack.match(/Do not repeat the number in the summary/g)?.length, 2);
+  assert.doesNotMatch(pack, /Good: Clarity is \d because/);
+  assert.doesNotMatch(pack, /Good: Confidence is \d because/);
+  assert.match(pack, /Blast radius/);
+  assert.match(pack, /Skip Risks only when Clarity is 5 and Confidence is 4 or higher/);
   assert.doesNotMatch(pack, /how suitable the work is for an agent/);
   assert.match(pack, /2 to 4 short sentences/);
   assert.match(pack, /Keep each option under 12 words/);
-  assert.match(pack, /If the score is 1 or 2/);
+  assert.match(pack, /If Clarity is 1 or 2/);
   assert.match(pack, /do not have enough Clarity to write a plan/);
   assert.match(pack, /Keep asking until Clarity is 5/);
-  assert.match(pack, /Scores 3 and 4/);
+  assert.match(pack, /Clarity 3 and 4/);
   assert.match(pack, /Review it and start if you are happy/);
   assert.match(pack, /A simple task can reach 5 with no survey/);
   assert.match(pack, /Do not invent a survey to fill a quota/);
@@ -134,7 +159,7 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
   });
 });
 
-test("proposeSpec and proposeConfidence publish on separate routes", async () => {
+test("proposeSpec, proposeClarity, and proposeConfidence publish on separate routes", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
   const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
   const previousFetch = global.fetch;
@@ -148,17 +173,27 @@ test("proposeSpec and proposeConfidence publish on separate routes", async () =>
 
   try {
     const spec = await proposeSpec({ body: "# Retry refunds\n" });
+    const clarity = await proposeClarity({
+      score: 5,
+      summary: "  The plan is ready.  ",
+    });
     const confidence = await proposeConfidence({
       score: 4,
       summary: "This issue is a good fit for an agent.",
     });
     assert.deepEqual(spec, { status: "shown" });
+    assert.deepEqual(clarity, { status: "shown" });
     assert.deepEqual(confidence, { status: "shown" });
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
     assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/specs");
     assert.deepEqual(JSON.parse(calls[0].options.body), { body: "# Retry refunds" });
-    assert.equal(calls[1].url, "https://superplane.example/api/v1/runner/planning-sessions/confidence");
+    assert.equal(calls[1].url, "https://superplane.example/api/v1/runner/planning-sessions/clarity");
     assert.deepEqual(JSON.parse(calls[1].options.body), {
+      score: 5,
+      summary: "The plan is ready.",
+    });
+    assert.equal(calls[2].url, "https://superplane.example/api/v1/runner/planning-sessions/confidence");
+    assert.deepEqual(JSON.parse(calls[2].options.body), {
       score: 4,
       summary: "This issue is a good fit for an agent.",
     });
@@ -227,31 +262,32 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   ]);
   assert.equal(replies[0].id, 1);
   assert.equal(replies[0].result.serverInfo.name, "superplane");
+  const tools = replies[1].result.tools;
   assert.deepEqual(
-    replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey"],
+    tools.map((tool) => tool.name),
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey"],
   );
-  assert.deepEqual(replies[1].result.tools[0].inputSchema.required, ["body"]);
-  assert.match(replies[1].result.tools[1].description, /every turn/);
-  assert.match(replies[1].result.tools[2].description, /short everyday options/);
-  assert.match(replies[1].result.tools[1].inputSchema.properties.summary.description, /Follow the task prompt/);
-  assert.match(replies[1].result.tools[0].description, /Do not leave a written plan unpublished/);
-  assert.match(replies[1].result.tools[1].description, /without propose_spec/);
-  assert.match(replies[1].result.tools[2].description, /task prompt says to ask/);
-  assert.match(
-    replies[1].result.tools[2].inputSchema.properties.questions.description,
-    /JSON array/,
-  );
-  assert.equal(replies[1].result.tools[2].inputSchema.additionalProperties, undefined);
+  const [spec, clarity, confidence, survey] = tools;
+  assert.deepEqual(spec.inputSchema.required, ["body"]);
+  assert.match(spec.description, /Do not leave a written plan unpublished/);
+  assert.match(clarity.description, /how well the task is defined/);
+  assert.match(clarity.description, /every turn/);
+  assert.match(clarity.description, /without propose_spec/);
+  assert.match(clarity.inputSchema.properties.summary.description, /Follow the task prompt/);
+  assert.match(confidence.description, /how likely a coding agent completes this task in one run/);
+  assert.match(confidence.description, /every turn/);
+  assert.match(confidence.description, /without propose_spec/);
+  assert.deepEqual(confidence.inputSchema.required, ["score", "summary"]);
+  assert.match(survey.description, /short everyday options/);
+  assert.match(survey.description, /task prompt says to ask/);
+  assert.match(survey.inputSchema.properties.questions.description, /JSON array/);
+  assert.equal(survey.inputSchema.additionalProperties, undefined);
+  assert.equal(survey.inputSchema.properties.questions.items.additionalProperties, undefined);
   assert.equal(
-    replies[1].result.tools[2].inputSchema.properties.questions.items.additionalProperties,
+    survey.inputSchema.properties.questions.items.properties.options.minItems,
     undefined,
   );
-  assert.equal(
-    replies[1].result.tools[2].inputSchema.properties.questions.items.properties.options.minItems,
-    undefined,
-  );
-  assert.doesNotMatch(replies[1].result.tools[1].description, /check copy/);
+  assert.doesNotMatch(clarity.description, /check copy/);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -266,7 +302,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey"],
   );
 });
 

@@ -60,21 +60,43 @@ describe("SplitRunReview start confirm", () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it("explains a score below 3", async () => {
+  it("explains a Clarity score of 2 or lower", async () => {
     const user = userEvent.setup();
-    renderConfirmReview(vi.fn(), { ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer, confidenceScore: 2 });
+    renderConfirmReview(vi.fn(), {
+      ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+      clarityScore: 2,
+      confidenceScore: 5,
+    });
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(screen.getByText(START_CONFIRM_COPY.low)).toBeInTheDocument();
   });
 
-  it("explains a score of 3 or 4", async () => {
+  it("explains a low Confidence or a score of 3", async () => {
     const user = userEvent.setup();
-    renderConfirmReview(vi.fn(), { ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer, confidenceScore: 4 });
+    renderConfirmReview(vi.fn(), {
+      ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+      clarityScore: 5,
+      confidenceScore: 2,
+    });
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(screen.getByText(START_CONFIRM_COPY.mid)).toBeInTheDocument();
   });
 
-  it("starts immediately at score 5", async () => {
+  it("starts immediately when both scores are 4 or higher", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(onStart, {
+      ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+      clarityScore: 4,
+      confidenceScore: 5,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("starts immediately on an intake draft with a high Confidence", async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();
     renderConfirmReview(onStart, splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]).footer);

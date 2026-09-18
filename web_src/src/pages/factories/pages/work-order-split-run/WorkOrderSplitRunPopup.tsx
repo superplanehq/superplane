@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -118,17 +118,7 @@ function AnalysisWorkOrderPopup({
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
-  const edits = useSplitRunWorkOrderEdits({
-    organizationId,
-    factoryId,
-    orderId,
-    canUpdate,
-    title: fixture.title,
-    description: popupData.sourceDescription,
-    owner: fixture.owner,
-    assigneeIds: fixture.assigneeIds ?? [],
-    footerKind: fixture.footer.kind,
-  });
+  const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
@@ -136,6 +126,14 @@ function AnalysisWorkOrderPopup({
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
+  const modelSelects = draftModelSelects({
+    organizationId,
+    factoryId,
+    fixture,
+    value: draftModel,
+    onChange: setDraftModel,
+    disabled: isDispatching || !canDispatch,
+  });
   const reviewArgs = {
     fixture,
     organizationId,
@@ -148,12 +146,12 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    draftModel,
-    setDraftModel,
     compact: showSidebarNote || fixture.footer.kind === "draft",
+    modelSelect: modelSelects.footer,
   };
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
+  const stripAnalysis = fixture.footer.kind === "draft" ? { ...analysis, modelSelect: modelSelects.strip } : undefined;
 
   return (
     <PopupShell
@@ -179,7 +177,7 @@ function AnalysisWorkOrderPopup({
         footerActions={footerActions}
         resultFooter={!showSidebarNote && tab === "description" ? review : undefined}
         sidebarNote={showSidebarNote ? review : undefined}
-        analysis={fixture.footer.kind === "draft" ? analysis : undefined}
+        analysis={stripAnalysis}
         header={(views) => (
           <PopupHeader
             title={edits.title}
@@ -212,6 +210,26 @@ function AnalysisWorkOrderPopup({
   );
 }
 
+/** Title, owner, and assignee edits for the popup header, fed from the fixture and loaded description. */
+function useAnalysisPopupEdits(args: {
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canUpdate: boolean;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  popupData: ReturnType<typeof useSplitRunPopupData>;
+}) {
+  const { fixture, popupData, ...ids } = args;
+  return useSplitRunWorkOrderEdits({
+    ...ids,
+    title: fixture.title,
+    description: popupData.sourceDescription,
+    owner: fixture.owner,
+    assigneeIds: fixture.assigneeIds ?? [],
+    footerKind: fixture.footer.kind,
+  });
+}
+
 function analysisPopupReview(args: {
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   organizationId?: string;
@@ -224,10 +242,9 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  draftModel: string;
-  setDraftModel: (value: string) => void;
   compact: boolean;
   actionsOnly?: boolean;
+  modelSelect?: ReactNode;
 }) {
   return (
     <SplitRunReview
@@ -246,42 +263,30 @@ function analysisPopupReview(args: {
       compact={args.compact}
       actionsOnly={args.actionsOnly}
       confirmUnclearStart
-      modelSelect={analysisDraftStartModelSelect({
-        organizationId: args.organizationId,
-        factoryId: args.factoryId,
-        lineName: args.fixture.lineName,
-        footerKind: args.fixture.footer.kind,
-        hasStart: args.fixture.footer.actions.some((action) => action.kind === "start"),
-        value: args.draftModel,
-        onChange: args.setDraftModel,
-        disabled: args.isDispatching || !args.canDispatch,
-      })}
+      modelSelect={args.modelSelect}
     />
   );
 }
 
-function analysisDraftStartModelSelect(args: {
+/**
+ * One model select per surface: `labeled` for the footer capsule under the
+ * plan, `ghost` for the refine strip settings row. Only a draft with Start
+ * gets one.
+ */
+function draftModelSelects(args: {
   organizationId?: string;
   factoryId?: string;
-  lineName: string;
-  footerKind: string;
-  hasStart: boolean;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
-}) {
-  if (args.footerKind !== "draft" || !args.hasStart) {
-    return undefined;
+}): { footer?: ReactNode; strip?: ReactNode } {
+  const { fixture, ...select } = args;
+  if (fixture.footer.kind !== "draft" || !fixture.footer.actions.some((action) => action.kind === "start")) {
+    return {};
   }
-  return (
-    <DraftStartModelSelect
-      organizationId={args.organizationId}
-      factoryId={args.factoryId}
-      lineName={args.lineName}
-      value={args.value}
-      onChange={args.onChange}
-      disabled={args.disabled}
-      appearance="labeled"
-    />
-  );
+  return {
+    footer: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="labeled" />,
+    strip: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="ghost" />,
+  };
 }

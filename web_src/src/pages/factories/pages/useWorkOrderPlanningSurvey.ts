@@ -3,10 +3,10 @@ import { useEffect, useRef } from "react";
 
 import { findPlanningSessionByWorkOrder } from "./planningSessionClient";
 import {
-  draftCardAgentIsWorking,
   planningSessionHasPendingSurvey,
   planningSessionIsWaiting,
   planningSessionIsWorking,
+  type PlanningSessionMachineInput,
   type PlanningSessionPayload,
 } from "./planningSessionView";
 
@@ -33,6 +33,14 @@ export function planningActivityPollInterval(
   return false;
 }
 
+export type WorkOrderPlanningActivity = {
+  hasAgentQuestion: boolean;
+  isWaiting: boolean;
+  isWorking: boolean;
+  /** Session machine fields for `draftCardAgentIsWorking`. Null until enabled. */
+  session: PlanningSessionMachineInput | null;
+};
+
 /**
  * Live analysis session for a draft card. `enabled` reads the shared
  * cache. Polling continues only while the agent still works.
@@ -43,7 +51,7 @@ export function useWorkOrderPlanningActivity(
   workOrderId: string,
   enabled: boolean,
   backlogAnalyzing = false,
-): { hasAgentQuestion: boolean; isWaiting: boolean; isWorking: boolean; isAgentWorking: boolean } {
+): WorkOrderPlanningActivity {
   const queryEnabled = enabled && Boolean(organizationId && factoryId && workOrderId);
   const { data, refetch } = useQuery({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
@@ -61,13 +69,13 @@ export function useWorkOrderPlanningActivity(
     }
   }, [backlogAnalyzing, queryEnabled, refetch]);
   if (!enabled) {
-    return { hasAgentQuestion: false, isWaiting: false, isWorking: false, isAgentWorking: backlogAnalyzing };
+    return { hasAgentQuestion: false, isWaiting: false, isWorking: false, session: null };
   }
   return {
     hasAgentQuestion: planningSessionHasPendingSurvey(data),
     isWaiting: planningSessionIsWaiting(data),
     isWorking: planningSessionIsWorking(data),
-    isAgentWorking: draftCardAgentIsWorking(data, backlogAnalyzing),
+    session: data ?? null,
   };
 }
 
