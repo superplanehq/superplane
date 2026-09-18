@@ -137,6 +137,29 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(outputNames(implement)).toEqual(["feature/rf-103", "#503"]);
   });
 
+  it("prefers reported step models over the Start override", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        lineDispatches: [
+          {
+            ...dispatch("STATE_FINISHED", [
+              {
+                id: "exec-1",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                models: ["openai/gpt-4.1"],
+              },
+            ]),
+            model: "anthropic/claude-sonnet-4-6",
+          },
+        ],
+      }),
+    );
+    expect(fixture.phases.find((phase) => phase.name === "Implement")?.model).toBe("openai/gpt-4.1");
+  });
+
   it("keeps a single Backlog ingest row on an ingest draft", () => {
     const fixture = splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog"]);
@@ -1029,6 +1052,36 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
     expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
+  });
+
+  it("shows spend, tokens, and model on the Analysis step when the run has usage", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            updatedAt: "2026-08-28T12:00:08Z",
+            finishedAt: "2026-08-28T12:00:08Z",
+            totalTokens: "1200",
+            costCents: "18",
+            models: ["anthropic/claude-sonnet-4-6"],
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")).toMatchObject({
+      costCents: "18",
+      totalTokens: "1200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
   });
 
   it("shows a requested analysis completion as passed while the run stops", () => {

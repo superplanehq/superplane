@@ -13,7 +13,6 @@ import { classicSplitRunFooter, isTaskResultFooter } from "./splitRunFooter";
 import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
-import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -44,7 +43,6 @@ export function ClassicWorkOrderPopup({
   sessionLookupError,
 }: ClassicWorkOrderPopupProps) {
   const classicFixture = useMemo(() => ({ ...fixture, footer: classicSplitRunFooter(fixture.footer) }), [fixture]);
-  const modelLabel = useImplementationRunnerModel(organizationId, classicFixture.phases);
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -134,8 +132,9 @@ export function ClassicWorkOrderPopup({
           >
             <OwnerTimeCostRow
               fixture={{ ...classicFixture, owner: edits.owner }}
-              modelLabel={modelLabel}
               assigneeIds={edits.assigneeIds}
+              usageByModel={classicFixture.usageByModel}
+              usageByMachineType={classicFixture.usageByMachineType}
             />
           </PopupHeader>
         )}

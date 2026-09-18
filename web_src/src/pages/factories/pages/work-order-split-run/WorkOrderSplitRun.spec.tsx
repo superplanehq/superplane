@@ -336,7 +336,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
-    expect(row).toHaveTextContent("claude-sonnet-4-6");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
     const close = screen.getByRole("button", { name: "Close" });
     const views = screen.getByRole("tablist", { name: "Task views" });
@@ -345,12 +345,27 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
   });
 
-  it("shows the implement model next to spend while the task is running", () => {
+  it("keeps the implement model off the header line while the task is running", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
 
     const row = screen.getByTestId("popup-owner-time-cost");
-    expect(row).toHaveTextContent("$0.73 · 2.7k tokens · claude-sonnet-4-6");
+    expect(row).toHaveTextContent("$0.73 · 2.7k tokens");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("underlines header spend and shows a model breakdown on hover", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+
+    const trigger = screen.getByTestId("popup-spend-breakdown-trigger");
+    expect(trigger).toHaveClass("underline");
+    await user.hover(trigger);
+    const card = await screen.findByTestId("popup-spend-breakdown");
+    expect(card).toHaveTextContent("claude-sonnet-4-6");
+    expect(card).toHaveTextContent("2.7k tokens · $0.45");
+    expect(card).toHaveTextContent("Machine time");
+    expect(card).toHaveTextContent("1 min 30 s · $0.28");
   });
 
   it("does not show a model on a draft that has not started", () => {
@@ -361,6 +376,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row).toHaveTextContent("0 tokens");
     expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(row).not.toHaveTextContent("grok-4.6");
+    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-spend-breakdown")).not.toBeInTheDocument();
   });
 
   it("opens the Task tab when no automation is running", () => {
