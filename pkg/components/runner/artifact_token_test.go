@@ -7,8 +7,26 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/jwt"
 )
+
+func TestAttachArtifactUploadEnvRequiresEnabledWorkOrderRun(t *testing.T) {
+	t.Parallel()
+
+	existing := []BrokerEnvironmentVariable{{Name: "EXISTING", Value: "value"}}
+	ctx := core.ExecutionContext{RunID: uuid.New(), ID: uuid.New()}
+	assert.Equal(t, existing, AttachArtifactUploadEnv(ctx, existing, 60, false))
+	assert.Equal(t, existing, AttachArtifactUploadEnv(core.ExecutionContext{}, existing, 60, true))
+}
+
+func TestAttachArtifactUploadEnvSkipsPlanningSessions(t *testing.T) {
+	t.Parallel()
+
+	environment := []BrokerEnvironmentVariable{{Name: EnvSuperplanePlanningID, Value: uuid.NewString()}}
+	ctx := core.ExecutionContext{RunID: uuid.New(), ID: uuid.New()}
+	assert.Equal(t, environment, AttachArtifactUploadEnv(ctx, environment, 60, true))
+}
 
 func TestArtifactUploadTokenRoundTrip(t *testing.T) {
 	signer := jwt.NewSigner("secret")
