@@ -130,6 +130,21 @@ describe("PhaseLogCard running pulse", () => {
     expect(screen.getByTestId("split-run-stream-line-run-tests")).not.toHaveAttribute("data-last-running-line");
   });
 
+  it("does not pulse a running activity when the stream is hidden", () => {
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running" }}
+        expanded
+        showExpandedStream={false}
+        stream={runningCommandStream()}
+      />,
+    );
+
+    expect(document.querySelector("[data-last-running-line]")).toBeNull();
+    expect(screen.getByTestId("split-run-automation-header-plan")).not.toHaveAttribute("data-last-running-line");
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+  });
+
   it("does not pulse a line after the automation finishes", () => {
     render(
       <PhaseLogCard

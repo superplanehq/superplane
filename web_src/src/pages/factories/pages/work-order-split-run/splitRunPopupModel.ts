@@ -49,7 +49,16 @@ const DESCRIPTION_NAMES = ["details.md", "description.md"];
 const PLAN_NAMES = ["plan.md"];
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  return fixture.footer.kind === "running" ? "log" : "description";
+  const hasRunningLineStep = fixture.phases.some((phase) => phase.stepIndex != null && phase.status === "running");
+  return hasRunningLineStep || hasActivePullRequestActivity(fixture) ? "log" : "description";
+}
+
+export function hasActivePullRequestActivity(fixture: SplitRunFixture): boolean {
+  return fixture.phases.some(
+    (phase) =>
+      Boolean(phase.pullRequestActivity) &&
+      (phase.status === "running" || phase.status === "pending" || phase.status === "waiting"),
+  );
 }
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {

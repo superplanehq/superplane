@@ -34,6 +34,7 @@ export function WorkOrderSplitRunOverview({
   analysis,
   source,
   showContextSidebar = false,
+  sidebarNote,
 }: {
   title: string;
   description: string;
@@ -54,6 +55,7 @@ export function WorkOrderSplitRunOverview({
   analysis?: IntentAnalysisChat;
   source?: SplitRunSource;
   showContextSidebar?: boolean;
+  sidebarNote?: ReactNode;
 }) {
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
   const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
@@ -102,6 +104,7 @@ export function WorkOrderSplitRunOverview({
               pullRequests={pullRequests}
               pullRequestsLoading={pullRequestsLoading}
               pullRequestsError={pullRequestsError}
+              sidebarNote={sidebarNote}
             />
           ) : undefined
         }

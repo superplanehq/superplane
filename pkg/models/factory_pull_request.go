@@ -104,6 +104,7 @@ type FactoryPullRequestRun struct {
 	RevisionID        *uuid.UUID
 	Access            string
 	State             string
+	Title             string
 	Description       string
 	Attempt           *int
 	AttemptLimit      *int
@@ -115,6 +116,7 @@ type FactoryPullRequestRun struct {
 
 type FactoryPullRequestLinkedRun struct {
 	Run          CanvasRun
+	Title        string
 	Description  string
 	Access       string
 	State        string
@@ -478,6 +480,7 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		seen[link.RunID] = true
 		linked := FactoryPullRequestLinkedRun{
 			Run:          run,
+			Title:        link.Title,
 			Description:  link.Description,
 			Access:       link.Access,
 			State:        link.State,

@@ -155,6 +155,10 @@ export interface SplitRunFooter {
   confidenceScore?: number;
 }
 
+export function isTaskResultFooter(footer: SplitRunFooter): boolean {
+  return footer.status === "completed" || footer.status === "rejected";
+}
+
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };

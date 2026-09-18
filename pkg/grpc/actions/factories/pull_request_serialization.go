@@ -122,6 +122,7 @@ func serializePullRequestRuns(
 	for _, linked := range runs {
 		usage := usageByRun[linked.Run.ID]
 		result = append(result, &pb.FactoryPullRequestRun{
+			Title:       linked.Title,
 			Description: linked.Description,
 			TotalTokens: usage.TotalTokens,
 			CostCents:   usage.CostCents(),
@@ -140,6 +141,7 @@ func serializePullRequestActivities(
 		usage := usageByRun[linked.Run.ID]
 		activity := &pb.FactoryPullRequestActivity{
 			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Title:       linked.Title,
 			Description: linked.Description,
 			Access:      linked.Access,
 			State:       linked.State,

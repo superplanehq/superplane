@@ -93,6 +93,7 @@ func activityPayload(result *core.PullRequestActivityResult) map[string]any {
 	}
 	if result.Activity != nil {
 		payload["activity"] = result.Activity
+		payload["title"] = result.Activity.Title
 		payload["description"] = result.Activity.Description
 		if result.Activity.Attempt != nil {
 			payload["attempt"] = *result.Activity.Attempt
