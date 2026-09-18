@@ -4,7 +4,7 @@ export const LINE_BOARD_COLUMN_COLOR_VIEWS = ["vivid", "dim", "borders", "off"] 
 
 export type LineBoardColumnColorView = (typeof LINE_BOARD_COLUMN_COLOR_VIEWS)[number];
 
-export const DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW: LineBoardColumnColorView = "dim";
+export const DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW: LineBoardColumnColorView = "vivid";
 
 export const LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY = "factories-column-color-view";
 
@@ -21,7 +21,7 @@ function migrateStoredView(value: string | null): LineBoardColumnColorView {
   return isLineBoardColumnColorView(value) ? value : DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
 }
 
-/** Read the persisted column-color view. Missing or invalid values use dim. */
+/** Read the persisted column-color view. Missing or invalid values use vivid. */
 export function readStoredLineBoardColumnColorView(): LineBoardColumnColorView {
   try {
     return migrateStoredView(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY));
@@ -42,7 +42,7 @@ function persistLineBoardColumnColorView(view: LineBoardColumnColorView): void {
   }
 }
 
-/** Owns the line-board column-color layout. Dim is the default and is not stored. */
+/** Owns the line-board column-color layout. Vivid is the default and is not stored. */
 export function useLineBoardColumnColorViewPreference(): {
   view: LineBoardColumnColorView;
   setView: (view: LineBoardColumnColorView) => void;

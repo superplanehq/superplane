@@ -48,7 +48,7 @@ import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
-import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
+import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
@@ -331,7 +331,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
   it("loads checks only for draft cards that can show a score", () => {
@@ -1400,7 +1400,7 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     const backlogLane = screen.getByTestId("lines-backlog-column");
-    for (const className of lineBoardColumnLaneClassName("lime")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("lime").surfaceClassName!.split(" ")) {
       expect(backlogLane).toHaveClass(className);
     }
   });
@@ -1424,7 +1424,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).toHaveClass(className);
     }
   });
@@ -1462,7 +1462,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).toHaveClass(className);
     }
   });
@@ -1481,7 +1481,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).not.toHaveClass(className);
     }
   });
@@ -1565,18 +1565,18 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     const first = renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
     fireEvent.click(await screen.findByTestId("lines-board-view-no-column-colors"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-100");
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
 
     first.unmount();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-100");
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
   });
 
   it("lets the header view menu show column colors as borders", async () => {
@@ -1588,27 +1588,27 @@ describe("LinesPage board editing", () => {
     fireEvent.click(await screen.findByTestId("lines-board-view-colored-borders"));
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).not.toContain("bg-lime-100");
+    expect(backlog.className).not.toContain("bg-lime-300");
     expect(backlog.className).toContain("border-lime-400");
   });
 
-  it("lets the header view menu show vivid column colors", async () => {
+  it("lets the header view menu show soft column colors", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).toContain("bg-lime-100");
-    expect(backlog.className).toContain("dark:bg-lime-950/40");
+    expect(backlog.className).toContain("bg-lime-300");
+    expect(backlog.className).toContain("dark:bg-lime-800");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
-    fireEvent.click(await screen.findByTestId("lines-board-view-vivid-column-colors"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-dim-column-colors"));
 
-    const vividBacklog = screen.getByTestId("lines-backlog-column");
-    expect(vividBacklog.className).toContain("bg-lime-300");
-    expect(vividBacklog.className).toContain("dark:bg-lime-800");
-    expect(vividBacklog.className).not.toContain("bg-lime-100");
-    expect(vividBacklog.className).not.toContain("dark:bg-lime-950/40");
+    const softBacklog = screen.getByTestId("lines-backlog-column");
+    expect(softBacklog.className).toContain("bg-lime-100");
+    expect(softBacklog.className).toContain("dark:bg-lime-950/40");
+    expect(softBacklog.className).not.toContain("bg-lime-300");
+    expect(softBacklog.className).not.toContain("dark:bg-lime-800");
   });
 
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {
