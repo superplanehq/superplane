@@ -63,7 +63,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas/Console/repository file changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
+	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas and Console changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -119,10 +119,6 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 				Type:        "array",
 				Description: "For read_file. Optional spec file paths to read in one call, for example canvas.yaml and console.yaml.",
 				Items:       &agents.CustomToolInputSchema{Type: "string"},
-			},
-			"content": {
-				Type:        "string",
-				Description: "For write_file. Complete file content to stage.",
 			},
 			"query": {
 				Type:        "string",

@@ -27,7 +27,6 @@ type Input struct {
 	Results             []string          `json:"results,omitempty"`
 	Path                string            `json:"path,omitempty"`
 	Paths               []string          `json:"paths,omitempty"`
-	Content             string            `json:"content,omitempty"`
 	Query               string            `json:"query,omitempty"`
 }
 
@@ -143,20 +142,6 @@ type fileReadEntry struct {
 type fileReadError struct {
 	Path  string `json:"path"`
 	Error string `json:"error"`
-}
-
-type fileStageResult struct {
-	Action         string         `json:"action"`
-	CanvasID       string         `json:"canvas_id"`
-	VersionID      string         `json:"version_id"`
-	Path           string         `json:"path"`
-	Deleted        bool           `json:"deleted,omitempty"`
-	StagingSummary stagingSummary `json:"staging_summary"`
-}
-
-type stagingSummary struct {
-	HasStaging  bool     `json:"has_staging"`
-	StagedPaths []string `json:"staged_paths,omitempty"`
 }
 
 type accessResult struct {
