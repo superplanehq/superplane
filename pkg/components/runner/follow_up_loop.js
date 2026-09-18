@@ -114,6 +114,14 @@ async function waitOnce() {
   return requestJSON("GET", `/api/v1/runner/planning-sessions/wait?hold_seconds=${HOLD_SECONDS}`);
 }
 
+function persistAnalysisContinuation(taskDir, result) {
+  const text = String((result && result.continuation) || "").trim();
+  if (!taskDir || !text) {
+    return;
+  }
+  fs.writeFileSync(path.join(taskDir, "analysis_continuation.md"), `${text}\n`);
+}
+
 function writePrompt(taskDir, text) {
   const dir = path.join(taskDir, "prompts");
   fs.mkdirSync(dir, { recursive: true });
@@ -127,7 +135,10 @@ function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
     const child = spawn(
       process.execPath,
       [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
-      { stdio: "inherit" },
+      {
+        stdio: "inherit",
+        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes" },
+      },
     );
     child.on("error", reject);
     child.on("close", (code) => resolve(code == null ? 1 : code));
@@ -205,6 +216,7 @@ async function runLoop(helpers) {
       await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
+    persistAnalysisContinuation(helpers.taskDir, result);
     const code = await runFollowUpPrompt(action.text, helpers, followUpIndex);
     followUpIndex += 1;
     if (code !== 0) {
@@ -220,6 +232,7 @@ async function main() {
   const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,
+    taskDir,
     runPrompt: (text) => runPromptFile(taskDir, writePrompt(taskDir, text), model, extraArgs),
   });
   process.exit(code);
@@ -230,6 +243,7 @@ module.exports = {
   MAX_UNREACHABLE_WAITS,
   interpretWaitResponse,
   nextAction,
+  persistAnalysisContinuation,
   runLoop,
   safeWaitRequest,
   writeLiveLogRecord,

@@ -2,6 +2,7 @@
 "use strict";
 
 const fs = require("fs");
+const { isCompactStatusText } = require("./analysis_protocol");
 
 /**
  * Stdio MCP server for task refinement.
@@ -176,7 +177,7 @@ async function createTask(input) {
 
 async function recordAgentMessage(text) {
   const body = String(text || "").trim();
-  if (!body) {
+  if (!body || isCompactStatusText(body)) {
     return { status: "ignored" };
   }
   return requestJSON(
