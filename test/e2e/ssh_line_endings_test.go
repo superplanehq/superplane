@@ -17,8 +17,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitstorage "github.com/superplanehq/superplane/pkg/git"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -33,21 +31,10 @@ const (
 	sshLineEndingSecretKey  = "password"
 	sshLineEndingPassword   = "correct-horse-battery-staple"
 	sshLineEndingUser       = "e2e"
-	sshLineEndingNodeName   = "Run SSH Script"
-	sshLineEndingScriptPath = "scripts/deploy.sh"
+	sshLineEndingNodeName = "Run SSH Script"
 )
 
 func TestSSHCommandLineEndings(t *testing.T) {
-	t.Run("normalizes CRLF command files before streaming them over SSH", func(t *testing.T) {
-		steps := &sshLineEndingsSteps{t: t}
-		steps.start()
-		steps.givenAnSSHServerExpectingScript("bash -s", "set -eo pipefail\nprintf ok\n")
-		steps.givenACanvasWithCRLFSSHCommandFile()
-		steps.whenTheManualTriggerRuns()
-		steps.thenTheSSHNodeCompletedSuccessfully()
-		steps.thenTheSSHServerReceivedNormalizedScript()
-	})
-
 	t.Run("normalizes CRLF inline scripts before streaming them over SSH", func(t *testing.T) {
 		steps := &sshLineEndingsSteps{t: t}
 		steps.start()
@@ -87,26 +74,11 @@ func (s *sshLineEndingsSteps) givenAnSSHServerExpectingScript(expectedCommand st
 	s.server = server
 }
 
-func (s *sshLineEndingsSteps) givenACanvasWithCRLFSSHCommandFile() {
-	require.NotNil(s.t, s.server, "SSH server must be started before creating the canvas")
-
-	s.createPasswordSecret()
-	canvas := s.createPublishedSSHCanvas(map[string]any{
-		"commandSource": "file",
-		"commandFile":   sshLineEndingScriptPath,
-	})
-	s.createRepositoryCommandFile(canvas, "set -eo pipefail\r\nprintf ok\r\n")
-
-	s.canvas = shared.NewCanvasSteps("SSH CRLF Line Endings", s.t, s.session)
-	s.canvas.WorkflowID = canvas.ID
-}
-
 func (s *sshLineEndingsSteps) givenACanvasWithCRLFInlineScript() {
 	require.NotNil(s.t, s.server, "SSH server must be started before creating the canvas")
 
 	s.createPasswordSecret()
 	canvas := s.createPublishedSSHCanvas(map[string]any{
-		"commandSource": "inline",
 		"commands": strings.Join([]string{
 			"#!/bin/bash",
 			"set -euo pipefail",
@@ -188,41 +160,6 @@ func (s *sshLineEndingsSteps) createPublishedSSHCanvas(commandConfig map[string]
 	})
 
 	return canvas
-}
-
-func (s *sshLineEndingsSteps) createRepositoryCommandFile(canvas *models.Canvas, script string) {
-	gitProvider, err := gitstorage.NewProvider()
-	require.NoError(s.t, err)
-
-	repoID := gitProvider.GetRepositoryID(gitprovider.RepositoryOptions{
-		OrganizationID: canvas.OrganizationID,
-		CanvasID:       canvas.ID,
-	})
-
-	repository, err := canvas.CreatePendingRepository(gitProvider.Name(), repoID)
-	require.NoError(s.t, err)
-
-	_, err = gitProvider.CreateRepository(s.t.Context(), repoID)
-	require.NoError(s.t, err)
-	require.NoError(s.t, repository.MarkReady(database.Conn()))
-
-	head, err := gitProvider.Head(s.t.Context(), repoID, "")
-	require.NoError(s.t, err)
-
-	_, err = gitProvider.Commit(s.t.Context(), repoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		Message:         "Add SSH command file",
-		ExpectedHeadSHA: head,
-		Author:          gitprovider.SuperPlaneBotAuthor(),
-		Operations: []gitprovider.FileOperation{
-			{
-				Path:      sshLineEndingScriptPath,
-				Content:   strings.NewReader(script),
-				SizeBytes: int64(len(script)),
-			},
-		},
-	})
-	require.NoError(s.t, err)
 }
 
 func (s *sshLineEndingsSteps) whenTheManualTriggerRuns() {

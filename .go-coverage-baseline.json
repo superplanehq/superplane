@@ -29,7 +29,6 @@
     "pkg/layout": 80.9,
     "pkg/config": 46.2,
     "pkg/configuration": 30.3,
-    "pkg/configuration/attachments": 91.1,
     "pkg/configuration/expressionvalidation": 72.6,
     "pkg/configuration/structuredoutput": 94.7,
     "pkg/crypto": 53.7,

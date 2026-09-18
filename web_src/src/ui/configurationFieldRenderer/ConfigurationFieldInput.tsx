@@ -18,7 +18,6 @@ import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
@@ -302,8 +301,6 @@ function renderReferenceField(commonProps: FieldRendererProps) {
   switch (commonProps.field.type) {
     case "git-ref":
       return <GitRefFieldRenderer {...commonProps} />;
-    case "repository-file":
-      return <RepositoryFileFieldRenderer {...commonProps} />;
     case "timezone":
       return <TimezoneFieldRenderer {...commonProps} />;
     default:
@@ -352,7 +349,6 @@ function isDateTimeField(fieldType: string | undefined): boolean {
 function isReferenceField(fieldType: string | undefined): boolean {
   return (
     fieldType === "git-ref" ||
-    fieldType === "repository-file" ||
     fieldType === "timezone" ||
     fieldType === "any-predicate-list"
   );

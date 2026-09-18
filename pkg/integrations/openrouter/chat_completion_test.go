@@ -3,7 +3,6 @@ package openrouter
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -14,24 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type fakeFiles struct{ data map[string][]byte }
-
-func (f *fakeFiles) List() ([]string, error) {
-	out := make([]string, 0, len(f.data))
-	for k := range f.data {
-		out = append(out, k)
-	}
-	return out, nil
-}
-
-func (f *fakeFiles) Read(path string) (io.ReadCloser, error) {
-	b, ok := f.data[path]
-	if !ok {
-		return nil, fmt.Errorf("not found: %s", path)
-	}
-	return io.NopCloser(bytes.NewReader(b)), nil
-}
 
 const completionBody = `{
 	"id": "gen-1",
@@ -345,74 +326,6 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		assert.Equal(t, []any{"openai/gpt-4o-mini", "anthropic/claude-sonnet-4.5"}, body["models"])
 	})
 
-	t.Run("pdfs are inlined as base64 file parts", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
-		ctx := execContext(map[string]any{
-			"model":  "openai/gpt-4o-mini",
-			"prompt": "Summarize",
-			"files":  []any{"doc.pdf"},
-		}, httpContext, &contexts.ExecutionStateContext{})
-		ctx.Files = &fakeFiles{data: map[string][]byte{"doc.pdf": []byte("%PDF-1.4")}}
-
-		require.NoError(t, c.Execute(ctx))
-
-		// No upload call: OpenRouter has no Files API.
-		require.Len(t, httpContext.Requests, 1)
-
-		body := requestBody(t, httpContext.Requests[0])
-		parts := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
-		require.Len(t, parts, 2)
-		assert.Equal(t, "text", parts[0].(map[string]any)["type"])
-
-		file := parts[1].(map[string]any)
-		assert.Equal(t, "file", file["type"])
-		assert.Equal(t, "doc.pdf", file["file"].(map[string]any)["filename"])
-		assert.Equal(t, "data:application/pdf;base64,JVBERi0xLjQ=", file["file"].(map[string]any)["file_data"])
-	})
-
-	t.Run("images are inlined as image parts", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
-		ctx := execContext(map[string]any{
-			"model":  "openai/gpt-4o-mini",
-			"prompt": "Describe",
-			"files":  []any{"shot.png"},
-		}, httpContext, &contexts.ExecutionStateContext{})
-		ctx.Files = &fakeFiles{data: map[string][]byte{"shot.png": []byte("\x89PNG\r\n\x1a\n")}}
-
-		require.NoError(t, c.Execute(ctx))
-
-		body := requestBody(t, httpContext.Requests[0])
-		parts := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
-		require.Len(t, parts, 2)
-
-		image := parts[1].(map[string]any)
-		assert.Equal(t, "image_url", image["type"])
-		assert.Contains(t, image["image_url"].(map[string]any)["url"], "data:image/png;base64,")
-	})
-
-	// A file part would route plain text through OpenRouter's document parser,
-	// which is a paid feature that rejects the request below a minimum balance.
-	t.Run("text files become prompt text rather than file parts", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
-		ctx := execContext(map[string]any{
-			"model":  "openai/gpt-4o-mini",
-			"prompt": "Summarize",
-			"files":  []any{"notes.md"},
-		}, httpContext, &contexts.ExecutionStateContext{})
-		ctx.Files = &fakeFiles{data: map[string][]byte{"notes.md": []byte("the codeword is BANANA")}}
-
-		require.NoError(t, c.Execute(ctx))
-
-		body := requestBody(t, httpContext.Requests[0])
-		parts := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
-		require.Len(t, parts, 2)
-
-		attached := parts[1].(map[string]any)
-		assert.Equal(t, "text", attached["type"])
-		assert.NotContains(t, attached, "file")
-		assert.Equal(t, "--- notes.md ---\nthe codeword is BANANA", attached["text"])
-	})
-
 	t.Run("reasoning stands in when content is null", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 			response(http.StatusOK, `{"id":"gen-2","model":"m","provider":"P","choices":[
@@ -617,17 +530,4 @@ func Test__ChatCompletion__Setup(t *testing.T) {
 		}, metadata.Metadata)
 	})
 
-	t.Run("rejects a file that is not in the repository", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Logger: logrus.NewEntry(logrus.New()),
-			Configuration: map[string]any{
-				"model":  "m",
-				"prompt": "hi",
-				"files":  []any{"missing.pdf"},
-			},
-			Metadata: &contexts.MetadataContext{},
-			Files:    &fakeFiles{data: map[string][]byte{"doc.pdf": []byte("%PDF-1.4")}},
-		})
-		require.ErrorContains(t, err, "not found in app repository")
-	})
 }
