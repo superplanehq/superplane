@@ -161,11 +161,12 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     sideTargetNodeIds: ctx.sideTargetNodeIds,
     edgeRouteGutters: ctx.edgeRouteGutters,
   });
-  const trunkRight = routeForwardTrunkEdges({
+  const graphLeft = Math.min(...component.map((id) => ctx.positions.get(id)?.x ?? componentOriginX));
+  const { trunkRight, leftGraphLanes } = routeForwardTrunkEdges({
     trunkEdges,
     positions: ctx.positions,
     nodeById: ctx.nodeById,
-    graphRight: maxRight + GUTTER_PAD,
+    graphLeft,
     edgeRouteGutters: ctx.edgeRouteGutters,
     edgeRouteOffsetsY: ctx.edgeRouteOffsetsY,
   });
@@ -173,12 +174,12 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
   const componentFeedbackEdges = ctx.feedbackEdges.filter(
     (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
   );
-  const graphLeft = Math.min(...component.map((id) => ctx.positions.get(id)?.x ?? componentOriginX));
   routeFeedbackEdges({
     feedbackEdges: componentFeedbackEdges,
     positions: ctx.positions,
     nodeById: ctx.nodeById,
     graphLeft,
+    occupiedLeftLanes: leftGraphLanes,
     feedbackEdgeKeys: ctx.feedbackEdgeKeys,
     spineEdgeKeys: ctx.spineEdgeKeys,
     edgeRouteGutters: ctx.edgeRouteGutters,

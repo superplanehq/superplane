@@ -126,18 +126,24 @@ describe("layoutFactoryRunLeafGraph", () => {
     { source: "bJoin", target: "shared", sourceHandle: "default" },
   ];
 
-  it("assigns overlapping merge edges to separate right gutters", () => {
+  it("routes a left-column merge to the left instead of past the right column", () => {
     const result = layoutFactoryRunLeafGraph(twoColumnIfMergeNodes, twoColumnIfMergeEdges);
 
-    const mergeKeys = [factoryRunLeafEdgeKey("ifA", "aJoin", "false"), factoryRunLeafEdgeKey("ifB", "bJoin", "false")];
-    const gutters = mergeKeys.map((key) => result.edgeRouteGutters.get(key));
-    const yOffsets = mergeKeys.map((key) => result.edgeRouteOffsetsY.get(key));
-    const graphRight = Math.max(...[...result.positions.values()].map((position) => position.x)) + 280 + 48;
+    const leftKey = factoryRunLeafEdgeKey("ifA", "aJoin", "false");
+    const rightKey = factoryRunLeafEdgeKey("ifB", "bJoin", "false");
+    const leftGutter = result.edgeRouteGutters.get(leftKey);
+    const rightGutter = result.edgeRouteGutters.get(rightKey);
+    const ifA = result.positions.get("ifA")!;
+    const ifB = result.positions.get("ifB")!;
+    const graphRight = Math.max(...[...result.positions.values()].map((position) => position.x)) + 280;
 
-    expect(new Set(gutters).size).toBe(2);
-    expect(yOffsets).toEqual([0, 16]);
-    expect(gutters[0]).toBe(graphRight);
-    expect(gutters[1]).toBe(graphRight + 48);
+    expect(leftGutter).toBeDefined();
+    expect(rightGutter).toBeDefined();
+    expect(leftGutter).not.toBe(rightGutter);
+    expect(leftGutter).toBeLessThan(ifA.x);
+    expect(rightGutter).toBeLessThan(graphRight);
+    expect(rightGutter).toBeGreaterThan(ifA.x + 280);
+    expect(rightGutter).toBeLessThan(ifB.x);
     expectNoOverlaps(result.positions);
   });
 
