@@ -28,6 +28,43 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
+export function streamNoteTextMatches(haystack: string, needle: string): boolean {
+  const extra = needle.trim();
+  if (!extra) {
+    return true;
+  }
+  const live = haystack.trim();
+  if (!live) {
+    return false;
+  }
+  return noteTextCovers(live, extra) || noteTextCovers(extra, live);
+}
+
+function noteTextCovers(container: string, part: string): boolean {
+  if (container === part) {
+    return true;
+  }
+  if (container.startsWith(part) && isLineBoundary(container, part.length)) {
+    return true;
+  }
+  let from = 0;
+  while (from < container.length) {
+    const embedded = container.indexOf(`\n${part}`, from);
+    if (embedded === -1) {
+      return false;
+    }
+    if (isLineBoundary(container, embedded + 1 + part.length)) {
+      return true;
+    }
+    from = embedded + 1;
+  }
+  return false;
+}
+
+function isLineBoundary(text: string, index: number): boolean {
+  return index === text.length || text.charAt(index) === "\n";
+}
+
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -266,12 +303,7 @@ function firstOpenStepIndex(notes: SplitRunStreamLine[]): number {
 }
 
 function streamAlreadyHasText(notes: SplitRunStreamLine[], text: string): boolean {
-  const needle = text.trim();
-  if (!needle) {
-    return true;
-  }
-  const prefix = needle.slice(0, 48);
-  return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+  return notes.some((note) => streamNoteTextMatches(`${note.componentName}\n${note.detail ?? ""}`, text));
 }
 
 export function notesForLiveStream(input: {

@@ -1,6 +1,7 @@
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import type { ClaudeStepGroup } from "./work-order-split-run/PhaseLogCard";
 import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
+import { streamNoteTextMatches } from "./work-order-split-run/streamNotesFromLiveLog";
 
 const PLANNING_SESSION_NOISE_PREFIXES = [
   "Planning session tools enabled",
@@ -17,14 +18,39 @@ const COLLAPSED_TOOL_TYPES = new Set(["bash", "read", "edit", "write", "tool"]);
 const PREAMBLE_ID = "planning-session-preamble";
 
 export function isPlanningSessionNoise(text: string): boolean {
-  const line = text.trim();
-  if (!line) {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
     return false;
   }
+  return lines.every(isPlanningSessionNoiseLine);
+}
+
+function isPlanningSessionNoiseLine(line: string): boolean {
   if (isPlanningSessionTurnEnd(line)) {
     return true;
   }
   return PLANNING_SESSION_NOISE_PREFIXES.some((prefix) => line === prefix || line.startsWith(prefix));
+}
+
+function planningTalkWithoutNoise(text: string): string {
+  const lines = text.split("\n");
+  let start = 0;
+  let end = lines.length;
+  while (start < end && isBlankOrPlanningSessionNoiseLine(lines[start])) {
+    start += 1;
+  }
+  while (end > start && isBlankOrPlanningSessionNoiseLine(lines[end - 1])) {
+    end -= 1;
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+function isBlankOrPlanningSessionNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+  return !trimmed || isPlanningSessionNoiseLine(trimmed);
 }
 
 export function isPlanningSessionToolPayload(text: string): boolean {
@@ -155,6 +181,10 @@ function attachPlanningTool(state: PlanningLogState, line: SplitRunStreamLine) {
 function consumePlanningLogLine(state: PlanningLogState, line: SplitRunStreamLine) {
   if (isPlanningSessionNoise(line.componentName)) {
     return;
+  }
+  const talk = planningTalkWithoutNoise(line.componentName);
+  if (talk !== line.componentName) {
+    line = { ...line, componentName: talk };
   }
   if (isPlanningSessionToolPayload(line.componentName) || isCollapsedTool(line)) {
     attachPlanningTool(state, line);
@@ -467,16 +497,11 @@ function isPlanningSessionWaitPrompt(text: string): boolean {
 }
 
 function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
-  const needle = text.trim();
-  if (!needle) {
-    return true;
-  }
-  const prefix = needle.slice(0, 48);
   return notes.some((note) => {
     if (isPlanningSessionSystemPrompt(note.componentName)) {
       return false;
     }
-    return `${note.componentName}\n${note.detail ?? ""}`.includes(prefix);
+    return streamNoteTextMatches(`${note.componentName}\n${note.detail ?? ""}`, text);
   });
 }
 
@@ -486,15 +511,14 @@ function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
  * section it streamed under. Only the first matching agent note is stamped.
  */
 function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderKey: number): void {
-  const prefix = text.trim().slice(0, 48);
-  if (!prefix) {
+  if (!text.trim()) {
     return;
   }
   for (const note of notes) {
     if (note.componentType === "prompt") {
       continue;
     }
-    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+    if (streamNoteTextMatches(`${note.componentName}\n${note.detail ?? ""}`, text)) {
       note.orderKey = orderKey;
       return;
     }
@@ -502,15 +526,14 @@ function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderK
 }
 
 function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {
-  const prefix = text.trim().slice(0, 48);
-  if (!prefix) {
+  if (!text.trim()) {
     return;
   }
   for (const note of notes) {
     if (note.noteParentId || note.componentType !== "prompt") {
       continue;
     }
-    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+    if (streamNoteTextMatches(`${note.componentName}\n${note.detail ?? ""}`, text)) {
       note.userTalk = userTalk;
     }
   }

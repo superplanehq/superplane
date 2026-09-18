@@ -33,7 +33,7 @@ export function startCommandSection(state: LogState, start: CommandStart): LogSt
   return attachPendingRecords(
     {
       ...state,
-      sections: [...state.sections, emptyCommandSection(start)],
+      sections: [...state.sections.map(closeOpenNoteEvent), emptyCommandSection(start)],
     },
     start.index,
   );
@@ -57,7 +57,7 @@ export function completeCommandSection(
         return section;
       }
       return {
-        ...closeOpenTool(section, status),
+        ...closeOpenNoteEvent(closeOpenTool(section, status)),
         status,
         duration_ms: durationMs,
         collapsed: status === "passed",
@@ -241,34 +241,74 @@ function applyBufferedRecord(state: LogState, record: PendingLiveLogRecord, comm
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
   const withLine = { ...section, lines: [...section.lines, text] };
-  if (!isPromptSection(section) || !text.trim()) {
+  if (!isPromptSection(section)) {
     return withLine;
   }
 
   const running = runningToolsInSection(section);
-  if (running.length !== 1) {
+  if (running.length === 1) {
+    if (!text.trim()) {
+      return withLine;
+    }
+    const open = running[0];
     return {
       ...withLine,
-      events: [...section.events, { kind: "note", text }],
+      events: section.events.map((event) => {
+        if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
+          return event;
+        }
+        return {
+          ...event,
+          tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
+        };
+      }),
     };
   }
 
-  const open = running[0];
+  return appendPromptNote(withLine, text);
+}
+
+function appendPromptNote(section: CommandSection, text: string): CommandSection {
+  const last = section.events.at(-1);
+  if (last?.kind === "note") {
+    return {
+      ...section,
+      events: [...section.events.slice(0, -1), { kind: "note", text: `${last.text}\n${text}` }],
+    };
+  }
+  if (!text.trim()) {
+    return section;
+  }
   return {
-    ...withLine,
-    events: section.events.map((event) => {
-      if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
-        return event;
-      }
-      return {
-        ...event,
-        tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
-      };
-    }),
+    ...section,
+    events: [...section.events, { kind: "note", text }],
   };
 }
 
+function closeOpenNoteEvent(section: CommandSection): CommandSection {
+  const last = section.events.at(-1);
+  if (last?.kind !== "note") {
+    return section;
+  }
+  const text = trimTrailingBlankLines(last.text);
+  if (text === last.text) {
+    return section;
+  }
+  if (!text.trim()) {
+    return { ...section, events: section.events.slice(0, -1) };
+  }
+  return {
+    ...section,
+    events: [...section.events.slice(0, -1), { kind: "note", text }],
+  };
+}
+
+function trimTrailingBlankLines(text: string): string {
+  return text.replace(/(?:\n[^\S\n]*)+$/u, "");
+}
+
 function startToolOnSection(section: CommandSection, kind: string, text: string, sourceId?: string): CommandSection {
+  section = closeOpenNoteEvent(section);
   const tool: CommandTool = {
     id: sourceId?.trim() || `${section.index}-tool-${toolCount(section)}`,
     sourceId: sourceId?.trim() || undefined,
@@ -302,6 +342,7 @@ function endOpenTool(
   durationMs: number,
   sourceId?: string,
 ): CommandSection {
+  section = closeOpenNoteEvent(section);
   const open = openToolInSection(section, sourceId);
   if (!open) {
     return section;
