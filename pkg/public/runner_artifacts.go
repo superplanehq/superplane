@@ -287,9 +287,10 @@ func loadRunnerArtifactContext(db *gorm.DB, scope *runneraction.ArtifactUploadSc
 	if err != nil || nodeExecution.RunID != scope.CanvasRunID || nodeExecution.NodeID != scope.NodeID {
 		return nil, fmt.Errorf("node execution does not match token")
 	}
-	execution, err := models.FindWorkOrderExecutionForRun(db, scope.CanvasRunID)
-	if err != nil || execution.OrganizationID != scope.OrganizationID || execution.FactoryID != scope.FactoryID || execution.WorkOrderID != scope.WorkOrderID {
-		return nil, fmt.Errorf("work order execution does not match token")
+	runContext, err := runneraction.ResolveArtifactRunContext(db, scope.CanvasRunID)
+	if err != nil || runContext.OrganizationID != scope.OrganizationID || runContext.FactoryID != scope.FactoryID ||
+		runContext.WorkOrderID != scope.WorkOrderID || runContext.CanvasID != scope.CanvasID {
+		return nil, fmt.Errorf("artifact run context does not match token")
 	}
 	factoryModel, err := models.FindFactory(db, scope.OrganizationID, scope.FactoryID)
 	if err != nil {
@@ -307,21 +308,35 @@ func loadRunnerArtifactContext(db *gorm.DB, scope *runneraction.ArtifactUploadSc
 	if err != nil {
 		return nil, err
 	}
-	line, _ := factoryModel.FindLine(db, execution.LineID)
-	return &runnerArtifactContext{Factory: factoryModel, Order: order, Canvas: canvas, Node: node, Line: line, Execution: execution, NodeExecution: nodeExecution}, nil
+	var line *models.FactoryLine
+	if runContext.LineExecution != nil {
+		line, _ = factoryModel.FindLine(db, runContext.LineExecution.LineID)
+	}
+	return &runnerArtifactContext{
+		Factory:       factoryModel,
+		Order:         order,
+		Canvas:        canvas,
+		Node:          node,
+		Line:          line,
+		Execution:     runContext.LineExecution,
+		NodeExecution: nodeExecution,
+	}, nil
 }
 
 func artifactAutomationRef(context *runnerArtifactContext) *factory.AutomationRef {
-	stepIndex := context.Execution.StepIndex
 	ref := &factory.AutomationRef{
-		NodeID:    context.Node.NodeID,
-		NodeName:  context.Node.Name,
-		AppID:     context.Canvas.ID,
-		AppName:   context.Canvas.Name,
-		LineID:    context.Execution.LineID,
-		StepIndex: &stepIndex,
-		StepName:  context.Execution.StepName,
+		NodeID:   context.Node.NodeID,
+		NodeName: context.Node.Name,
+		AppID:    context.Canvas.ID,
+		AppName:  context.Canvas.Name,
 	}
+	if context.Execution == nil {
+		return ref
+	}
+	stepIndex := context.Execution.StepIndex
+	ref.LineID = context.Execution.LineID
+	ref.StepIndex = &stepIndex
+	ref.StepName = context.Execution.StepName
 	if context.Line != nil {
 		ref.LineName = context.Line.Name
 	}

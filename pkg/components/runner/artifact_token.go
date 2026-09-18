@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -30,6 +31,78 @@ type ArtifactUploadScope struct {
 	CanvasRunID     uuid.UUID
 	NodeExecutionID uuid.UUID
 	NodeID          string
+}
+
+var ErrArtifactRunScopeNotFound = errors.New("artifact run scope not found")
+
+type ArtifactRunContext struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	WorkOrderID    uuid.UUID
+	CanvasID       uuid.UUID
+	LineExecution  *models.FactoryWorkOrderExecution
+}
+
+// ResolveArtifactRunContext accepts factory line runs and registered PR
+// discussion runs. Other factory canvases do not receive artifact access.
+func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContext, error) {
+	execution, err := models.FindWorkOrderExecutionForRun(tx, runID)
+	if err == nil {
+		run, runErr := models.FindUnscopedCanvasRun(tx, runID)
+		if runErr != nil {
+			return nil, runErr
+		}
+		return &ArtifactRunContext{
+			OrganizationID: execution.OrganizationID,
+			FactoryID:      execution.FactoryID,
+			WorkOrderID:    execution.WorkOrderID,
+			CanvasID:       run.WorkflowID,
+			LineExecution:  execution,
+		}, nil
+	}
+	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		return nil, err
+	}
+
+	run, err := models.FindUnscopedCanvasRun(tx, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrArtifactRunScopeNotFound
+		}
+		return nil, err
+	}
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, run.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	if handler == nil || handler.Source != models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+	activity, err := models.FindPullRequestActivityByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
+			return nil, ErrArtifactRunScopeNotFound
+		}
+		return nil, err
+	}
+	if activity.FeedbackHandlerID == nil || *activity.FeedbackHandlerID != handler.ID {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+	factoryModel, err := models.FindFactory(tx, handler.OrganizationID, handler.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	pullRequest, err := factoryModel.FindPullRequest(tx, models.FactoryPullRequestLookup{ID: activity.PullRequestID})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ArtifactRunContext{
+		OrganizationID: handler.OrganizationID,
+		FactoryID:      handler.FactoryID,
+		WorkOrderID:    pullRequest.WorkOrderID,
+		CanvasID:       run.WorkflowID,
+	}, nil
 }
 
 func MintArtifactUploadToken(signer *jwt.Signer, scope ArtifactUploadScope, ttl time.Duration) (string, error) {
@@ -109,15 +182,18 @@ func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvi
 		return environment
 	}
 	db := database.DB(context.Background())
-	execution, err := models.FindWorkOrderExecutionForRun(db, ctx.RunID)
+	runContext, err := ResolveArtifactRunContext(db, ctx.RunID)
 	if err != nil {
-		if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) && ctx.Logger != nil {
+		if !errors.Is(err, ErrArtifactRunScopeNotFound) && ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("skip artifact upload token: failed to resolve work order")
 		}
 		return environment
 	}
 	canvasID, err := uuid.Parse(ctx.WorkflowID)
 	if err != nil {
+		return environment
+	}
+	if canvasID != runContext.CanvasID {
 		return environment
 	}
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
@@ -133,9 +209,9 @@ func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvi
 		ttl = time.Duration(timeoutSeconds)*time.Second + artifactTokenGracePeriod
 	}
 	token, err := MintArtifactUploadToken(jwt.NewSigner(secret), ArtifactUploadScope{
-		OrganizationID:  execution.OrganizationID,
-		FactoryID:       execution.FactoryID,
-		WorkOrderID:     execution.WorkOrderID,
+		OrganizationID:  runContext.OrganizationID,
+		FactoryID:       runContext.FactoryID,
+		WorkOrderID:     runContext.WorkOrderID,
 		CanvasID:        canvasID,
 		CanvasRunID:     ctx.RunID,
 		NodeExecutionID: ctx.ID,
