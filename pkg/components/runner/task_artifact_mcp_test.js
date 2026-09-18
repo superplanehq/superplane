@@ -221,7 +221,7 @@ test("uploadArtifact uploads an inspected poster before a video", async () => {
   assert.equal(manifest.artifacts[1].markdown, "[Watch video: Checkout flow](https://app.example/demo.webm)");
 });
 
-test("uploadArtifact keeps a poster when the video upload fails", async () => {
+test("uploadArtifact records a partial result when the video upload fails", async () => {
   const value = fixture();
   const video = path.join(value.evidence, "demo.webm");
   fs.writeFileSync(video, "video");
@@ -248,8 +248,8 @@ test("uploadArtifact keeps a poster when the video upload fails", async () => {
   );
 
   assert.deepEqual(readManifest(value.env), {
-    status: "captured",
-    reason: "",
+    status: "partial",
+    reason: "Video upload failed: storage unavailable",
     artifacts: [
       { file_id: "poster-1", public_url: "https://app.example/poster.png", markdown: "![Checkout](poster)" },
     ],
@@ -373,6 +373,53 @@ test("reportVisualEvidenceUnavailable keeps captured evidence available", () => 
     assert.equal(result.artifacts.length, 1);
     assert.equal(result.reason, "The video upload failed.");
   });
+});
+
+test("reportVisualEvidenceUnavailable preserves a partial video result", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  inspectScreenshot({ path: value.file }, value.env);
+  let request = 0;
+
+  await assert.rejects(
+    uploadArtifact(
+      { path: video, posterPath: value.file, title: "Checkout flow" },
+      value.env,
+      async () => {
+        request += 1;
+        if (request === 1) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({ file_id: "poster-1", markdown: "![Checkout](poster)" }),
+          };
+        }
+        return {
+          ok: false,
+          status: 503,
+          text: async () => JSON.stringify({ message: "storage unavailable" }),
+        };
+      },
+    ),
+    /storage unavailable/,
+  );
+
+  const result = reportVisualEvidenceUnavailable(
+    {
+      reason: "The video upload failed.",
+      attempts: [
+        { type: "preview", command: "npm run storybook", outcome: "The preview started." },
+        { type: "playwright", command: "playwright video-start", outcome: "The video was captured." },
+        { type: "upload", command: "upload_artifact", outcome: "The video upload failed." },
+      ],
+    },
+    value.env,
+  );
+
+  assert.equal(result.status, "partial");
+  assert.equal(result.reason, "The video upload failed.");
+  assert.equal(result.artifacts.length, 1);
 });
 
 test("lists artifact tools over newline-delimited JSON-RPC", () => {

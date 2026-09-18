@@ -202,8 +202,10 @@ spec:
               fi
 
               EVIDENCE_MARKDOWN="$(jq -r '
-                if .status == "captured" and (.artifacts | length) > 0 then
-                  [.artifacts[].markdown] | join("\n\n")
+                if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then
+                  ([.artifacts[].markdown] +
+                    (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |
+                  join("\n\n")
                 else
                   ""
                 end
@@ -351,7 +353,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1160
         "y": 1320
@@ -415,7 +417,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1724
         "y": 1320
