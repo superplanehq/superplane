@@ -69,11 +69,32 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 12)
-		assert.Len(t, liveVersion.Edges, 9)
+		assert.Len(t, liveVersion.Nodes, 13)
+		assert.Len(t, liveVersion.Edges, 10)
+		var foundAcknowledge bool
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
+			if node.ID != prFeedbackAcknowledgeCommentNodeID {
+				continue
+			}
+			foundAcknowledge = true
+			assert.Equal(t, "github.addReaction", node.ComponentName())
+			assert.Equal(t, "{{ root().data.repository.full_name }}", node.Configuration["repository"])
+			assert.Equal(t, "{{ root().data.comment.id }}", node.Configuration["commentId"])
+			assert.Equal(t, "eyes", node.Configuration["content"])
+			assert.Equal(t, "issueComment", node.Configuration["target"])
 		}
+		assert.True(t, foundAcknowledge)
+		var foundAcknowledgeEdge bool
+		for _, edge := range liveVersion.Edges {
+			if edge.SourceID == prFeedbackCommentTriggerNodeID &&
+				edge.TargetID == prFeedbackAcknowledgeCommentNodeID &&
+				edge.Channel == "default" {
+				foundAcknowledgeEdge = true
+				break
+			}
+		}
+		assert.True(t, foundAcknowledgeEdge)
 	})
 
 	t.Run("creation fails when no repository is available", func(t *testing.T) {

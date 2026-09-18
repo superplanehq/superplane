@@ -8,18 +8,19 @@ import (
 )
 
 const (
-	prFeedbackCommentTriggerNodeID = "on-pr-comment"
-	prFeedbackReviewTriggerNodeID  = "on-pr-review"
-	prFeedbackReplyTriggerNodeID   = "on-pr-review-reply"
-	prFeedbackFindNodeID           = "find-pull-request"
-	prFeedbackActivityNodeID       = "add-pr-activity"
-	prFeedbackRunnerNodeID         = "address-pr-feedback"
-	prFeedbackReviewFindNodeID     = "find-pull-request-for-review"
-	prFeedbackReviewActivityNodeID = "add-pr-review-activity"
-	prFeedbackReviewRunnerNodeID   = "address-pr-review-feedback"
-	prFeedbackReplyFindNodeID      = "find-pull-request-for-review-reply"
-	prFeedbackReplyActivityNodeID  = "add-pr-review-reply-activity"
-	prFeedbackReplyRunnerNodeID    = "address-pr-review-reply-feedback"
+	prFeedbackCommentTriggerNodeID     = "on-pr-comment"
+	prFeedbackAcknowledgeCommentNodeID = "acknowledge-pr-comment"
+	prFeedbackReviewTriggerNodeID      = "on-pr-review"
+	prFeedbackReplyTriggerNodeID       = "on-pr-review-reply"
+	prFeedbackFindNodeID               = "find-pull-request"
+	prFeedbackActivityNodeID           = "add-pr-activity"
+	prFeedbackRunnerNodeID             = "address-pr-feedback"
+	prFeedbackReviewFindNodeID         = "find-pull-request-for-review"
+	prFeedbackReviewActivityNodeID     = "add-pr-review-activity"
+	prFeedbackReviewRunnerNodeID       = "address-pr-review-feedback"
+	prFeedbackReplyFindNodeID          = "find-pull-request-for-review-reply"
+	prFeedbackReplyActivityNodeID      = "add-pr-review-reply-activity"
+	prFeedbackReplyRunnerNodeID        = "address-pr-review-reply-feedback"
 
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
@@ -95,6 +96,25 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            80,
 	}, request)
+	commentFlow.nodes = append(commentFlow.nodes, yaml.Node{
+		ID:        prFeedbackAcknowledgeCommentNodeID,
+		Name:      "Acknowledge PR Comment",
+		Type:      yaml.NodeTypeAction,
+		Component: "github.addReaction",
+		Configuration: map[string]any{
+			"repository": "{{ root().data.repository.full_name }}",
+			"commentId":  "{{ root().data.comment.id }}",
+			"content":    "eyes",
+			"target":     "issueComment",
+		},
+		Integration: request.Binding.integrationRef(),
+		Position:    yaml.Position{X: 360, Y: -40},
+	})
+	commentFlow.edges = append(commentFlow.edges, yaml.Edge{
+		Channel:  "default",
+		SourceID: prFeedbackCommentTriggerNodeID,
+		TargetID: prFeedbackAcknowledgeCommentNodeID,
+	})
 	reviewFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
 		Trigger: yaml.Node{
 			ID:            prFeedbackReviewTriggerNodeID,
