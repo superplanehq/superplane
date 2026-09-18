@@ -33,11 +33,15 @@ function readManifest(env = process.env) {
   const { manifest } = artifactPaths(env);
   try {
     const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    return {
+    const result = {
       status: String(parsed.status || "not_applicable"),
       reason: String(parsed.reason || ""),
       artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
     };
+    if (Array.isArray(parsed.attempts)) {
+      result.attempts = parsed.attempts.map(String);
+    }
+    return result;
   } catch (_error) {
     return { status: "not_applicable", reason: "", artifacts: [] };
   }
@@ -134,10 +138,19 @@ async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
 function reportVisualEvidenceUnavailable(input, env = process.env) {
   const reason = String((input && input.reason) || "").trim();
   if (!reason) throw new Error("reason is required");
+  const attempts = Array.isArray(input && input.attempts)
+    ? input.attempts.map((attempt) => String(attempt).trim()).filter(Boolean)
+    : [];
+  if (attempts.length < 2) {
+    throw new Error(
+      "attempts is required and must include preview and Playwright capture attempts",
+    );
+  }
   const manifest = readManifest(env);
   const result = {
     status: "unavailable",
     reason,
+    attempts,
     artifacts: manifest.artifacts,
   };
   writeManifest(result, env);
@@ -158,11 +171,20 @@ const TOOLS = [
   {
     name: "report_visual_evidence_unavailable",
     description:
-      "Record why required visual evidence could not be captured or uploaded.",
+      "Record why required visual evidence could not be produced after trying an isolated preview and a Playwright capture.",
     inputSchema: {
       type: "object",
-      properties: { reason: { type: "string" } },
-      required: ["reason"],
+      properties: {
+        reason: { type: "string" },
+        attempts: {
+          type: "array",
+          description:
+            "Concrete preview and Playwright commands attempted, including their errors.",
+          items: { type: "string" },
+          minItems: 2,
+        },
+      },
+      required: ["reason", "attempts"],
     },
   },
 ];

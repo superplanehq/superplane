@@ -117,15 +117,35 @@ test("uploadArtifact streams metadata and records the returned artifact", async 
   assert.equal(readManifest(value.env).artifacts.length, 1);
 });
 
-test("reportVisualEvidenceUnavailable preserves uploaded artifacts", () => {
+test("reportVisualEvidenceUnavailable requires documented attempts", () => {
   const value = fixture();
+
+  assert.throws(
+    () =>
+      reportVisualEvidenceUnavailable(
+        { reason: "The preview did not start." },
+        value.env,
+      ),
+    /attempts is required/,
+  );
+
   reportVisualEvidenceUnavailable(
-    { reason: "The preview did not start." },
+    {
+      reason: "The preview did not start.",
+      attempts: [
+        "npm run storybook failed with exit code 1.",
+        "playwright screenshot could not connect to localhost:6006.",
+      ],
+    },
     value.env,
   );
   assert.deepEqual(readManifest(value.env), {
     status: "unavailable",
     reason: "The preview did not start.",
+    attempts: [
+      "npm run storybook failed with exit code 1.",
+      "playwright screenshot could not connect to localhost:6006.",
+    ],
     artifacts: [],
   });
 });
