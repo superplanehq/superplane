@@ -173,6 +173,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
+	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
