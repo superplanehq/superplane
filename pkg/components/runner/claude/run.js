@@ -123,20 +123,29 @@ function planningSystemPrompt(env = process.env) {
 }
 
 function allowedClaudeTools(env = process.env) {
+  const workspaceAllow = Object.keys(workspaceMCPServers(env)).map(
+    (name) => `mcp__${name}`,
+  );
   if (planningMCPEnabled(env)) {
     return [
       PLANNING_READONLY_TOOLS,
       "mcp__superplane",
+      ...workspaceAllow,
       ...ANALYSIS_ALLOWED_TOOLS,
     ].join(",");
   }
-  if (artifactMCPEnabled(env))
+  if (artifactMCPEnabled(env)) {
     return [
       BASE_ALLOWED_TOOLS,
       "mcp__superplane",
+      ...workspaceAllow,
       ...ARTIFACT_ALLOWED_TOOLS,
     ].join(",");
-  return BASE_ALLOWED_TOOLS;
+  }
+  if (workspaceAllow.length === 0) {
+    return BASE_ALLOWED_TOOLS;
+  }
+  return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
 }
 
 function claudePermissionMode(env = process.env) {
@@ -183,6 +192,69 @@ function configureArtifactOutput(taskDir, env = process.env) {
   fs.mkdirSync(outputDir, { recursive: true });
   env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
   env.PLAYWRIGHT_MCP_BROWSER = env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+}
+
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const servers = Array.isArray(parsed.servers) ? parsed.servers : [];
+    const out = {};
+    for (const server of servers) {
+      const name = String((server && server.name) || "").trim();
+      if (!name || name === "superplane") {
+        continue;
+      }
+      out[name] = {
+        type: "http",
+        url: String((server && server.url) || "").trim(),
+        headers: server && server.headers && typeof server.headers === "object" ? server.headers : {},
+      };
+    }
+    return out;
+  } catch (_err) {
+    return {};
+  }
+}
+
+function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
+  const mcpServers = { ...workspaceMCPServers(env) };
+  if (includeSuperplane) {
+    mcpServers.superplane = {
+      command: "node",
+      args: [artifactMCPPath(taskDir, env)],
+    };
+  }
+  const names = Object.keys(mcpServers);
+  if (names.length === 0) {
+    return "";
+  }
+  const mcpConfigPath = path.join(taskDir, "mcp.runtime.json");
+  fs.writeFileSync(mcpConfigPath, `${JSON.stringify({ mcpServers })}\n`);
+  return mcpConfigPath;
 }
 
 function readSessionID(taskDir) {
@@ -269,26 +341,17 @@ async function runPrompt(promptFile, model) {
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
-  if (toolsEnabled) {
-    if (planningToolsEnabled) {
-      println("Planning session tools enabled");
-      println(`permission mode: ${claudePermissionMode()}`);
-      claudeArgs[claudeArgs.length - 1] =
-        SYSTEM_PROMPT + planningSystemPrompt();
-    }
-    const mcpConfigPath = path.join(sp, "mcp.runtime.json");
-    fs.writeFileSync(
-      mcpConfigPath,
-      `${JSON.stringify({
-        mcpServers: {
-          superplane: {
-            command: "node",
-            args: [artifactMCPPath(sp)],
-          },
-        },
-      })}\n`,
-    );
+  if (planningToolsEnabled) {
+    println("Planning session tools enabled");
+    println(`permission mode: ${claudePermissionMode()}`);
+    claudeArgs[claudeArgs.length - 1] =
+      SYSTEM_PROMPT + planningSystemPrompt();
+  }
+  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, toolsEnabled);
+  if (mcpConfigPath) {
     claudeArgs.push("--mcp-config", mcpConfigPath);
+  }
+  if (planningToolsEnabled) {
     claudeArgs.push("--allowedTools", allowedClaudeTools());
     println(`allowed tools: ${allowedClaudeTools()}`);
   } else {
@@ -1173,4 +1236,6 @@ module.exports = {
   claudeSessionIDFromEvent,
   formatStreamJsonLines,
   planningSystemPrompt,
+  workspaceMCPServers,
+  writeClaudeMCPConfig,
 };

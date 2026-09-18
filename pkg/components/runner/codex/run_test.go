@@ -49,6 +49,40 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 	assert.Contains(t, joined, "developer_instructions")
 }
 
+func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+	assert.Contains(t, joined, `mcp_servers.docs.http_headers.Authorization="Bearer tok"`)
+}
+
+func TestCodexExecArgsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_TASK_DIR":             taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": "/task/workspace_mcp.json",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers.deepwiki.url="https://mcp.deepwiki.com/mcp"`)
+}
+
+func TestCodexExecArgsQuotesUnsafeWorkspaceMCPKeys(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"linear-docs","url":"https://mcp.example.com/mcp","headers":{"X-API-Key":"secret","X.Custom":"dotted"}}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers."linear-docs".url="https://mcp.example.com/mcp"`)
+	assert.Contains(t, joined, `mcp_servers."linear-docs".http_headers."X-API-Key"="secret"`)
+	assert.Contains(t, joined, `mcp_servers."linear-docs".http_headers."X.Custom"="dotted"`)
+}
+
 func TestCodexExecArgsResumesExactSession(t *testing.T) {
 	args := codexExecArgsFromScriptWithSession(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",

@@ -108,6 +108,55 @@ function planningEnabled(env = process.env) {
   );
 }
 
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const servers = Array.isArray(parsed.servers) ? parsed.servers : [];
+    const out = {};
+    for (const server of servers) {
+      const name = String((server && server.name) || "").trim();
+      const url = String((server && server.url) || "").trim();
+      if (!name || name === "superplane" || !url) {
+        continue;
+      }
+      const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+      out[name] = {
+        type: "remote",
+        url,
+        enabled: true,
+        headers,
+      };
+    }
+    return out;
+  } catch (_err) {
+    return {};
+  }
+}
+
 function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
 }
@@ -347,6 +396,10 @@ function buildOpenCodeConfig({
         enabled: true,
       },
     };
+  }
+  const workspaceServers = workspaceMCPServers(env);
+  if (Object.keys(workspaceServers).length > 0) {
+    config.mcp = { ...(config.mcp || {}), ...workspaceServers };
   }
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
@@ -1847,4 +1900,5 @@ module.exports = {
   waitDeadlineMs,
   openCodeProcessEnv,
   readSessionUsage,
+  workspaceMCPServers,
 };
