@@ -365,7 +365,7 @@ function mockConsoleRepositoryFileFetch(yamlBody: string, options?: { committedY
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/repository/file") && url.includes("console.yaml")) {
+      if (url.includes("/file") && url.includes("console.yaml")) {
         const committedYaml = options?.committedYaml ?? yamlBody;
         const body = url.includes("stage=true") ? yamlBody : committedYaml;
         return new Response(body, { status: 200 });

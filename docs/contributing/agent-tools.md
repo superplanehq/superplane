@@ -9,7 +9,7 @@ to the CLI for common app operations.
 Prefer adding an action to `superplane_app` when the capability is app-related:
 
 - reading app/canvas or Console YAML (served from the effective staged content the UI editor reads: the user's pending staged edits when present, otherwise the live version)
-- listing, reading, staging, or deleting normal app repository files such as `README.md` and `AGENTS.md`
+- listing and reading `canvas.yaml` and `console.yaml`
 - updating the app (`patch_staging` saves graph, Console, and layout edits as pending staged changes against the live canvas, exactly like edits made in the UI editor, so the user reviews and commits them)
 - inspecting agent token permissions (`access`) and runtime state (`read_runtime`)
 - listing connected integrations for the current app context
@@ -66,27 +66,15 @@ Action rules:
 - Always stay scoped to the current `AgentSessionContext`.
 - Reject or ignore attempts to operate on another canvas.
 - Never commit from an agent action without an explicit user-driven commit step. `patch_staging` saves graph, Console, and layout edits as pending staged changes (exactly like edits made in the UI editor) and never commits or goes live; the user reviews and commits the staged changes with a message.
-- Treat `canvas.yaml` and `console.yaml` as spec files. Agents should update them through `patch_staging`; normal repository file actions are for additional app files.
-- When exposing repository file reads, preserve the same staging semantics as `read`: serve effective staged content for the current user when present.
+- Treat `canvas.yaml` and `console.yaml` as spec files. Agents should update them through `patch_staging`.
+- When exposing spec file reads, preserve the same staging semantics as `read`: serve effective staged content for the current user when present.
 - Return concise JSON payloads; avoid dumping large unrelated data.
 - Prefer backend APIs and model methods over invoking the CLI.
 
-## App Repository Context Files
+## Spec files
 
-The app repository can contain additional files beyond `canvas.yaml` and
-`console.yaml`. Examples include `README.md` and AI context files.
-
-Managed agents treat these repository file names as context candidates:
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `README.md`
-- `*.agents.md`
-
-When an app task involves repository files, the agent should use
-`superplane_app` action `list_files`, read any returned context files with
-`read_file`, and then stage normal file edits with `write_file` or
-`delete_file`. The user commits or discards all staging from the UI.
+`list_files` returns `canvas.yaml` and `console.yaml` only. It does not list
+git repository files.
 
 ## Adding a Top-Level Agent Tool
 
