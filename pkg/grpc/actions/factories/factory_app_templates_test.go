@@ -55,8 +55,14 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, "task().visual_evidence_enabled")
 	assert.Contains(t, result.canvasYAML, "For a visual-only change, capture and upload at least one screenshot.")
 	assert.Contains(t, result.canvasYAML, "record and upload a short WebM video that shows the interaction works")
+	assert.Contains(t, result.canvasYAML, "Rendered markup, styles, layout, and interaction behavior are UI changes.")
+	assert.Contains(t, result.canvasYAML, "Use an existing Storybook story or component preview first.")
+	assert.Contains(t, result.canvasYAML, "Open the Storybook story iframe directly.")
+	assert.Contains(t, result.canvasYAML, "A signed-in application is not required when an isolated preview can show the change.")
+	assert.Contains(t, result.canvasYAML, "Unit tests do not replace visual evidence.")
 	assert.Contains(t, result.canvasYAML, "report_visual_evidence_unavailable")
 	assert.Contains(t, result.canvasYAML, "$SUPERPLANE_TASK_DIR/evidence")
+	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -74,6 +80,18 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
+	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
+	assert.Equal(
+		t,
+		`len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		hasEvidence.Configuration["expression"],
+	)
+	hasUpdatedEvidence := findYAMLNode(t, canvas, "has-visual-evidence-updated")
+	assert.Equal(
+		t,
+		`len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		hasUpdatedEvidence.Configuration["expression"],
+	)
 
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)
