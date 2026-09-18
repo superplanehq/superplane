@@ -1167,19 +1167,11 @@
 }
 
 .sp-user-note-fade {
-  background-image: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--muted), var(--background)),
-    transparent
-  );
+  background-image: linear-gradient(to top, var(--muted), transparent);
 }
 
 .dark .sp-user-note-fade {
-  background-image: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--muted), var(--background)),
-    transparent
-  );
+  background-image: linear-gradient(to top, var(--muted), transparent);
 }
 
 /* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */
