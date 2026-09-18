@@ -121,29 +121,10 @@ type ProviderRouting struct {
 	DataCollection    string   `json:"data_collection,omitempty"`
 }
 
-// Message is one chat message. Content is a plain string for text-only
-// messages, or []ContentPart when attachments are inlined.
+// Message is one chat message.
 type Message struct {
 	Role    string `json:"role"`
 	Content any    `json:"content"`
-}
-
-// ContentPart is a content block: text, image_url, or file. OpenRouter has no
-// Files API, so attachments are inlined here as base64 data URLs.
-type ContentPart struct {
-	Type     string    `json:"type"`
-	Text     string    `json:"text,omitempty"`
-	ImageURL *ImageURL `json:"image_url,omitempty"`
-	File     *FilePart `json:"file,omitempty"`
-}
-
-type ImageURL struct {
-	URL string `json:"url"`
-}
-
-type FilePart struct {
-	Filename string `json:"filename"`
-	FileData string `json:"file_data"`
 }
 
 type ChatCompletionResponse struct {
