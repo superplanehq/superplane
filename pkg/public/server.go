@@ -415,7 +415,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	// so we need to lift that endpoint here instead.
 	//
 	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/repository/file",
+		"/api/v1/canvases/{canvas_id}/file",
 		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
 	).Methods(http.MethodGet)
 

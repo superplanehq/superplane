@@ -6,7 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"google.golang.org/grpc/codes"
 )
 
 func Test__PutCanvasStaging__StagesCanvasYAML(t *testing.T) {
@@ -35,12 +38,53 @@ func Test__PutCanvasStaging__StagesCanvasYAML(t *testing.T) {
 	assert.NotContains(t, committed, "# staged edit")
 }
 
-func Test__PutCanvasStaging__RejectsReservedPath(t *testing.T) {
+func Test__PutCanvasStaging__RejectsNonSpecFile(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 	defer r.Close()
 
 	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
-		{Path: ".superplane/config", Content: []byte("nope")},
+		{Path: "README.md", Content: []byte("staged readme")},
 	})
-	require.Error(t, err)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, msg, "only canvas.yaml and console.yaml")
+}
+
+func Test__PutCanvasStaging__RejectsSpecFileDelete(t *testing.T) {
+	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
+	defer r.Close()
+
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Delete: true},
+	})
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, msg, "cannot be deleted")
+}
+
+func Test__PutCanvasStaging__RejectsMixedBatchWithoutWriting(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
+	defer r.Close()
+
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# staged edit\n")},
+		{Path: "README.md", Content: []byte("staged readme")},
+	})
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, msg, "only canvas.yaml and console.yaml")
+
+	hasStaging, err := models.HasStagedFilesForUser(database.DB(ctx), canvas.ID, r.User)
+	require.NoError(t, err)
+	assert.False(t, hasStaging)
+
+	effective, err := ReadRepositorySpecFileStaged(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	assert.Equal(t, baseline, effective)
 }

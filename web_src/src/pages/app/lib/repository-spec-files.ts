@@ -40,7 +40,7 @@ export async function fetchRepositorySpecFileContent(
     params.set("version_id", versionId);
   }
 
-  const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params}`, {
+  const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/file?${params}`, {
     credentials: "include",
     headers: withOrganizationHeader().headers,
   });

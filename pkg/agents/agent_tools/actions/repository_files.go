@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -14,34 +13,25 @@ import (
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/services/files"
 )
 
 const (
-	listFilesActionName  = "list_files"
-	readFileActionName   = "read_file"
-	writeFileActionName  = "write_file"
-	deleteFileActionName = "delete_file"
+	listFilesActionName = "list_files"
+	readFileActionName  = "read_file"
 )
 
-type listFilesAction struct {
-	gitProvider gitprovider.Provider
-}
+type listFilesAction struct{}
 
-func newListFilesAction(deps Dependencies) listFilesAction {
-	return listFilesAction{gitProvider: deps.GitProvider}
+func newListFilesAction() listFilesAction {
+	return listFilesAction{}
 }
 
 func (listFilesAction) Name() string {
 	return listFilesActionName
 }
 
-func (a listFilesAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.gitProvider == nil {
-		return fileListResult{}, fmt.Errorf("git provider is not configured")
-	}
-
+func (listFilesAction) Execute(_ context.Context, session agents.AgentSessionContext, input Input) (any, error) {
 	orgID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
 		return fileListResult{}, fmt.Errorf("invalid session organization id: %w", err)
@@ -52,32 +42,23 @@ func (a listFilesAction) Execute(ctx context.Context, session agents.AgentSessio
 		return fileListResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
+	if _, err := models.FindCanvas(orgID, canvasID); err != nil {
 		return fileListResult{}, fmt.Errorf("find canvas: %w", err)
 	}
 
-	response, err := canvasRepository.ListCanvasRepositoryFiles(ctx, a.gitProvider, canvas)
-	if err != nil {
-		return fileListResult{}, err
-	}
-
 	query := strings.ToLower(strings.TrimSpace(input.Query))
-	files := make([]string, 0, len(response.GetFiles()))
-	for _, file := range response.GetFiles() {
-		path := file.GetPath()
+	listed := make([]string, 0, 2)
+	for _, path := range []string{files.CanvasYAMLPath, files.ConsoleYAMLPath} {
 		if query != "" && !strings.Contains(strings.ToLower(path), query) {
 			continue
 		}
-		files = append(files, path)
+		listed = append(listed, path)
 	}
-	sort.Strings(files)
 
 	return fileListResult{
-		Action:       listFilesActionName,
-		CanvasID:     session.CanvasID,
-		Files:        files,
-		ContextFiles: contextFilePaths(files),
+		Action:   listFilesActionName,
+		CanvasID: session.CanvasID,
+		Files:    listed,
 	}, nil
 }
 
@@ -221,111 +202,6 @@ func (a readFileAction) readCommittedGitFile(ctx context.Context, session agents
 	return string(content), nil
 }
 
-type writeFileAction struct{}
-
-func (writeFileAction) Name() string {
-	return writeFileActionName
-}
-
-func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	path, err := requestedWritableFilePath(input.Path)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	orgID, err := uuid.Parse(session.OrganizationID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("invalid session organization id: %w", err)
-	}
-
-	canvasID, err := uuid.Parse(session.CanvasID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("invalid session canvas id: %w", err)
-	}
-
-	db := database.DB(ctx)
-	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("find canvas: %w", err)
-	}
-
-	liveVersion, err := resolveFileLiveVersion(session, input)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	state, err := canvasRepository.PutCanvasStaging(
-		ctx,
-		db,
-		canvas,
-		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
-	)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	return fileStageResult{
-		Action:         writeFileActionName,
-		CanvasID:       session.CanvasID,
-		VersionID:      liveVersion.ID.String(),
-		Path:           path,
-		StagingSummary: serializeStagingSummary(state),
-	}, nil
-}
-
-type deleteFileAction struct{}
-
-func (deleteFileAction) Name() string {
-	return deleteFileActionName
-}
-
-func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	path, err := requestedWritableFilePath(input.Path)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	orgID, err := uuid.Parse(session.OrganizationID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("invalid session organization id: %w", err)
-	}
-
-	canvasID, err := uuid.Parse(session.CanvasID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("invalid session canvas id: %w", err)
-	}
-
-	db := database.DB(ctx)
-	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
-	if err != nil {
-		return fileStageResult{}, fmt.Errorf("find canvas: %w", err)
-	}
-
-	liveVersion, err := resolveFileLiveVersion(session, input)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	state, err := canvasRepository.PutCanvasStaging(
-		ctx,
-		db,
-		canvas,
-		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
-	)
-	if err != nil {
-		return fileStageResult{}, err
-	}
-
-	return fileStageResult{
-		Action:         deleteFileActionName,
-		CanvasID:       session.CanvasID,
-		VersionID:      liveVersion.ID.String(),
-		Path:           path,
-		Deleted:        true,
-		StagingSummary: serializeStagingSummary(state),
-	}, nil
-}
-
 func requestedFilePaths(input Input) ([]string, error) {
 	rawPaths := append([]string(nil), input.Paths...)
 	if strings.TrimSpace(input.Path) != "" {
@@ -349,17 +225,6 @@ func requestedFilePaths(input Input) ([]string, error) {
 		paths = append(paths, path)
 	}
 	return paths, nil
-}
-
-func requestedWritableFilePath(rawPath string) (string, error) {
-	path, err := gitprovider.ValidateUserPath(rawPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid file path %q: %w", rawPath, err)
-	}
-	if canvasRepository.IsRepositorySpecFilePath(path) {
-		return "", fmt.Errorf("use patch_staging for %s", path)
-	}
-	return path, nil
 }
 
 func requestedReadableFileVersionID(session agents.AgentSessionContext, input Input) (string, error) {
@@ -388,37 +253,4 @@ func parseSessionIDs(session agents.AgentSessionContext) (uuid.UUID, uuid.UUID, 
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 	return orgID, canvasID, nil
-}
-
-func serializeStagingSummary(summary *pb.StagingSummary) stagingSummary {
-	if summary == nil {
-		return stagingSummary{}
-	}
-	return stagingSummary{
-		HasStaging:  summary.GetHasStaging(),
-		StagedPaths: append([]string(nil), summary.GetStagedPaths()...),
-	}
-}
-
-func contextFilePaths(paths []string) []string {
-	matches := []string{}
-	for _, path := range paths {
-		if isContextFilePath(path) {
-			matches = append(matches, path)
-		}
-	}
-	return matches
-}
-
-func isContextFilePath(path string) bool {
-	base := strings.ToLower(path)
-	if index := strings.LastIndex(base, "/"); index >= 0 {
-		base = base[index+1:]
-	}
-	switch base {
-	case "agents.md", "agent.md", "claude.md", "readme.md":
-		return true
-	default:
-		return strings.HasSuffix(base, ".agents.md")
-	}
 }

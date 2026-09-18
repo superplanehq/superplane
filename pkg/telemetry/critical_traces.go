@@ -10,14 +10,14 @@ import (
 )
 
 var criticalHTTPRoutes = map[string]struct{}{
-	"/api/v1/me":                                   {},
-	"/api/v1/organizations/{id}":                   {},
-	"/api/v1/organizations/{id}/usage":             {},
-	"/api/v1/canvases/{canvas_id}":                 {},
-	"/api/v1/canvases/{canvas_id}/versions":        {},
-	"/api/v1/canvases/{canvas_id}/runs":            {},
-	"/api/v1/canvases/{canvas_id}/repository/file": {},
-	"/api/v1/canvases/{canvas_id}/memory":          {},
+	"/api/v1/me":                            {},
+	"/api/v1/organizations/{id}":            {},
+	"/api/v1/organizations/{id}/usage":      {},
+	"/api/v1/canvases/{canvas_id}":          {},
+	"/api/v1/canvases/{canvas_id}/versions": {},
+	"/api/v1/canvases/{canvas_id}/runs":     {},
+	"/api/v1/canvases/{canvas_id}/file":     {},
+	"/api/v1/canvases/{canvas_id}/memory":   {},
 }
 
 var criticalHTTPHandlers = map[string]struct{}{
@@ -92,10 +92,8 @@ func MayTraceHTTPRequest(r *http.Request) bool {
 	}
 
 	switch parts[1] {
-	case "runs", "events", "versions", "memory":
+	case "runs", "events", "versions", "memory", "file":
 		return true
-	case "repository":
-		return len(parts) >= 3 && parts[2] == "file"
 	default:
 		return false
 	}

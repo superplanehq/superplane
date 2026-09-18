@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 type fakeCanvasUsageService struct {
@@ -74,10 +75,10 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil, nil, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil)
+	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
@@ -93,7 +94,7 @@ func TestCreateCanvasNameUniquenessIsScopedToWorkspace(t *testing.T) {
 	require.NoError(t, err)
 
 	createPlan := func(factoryID *uuid.UUID) error {
-		_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Plan", "", factoryID, nil)
+		_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Plan", "", factoryID, nil, nil, nil)
 		return err
 	}
 
@@ -124,7 +125,7 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "   ", "", nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "   ", "", nil, nil, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Equal(t, "canvas name is required", func() string {
@@ -141,7 +142,7 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Health Check Monitor", "Quick start canvas on a fresh organization", nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Health Check Monitor", "Quick start canvas on a fresh organization", nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -161,6 +162,9 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, liveVersion.Nodes)
 	require.Empty(t, liveVersion.Edges)
+
+	_, err = models.FindRepository(r.Organization.ID, canvasID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
@@ -181,7 +185,7 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Limited Canvas", "", nil, service)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Limited Canvas", "", nil, nil, nil, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
 	assert.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())

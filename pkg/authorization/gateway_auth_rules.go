@@ -169,18 +169,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/repository"}: {
-			Resource:           "canvases",
-			Action:             "read",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/repository/files"}: {
-			Resource:           "canvases",
-			Action:             "read",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
 		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/runs"}: {
 			Resource:           "canvases",
 			Action:             "read",

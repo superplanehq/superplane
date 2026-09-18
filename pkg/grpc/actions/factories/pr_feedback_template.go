@@ -67,6 +67,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -335,7 +336,7 @@ func prFeedbackVisualEvidenceCommentConfiguration() map[string]any {
 		"body": strings.Join([]string{
 			"## Visual evidence",
 			"",
-			"Captured for commit `{{ substring(previous(2).data.result.headSha, 0, 7) }}`.",
+			"Captured for commit `{{ previous(2).data.result.headSha[:7] }}`.",
 			"",
 			"{{ fromBase64(previous(2).data.result.visualEvidence.markdown) }}",
 		}, "\n"),
@@ -425,7 +426,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 	configuration := map[string]any{
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
-		"includeVisualEvidence":   false,
+		"includeVisualEvidence":   request.IncludeVisualEvidence,
 		"steps":                   prFeedbackRunnerSteps(),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
