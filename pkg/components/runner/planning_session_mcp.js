@@ -375,12 +375,30 @@ async function handleRequest(message) {
   }
 }
 
+const CONTENT_LENGTH_HEADER = "content-length:";
+
+function isContentLengthPrefix(buffer) {
+  const peek = buffer
+    .toString(
+      "utf8",
+      0,
+      Math.min(buffer.length, CONTENT_LENGTH_HEADER.length),
+    )
+    .toLowerCase();
+  return (
+    CONTENT_LENGTH_HEADER.startsWith(peek) ||
+    peek.startsWith(CONTENT_LENGTH_HEADER)
+  );
+}
+
 function parseFrames(buffer) {
   const messages = [];
   let rest = skipASCIIWhitespace(buffer);
   while (rest.length > 0) {
-    const peek = rest.toString("utf8", 0, Math.min(rest.length, 16));
-    if (/^content-length:/i.test(peek)) {
+    if (isContentLengthPrefix(rest)) {
+      if (rest.length < CONTENT_LENGTH_HEADER.length) {
+        break;
+      }
       const parsed = parseContentLengthFrame(rest);
       if (!parsed) {
         break;
@@ -500,4 +518,5 @@ module.exports = {
   TOOLS,
   writeAnalysisOutputs,
   analysisOutputPaths,
+  parseFrames,
 };
