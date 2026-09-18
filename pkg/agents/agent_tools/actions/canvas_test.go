@@ -705,17 +705,15 @@ func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
 
-	_, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "README.md",
-		Content:   "draft readme\n",
-	})
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		liveVersion.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"draft readme\n",
+	)
 	require.NoError(t, err)
 
 	result, err := registry.Execute(ctx, agents.AgentSessionContext{
@@ -754,12 +752,15 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 		CanvasID:       canvas.ID.String(),
 	}
 
-	_, err := registry.Execute(ctx, session, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "README.md",
-		Content:   "draft readme\n",
-	})
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		liveVersion.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"draft readme\n",
+	)
 	require.NoError(t, err)
 
 	result, err := registry.Execute(ctx, session, Input{
@@ -799,6 +800,31 @@ func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "use patch_staging")
+}
+
+func TestAppAgentTool_WriteFileRejectsNonSpecFiles(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	liveVersion := requireLiveVersion(t, canvas.ID)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	_, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "write_file",
+		VersionID: liveVersion.ID.String(),
+		Path:      "README.md",
+		Content:   "draft readme\n",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only canvas.yaml and console.yaml")
 }
 
 func TestAppAgentTool_ReadFileReturnsLiveCommittedContent(t *testing.T) {
@@ -873,57 +899,27 @@ func TestAppAgentTool_ReadFileReturnsStagedSpecFileContent(t *testing.T) {
 	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
 }
 
-func TestAppAgentTool_DeleteFileStagesDeletion(t *testing.T) {
+func TestAppAgentTool_DeleteFileRejectsNonSpecFiles(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 	liveVersion := requireLiveVersion(t, canvas.ID)
-	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-	require.NoError(t, err)
-	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: head,
-		Message:         "Add notes",
-		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
-		Operations: []gitprovider.FileOperation{
-			{Path: "notes.md", Content: strings.NewReader("delete me\n"), SizeBytes: int64(len("delete me\n"))},
-		},
-	})
-	require.NoError(t, err)
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
-	session := agents.AgentSessionContext{
+	_, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
-	}
-
-	result, err := registry.Execute(ctx, session, Input{
+	}, Input{
 		Action:    "delete_file",
 		VersionID: liveVersion.ID.String(),
 		Path:      "notes.md",
 	})
-	require.NoError(t, err)
-
-	deleted, ok := result.(fileStageResult)
-	require.True(t, ok)
-	assert.Equal(t, "delete_file", deleted.Action)
-	assert.True(t, deleted.Deleted)
-	assert.Equal(t, "notes.md", deleted.Path)
-	assert.True(t, deleted.StagingSummary.HasStaging)
-	assert.Contains(t, deleted.StagingSummary.StagedPaths, "notes.md")
-
-	_, err = registry.Execute(ctx, session, Input{
-		Action:    "read_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "notes.md",
-	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "staged for deletion")
+	assert.Contains(t, err.Error(), "only canvas.yaml and console.yaml")
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {

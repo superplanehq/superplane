@@ -16,6 +16,11 @@ const (
 	ConsoleYAMLRepositoryPath = "console.yaml"
 )
 
+func IsRepositorySpecFilePath(path string) bool {
+	normalized := NormalizeRepositoryPath(path)
+	return normalized == CanvasYAMLRepositoryPath || normalized == ConsoleYAMLRepositoryPath
+}
+
 func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID string) ([]byte, error) {
 	config := ctx.API.GetConfig()
 	if config == nil {

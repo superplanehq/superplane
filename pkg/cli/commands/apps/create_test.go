@@ -80,7 +80,7 @@ func TestCreateCommandWithFilesStagesAndCommits(t *testing.T) {
 		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/canvas-1/staging":
 			body, _ := io.ReadAll(r.Body)
 			stagedBody = string(body)
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml","README.md"]}}`))
+			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml"]}}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases/canvas-1/staging/commit":
 			body, _ := io.ReadAll(r.Body)
 			commitBody = string(body)
@@ -93,7 +93,6 @@ func TestCreateCommandWithFilesStagesAndCommits(t *testing.T) {
 
 	dir := t.TempDir()
 	canvasPath := filepath.Join(dir, "canvas.yaml")
-	readmePath := filepath.Join(dir, "README.md")
 	require.NoError(t, os.WriteFile(canvasPath, []byte(`apiVersion: v1
 kind: Canvas
 metadata:
@@ -102,11 +101,10 @@ spec:
   nodes: []
   edges: []
 `), 0o600))
-	require.NoError(t, os.WriteFile(readmePath, []byte("# My App\n"), 0o600))
 
 	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	name := "My App"
-	files := []string{canvasPath, readmePath}
+	files := []string{canvasPath}
 	cmd := &createCommand{name: &name, files: &files}
 
 	err := cmd.Execute(ctx)
@@ -114,11 +112,27 @@ spec:
 	require.Contains(t, stdout.String(), `App "My App" created (ID: canvas-1)`)
 	require.Contains(t, stdout.String(), "Committed version: version-1")
 	require.Contains(t, stagedBody, "canvas.yaml")
-	require.Contains(t, stagedBody, "README.md")
+	require.NotContains(t, stagedBody, "README.md")
 	stagedCanvasYAML := decodeStagingPayload(t, stagedBody)
 	require.Contains(t, stagedCanvasYAML, "name: Source Name")
 	require.NotContains(t, stagedCanvasYAML, "id:")
 	require.Contains(t, commitBody, `Create \"My App\"`)
+}
+
+func TestCreateCommandRejectsNonSpecFiles(t *testing.T) {
+	server := newCreateOnlyServer(t, "canvas-1", "My App", "org-1")
+	dir := t.TempDir()
+	readmePath := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readmePath, []byte("# My App\n"), 0o600))
+
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+	name := "My App"
+	files := []string{readmePath}
+	cmd := &createCommand{name: &name, files: &files}
+
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only canvas.yaml and console.yaml")
 }
 
 func decodeStagingPayload(t *testing.T, body string) string {
