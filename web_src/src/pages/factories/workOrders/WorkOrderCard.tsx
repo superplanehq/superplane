@@ -143,13 +143,13 @@ export function WorkOrderCard({
       <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
-        <div className="flex min-w-0 items-center gap-2">
-          <WorkOrderStatusIcon status={entry.displayStatus} title={meta.label} aria-label={meta.label} />
-          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
-            {entry.title}
-          </h3>
-          {source ? <WorkOrderSourceIcon entryId={entry.id} source={source} /> : null}
-        </div>
+        <WorkOrderCardTitleRow
+          entryId={entry.id}
+          displayStatus={entry.displayStatus}
+          statusLabel={meta.label}
+          title={entry.title}
+          source={source}
+        />
 
         <WorkOrderCardStatusRow
           entryId={entry.id}
@@ -175,6 +175,28 @@ export function WorkOrderCard({
         />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardTitleRow({
+  entryId,
+  displayStatus,
+  statusLabel,
+  title,
+  source,
+}: {
+  entryId: string;
+  displayStatus: WorkOrderListEntry["displayStatus"];
+  statusLabel: string;
+  title: string;
+  source: ReturnType<typeof workOrderCardSource>;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
+      <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">{title}</h3>
+      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
+    </div>
   );
 }
 
