@@ -1763,6 +1763,7 @@ message WorkOrderArtifact {
     TYPE_MARKDOWN = 1;
     TYPE_BRANCH = 2;
     TYPE_LINK = 3;
+    TYPE_FILE = 4;
   }
 
   string id = 1;

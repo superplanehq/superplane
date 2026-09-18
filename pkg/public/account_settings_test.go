@@ -529,7 +529,7 @@ func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 	assert.Equal(t, r.Account.ID, linked.ID)
 }
 
-func TestLinkProviderToAccount_AllowsSharedGitHubIdentity(t *testing.T) {
+func TestLinkProviderToAccount_RefusesSharedGitHubIdentity(t *testing.T) {
 	r := support.Setup(t)
 	first, err := models.CreateAccount("First GitHub", "first-github-sso@example.com")
 	require.NoError(t, err)
@@ -540,36 +540,7 @@ func TestLinkProviderToAccount_AllowsSharedGitHubIdentity(t *testing.T) {
 	require.NoError(t, err)
 
 	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, second, testGothUser(models.ProviderGitHub, "github-shared", second.Email))
-	require.NoError(t, err)
-
-	accounts, err := models.FindAccountsByProvider(database.Conn(), models.ProviderGitHub, "github-shared")
-	require.NoError(t, err)
-	require.Len(t, accounts, 2)
-}
-
-func TestDisconnectAccountProvider_LeavesGitHubOnOtherAccount(t *testing.T) {
-	r := support.Setup(t)
-	hash, err := crypto.HashPassword("current-pass-123")
-	require.NoError(t, err)
-	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
-	require.NoError(t, err)
-
-	other, err := models.CreateAccount("Other GitHub", "other-github-keep@example.com")
-	require.NoError(t, err)
-	require.NoError(t, authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, other, testGothUser(models.ProviderGitHub, "testuser", other.Email)))
-
-	server, account, token := setupTestServer(r, t)
-	req, _ := http.NewRequest(http.MethodDelete, "/account/providers/github", nil)
-	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-	res := httptest.NewRecorder()
-	server.Router.ServeHTTP(res, req)
-
-	require.Equal(t, http.StatusNoContent, res.Code)
-	_, err = account.GetAccountProvider(models.ProviderGitHub)
-	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	kept, err := other.GetAccountProvider(models.ProviderGitHub)
-	require.NoError(t, err)
-	assert.Equal(t, "testuser", kept.ProviderID)
+	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
 func testGothUser(provider, providerID, email string) goth.User {

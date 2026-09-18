@@ -16,11 +16,14 @@ import (
 )
 
 const (
-	FileStatePending = "pending"
-	FileStateReady   = "ready"
-	FileStateFailed  = "failed"
+	FileStatePending      = "pending"
+	FileStateReady        = "ready"
+	FileStateFailed       = "failed"
+	FilePurposeAttachment = "attachment"
+	FilePurposeArtifact   = "artifact"
 
 	MaxFileBytes             = 10 << 20
+	MaxArtifactFileBytes     = 100 << 20
 	MaxFilesPerWorkOrder     = 20
 	MaxOrganizationFileBytes = 10 << 30
 	MaxFileNameBytes         = 255
@@ -46,6 +49,14 @@ var allowedFileContentTypes = []string{
 	"text/markdown",
 }
 
+var allowedArtifactContentTypes = []string{
+	"image/png",
+	"image/jpeg",
+	"image/webp",
+	"video/webm",
+	"video/mp4",
+}
+
 type File struct {
 	ID             uuid.UUID
 	InstallationID string
@@ -59,6 +70,8 @@ type File struct {
 	Checksum       *string
 	StorageKey     string
 	State          string
+	Purpose        string `gorm:"default:attachment"`
+	PublicID       *uuid.UUID
 	CreatedByID    *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -70,6 +83,9 @@ func (File) TableName() string {
 
 func (f File) IsDispatchable(organizationID, factoryID, workOrderID uuid.UUID) bool {
 	if f.State != FileStateReady {
+		return false
+	}
+	if f.Purpose != "" && f.Purpose != FilePurposeAttachment {
 		return false
 	}
 	if f.OrganizationID == nil || *f.OrganizationID != organizationID {
@@ -102,10 +118,22 @@ type CreateFileParams struct {
 	Filename       string
 	ContentType    string
 	CreatedByID    uuid.UUID
+	Purpose        string
 }
 
 func IsAllowedFileContentType(contentType string) bool {
 	return slices.Contains(allowedFileContentTypes, normalizeContentType(contentType))
+}
+
+func IsAllowedArtifactContentType(contentType string) bool {
+	return slices.Contains(allowedArtifactContentTypes, normalizeContentType(contentType))
+}
+
+func (f File) MaxBytes() int64 {
+	if f.Purpose == FilePurposeArtifact {
+		return MaxArtifactFileBytes
+	}
+	return MaxFileBytes
 }
 
 func IsInlineImageContentType(contentType string) bool {
@@ -122,8 +150,18 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	purpose := strings.TrimSpace(params.Purpose)
+	if purpose == "" {
+		purpose = FilePurposeAttachment
+	}
+	if purpose != FilePurposeAttachment && purpose != FilePurposeArtifact {
+		return nil, fmt.Errorf("%w: unknown file purpose %q", ErrFileInvalid, purpose)
+	}
 	contentType := normalizeContentType(params.ContentType)
-	if !IsAllowedFileContentType(contentType) {
+	if purpose == FilePurposeAttachment && !IsAllowedFileContentType(contentType) {
+		return nil, fmt.Errorf("%w: %s", ErrFileContentType, params.ContentType)
+	}
+	if purpose == FilePurposeArtifact && !IsAllowedArtifactContentType(contentType) {
 		return nil, fmt.Errorf("%w: %s", ErrFileContentType, params.ContentType)
 	}
 
@@ -154,8 +192,13 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 		ContentType:    contentType,
 		StorageKey:     storageKey,
 		State:          FileStatePending,
+		Purpose:        purpose,
 		CreatedAt:      now,
 		UpdatedAt:      now,
+	}
+	if purpose == FilePurposeArtifact {
+		publicID := uuid.New()
+		file.PublicID = &publicID
 	}
 	if params.OrganizationID != uuid.Nil {
 		orgID := params.OrganizationID
@@ -198,13 +241,31 @@ func FindFile(tx *gorm.DB, id uuid.UUID) (*File, error) {
 	return &file, nil
 }
 
+func FindReadyArtifactFileByPublicID(tx *gorm.DB, publicID uuid.UUID) (*File, error) {
+	var file File
+	err := tx.Where(
+		"public_id = ? AND purpose = ? AND state = ?",
+		publicID,
+		FilePurposeArtifact,
+		FileStateReady,
+	).First(&file).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+		return nil, err
+	}
+	return &file, nil
+}
+
 func ListReadyWorkspaceFiles(tx *gorm.DB, factoryID uuid.UUID) ([]File, error) {
 	var files []File
 	err := tx.Where(
-		"factory_id = ? AND scope = ? AND state = ?",
+		"factory_id = ? AND scope = ? AND state = ? AND purpose = ?",
 		factoryID,
 		blob.ScopeWorkspace,
 		FileStateReady,
+		FilePurposeAttachment,
 	).Order("created_at ASC, id ASC").Find(&files).Error
 	return files, err
 }
@@ -212,10 +273,11 @@ func ListReadyWorkspaceFiles(tx *gorm.DB, factoryID uuid.UUID) ([]File, error) {
 func ListReadyTaskFiles(tx *gorm.DB, workOrderID uuid.UUID) ([]File, error) {
 	var files []File
 	err := tx.Where(
-		"work_order_id = ? AND scope = ? AND state = ?",
+		"work_order_id = ? AND scope = ? AND state = ? AND purpose = ?",
 		workOrderID,
 		blob.ScopeTask,
 		FileStateReady,
+		FilePurposeAttachment,
 	).Order("created_at ASC, id ASC").Find(&files).Error
 	return files, err
 }
@@ -344,8 +406,9 @@ func (f *File) MarkReady(tx *gorm.DB, sizeBytes int64, checksum string) error {
 	if sizeBytes <= 0 {
 		return fmt.Errorf("%w: size must be greater than zero", ErrFileInvalid)
 	}
-	if sizeBytes > MaxFileBytes {
-		return fmt.Errorf("%w: file exceeds %d bytes", ErrFileQuotaExceeded, MaxFileBytes)
+	maxBytes := f.MaxBytes()
+	if sizeBytes > maxBytes {
+		return fmt.Errorf("%w: file exceeds %d bytes", ErrFileQuotaExceeded, maxBytes)
 	}
 	now := time.Now()
 	updates := map[string]any{
@@ -433,6 +496,7 @@ func RememberAbandonedFileObjects(tx *gorm.DB, organizationID, factoryID uuid.UU
 			ContentType:    "text/plain",
 			StorageKey:     key,
 			State:          FileStateFailed,
+			Purpose:        FilePurposeAttachment,
 			CreatedAt:      now,
 			UpdatedAt:      staleAt,
 		}

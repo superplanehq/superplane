@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"gorm.io/gorm"
 )
 
 func TestFindAccountByProvider(t *testing.T) {
@@ -45,6 +47,35 @@ func TestFindAccountByProvider(t *testing.T) {
 		assert.Nil(t, account)
 	})
 
+	t.Run("should use the supplied transaction", func(t *testing.T) {
+		account, err := CreateAccount("Tx User", "tx-user@example.com")
+		require.NoError(t, err)
+
+		err = database.Conn().Transaction(func(tx *gorm.DB) error {
+			provider := &AccountProvider{
+				AccountID:  account.ID,
+				Provider:   "github",
+				ProviderID: "tx-github-id",
+				Username:   "txuser",
+				Email:      account.Email,
+				Name:       account.Name,
+			}
+			if err := tx.Create(provider).Error; err != nil {
+				return err
+			}
+
+			found, err := FindAccountByProvider(tx, "github", "tx-github-id")
+			require.NoError(t, err)
+			assert.Equal(t, account.ID, found.ID)
+
+			_, outsideErr := FindAccountByProvider(database.Conn(), "github", "tx-github-id")
+			assert.ErrorIs(t, outsideErr, gorm.ErrRecordNotFound)
+
+			return errors.New("rollback")
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("should return error when account is deleted", func(t *testing.T) {
 
 		deletedAccount, err := CreateAccount("Deleted User", "deleted@example.com")
@@ -73,37 +104,6 @@ func TestFindAccountByProvider(t *testing.T) {
 		assert.Nil(t, account)
 	})
 
-	t.Run("should return every account that holds the same GitHub identity", func(t *testing.T) {
-		first, err := CreateAccount("First Shared", "first-shared-github@example.com")
-		require.NoError(t, err)
-		second, err := CreateAccount("Second Shared", "second-shared-github@example.com")
-		require.NoError(t, err)
-
-		require.NoError(t, database.Conn().Create(&AccountProvider{
-			AccountID:  first.ID,
-			Provider:   ProviderGitHub,
-			ProviderID: "shared-123",
-			Email:      first.Email,
-			Name:       first.Name,
-		}).Error)
-		require.NoError(t, database.Conn().Create(&AccountProvider{
-			AccountID:  second.ID,
-			Provider:   ProviderGitHub,
-			ProviderID: "shared-123",
-			Email:      second.Email,
-			Name:       second.Name,
-		}).Error)
-
-		accounts, err := FindAccountsByProvider(database.Conn(), ProviderGitHub, "shared-123")
-		require.NoError(t, err)
-		require.Len(t, accounts, 2)
-		assert.Equal(t, first.ID, accounts[0].ID)
-		assert.Equal(t, second.ID, accounts[1].ID)
-
-		found, err := FindAccountByProvider(database.Conn(), ProviderGitHub, "shared-123")
-		require.NoError(t, err)
-		assert.Equal(t, first.ID, found.ID)
-	})
 }
 
 func TestAccount_UpdateEmail(t *testing.T) {

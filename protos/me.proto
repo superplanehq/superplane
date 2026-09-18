@@ -203,13 +203,10 @@ message RevokeTokenResponse {}
 message NotificationSettings {
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_WORK_ORDER_ASSIGNED = 1;
-    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
-    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
-    TYPE_WORK_ORDER_STATUS_OWNED = 4;
-    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
-    TYPE_WORK_ORDER_MENTIONED = 6;
-    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 7;
+    TYPE_WORK_ORDER_STATUS_OWNED = 1;
+    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 2;
+    TYPE_WORK_ORDER_AGENT_QUESTION = 3;
+    TYPE_WORK_ORDER_PLAN_READY = 4;
   }
 
   enum WorkspaceScope {
@@ -228,14 +225,14 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
   }
 
   message Browser {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
     bool show_while_viewing = 4;
   }

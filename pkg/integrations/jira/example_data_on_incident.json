@@ -3,6 +3,7 @@
   "type": "jira.incident",
   "data": {
     "action": "created",
+    "url": "https://your-domain.atlassian.net/browse/ENG-42",
     "issue": {
       "id": "10001",
       "key": "ENG-42",

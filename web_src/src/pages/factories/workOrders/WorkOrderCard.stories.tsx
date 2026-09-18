@@ -266,3 +266,20 @@ export const GitHubOrigin: Story = {
     ),
   },
 };
+
+/**
+ * Manual origin on the card. The product logo sits first in the pill
+ * row and is not a link.
+ */
+export const ManualOrigin: Story = {
+  name: "Manual origin",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        createdBy: { user: { id: "user-1", name: "Ada Lovelace" } },
+      }),
+      factory,
+    ),
+    pullRequests: [],
+  },
+};

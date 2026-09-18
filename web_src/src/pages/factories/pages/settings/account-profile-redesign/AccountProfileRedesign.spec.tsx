@@ -42,8 +42,8 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(
       screen.getByText("Preferences, profile information, and security for your SuperPlane account."),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Link GitHub" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
     expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
@@ -90,27 +90,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-identity")).toHaveTextContent("ada@users.noreply.github.com");
   });
 
-  it("moves the profile email to the remaining sign-in method after disconnect", async () => {
-    const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground initialPage="security" initialProfile={ACCOUNT_REDESIGN_SECURE_PROFILE} />
-        </TooltipProvider>
-      </ThemeProvider>,
-    );
-
-    await user.click(
-      within(screen.getByTestId("account-redesign-sso-google")).getByRole("button", { name: "Disconnect" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Disconnect Google" }));
-
-    await user.click(screen.getByTestId("account-redesign-nav-account-profile"));
-    expect(screen.getByTestId("account-redesign-identity")).toHaveTextContent("ada@users.noreply.github.com");
-    expect(screen.getByTestId("account-redesign-email")).toHaveTextContent("ada@users.noreply.github.com");
-  });
-
-  it("hides the password row when the account has no password", () => {
+  it("hides the Sign in methods card when the account has no password", () => {
     render(
       <ThemeProvider>
         <TooltipProvider>
@@ -123,81 +103,43 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.queryByTestId("account-redesign-password")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-signin")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-signin")).not.toBeInTheDocument();
   });
 
-  it("disables last SSO disconnect when no password is set", () => {
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground
-            initialPage="security"
-            initialProfile={{
-              ...ACCOUNT_REDESIGN_SECURE_PROFILE,
-              passwordSet: false,
-              ssoAccounts: [
-                { provider: "github", identity: "ada" },
-                { provider: "google", identity: null },
-              ],
-            }}
-          />
-        </TooltipProvider>
-      </ThemeProvider>,
-    );
-
-    expect(
-      within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Disconnect" }),
-    ).toBeDisabled();
-    expect(screen.getByText("Keep at least one sign-in method.")).toBeInTheDocument();
-  });
-
-  it("shows Security & access on the Account page with password, SSO methods, and tokens", () => {
+  it("shows Security & access with password and tokens only", () => {
     renderPlayground();
 
     expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
-    );
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
-    expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-github")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-google")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in with Google" })).not.toBeInTheDocument();
     expect(
       screen.getByText("This token acts as you. Organization API keys act as the organization."),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
   });
 
-  it("connects Google and disconnects GitHub on the same account", async () => {
+  it("links and removes GitHub from Associated accounts", async () => {
     const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground initialPage="security" />
-        </TooltipProvider>
-      </ThemeProvider>,
+    renderPlayground();
+
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
+      "Velocity uses this GitHub account to credit your pull requests.",
     );
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Connected as ada. Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
-    );
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
-
-    await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Link GitHub" }));
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent("Linked as ada-lovelace");
 
     await user.click(
-      within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Disconnect" }),
+      within(screen.getByTestId("account-redesign-associated-github")).getByRole("button", { name: "Remove" }),
     );
     expect(screen.getByText(/Velocity reports stop crediting your pull requests/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
+    await user.click(screen.getByRole("button", { name: "Remove link" }));
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
-      "Used to sign in and to credit pull requests. This identity can also sign in to another SuperPlane account.",
-    );
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
   });
 
   it("turns task emails off and hides events", async () => {
@@ -216,7 +158,9 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.getByText("Choose which task emails and browser alerts SuperPlane sends you.")).toBeInTheDocument();
-    expect(screen.getByText("Added as a task owner")).toBeInTheDocument();
+    expect(screen.getByText("Status changes on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Agent questions on your tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Send task emails" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ emailEnabled: false }));

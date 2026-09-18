@@ -50,6 +50,15 @@ func (s *stubIntakeItemAvailabilitySource) IsItemAvailable(_ context.Context, id
 	return s.available[id], nil
 }
 
+type jiraBacklogAvailabilitySource struct {
+	jiraIntakeItemSource
+	available map[string]bool
+}
+
+func (s *jiraBacklogAvailabilitySource) IsItemAvailable(_ context.Context, id string) (bool, error) {
+	return s.available[id], nil
+}
+
 func TestRefreshBacklog(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -196,6 +205,38 @@ func TestRefreshBacklog(t *testing.T) {
 		}, orgID, request(factory))
 		require.NoError(t, err)
 		assert.Equal(t, int32(1), response.GetFailedSourceCount())
+	})
+
+	t.Run("archives a resolved Jira issue matched by its browse origin", func(t *testing.T) {
+		factory := newFactory(t)
+		createIntake(t, factory, models.FactoryIntakeSourceJiraIssues)
+		resolved := createDraft(t, factory, "Resolved issue", "https://acme.atlassian.net/browse/ENG-42")
+		open := createDraft(t, factory, "Open issue", "https://acme.atlassian.net/browse/ENG-43")
+		source := &jiraBacklogAvailabilitySource{
+			jiraIntakeItemSource: jiraIntakeItemSource{
+				projectKey: "ENG",
+				siteURL:    "https://acme.atlassian.net",
+			},
+			available: map[string]bool{"ENG-42": false, "ENG-43": true},
+		}
+
+		response, err := RefreshBacklog(ctx, IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return source, nil
+			},
+		}, orgID, request(factory))
+		require.NoError(t, err)
+		assert.Equal(t, int32(1), response.GetArchivedCount())
+		assert.Zero(t, response.GetFailedItemCount())
+
+		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), resolved.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+
+		reloaded, err = factory.FindWorkOrder(database.DB(t.Context()), open.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
 	})
 
 	t.Run("requires a connected readable intake", func(t *testing.T) {

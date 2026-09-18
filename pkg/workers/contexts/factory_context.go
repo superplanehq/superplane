@@ -376,14 +376,6 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderCommentAdded,
-		ActorName:      c.automationName(),
-		CommentBody:    body,
-	})
 	return nil
 }
 
@@ -406,14 +398,6 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 
 	if created {
 		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
-		c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID: order.OrganizationID.String(),
-			FactoryID:      order.FactoryID.String(),
-			OrderID:        order.ID.String(),
-			EventType:      factory.EventTypeOrderArtifactAdded,
-			ActorName:      c.automationName(),
-			ArtifactType:   artifact.Type,
-		})
 	} else {
 		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
 	}

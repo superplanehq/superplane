@@ -20,6 +20,7 @@ export function AccountProfileRedesignPage({
   onNameChange,
   onEmailChange,
   onSave,
+  associatedAccounts,
   security,
   dangerZone,
 }: {
@@ -29,6 +30,7 @@ export function AccountProfileRedesignPage({
   onNameChange: (name: string) => void;
   onEmailChange?: (email: string) => void | Promise<void>;
   onSave: () => void | Promise<void>;
+  associatedAccounts?: ReactNode;
   security?: ReactNode;
   dangerZone?: ReactNode;
 }) {
@@ -85,6 +87,8 @@ export function AccountProfileRedesignPage({
         </div>
       </FactorySettingsCard>
 
+      {associatedAccounts}
+
       {security}
 
       {dangerZone}
@@ -140,7 +144,7 @@ function ProfileEmailField({
             notifications.
           </>
         ) : (
-          "SuperPlane uses this email to sign you in. Change this in Security & access below."
+          "SuperPlane uses this email to sign you in and send notifications."
         )}
       </p>
     </div>
