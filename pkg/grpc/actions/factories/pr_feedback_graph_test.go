@@ -263,6 +263,50 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
 		assert.Equal(t, "opus", runner.Configuration["model"])
 	})
+
+	t.Run("action nodes serialize per pull request", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    prFeedbackDefaultMention,
+			IgnoreBots: true,
+		})
+
+		assertPRFeedbackPerPullRequestConcurrency(t, canvas)
+	})
+}
+
+func Test__EnsurePRFeedbackConcurrency(t *testing.T) {
+	t.Run("stamps a per-pull-request key on action nodes that still serialize globally", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(prFeedbackCommentTriggerNodeID, "github.onPRComment"),
+			componentNode(prFeedbackRunnerNodeID, "runnerClaudeCode"),
+			componentNode(prFeedbackWaitChecksNodeID, prFeedbackWaitChecksComponent),
+		}
+
+		nodes = ensurePRFeedbackConcurrency(nodes)
+
+		assert.Nil(t, nodes[0].Concurrency)
+		require.NotNil(t, nodes[1].Concurrency)
+		assert.Equal(t, prFeedbackConcurrencyKey, nodes[1].Concurrency.Key)
+		assert.Nil(t, nodes[1].Concurrency.Max)
+		require.NotNil(t, nodes[2].Concurrency)
+		assert.Equal(t, prFeedbackConcurrencyKey, nodes[2].Concurrency.Key)
+	})
+
+	t.Run("keeps a concurrency spec that is already set", func(t *testing.T) {
+		max := 4
+		nodes := []models.Node{
+			componentNode(prFeedbackRunnerNodeID, "runnerClaudeCode"),
+		}
+		nodes[0].Concurrency = &models.ConcurrencySpec{Max: &max, Key: "custom"}
+
+		nodes = ensurePRFeedbackConcurrency(nodes)
+
+		require.NotNil(t, nodes[0].Concurrency)
+		assert.Equal(t, "custom", nodes[0].Concurrency.Key)
+		require.NotNil(t, nodes[0].Concurrency.Max)
+		assert.Equal(t, 4, *nodes[0].Concurrency.Max)
+	})
 }
 
 func Test__EnsureChecksAnnounceLimitNode(t *testing.T) {
@@ -374,6 +418,30 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
 		assert.Contains(t, push, `git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`)
 	})
+
+	t.Run("action nodes serialize per pull request", func(t *testing.T) {
+		canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:      "acme/app",
+			MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+		})
+
+		assertPRFeedbackPerPullRequestConcurrency(t, canvas)
+	})
+}
+
+func assertPRFeedbackPerPullRequestConcurrency(t *testing.T, canvas *yaml.Canvas) {
+	t.Helper()
+
+	for _, node := range canvas.Spec.Nodes {
+		if node.Type == yaml.NodeTypeTrigger {
+			assert.Nilf(t, node.Concurrency, "trigger %s caps its concurrency", node.ID)
+			continue
+		}
+
+		require.NotNilf(t, node.Concurrency, "node %s has no concurrency", node.ID)
+		assert.Equalf(t, prFeedbackConcurrencyKey, node.Concurrency.Key, "node %s", node.ID)
+		assert.Nilf(t, node.Concurrency.Max, "node %s sets a concurrency max", node.ID)
+	}
 }
 
 func yamlEdgeChannels(canvas *yaml.Canvas) []string {

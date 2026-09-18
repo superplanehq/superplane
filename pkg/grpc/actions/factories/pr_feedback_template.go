@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
@@ -40,6 +41,13 @@ const (
 
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
+
+	// A node with no concurrency spec runs one execution at a time across
+	// every pull request. Waiting for checks or addressing comments on one
+	// PR would then block the others. The key partitions the queue by PR
+	// number; max stays at the default of 1 so one PR still serializes.
+	prFeedbackPRNumberSource = `root().data.pull_request?.number ?? root().data.issue?.number`
+	prFeedbackConcurrencyKey = "pr-{{ " + prFeedbackPRNumberSource + " }}"
 )
 
 var prFeedbackTriggerNodeIDs = []string{
@@ -158,7 +166,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		Y:            440,
 	}, request)
 
-	return &yaml.Canvas{
+	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
@@ -169,7 +177,46 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Edges: append(append(commentFlow.edges, reviewFlow.edges...), replyFlow.edges...),
 			Nodes: append(append(commentFlow.nodes, reviewFlow.nodes...), replyFlow.nodes...),
 		},
+	})
+}
+
+// withPRFeedbackConcurrency lets each pull request run at the same time.
+// Triggers have no queue, so they keep the default.
+func withPRFeedbackConcurrency(canvas *yaml.Canvas) *yaml.Canvas {
+	if canvas == nil || canvas.Spec == nil {
+		return canvas
 	}
+	for i := range canvas.Spec.Nodes {
+		if canvas.Spec.Nodes[i].Type != yaml.NodeTypeAction {
+			continue
+		}
+		canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+	}
+	return canvas
+}
+
+func prFeedbackConcurrency() *yaml.ConcurrencySpec {
+	return &yaml.ConcurrencySpec{Key: prFeedbackConcurrencyKey}
+}
+
+func prFeedbackModelConcurrency() *models.ConcurrencySpec {
+	return &models.ConcurrencySpec{Key: prFeedbackConcurrencyKey}
+}
+
+// ensurePRFeedbackConcurrency stamps the per-PR key on action nodes that
+// still use the global default of one execution at a time. A node that
+// already has a spec keeps it, so a custom limit is not overwritten.
+func ensurePRFeedbackConcurrency(nodes []models.Node) []models.Node {
+	for i := range nodes {
+		if nodes[i].Type == models.NodeTypeTrigger {
+			continue
+		}
+		if nodes[i].Concurrency != nil {
+			continue
+		}
+		nodes[i].Concurrency = prFeedbackModelConcurrency()
+	}
+	return nodes
 }
 
 type prFeedbackDiscussionFlowRequest struct {
@@ -308,7 +355,7 @@ func prFeedbackPRURLExpression() string {
 }
 
 func prFeedbackPRNumberExpression() string {
-	return "{{ root().data.pull_request?.number ?? root().data.issue?.number }}"
+	return "{{ " + prFeedbackPRNumberSource + " }}"
 }
 
 func prFeedbackPRHeadExpression() string {

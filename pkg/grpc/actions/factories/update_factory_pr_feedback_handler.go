@@ -233,6 +233,7 @@ func applyPRFeedbackSettings(
 		}
 
 		nodes, edges := ensureChecksAnnounceLimitNode(nodes, slices.Clone(liveVersion.Edges), graph, updated.MaximumAttempts)
+		nodes = ensurePRFeedbackConcurrency(nodes)
 
 		if err := canvases.PublishGeneratedCanvasNodes(
 			ctx,
