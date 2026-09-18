@@ -162,7 +162,7 @@ function writeSessionID(taskDir, sessionID) {
 }
 
 function codexSessionForPrompt(promptCount, sessionID, env = process.env) {
-  if (planningAnalysisEnabled(env)) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
     return "";
   }
   if (Number(promptCount) < 1) {

@@ -411,13 +411,14 @@ test("runPromptFile forwards extra argv to run.js", async () => {
   const argvFile = path.join(taskDir, "argv.json");
   fs.writeFileSync(
     path.join(taskDir, "run.js"),
-    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify({argv: process.argv.slice(2), rewind: process.env.SUPERPLANE_ANALYSIS_REWIND}));\n`,
   );
   const promptFile = path.join(taskDir, "prompt.txt");
   fs.writeFileSync(promptFile, "hello\n");
 
   const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
   assert.equal(code, 0);
-  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
-  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
+  const recorded = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(recorded.argv, [promptFile, "openai/gpt-4.1", "64"]);
+  assert.equal(recorded.rewind, "yes");
 });

@@ -424,7 +424,8 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
     Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  const rewindPlanning = planningAnalysisEnabled(env);
+  const rewindPlanning =
+    planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND");
   let prompt = applyAnalysisContinuation(
     sp,
     rewindPlanning ? 0 : promptCount,

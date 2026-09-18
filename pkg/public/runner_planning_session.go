@@ -209,7 +209,13 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					writeRunnerPlanningError(w, err)
 					return
 				}
-				if err := writeJSON(w, http.StatusOK, planningWaitMessageBody(r.Context(), session, result, text)); err != nil {
+				body, bodyErr := planningWaitMessageBody(r.Context(), session, result, text)
+				if bodyErr != nil {
+					restorePlanningWait(session, result)
+					writeRunnerPlanningError(w, bodyErr)
+					return
+				}
+				if err := writeJSON(w, http.StatusOK, body); err != nil {
 					restorePlanningWait(session, result)
 				}
 				return
@@ -440,7 +446,7 @@ func planningWaitMessageBody(
 	session *models.FactoryPlanningSession,
 	result models.PlanningWaitResult,
 	text string,
-) map[string]any {
+) (map[string]any, error) {
 	body := map[string]any{
 		"status":         result.Kind,
 		"text":           text,
@@ -448,14 +454,16 @@ func planningWaitMessageBody(
 		"work_order_key": result.WorkOrderKey,
 	}
 	if session == nil || !session.IsAnalysisSession() {
-		return body
+		return body, nil
 	}
 	continuation, err := models.AnalysisContinuationText(database.DB(ctx), session)
-	if err != nil || strings.TrimSpace(continuation) == "" {
-		return body
+	if err != nil {
+		return nil, err
 	}
-	body["continuation"] = continuation
-	return body
+	if strings.TrimSpace(continuation) != "" {
+		body["continuation"] = continuation
+	}
+	return body, nil
 }
 
 func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {

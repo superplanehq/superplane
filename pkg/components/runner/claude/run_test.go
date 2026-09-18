@@ -166,7 +166,7 @@ func TestClaudePlanningFollowUpDoesNotResume(t *testing.T) {
 	cmd := exec.Command(
 		"node",
 		"-e",
-		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(4, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(4, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
 		script,
 	)
 	out, err := cmd.CombinedOutput()
@@ -174,6 +174,22 @@ func TestClaudePlanningFollowUpDoesNotResume(t *testing.T) {
 	var args []string
 	require.NoError(t, json.Unmarshal(out, &args))
 	assert.Empty(t, args)
+}
+
+func TestClaudePlanningPromptStepsStillResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(2, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Equal(t, []string{"--resume", "session-123"}, args)
 }
 
 func TestClaudeContinuationRejectsMissingSession(t *testing.T) {

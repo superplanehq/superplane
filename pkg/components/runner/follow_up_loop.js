@@ -135,7 +135,10 @@ function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
     const child = spawn(
       process.execPath,
       [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
-      { stdio: "inherit" },
+      {
+        stdio: "inherit",
+        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes" },
+      },
     );
     child.on("error", reject);
     child.on("close", (code) => resolve(code == null ? 1 : code));

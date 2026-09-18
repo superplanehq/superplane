@@ -63,7 +63,7 @@ func TestCodexPlanningFollowUpDoesNotResume(t *testing.T) {
 	cmd := exec.Command(
 		"node",
 		"-e",
-		`const { codexSessionForPrompt } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexSessionForPrompt(4, "019ce0d1-cb1e-7e60-8745-fba83baea3a7", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		`const { codexSessionForPrompt } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexSessionForPrompt(4, "019ce0d1-cb1e-7e60-8745-fba83baea3a7", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
 		script,
 	)
 	out, err := cmd.CombinedOutput()
