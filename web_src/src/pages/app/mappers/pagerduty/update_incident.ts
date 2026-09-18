@@ -36,7 +36,7 @@ export const updateIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     return buildIncidentExecutionDetails(context.execution);
   },
 

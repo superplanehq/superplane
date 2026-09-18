@@ -76,7 +76,7 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no log entries", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
