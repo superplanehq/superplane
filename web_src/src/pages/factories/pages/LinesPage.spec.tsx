@@ -331,7 +331,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
   });
 
   it("loads checks only for draft cards that can show a score", () => {
@@ -1565,17 +1565,18 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     const first = renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-view-no-column-colors"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-no-column-colors"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-100");
 
     first.unmount();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-100");
   });
 
   it("lets the header view menu show column colors as borders", async () => {
@@ -1583,11 +1584,31 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-view-colored-borders"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-colored-borders"));
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).not.toContain("bg-lime-300");
+    expect(backlog.className).not.toContain("bg-lime-100");
     expect(backlog.className).toContain("border-lime-400");
+  });
+
+  it("lets the header view menu show vivid column colors", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(backlog.className).toContain("bg-lime-100");
+    expect(backlog.className).toContain("dark:bg-lime-950/40");
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-vivid-column-colors"));
+
+    const vividBacklog = screen.getByTestId("lines-backlog-column");
+    expect(vividBacklog.className).toContain("bg-lime-300");
+    expect(vividBacklog.className).toContain("dark:bg-lime-800");
+    expect(vividBacklog.className).not.toContain("bg-lime-100");
+    expect(vividBacklog.className).not.toContain("dark:bg-lime-950/40");
   });
 
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {
@@ -1599,7 +1620,8 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-view-icons"));
+    await user.hover(screen.getByTestId("lines-board-view-automations"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-icons"));
 
     expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();

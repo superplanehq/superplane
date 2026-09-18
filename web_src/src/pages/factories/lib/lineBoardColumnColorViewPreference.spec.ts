@@ -13,8 +13,8 @@ describe("lineBoardColumnColorViewPreference", () => {
     window.localStorage.clear();
   });
 
-  it("defaults to fill when nothing is stored", () => {
-    expect(readStoredLineBoardColumnColorView()).toBe("fill");
+  it("defaults to dim when nothing is stored", () => {
+    expect(readStoredLineBoardColumnColorView()).toBe("dim");
   });
 
   it("reads a stored borders view", () => {
@@ -22,29 +22,35 @@ describe("lineBoardColumnColorViewPreference", () => {
     expect(readStoredLineBoardColumnColorView()).toBe("borders");
   });
 
-  it("falls back to fill when the stored value is invalid", () => {
-    window.localStorage.setItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY, "pastel");
-    expect(readStoredLineBoardColumnColorView()).toBe("fill");
-    expect(isLineBoardColumnColorView("pastel")).toBe(false);
-    expect(isLineBoardColumnColorView("borders")).toBe(true);
+  it("maps the previous fill view to dim", () => {
+    window.localStorage.setItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY, "fill");
+    expect(readStoredLineBoardColumnColorView()).toBe("dim");
   });
 
-  it("stores a non-default view and clears storage when fill is selected", () => {
+  it("falls back to dim when the stored value is invalid", () => {
+    window.localStorage.setItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY, "pastel");
+    expect(readStoredLineBoardColumnColorView()).toBe("dim");
+    expect(isLineBoardColumnColorView("pastel")).toBe(false);
+    expect(isLineBoardColumnColorView("borders")).toBe(true);
+    expect(isLineBoardColumnColorView("vivid")).toBe(true);
+  });
+
+  it("stores a non-default view and clears storage when dim is selected", () => {
     const { result } = renderHook(() => useLineBoardColumnColorViewPreference());
 
-    expect(result.current.view).toBe("fill");
+    expect(result.current.view).toBe("dim");
     expect(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY)).toBeNull();
 
     act(() => {
-      result.current.setView("off");
+      result.current.setView("vivid");
     });
-    expect(result.current.view).toBe("off");
-    expect(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY)).toBe("off");
+    expect(result.current.view).toBe("vivid");
+    expect(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY)).toBe("vivid");
 
     act(() => {
-      result.current.setView("fill");
+      result.current.setView("dim");
     });
-    expect(result.current.view).toBe("fill");
+    expect(result.current.view).toBe("dim");
     expect(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY)).toBeNull();
   });
 });

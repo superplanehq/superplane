@@ -1,22 +1,30 @@
 import { useCallback, useState } from "react";
 
-export const LINE_BOARD_COLUMN_COLOR_VIEWS = ["fill", "off", "borders"] as const;
+export const LINE_BOARD_COLUMN_COLOR_VIEWS = ["vivid", "dim", "borders", "off"] as const;
 
 export type LineBoardColumnColorView = (typeof LINE_BOARD_COLUMN_COLOR_VIEWS)[number];
 
-export const DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW: LineBoardColumnColorView = "fill";
+export const DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW: LineBoardColumnColorView = "dim";
 
 export const LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY = "factories-column-color-view";
 
+const LEGACY_FILL_VIEW = "fill";
+
 export function isLineBoardColumnColorView(value: unknown): value is LineBoardColumnColorView {
-  return value === "fill" || value === "off" || value === "borders";
+  return value === "vivid" || value === "dim" || value === "borders" || value === "off";
 }
 
-/** Read the persisted column-color view. Missing or invalid values use fill. */
+function migrateStoredView(value: string | null): LineBoardColumnColorView {
+  if (value === LEGACY_FILL_VIEW) {
+    return "dim";
+  }
+  return isLineBoardColumnColorView(value) ? value : DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
+}
+
+/** Read the persisted column-color view. Missing or invalid values use dim. */
 export function readStoredLineBoardColumnColorView(): LineBoardColumnColorView {
   try {
-    const stored = window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY);
-    return isLineBoardColumnColorView(stored) ? stored : DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
+    return migrateStoredView(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY));
   } catch {
     return DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
   }
@@ -34,7 +42,7 @@ function persistLineBoardColumnColorView(view: LineBoardColumnColorView): void {
   }
 }
 
-/** Owns the line-board column-color layout. Fill is the default and is not stored. */
+/** Owns the line-board column-color layout. Dim is the default and is not stored. */
 export function useLineBoardColumnColorViewPreference(): {
   view: LineBoardColumnColorView;
   setView: (view: LineBoardColumnColorView) => void;
