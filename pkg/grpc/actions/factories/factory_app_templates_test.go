@@ -57,13 +57,21 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, "record and upload a short WebM video that shows the interaction works")
 	assert.Contains(t, result.canvasYAML, "Rendered markup, styles, layout, and interaction behavior are UI changes.")
 	assert.Contains(t, result.canvasYAML, "Use an existing Storybook story or component preview first.")
-	assert.Contains(t, result.canvasYAML, "Open the Storybook story iframe directly.")
+	assert.Contains(t, result.canvasYAML, "Open the direct Storybook iframe or the focused preview route.")
+	assert.Contains(t, result.canvasYAML, "Poll the preview URL with a bounded timeout")
+	assert.Contains(t, result.canvasYAML, "Use `snapshot` or `find`, then use the returned element references")
+	assert.Contains(t, result.canvasYAML, "Call `inspect_screenshot` for every screenshot")
+	assert.Contains(t, result.canvasYAML, "Do not use file size, custom PNG decoding, or pixel-color counting")
+	assert.Contains(t, result.canvasYAML, "Close the Playwright session and stop temporary preview processes")
 	assert.Contains(t, result.canvasYAML, "A signed-in application is not required when an isolated preview can show the change.")
 	assert.Contains(t, result.canvasYAML, "Unit tests do not replace visual evidence.")
 	assert.Contains(t, result.canvasYAML, "Set each attempt type to preview, playwright, or upload.")
 	assert.Contains(t, result.canvasYAML, "report_visual_evidence_unavailable")
 	assert.Contains(t, result.canvasYAML, "$SUPERPLANE_TASK_DIR/evidence")
 	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")
+	assert.NotContains(t, result.canvasYAML, "x-access-token")
+	assert.Contains(t, result.canvasYAML, "Captured for commit `\" + $commit + \"`.")
+	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -84,13 +92,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
 	assert.Equal(
 		t,
-		`len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		`$["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
 		hasEvidence.Configuration["expression"],
 	)
 	hasUpdatedEvidence := findYAMLNode(t, canvas, "has-visual-evidence-updated")
 	assert.Equal(
 		t,
-		`len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		`$["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
 		hasUpdatedEvidence.Configuration["expression"],
 	)
 
