@@ -43,7 +43,11 @@ import {
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
@@ -1527,7 +1531,39 @@ describe("LinesPage board editing", () => {
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("lists Source in the filter menu from configured intakes", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+  });
+
+  it("narrows the board when a Source filter is selected", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+    });
+    renderLinesBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-sourceIds"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-sourceIds-github-issues"));
+
+    const board = screen.getByTestId("lines-detail-page");
+    expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
+    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {

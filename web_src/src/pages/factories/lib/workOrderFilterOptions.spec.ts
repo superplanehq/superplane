@@ -1,14 +1,20 @@
 import { describe, expect, it } from "bun:test";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder } from "@/api-client";
 
 import {
   buildAssigneeFilterOptions,
   buildLineFilterOptions,
+  buildSourceFilterOptions,
   buildStatusFilterOptions,
   buildWorkOrderFilterChips,
 } from "./workOrderFilterOptions";
-import { EMPTY_WORK_ORDER_FILTERS, UNASSIGNED_FILTER_VALUE, buildWorkOrderListEntries } from "./workOrderListModel";
+import {
+  EMPTY_WORK_ORDER_FILTERS,
+  MANUAL_FILTER_VALUE,
+  UNASSIGNED_FILTER_VALUE,
+  buildWorkOrderListEntries,
+} from "./workOrderListModel";
 
 const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
 
@@ -56,6 +62,34 @@ describe("buildLineFilterOptions", () => {
   });
 });
 
+describe("buildSourceFilterOptions", () => {
+  it("lists configured tools once, plus sources on tasks, with Created manually last", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "github-1", source: "SOURCE_GITHUB_ISSUES" },
+      { id: "github-2", source: "SOURCE_GITHUB_ISSUES" },
+      { id: "jira-1", source: "SOURCE_JIRA_ISSUES" },
+    ];
+    const entries = buildWorkOrderListEntries(
+      [order({ id: "wo-slack", origin: { url: "https://acme.slack.com/archives/C1/p1" } }), order({ id: "wo-hand" })],
+      factory,
+    );
+
+    expect(buildSourceFilterOptions(intakes, entries)).toEqual([
+      { value: "github-issues", label: "GitHub issues" },
+      { value: "jira-issues", label: "Jira issues" },
+      { value: "slack", label: "Slack" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+  });
+
+  it("keeps a configured source with no tasks, and always includes Created manually", () => {
+    expect(buildSourceFilterOptions([{ id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" }], [])).toEqual([
+      { value: "sentry-exceptions", label: "Sentry exceptions" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+  });
+});
+
 describe("buildAssigneeFilterOptions", () => {
   it("puts No Owner first, then people sorted by name", () => {
     const entries = buildWorkOrderListEntries(
@@ -78,6 +112,10 @@ describe("buildAssigneeFilterOptions", () => {
 describe("buildWorkOrderFilterChips", () => {
   const options = {
     lines: [{ value: "line-a", label: "hotfix" }],
+    sources: [
+      { value: "github-issues", label: "GitHub issues" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ],
     assignees: [
       { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
       { value: "u1", label: "Alex" },
@@ -86,13 +124,20 @@ describe("buildWorkOrderFilterChips", () => {
 
   it("labels one chip per applied filter", () => {
     const chips = buildWorkOrderFilterChips(
-      { statuses: ["running"], lineIds: ["line-a"], assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE] },
+      {
+        statuses: ["running"],
+        lineIds: ["line-a"],
+        sourceIds: ["github-issues", MANUAL_FILTER_VALUE],
+        assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE],
+      },
       options,
     );
 
     expect(chips.map((chip) => chip.label)).toEqual([
       "Status is Running",
       "Line is hotfix",
+      "Source is GitHub issues",
+      "Created manually",
       "Owner is Alex",
       "No Owner",
     ]);
