@@ -184,7 +184,11 @@ function PRFeedbackSettingsLoaded({
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
-  const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
+  const isDiscussionHandler = settings.source === "discussion";
+  const agent = useColumnCanvasAgentEditor(organizationId, canvasId, {
+    showVisualEvidenceSetting: isDiscussionHandler,
+    synchronizeAgentNodes: isDiscussionHandler,
+  });
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
   const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
   const editAutomationHref = canvasId
@@ -244,6 +248,7 @@ function PRFeedbackSettingsLoaded({
               isLoading: agent.isLoading || !agent.draft,
               organizationId,
               onSave: agent.save,
+              showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
           : undefined
       }
