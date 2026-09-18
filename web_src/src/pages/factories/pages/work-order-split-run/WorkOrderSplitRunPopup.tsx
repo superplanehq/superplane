@@ -118,17 +118,7 @@ function AnalysisWorkOrderPopup({
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
-  const edits = useSplitRunWorkOrderEdits({
-    organizationId,
-    factoryId,
-    orderId,
-    canUpdate,
-    title: fixture.title,
-    description: popupData.sourceDescription,
-    owner: fixture.owner,
-    assigneeIds: fixture.assigneeIds ?? [],
-    footerKind: fixture.footer.kind,
-  });
+  const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
@@ -218,6 +208,26 @@ function AnalysisWorkOrderPopup({
       {!showSidebarNote && tab !== "description" ? review : null}
     </PopupShell>
   );
+}
+
+/** Title, owner, and assignee edits for the popup header, fed from the fixture and loaded description. */
+function useAnalysisPopupEdits(args: {
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canUpdate: boolean;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  popupData: ReturnType<typeof useSplitRunPopupData>;
+}) {
+  const { fixture, popupData, ...ids } = args;
+  return useSplitRunWorkOrderEdits({
+    ...ids,
+    title: fixture.title,
+    description: popupData.sourceDescription,
+    owner: fixture.owner,
+    assigneeIds: fixture.assigneeIds ?? [],
+    footerKind: fixture.footer.kind,
+  });
 }
 
 function analysisPopupReview(args: {

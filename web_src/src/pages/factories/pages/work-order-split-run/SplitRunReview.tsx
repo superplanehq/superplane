@@ -91,6 +91,11 @@ function footerActionHandler({
   };
 }
 
+/** Start weight follows the given verdict, or the verdict the footer scores produce. */
+function reviewStartEmphasis(footer: SplitRunFooter, startTone?: DraftReadinessTone) {
+  return startEmphasisForTone(startTone ?? draftReadiness(splitRunFooterScores(footer)).tone);
+}
+
 /**
  * Decision note under the plan on Description, and under Automations.
  */
@@ -138,7 +143,7 @@ export function SplitRunReview({
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
-  const startEmphasis = startEmphasisForTone(startTone ?? draftReadiness(splitRunFooterScores(footer)).tone);
+  const startEmphasis = reviewStartEmphasis(footer, startTone);
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
   const actions = canAct
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
