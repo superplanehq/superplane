@@ -31,7 +31,7 @@ const (
 	sshLineEndingSecretKey  = "password"
 	sshLineEndingPassword   = "correct-horse-battery-staple"
 	sshLineEndingUser       = "e2e"
-	sshLineEndingNodeName = "Run SSH Script"
+	sshLineEndingNodeName   = "Run SSH Script"
 )
 
 func TestSSHCommandLineEndings(t *testing.T) {

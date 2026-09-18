@@ -347,9 +347,5 @@ function isDateTimeField(fieldType: string | undefined): boolean {
 }
 
 function isReferenceField(fieldType: string | undefined): boolean {
-  return (
-    fieldType === "git-ref" ||
-    fieldType === "timezone" ||
-    fieldType === "any-predicate-list"
-  );
+  return fieldType === "git-ref" || fieldType === "timezone" || fieldType === "any-predicate-list";
 }
