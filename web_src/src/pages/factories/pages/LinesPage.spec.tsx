@@ -357,7 +357,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveTextContent("55");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
