@@ -145,7 +145,7 @@ describe("Line board job popup", () => {
     expect(cardVerdict("wo-review-pay-844")).toContain("Confidence score 4 of 5");
     expect(cardVerdict("wo-review-pay-845")).toContain("Confidence score 3 of 5");
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("data-tone", "caution");
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence3");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("3");
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
     expect(

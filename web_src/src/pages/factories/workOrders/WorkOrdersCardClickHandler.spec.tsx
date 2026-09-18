@@ -380,7 +380,7 @@ describe("WorkOrderCard scores", () => {
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
     expect(score).toHaveAttribute("data-tone", "caution");
-    expect(score).toHaveTextContent("Clarity5Confidence3");
+    expect(score).toHaveTextContent("53");
     expect(score).toHaveAttribute(
       "aria-label",
       "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
@@ -430,7 +430,7 @@ describe("WorkOrderCard scores", () => {
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
     expect(effectivePointerEvents(score)).toBe("auto");
-    expect(score).toHaveTextContent("Clarity4Confidence2");
+    expect(score).toHaveTextContent("42");
 
     await user.hover(score);
 
