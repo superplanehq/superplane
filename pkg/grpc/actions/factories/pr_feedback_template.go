@@ -67,6 +67,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -425,7 +426,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 	configuration := map[string]any{
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
-		"includeVisualEvidence":   false,
+		"includeVisualEvidence":   request.IncludeVisualEvidence,
 		"steps":                   prFeedbackRunnerSteps(),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
