@@ -208,7 +208,15 @@ function recordArtifact(result, env = process.env) {
     (item) => item.file_id !== result.file_id,
   );
   artifacts.push(result);
-  writeManifest({ status: "captured", reason: "", artifacts }, env);
+  const partial = manifest.status === "partial";
+  writeManifest(
+    {
+      status: partial ? "partial" : "captured",
+      reason: partial ? manifest.reason : "",
+      artifacts,
+    },
+    env,
+  );
 }
 
 function markdownLabel(value) {
@@ -226,9 +234,25 @@ async function uploadVideoWithPoster(file, poster, title, env, fetchImpl) {
 
   const posterTitle = title ? `${title} poster` : "Video poster";
   const posterResult = await uploadFile(poster, posterTitle, env, fetchImpl);
-  recordArtifact(posterResult, env);
-
-  const videoResult = await uploadFile(file, title, env, fetchImpl);
+  let videoResult;
+  try {
+    videoResult = await uploadFile(file, title, env, fetchImpl);
+  } catch (error) {
+    const manifest = readManifest(env);
+    const artifacts = manifest.artifacts.filter(
+      (item) => item.file_id !== posterResult.file_id,
+    );
+    artifacts.push(posterResult);
+    writeManifest(
+      {
+        status: "partial",
+        reason: `Video upload failed: ${error.message}`,
+        artifacts,
+      },
+      env,
+    );
+    throw error;
+  }
   const label = markdownLabel(title || file.filename);
   const linkedPoster = {
     ...posterResult,
@@ -275,7 +299,12 @@ function reportVisualEvidenceUnavailable(input, env = process.env) {
   const attempts = normalizeEvidenceAttempts(input && input.attempts);
   const manifest = readManifest(env);
   const result = {
-    status: manifest.artifacts.length > 0 ? "captured" : "unavailable",
+    status:
+      manifest.artifacts.length > 0
+        ? manifest.status === "partial"
+          ? "partial"
+          : "captured"
+        : "unavailable",
     reason,
     attempts,
     artifacts: manifest.artifacts,

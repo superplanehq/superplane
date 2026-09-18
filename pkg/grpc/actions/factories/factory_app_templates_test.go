@@ -83,13 +83,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
 	assert.Equal(
 		t,
-		`$["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
 		hasEvidence.Configuration["expression"],
 	)
 	hasUpdatedEvidence := findYAMLNode(t, canvas, "has-visual-evidence-updated")
 	assert.Equal(
 		t,
-		`$["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
 		hasUpdatedEvidence.Configuration["expression"],
 	)
 	updatedCommentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence-updated")
