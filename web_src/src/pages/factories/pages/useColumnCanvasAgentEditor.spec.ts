@@ -243,7 +243,7 @@ describe("persistColumnAgent", () => {
     });
 
     const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
-    const synchronizedIds = new Set(PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS);
+    const synchronizedIds = new Set<string>(PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS);
     const runners = serialized.nodes?.filter((node) => node.id && synchronizedIds.has(node.id)) ?? [];
     expect(runners).toHaveLength(3);
     for (const runner of runners) {
