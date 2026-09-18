@@ -40,6 +40,10 @@ export type SplitRunSource =
       detail: typeof CREATED_MANUALLY;
     };
 
+export function isMonochromeSourceLogo(iconAlt: string): boolean {
+  return iconAlt === "GitHub" || iconAlt === "SuperPlane";
+}
+
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
   name: STORYBOOK_ME_USER_NAME,
