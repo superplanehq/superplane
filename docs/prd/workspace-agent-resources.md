@@ -60,7 +60,7 @@ Do not reinvent these pieces:
 | Kinds | `mcp_server` in v1. `skill` is reserved and unused at runtime. |
 | Name | Slug, unique per factory. The name `superplane` is reserved. |
 | MCP transport | HTTP / streamable HTTP only. No stdio or `npx` in v1. |
-| Header auth | Map header names to organization secret name and key. |
+| Header auth | Optional. Map header names to organization secret name and key. |
 | OAuth | SuperPlane is the MCP OAuth client. Inject Bearer at task start. |
 | Cap | At most 20 enabled MCP servers per workspace. |
 | Settings page | Workspace / Agent resources. Tabs: Connections, Skills. |

@@ -232,6 +232,15 @@ func Test__FactoryAgentResourceConfigValidateMCP(t *testing.T) {
 		URL:  "https://mcp.example.com/mcp",
 		Auth: models.FactoryAgentResourceAuthHeaders,
 	}.ValidateMCP()
+	assert.NoError(t, err)
+
+	err = models.FactoryAgentResourceConfig{
+		URL:  "https://mcp.example.com/mcp",
+		Auth: models.FactoryAgentResourceAuthHeaders,
+		Headers: []models.FactoryAgentResourceHeader{{
+			Name: "Authorization",
+		}},
+	}.ValidateMCP()
 	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceHeaderInvalid)
 
 	err = models.FactoryAgentResourceConfig{

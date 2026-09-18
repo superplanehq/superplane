@@ -164,9 +164,6 @@ func (c FactoryAgentResourceConfig) ValidateMCP() error {
 	}
 	switch c.MCPAuth() {
 	case FactoryAgentResourceAuthHeaders:
-		if len(c.Headers) == 0 {
-			return ErrFactoryAgentResourceHeaderInvalid
-		}
 		for _, header := range c.Headers {
 			if strings.TrimSpace(header.Name) == "" || strings.TrimSpace(header.SecretName) == "" || strings.TrimSpace(header.SecretKey) == "" {
 				return ErrFactoryAgentResourceHeaderInvalid

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -38,15 +39,14 @@ func AttachWorkspaceAgentResources(
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
 ) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+	logger := workspaceAgentResourcesLogger(ctx)
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
 		return environment, files
 	}
 	enabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgentResources)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warn("skip workspace agent resources: feature check failed")
-		}
+		logger.WithError(err).Warn("skip workspace agent resources: feature check failed")
 		return environment, files
 	}
 	if !enabled {
@@ -65,17 +65,13 @@ func AttachWorkspaceAgentResources(
 
 	factory, err := models.FindFactory(db, orgID, *factoryID)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warn("skip workspace agent resources: factory not found")
-		}
+		logger.WithError(err).Warn("skip workspace agent resources: factory not found")
 		return environment, files
 	}
 
 	resources, err := factory.ListEnabledMCPServers(db)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warn("skip workspace agent resources: list failed")
-		}
+		logger.WithError(err).Warn("skip workspace agent resources: list failed")
 		return environment, files
 	}
 	if len(resources) == 0 {
@@ -98,9 +94,7 @@ func AttachWorkspaceAgentResources(
 
 	payload, err := json.Marshal(workspaceMCPFile{Servers: servers})
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warn("skip workspace agent resources: encode failed")
-		}
+		logger.WithError(err).Warn("skip workspace agent resources: encode failed")
 		return environment, files
 	}
 
@@ -116,6 +110,13 @@ func AttachWorkspaceAgentResources(
 	return environment, files
 }
 
+func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
+	if ctx.Logger != nil {
+		return ctx.Logger
+	}
+	return log.WithField("component", "workspace_agent_resources")
+}
+
 func assembleWorkspaceMCPServer(
 	ctx core.ExecutionContext,
 	encryptor crypto.Encryptor,
@@ -123,6 +124,7 @@ func assembleWorkspaceMCPServer(
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
 ) (workspaceMCPServer, bool) {
+	logger := workspaceAgentResourcesLogger(ctx)
 	config := resource.Config.Data()
 	if strings.TrimSpace(config.URL) == "" || resource.Name == models.ReservedFactoryAgentResourceName {
 		return workspaceMCPServer{}, false
@@ -131,31 +133,27 @@ func assembleWorkspaceMCPServer(
 	headers := map[string]string{}
 	switch config.MCPAuth() {
 	case models.FactoryAgentResourceAuthHeaders:
-		if ctx.Secrets == nil {
-			return workspaceMCPServer{}, false
-		}
 		for _, header := range config.Headers {
+			if ctx.Secrets == nil {
+				logger.WithField("mcp", resource.Name).Warn("skip workspace MCP header: secrets context missing")
+				break
+			}
 			value, err := ctx.Secrets.GetKey(header.SecretName, header.SecretKey)
 			if err != nil {
-				if ctx.Logger != nil {
-					ctx.Logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: secret missing")
-				}
-				return workspaceMCPServer{}, false
+				logger.WithError(err).WithField("mcp", resource.Name).WithField("header", header.Name).
+					Warn("skip workspace MCP header: secret missing")
+				continue
 			}
 			headers[header.Name] = string(value)
 		}
 	case models.FactoryAgentResourceAuthOAuth:
 		if encryptor == nil {
-			if ctx.Logger != nil {
-				ctx.Logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: encryptor missing")
-			}
+			logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: encryptor missing")
 			return workspaceMCPServer{}, false
 		}
 		token, err := mcp.MintFactoryAgentResourceAccessToken(context.Background(), encryptor, httpClient, db, resource)
 		if err != nil || strings.TrimSpace(token) == "" {
-			if ctx.Logger != nil {
-				ctx.Logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
-			}
+			logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
 			return workspaceMCPServer{}, false
 		}
 		headers["Authorization"] = "Bearer " + token

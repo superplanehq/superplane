@@ -91,11 +91,9 @@ function headerErrorForDraft(auth: FactoryAgentResourceAuth, headers: HeaderDraf
   if (auth !== "AUTH_HEADERS") {
     return "";
   }
-  const completeHeaders = headers.filter((header) => header.name.trim() && header.secretName && header.secretKey);
-  if (completeHeaders.length === 0) {
-    return AGENT_RESOURCES_COPY.headerRequired;
-  }
-  if (completeHeaders.length !== headers.filter((header) => header.name.trim()).length) {
+  const namedHeaders = headers.filter((header) => header.name.trim());
+  const completeHeaders = namedHeaders.filter((header) => header.secretName && header.secretKey);
+  if (completeHeaders.length !== namedHeaders.length) {
     return AGENT_RESOURCES_COPY.headerIncomplete;
   }
   return "";
@@ -305,6 +303,7 @@ function ConnectionHeaderFields({
   return (
     <div className="flex flex-col gap-3" data-testid="agent-resource-headers">
       <p className="text-[13px] font-medium">{AGENT_RESOURCES_COPY.headersLabel}</p>
+      <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.headersHelper}</p>
       {headers.map((header, index) => (
         <div key={index} className="grid gap-2 rounded-md border border-border p-3">
           <div className="flex flex-col gap-1.5">
@@ -325,7 +324,7 @@ function ConnectionHeaderFields({
           </div>
           <SecretKeyFieldRenderer
             field={{ ...SECRET_FIELD, name: `header-secret-${index}` }}
-            isRequired
+            isRequired={false}
             value={
               header.secretName && header.secretKey ? { secret: header.secretName, key: header.secretKey } : undefined
             }
