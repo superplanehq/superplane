@@ -13,8 +13,9 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -139,7 +140,9 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
-  const review = analysisPopupReview({
+  const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
+  const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
+  const reviewArgs = {
     fixture,
     organizationId,
     factoryId,
@@ -154,7 +157,10 @@ function AnalysisWorkOrderPopup({
     canDispatch,
     draftModel,
     setDraftModel,
-  });
+    compact: showSidebarNote || fixture.footer.kind === "draft",
+  };
+  const review = analysisPopupReview(reviewArgs);
+  const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
 
   return (
     <PopupShell
@@ -178,7 +184,8 @@ function AnalysisWorkOrderPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
-        resultFooter={tab === "description" ? review : undefined}
+        resultFooter={!showSidebarNote && tab === "description" ? review : undefined}
+        sidebarNote={showSidebarNote ? review : undefined}
         analysis={fixture.footer.kind === "draft" ? analysis : undefined}
         header={(views) => (
           <PopupHeader
@@ -194,6 +201,7 @@ function AnalysisWorkOrderPopup({
                 copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
                 onArchive={fixture.footer.kind === "draft" ? mutations.onArchive : undefined}
                 archiveBusy={footerActions.busy}
+                taskActions={reviewActions}
               />
             }
             accessory={views}
@@ -206,7 +214,7 @@ function AnalysisWorkOrderPopup({
           </PopupHeader>
         )}
       />
-      {tab !== "description" ? review : null}
+      {!showSidebarNote && tab !== "description" ? review : null}
     </PopupShell>
   );
 }
@@ -226,6 +234,8 @@ function analysisPopupReview(args: {
   canDispatch: boolean;
   draftModel: string;
   setDraftModel: (value: string) => void;
+  compact: boolean;
+  actionsOnly?: boolean;
 }) {
   return (
     <SplitRunReview
@@ -242,7 +252,8 @@ function analysisPopupReview(args: {
       startBusy={args.isDispatching}
       actionBusy={args.footerBusy}
       startDisabled={!args.canDispatch}
-      compact={args.fixture.footer.kind === "draft"}
+      compact={args.compact}
+      actionsOnly={args.actionsOnly}
       confirmUnclearStart
       modelSelect={analysisDraftStartModelSelect({
         organizationId: args.organizationId,

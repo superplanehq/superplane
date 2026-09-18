@@ -9,8 +9,9 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter } from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter } from "./splitRunFooter";
 import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
+import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -69,6 +70,36 @@ export function ClassicWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
+  const showPullRequestReview = isPullRequestReviewFooter(classicFixture.footer);
+  const showSidebarNote = showPullRequestReview || isTaskResultFooter(classicFixture.footer);
+  const reviewProps = {
+    footer: classicFixture.footer,
+    organizationId,
+    factoryKey,
+    orderNumber,
+    canAct: canUpdate,
+    onStart: draftStart,
+    onArchive: mutations.onArchive,
+    onReject: mutations.onReject,
+    onBackToDraft: backToDraft,
+    onStop: mutations.onStop,
+    startBusy: isDispatching,
+    actionBusy: footerActions.busy,
+    startDisabled: !canDispatch,
+    modelSelect:
+      classicFixture.footer.kind === "draft" && canPickDraftStartModel ? (
+        <DraftStartModelSelect
+          organizationId={organizationId}
+          factoryId={factoryId}
+          lineName={classicFixture.lineName}
+          value={draftModel}
+          onChange={setDraftModel}
+          disabled={isDispatching || !canDispatch}
+        />
+      ) : undefined,
+  };
+  const review = <SplitRunReview {...reviewProps} compact={showSidebarNote} />;
+  const reviewActions = showPullRequestReview ? <SplitRunReview {...reviewProps} actionsOnly /> : undefined;
 
   return (
     <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
@@ -87,6 +118,7 @@ export function ClassicWorkOrderPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
+        sidebarNote={showSidebarNote ? review : undefined}
         sessionLookupError={sessionLookupError?.message}
         header={(views) => (
           <PopupHeader
@@ -102,6 +134,7 @@ export function ClassicWorkOrderPopup({
                 copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
                 onArchive={classicFixture.footer.kind === "draft" ? mutations.onArchive : undefined}
                 archiveBusy={footerActions.busy}
+                taskActions={reviewActions}
               />
             }
             accessory={views}
@@ -114,33 +147,7 @@ export function ClassicWorkOrderPopup({
           </PopupHeader>
         )}
       />
-      <SplitRunReview
-        footer={classicFixture.footer}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        canAct={canUpdate}
-        onStart={draftStart}
-        onArchive={mutations.onArchive}
-        onReject={mutations.onReject}
-        onBackToDraft={backToDraft}
-        onStop={mutations.onStop}
-        startBusy={isDispatching}
-        actionBusy={footerActions.busy}
-        startDisabled={!canDispatch}
-        modelSelect={
-          classicFixture.footer.kind === "draft" && canPickDraftStartModel ? (
-            <DraftStartModelSelect
-              organizationId={organizationId}
-              factoryId={factoryId}
-              lineName={classicFixture.lineName}
-              value={draftModel}
-              onChange={setDraftModel}
-              disabled={isDispatching || !canDispatch}
-            />
-          ) : undefined
-        }
-      />
+      {showPullRequestReview ? null : review}
     </PopupShell>
   );
 }

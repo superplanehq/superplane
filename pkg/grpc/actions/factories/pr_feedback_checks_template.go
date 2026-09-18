@@ -86,7 +86,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
 						"revision":      prFeedbackPRHeadSHAExpression(),
 						"access":        "concurrent",
-						"description":   prFeedbackChecksWaitingDescriptionExpression(),
+						"title":         prFeedbackChecksWaitingTitleExpression(),
 					},
 					Position: yaml.Position{X: 500, Y: 260},
 				},
@@ -105,6 +105,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
+						"title":       prFeedbackChecksPassedTitleExpression(),
 						"description": prFeedbackChecksPassedDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 80},
@@ -116,6 +117,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
 						"access":      "exclusive",
+						"title":       prFeedbackChecksRepairTitleExpression(),
 						"description": prFeedbackChecksRepairDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 260},
@@ -134,7 +136,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"description": prFeedbackChecksLimitDescriptionExpression(request.MaximumAttempts),
+						"title": prFeedbackChecksLimitDescriptionExpression(request.MaximumAttempts),
 					},
 					Position: yaml.Position{X: 1000, Y: 400},
 				},
@@ -152,7 +154,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
-						"description": prFeedbackChecksTimeoutDescriptionExpression(),
+						"title": prFeedbackChecksTimeoutDescriptionExpression(),
 					},
 					Position: yaml.Position{X: 820, Y: 440},
 				},
@@ -335,16 +337,65 @@ func prFeedbackPRHeadSHAExpression() string {
 	return "{{ root().data.pull_request.head.sha }}"
 }
 
-func prFeedbackChecksWaitingDescriptionExpression() string {
-	return "Waiting for checks on {{ root().data.pull_request.head.sha[:7] }}"
+func prFeedbackChecksWaitingTitleExpression() string {
+	return prFeedbackChecksSHATitleExpression("Waiting for checks on ")
+}
+
+func prFeedbackChecksPassedTitleExpression() string {
+	return prFeedbackChecksSHATitleExpression("Checks passed on ")
+}
+
+func prFeedbackChecksRepairTitleExpression() string {
+	return prFeedbackChecksSHATitleExpression("Fixing failed checks on ")
+}
+
+func prFeedbackChecksSHATitleExpression(prefix string) string {
+	return `{{ "` + prefix + `[" + root().data.pull_request.head.sha[:7] + "](" + ` +
+		prFeedbackCommitURLSource() + ` + ")" }}`
+}
+
+func prFeedbackCommitURLSource() string {
+	return `(root().data.repository.html_url ?? ("https://github.com/" + root().data.repository.full_name))` +
+		` + "/commit/" + root().data.pull_request.head.sha`
 }
 
 func prFeedbackChecksPassedDescriptionExpression() string {
-	return "Checks passed on {{ root().data.pull_request.head.sha[:7] }}"
+	return `{{ ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksSelectedSource()) + ` }}`
 }
 
 func prFeedbackChecksRepairDescriptionExpression() string {
-	return "Fixing failed checks on {{ root().data.pull_request.head.sha[:7] }}"
+	return `{{ "Failed checks\n" + ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksFailedSource()) + ` }}`
+}
+
+func prFeedbackWaitChecksSelectedSource() string {
+	return `$["` + prFeedbackWaitChecksNodeName + `"].data.selectedChecks ?? []`
+}
+
+func prFeedbackWaitChecksFailedSource() string {
+	return `$["` + prFeedbackWaitChecksNodeName + `"].data.failedChecks ?? []`
+}
+
+func prFeedbackChecksMarkdownListSource(checksExpr string) string {
+	return `join(map(` + checksExpr + `, ` + prFeedbackCheckMarkdownItemSource() + `), "\n")`
+}
+
+func prFeedbackCheckMarkdownItemSource() string {
+	label := `.name + ((.description ?? "") != "" ? ": " + .description : "")`
+	linked := `((.detailsUrl ?? "") != "" ? "[" + (` + label + `) + "](" + .detailsUrl + ")" : (` + label + `))`
+	return `"· " + ` + linked + ` + ((.summary ?? "") != "" ? ": " + .summary : "")`
+}
+
+func prFeedbackChecksActivityExpressions(nodeID string) (string, string, bool) {
+	switch nodeID {
+	case prFeedbackActivityNodeID:
+		return prFeedbackChecksWaitingTitleExpression(), "", true
+	case prFeedbackMarkPassedNodeID:
+		return prFeedbackChecksPassedTitleExpression(), prFeedbackChecksPassedDescriptionExpression(), true
+	case prFeedbackStartRepairNodeID:
+		return prFeedbackChecksRepairTitleExpression(), prFeedbackChecksRepairDescriptionExpression(), true
+	default:
+		return "", "", false
+	}
 }
 
 func prFeedbackChecksTimeoutDescriptionExpression() string {

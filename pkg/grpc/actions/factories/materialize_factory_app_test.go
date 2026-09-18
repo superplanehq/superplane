@@ -241,7 +241,13 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 			"id":      prFeedbackDiscussionTemplateID,
 			"version": float64(factoryTemplateVersion),
 		}, trigger.Metadata[factoryTemplateMetadataKey])
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, prFeedbackRunnerNodeID))
+		for _, runnerID := range []string{
+			prFeedbackRunnerNodeID,
+			prFeedbackReviewRunnerNodeID,
+			prFeedbackReplyRunnerNodeID,
+		} {
+			assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, runnerID))
+		}
 	})
 
 	t.Run("a checks PR feedback handler resets to its generated graph", func(t *testing.T) {

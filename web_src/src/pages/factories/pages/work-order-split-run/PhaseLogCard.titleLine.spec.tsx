@@ -38,7 +38,8 @@ describe("PhaseLogCard title line", () => {
     expect(within(row).queryByText("Planning")).not.toBeInTheDocument();
     expect(within(row).queryByText("Completed")).not.toBeInTheDocument();
     expect(within(row).queryByText("Passed 01:00")).not.toBeInTheDocument();
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:00");
+    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1m");
+    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveClass("text-[11px]");
     expect(row.firstElementChild?.className).toMatch(/rounded-md/);
     expect(row.firstElementChild?.className).toMatch(/\bbg-muted\b/);
     expect(row.firstElementChild?.className).toMatch(/hover:bg-/);
@@ -50,13 +51,13 @@ describe("PhaseLogCard title line", () => {
     render(<PhaseLogCard phase={{ ...PHASE, costCents: "45", totalTokens: "1200" }} expanded={false} />);
 
     const row = screen.getByTestId("split-run-phase-plan");
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · 01:00");
+    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · 1m");
   });
 
   it("shows tokens alone when the phase has no dollar spend", () => {
     render(<PhaseLogCard phase={{ ...PHASE, totalTokens: "1200" }} expanded={false} />);
 
-    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1.2k · 01:00");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1.2k · 1m");
   });
 
   it("shows the used model next to spend", () => {
@@ -68,7 +69,7 @@ describe("PhaseLogCard title line", () => {
     );
 
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent(
-      "$0.45 · 1.2k · claude-opus-4-6 · 01:00",
+      "$0.45 · 1.2k · claude-opus-4-6 · 1m",
     );
   });
 
@@ -110,7 +111,7 @@ describe("PhaseLogCard title line", () => {
       />,
     );
 
-    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("04:00");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("4m");
     const badge = screen.getByTestId("split-run-stream-duration-planner-agent");
     expect(badge).toHaveAccessibleName("Running");
     expect(badge).not.toHaveTextContent("✓");
@@ -123,7 +124,7 @@ describe("PhaseLogCard title line", () => {
       vi.advanceTimersByTime(1000);
     });
     expect(badge).toHaveTextContent("04:01");
-    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("04:01");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("4m1s");
 
     vi.useRealTimers();
   });
@@ -147,7 +148,7 @@ describe("PhaseLogCard title line", () => {
     expect(artifacts.className).toMatch(/justify-end/);
     expect(artifacts.parentElement).toBe(duration.parentElement);
     expect(artifacts.parentElement?.className).toMatch(/ml-auto/);
-    expect(duration).toHaveTextContent("01:00");
+    expect(duration).toHaveTextContent("1m");
 
     rerender(<PhaseLogCard phase={phase} expanded stream={[]} />);
     expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
@@ -334,7 +335,7 @@ describe("PhaseLogCard title line", () => {
     const row = screen.getByTestId("split-run-phase-plan");
     expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
     expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:00");
+    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1m");
   });
 });
 
@@ -348,7 +349,7 @@ describe("PhaseLogCard phase actions", () => {
   it("stays off collapsed phases", () => {
     renderCard(<PhaseLogCard phase={PHASE} expanded={false} runHref={RUN_HREF} />);
 
-    expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });
@@ -359,32 +360,35 @@ describe("PhaseLogCard phase actions", () => {
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     const name = within(header).getByRole("button", { name: "Plan" });
-    const view = screen.getByRole("link", { name: "View automation run" });
+    const view = screen.getByRole("link", { name: "View run" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
     const duration = within(header).getByTestId("split-run-phase-duration-plan");
     expect(view).toHaveAttribute("href", RUN_HREF);
+    expect(view.querySelector(".lucide-maximize-2")).not.toBeNull();
+    expect(screen.queryByText("View run")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByText("View automation run")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
     expect(view.className).toMatch(/font-mono/);
     expect(view.className).not.toMatch(/rounded-full/);
     expect(view.className).not.toMatch(/border-border/);
     expect(name.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(view.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(duration.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).toBe(
       duration.parentElement,
     );
+    expect(view.parentElement).toBe(duration.parentElement);
     expect(duration.parentElement?.className).toMatch(/ml-auto/);
-    expect(duration).toHaveTextContent("01:00");
+    expect(duration).toHaveTextContent("1m");
     expect(duration.className).toMatch(/font-mono/);
+    expect(duration.className).toMatch(/text-\[11px\]/);
     expect(duration.className).toMatch(/tabular-nums/);
 
     await user.hover(view);
-    expect(await screen.findByRole("tooltip", { name: "View automation run" })).toBeInTheDocument();
+    expect(await screen.findByRole("tooltip", { name: "View run" })).toBeInTheDocument();
   });
 
-  it("puts Stop after View on the left of a running automation", async () => {
+  it("puts Stop after the name on the left of a running automation", async () => {
     const user = userEvent.setup();
     const onStop = vi.fn();
     renderCard(
@@ -397,11 +401,13 @@ describe("PhaseLogCard phase actions", () => {
     );
 
     const header = screen.getByTestId("split-run-automation-header-plan");
-    const view = screen.getByRole("link", { name: "View automation run" });
+    const name = within(header).getByRole("button", { name: "Plan" });
+    const view = screen.getByRole("link", { name: "View run" });
     const stop = screen.getByRole("button", { name: "Stop" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(view.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(stop.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(artifact.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
       stop.parentElement,
     );
@@ -414,7 +420,7 @@ describe("PhaseLogCard phase actions", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("puts Rerun after View on the left of a failed automation", async () => {
+  it("puts Rerun after the name on the left of a failed automation", async () => {
     const user = userEvent.setup();
     const onRerun = vi.fn();
     renderCard(
@@ -428,12 +434,12 @@ describe("PhaseLogCard phase actions", () => {
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     const name = within(header).getByRole("button", { name: "Plan" });
-    const view = screen.getByRole("link", { name: "View automation run" });
+    const view = screen.getByRole("link", { name: "View run" });
     const rerun = screen.getByRole("button", { name: "Rerun" });
     const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(name.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(view.compareDocumentPosition(rerun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.compareDocumentPosition(rerun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rerun.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(artifact.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
       rerun.parentElement,
     );
@@ -451,7 +457,7 @@ describe("PhaseLogCard phase actions", () => {
     const user = userEvent.setup();
     renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} onToggle={onToggle} />);
 
-    await user.click(screen.getByRole("link", { name: "View automation run" }));
+    await user.click(screen.getByRole("link", { name: "View run" }));
 
     expect(onToggle).not.toHaveBeenCalled();
   });
@@ -459,7 +465,7 @@ describe("PhaseLogCard phase actions", () => {
   it("is absent when the log has no run path", () => {
     renderCard(<PhaseLogCard phase={PHASE} expanded />);
 
-    expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });

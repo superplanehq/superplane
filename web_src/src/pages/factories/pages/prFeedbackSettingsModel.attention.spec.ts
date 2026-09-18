@@ -6,6 +6,7 @@ import {
   activePRFeedbackWorkOrderIds,
   addressingFeedbackLabelsByWorkOrder,
   addressingFeedbackWorkOrderIds,
+  checksPassedLabelsByWorkOrder,
   checksPassedWorkOrderIds,
   fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
@@ -135,6 +136,24 @@ describe("activePRFeedbackWorkOrderIds", () => {
     expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-repair")).toBe("Fixing failed checks on a82fd91");
   });
 
+  it("keeps the commit link in the check-fix label", () => {
+    expect(
+      addressingFeedbackLabelsByWorkOrder([
+        {
+          workOrderId: "wo-repair",
+          activities: [
+            {
+              access: "exclusive",
+              state: "active",
+              title: "Fixing failed checks on [2e46445](https://github.com/acme/app/commit/2e46445)",
+              run: run({ id: "r-repair", state: "STATE_STARTED" }),
+            },
+          ],
+        },
+      ]).get("wo-repair"),
+    ).toBe("Fixing failed checks on [2e46445](https://github.com/acme/app/commit/2e46445)");
+  });
+
   it("treats a finished passed check wait as checks passed", () => {
     expect(
       checksPassedWorkOrderIds([
@@ -173,6 +192,21 @@ describe("activePRFeedbackWorkOrderIds", () => {
         },
       ]),
     ).toEqual(new Set(["wo-passed"]));
+    expect(
+      checksPassedLabelsByWorkOrder([
+        {
+          workOrderId: "wo-passed",
+          activities: [
+            {
+              access: "concurrent",
+              state: "finished",
+              title: "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)",
+              run: run({ id: "r1", state: "STATE_FINISHED", result: "RESULT_PASSED" }),
+            },
+          ],
+        },
+      ]).get("wo-passed"),
+    ).toBe("Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)");
   });
 
   it("treats a limit-reached check activity as fixes paused", () => {

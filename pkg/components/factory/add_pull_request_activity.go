@@ -22,6 +22,7 @@ type AddPullRequestActivity struct{}
 type AddPullRequestActivityConfiguration struct {
 	PullRequestID string `json:"pullRequestId" mapstructure:"pullRequestId"`
 	Revision      string `json:"revision" mapstructure:"revision"`
+	Title         string `json:"title" mapstructure:"title"`
 	Description   string `json:"description" mapstructure:"description"`
 	Access        string `json:"access" mapstructure:"access"`
 }
@@ -45,7 +46,7 @@ Set ` + "`pullRequestId`" + ` from Find Pull Request output. Use ` + "`revision`
 
 Use ` + "`access`" + ` to request ` + "`concurrent`" + ` or ` + "`exclusive`" + ` access. Concurrent activities can observe a pull request without changing it. Exclusive access is required before a run changes the pull request. If exclusive access is not available, the component waits and retries.
 
-Use ` + "`description`" + ` to record why this run is linked. The field accepts event data, for example ` + "`{{ root().data.comment.body }}`" + `.
+Use ` + "`title`" + ` for the activity heading. Use ` + "`description`" + ` for additional details. Both fields support Markdown and event data.
 
 If another active activity already owns the same handler and revision, this node finishes without output. The existing activity keeps running. A newer pull request head does not stop an in-flight activity.
 
@@ -65,7 +66,8 @@ func (c *AddPullRequestActivity) ExampleOutput() map[string]any {
 		"timestamp": "2026-01-01T00:00:00Z",
 		"type":      addPullRequestActivityEventType,
 		"data": map[string]any{
-			"description": "Waiting for checks on d1209da",
+			"title":       "Waiting for checks",
+			"description": "Waiting for checks on [`d1209da`](https://github.com/acme/app/commit/d1209da).",
 			"pullRequest": map[string]any{
 				"id":     "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
 				"number": 42,
@@ -102,9 +104,16 @@ func (c *AddPullRequestActivity) Configuration() []configuration.Field {
 			Required:    false,
 		},
 		{
+			Name:        "title",
+			Label:       "Title",
+			Description: "Write the activity title in Markdown.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+		},
+		{
 			Name:        "description",
 			Label:       "Description",
-			Description: "Write why this run is linked to the pull request. You can use event data such as {{ root().data.comment.body }}.",
+			Description: "Write activity details in Markdown. You can use event data such as {{ root().data.comment.body }}.",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 		},
@@ -134,6 +143,7 @@ func (c *AddPullRequestActivity) Execute(ctx core.ExecutionContext) error {
 
 	result, err := ctx.Factory.AddPullRequestActivity(core.AddPullRequestActivityParams{
 		PullRequestID: config.PullRequestID,
+		Title:         config.Title,
 		Description:   config.Description,
 		Revision:      config.Revision,
 		Access:        config.Access,
@@ -171,6 +181,7 @@ func (c *AddPullRequestActivity) HandleHook(ctx core.ActionHookContext) error {
 
 	result, err := ctx.Factory.AddPullRequestActivity(core.AddPullRequestActivityParams{
 		PullRequestID: hookPullRequestID(ctx.Configuration),
+		Title:         hookString(ctx.Configuration, "title"),
 		Description:   hookString(ctx.Configuration, "description"),
 		Revision:      hookString(ctx.Configuration, "revision"),
 		Access:        hookString(ctx.Configuration, "access"),

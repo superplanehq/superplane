@@ -1,4 +1,5 @@
 import { Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,13 +13,16 @@ export function PopupHeaderActions({
   copyUrl,
   onArchive,
   archiveBusy = false,
+  taskActions,
 }: {
   copyUrl?: string;
   onArchive?: () => void | Promise<void>;
   archiveBusy?: boolean;
+  taskActions?: ReactNode;
 }) {
   return (
     <>
+      {taskActions}
       {onArchive ? <PopupArchiveButton onArchive={onArchive} busy={archiveBusy} /> : null}
       <CopyLinkButton
         url={copyUrl}

@@ -1,5 +1,6 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { ArrowLeft } from "lucide-react";
 import { FactoryAppCanvasTitleEditor, FACTORY_APP_CANVAS_TITLE_CLASS } from "./FactoryAppCanvasTitleEditor";
 import { FactoryAppCanvasViewActions } from "./FactoryAppCanvasViewActions";
@@ -11,6 +12,12 @@ import {
 
 export const FACTORY_APP_CANVAS_HEADER_SHELL_CLASS =
   "grid shrink-0 grid-cols-[minmax(0,1fr)_20.5rem] items-start gap-4 border-b border-border px-5 py-3";
+
+const MARKDOWN_LINK = /\[[^\]]*\]\([^)]+\)/;
+
+function canvasTitleHasMarkdown(title: string): boolean {
+  return MARKDOWN_LINK.test(title);
+}
 
 type FactoryAppCanvasWorkspaceChrome = FactoryAppCanvasWorkspaceTogglesProps & {
   onViewYaml: () => void;
@@ -78,7 +85,17 @@ export function FactoryAppCanvasHeader({
             />
           ) : (
             <h2 className={FACTORY_APP_CANVAS_TITLE_CLASS} data-testid="factory-app-canvas-title">
-              {title}
+              {canvasTitleHasMarkdown(title) ? (
+                <MarkdownContent
+                  content={title}
+                  variant="workspace"
+                  openLinksInNewTab
+                  linkClassName="font-semibold text-current !underline !decoration-current underline-offset-2"
+                  className="min-w-0 truncate [&_p]:m-0 [&_p]:inline"
+                />
+              ) : (
+                title
+              )}
             </h2>
           )}
         </div>

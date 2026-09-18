@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, GitPullRequest } from "lucide-react";
+import { Ellipsis, ExternalLink, GitPullRequest } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -22,16 +22,16 @@ const MARK_CLASSNAME = "flex shrink-0 items-center justify-center rounded-full b
 export function SplitRunPullRequestReviewNote({
   ctaLabel,
   pullRequest,
-  actions = [],
-  actionBusy = false,
-  onAction,
+  compact = false,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
-  actions?: SplitRunFooterAction[];
-  actionBusy?: boolean;
-  onAction?: (action: SplitRunFooterAction) => void;
+  compact?: boolean;
 }) {
+  if (compact) {
+    return <CompactPullRequestReviewNote ctaLabel={ctaLabel} pullRequest={pullRequest} />;
+  }
+
   return (
     <div
       className="border-t border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] px-5 py-5"
@@ -47,8 +47,7 @@ export function SplitRunPullRequestReviewNote({
           <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-foreground">
             {PULL_REQUEST_REVIEW_COPY.headline}
           </h3>
-          <ReviewSteps />
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button
               asChild
               size="lg"
@@ -63,28 +62,39 @@ export function SplitRunPullRequestReviewNote({
             <p className="text-[13px] leading-5 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
           </div>
         </div>
-
-        <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />
       </div>
     </div>
   );
 }
 
-function ReviewSteps() {
+function CompactPullRequestReviewNote({
+  ctaLabel,
+  pullRequest,
+}: {
+  ctaLabel: string;
+  pullRequest: PullRequestReviewTarget;
+}) {
   return (
-    <ol aria-label={PULL_REQUEST_REVIEW_COPY.stepsLabel} className="mt-3.5 flex flex-col gap-2">
-      {PULL_REQUEST_REVIEW_COPY.steps.map((step, index) => (
-        <li key={step.title} className="flex items-start gap-2.5">
-          <span className={`${MARK_CLASSNAME} mt-px size-6 text-[12px] font-semibold`} aria-hidden>
-            {index + 1}
-          </span>
-          <p className="min-w-0 text-[14px] leading-6">
-            <span className="font-semibold text-foreground">{step.title}</span>
-            <span className="text-foreground/70"> {step.text}</span>
-          </p>
-        </li>
-      ))}
-    </ol>
+    <div
+      className="rounded-lg border border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] p-4"
+      data-testid="split-run-attention-note"
+      data-variant="pull-request"
+    >
+      <div className="min-w-0">
+        <h3 className="text-[14px] font-semibold leading-5 text-foreground">{PULL_REQUEST_REVIEW_COPY.headline}</h3>
+        <p className="mt-1 text-[12px] leading-4 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
+        <Button
+          asChild
+          size="sm"
+          className="mt-3 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700"
+        >
+          <a href={pullRequest.href} target="_blank" rel="noreferrer" data-testid="split-run-pull-request-cta">
+            {ctaLabel}
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -106,14 +116,13 @@ function MoreActionsMenu({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className="shrink-0 text-foreground/70"
+          size="icon-xs"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-foreground/70 hover:bg-slate-950/5 dark:hover:bg-white/10"
           aria-label={PULL_REQUEST_REVIEW_COPY.moreActions}
           disabled={disabled}
           data-testid="split-run-more-actions"
         >
-          {PULL_REQUEST_REVIEW_COPY.more}
-          <ChevronDown className="size-3.5" aria-hidden />
+          <Ellipsis className="size-4" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
@@ -136,25 +145,24 @@ export function WaitingPullRequestReview({
   tone,
   actions,
   actionBusy,
+  compact = false,
+  actionsOnly = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
   tone: SplitRunDecisionTone;
   actions: SplitRunFooterAction[];
   actionBusy: boolean;
+  compact?: boolean;
+  actionsOnly?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
   if (!pullRequest || !note.cta) {
     return null;
   }
-  return (
-    <SplitRunPullRequestReviewNote
-      ctaLabel={note.cta.label}
-      pullRequest={pullRequest}
-      actions={actions}
-      actionBusy={actionBusy}
-      onAction={onAction}
-    />
-  );
+  if (actionsOnly) {
+    return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
+  }
+  return <SplitRunPullRequestReviewNote ctaLabel={note.cta.label} pullRequest={pullRequest} compact={compact} />;
 }

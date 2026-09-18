@@ -10,7 +10,7 @@ import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
-import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
+import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
@@ -21,6 +21,7 @@ const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_CHECKS_PASSED_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [];
 
@@ -44,6 +45,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   waitingOnChecksOrderIds?: ReadonlySet<string>;
   /** Tasks whose latest check wait finished with passing checks. */
   checksPassedOrderIds?: ReadonlySet<string>;
+  /** Completed check-wait title, keyed by task id. */
+  checksPassedLabels?: ReadonlyMap<string, string>;
   /** Tasks whose check handler stopped at the attempt limit. */
   fixesPausedOrderIds?: ReadonlySet<string>;
   /** Pull requests attached to tasks on this board. */
@@ -98,6 +101,7 @@ export function WorkOrderCard({
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
   checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   pullRequests = EMPTY_PULL_REQUESTS,
   onDispatch,
@@ -151,6 +155,7 @@ export function WorkOrderCard({
           source={source}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+          checksPassedLabel={checksPassedLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
         />
@@ -195,6 +200,7 @@ function WorkOrderCardStatusRow({
   source,
   reasons,
   feedbackLabel,
+  checksPassedLabel,
   cardPullRequest,
   hasAgentQuestion,
 }: {
@@ -202,6 +208,7 @@ function WorkOrderCardStatusRow({
   source: WorkOrderCardSource | null;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
+  checksPassedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
 }) {
@@ -216,19 +223,29 @@ function WorkOrderCardStatusRow({
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
       ) : null}
-      {reasons.map((reason) =>
-        reason === "checksPassed" ? (
-          <WorkOrderChecksPassedMark key={reason} />
-        ) : (
-          <WorkOrderAttentionChip
-            key={reason}
-            reason={reason}
-            label={reason === "feedback" ? feedbackLabel : undefined}
-          />
-        ),
-      )}
+      {reasons.map((reason) => (
+        <WorkOrderAttentionChip
+          key={reason}
+          reason={reason}
+          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+        />
+      ))}
     </div>
   );
+}
+
+function attentionChipLabel(
+  reason: WorkOrderAttentionReason,
+  feedbackLabel?: string,
+  checksPassedLabel?: string,
+): string | undefined {
+  if (reason === "feedback") {
+    return feedbackLabel;
+  }
+  if (reason === "checksPassed") {
+    return checksPassedLabel;
+  }
+  return undefined;
 }
 
 function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
