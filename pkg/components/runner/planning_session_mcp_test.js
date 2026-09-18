@@ -21,9 +21,10 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /propose_spec/);
   assert.match(pack, /propose_clarity/);
   assert.match(pack, /propose_confidence/);
-  assert.match(pack, /Do not ask a question to raise Confidence/);
+  assert.match(pack, /A question can raise Clarity or Confidence/);
+  assert.doesNotMatch(pack, /Do not ask a question to raise Confidence/);
   assert.doesNotMatch(pack, /propose_plan/);
-  assert.match(pack, /Follow the task prompt/);
+  assert.match(pack, /The task prompt owns the judgment/);
   assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the specification/);
   assert.match(pack, /call survey with 2 to 4 options/);
@@ -66,8 +67,13 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.doesNotMatch(pack, /how likely implementation is to succeed/);
   assert.match(pack, /why Clarity is not 5/);
   assert.match(pack, /how likely a coding agent finishes this task in one run/);
-  assert.match(pack, /Do not push Confidence to 5/);
-  assert.match(pack, /Do not ask a survey question to raise it/);
+  assert.match(pack, /### Calibration/);
+  assert.match(pack, /Start at 4 for a bounded change that has a pattern in the repository/);
+  assert.match(pack, /### Raise Confidence through refinement/);
+  assert.match(pack, /Split into two or three tasks that each fit one run/);
+  assert.match(pack, /Be direct when the task is too big or too complex for one run/);
+  assert.doesNotMatch(pack, /Do not push Confidence to 5/);
+  assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
   assert.match(pack, /Confidence is provisional/);
   assert.strictEqual(pack.match(/Do not repeat the number in the summary/g)?.length, 2);
   assert.doesNotMatch(pack, /Good: Clarity is \d because/);
