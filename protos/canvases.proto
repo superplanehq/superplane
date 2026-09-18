@@ -113,8 +113,8 @@ service Canvases {
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Stage canvas repository files";
-      description: "Writes staged edits for the current user without creating a new version";
+      summary: "Stage canvas spec files";
+      description: "Writes staged canvas.yaml and console.yaml edits for the current user without creating a new version";
       tags: "CanvasStaging";
     };
   }
@@ -148,7 +148,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Commit canvas staging";
-      description: "Commits the current user's staged edits to the main branch";
+      description: "Commits the current user's staged canvas.yaml and console.yaml edits as a new canvas version";
       tags: "CanvasStaging";
     };
   }
