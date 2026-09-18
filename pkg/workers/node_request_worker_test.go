@@ -89,6 +89,74 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
+func Test__NodeRequestWorker_ScheduleSkipsTickWhileCanvasRunIsActive(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"type":              "minutes",
+					"minutesInterval":   5,
+					"concurrencyPolicy": "skip",
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	activeRun, err := models.CreateCanvasRunInTransaction(
+		database.DB(t.Context()),
+		canvas.ID,
+		triggerNode,
+		models.CanvasRunStateStarted,
+		"",
+	)
+	require.NoError(t, err)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     triggerNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.DB(t.Context()).Create(&request).Error)
+
+	require.NoError(t, worker.LockAndProcessRequest(request))
+
+	eventCount, err := models.CountCanvasEvents(database.DB(t.Context()), canvas.ID, triggerNode)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
+
+	var runs []models.CanvasRun
+	require.NoError(t, database.DB(t.Context()).Where("workflow_id = ?", canvas.ID).Find(&runs).Error)
+	require.Len(t, runs, 1)
+	assert.Equal(t, activeRun.ID, runs[0].ID)
+
+	nextRequest, err := models.FindPendingRequestForNode(database.DB(t.Context()), canvas.ID, triggerNode)
+	require.NoError(t, err)
+	assert.NotEqual(t, request.ID, nextRequest.ID)
+	nextSpec := nextRequest.Spec.Data()
+	require.NotNil(t, nextSpec.InvokeAction)
+	assert.Equal(t, "emitEvent", nextSpec.InvokeAction.ActionName)
+}
+
 func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

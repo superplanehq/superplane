@@ -1,10 +1,12 @@
 package schedule
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -649,4 +651,206 @@ func TestHandleHookRun(t *testing.T) {
 	if eventCtx.Payloads[0].Type != "scheduler.tick" {
 		t.Errorf("expected payload type to be scheduler.tick, got %q", eventCtx.Payloads[0].Type)
 	}
+}
+
+func TestConfigurationIncludesOptionalConcurrencyPolicy(t *testing.T) {
+	fields := (&Schedule{}).Configuration()
+
+	var concurrencyField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "concurrencyPolicy" {
+			concurrencyField = &fields[i]
+			break
+		}
+	}
+
+	if concurrencyField == nil {
+		t.Fatal("expected concurrencyPolicy configuration field")
+	}
+
+	if concurrencyField.Type != configuration.FieldTypeSelect {
+		t.Errorf("expected select field, got %q", concurrencyField.Type)
+	}
+	if concurrencyField.Required {
+		t.Error("expected concurrencyPolicy to remain optional for existing schedules")
+	}
+	if concurrencyField.Default != ConcurrencyPolicyAllow {
+		t.Errorf("expected default %q, got %#v", ConcurrencyPolicyAllow, concurrencyField.Default)
+	}
+	if concurrencyField.TypeOptions == nil || concurrencyField.TypeOptions.Select == nil {
+		t.Fatal("expected select options for concurrencyPolicy")
+	}
+
+	values := map[string]bool{}
+	for _, option := range concurrencyField.TypeOptions.Select.Options {
+		values[option.Value] = true
+	}
+
+	if !values[ConcurrencyPolicyAllow] || !values[ConcurrencyPolicySkip] || len(values) != 2 {
+		t.Errorf("expected only allow and skip options, got %#v", values)
+	}
+}
+
+func TestHandleHookAllowsOverlappingScheduledRunsByDefault(t *testing.T) {
+	runs := &runStateContextStub{active: true}
+	events := &contexts.EventContext{}
+
+	_, err := (&Schedule{}).HandleHook(core.TriggerHookContext{
+		Name: HookEmitEvent,
+		Configuration: map[string]any{
+			"type":            TypeMinutes,
+			"minutesInterval": 5,
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   events,
+		Metadata: &contexts.MetadataContext{},
+		Requests: &contexts.RequestContext{},
+		Runs:     runs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if events.Count() != 1 {
+		t.Fatalf("expected one emitted payload, got %d", events.Count())
+	}
+	if runs.calls != 0 {
+		t.Errorf("expected default allow policy not to query active runs, got %d calls", runs.calls)
+	}
+}
+
+func TestHandleHookSkipsScheduledRunWhenActive(t *testing.T) {
+	runs := &runStateContextStub{active: true}
+	events := &contexts.EventContext{}
+	requests := &contexts.RequestContext{}
+	metadata := &contexts.MetadataContext{}
+
+	_, err := (&Schedule{}).HandleHook(core.TriggerHookContext{
+		Name: HookEmitEvent,
+		Configuration: map[string]any{
+			"type":              TypeMinutes,
+			"minutesInterval":   5,
+			"concurrencyPolicy": ConcurrencyPolicySkip,
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   events,
+		Metadata: metadata,
+		Requests: requests,
+		Runs:     runs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if events.Count() != 0 {
+		t.Fatalf("expected active run to suppress the scheduled event, got %d payloads", events.Count())
+	}
+	if runs.calls != 1 {
+		t.Errorf("expected one active-run query, got %d", runs.calls)
+	}
+	if requests.Action != HookEmitEvent {
+		t.Errorf("expected the next scheduled request, got %q", requests.Action)
+	}
+	if metadata.Metadata == nil {
+		t.Error("expected next trigger metadata to be updated")
+	}
+}
+
+func TestHandleHookEmitsScheduledRunWhenNoRunIsActive(t *testing.T) {
+	runs := &runStateContextStub{}
+	events := &contexts.EventContext{}
+
+	_, err := (&Schedule{}).HandleHook(core.TriggerHookContext{
+		Name: HookEmitEvent,
+		Configuration: map[string]any{
+			"type":              TypeMinutes,
+			"minutesInterval":   5,
+			"concurrencyPolicy": ConcurrencyPolicySkip,
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   events,
+		Metadata: &contexts.MetadataContext{},
+		Requests: &contexts.RequestContext{},
+		Runs:     runs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if events.Count() != 1 {
+		t.Fatalf("expected one emitted payload, got %d", events.Count())
+	}
+	if runs.calls != 1 {
+		t.Errorf("expected one active-run query, got %d", runs.calls)
+	}
+}
+
+func TestHandleHookRunBypassesSkipPolicy(t *testing.T) {
+	runs := &runStateContextStub{active: true}
+	events := &contexts.EventContext{}
+
+	_, err := (&Schedule{}).HandleHook(core.TriggerHookContext{
+		Name: HookRun,
+		Configuration: map[string]any{
+			"type":              TypeMinutes,
+			"minutesInterval":   5,
+			"concurrencyPolicy": ConcurrencyPolicySkip,
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   events,
+		Metadata: &contexts.MetadataContext{},
+		Requests: &contexts.RequestContext{},
+		Runs:     runs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if events.Count() != 1 {
+		t.Fatalf("expected manual Run to emit one payload, got %d", events.Count())
+	}
+	if runs.calls != 0 {
+		t.Errorf("expected manual Run not to query active runs, got %d calls", runs.calls)
+	}
+}
+
+func TestHandleHookDoesNotEmitWhenActiveRunCheckFails(t *testing.T) {
+	runs := &runStateContextStub{err: errors.New("database unavailable")}
+	events := &contexts.EventContext{}
+	requests := &contexts.RequestContext{}
+
+	_, err := (&Schedule{}).HandleHook(core.TriggerHookContext{
+		Name: HookEmitEvent,
+		Configuration: map[string]any{
+			"type":              TypeMinutes,
+			"minutesInterval":   5,
+			"concurrencyPolicy": ConcurrencyPolicySkip,
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   events,
+		Metadata: &contexts.MetadataContext{},
+		Requests: requests,
+		Runs:     runs,
+	})
+	if err == nil || !contains(err.Error(), "check active runs") {
+		t.Fatalf("expected active-run query error, got %v", err)
+	}
+
+	if events.Count() != 0 {
+		t.Errorf("expected no event after failed active-run query, got %d", events.Count())
+	}
+	if requests.Action != "" {
+		t.Errorf("expected failed tick not to replace its retry request, got %q", requests.Action)
+	}
+}
+
+type runStateContextStub struct {
+	active bool
+	err    error
+	calls  int
+}
+
+func (c *runStateContextStub) HasActive() (bool, error) {
+	c.calls++
+	return c.active, c.err
 }
