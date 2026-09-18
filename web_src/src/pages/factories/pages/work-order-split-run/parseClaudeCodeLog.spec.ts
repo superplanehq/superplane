@@ -59,10 +59,9 @@ describe("parseClaudeCodeLog", () => {
         status: "passed",
         output: '1\timport type { FactoriesFactoryLine } from "@/api-client";',
       },
-      { type: "note", name: "Let me examine the key files.", status: "passed" },
       {
         type: "note",
-        name: "Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.",
+        name: "Let me examine the key files.\nNow let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.",
         status: "passed",
       },
       {
@@ -70,6 +69,34 @@ describe("parseClaudeCodeLog", () => {
         name: "cat > /tmp/plan.md << 'EOF' Add an automations-style 3-dots overflow…",
         status: "passed",
       },
+    ]);
+  });
+
+  it("joins consecutive agent notes and keeps blank lines", () => {
+    const steps = parseClaudeCodeLog(
+      [
+        "$ Implementation",
+        "Claude Code started · model=claude-sonnet-5",
+        "Here is the change:",
+        "",
+        "```ts",
+        "const n = 1;",
+        "",
+        "const m = 2;",
+        "```",
+        "-> [Bash] git status",
+        "     On branch main",
+      ].join("\n"),
+      [{ name: "Implementation", type: "prompt" }],
+    );
+
+    expect(steps[0]?.commands).toEqual([
+      {
+        type: "note",
+        name: "Here is the change:\n\n```ts\nconst n = 1;\n\nconst m = 2;\n```",
+        status: "passed",
+      },
+      { type: "bash", name: "git status", status: "passed", output: "On branch main" },
     ]);
   });
 

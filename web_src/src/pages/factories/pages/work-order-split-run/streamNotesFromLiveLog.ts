@@ -28,6 +28,20 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
+export function streamNoteTextMatches(haystack: string, needle: string): boolean {
+  const extra = needle.trim();
+  if (!extra) {
+    return true;
+  }
+  const live = haystack.trim();
+  if (!live) {
+    return false;
+  }
+  const extraPrefix = extra.slice(0, 48);
+  const livePrefix = live.slice(0, 48);
+  return live.includes(extraPrefix) || extra.includes(livePrefix);
+}
+
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -266,12 +280,7 @@ function firstOpenStepIndex(notes: SplitRunStreamLine[]): number {
 }
 
 function streamAlreadyHasText(notes: SplitRunStreamLine[], text: string): boolean {
-  const needle = text.trim();
-  if (!needle) {
-    return true;
-  }
-  const prefix = needle.slice(0, 48);
-  return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+  return notes.some((note) => streamNoteTextMatches(`${note.componentName}\n${note.detail ?? ""}`, text));
 }
 
 export function notesForLiveStream(input: {

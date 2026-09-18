@@ -40,7 +40,7 @@ import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./s
 const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
 const STREAM_NOTE_MARKDOWN =
-  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
+  "max-w-none font-sans text-[14px] leading-5 text-foreground [&>:first-child]:mt-0 [&>:last-child]:mb-0";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -1049,6 +1049,28 @@ function StreamStep({
   );
 }
 
+function markdownWithClosedFence(text: string): string {
+  let openMarker: string | undefined;
+  for (const line of text.split("\n")) {
+    const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!match) {
+      continue;
+    }
+    const marker = match[2];
+    if (!openMarker) {
+      openMarker = marker;
+      continue;
+    }
+    if (marker[0] === openMarker[0] && marker.length >= openMarker.length && !match[3].trim()) {
+      openMarker = undefined;
+    }
+  }
+  if (!openMarker) {
+    return text;
+  }
+  return text.endsWith("\n") ? `${text}${openMarker}` : `${text}\n${openMarker}`;
+}
+
 function StreamTalkNote({
   line,
   highlightUserTalk,
@@ -1071,7 +1093,7 @@ function StreamTalkNote({
         <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
           <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">{youLabel}</span>
           <MarkdownContent
-            content={line.componentName}
+            content={markdownWithClosedFence(line.componentName)}
             files={files}
             variant="workspace"
             className={STREAM_NOTE_MARKDOWN}
@@ -1080,7 +1102,7 @@ function StreamTalkNote({
       ) : (
         <div className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
           <MarkdownContent
-            content={line.componentName}
+            content={markdownWithClosedFence(line.componentName)}
             files={files}
             variant="workspace"
             className={STREAM_NOTE_MARKDOWN}

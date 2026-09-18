@@ -226,6 +226,44 @@ describe("liveLogSections", () => {
     expect(section.events[0].tools.map((tool) => tool.id)).toEqual(["toolu_a", "toolu_b"]);
   });
 
+  it("joins a fenced agent note across lines and splits it on a tool start", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = appendLineToLatestSection(state, "Here is the change:");
+    state = appendLineToLatestSection(state, "");
+    state = appendLineToLatestSection(state, "```ts");
+    state = appendLineToLatestSection(state, "const n = 1;");
+    state = appendLineToLatestSection(state, "");
+    state = appendLineToLatestSection(state, "const m = 2;");
+    state = appendLineToLatestSection(state, "```");
+    state = appendLineToLatestSection(state, "");
+    state = startToolOnLatestSection(state, "read", "pkg/foo.go");
+    state = appendLineToLatestSection(state, "package workers");
+    state = endToolOnLatestSection(state, "passed", 80);
+    state = appendLineToLatestSection(state, "Done.");
+
+    const section = state.sections[0];
+    expect(section.events[0]).toEqual({
+      kind: "note",
+      text: "Here is the change:\n\n```ts\nconst n = 1;\n\nconst m = 2;\n```",
+    });
+    expect(section.events[1]?.kind).toBe("tools");
+    if (section.events[1]?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(section.events[1].tools[0]).toMatchObject({
+      kind: "read",
+      text: "pkg/foo.go",
+      lines: ["package workers"],
+    });
+    expect(section.events[2]).toEqual({ kind: "note", text: "Done." });
+  });
+
   it("keeps bash section lines flat", () => {
     let state = startCommandSection(emptyState(), {
       index: 0,
@@ -284,9 +322,7 @@ describe("liveLogSections", () => {
     const prompt = state.sections[2];
     expect(prompt.lines).toEqual(["Starting OpenCode", "Hello! How can I help you today?", "What should we work on?"]);
     expect(prompt.events.map((event) => (event.kind === "note" ? event.text : event.kind))).toEqual([
-      "Starting OpenCode",
-      "Hello! How can I help you today?",
-      "What should we work on?",
+      "Starting OpenCode\nHello! How can I help you today?\nWhat should we work on?",
     ]);
   });
 
