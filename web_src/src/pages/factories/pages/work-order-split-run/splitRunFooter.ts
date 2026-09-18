@@ -7,15 +7,7 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "s
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind =
-  | "start"
-  | "archive"
-  | "reject"
-  | "refine"
-  | "approve"
-  | "rerun"
-  | "reopen"
-  | "back-to-draft";
+export type SplitRunFooterActionKind = "start" | "archive" | "reject" | "refine" | "approve" | "rerun" | "reopen";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -127,7 +119,6 @@ export interface SplitRunFooterAction {
   kind: SplitRunFooterActionKind;
   label: string;
   emphasis: "primary" | "quiet";
-  icon?: "undo-2" | "sparkles";
   tooltip?: string;
   disabled?: boolean;
 }
@@ -165,13 +156,6 @@ const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
-const BACK_TO_DRAFT: SplitRunFooterAction = {
-  id: "back-to-draft",
-  kind: "back-to-draft",
-  label: "To Backlog",
-  emphasis: "quiet",
-  icon: "undo-2",
-};
 
 export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
   headline: "This task needs a decision",
@@ -317,7 +301,7 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
- * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
+ * waiting shows Reject and Approve. Failed and stopped show Reject and Rerun.
  * Draft keeps Archive in the header. Build follows the confidence band. Closed
  * failed keeps Reopen. Completed and rejected explain the result only.
  */
@@ -447,12 +431,12 @@ function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): S
     sentence: "This task needs attention.",
     note: stoppedNote(note, input.actor),
     attentionCard: true,
-    actions: [BACK_TO_DRAFT, REJECT, RERUN],
+    actions: [REJECT, RERUN],
   });
 }
 
 function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  const actions = input.kind === "failed" ? [BACK_TO_DRAFT, REJECT, RERUN] : [BACK_TO_DRAFT, REJECT, APPROVE];
+  const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
     sentence: "This task needs attention.",

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, Undo2, XIcon } from "lucide-react";
+import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, XIcon } from "lucide-react";
 
 /**
  * Storybook-only: close actions in a note-style footer. Header stays Close
@@ -17,7 +17,7 @@ export type DecisionFooterKind =
   | "rejected"
   | "closedFailed";
 
-type DecisionAction = { id: string; label: string; emphasis: "primary" | "quiet"; icon?: "undo-2" };
+type DecisionAction = { id: string; label: string; emphasis: "primary" | "quiet" };
 
 type DecisionCopy = {
   title: string;
@@ -45,7 +45,6 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     text: "Every automation finished. This task is ready to complete.",
     tone: "waiting",
     actions: [
-      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "approve", label: "Approve", emphasis: "primary" },
     ],
@@ -57,7 +56,6 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     tone: "waiting",
     cta: { label: "Review PR", href: "https://github.com/superplanehq/superplane/pull/6812" },
     actions: [
-      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "approve", label: "Approve", emphasis: "primary" },
     ],
@@ -69,7 +67,6 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     tone: "failed",
     cta: { label: "Debug", href: "/run/implement", icon: "bug" },
     actions: [
-      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "rerun", label: "Rerun", emphasis: "primary" },
     ],
@@ -149,7 +146,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
         {kind === "running"
           ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
-            ? "A Set Task Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
+            ? "A Set Task Status Note supplies the headline, body, and Review PR link. Reject and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}
       </div>
       {model ? <DecisionNote copy={model} /> : null}
@@ -199,7 +196,6 @@ function NoteActions({ copy }: { copy: DecisionCopy }) {
       {copy.cta ? <NoteCta cta={copy.cta} /> : null}
       {copy.actions.map((action) => (
         <Button key={action.id} type="button" size="sm" variant={action.emphasis === "primary" ? "default" : "outline"}>
-          {action.icon === "undo-2" ? <Undo2 className="size-3.5" aria-hidden /> : null}
           {action.label}
         </Button>
       ))}

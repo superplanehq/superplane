@@ -5,21 +5,18 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { handleStopMock, handleRejectMock, handleArchiveMock, handleBackToDraftMock, enabledExperimentalFeatures } =
-  vi.hoisted(() => ({
-    handleStopMock: vi.fn(),
-    handleRejectMock: vi.fn(),
-    handleArchiveMock: vi.fn(),
-    handleBackToDraftMock: vi.fn(),
-    enabledExperimentalFeatures: new Set<string>(),
-  }));
+const { handleStopMock, handleRejectMock, handleArchiveMock, enabledExperimentalFeatures } = vi.hoisted(() => ({
+  handleStopMock: vi.fn(),
+  handleRejectMock: vi.fn(),
+  handleArchiveMock: vi.fn(),
+  enabledExperimentalFeatures: new Set<string>(),
+}));
 
 vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
     handleArchive: handleArchiveMock,
-    handleBackToDraft: handleBackToDraftMock,
     handleStopAutomation: vi.fn(),
     busy: false,
   }),
@@ -78,7 +75,6 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
     handleArchiveMock.mockReset().mockResolvedValue(true);
-    handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
   it("keeps Reject and Approve off a running task", () => {
@@ -274,77 +270,6 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
-  });
-
-  it("opens Description after To Backlog", async () => {
-    const user = userEvent.setup();
-    renderPopup(
-      splitRunFixtureForWorkOrder({
-        id: "wo-stopped",
-        title: "Stopped job",
-        state: "STATE_OPEN",
-        lineDispatches: [
-          {
-            id: "d-1",
-            line: { id: "line-1", name: "Software delivery" },
-            state: "STATE_FINISHED",
-            stepExecutions: [
-              {
-                id: "e-impl",
-                step: "Implement",
-                stepIndex: 0,
-                state: "STATE_FINISHED",
-                result: "RESULT_CANCELLED",
-              },
-            ],
-          },
-        ],
-      }),
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
-    );
-    expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
-  });
-
-  it("keeps Automations open when To Backlog does not succeed", async () => {
-    handleBackToDraftMock.mockResolvedValueOnce(false);
-    const user = userEvent.setup();
-    renderPopup(
-      splitRunFixtureForWorkOrder({
-        id: "wo-stopped",
-        title: "Stopped job",
-        state: "STATE_OPEN",
-        lineDispatches: [
-          {
-            id: "d-1",
-            line: { id: "line-1", name: "Software delivery" },
-            state: "STATE_FINISHED",
-            stepExecutions: [
-              {
-                id: "e-impl",
-                step: "Implement",
-                stepIndex: 0,
-                state: "STATE_FINISHED",
-                result: "RESULT_CANCELLED",
-              },
-            ],
-          },
-        ],
-      }),
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    await user.click(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
-    );
-    expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
   });
 
   it("reruns a failed open task from the note", async () => {

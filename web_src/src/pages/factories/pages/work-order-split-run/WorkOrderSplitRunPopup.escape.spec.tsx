@@ -4,17 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
+const { handleStopMock, handleRejectMock } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
   handleRejectMock: vi.fn(),
-  handleBackToDraftMock: vi.fn(),
 }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
-    handleBackToDraft: handleBackToDraftMock,
     handleStopAutomation: vi.fn(),
     busy: false,
   }),
@@ -45,7 +43,6 @@ describe("WorkOrderSplitRunPopup Escape handling", () => {
   beforeEach(() => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
-    handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
   it("closes the popup when Escape is pressed", async () => {

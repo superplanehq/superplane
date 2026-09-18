@@ -19,12 +19,7 @@ import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
-import {
-  draftStartAction,
-  footerMutationHandlers,
-  popupWorkOrderUrl,
-  returnToBacklogAction,
-} from "./workOrderPopupActions";
+import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 
 type ClassicWorkOrderPopupProps = WorkOrderSplitRunPopupProps & {
   popupData: ReturnType<typeof useSplitRunPopupData>;
@@ -69,7 +64,6 @@ export function ClassicWorkOrderPopup({
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
-  const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
   const showPullRequestReview = isPullRequestReviewFooter(classicFixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(classicFixture.footer);
   const reviewProps = {
@@ -81,7 +75,6 @@ export function ClassicWorkOrderPopup({
     onStart: draftStart,
     onArchive: mutations.onArchive,
     onReject: mutations.onReject,
-    onBackToDraft: backToDraft,
     onStop: mutations.onStop,
     startBusy: isDispatching,
     actionBusy: footerActions.busy,

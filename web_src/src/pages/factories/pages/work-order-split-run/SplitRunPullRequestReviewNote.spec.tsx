@@ -15,7 +15,6 @@ const PR_NOTE: SplitRunFooterNote = {
 };
 
 const ACTIONS: SplitRunFooterAction[] = [
-  { id: "back-to-draft", kind: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
   { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
   { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" },
 ];
@@ -62,7 +61,6 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getAllByRole("link")).toHaveLength(1);
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
   });
 
@@ -77,10 +75,10 @@ describe("SplitRunAttentionNote for a pull request", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["To Backlog", "Reject", "Approve"]);
+    ).toEqual(["Reject", "Approve"]);
 
     await user.click(within(menu).getByRole("menuitem", { name: "Approve" }));
-    expect(onAction).toHaveBeenCalledWith(ACTIONS[2]);
+    expect(onAction).toHaveBeenCalledWith(ACTIONS[1]);
   });
 
   it("hides the More menu when there are no actions", () => {
