@@ -147,8 +147,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
   });
 
-  it("disables merge and shows the reason on hover when automation is running", async () => {
-    const user = userEvent.setup();
+  it("disables merge and shows the reason when automation is running", () => {
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
@@ -159,14 +158,10 @@ describe("SplitRunAttentionNote for a pull request", () => {
     renderNote({ pullRequests: [GITHUB_PR] });
 
     expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(screen.getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
+    expect(screen.getByTestId("split-run-merge-reason")).toHaveTextContent("Automation is still running.");
   });
 
-  it("disables merge and shows the reason on hover when checks are still running", async () => {
-    const user = userEvent.setup();
+  it("disables merge and shows the reason when checks are still running", () => {
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
@@ -177,10 +172,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     renderNote({ pullRequests: [GITHUB_PR], compact: true });
 
     expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(screen.getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Checks are still running.");
+    expect(screen.getByTestId("split-run-merge-reason")).toHaveTextContent("Checks are still running.");
   });
 
   it("lists only allowed merge methods", async () => {
