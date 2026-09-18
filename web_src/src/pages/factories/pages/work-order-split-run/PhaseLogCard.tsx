@@ -925,20 +925,27 @@ function PhaseStopButton({ phaseId, busy, onStop }: { phaseId: string; busy: boo
 
 function StreamDuration({ line }: { line: SplitRunStreamLine }) {
   return (
-    <LogStatusTime status={line.status} duration={line.duration} testId={`split-run-stream-duration-${line.id}`} />
+    <LogStatusTime
+      status={line.status}
+      duration={line.duration}
+      durationRunning={line.durationRunning}
+      testId={`split-run-stream-duration-${line.id}`}
+    />
   );
 }
 
 function LogStatusTime({
   status,
   duration,
+  durationRunning,
   testId,
 }: {
   status: SplitRunPhaseStatus;
   duration?: string;
+  durationRunning?: boolean;
   testId: string;
 }) {
-  const running = status === "running";
+  const running = durationRunning ?? status === "running";
   const { now, sampledAt } = useRunningLogClock(running, duration);
   const clock = running ? tickingRunningClock(duration, sampledAt, now) : logStatusTimeLabel(duration);
   const mark = statusTimeMark(status);
@@ -1010,7 +1017,7 @@ function PhaseMetrics({
   phase: SplitRunPhase;
   onUsageOpenChange?: (open: boolean) => void;
 }) {
-  const running = phase.status === "running";
+  const running = phase.durationRunning ?? phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
