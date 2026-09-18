@@ -351,6 +351,24 @@ export function LinesPage() {
 
   usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
 
+  const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
+  const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const nextSteps = workspaceNextSteps({
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    takenPRFeedbackSources,
+    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+  });
+  const nextStepBanner = workspaceNextStepBanner(nextSteps);
+  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
+  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
+
+  useEffect(() => {
+    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
+      nextStepDeferral.forget();
+    }
+  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
+
   const canonicalNumber = canonicalWorkOrderNumber(permalink.order);
   if (routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber)) {
     return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
@@ -379,24 +397,6 @@ export function LinesPage() {
           navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
-
-  const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
-  const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
-  const nextSteps = workspaceNextSteps({
-    onboardingComplete: isFactoryOnboardingComplete(factory),
-    canConfigure: canUpdate,
-    takenPRFeedbackSources,
-    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
-  });
-  const nextStepBanner = workspaceNextStepBanner(nextSteps);
-  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
-  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
-
-  useEffect(() => {
-    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
-      nextStepDeferral.forget();
-    }
-  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
