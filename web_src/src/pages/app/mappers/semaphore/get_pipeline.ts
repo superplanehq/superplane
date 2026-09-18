@@ -45,7 +45,7 @@ export const getPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, any> = {};
     const outputs = context.execution.outputs as { default?: { data?: any }[] } | undefined;
     const payload = outputs?.default?.[0]?.data as Record<string, any> | undefined;
