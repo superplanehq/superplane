@@ -2824,6 +2824,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 
 
 --
+-- Name: idx_factory_work_order_assignees_work_order_created_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.factory_work_order_assignees USING btree (work_order_id, created_at, user_id);
+
+
+--
 -- Name: idx_factory_work_order_checks_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4545,7 +4552,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918030151	f
+20260918090357	f
 \.
 
 
