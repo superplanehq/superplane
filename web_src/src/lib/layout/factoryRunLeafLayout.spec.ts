@@ -133,6 +133,48 @@ describe("layoutFactoryRunLeafGraph", () => {
     expectNoOverlaps(result.positions);
   });
 
+  it("reserves overlapping forward gutters before the next disconnected component", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "root" },
+        { id: "a" },
+        { id: "b" },
+        { id: "c" },
+        { id: "d" },
+        { id: "e" },
+        { id: "f" },
+        { id: "other-root" },
+        { id: "other-leaf" },
+      ],
+      [
+        { source: "root", target: "a", sourceHandle: "default" },
+        { source: "a", target: "b", sourceHandle: "default" },
+        { source: "b", target: "c", sourceHandle: "default" },
+        { source: "c", target: "d", sourceHandle: "default" },
+        { source: "d", target: "e", sourceHandle: "default" },
+        { source: "e", target: "f", sourceHandle: "default" },
+        { source: "root", target: "e", sourceHandle: "skip1" },
+        { source: "a", target: "e", sourceHandle: "skip2" },
+        { source: "b", target: "e", sourceHandle: "skip3" },
+        { source: "other-root", target: "other-leaf", sourceHandle: "default" },
+      ],
+    );
+
+    const gutters = [
+      factoryRunLeafEdgeKey("root", "e", "skip1"),
+      factoryRunLeafEdgeKey("a", "e", "skip2"),
+      factoryRunLeafEdgeKey("b", "e", "skip3"),
+    ].map((key) => result.edgeRouteGutters.get(key));
+
+    expect(gutters.every((gutter) => gutter != null)).toBe(true);
+    expect(new Set(gutters).size).toBe(3);
+
+    const rightmostGutter = Math.max(...gutters.map((gutter) => gutter!));
+    const otherRoot = result.positions.get("other-root")!;
+    expect(otherRoot.x).toBeGreaterThan(rightmostGutter);
+    expectNoOverlaps(result.positions);
+  });
+
   it("keeps node positions unchanged when merge edges get separate gutters", () => {
     const graph = twoIfMergeGraph();
     const result = layoutFactoryRunLeafGraph(graph.nodes, graph.edges);

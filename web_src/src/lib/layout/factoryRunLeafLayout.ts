@@ -165,7 +165,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     sideTargetNodeIds: ctx.sideTargetNodeIds,
     forwardGutterEdges,
   });
-  routeForwardGutterEdges({
+  const rightmostForwardGutter = routeForwardGutterEdges({
     edges: forwardGutterEdges,
     positions: ctx.positions,
     nodeById: ctx.nodeById,
@@ -197,7 +197,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     spineSourceNodeIds: ctx.spineSourceNodeIds,
   });
 
-  return maxRight + COMPONENT_GAP_X;
+  return (rightmostForwardGutter ?? maxRight) + COMPONENT_GAP_X;
 }
 
 function emptyFactoryRunLeafLayoutResult(): FactoryRunLeafLayoutResult {

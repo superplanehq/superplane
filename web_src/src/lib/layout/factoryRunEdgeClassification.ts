@@ -83,7 +83,7 @@ type RouteForwardGutterEdgesOptions = {
   edgeRouteOffsetsY: Map<string, number>;
 };
 
-export function routeForwardGutterEdges(options: RouteForwardGutterEdgesOptions): void {
+export function routeForwardGutterEdges(options: RouteForwardGutterEdgesOptions): number | undefined {
   const lanes: GutterInterval[][] = [];
   const sortedEdges = [...options.edges].sort((a, b) => compareForwardGutterEdges(a, b, options.positions));
 
@@ -101,6 +101,9 @@ export function routeForwardGutterEdges(options: RouteForwardGutterEdgesOptions)
     options.edgeRouteGutters.set(key, options.graphRight + laneIndex * FORWARD_GUTTER_LANE_SPACING);
     options.edgeRouteOffsetsY.set(key, laneIndex * FORWARD_GUTTER_ROUTE_Y_SPACING);
   }
+
+  if (lanes.length === 0) return undefined;
+  return options.graphRight + (lanes.length - 1) * FORWARD_GUTTER_LANE_SPACING;
 }
 
 type ClassifyComponentEdgesOptions = {
