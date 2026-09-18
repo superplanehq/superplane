@@ -290,6 +290,16 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
 		assert.Equal(t, "concurrent", activity.Configuration["access"])
 		assert.Equal(t, prFeedbackPRHeadSHAExpression(), activity.Configuration["revision"])
+		assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), activity.Configuration["title"])
+		assert.Nil(t, activity.Configuration["description"])
+
+		passed := findSpecNode(t, canvas, prFeedbackMarkPassedNodeID)
+		assert.Equal(t, prFeedbackChecksPassedTitleExpression(), passed.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), passed.Configuration["description"])
+
+		repair := findSpecNode(t, canvas, prFeedbackStartRepairNodeID)
+		assert.Equal(t, prFeedbackChecksRepairTitleExpression(), repair.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), repair.Configuration["description"])
 
 		wait := findSpecNode(t, canvas, prFeedbackWaitChecksNodeID)
 		assert.Equal(t, []any{"lint", "unit"}, wait.Configuration["checkNames"])

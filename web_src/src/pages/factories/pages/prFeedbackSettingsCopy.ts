@@ -141,5 +141,5 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   automationError: "Could not load the canvas.",
   retryAutomation: "Retry",
   editAutomation: "Edit automation",
-  waitingForAccess: "Waiting for another pull request activity",
+  waitingForAccess: "Waiting for another activity",
 } as const;

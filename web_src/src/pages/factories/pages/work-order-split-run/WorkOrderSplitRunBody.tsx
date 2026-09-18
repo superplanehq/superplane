@@ -44,6 +44,8 @@ type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;
 
 interface SplitRunPhaseRenderOptions {
   markdownName?: boolean;
+  inlineRunDetails?: boolean;
+  collapsible?: boolean;
 }
 
 type SplitRunPhaseRenderer = (phase: SplitRunPhase, options?: SplitRunPhaseRenderOptions) => ReactNode;
@@ -115,6 +117,8 @@ export function WorkOrderSplitRunBody({
       entry={entry}
       headerLeading={<SplitRunPhaseTimestamp phase={entry} />}
       markdownName={options?.markdownName}
+      inlineRunDetails={options?.inlineRunDetails}
+      collapsible={options?.collapsible}
       organizationId={organizationId}
       factoryKey={factoryKey}
       orderNumber={orderNumber}
@@ -211,12 +215,7 @@ function PullRequestActivityTimeline({
       <h2 id={headingId} className="mb-3 flex min-w-0 items-center gap-1.5 px-1">
         <Activity className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         {group.pullRequest ? (
-          <WorkOrderPullRequestInline
-            className="w-full justify-start"
-            pullRequest={group.pullRequest}
-            showTitle
-            showStateIcon={false}
-          />
+          <WorkOrderPullRequestInline pullRequest={group.pullRequest} showTitle showStateIcon={false} />
         ) : (
           <span className="text-[13px] font-medium text-foreground">Pull request</span>
         )}
@@ -246,7 +245,7 @@ function PullRequestActivityTimelineItem({
 }) {
   return (
     <li className="min-w-0" data-testid={`split-run-pull-request-activity-item-${index}`}>
-      {renderPhase(phase, { markdownName: true })}
+      {renderPhase(phase, { markdownName: true, inlineRunDetails: false, collapsible: false })}
     </li>
   );
 }
@@ -270,6 +269,8 @@ function SplitRunPhaseLogItem({
   entry,
   headerLeading,
   markdownName,
+  inlineRunDetails = true,
+  collapsible = true,
   organizationId,
   factoryKey,
   orderNumber,
@@ -289,6 +290,8 @@ function SplitRunPhaseLogItem({
   entry: SplitRunPhase;
   headerLeading?: ReactNode;
   markdownName?: boolean;
+  inlineRunDetails?: boolean;
+  collapsible?: boolean;
   organizationId?: string;
   factoryKey?: string;
   orderNumber?: string;
@@ -306,7 +309,8 @@ function SplitRunPhaseLogItem({
   files?: FilesFile[];
 }) {
   const [usageOpen, setUsageOpen] = useState(false);
-  const live = useSplitRunLiveCanvas(organizationId, expanded || usageOpen ? entry : undefined);
+  const loadLive = usageOpen || (inlineRunDetails && expanded);
+  const live = useSplitRunLiveCanvas(organizationId, loadLive ? entry : undefined);
   const visual = useMemo(() => resolveSplitRunVisual(entry, live, { demoArtifacts }), [demoArtifacts, entry, live]);
   const stream = useMemo(
     () => attachArtifactsToStream(visual.stream, artifactIndex, entry.runId),
@@ -323,8 +327,10 @@ function SplitRunPhaseLogItem({
       headerLeading={headerLeading}
       markdownName={markdownName}
       showMarkdownDescription={markdownName}
-      stream={stream ?? entry.stream}
-      streamLoading={live.isLoading}
+      showExpandedStream={inlineRunDetails}
+      collapsible={collapsible}
+      stream={loadLive ? (stream ?? entry.stream) : []}
+      streamLoading={loadLive && live.isLoading}
       selectedNodeId={selectedNodeId}
       onSelectNode={onSelectNode}
       organizationId={organizationId}

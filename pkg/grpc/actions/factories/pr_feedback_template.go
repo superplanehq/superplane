@@ -248,9 +248,9 @@ func prFeedbackCommentActivityDescriptionExpression() string {
 func prFeedbackReviewActivityDescriptionExpression() string {
 	reviewBody := `(root().data.review?.body ?? "")`
 	reviewComments := `root().data.review_comments ?? []`
-	reviewCommentSections := `join(map(` + reviewComments + `, "[" + .path + "](" + .html_url + ")\n" + .body), "\n\n---\n\n")`
+	reviewCommentSections := `join(map(` + reviewComments + `, "· [" + .path + "](" + .html_url + ")\n" + .body), "\n\n")`
 	return `{{ ` + reviewBody +
-		` + (` + reviewBody + ` != "" && len(` + reviewComments + `) > 0 ? "\n\n---\n\n" : "")` +
+		` + (` + reviewBody + ` != "" && len(` + reviewComments + `) > 0 ? "\n\n" : "")` +
 		` + ` + reviewCommentSections + ` }}`
 }
 
@@ -267,7 +267,7 @@ func prFeedbackReplyActivityTitleExpression() string {
 
 func prFeedbackReviewActivityTitleExpression() string {
 	return `{{ "[@" + root().data.review.user.login + "](" + root().data.review.user.html_url` +
-		` + ") left a [review](" + root().data.review.html_url + ") - addressing" }}`
+		` + ") left a [review](" + root().data.review.html_url + ")" }}`
 }
 
 func prFeedbackDiscussionActivityExpressions(nodeID string) (string, string, bool) {

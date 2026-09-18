@@ -151,6 +151,7 @@ export interface SplitRunPhase {
     pullRequest?: FactoriesFactoryPullRequest;
     revision?: FactoriesFactoryPullRequestRevision;
     startedAt?: string;
+    waitingForAccess?: boolean;
   };
 }
 
@@ -777,7 +778,7 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 }
 
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+  const status = entry.waitingForAccess && isActiveCanvasRun(entry.run) ? "waiting" : statusForCanvasRun(entry.run);
   const title = entry.title?.trim();
   const description = entry.description?.trim();
   const baseName = title
@@ -787,7 +788,8 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
       : entry.pullRequestNumber
         ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
         : "Activity on PR";
-  const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
+  const attempt = entry.attemptLabel?.trim();
+  const name = attempt ? `${baseName} ${attempt}` : baseName;
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
     {
@@ -826,6 +828,7 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
       pullRequest: entry.pullRequest ?? (entry.pullRequestNumber ? { number: entry.pullRequestNumber } : undefined),
       revision: entry.revision,
       startedAt: entry.run.createdAt,
+      waitingForAccess: entry.waitingForAccess,
     },
   };
 }

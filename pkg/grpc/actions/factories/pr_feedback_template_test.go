@@ -41,7 +41,7 @@ func TestPrFeedbackReviewActivityDescriptionExpression(t *testing.T) {
 					},
 				},
 			},
-			want: "[go.mod](https://github.com/acme/app/pull/42#discussion_r1)\n" +
+			want: "· [go.mod](https://github.com/acme/app/pull/42#discussion_r1)\n" +
 				"@superplaneagent upgrade to Go 1.26",
 		},
 		{
@@ -61,9 +61,9 @@ func TestPrFeedbackReviewActivityDescriptionExpression(t *testing.T) {
 					},
 				},
 			},
-			want: "Review summary\n\n---\n\n" +
-				"[docs/API.md](https://github.com/acme/app/pull/42#discussion_r1)\nFirst comment\n\n---\n\n" +
-				"[pkg/models/decks.go](https://github.com/acme/app/pull/42#discussion_r2)\nSecond comment",
+			want: "Review summary\n\n" +
+				"· [docs/API.md](https://github.com/acme/app/pull/42#discussion_r1)\nFirst comment\n\n" +
+				"· [pkg/models/decks.go](https://github.com/acme/app/pull/42#discussion_r2)\nSecond comment",
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestPrFeedbackReviewActivityTitleExpression(t *testing.T) {
 
 	assert.Equal(
 		t,
-		"[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/42#pullrequestreview-1) - addressing",
+		"[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/42#pullrequestreview-1)",
 		evalRootDataExpression(t, source, data),
 	)
 }

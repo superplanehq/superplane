@@ -90,14 +90,20 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.getByText("Needs attention")).toBeInTheDocument();
   });
 
-  it("keeps the checks-passed mark next to the pull request pill", () => {
+  it("keeps the checks-passed title next to the pull request pill", () => {
     renderCard({
       pullRequests: [openPullRequest],
       checksPassedOrderIds: new Set(["wo-waiting"]),
+      checksPassedLabels: new Map([
+        ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+      ]),
     });
 
     expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
-    expect(screen.getByLabelText("Status checks passed")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "2e46445" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/commit/2e46445",
+    );
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 

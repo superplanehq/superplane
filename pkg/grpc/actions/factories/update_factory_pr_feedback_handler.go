@@ -191,6 +191,22 @@ func applyPRFeedbackSettings(
 				nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
 				continue
 			}
+			if graph.isChecks() {
+				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
+					configuration := maps.Clone(nodes[i].Configuration)
+					if configuration == nil {
+						configuration = map[string]any{}
+					}
+					configuration["title"] = title
+					if description == "" {
+						delete(configuration, "description")
+					} else {
+						configuration["description"] = description
+					}
+					nodes[i].Configuration = configuration
+					continue
+				}
+			}
 			if nodes[i].ID != graph.ActivityNodeID && nodes[i].ComponentName() != prFeedbackActivityComponent {
 				continue
 			}

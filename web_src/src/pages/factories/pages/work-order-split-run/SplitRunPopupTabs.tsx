@@ -9,7 +9,7 @@ import { ClassicWorkOrderSplitRunOverview } from "./ClassicWorkOrderSplitRunOver
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
-import { refinePopupShowsAutomations, type SplitRunPopupTab } from "./splitRunPopupModel";
+import { hasActivePullRequestActivity, refinePopupShowsAutomations, type SplitRunPopupTab } from "./splitRunPopupModel";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -135,7 +135,12 @@ export function SplitRunPopupTabs({
       }}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      {header(<SplitRunPopupViewTabs lineStatus={fixture.lineStatus} />)}
+      {header(
+        <SplitRunPopupViewTabs
+          lineStatus={fixture.lineStatus}
+          hasActivePullRequestActivity={hasActivePullRequestActivity(fixture)}
+        />,
+      )}
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         {description}
       </TabsContent>
@@ -161,7 +166,15 @@ export function SplitRunPopupTabs({
 
 const VIEW_TAB_CLASSNAME = "sp-popup-view-tab";
 
-function SplitRunPopupViewTabs({ lineStatus }: { lineStatus: SplitRunFixture["lineStatus"] }) {
+function SplitRunPopupViewTabs({
+  lineStatus,
+  hasActivePullRequestActivity: hasActivePRActivity,
+}: {
+  lineStatus: SplitRunFixture["lineStatus"];
+  hasActivePullRequestActivity: boolean;
+}) {
+  const automationStatus = hasActivePRActivity ? "running" : displayStatusForLineStatus(lineStatus);
+  const automationStatusLabel = hasActivePRActivity ? "Running" : splitRunStatusLabel(lineStatus);
   return (
     <TabsList aria-label="Task views">
       <TabsTrigger value="description" className={VIEW_TAB_CLASSNAME}>
@@ -169,8 +182,8 @@ function SplitRunPopupViewTabs({ lineStatus }: { lineStatus: SplitRunFixture["li
       </TabsTrigger>
       <TabsTrigger value="log" className={VIEW_TAB_CLASSNAME}>
         <WorkOrderStatusIcon
-          status={displayStatusForLineStatus(lineStatus)}
-          title={splitRunStatusLabel(lineStatus)}
+          status={automationStatus}
+          title={automationStatusLabel}
           className="size-3"
           data-testid="split-run-log-tab-dot"
           aria-hidden

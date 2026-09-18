@@ -113,7 +113,7 @@ describe("splitRunPopupModel", () => {
     expect(splitRunPhaseRunHref({ phase: prCreation! })).toBeUndefined();
   });
 
-  it("opens Automations only while a run is in progress", () => {
+  it("opens Automations only while a line run or pull request activity is active", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
     expect(
       defaultSplitRunPopupTab(
@@ -137,6 +137,49 @@ describe("splitRunPopupModel", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("description");
+    const noActiveRuns = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER);
+    expect(
+      defaultSplitRunPopupTab({
+        ...noActiveRuns,
+        footer: { ...noActiveRuns.footer, kind: "running" },
+      }),
+    ).toBe("description");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
+              run: {
+                id: "run-pr-feedback",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("log");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
+              run: {
+                id: "run-pr-feedback",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("description");
     expect(defaultSplitRunPopupTab(SPLIT_RUN_RUNNING)).toBe("log");
   });
 

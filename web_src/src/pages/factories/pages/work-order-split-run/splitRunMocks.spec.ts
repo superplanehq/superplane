@@ -1557,6 +1557,31 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("pr-feedback-run-new");
   });
 
+  it("puts the attempt count on the title", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          title: "Fixing failed checks on 2e46445",
+          description:
+            "Failed checks\n· [ci/semaphoreci/push: CI](https://example.com/ci): The build failed on Semaphore 2.0.",
+          attemptLabel: "· 1/3",
+          run: {
+            id: "run-repair",
+            canvasId: "canvas-fb",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-repair")).toMatchObject({
+      name: "Fixing failed checks on 2e46445 · 1/3",
+      description:
+        "Failed checks\n· [ci/semaphoreci/push: CI](https://example.com/ci): The build failed on Semaphore 2.0.",
+    });
+  });
+
   it("uses the activity title and keeps its description", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
@@ -1584,6 +1609,31 @@ describe("line board work-order examples", () => {
       description: "Please add [tests](https://example.com/tests).",
       costCents: "45",
       totalTokens: "1200",
+    });
+  });
+
+  it("keeps a queued activity title and marks it waiting", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          title: "[@lucaspin](https://github.com/lucaspin) left a [review](https://example.com/review)",
+          description: "Read the requested changes.",
+          waitingForAccess: true,
+          run: {
+            id: "run-queued",
+            canvasId: "canvas-fb",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-queued")).toMatchObject({
+      name: "[@lucaspin](https://github.com/lucaspin) left a [review](https://example.com/review)",
+      description: "Read the requested changes.",
+      status: "waiting",
+      pullRequestActivity: { waitingForAccess: true },
     });
   });
 

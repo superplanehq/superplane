@@ -323,6 +323,17 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			if node.ID == prFeedbackWaitChecksNodeID {
 				assert.Equal(t, []any{"lint", "unit"}, node.Configuration["checkNames"])
 			}
+			if node.ID == prFeedbackActivityNodeID {
+				assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), node.Configuration["title"])
+			}
+			if node.ID == prFeedbackMarkPassedNodeID {
+				assert.Equal(t, prFeedbackChecksPassedTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), node.Configuration["description"])
+			}
+			if node.ID == prFeedbackStartRepairNodeID {
+				assert.Equal(t, prFeedbackChecksRepairTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), node.Configuration["description"])
+			}
 			if node.ID == prFeedbackPauseFixesNodeID {
 				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["title"])
 			}

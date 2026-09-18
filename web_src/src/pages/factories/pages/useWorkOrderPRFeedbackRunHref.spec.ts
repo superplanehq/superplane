@@ -77,9 +77,10 @@ describe("prFeedbackLogRunsFromPullRequests", () => {
       { canvasId: "c-1", name: "Fix pull request checks" },
     ]);
     expect(matches).toHaveLength(1);
-    expect(matches[0]?.title).toBe("Waiting for another pull request activity");
+    expect(matches[0]?.title).toBe("Fixing failed checks on a82fd91");
     expect(matches[0]?.description).toBeUndefined();
-    expect(matches[0]?.attemptLabel).toBe("Attempt 2 of 3");
+    expect(matches[0]?.waitingForAccess).toBe(true);
+    expect(matches[0]?.attemptLabel).toBe("· 2/3");
     expect(matches[0]?.costCents).toBe("12");
     expect(matches[0]?.pullRequest).toMatchObject({
       id: "pr-7",

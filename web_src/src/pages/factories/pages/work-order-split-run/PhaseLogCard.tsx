@@ -3,7 +3,7 @@ import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
 
 const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
-import { formatClockDurationLabel } from "@/lib/duration";
+import { durationLabelMs, formatGoDuration, formatGoDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
@@ -20,6 +20,7 @@ import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
+import { PR_FEEDBACK_SETTINGS_COPY } from "../prFeedbackSettingsCopy";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { displayRunnerModel } from "./draftStartModel";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
@@ -41,8 +42,9 @@ const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
 const STREAM_NOTE_MARKDOWN =
   "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
-const ACTIVITY_MARKDOWN_LINK =
-  "font-medium text-sky-700 !underline !decoration-current underline-offset-2 dark:text-sky-300";
+const ACTIVITY_MARKDOWN_TEXT = "font-mono text-[13px]";
+const ACTIVITY_MARKDOWN_LINK = "font-semibold text-current !underline !decoration-current underline-offset-2";
+const PHASE_META_FACE = "font-mono text-[11px] font-normal tabular-nums text-muted-foreground";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -51,6 +53,23 @@ function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "cancelled") return "cancelled";
   if (status === "failed") return "failed";
   return "pending";
+}
+
+function PhaseStatusGlyph({ phase }: { phase: SplitRunPhase }) {
+  const glyph = <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />;
+  if (!phase.pullRequestActivity?.waitingForAccess) {
+    return glyph;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="inline-flex shrink-0" aria-label={PR_FEEDBACK_SETTINGS_COPY.waitingForAccess}>
+          {glyph}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{PR_FEEDBACK_SETTINGS_COPY.waitingForAccess}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function statusTimeTone(status: SplitRunPhaseStatus): string {
@@ -402,6 +421,7 @@ type PhaseLogCardProps = {
   headerLeading?: ReactNode;
   markdownName?: boolean;
   showMarkdownDescription?: boolean;
+  showExpandedStream?: boolean;
   stream?: SplitRunStreamLine[];
   selectedNodeId?: string | null;
   onToggle?: () => void;
@@ -432,6 +452,7 @@ export function PhaseLogCard({
   headerLeading,
   markdownName = false,
   showMarkdownDescription = false,
+  showExpandedStream = true,
   stream,
   selectedNodeId,
   onToggle,
@@ -452,7 +473,7 @@ export function PhaseLogCard({
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
   const producedPullRequests = pullRequestsProducedBySteps(groups);
   const rootRef = useRef<HTMLDivElement>(null);
-  useLastRunningLine(rootRef, phase.status === "running");
+  useLastRunningLine(rootRef, phase.status === "running" && showExpandedStream);
   const expectUsage = phaseExpectsUsage(groups);
 
   useEffect(() => {
@@ -478,6 +499,7 @@ export function PhaseLogCard({
         <PhaseCollapsedUsageCollectors
           groups={groups}
           expanded={expanded}
+          showExpandedStream={showExpandedStream}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
         />
@@ -517,22 +539,28 @@ export function PhaseLogCard({
                 actionBusy={actionBusy}
                 onUsageOpenChange={onUsageOpenChange}
                 files={files}
+                showExpandedStream={showExpandedStream}
+                description={
+                  showMarkdownDescription && (expanded || !collapsible) && phase.description ? (
+                    <MarkdownContent
+                      content={phase.description}
+                      files={files}
+                      variant="workspace"
+                      openLinksInNewTab
+                      linkClassName={ACTIVITY_MARKDOWN_LINK}
+                      className={cn(
+                        "max-w-none pt-1 leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+                        ACTIVITY_MARKDOWN_TEXT,
+                      )}
+                      data-testid={`split-run-phase-description-${phase.id}`}
+                    />
+                  ) : undefined
+                }
               />
-              {showMarkdownDescription && expanded && phase.description ? (
-                <MarkdownContent
-                  content={phase.description}
-                  files={files}
-                  variant="workspace"
-                  openLinksInNewTab
-                  linkClassName={ACTIVITY_MARKDOWN_LINK}
-                  className="max-w-none px-2 pt-1 font-sans text-[13px] leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
-                  data-testid={`split-run-phase-description-${phase.id}`}
-                />
-              ) : null}
             </>
           )}
 
-          {expanded ? (
+          {expanded && showExpandedStream ? (
             <ol
               className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
               data-testid={`split-run-stream-${phase.id}`}
@@ -573,6 +601,8 @@ function AutomationHeader({
   actionBusy,
   onUsageOpenChange,
   files,
+  showExpandedStream,
+  description,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -588,19 +618,12 @@ function AutomationHeader({
   actionBusy: boolean;
   onUsageOpenChange?: (open: boolean) => void;
   files?: FilesFile[];
+  showExpandedStream: boolean;
+  description?: ReactNode;
 }) {
-  return (
-    <div
-      data-testid={`split-run-automation-header-${phase.id}`}
-      {...streamLineAttrs(phase.status)}
-      className={cn(
-        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight bg-muted",
-        LAST_RUNNING_LINE_PULSE,
-        expanded && STICKY_PHASE,
-        collapsible && onToggle && "cursor-pointer",
-      )}
-    >
-      {headerLeading}
+  const alignDescriptionWithTitle = Boolean(description && headerLeading);
+  const content = (
+    <>
       {collapsible && markdownName ? (
         <div className={PHASE_NAME_FACE}>
           <button
@@ -610,7 +633,7 @@ function AutomationHeader({
             aria-label={`${expanded ? "Collapse" : "Expand"} ${phase.name}`}
             className="shrink-0"
           >
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+            <PhaseStatusGlyph phase={phase} />
           </button>
           <MarkdownContent
             content={phase.name}
@@ -618,33 +641,32 @@ function AutomationHeader({
             variant="workspace"
             openLinksInNewTab
             linkClassName={ACTIVITY_MARKDOWN_LINK}
-            className="min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline"
+            className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
           />
         </div>
       ) : collapsible ? (
         <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
-          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <PhaseStatusGlyph phase={phase} />
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </button>
       ) : markdownName ? (
         <div className={PHASE_NAME_FACE}>
-          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <PhaseStatusGlyph phase={phase} />
           <MarkdownContent
             content={phase.name}
             files={files}
             variant="workspace"
             openLinksInNewTab
             linkClassName={ACTIVITY_MARKDOWN_LINK}
-            className="min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline"
+            className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
           />
         </div>
       ) : (
         <div className={PHASE_NAME_FACE}>
-          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <PhaseStatusGlyph phase={phase} />
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </div>
       )}
-      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
       {phase.status === "running" && onStop ? (
         <PhaseStopButton phaseId={phase.id} busy={actionBusy} onStop={onStop} />
       ) : null}
@@ -671,7 +693,34 @@ function AutomationHeader({
           </span>
         ) : null}
         <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
+        {expanded || !collapsible ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
       </span>
+    </>
+  );
+
+  return (
+    <div
+      data-testid={`split-run-automation-header-${phase.id}`}
+      {...streamLineAttrs(phase.status)}
+      className={cn(
+        "w-full min-w-0 overflow-hidden px-2 leading-tight bg-muted",
+        alignDescriptionWithTitle
+          ? "grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-2"
+          : "flex items-center gap-2 whitespace-nowrap",
+        LAST_RUNNING_LINE_PULSE,
+        expanded && showExpandedStream && STICKY_PHASE,
+        collapsible && onToggle && "cursor-pointer",
+      )}
+    >
+      {headerLeading}
+      {alignDescriptionWithTitle ? (
+        <>
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">{content}</div>
+          <div className="col-start-2 min-w-0">{description}</div>
+        </>
+      ) : (
+        content
+      )}
     </div>
   );
 }
@@ -680,7 +729,7 @@ const PHASE_ACTION_LINK = cn(
   LOG_FACE,
   "inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
 );
-const VIEW_RUN_LABEL = "View automation run";
+const VIEW_RUN_LABEL = "View run";
 const RERUN_LABEL = "Rerun";
 const STOP_LABEL = "Stop";
 const PHASE_STOP_ACTION = cn(PHASE_ACTION_LINK, "hover:bg-destructive/10 hover:text-destructive");
@@ -690,31 +739,18 @@ function PhaseActionPills({ phase, runHref }: { phase: SplitRunPhase; runHref?: 
     return null;
   }
   return (
-    <PhaseActionLink href={runHref} testId={`split-run-phase-run-${phase.id}`} label={VIEW_RUN_LABEL}>
-      <Maximize2 className="size-3.5" aria-hidden />
-    </PhaseActionLink>
-  );
-}
-
-function PhaseActionLink({
-  href,
-  testId,
-  label,
-  children,
-}: {
-  href: string;
-  testId: string;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link href={href} data-testid={testId} aria-label={label} className={PHASE_ACTION_LINK}>
-          {children}
+        <Link
+          href={runHref}
+          data-testid={`split-run-phase-run-${phase.id}`}
+          aria-label={VIEW_RUN_LABEL}
+          className={PHASE_ACTION_LINK}
+        >
+          <Maximize2 className="size-3.5" aria-hidden />
         </Link>
       </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
+      <TooltipContent side="top">{VIEW_RUN_LABEL}</TooltipContent>
     </Tooltip>
   );
 }
@@ -865,8 +901,8 @@ function PhaseMetrics({
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
-    ? tickingRunningClock(phase.duration, sampledAt, now)
-    : formatClockDurationLabel(phase.duration);
+    ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
+    : formatGoDurationLabel(phase.duration ?? "");
   const agents = usePhaseAgentUsageAgents();
   const live = livePhaseSpend(agents);
   const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
@@ -883,7 +919,7 @@ function PhaseMetrics({
   if (model) {
     restParts.push(model);
   }
-  if (clock && clock !== "—") {
+  if (clock) {
     restParts.push(clock);
   }
   if (spendParts.length === 0 && restParts.length === 0) {
@@ -892,15 +928,14 @@ function PhaseMetrics({
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className={cn(LOG_FACE, "inline-flex items-center gap-1 tabular-nums text-muted-foreground")}
+      className={cn(PHASE_META_FACE, "inline-flex items-center gap-1")}
     >
       {spendParts.length > 0 ? (
         <PhaseUsageSpendButton
           phaseId={phase.id}
-          phaseName={phase.name}
           spendLabel={spendParts.join(" · ")}
           live={running}
-          className={cn(LOG_FACE, "tabular-nums text-muted-foreground hover:text-foreground hover:underline")}
+          className={cn(PHASE_META_FACE, ACTIVITY_MARKDOWN_LINK)}
           onOpenChange={onUsageOpenChange}
         />
       ) : null}
@@ -1317,15 +1352,17 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
 function PhaseCollapsedUsageCollectors({
   groups,
   expanded,
+  showExpandedStream,
   organizationId,
   canvasId,
 }: {
   groups: StreamNodeGroup[];
   expanded: boolean;
+  showExpandedStream: boolean;
   organizationId?: string;
   canvasId?: string;
 }) {
-  if (expanded) {
+  if (expanded && showExpandedStream) {
     return null;
   }
   return (

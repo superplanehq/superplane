@@ -124,8 +124,60 @@ describe("WorkOrderSplitRunPopup", () => {
             run: {
               id: "run-fb",
               canvasId: "canvas-fb",
-              state: "STATE_FINISHED",
-              result: "RESULT_PASSED",
+              state: "STATE_STARTED",
+              result: "RESULT_UNKNOWN",
+              createdAt: "2026-08-26T11:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveAttribute("data-status-mark", "running");
+    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveClass("animate-spin");
+    await openLogTab(user);
+    expect(screen.queryByRole("heading", { name: "Task automations" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Pull request activity" })).not.toBeInTheDocument();
+    const heading = screen.getByRole("heading", {
+      name: "#12 feat: add endpoint to re-shuffle an existing deck",
+    });
+    const titleLink = within(heading).getByRole("link", {
+      name: "#12 feat: add endpoint to re-shuffle an existing deck",
+    });
+    expect(titleLink).toHaveAttribute("href", "https://github.com/example/repo/pull/12");
+    expect(titleLink).not.toHaveClass("w-full");
+    expect(heading.querySelector(".lucide-activity")).toBeInTheDocument();
+    expect(heading.querySelector(".lucide-git-pull-request")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Activity on PR #12");
+    expect(
+      within(screen.getByTestId("split-run-task-automations")).getAllByTestId(/^split-run-phase-time-/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps a queued activity title and uses the waiting clock", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-fb",
+            title:
+              "[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/12#pullrequestreview-1)",
+            description: "Read the requested changes.",
+            waitingForAccess: true,
+            pullRequest: {
+              id: "pr-12",
+              number: "12",
+              title: "feat: add endpoint to re-shuffle an existing deck",
+              url: "https://github.com/example/repo/pull/12",
+              state: "STATE_OPEN",
+            },
+            run: {
+              id: "run-queued",
+              canvasId: "canvas-fb",
+              state: "STATE_STARTED",
+              result: "RESULT_UNKNOWN",
               createdAt: "2026-08-26T11:00:00Z",
             },
           },
@@ -134,17 +186,14 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     await openLogTab(user);
-    expect(screen.queryByRole("heading", { name: "Task automations" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pull request activity" })).not.toBeInTheDocument();
-    const heading = screen.getByRole("heading", {
-      name: "#12 feat: add endpoint to re-shuffle an existing deck",
-    });
-    expect(heading.querySelector(".lucide-activity")).toBeInTheDocument();
-    expect(heading.querySelector(".lucide-git-pull-request")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Activity on PR #12");
-    expect(
-      within(screen.getByTestId("split-run-task-automations")).getAllByTestId(/^split-run-phase-time-/).length,
-    ).toBeGreaterThan(0);
+    const activity = screen.getByTestId("split-run-phase-pr-feedback-run-queued");
+    expect(within(activity).getByRole("link", { name: "@lucaspin" })).toBeInTheDocument();
+    expect(within(activity).getByRole("link", { name: "review" })).toBeInTheDocument();
+    expect(activity).toHaveTextContent("Read the requested changes.");
+    expect(activity.querySelector(".lucide-clock")).toBeInTheDocument();
+    expect(activity.querySelector(".lucide-loader-circle")).toBeNull();
+    await user.hover(within(activity).getByLabelText("Waiting for another activity"));
+    expect(await screen.findByRole("tooltip", { name: "Waiting for another activity" })).toBeInTheDocument();
   });
 
   it("shows pull request activity as a flat timestamp-first timeline", async () => {
@@ -214,6 +263,9 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-log-tab-dot")).not.toHaveAttribute("data-status-mark", "running");
+    expect(screen.getByTestId("split-run-log-tab-dot")).not.toHaveClass("animate-spin");
     await openLogTab(user);
 
     const pullRequestActivity = screen.getByTestId("split-run-pull-request-activity");
@@ -237,24 +289,33 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toEqual(["2026-08-26T10:00:00Z", "2026-08-26T11:00:00Z", "2026-08-26T12:00:00Z"]);
     expect(within(timeline).queryByTestId(/^split-run-phase-revision-/)).not.toBeInTheDocument();
     const commentTime = within(activities[1]!).getByTestId("split-run-phase-time-pr-feedback-run-comment");
-    expect(commentTime.parentElement).toBe(
+    expect(commentTime.closest("[data-testid='split-run-automation-header-pr-feedback-run-comment']")).toBe(
       within(activities[1]!).getByTestId("split-run-automation-header-pr-feedback-run-comment"),
     );
     const authorLink = within(activities[1]!).getByRole("link", { name: "@lucaspin" });
     const commentLink = within(activities[1]!).getByRole("link", { name: "comment" });
-    expect(within(activities[1]!).queryByRole("link", { name: "requested changes" })).not.toBeInTheDocument();
-    await user.click(within(activities[1]!).getByRole("button", { name: /^Expand / }));
     const descriptionLink = within(activities[1]!).getByRole("link", { name: "requested changes" });
+    expect(authorLink.closest(".workspace-markdown")).toHaveClass("font-mono", "text-[13px]");
+    expect(within(activities[1]!).queryByRole("button", { name: /^(Expand|Collapse) / })).not.toBeInTheDocument();
+    expect(
+      within(activities[1]!).getByTestId("split-run-automation-header-pr-feedback-run-comment").className,
+    ).not.toMatch(/\bh-8\b/);
+    expect(within(activities[1]!).getByTestId("split-run-phase-description-pr-feedback-run-comment")).toHaveClass(
+      "font-mono",
+      "text-[13px]",
+    );
+    expect(within(activities[1]!).getByTestId("split-run-phase-description-pr-feedback-run-comment")).toHaveTextContent(
+      "Read the requested changes",
+    );
+    expect(within(activities[1]!).queryByTestId("split-run-stream-pr-feedback-run-comment")).not.toBeInTheDocument();
     expect(authorLink).toHaveAttribute("href", "https://github.com/lucaspin");
     expect(commentLink).toHaveAttribute("href", "https://github.com/acme/app/pull/12#issuecomment-1");
     expect(descriptionLink).toHaveAttribute("href", "https://example.com/review");
     for (const link of [authorLink, commentLink, descriptionLink]) {
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
-      expect(link).toHaveClass("text-sky-700", "!underline", "!decoration-current");
+      expect(link).toHaveClass("font-semibold", "text-current", "!underline", "!decoration-current");
     }
-    await user.click(within(activities[1]!).getByRole("button", { name: /^Collapse / }));
-    expect(within(activities[1]!).queryByRole("link", { name: "requested changes" })).not.toBeInTheDocument();
   });
 
   it("keeps the log scroller flush so sticky phase headers cover scrolled lines", () => {
@@ -411,13 +472,13 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
-    expect(within(backlog).getByTestId("split-run-phase-duration-backlog")).toHaveTextContent("00:02");
+    expect(within(backlog).getByTestId("split-run-phase-duration-backlog")).toHaveTextContent("2s");
     expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
     expect(within(implement).getAllByText(/Implementation/).length).toBeGreaterThan(0);
-    expect(within(implement).getByTestId("split-run-phase-duration-implement")).toHaveTextContent("04:00");
+    expect(within(implement).getByTestId("split-run-phase-duration-implement")).toHaveTextContent("4m");
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
@@ -1309,7 +1370,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await openLogTab(user);
 
     const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
-    const view = within(prCreation).getByRole("link", { name: "View automation run" });
+    const view = within(prCreation).getByRole("link", { name: "View run" });
     expect(view).toHaveAttribute(
       "href",
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
@@ -1321,9 +1382,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(prCreation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
-    expect(within(backlog).queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     await user.click(within(backlog).getByRole("button", { name: /^Backlog/ }));
-    expect(within(backlog).queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(within(backlog).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
