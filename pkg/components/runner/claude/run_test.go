@@ -116,6 +116,17 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
+func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
+	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
 func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {
 	// Planning sessions must use "default" (not "plan"): plan mode blocks the
 	// planning MCP tools. Read-only is enforced

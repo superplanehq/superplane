@@ -241,7 +241,129 @@ describe("notesFromLiveLogSections", () => {
       "I will verify the seams.",
       "git status",
     ]);
+    expect(notes[2]?.componentType).toBe("bash");
     expect(notes.some((note) => note.componentName.includes("schema_version"))).toBe(false);
+  });
+
+  it("uses the bash command after empty start input is filled", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [],
+        activities: [
+          {
+            id: "act-1",
+            provider: "claude",
+            status: "running",
+            sequence: 4,
+            items: [
+              {
+                type: "tool",
+                id: "t1",
+                kind: "bash",
+                name: "Bash",
+                input: '{"command":"ls pkg"}',
+                output: "pkg/\n",
+                outputStreams: [],
+                status: "passed",
+                durationMs: 12,
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ],
+      },
+    ]);
+
+    expect(notes.map((note) => note.componentName)).toEqual(["You are implementing a fix", "ls pkg"]);
+    expect(notes[1]?.componentType).toBe("bash");
+    expect(notes[1]?.detail).toBe("pkg/");
+  });
+
+  it("uses the action label when a bash command has not arrived", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [],
+        activities: [
+          {
+            id: "act-1",
+            provider: "claude",
+            status: "running",
+            sequence: 2,
+            items: [
+              {
+                type: "tool",
+                id: "t1",
+                kind: "bash",
+                name: "Bash",
+                input: "",
+                output: "",
+                outputStreams: [],
+                status: "running",
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ],
+      },
+    ]);
+
+    expect(notes[1]?.componentName).toBe("Bash");
+    expect(notes[1]?.componentType).toBe("bash");
+    expect(`${notes[1]?.componentName}`.toLowerCase()).not.toBe("bash bash");
+  });
+
+  it("names read and search activity notes from the file or pattern", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [],
+        activities: [
+          {
+            id: "act-1",
+            provider: "claude",
+            status: "passed",
+            sequence: 3,
+            items: [
+              {
+                type: "tool",
+                id: "read-1",
+                kind: "read",
+                name: "Read",
+                input: '{"path":"pkg/foo.go"}',
+                output: "package foo",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+              {
+                type: "tool",
+                id: "grep-1",
+                kind: "grep",
+                name: "Grep",
+                input: "rootTriggerRenderer",
+                output: "Found 1 matches",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ],
+      },
+    ]);
+
+    expect(notes.map((note) => ({ type: note.componentType, name: note.componentName }))).toEqual([
+      { type: "prompt", name: "You are implementing a fix" },
+      { type: "read", name: "Explored foo.go" },
+      { type: "grep", name: "rootTriggerRenderer" },
+    ]);
+    expect(notes[1]?.detail).toBe("package foo");
+    expect(notes[2]?.detail).toBe("Found 1 matches");
   });
 
   it("maps grep stdout after a late cmd_start to one tool detail, not note titles", () => {

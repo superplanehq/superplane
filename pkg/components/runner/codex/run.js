@@ -16,7 +16,10 @@ const SESSION_FILE = "codex_session";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
   for (const file of candidates) {
     if (file && fs.existsSync(file)) {
       return require(file);
@@ -44,7 +47,10 @@ function createDisabledActivityStream() {
 }
 
 function loadAnalysisProtocolModule() {
-  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
   for (const file of candidates) {
     try {
       return require(file);
@@ -57,7 +63,9 @@ function loadAnalysisProtocolModule() {
 
 function loadAnalysisProtocol() {
   const mod = loadAnalysisProtocolModule();
-  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol()
+    : "";
 }
 
 function withoutEmbeddedAnalysisProtocol(prompt) {
@@ -84,11 +92,18 @@ function envFlag(env, name) {
 }
 
 function planningEnabled(env = process.env) {
-  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
 }
 
 function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function artifactEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
 function planningSystemPrompt(env = process.env) {
@@ -98,19 +113,36 @@ function planningSystemPrompt(env = process.env) {
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
-function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
+function codexExecArgs(
+  env = process.env,
+  model,
+  mcpScriptPath,
+  sessionID = "",
+) {
   const args = ["exec"];
   if (sessionID) {
     args.push("resume", sessionID);
   }
   args.push("--json", "--skip-git-repo-check");
   if (planningEnabled(env)) {
-    args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
+    args.push(
+      "-c",
+      'sandbox_mode="read-only"',
+      "-c",
+      'approval_policy="never"',
+    );
     args.push(...mcpConfigOverrides(mcpScriptPath, env));
-    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
+    args.push(
+      "-c",
+      `developer_instructions=${tomlString(loadAnalysisProtocol())}`,
+    );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    args.push(...workspaceMCPConfigOverrides(env));
+    if (artifactEnabled(env)) {
+      args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    } else {
+      args.push(...workspaceMCPConfigOverrides(env));
+    }
   }
   if (model) {
     args.push("-m", model);
@@ -145,7 +177,9 @@ function codexSessionForPrompt(promptCount, sessionID) {
 }
 
 function codexSessionIDFromEvent(event) {
-  return String((event && (event.thread_id || (event.thread && event.thread.id))) || "").trim();
+  return String(
+    (event && (event.thread_id || (event.thread && event.thread.id))) || "",
+  ).trim();
 }
 
 function mcpConfigOverrides(mcpScriptPath, env = process.env) {
@@ -237,18 +271,37 @@ async function runPrompt(promptFile, model) {
   }
 
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(
+    sp,
+    promptCount,
+    fs.readFileSync(promptFile, "utf8"),
+  );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
   const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
+  if (artifactEnabled()) {
+    const outputDir = path.join(sp, "evidence");
+    fs.mkdirSync(outputDir, { recursive: true });
+    process.env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+    process.env.PLAYWRIGHT_MCP_BROWSER =
+      process.env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+  }
   const planning = planningEnabled();
-  const activity = loadActivityStreamModule().createActivityStream({ provider: "codex", turn: promptCount + 1 });
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "codex",
+    turn: promptCount + 1,
+  });
   activity.start();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
+  const mcpScript = path.join(
+    sp,
+    planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
+  );
+  const codexArgs = codexExecArgs(process.env, model, mcpScript, sessionID);
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write("sandbox: read-only\n");
@@ -258,13 +311,18 @@ async function runPrompt(promptFile, model) {
   }
   codexArgs.push(prompt);
 
-  const child = spawn("codex", codexArgs, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn("codex", codexArgs, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   child.stderr.pipe(process.stderr);
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
   const formatter = createCodexFormatter(telemetry, activity);
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  const rl = readline.createInterface({
+    input: child.stdout,
+    crlfDelay: Infinity,
+  });
   rl.on("line", (raw) => {
     const line = raw.trim();
     if (!line) {
@@ -280,8 +338,15 @@ async function runPrompt(promptFile, model) {
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
         }
-        if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "result") {
-          if (!lastResult.usage && !(lastResult.item && lastResult.item.usage)) {
+        if (
+          event.type === "item.completed" ||
+          event.type === "turn.completed" ||
+          event.type === "result"
+        ) {
+          if (
+            !lastResult.usage &&
+            !(lastResult.item && lastResult.item.usage)
+          ) {
             lastResult = event;
           }
         }
@@ -319,11 +384,16 @@ async function runPrompt(promptFile, model) {
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(payload.result);
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      payload.result,
+    );
   }
   formatTurnResult({
     is_error: exitCode !== 0,
-    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    num_turns:
+      payload.telemetry && payload.telemetry.num_turns
+        ? payload.telemetry.num_turns
+        : 1,
     duration_ms: Date.now() - startedAt,
   });
   return exitCode;
@@ -360,8 +430,12 @@ function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
   return {
     input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
-    output_tokens: Number(source.output_tokens || source.completion_tokens || 0),
-    cache_read_input_tokens: Number(source.cached_input_tokens || source.cache_read_input_tokens || 0),
+    output_tokens: Number(
+      source.output_tokens || source.completion_tokens || 0,
+    ),
+    cache_read_input_tokens: Number(
+      source.cached_input_tokens || source.cache_read_input_tokens || 0,
+    ),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
 }
@@ -384,7 +458,9 @@ function writeLiveLogRecord(rec) {
 
 function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
-  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "codex" });
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "codex" });
   const open = new Map();
   const anonQueue = [];
   const contentText = new Map();
@@ -433,7 +509,9 @@ function createCodexFormatter(telemetry, activityOverride) {
       return;
     }
     const previous = contentText.get(id) || "";
-    const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
+    const delta = text.startsWith(previous)
+      ? text.slice(previous.length)
+      : text;
     activity.appendContent(contentKind, id, delta);
     contentText.set(id, text);
   }
@@ -484,12 +562,19 @@ function createCodexFormatter(telemetry, activityOverride) {
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
       if (activity.enabled) {
-        activity.appendToolOutput(id, output.replace(/\s+$/, ""), toolFailed(item) ? "stderr" : "stdout");
+        activity.appendToolOutput(
+          id,
+          output.replace(/\s+$/, ""),
+          toolFailed(item) ? "stderr" : "stdout",
+        );
       } else {
         process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
       }
     }
-    const tracked = open.get(id) || { kind: normalizeCodexToolKind(item), startedAt: Date.now() };
+    const tracked = open.get(id) || {
+      kind: normalizeCodexToolKind(item),
+      startedAt: Date.now(),
+    };
     open.delete(id);
     const anonIndex = anonQueue.indexOf(id);
     if (anonIndex >= 0) {
@@ -531,7 +616,10 @@ function createCodexFormatter(telemetry, activityOverride) {
           const text = item.text || item.result || "";
           if (!roundOpen) {
             tracker.beginTurn(item.usage || event.usage, {
-              message: typeof text === "string" && type !== "reasoning" ? text : undefined,
+              message:
+                typeof text === "string" && type !== "reasoning"
+                  ? text
+                  : undefined,
             });
           }
           roundOpen = false;
@@ -595,7 +683,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 }
 
 function isMessageItem(type) {
-  return type === "agent_message" || type === "assistant_message" || type === "reasoning";
+  return (
+    type === "agent_message" ||
+    type === "assistant_message" ||
+    type === "reasoning"
+  );
 }
 
 function isToolItem(type) {
@@ -634,7 +726,9 @@ function normalizeCodexToolKind(item) {
 
 function fileChangeKind(item) {
   const changes = Array.isArray(item.changes) ? item.changes : [];
-  const kinds = changes.map((change) => String((change && change.kind) || "").toLowerCase());
+  const kinds = changes.map((change) =>
+    String((change && change.kind) || "").toLowerCase(),
+  );
   if (kinds.includes("add") && !kinds.includes("update")) {
     return "write";
   }
@@ -651,10 +745,16 @@ function toolTextForItem(item) {
   }
   if (type === "file_change") {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const paths = changes.map((change) => change && change.path).filter(Boolean);
-    return paths.length > 0 ? paths.map(String).join("\n") : String(item.path || "file");
+    const paths = changes
+      .map((change) => change && change.path)
+      .filter(Boolean);
+    return paths.length > 0
+      ? paths.map(String).join("\n")
+      : String(item.path || "file");
   }
-  return String(item.command || item.path || item.query || item.name || type || "tool");
+  return String(
+    item.command || item.path || item.query || item.name || type || "tool",
+  );
 }
 
 function stripBashLc(command) {
@@ -686,7 +786,11 @@ function formatTurnResult(event) {
   }
   if (event && event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event && event.duration_ms != null) {
     const ms = Number(event.duration_ms);

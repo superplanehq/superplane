@@ -158,7 +158,9 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.getByText("Choose which task emails and browser alerts SuperPlane sends you.")).toBeInTheDocument();
-    expect(screen.getByText("Added as a task owner")).toBeInTheDocument();
+    expect(screen.getByText("Status changes on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Agent questions on your tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Send task emails" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ emailEnabled: false }));

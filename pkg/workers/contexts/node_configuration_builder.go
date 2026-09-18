@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -1086,17 +1087,22 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, err
 	}
+	organization, err := models.FindOrganizationByIDInTransaction(b.tx, order.OrganizationID.String())
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the owning organization: %w", err)
+	}
 
 	payload := map[string]any{
-		"id":             order.ID.String(),
-		"title":          order.Title,
-		"description":    order.Description,
-		"factory_id":     order.FactoryID.String(),
-		"state":          order.State,
-		"result":         order.Result,
-		"repository":     repository,
-		"repository_url": githubRepositoryURL(repository),
-		"default_branch": defaultBranch,
+		"id":                      order.ID.String(),
+		"title":                   order.Title,
+		"description":             order.Description,
+		"factory_id":              order.FactoryID.String(),
+		"state":                   order.State,
+		"result":                  order.Result,
+		"repository":              repository,
+		"repository_url":          githubRepositoryURL(repository),
+		"default_branch":          defaultBranch,
+		"visual_evidence_enabled": organization.HasExperimentalFeature(features.FeatureFactoryVisualEvidence),
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {

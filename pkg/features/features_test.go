@@ -80,6 +80,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
 	})
 
+	t.Run("known id returns factory visual evidence feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryVisualEvidence)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryVisualEvidence, f.ID)
+		assert.Equal(t, "Factory Visual Evidence", f.Label)
+		assert.Equal(t, "Ask implementation agents to capture and publish visual evidence", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -103,6 +112,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureFactoryVisualEvidence))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

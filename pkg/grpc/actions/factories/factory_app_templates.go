@@ -41,9 +41,10 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		canvasFile:       "templates/line-implementation.canvas.yaml",
 		consoleFile:      "templates/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"github.createPullRequest": "github",
-			"github.findPullRequest":   "github",
-			"github.updatePullRequest": "github",
+			"github.createIssueComment": "github",
+			"github.createPullRequest":  "github",
+			"github.findPullRequest":    "github",
+			"github.updatePullRequest":  "github",
 		},
 	},
 	"pr-closure": {

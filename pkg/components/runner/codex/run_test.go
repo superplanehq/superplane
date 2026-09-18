@@ -23,6 +23,17 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
 }
 
+func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	}, "gpt-5", "/task/task_artifact_mcp.js")
+
+	joined := strings.Join(args, " ")
+	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
+}
+
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
