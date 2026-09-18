@@ -1,6 +1,9 @@
 package telegram
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +19,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+)
+
+const (
+	WebhookSecretName = "webhookSecret"
+	secretTokenHeader = "X-Telegram-Bot-Api-Secret-Token"
 )
 
 func init() {
@@ -120,9 +128,20 @@ func (t *Telegram) Sync(ctx core.SyncContext) error {
 	}
 	webhookURL = fmt.Sprintf("%s/api/v1/integrations/%s/events", webhookURL, ctx.Integration.ID().String())
 
-	err = client.SetWebhook(webhookURL)
+	secret, isNew, err := webhookSecret(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get webhook secret: %v", err)
+	}
+
+	err = client.SetWebhook(webhookURL, secret)
 	if err != nil {
 		return fmt.Errorf("failed to set webhook: %v", err)
+	}
+
+	if isNew {
+		if err := ctx.Integration.SetSecret(WebhookSecretName, []byte(secret)); err != nil {
+			return fmt.Errorf("failed to store webhook secret: %v", err)
+		}
 	}
 
 	ctx.Integration.SetMetadata(Metadata{
@@ -135,7 +154,47 @@ func (t *Telegram) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func webhookSecret(integration core.IntegrationContext) (string, bool, error) {
+	secrets, err := integration.GetSecrets()
+	if err != nil {
+		return "", false, err
+	}
+
+	for _, secret := range secrets {
+		if secret.Name == WebhookSecretName {
+			return string(secret.Value), false, nil
+		}
+	}
+
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", false, err
+	}
+
+	// Telegram's secret-token alphabet does not allow base64 padding.
+	return base64.RawURLEncoding.EncodeToString(value), true, nil
+}
+
 func (t *Telegram) HandleRequest(ctx core.HTTPRequestContext) {
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Logger.Errorf("error getting integration secrets: %v", err)
+		ctx.Response.WriteHeader(500)
+		return
+	}
+
+	for _, secret := range secrets {
+		if secret.Name != WebhookSecretName {
+			continue
+		}
+
+		if subtle.ConstantTimeCompare([]byte(ctx.Request.Header.Get(secretTokenHeader)), secret.Value) != 1 {
+			ctx.Response.WriteHeader(403)
+			return
+		}
+		break
+	}
+
 	body, err := io.ReadAll(ctx.Request.Body)
 	if err != nil {
 		ctx.Logger.Errorf("error reading request body: %v", err)
