@@ -48,14 +48,14 @@ describe("urlPinsNavigation", () => {
     expect(urlPinsNavigation(new URLSearchParams())).toBe(false);
   });
 
-  it.each(["console", "dashboard", "memory"])(
-    "pins on tab-selecting view=%s (dashboard is the legacy Console alias)",
+  it.each(["console", "dashboard", "memory", "files"])(
+    "pins on tab-selecting view=%s (dashboard is the legacy Console alias; files is the retired Files tab)",
     (view) => {
       expect(urlPinsNavigation(new URLSearchParams(`view=${view}`))).toBe(true);
     },
   );
 
-  it.each(["runs", "versions", "files"])(
+  it.each(["runs", "versions"])(
     "does not pin on legacy view=%s — those values select no tab and are cleaned up on mount",
     (view) => {
       expect(urlPinsNavigation(new URLSearchParams(`view=${view}`))).toBe(false);

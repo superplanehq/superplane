@@ -18,13 +18,15 @@ export type UrlViewFlags = {
 const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const;
 
 /**
- * `view` values that actually select a tab (`dashboard` is the legacy alias
- * for Console and is rewritten to it on mount). Legacy values that select no
- * tab (`runs`, `versions`) are deleted on mount by
- * useWorkflowViewSearchParams, so they must not pin navigation: the stored-tab
- * redirect and the Console fallback should still apply for that visit.
+ * `view` values that pin navigation. `dashboard` is the legacy Console alias
+ * and is rewritten to `console` on mount. Legacy `files` pins so the
+ * default-tab gate does not send the user to a stored Console or Memory tab
+ * before useWorkflowViewSearchParams migrates the URL to Canvas. Legacy
+ * values that select no tab (`runs`, `versions`) are deleted on mount, so
+ * they must not pin: the stored-tab redirect and the Console fallback still
+ * apply for that visit.
  */
-const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory"] as const;
+const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory", "files"] as const;
 
 function hasAnyParam(searchParams: URLSearchParams, params: readonly string[]): boolean {
   return params.some((param) => (searchParams.get(param) ?? "") !== "");
