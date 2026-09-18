@@ -21,7 +21,7 @@ export type FactoryConfigureActions = {
    * onto the live canvas snapshot). Leaves the session dirty — the caller
    * still needs Save to persist it.
    */
-  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => void;
+  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => Promise<void>;
 };
 
 type UpdateCanvasVersionMutation = {
@@ -65,6 +65,7 @@ type UseFactoryConfigureSessionOptions = {
   hasStagingChanges: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
   applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
+  layoutDraftWorkflow?: (workflow: CanvasesCanvas) => Promise<CanvasesCanvas>;
 };
 
 /**
@@ -97,15 +98,20 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     applyLocalWorkflowUpdate,
+    layoutDraftWorkflow,
   } = options;
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
   onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
   const onFactoryConfigureSavedRef = useRef(onFactoryConfigureSaved);
   onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
+  const editSessionActiveRef = useRef(editSessionActive);
+  editSessionActiveRef.current = editSessionActive;
+  const layoutDraftWorkflowRef = useRef(layoutDraftWorkflow);
+  layoutDraftWorkflowRef.current = layoutDraftWorkflow;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
+  const { allowNextConfigureEnter, configureVisitIdRef } = useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -158,12 +164,25 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               onDone: () => onFactoryConfigureDoneRef.current?.(),
             });
           },
-          applyDraftSpec: (spec) => {
+          applyDraftSpec: async (spec) => {
             const current = getCurrentWorkflowSnapshot();
             if (!current) {
               return;
             }
-            applyLocalWorkflowUpdate({ ...current, spec });
+            const requestedVisitId = configureVisitIdRef.current;
+            const requestedVersionId = activeCanvasVersionIdRef.current;
+            const requestedEditSessionActive = editSessionActiveRef.current;
+            const merged = { ...current, spec };
+            const layout = layoutDraftWorkflowRef.current;
+            const nextWorkflow = layout ? await layout(merged) : merged;
+            if (
+              configureVisitIdRef.current !== requestedVisitId ||
+              activeCanvasVersionIdRef.current !== requestedVersionId ||
+              editSessionActiveRef.current !== requestedEditSessionActive
+            ) {
+              return;
+            }
+            applyLocalWorkflowUpdate(nextWorkflow);
           },
         };
   }
