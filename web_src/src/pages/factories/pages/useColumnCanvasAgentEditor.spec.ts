@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 
-import type { CanvasSpecNode } from "../lib/columnCanvasAgent";
+import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS, type CanvasSpecNode } from "../lib/columnCanvasAgent";
 import { persistColumnAgent, useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
@@ -75,6 +75,7 @@ const prFeedbackCanvas: CanvasesCanvas = {
       { ...implementerNode, id: "address-pr-feedback", name: "Address PR feedback" },
       { ...implementerNode, id: "address-pr-review-feedback", name: "Address PR feedback" },
       { ...implementerNode, id: "address-pr-review-reply-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "custom-runner", name: "Custom agent" },
     ],
     edges: [],
   },
@@ -165,7 +166,7 @@ describe("useColumnCanvasAgentEditor", () => {
       () =>
         useColumnCanvasAgentEditor("organization-1", "pr-feedback", {
           showVisualEvidenceSetting: true,
-          synchronizeAgentNodes: true,
+          synchronizedAgentNodeIds: PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
         }),
       { wrapper: createWrapper() },
     );
@@ -242,11 +243,15 @@ describe("persistColumnAgent", () => {
     });
 
     const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
-    const runners = serialized.nodes?.filter((node) => node.component === "runnerClaudeCode") ?? [];
+    const synchronizedIds = new Set(PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS);
+    const runners = serialized.nodes?.filter((node) => node.id && synchronizedIds.has(node.id)) ?? [];
     expect(runners).toHaveLength(3);
     for (const runner of runners) {
       expect(runner.configuration?.includeVisualEvidence).toBe(true);
       expect(runner.configuration?.model).toBe("opus");
     }
+    const customRunner = serialized.nodes?.find((node) => node.id === "custom-runner");
+    expect(customRunner?.configuration?.includeVisualEvidence).toBeUndefined();
+    expect(customRunner?.configuration?.model).toBe("sonnet");
   });
 });

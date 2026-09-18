@@ -21,20 +21,21 @@ const REFINEMENT_AGENT_NODE_ID = "refine-task";
 
 interface ColumnCanvasAgentEditorOptions {
   showVisualEvidenceSetting?: boolean;
-  synchronizeAgentNodes?: boolean;
+  synchronizedAgentNodeIds?: readonly string[];
 }
 
 function editableAgentNodeIds(
   canvas: CanvasesCanvas | undefined,
   primaryNodeId: string | undefined,
-  synchronize: boolean,
+  synchronizedNodeIds: readonly string[] | undefined,
 ): string[] {
-  if (!synchronize) {
+  if (!synchronizedNodeIds) {
     return primaryNodeId ? [primaryNodeId] : [];
   }
+  const synchronizedNodeIdSet = new Set(synchronizedNodeIds);
   return findAgentNodes(canvas?.spec)
     .map((node) => node.id)
-    .filter((id): id is string => Boolean(id));
+    .filter((id): id is string => Boolean(id && synchronizedNodeIdSet.has(id)));
 }
 
 export function useColumnCanvasAgentEditor(
@@ -54,7 +55,7 @@ export function useColumnCanvasAgentEditor(
   const canvas = canvasQuery.data;
   const preferredAgentNodeId = features.has(FEATURE_FACTORY_CREATE_WITH_AGENT) ? REFINEMENT_AGENT_NODE_ID : undefined;
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
-  const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizeAgentNodes === true);
+  const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
   const showVisualEvidenceSetting =
     options.showVisualEvidenceSetting ?? resolveFactoryAppTemplate(canvas)?.id === "line-implementation";

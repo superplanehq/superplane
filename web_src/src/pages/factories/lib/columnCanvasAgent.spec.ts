@@ -6,8 +6,10 @@ import {
   canvasNodeToPlanningReviewComponent,
   findAgentNodes,
   planningReviewDraftFromCanvas,
+  PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
   primaryAgentNode,
   serializeColumnAgentCanvas,
+  supportsPRFeedbackVisualEvidence,
   type CanvasSpecNode,
 } from "./columnCanvasAgent";
 
@@ -99,6 +101,32 @@ describe("primaryAgentNode", () => {
 
   it("returns undefined when no agent exists", () => {
     expect(primaryAgentNode({ nodes: [triggerNode()] })).toBeUndefined();
+  });
+});
+
+describe("supportsPRFeedbackVisualEvidence", () => {
+  const feedbackAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) =>
+    agentNode({
+      id,
+      configuration: { ...implementerConfiguration, steps: [{ name: "Publish Visual Evidence", type: "bash" }] },
+    }),
+  );
+  const evidenceNodes = [
+    "has-pr-comment-visual-evidence",
+    "comment-pr-comment-visual-evidence",
+    "has-pr-review-visual-evidence",
+    "comment-pr-review-visual-evidence",
+    "has-pr-review-reply-visual-evidence",
+    "comment-pr-review-reply-visual-evidence",
+  ].map((id) => ({ id, type: "TYPE_ACTION" as const, component: "if" }));
+
+  it("accepts the generated discussion graph", () => {
+    expect(supportsPRFeedbackVisualEvidence({ nodes: [...feedbackAgents, ...evidenceNodes] })).toBe(true);
+  });
+
+  it("rejects a legacy discussion graph without publish support", () => {
+    const legacyAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) => agentNode({ id }));
+    expect(supportsPRFeedbackVisualEvidence({ nodes: legacyAgents })).toBe(false);
   });
 });
 
