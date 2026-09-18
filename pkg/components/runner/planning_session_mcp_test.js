@@ -7,7 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation } = require("./analysis_protocol");
+const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation, isCompactStatusText } = require("./analysis_protocol");
 const {
   proposeSpec,
   proposeClarity,
@@ -221,6 +221,28 @@ test("proposeSpec, proposeClarity, and proposeConfidence publish on separate rou
     else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
     if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
     else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+  }
+});
+
+test("compact status text is not a user-facing reply", () => {
+  assert.equal(isCompactStatusText("Compactions remaining: 0"), true);
+  assert.equal(isCompactStatusText("  Compactions remaining: 2 \n"), true);
+  assert.equal(isCompactStatusText("The plan is ready."), false);
+});
+
+test("recordAgentMessage ignores Claude compact status", async () => {
+  const previousFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => '{"status":"shown"}' };
+  };
+  try {
+    const result = await recordAgentMessage("Compactions remaining: 0");
+    assert.deepEqual(result, { status: "ignored" });
+    assert.equal(calls.length, 0);
+  } finally {
+    global.fetch = previousFetch;
   }
 });
 

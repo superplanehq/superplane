@@ -9,6 +9,7 @@ const {
   FOLLOW_UP_CMD_INDEX_BASE,
   interpretWaitResponse,
   nextAction,
+  persistAnalysisContinuation,
   runLoop,
   runPromptFile,
   safeWaitRequest,
@@ -54,6 +55,40 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-continuation-"));
+  persistAnalysisContinuation(dir, {
+    continuation: "Continue this SuperPlane analysis session.",
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
+});
+
+test("runLoop writes wait continuation before the follow-up prompt", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-continuation-"));
+  const results = [
+    {
+      status: "message",
+      text: "Narrow the spec",
+      continuation: "Continue this SuperPlane analysis session.",
+    },
+    { status: "ended" },
+  ];
+  await runLoop({
+    waitOnce: async () => results.shift(),
+    taskDir: dir,
+    runPrompt: async () => 0,
+    sleep: async () => {},
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
 });
 
 test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {

@@ -33,4 +33,14 @@ function withAnalysisContinuation(taskDir, promptCount, prompt) {
   }
 }
 
-module.exports = { ANALYSIS_PROTOCOL, analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation };
+function isCompactStatusText(text) {
+  return /^\s*compactions remaining:\s*\d+\s*$/i.test(String(text || "").trim());
+}
+
+module.exports = {
+  ANALYSIS_PROTOCOL,
+  analysisProtocol,
+  withoutEmbeddedAnalysisProtocol,
+  withAnalysisContinuation,
+  isCompactStatusText,
+};
