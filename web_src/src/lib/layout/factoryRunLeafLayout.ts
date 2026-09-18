@@ -25,7 +25,11 @@ import {
   placeComponentNodes,
   type SpinePickers,
 } from "./factoryRunLeafLayoutHelpers";
-import { classifyComponentEdges, markDisplaySourceNodes } from "./factoryRunEdgeClassification";
+import {
+  classifyComponentEdges,
+  markDisplaySourceNodes,
+  routeForwardGutterEdges,
+} from "./factoryRunEdgeClassification";
 import { routeFeedbackEdges } from "./factoryRunFeedbackRouting";
 
 export { factoryRunLeafEdgeKey } from "./factoryRunLeafLayoutHelpers";
@@ -66,7 +70,7 @@ export type FactoryRunLeafLayoutResult = {
   sideTargetNodeIds: Set<string>;
   /** Optional vertical-gutter X for long, cross-column, and feedback edges. */
   edgeRouteGutters: Map<string, number>;
-  /** Small endpoint-turn Y stagger for feedback edges that use adjacent gutters. */
+  /** Small endpoint-turn Y stagger for gutter routes that use adjacent lanes. */
   edgeRouteOffsetsY: Map<string, number>;
   /** Edges removed from the DAG for ranking but preserved for display routing. */
   feedbackEdgeKeys: Set<string>;
@@ -149,17 +153,25 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
   const componentForwardEdges = ctx.forwardEdges.filter(
     (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
   );
+  const forwardGutterEdges: FactoryRunLayoutEdge[] = [];
   classifyComponentEdges({
     componentEdges: componentForwardEdges,
     positions: ctx.positions,
     layer,
     column,
-    graphRight: maxRight + GUTTER_PAD,
     leafEdgeKeys: ctx.leafEdgeKeys,
     spineEdgeKeys: ctx.spineEdgeKeys,
     sideHandleNodeIds: ctx.sideHandleNodeIds,
     sideTargetNodeIds: ctx.sideTargetNodeIds,
+    forwardGutterEdges,
+  });
+  routeForwardGutterEdges({
+    edges: forwardGutterEdges,
+    positions: ctx.positions,
+    nodeById: ctx.nodeById,
+    graphRight: maxRight + GUTTER_PAD,
     edgeRouteGutters: ctx.edgeRouteGutters,
+    edgeRouteOffsetsY: ctx.edgeRouteOffsetsY,
   });
 
   const componentFeedbackEdges = ctx.feedbackEdges.filter(
