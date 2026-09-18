@@ -48,6 +48,7 @@ type RouteFeedbackEdgesOptions = {
   positions: Map<string, FactoryRunLayoutPosition>;
   nodeById: Map<string, FactoryRunLayoutNode>;
   graphLeft: number;
+  occupiedLeftLanes?: FeedbackInterval[][];
   feedbackEdgeKeys: Set<string>;
   spineEdgeKeys: Set<string>;
   edgeRouteGutters: Map<string, number>;
@@ -55,7 +56,7 @@ type RouteFeedbackEdgesOptions = {
 };
 
 export function routeFeedbackEdges(options: RouteFeedbackEdgesOptions): void {
-  const lanes: FeedbackInterval[][] = [];
+  const lanes: FeedbackInterval[][] = (options.occupiedLeftLanes ?? []).map((lane) => [...lane]);
   const sortedEdges = [...options.feedbackEdges].sort((a, b) => compareFeedbackEdges(a, b, options.positions));
 
   for (const edge of sortedEdges) {
