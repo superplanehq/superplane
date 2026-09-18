@@ -99,7 +99,7 @@ type RepositoryFileStaging struct {
 	Content []byte
 }
 
-// StageRepositoryFiles writes one or more repository files into per-user staging.
+// StageRepositoryFiles writes one or more spec files into per-user staging.
 func StageRepositoryFiles(ctx core.CommandContext, canvasID string, files []RepositoryFileStaging) error {
 	if len(files) == 0 {
 		return fmt.Errorf("at least one file is required")

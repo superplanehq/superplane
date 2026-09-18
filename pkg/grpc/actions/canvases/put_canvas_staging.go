@@ -3,12 +3,10 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -37,27 +35,13 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 			continue
 		}
 
-		normalized := normalizeRepositoryFilePath(operation.GetPath())
-		if normalized == "" {
-			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
-		}
-		if normalized == gitprovider.ReservedSuperPlanePath ||
-			strings.HasPrefix(normalized, gitprovider.ReservedSuperPlanePath+"/") {
-			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("path %q is reserved for SuperPlane", operation.GetPath()))
+		normalized, err := requireStagedSpecFilePath(operation.GetPath())
+		if err != nil {
+			return nil, err
 		}
 
 		if operation.GetDelete() {
-			if err := models.MarkStagedFilePathDeleted(
-				db,
-				canvas.ID,
-				userID,
-				*baseVersionID,
-				canvas.OrganizationID,
-				normalized,
-			); err != nil {
-				return nil, grpcerrors.Internal(err, "failed to stage deletion")
-			}
-			continue
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
 		}
 
 		if _, err := models.UpsertStagedFile(

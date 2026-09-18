@@ -118,6 +118,9 @@ func prepareCreateRepositoryFiles(localFiles []string) ([]common.RepositoryFileS
 		if _, exists := seenPaths[repositoryPath]; exists {
 			return nil, fmt.Errorf("duplicate repository file %q", repositoryPath)
 		}
+		if !common.IsRepositorySpecFilePath(repositoryPath) {
+			return nil, fmt.Errorf("only canvas.yaml and console.yaml can be staged; %q is not supported", repositoryPath)
+		}
 		seenPaths[repositoryPath] = struct{}{}
 
 		switch repositoryPath {
@@ -184,15 +187,16 @@ func NewCreateCommand(options core.BindOptions) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create an app",
-		Long: `Create an app by name and optionally commit repository files.
+		Long: `Create an app by name and optionally commit spec files.
 
 Examples:
   superplane apps create --name "My App"
-  superplane apps create --name "My App" --file canvas.yaml --file console.yaml --file README.md
+  superplane apps create --name "My App" --file canvas.yaml --file console.yaml
 
 When --file is provided, the command creates an empty app, stages the files, and
-commits them in one step. canvas.yaml and console.yaml do not need metadata.id
-or metadata.canvasId beforehand; those fields are filled in automatically.
+commits them in one step. Only canvas.yaml and console.yaml can be staged.
+Those files do not need metadata.id or metadata.canvasId beforehand; those
+fields are filled in automatically.
 
 AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 - ` + core.SkillsInstallCommand("superplane-app-builder") + `
