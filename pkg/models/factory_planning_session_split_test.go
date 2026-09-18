@@ -65,9 +65,9 @@ func TestFactoryPlanningSession_CreateSplitTask(t *testing.T) {
 	assert.Equal(t, "Duplicate action on the card", body.Title)
 }
 
-func TestFactoryPlanningSession_CreateSplitTaskFallsBackToParentCreator(t *testing.T) {
+func TestFactoryPlanningSession_CreateSplitTaskNeedsAUserReply(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-split-creator")
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-split-confirm")
 	db := database.DB(t.Context())
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	parent, err := factoryModel.CreateWorkOrder(db, "Duplicate a task", "Copy it.", &userID, nil, nil)
@@ -82,10 +82,20 @@ func TestFactoryPlanningSession_CreateSplitTaskFallsBackToParentCreator(t *testi
 	})
 	require.NoError(t, err)
 
+	// The first, automatic turn has no user reply, so nothing can confirm a split.
+	_, err = session.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Part two", Description: "The rest."}, uuid.Nil)
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.ErrorContains(t, err, "user has not replied")
+	split, err := session.SplitTaskOrders(db)
+	require.NoError(t, err)
+	assert.Empty(t, split)
+
+	// A survey answer or chat message from someone without an id still counts as a reply.
+	require.NoError(t, session.SendUserMessage(db, "Split it? Yes", uuid.Nil))
 	created, err := session.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Part two", Description: "The rest."}, uuid.Nil)
 	require.NoError(t, err)
 	require.NotNil(t, created.CreatedByID)
-	assert.Equal(t, userID, *created.CreatedByID)
+	assert.Equal(t, userID, *created.CreatedByID, "falls back to the parent creator when the reply has no user")
 	assert.Equal(t, []uuid.UUID{userID}, created.AssigneeIDs())
 }
 
@@ -105,6 +115,7 @@ func TestFactoryPlanningSession_CreateSplitTaskRejectsBadInput(t *testing.T) {
 		WorkOrderID: parent.ID,
 	})
 	require.NoError(t, err)
+	require.NoError(t, session.SendUserMessage(db, "Yes, split it.", uuid.Nil))
 
 	_, err = session.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: " ", Description: "x"}, uuid.Nil)
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)

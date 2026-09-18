@@ -226,8 +226,61 @@ func TestAnalysisContinuationTextListsSplitTasks(t *testing.T) {
 	require.NoError(t, err)
 	key := factoryModel.WorkOrderKey(created.Number)
 	assert.Contains(t, text, "SuperPlane: Created task "+key+": Add the retry table")
-	assert.Contains(t, text, "Do not create a task that this session already created")
+	assert.Contains(t, text, "Tasks this session already created. Do not create them again:\n\n- "+key+": Add the retry table")
 	assert.NotContains(t, text, created.ID.String(), "the raw JSON body stays out of the prompt")
+
+	// Push the task message out of the bounded rewind window. The durable list still names the task.
+	require.NoError(t, session.SendUserMessage(db, strings.Repeat("more context ", analysisRewindMessageCharacterLimit/12), uuid.Nil))
+	text, err = AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	assert.NotContains(t, text, "SuperPlane: Created task", "the old task message fell out of the window")
+	assert.Contains(t, text, "Tasks this session already created. Do not create them again:\n\n- "+key+": Add the retry table")
+}
+
+func TestAnalysisContinuationTextNamesSplitSiblingsForANewPart(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-sibling")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	parent, err := factoryModel.CreateWorkOrder(db, "Duplicate a task", "Copy and rerun.", &userID, nil, nil)
+	require.NoError(t, err)
+	parentRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	parentSession, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: parentRun.ID,
+		WorkOrderID: parent.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, parentSession.SendUserMessage(db, "Yes, split it.", uuid.Nil))
+	first, err := parentSession.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the duplicate operation", Description: "Back end."}, uuid.Nil)
+	require.NoError(t, err)
+	second, err := parentSession.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the duplicate action", Description: "Front end."}, uuid.Nil)
+	require.NoError(t, err)
+
+	childRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	childSession, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: childRun.ID,
+		WorkOrderID: second.ID,
+	})
+	require.NoError(t, err)
+
+	text, err := AnalysisContinuationText(db, childSession)
+	require.NoError(t, err)
+	assert.Contains(t, text, "This task is one part of a split.")
+	assert.Contains(t, text, factoryModel.WorkOrderKey(parent.Number)+": Duplicate a task (the task it was split from)")
+	assert.Contains(t, text, factoryModel.WorkOrderKey(first.Number)+": Add the duplicate operation")
+	assert.NotContains(t, text, factoryModel.WorkOrderKey(second.Number)+": Add the duplicate action", "the task itself is not a sibling")
+	assert.Contains(t, text, "Treat the boundary between the parts as decided")
+	assert.NotContains(t, text, "Continue this SuperPlane analysis session", "a new part has no prior turn to continue")
+
+	parentText, err := AnalysisContinuationText(db, parentSession)
+	require.NoError(t, err)
+	assert.NotContains(t, parentText, "This task is one part of a split.", "the parent lists the parts it created instead")
 }
 
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {

@@ -44,6 +44,10 @@ func ParsePlanningTaskMessage(text string) (PlanningTaskMessage, bool) {
 // chat message so the transcript shows the new task in order. The parent's
 // owners carry over, plus the person whose last chat message confirmed the
 // split. That person is the creator, so the new draft reads as theirs.
+//
+// A split needs a user reply in the session. The prompt tells the agent to
+// create tasks only after the user confirms; this check backs that up on the
+// server, so the automatic first turn can never spawn drafts on its own.
 func (s *FactoryPlanningSession) CreateSplitTask(
 	tx *gorm.DB,
 	factoryModel *Factory,
@@ -62,6 +66,9 @@ func (s *FactoryPlanningSession) CreateSplitTask(
 	err := s.withLockedSession(tx, func(inner *gorm.DB) error {
 		if err := s.guardOpen(); err != nil {
 			return err
+		}
+		if !s.hasUserReply() {
+			return fmt.Errorf("%w: the user has not replied in this session, so nothing confirms a split", ErrFactoryPlanningSessionInvalid)
 		}
 		parent, err := s.analysisWorkOrder(inner)
 		if err != nil {
@@ -109,6 +116,74 @@ func (s *FactoryPlanningSession) SplitTaskOrders(tx *gorm.DB) ([]FactoryWorkOrde
 	}), nil
 }
 
+// SplitSibling is one other part of a split this draft belongs to.
+type SplitSibling struct {
+	Order FactoryWorkOrder
+	// Parent marks the task the split started from.
+	Parent bool
+}
+
+// SplitSiblings lists the other parts of the split this session's draft was
+// created in: the task it was split from, then the tasks created with it.
+// Empty when the draft was not created by a split.
+func (s *FactoryPlanningSession) SplitSiblings(tx *gorm.DB) ([]SplitSibling, error) {
+	if s.DraftWorkOrderID == nil {
+		return nil, nil
+	}
+	parent, err := s.splitParentSession(tx)
+	if err != nil || parent == nil {
+		return nil, err
+	}
+	siblings := []SplitSibling{}
+	if parent.DraftWorkOrderID != nil {
+		var order FactoryWorkOrder
+		err := tx.Where("factory_id = ? AND id = ?", s.FactoryID, *parent.DraftWorkOrderID).First(&order).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if err == nil {
+			siblings = append(siblings, SplitSibling{Order: order, Parent: true})
+		}
+	}
+	parts, err := parent.SplitTaskOrders(tx)
+	if err != nil {
+		return nil, err
+	}
+	for _, part := range parts {
+		if part.ID == *s.DraftWorkOrderID {
+			continue
+		}
+		siblings = append(siblings, SplitSibling{Order: part})
+	}
+	return siblings, nil
+}
+
+// splitParentSession finds the session that created this session's draft as
+// a split part. A draft is linked to its own session too, so that link is
+// skipped. Nil when no other session created the draft.
+func (s *FactoryPlanningSession) splitParentSession(tx *gorm.DB) (*FactoryPlanningSession, error) {
+	var link FactoryPlanningSessionWorkOrder
+	err := tx.
+		Where("work_order_id = ? AND session_id <> ?", *s.DraftWorkOrderID, s.ID).
+		Order("created_at ASC").
+		First(&link).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var parent FactoryPlanningSession
+	if err := tx.Where("id = ?", link.SessionID).First(&parent).Error; err != nil {
+		return nil, err
+	}
+	if parent.DraftWorkOrderID != nil && *parent.DraftWorkOrderID == *s.DraftWorkOrderID {
+		// Another session refined this same draft; that is not a split.
+		return nil, nil
+	}
+	return &parent, nil
+}
+
 // splitTaskPeople picks the creator and owners for a split task: the last
 // person who wrote in the chat (they confirmed the split), falling back to
 // the parent's creator, plus every current owner of the parent.
@@ -129,6 +204,14 @@ func (s *FactoryPlanningSession) splitTaskPeople(tx *gorm.DB, parent *FactoryWor
 		owners = append(owners, *creator)
 	}
 	return creator, owners, nil
+}
+
+// hasUserReply reports whether a person wrote in this session: a chat
+// message or a survey answer. Both are user-role messages.
+func (s *FactoryPlanningSession) hasUserReply() bool {
+	return slices.ContainsFunc(s.Messages, func(message PlanningSessionMessage) bool {
+		return message.Role == PlanningSessionMessageRoleUser
+	})
 }
 
 func (s *FactoryPlanningSession) lastChatUser() *uuid.UUID {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -340,12 +339,18 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if err != nil {
 		return "", err
 	}
+	var b strings.Builder
+	if err := writeSplitSiblingsBlock(&b, tx, session); err != nil {
+		return "", err
+	}
 	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && len(messages) == 0 {
-		return "", nil
+		return b.String(), nil
 	}
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
-	var b strings.Builder
+	if b.Len() > 0 {
+		b.WriteString("\n")
+	}
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. Call propose_clarity and propose_confidence every turn. If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
@@ -367,11 +372,54 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 			fmt.Fprintf(&b, "\n%s: %s\n", rewindMessageRole(message), rewindMessageText(message))
 		}
 	}
-	if hasTaskMessage(window.Messages) {
-		b.WriteString("\nDo not create a task that this session already created. Create a task only for a part that is not listed above.\n")
+	if err := writeCreatedTasksBlock(&b, tx, session); err != nil {
+		return "", err
 	}
 	b.WriteString("\nApply the latest user message. Do not rewrite the specification from scratch unless the new context requires it.\n")
 	return b.String(), nil
+}
+
+// writeCreatedTasksBlock lists every task this session split off its draft.
+// It reads the durable session links, not the chat, so a task stays listed
+// after its chat message falls out of the bounded rewind window.
+func writeCreatedTasksBlock(b *strings.Builder, tx *gorm.DB, session *FactoryPlanningSession) error {
+	created, err := session.SplitTaskOrders(tx)
+	if err != nil || len(created) == 0 {
+		return err
+	}
+	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		return err
+	}
+	b.WriteString("\nTasks this session already created. Do not create them again:\n")
+	for _, order := range created {
+		fmt.Fprintf(b, "\n- %s: %s", factoryModel.WorkOrderKey(order.Number), order.Title)
+	}
+	b.WriteString("\n\nCreate a task only for a part that is not listed above.\n")
+	return nil
+}
+
+// writeSplitSiblingsBlock tells the agent that its draft is one part of a
+// split and names the other parts, so it plans against that boundary
+// instead of asking about work another part owns.
+func writeSplitSiblingsBlock(b *strings.Builder, tx *gorm.DB, session *FactoryPlanningSession) error {
+	siblings, err := session.SplitSiblings(tx)
+	if err != nil || len(siblings) == 0 {
+		return err
+	}
+	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		return err
+	}
+	b.WriteString("This task is one part of a split. The other parts are separate tasks, each with its own refinement and its own run:\n")
+	for _, sibling := range siblings {
+		fmt.Fprintf(b, "\n- %s: %s", factoryModel.WorkOrderKey(sibling.Order.Number), sibling.Order.Title)
+		if sibling.Parent {
+			b.WriteString(" (the task it was split from)")
+		}
+	}
+	b.WriteString("\n\nTreat the boundary between the parts as decided. Work that another part owns is not missing and is not an open question: do not ask how to handle it, do not propose a stub for it, and do not lower Confidence because it is not in the repository yet. Plan against the interface the task description gives. Say once, in chat, which part you depend on. Do not create a task for work a listed part already owns.\n")
+	return nil
 }
 
 func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
@@ -457,12 +505,6 @@ func rewindMessageText(message PlanningSessionMessage) string {
 		return "Created a task."
 	}
 	return fmt.Sprintf("Created task %s: %s", task.Key, task.Title)
-}
-
-func hasTaskMessage(messages []PlanningSessionMessage) bool {
-	return slices.ContainsFunc(messages, func(message PlanningSessionMessage) bool {
-		return message.Role == PlanningSessionMessageRoleTask
-	})
 }
 
 func truncateAnalysisMessageForRewind(text string, limit int) string {

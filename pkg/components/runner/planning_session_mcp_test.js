@@ -83,6 +83,12 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.doesNotMatch(pack, /create_task/);
   assert.match(pack, /This task stays as the first part/);
   assert.match(pack, /Do not create a task the user did not confirm/);
+  assert.match(pack, /Do not use contractions/);
+  assert.doesNotMatch(pack, /Contractions are fine/);
+  assert.match(pack, /### A part of a split/);
+  assert.match(pack, /that boundary is decided/);
+  assert.match(pack, /Do not lower Confidence because it is not in the repository yet/);
+  assert.match(pack, /Score only the work this task owns/);
   assert.doesNotMatch(pack, /Do not push Confidence to 5/);
   assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
   assert.match(pack, /Confidence is provisional/);

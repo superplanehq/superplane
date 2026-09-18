@@ -30,6 +30,8 @@ var defaultRefinePromptDigests = map[string]struct{}{
 	"50eae06fb6d645a9ca446d234920f780fbd579975a5edfd96fb6da6be0348aed": {},
 	// Split the task: propose a split in a survey, create the parts on confirm.
 	"fe98c9788445b9c1444cccd44762dbd30ceecae6ef0185855e879d646017c51b": {},
+	// A part of a split treats the boundary as decided; no contractions.
+	"89357bdc369d0ee8a7bb9173408c155338b0e9db6fc9a88a0a0345fe420b0151": {},
 }
 
 func refinePromptDigest(prompt string) string {

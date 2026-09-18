@@ -164,11 +164,18 @@ func TestRunnerPlanningSessionCreatesSplitTask(t *testing.T) {
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(
-		`{"title":"Add the retry table","description":"Schema and migration only."}`,
-	)))
+	body := `{"title":"Add the retry table","description":"Schema and migration only."}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code, "no user reply yet, so nothing confirms a split")
+	assert.Contains(t, rec.Body.String(), "user has not replied")
+
+	require.NoError(t, session.SendUserMessage(db, "Split: table first. Yes.", r.User))
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
@@ -191,8 +198,8 @@ func TestRunnerPlanningSessionCreatesSplitTask(t *testing.T) {
 
 	messages, err := models.ListPlanningSessionMessages(db, session.ID)
 	require.NoError(t, err)
-	require.Len(t, messages, 1)
-	assert.Equal(t, models.PlanningSessionMessageRoleTask, messages[0].Role)
+	require.Len(t, messages, 2)
+	assert.Equal(t, models.PlanningSessionMessageRoleTask, messages[1].Role)
 
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(`{"title":"","description":"x"}`)))
 	req.Header.Set("Authorization", "Bearer "+token)
