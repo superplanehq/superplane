@@ -103,8 +103,9 @@ func HasArtifactUploadToken(environment []BrokerEnvironmentVariable) bool {
 	return false
 }
 
-func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int) []BrokerEnvironmentVariable {
-	if HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
+func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int, enabled bool) []BrokerEnvironmentVariable {
+	environment = removeArtifactUploadToken(environment)
+	if !enabled || HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
 		return environment
 	}
 	db := database.DB(context.Background())
@@ -151,4 +152,14 @@ func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvi
 		BrokerEnvironmentVariable{Name: EnvSuperplaneArtifactToken, Value: token},
 		BrokerEnvironmentVariable{Name: EnvPlaywrightMCPBrowser, Value: "chromium"},
 	)
+}
+
+func removeArtifactUploadToken(environment []BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
+	filtered := make([]BrokerEnvironmentVariable, 0, len(environment))
+	for _, item := range environment {
+		if item.Name != EnvSuperplaneArtifactToken {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
 }

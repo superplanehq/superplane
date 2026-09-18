@@ -51,7 +51,10 @@ const implementerNode: CanvasSpecNode = {
 
 const canvas: CanvasesCanvas = {
   metadata: { id: "app-refund-implementer", liveVersionId: "version-live" },
-  spec: { nodes: [implementerNode], edges: [] },
+  spec: {
+    nodes: [{ id: "onrun-implement", name: "On run", type: "TYPE_TRIGGER", component: "onWorkOrder" }, implementerNode],
+    edges: [],
+  },
 };
 
 const backlogCanvas: CanvasesCanvas = {
@@ -73,7 +76,11 @@ const draft: PlanningReviewDraft = {
       title: "Implement From Task Description",
       description: "",
       expanded: true,
-      configuration: { model: "opus", steps: [{ name: "Clone Repo", type: "bash", command: "git clone --depth 1" }] },
+      configuration: {
+        model: "opus",
+        includeVisualEvidence: true,
+        steps: [{ name: "Clone Repo", type: "bash", command: "git clone --depth 1" }],
+      },
       concurrency: { max: "5", key: "" },
     },
   ],
@@ -124,6 +131,20 @@ describe("useColumnCanvasAgentEditor", () => {
 
     expect(result.current.isLoading).toBe(true);
   });
+
+  it("shows the visual evidence setting only for line implementation", () => {
+    hookState.canvas.current = canvas;
+
+    const { result, rerender } = renderHook(({ appId }) => useColumnCanvasAgentEditor("organization-1", appId), {
+      initialProps: { appId: "app-refund-implementer" },
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.showVisualEvidenceSetting).toBe(true);
+    hookState.canvas.current = backlogCanvas;
+    rerender({ appId: "backlog" });
+    expect(result.current.showVisualEvidenceSetting).toBe(false);
+  });
 });
 
 describe("persistColumnAgent", () => {
@@ -147,6 +168,7 @@ describe("persistColumnAgent", () => {
       canvasYaml: expect.stringContaining("opus"),
     });
     expect(stageYaml.mock.calls[0][0].canvasYaml).toContain("git clone --depth 1");
+    expect(stageYaml.mock.calls[0][0].canvasYaml).toContain('"includeVisualEvidence":true');
     expect(commit).toHaveBeenCalledWith("Update agent");
     expect(invalidate).toHaveBeenCalled();
   });

@@ -68,8 +68,9 @@ func TestDecodeRunOpenRouterSpecIgnoresOmittedMaxTurns(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunOpenRouterSpec(map[string]any{
-		"machineType": "e1-large-amd64",
-		"model":       "anthropic/claude-sonnet-4-6",
+		"machineType":           "e1-large-amd64",
+		"model":                 "anthropic/claude-sonnet-4-6",
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
 		},
@@ -78,6 +79,7 @@ func TestDecodeRunOpenRouterSpecIgnoresOmittedMaxTurns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, spec.MaxTurns)
 	require.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	require.True(t, spec.IncludeVisualEvidence)
 }
 
 func TestDecodeRunOpenRouterSpecKeepsExplicitMaxTurns(t *testing.T) {
