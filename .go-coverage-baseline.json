@@ -58,7 +58,6 @@
     "pkg/grpc/actions/widgets": 0,
     "pkg/grpc/errors": 60.5,
     "pkg/impersonation": 100,
-    "pkg/installation": 53.6,
     "pkg/jwt": 55.3,
     "pkg/lint/configurationfields": 91.9,
     "pkg/lint/examplepayloads": 84.6,

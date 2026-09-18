@@ -223,13 +223,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         },
       }),
     },
-    // Catalog install from FreshOrgLanding starter setup
-    {
-      pattern: re("/apps/install"),
-      resolve: () => ({
-        json: { canvasId: "storybook-installed-canvas", organizationId: orgId },
-      }),
-    },
   ];
 }
 

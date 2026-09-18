@@ -63,10 +63,10 @@ func CreateCanvas(
 	)
 }
 
-// CreateCanvasWithSeedFiles is the variant called by the app install flow. It
-// persists the provided files alongside the canvas's pending repository row so
-// the repository provisioner can commit them as the repo's initial content. A
-// nil/empty seedFiles slice is equivalent to calling CreateCanvas.
+// CreateCanvasWithSeedFiles persists the provided files alongside the canvas's
+// pending repository row so the repository provisioner can commit them as the
+// repo's initial content. Factory canvas creation uses this. A nil or empty
+// seedFiles slice is equivalent to calling CreateCanvas.
 func CreateCanvasWithSeedFiles(
 	ctx context.Context,
 	registry *registry.Registry,
