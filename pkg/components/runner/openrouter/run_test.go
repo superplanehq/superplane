@@ -129,6 +129,20 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
+func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	docs, ok := mcp["docs"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", docs["type"])
+	assert.Equal(t, "https://mcp.example.com/mcp", docs["url"])
+}
+
 func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
