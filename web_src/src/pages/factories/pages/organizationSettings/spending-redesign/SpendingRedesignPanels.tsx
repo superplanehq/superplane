@@ -400,7 +400,9 @@ function SpendingBreakdownCard({
           </tbody>
           <tfoot>
             <tr className="border-t border-border" data-testid={`${testId}-total`}>
-              <td className="px-4 py-2 font-medium">Total</td>
+              <th scope="row" className="px-4 py-2 font-medium">
+                Total
+              </th>
               <td className="px-4 py-2 font-medium">{formatUsdCents(report.totals.costCents)}</td>
               {showTokens ? (
                 <td className="px-4 py-2 font-medium">{formatCompactTokens(report.totals.tokens)}</td>

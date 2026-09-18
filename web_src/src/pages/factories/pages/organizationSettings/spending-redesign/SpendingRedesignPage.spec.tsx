@@ -431,11 +431,11 @@ describe("SpendingRedesignPage", () => {
     });
     const total = within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown-total");
 
-    expect(total).toHaveTextContent("Total");
+    expect(within(total).getByRole("rowheader", { name: "Total" })).toBeInTheDocument();
     expect(total).toHaveTextContent(formatUsdCents(report.totals.costCents));
     expect(total).toHaveTextContent(formatCompactTokens(report.totals.tokens));
     expect(total).toHaveTextContent(formatShare(1));
-    expect(total.querySelectorAll("td")).toHaveLength(4);
+    expect(total.querySelectorAll("td")).toHaveLength(3);
   });
 
   it("shows a VM breakdown total with spend and 100% share, and no tokens cell", () => {
@@ -451,11 +451,11 @@ describe("SpendingRedesignPage", () => {
     });
     const total = within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-breakdown-total");
 
-    expect(total).toHaveTextContent("Total");
+    expect(within(total).getByRole("rowheader", { name: "Total" })).toBeInTheDocument();
     expect(total).toHaveTextContent(formatUsdCents(report.totals.costCents));
     expect(total).toHaveTextContent(formatShare(1));
     expect(total).not.toHaveTextContent("tokens");
-    expect(total.querySelectorAll("td")).toHaveLength(3);
+    expect(total.querySelectorAll("td")).toHaveLength(2);
   });
 
   it("hides the breakdown total when a section is empty", () => {
