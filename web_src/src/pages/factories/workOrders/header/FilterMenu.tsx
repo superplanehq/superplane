@@ -125,6 +125,7 @@ function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabe
             <DropdownMenuItem
               key={option.value}
               className={MENU_ITEM_CLASSNAME}
+              data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
                 state.toggleFilter(dimension, option.value);
