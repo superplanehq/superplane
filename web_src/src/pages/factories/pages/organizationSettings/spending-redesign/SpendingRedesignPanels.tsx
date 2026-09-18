@@ -398,6 +398,18 @@ function SpendingBreakdownCard({
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="border-t border-border" data-testid={`${testId}-total`}>
+              <td className="px-4 py-2 font-medium">Total</td>
+              <td className="px-4 py-2 font-medium">{formatUsdCents(report.totals.costCents)}</td>
+              {showTokens ? (
+                <td className="px-4 py-2 font-medium">{formatCompactTokens(report.totals.tokens)}</td>
+              ) : null}
+              <td className="px-4 py-2 font-medium text-muted-foreground">
+                {formatShare(report.totals.costCents > 0 ? 1 : 0)}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       )}
     </section>
