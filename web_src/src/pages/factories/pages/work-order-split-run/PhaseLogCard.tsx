@@ -5,6 +5,7 @@ const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { durationLabelMs, formatGoDuration, formatGoDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -1455,7 +1456,11 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
   const Icon = resolveIcon(iconSlug ?? "box");
   return (
     <span className="inline-flex size-3 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
-      {iconSrc ? <img src={iconSrc} alt="" className="size-3 object-contain" /> : <Icon className="size-3" />}
+      {iconSrc ? (
+        <img src={iconSrc} alt="" className={cn("size-3 object-contain", logoDarkInvertClass(iconSrc))} />
+      ) : (
+        <Icon className="size-3" />
+      )}
     </span>
   );
 }
