@@ -66,6 +66,19 @@ func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 }
 
+func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_TASK_DIR":              taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  "/task/workspace_mcp.json",
+	})
+	assert.Contains(t, tools, "mcp__deepwiki")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
 func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	analysis := planningSystemPromptFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",

@@ -19,7 +19,7 @@ import (
 const (
 	WorkspaceMCPConfigPath          = "workspace_mcp.json"
 	EnvSuperplaneWorkspaceMCPConfig = "SUPERPLANE_WORKSPACE_MCP_CONFIG"
-	workspaceMCPConfigTaskPath      = "/task/" + WorkspaceMCPConfigPath
+	workspaceMCPConfigEnvValue      = "$SUPERPLANE_TASK_DIR/" + WorkspaceMCPConfigPath
 )
 
 type workspaceMCPServer struct {
@@ -105,7 +105,7 @@ func AttachWorkspaceAgentResources(
 	})
 	environment = append(environment, BrokerEnvironmentVariable{
 		Name:  EnvSuperplaneWorkspaceMCPConfig,
-		Value: workspaceMCPConfigTaskPath,
+		Value: workspaceMCPConfigEnvValue,
 	})
 	return environment, files
 }

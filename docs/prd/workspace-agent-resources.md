@@ -194,7 +194,8 @@ Each runner component already calls `ResolveEnvironment` and
    when the canvas is not factory-owned.
 2. Load enabled `mcp_server` rows.
 3. Resolve header secrets or mint an OAuth access token.
-4. Ship `workspace_mcp.json`. Set `SUPERPLANE_WORKSPACE_MCP_CONFIG`.
+4. Ship `workspace_mcp.json` under `SUPERPLANE_TASK_DIR`. Set
+   `SUPERPLANE_WORKSPACE_MCP_CONFIG` to `$SUPERPLANE_TASK_DIR/workspace_mcp.json`.
 5. Each `run.js` merges those remote servers with the SuperPlane stdio
    MCP when planning is on.
 

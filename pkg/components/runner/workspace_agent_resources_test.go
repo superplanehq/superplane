@@ -70,6 +70,7 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
 	require.Len(t, environment, 1)
 	assert.Equal(t, runner.EnvSuperplaneWorkspaceMCPConfig, environment[0].Name)
+	assert.Equal(t, "$SUPERPLANE_TASK_DIR/"+runner.WorkspaceMCPConfigPath, environment[0].Value)
 
 	var payload struct {
 		Servers []struct {

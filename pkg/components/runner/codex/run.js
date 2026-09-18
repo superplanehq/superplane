@@ -192,9 +192,29 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   ];
 }
 
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
 function workspaceMCPServers(env = process.env) {
-  const configPath = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
-  if (!configPath || !fs.existsSync(configPath)) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
     return [];
   }
   try {
