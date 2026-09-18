@@ -304,6 +304,7 @@ export function LinesPage() {
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
@@ -662,6 +663,7 @@ export function LinesPage() {
               addressingFeedbackLabels,
               waitingOnChecksOrderIds,
               checksPassedOrderIds,
+              checksPassedLabels,
               fixesPausedOrderIds,
               pullRequests,
               ...cardActions,

@@ -1,5 +1,6 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { ArrowLeft } from "lucide-react";
 import { FactoryAppCanvasTitleEditor, FACTORY_APP_CANVAS_TITLE_CLASS } from "./FactoryAppCanvasTitleEditor";
 import { FactoryAppCanvasViewActions } from "./FactoryAppCanvasViewActions";
@@ -78,7 +79,13 @@ export function FactoryAppCanvasHeader({
             />
           ) : (
             <h2 className={FACTORY_APP_CANVAS_TITLE_CLASS} data-testid="factory-app-canvas-title">
-              {title}
+              <MarkdownContent
+                content={title}
+                variant="workspace"
+                openLinksInNewTab
+                linkClassName="font-semibold text-current !underline !decoration-current underline-offset-2"
+                className="min-w-0 truncate [&_p]:m-0 [&_p]:inline"
+              />
             </h2>
           )}
         </div>

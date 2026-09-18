@@ -69,8 +69,8 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 6)
-		assert.Len(t, liveVersion.Edges, 5)
+		assert.Len(t, liveVersion.Nodes, 12)
+		assert.Len(t, liveVersion.Edges, 9)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}
@@ -153,8 +153,9 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
-			if node.ID == prFeedbackActivityNodeID {
-				assert.Equal(t, prFeedbackActivityDescriptionExpression(), node.Configuration["description"])
+			if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID); ok {
+				assert.Equal(t, title, node.Configuration["title"])
+				assert.Equal(t, description, node.Configuration["description"])
 			}
 			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
 				continue
@@ -322,8 +323,19 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			if node.ID == prFeedbackWaitChecksNodeID {
 				assert.Equal(t, []any{"lint", "unit"}, node.Configuration["checkNames"])
 			}
+			if node.ID == prFeedbackActivityNodeID {
+				assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), node.Configuration["title"])
+			}
+			if node.ID == prFeedbackMarkPassedNodeID {
+				assert.Equal(t, prFeedbackChecksPassedTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), node.Configuration["description"])
+			}
+			if node.ID == prFeedbackStartRepairNodeID {
+				assert.Equal(t, prFeedbackChecksRepairTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), node.Configuration["description"])
+			}
 			if node.ID == prFeedbackPauseFixesNodeID {
-				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["description"])
+				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["title"])
 			}
 			if node.ID == prFeedbackAnnounceLimitNodeID {
 				assert.Equal(t, prFeedbackChecksLimitStatusNoteBody(5), node.Configuration["body"])

@@ -213,12 +213,14 @@ const (
 
 type AddPullRequestActivityParams struct {
 	PullRequestID string
+	Title         string
 	Description   string
 	Revision      string
 	Access        string
 }
 
 type UpdatePullRequestActivityParams struct {
+	Title       *string
 	Description *string
 	Access      string
 }
@@ -229,6 +231,7 @@ type PullRequestRevision struct {
 }
 
 type PullRequestActivity struct {
+	Title        string               `json:"title,omitempty"`
 	Description  string               `json:"description,omitempty"`
 	Access       string               `json:"access"`
 	State        string               `json:"state"`

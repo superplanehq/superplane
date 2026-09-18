@@ -121,7 +121,7 @@ func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestAc
 	return &core.PullRequestActivityResult{
 		PullRequest: &core.PullRequest{ID: params.PullRequestID, Number: 42},
 		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
-		Activity:    &core.PullRequestActivity{Description: params.Description, Access: core.PullRequestActivityAccessConcurrent, State: "active"},
+		Activity:    &core.PullRequestActivity{Title: params.Title, Description: params.Description, Access: core.PullRequestActivityAccessConcurrent, State: "active"},
 		Outcome:     core.PullRequestActivityOutcomeReady,
 	}, nil
 }
@@ -138,10 +138,14 @@ func (f *fakeFactoryContext) UpdatePullRequestActivity(params core.UpdatePullReq
 	if params.Description != nil {
 		description = *params.Description
 	}
+	title := ""
+	if params.Title != nil {
+		title = *params.Title
+	}
 	return &core.PullRequestActivityResult{
 		PullRequest: &core.PullRequest{ID: "pr-1", Number: 42},
 		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
-		Activity:    &core.PullRequestActivity{Description: description, Access: params.Access, State: "active"},
+		Activity:    &core.PullRequestActivity{Title: title, Description: description, Access: params.Access, State: "active"},
 		Outcome:     core.PullRequestActivityOutcomeReady,
 	}, nil
 }
@@ -781,28 +785,31 @@ func TestPrArtifactLifecycleFields_SharedByAddAndUpdate(t *testing.T) {
 func TestAddPullRequestActivity_Execute(t *testing.T) {
 	component := &AddPullRequestActivity{}
 
-	t.Run("passes description to the factory context", func(t *testing.T) {
+	t.Run("passes Markdown content to the factory context", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{}
 		stateCtx := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"pullRequestId": "pr-1",
-				"description":   "Please add tests for the retry path.",
+				"title":         "Address **review** comment",
+				"description":   "Please add [tests](https://example.com/tests).",
 			},
 			ExecutionState: stateCtx,
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "pr-1", factoryCtx.lastActivityParams.PullRequestID)
-		assert.Equal(t, "Please add tests for the retry path.", factoryCtx.lastActivityParams.Description)
+		assert.Equal(t, "Address **review** comment", factoryCtx.lastActivityParams.Title)
+		assert.Equal(t, "Please add [tests](https://example.com/tests).", factoryCtx.lastActivityParams.Description)
 		assert.Equal(t, "pullRequest.activityAdded", stateCtx.Type)
 		require.Len(t, stateCtx.Payloads, 1)
 		payload, ok := stateCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
 		data, ok := payload["data"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "Please add tests for the retry path.", data["description"])
+		assert.Equal(t, "Address **review** comment", data["title"])
+		assert.Equal(t, "Please add [tests](https://example.com/tests).", data["description"])
 	})
 
 	t.Run("passes without output when another activity owns the revision", func(t *testing.T) {
@@ -846,18 +853,23 @@ func TestAddPullRequestActivity_Execute(t *testing.T) {
 func TestUpdatePullRequestActivity_Execute(t *testing.T) {
 	component := &UpdatePullRequestActivity{}
 
-	t.Run("updates the description", func(t *testing.T) {
+	t.Run("updates Markdown content", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{}
 		stateCtx := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"description": "Checks passed on d1209da"},
+			Configuration: map[string]any{
+				"title":       "Checks **passed**",
+				"description": "View the [run](https://example.com/run).",
+			},
 			ExecutionState: stateCtx,
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
+		require.NotNil(t, factoryCtx.lastUpdateParams.Title)
+		assert.Equal(t, "Checks **passed**", *factoryCtx.lastUpdateParams.Title)
 		require.NotNil(t, factoryCtx.lastUpdateParams.Description)
-		assert.Equal(t, "Checks passed on d1209da", *factoryCtx.lastUpdateParams.Description)
+		assert.Equal(t, "View the [run](https://example.com/run).", *factoryCtx.lastUpdateParams.Description)
 		assert.Equal(t, "pullRequest.activityUpdated", stateCtx.Type)
 	})
 

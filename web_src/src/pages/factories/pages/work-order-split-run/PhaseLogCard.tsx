@@ -3,7 +3,7 @@ import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
 
 const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
-import { formatClockDurationLabel } from "@/lib/duration";
+import { durationLabelMs, formatGoDuration, formatGoDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
@@ -20,6 +20,7 @@ import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
+import { PR_FEEDBACK_SETTINGS_COPY } from "../prFeedbackSettingsCopy";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { displayRunnerModel } from "./draftStartModel";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
@@ -41,6 +42,9 @@ const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
 const STREAM_NOTE_MARKDOWN =
   "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
+const ACTIVITY_MARKDOWN_TEXT = "font-mono text-[13px]";
+const ACTIVITY_MARKDOWN_LINK = "font-semibold text-current !underline !decoration-current underline-offset-2";
+const PHASE_META_FACE = "font-mono text-[11px] font-normal tabular-nums text-muted-foreground";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -49,6 +53,23 @@ function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "cancelled") return "cancelled";
   if (status === "failed") return "failed";
   return "pending";
+}
+
+function PhaseStatusGlyph({ phase }: { phase: SplitRunPhase }) {
+  const glyph = <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />;
+  if (!phase.pullRequestActivity?.waitingForAccess) {
+    return glyph;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="inline-flex shrink-0" aria-label={PR_FEEDBACK_SETTINGS_COPY.waitingForAccess}>
+          {glyph}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{PR_FEEDBACK_SETTINGS_COPY.waitingForAccess}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function statusTimeTone(status: SplitRunPhaseStatus): string {
@@ -70,7 +91,7 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
   return "text-muted-foreground";
 }
 
-const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
+const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)] dark:hover:bg-muted";
 const LOG_ROW_H = "h-[1.375rem]";
 const STREAM_SECTION = "bg-muted px-2";
 const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
@@ -397,6 +418,10 @@ function isNestedHeaderControl(target: EventTarget | null): boolean {
 type PhaseLogCardProps = {
   phase: SplitRunPhase;
   expanded: boolean;
+  headerLeading?: ReactNode;
+  markdownName?: boolean;
+  showMarkdownDescription?: boolean;
+  showExpandedStream?: boolean;
   stream?: SplitRunStreamLine[];
   selectedNodeId?: string | null;
   onToggle?: () => void;
@@ -421,9 +446,81 @@ function phaseExpectsUsage(groups: StreamNodeGroup[]): boolean {
   return groups.some((group) => isRunnerComponent(group.line.component) && Boolean(group.line.executionId));
 }
 
+function useScrollSelectedStreamNode(selectedNodeId?: string) {
+  useEffect(() => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const row = document.querySelector(`[data-testid="split-run-stream-line-${selectedNodeId}"]`);
+    if (row instanceof HTMLElement && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedNodeId]);
+}
+
+function phaseExpandClick(onToggle?: () => void) {
+  if (!onToggle) {
+    return undefined;
+  }
+  return (event: { target: EventTarget | null }) => {
+    if (!isNestedHeaderControl(event.target)) {
+      onToggle();
+    }
+  };
+}
+
+function phaseMarkdownDescription(phase: SplitRunPhase, files: FilesFile[] | undefined, visible: boolean) {
+  if (!visible || !phase.description) {
+    return undefined;
+  }
+  return (
+    <MarkdownContent
+      content={phase.description}
+      files={files}
+      variant="workspace"
+      openLinksInNewTab
+      linkClassName={ACTIVITY_MARKDOWN_LINK}
+      className={cn(
+        "max-w-none pt-1 leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+        ACTIVITY_MARKDOWN_TEXT,
+      )}
+      data-testid={`split-run-phase-description-${phase.id}`}
+    />
+  );
+}
+
+function phaseCardLayout(args: {
+  phase: SplitRunPhase;
+  expanded: boolean;
+  showExpandedStream: boolean;
+  showMarkdownDescription: boolean;
+  collapsible: boolean;
+  onToggle?: () => void;
+}) {
+  const canToggle = args.collapsible && Boolean(args.onToggle);
+  return {
+    followRunning: args.phase.status === "running" && args.showExpandedStream,
+    showStream: args.expanded && args.showExpandedStream,
+    current: args.expanded ? ("step" as const) : undefined,
+    className: cn(
+      "rounded-md bg-muted",
+      !args.expanded && LOG_ROW_HOVER,
+      args.expanded ? "pb-2" : "py-2",
+      canToggle && !args.expanded && "cursor-pointer",
+    ),
+    expandTestId: canToggle ? `split-run-phase-expand-${args.phase.id}` : undefined,
+    onExpandClick: phaseExpandClick(canToggle ? args.onToggle : undefined),
+    showDescription: args.showMarkdownDescription && (args.expanded || !args.collapsible),
+  };
+}
+
 export function PhaseLogCard({
   phase,
   expanded,
+  headerLeading,
+  markdownName = false,
+  showMarkdownDescription = false,
+  showExpandedStream = true,
   stream,
   selectedNodeId,
   onToggle,
@@ -443,60 +540,36 @@ export function PhaseLogCard({
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
   const producedPullRequests = pullRequestsProducedBySteps(groups);
+  const layout = phaseCardLayout({
+    phase,
+    expanded,
+    showExpandedStream,
+    showMarkdownDescription,
+    collapsible,
+    onToggle,
+  });
   const rootRef = useRef<HTMLDivElement>(null);
-  useLastRunningLine(rootRef, phase.status === "running");
-  const expectUsage = phaseExpectsUsage(groups);
-
-  useEffect(() => {
-    if (!selectedNodeId) {
-      return;
-    }
-    const row = document.querySelector(`[data-testid="split-run-stream-line-${selectedNodeId}"]`);
-    if (row instanceof HTMLElement && typeof row.scrollIntoView === "function") {
-      row.scrollIntoView({ block: "nearest" });
-    }
-  }, [selectedNodeId]);
-
-  const canToggleFromHeader = collapsible && Boolean(onToggle);
+  useLastRunningLine(rootRef, layout.followRunning);
+  useScrollSelectedStreamNode(selectedNodeId);
 
   return (
-    <div
-      ref={rootRef}
-      className="min-w-0"
-      data-testid={`split-run-phase-${phase.id}`}
-      aria-current={expanded ? "step" : undefined}
-    >
-      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={expectUsage}>
+    <div ref={rootRef} className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={layout.current}>
+      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={phaseExpectsUsage(groups)}>
         <PhaseCollapsedUsageCollectors
           groups={groups}
           expanded={expanded}
+          showExpandedStream={showExpandedStream}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
         />
-        <div
-          className={cn(
-            "rounded-md bg-muted",
-            !expanded && LOG_ROW_HOVER,
-            expanded ? "pb-2" : "py-2",
-            canToggleFromHeader && !expanded && "cursor-pointer",
-          )}
-          data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
-          onClick={
-            canToggleFromHeader
-              ? (event) => {
-                  if (isNestedHeaderControl(event.target)) {
-                    return;
-                  }
-                  onToggle?.();
-                }
-              : undefined
-          }
-        >
+        <div className={layout.className} data-testid={layout.expandTestId} onClick={layout.onExpandClick}>
           {compactSessionLog ? null : (
             <AutomationHeader
               phase={phase}
               expanded={expanded}
               collapsible={collapsible}
+              headerLeading={headerLeading}
+              markdownName={markdownName}
               producedArtifacts={producedArtifacts}
               producedPullRequests={producedPullRequests}
               onToggle={onToggle}
@@ -505,28 +578,22 @@ export function PhaseLogCard({
               runHref={runHref}
               actionBusy={actionBusy}
               onUsageOpenChange={onUsageOpenChange}
+              files={files}
+              showExpandedStream={showExpandedStream}
+              description={phaseMarkdownDescription(phase, files, layout.showDescription)}
             />
           )}
-
-          {expanded ? (
-            <ol
-              className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
-              data-testid={`split-run-stream-${phase.id}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              {groups.map((group) => (
-                <StreamNode
-                  key={group.line.id}
-                  group={group}
-                  highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
-                  onSelect={onSelectNode}
-                  organizationId={organizationId}
-                  canvasId={canvasId ?? phase.appId}
-                  compactSessionLog={compactSessionLog}
-                  files={files}
-                />
-              ))}
-            </ol>
+          {layout.showStream ? (
+            <PhaseLogCardStream
+              phase={phase}
+              groups={groups}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              organizationId={organizationId}
+              canvasId={canvasId}
+              compactSessionLog={compactSessionLog}
+              files={files}
+            />
           ) : null}
         </div>
       </PhaseAgentUsageProvider>
@@ -534,10 +601,155 @@ export function PhaseLogCard({
   );
 }
 
+function PhaseLogCardStream({
+  phase,
+  groups,
+  selectedNodeId,
+  onSelectNode,
+  organizationId,
+  canvasId,
+  compactSessionLog,
+  files,
+}: {
+  phase: SplitRunPhase;
+  groups: StreamNodeGroup[];
+  selectedNodeId?: string;
+  onSelectNode?: (nodeId: string) => void;
+  organizationId?: string;
+  canvasId?: string;
+  compactSessionLog: boolean;
+  files?: FilesFile[];
+}) {
+  return (
+    <ol
+      className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
+      data-testid={`split-run-stream-${phase.id}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {groups.map((group) => (
+        <StreamNode
+          key={group.line.id}
+          group={group}
+          highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
+          onSelect={onSelectNode}
+          organizationId={organizationId}
+          canvasId={canvasId ?? phase.appId}
+          compactSessionLog={compactSessionLog}
+          files={files}
+        />
+      ))}
+    </ol>
+  );
+}
+
+function AutomationPhaseName({
+  phase,
+  expanded,
+  collapsible,
+  markdownName,
+  files,
+  onToggle,
+}: {
+  phase: SplitRunPhase;
+  expanded: boolean;
+  collapsible: boolean;
+  markdownName: boolean;
+  files?: FilesFile[];
+  onToggle?: () => void;
+}) {
+  const name = markdownName ? (
+    <MarkdownContent
+      content={phase.name}
+      files={files}
+      variant="workspace"
+      openLinksInNewTab
+      linkClassName={ACTIVITY_MARKDOWN_LINK}
+      className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
+    />
+  ) : (
+    <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+  );
+  if (collapsible && markdownName) {
+    return (
+      <div className={PHASE_NAME_FACE}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${phase.name}`}
+          className="shrink-0"
+        >
+          <PhaseStatusGlyph phase={phase} />
+        </button>
+        {name}
+      </div>
+    );
+  }
+  if (collapsible) {
+    return (
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
+        <PhaseStatusGlyph phase={phase} />
+        {name}
+      </button>
+    );
+  }
+  return (
+    <div className={PHASE_NAME_FACE}>
+      <PhaseStatusGlyph phase={phase} />
+      {name}
+    </div>
+  );
+}
+
+function AutomationHeaderActions({
+  phase,
+  producedArtifacts,
+  producedPullRequests,
+  onUsageOpenChange,
+  expanded,
+  collapsible,
+  runHref,
+}: {
+  phase: SplitRunPhase;
+  producedArtifacts: FactoriesWorkOrderArtifact[];
+  producedPullRequests: FactoriesFactoryPullRequest[];
+  onUsageOpenChange?: (open: boolean) => void;
+  expanded: boolean;
+  collapsible: boolean;
+  runHref?: string;
+}) {
+  return (
+    <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden">
+      {phase.checks && phase.checks.length > 0 ? (
+        <span className="shrink-0">
+          <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+        </span>
+      ) : null}
+      {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
+        <span
+          data-testid={`split-run-phase-artifacts-${phase.id}`}
+          className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+        >
+          {producedPullRequests.map((pullRequest) => (
+            <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
+          ))}
+          {producedArtifacts.map((artifact) => (
+            <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+          ))}
+        </span>
+      ) : null}
+      <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
+      {expanded || !collapsible ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
+    </span>
+  );
+}
+
 function AutomationHeader({
   phase,
   expanded,
   collapsible,
+  headerLeading,
+  markdownName,
   producedArtifacts,
   producedPullRequests,
   onToggle,
@@ -546,10 +758,15 @@ function AutomationHeader({
   runHref,
   actionBusy,
   onUsageOpenChange,
+  files,
+  showExpandedStream,
+  description,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
   collapsible: boolean;
+  headerLeading?: ReactNode;
+  markdownName: boolean;
   producedArtifacts: FactoriesWorkOrderArtifact[];
   producedPullRequests: FactoriesFactoryPullRequest[];
   onToggle?: () => void;
@@ -558,57 +775,62 @@ function AutomationHeader({
   runHref?: string;
   actionBusy: boolean;
   onUsageOpenChange?: (open: boolean) => void;
+  files?: FilesFile[];
+  showExpandedStream: boolean;
+  description?: ReactNode;
 }) {
-  return (
-    <div
-      data-testid={`split-run-automation-header-${phase.id}`}
-      {...streamLineAttrs(phase.status)}
-      className={cn(
-        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight bg-muted",
-        LAST_RUNNING_LINE_PULSE,
-        expanded && STICKY_PHASE,
-        collapsible && onToggle && "cursor-pointer",
-      )}
-    >
-      {collapsible ? (
-        <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
-          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
-          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-        </button>
-      ) : (
-        <div className={PHASE_NAME_FACE}>
-          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
-          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-        </div>
-      )}
-      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
+  const alignDescriptionWithTitle = Boolean(description && headerLeading);
+  const content = (
+    <>
+      <AutomationPhaseName
+        phase={phase}
+        expanded={expanded}
+        collapsible={collapsible}
+        markdownName={markdownName}
+        files={files}
+        onToggle={onToggle}
+      />
       {phase.status === "running" && onStop ? (
         <PhaseStopButton phaseId={phase.id} busy={actionBusy} onStop={onStop} />
       ) : null}
       {phase.status === "failed" && onRerun ? (
         <PhaseRerunButton phaseId={phase.id} busy={actionBusy} onRerun={onRerun} />
       ) : null}
-      <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden">
-        {phase.checks && phase.checks.length > 0 ? (
-          <span className="shrink-0">
-            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-          </span>
-        ) : null}
-        {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
-          <span
-            data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-          >
-            {producedPullRequests.map((pullRequest) => (
-              <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
-            ))}
-            {producedArtifacts.map((artifact) => (
-              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-            ))}
-          </span>
-        ) : null}
-        <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
-      </span>
+      <AutomationHeaderActions
+        phase={phase}
+        producedArtifacts={producedArtifacts}
+        producedPullRequests={producedPullRequests}
+        onUsageOpenChange={onUsageOpenChange}
+        expanded={expanded}
+        collapsible={collapsible}
+        runHref={runHref}
+      />
+    </>
+  );
+
+  return (
+    <div
+      data-testid={`split-run-automation-header-${phase.id}`}
+      {...streamLineAttrs(phase.status)}
+      className={cn(
+        "w-full min-w-0 overflow-hidden px-2 leading-tight bg-muted",
+        alignDescriptionWithTitle
+          ? "grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-2"
+          : "flex items-center gap-2 whitespace-nowrap",
+        LAST_RUNNING_LINE_PULSE,
+        expanded && showExpandedStream && STICKY_PHASE,
+        collapsible && onToggle && "cursor-pointer",
+      )}
+    >
+      {headerLeading}
+      {alignDescriptionWithTitle ? (
+        <>
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">{content}</div>
+          <div className="col-start-2 min-w-0">{description}</div>
+        </>
+      ) : (
+        content
+      )}
     </div>
   );
 }
@@ -617,7 +839,7 @@ const PHASE_ACTION_LINK = cn(
   LOG_FACE,
   "inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
 );
-const VIEW_RUN_LABEL = "View automation run";
+const VIEW_RUN_LABEL = "View run";
 const RERUN_LABEL = "Rerun";
 const STOP_LABEL = "Stop";
 const PHASE_STOP_ACTION = cn(PHASE_ACTION_LINK, "hover:bg-destructive/10 hover:text-destructive");
@@ -627,31 +849,18 @@ function PhaseActionPills({ phase, runHref }: { phase: SplitRunPhase; runHref?: 
     return null;
   }
   return (
-    <PhaseActionLink href={runHref} testId={`split-run-phase-run-${phase.id}`} label={VIEW_RUN_LABEL}>
-      <Maximize2 className="size-3.5" aria-hidden />
-    </PhaseActionLink>
-  );
-}
-
-function PhaseActionLink({
-  href,
-  testId,
-  label,
-  children,
-}: {
-  href: string;
-  testId: string;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link href={href} data-testid={testId} aria-label={label} className={PHASE_ACTION_LINK}>
-          {children}
+        <Link
+          href={runHref}
+          data-testid={`split-run-phase-run-${phase.id}`}
+          aria-label={VIEW_RUN_LABEL}
+          className={PHASE_ACTION_LINK}
+        >
+          <Maximize2 className="size-3.5" aria-hidden />
         </Link>
       </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
+      <TooltipContent side="top">{VIEW_RUN_LABEL}</TooltipContent>
     </Tooltip>
   );
 }
@@ -802,8 +1011,8 @@ function PhaseMetrics({
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
-    ? tickingRunningClock(phase.duration, sampledAt, now)
-    : formatClockDurationLabel(phase.duration);
+    ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
+    : formatGoDurationLabel(phase.duration ?? "");
   const agents = usePhaseAgentUsageAgents();
   const live = livePhaseSpend(agents);
   const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
@@ -820,7 +1029,7 @@ function PhaseMetrics({
   if (model) {
     restParts.push(model);
   }
-  if (clock && clock !== "—") {
+  if (clock) {
     restParts.push(clock);
   }
   if (spendParts.length === 0 && restParts.length === 0) {
@@ -829,15 +1038,14 @@ function PhaseMetrics({
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className={cn(LOG_FACE, "inline-flex items-center gap-1 tabular-nums text-muted-foreground")}
+      className={cn(PHASE_META_FACE, "inline-flex items-center gap-1")}
     >
       {spendParts.length > 0 ? (
         <PhaseUsageSpendButton
           phaseId={phase.id}
-          phaseName={phase.name}
           spendLabel={spendParts.join(" · ")}
           live={running}
-          className={cn(LOG_FACE, "tabular-nums text-muted-foreground hover:text-foreground hover:underline")}
+          className={cn(PHASE_META_FACE, ACTIVITY_MARKDOWN_LINK)}
           onOpenChange={onUsageOpenChange}
         />
       ) : null}
@@ -1254,15 +1462,17 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
 function PhaseCollapsedUsageCollectors({
   groups,
   expanded,
+  showExpandedStream,
   organizationId,
   canvasId,
 }: {
   groups: StreamNodeGroup[];
   expanded: boolean;
+  showExpandedStream: boolean;
   organizationId?: string;
   canvasId?: string;
 }) {
-  if (expanded) {
+  if (expanded && showExpandedStream) {
     return null;
   }
   return (

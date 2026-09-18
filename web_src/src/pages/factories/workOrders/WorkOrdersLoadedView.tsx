@@ -63,6 +63,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
@@ -121,6 +122,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           addressingFeedbackLabels={addressingFeedbackLabels}
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}
           checksPassedOrderIds={checksPassedOrderIds}
+          checksPassedLabels={checksPassedLabels}
           fixesPausedOrderIds={fixesPausedOrderIds}
           pullRequests={pullRequests}
         />
