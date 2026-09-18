@@ -193,7 +193,7 @@ function useFactoryAppResetActions({
       const response = await factoriesMaterializeFactoryAutomationDefaults(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId, appId },
+          path: { factoryId, automationId: appId },
           body: {},
         }),
       );
