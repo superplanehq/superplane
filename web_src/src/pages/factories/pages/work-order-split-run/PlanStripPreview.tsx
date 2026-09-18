@@ -1,22 +1,37 @@
 import { useState, type ReactNode } from "react";
+import { Bot, ChevronDown, Play } from "lucide-react";
 
 import { Alert, AlertAction, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
 
+import { liveDraftReadiness, startEmphasisForTone, type StartEmphasis } from "../../lib/draftReadiness";
 import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { ComposerPlanStack } from "./ComposerPlanControls";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 
 /**
- * Isolated strip playground. Compare the live one-bar Alert with the chip row.
+ * Isolated strip playground. Compare the old one-bar Alert with the decision
+ * strip (verdict, evidence, Plan toggle) in each readiness state.
  */
-export type PlanStripLook = "today" | "oneBar" | "oneBarOpen" | "chips" | "chipsOpen";
+export type PlanStripLook =
+  | "today"
+  | "oneBar"
+  | "oneBarOpen"
+  | "chips"
+  | "chipsOpen"
+  | "stripBlocked"
+  | "stripCaution"
+  | "stripAnalyzing";
 
 const TASK_TITLE = "Duplicate a task";
 const REVIEW_HEADLINE = "Review the plan before you start";
 const REVIEW_TEXT = "The work is still uncertain. Add more context, or start if you accept the risk.";
 const SCORE = 2;
+const CONFIDENCE_SCORE = 4;
+const CLARITY_TEXT = "The prompt and the copy scope are not defined. Answer the questions in this session.";
+const CONFIDENCE_TEXT = "The change is small and a similar action already exists to copy.";
+const LOW_CONFIDENCE_TEXT = "The change crosses billing and the API and there is no test for the refund path.";
 
 export function PlanStripPreview({ look }: { look: PlanStripLook }) {
   return (
@@ -73,18 +88,69 @@ function PreviewStrip({ look }: { look: PlanStripLook }) {
   if (look === "chips" || look === "chipsOpen") {
     return <ChipStrip open={look === "chipsOpen"} />;
   }
+  if (look === "stripBlocked") {
+    return <ChipStrip open={false} clarity={2} confidence={CONFIDENCE_SCORE} />;
+  }
+  if (look === "stripCaution") {
+    return <ChipStrip open={false} clarity={5} confidence={2} />;
+  }
+  if (look === "stripAnalyzing") {
+    return <ChipStrip open={false} isAnalyzing />;
+  }
   return <OneBarStrip open={look === "oneBarOpen"} />;
 }
 
-function ChipStrip({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
+function ChipStrip({
+  open,
+  clarity = 5,
+  confidence = CONFIDENCE_SCORE,
+  isAnalyzing = false,
+  onToggle,
+}: {
+  open: boolean;
+  clarity?: number;
+  confidence?: number;
+  isAnalyzing?: boolean;
+  onToggle?: () => void;
+}) {
+  const tone = liveDraftReadiness({ clarity, confidence, isAnalyzing }).tone;
   return (
     <ComposerPlanStack
       open={open}
-      score={SCORE}
-      scoreSummary={REVIEW_TEXT}
+      clarity={{ score: clarity, summary: clarity <= 2 ? CLARITY_TEXT : REVIEW_TEXT }}
+      confidence={{ score: confidence, summary: confidence <= 2 ? LOW_CONFIDENCE_TEXT : CONFIDENCE_TEXT }}
+      isAnalyzing={isAnalyzing}
+      planStatus={open ? undefined : "updated"}
       onToggle={onToggle}
-      actions={<DraftActions />}
+      actions={<StripStart emphasis={startEmphasisForTone(tone)} />}
+      modelSelect={<FakeModelSelect />}
     />
+  );
+}
+
+/** Start alone on the verdict row. Filled only when the verdict says go. */
+function StripStart({ emphasis }: { emphasis: StartEmphasis }) {
+  return (
+    <Button type="button" size="sm" variant={emphasis === "filled" ? "default" : "outline"}>
+      <Play className="size-3.5" aria-hidden />
+      Start
+    </Button>
+  );
+}
+
+function FakeModelSelect() {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      aria-label="Model: Auto"
+      className="gap-1.5 text-muted-foreground hover:text-foreground"
+    >
+      <Bot className="size-4" aria-hidden />
+      Auto
+      <ChevronDown className="size-3 opacity-60" aria-hidden />
+    </Button>
   );
 }
 
@@ -152,7 +218,7 @@ function DraftActions() {
 
 function FakeComposer() {
   return (
-    <div className="sp-user-note flex min-h-[3.5rem] items-center rounded-2xl border px-3.5 text-[13px] text-muted-foreground">
+    <div className="flex min-h-[3.5rem] items-center rounded-xl border bg-background px-3.5 text-[13px] text-muted-foreground">
       {ANALYSIS_PLANNING_COPY.composerPlaceholder}
     </div>
   );

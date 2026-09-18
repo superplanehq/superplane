@@ -102,8 +102,10 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 const ANALYSIS_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
+  "mcp__superplane__propose_clarity",
   "mcp__superplane__propose_confidence",
   "mcp__superplane__survey",
+  "mcp__superplane__create_task",
 ];
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",

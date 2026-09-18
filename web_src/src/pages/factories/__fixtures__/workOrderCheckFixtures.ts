@@ -1,6 +1,8 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
 import {
+  CLARITY_CHECK_KEY,
+  CLARITY_CHECK_NAME,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
@@ -238,10 +240,41 @@ const LEVEL_FOR_CHECK: Record<ReturnType<typeof confidenceCheckLevel>, Factories
   critical: "LEVEL_CRITICAL",
 };
 
+/** Clarity summaries the refine agent writes, by score. */
+export const CLARITY_READY_SUMMARY = "The plan is ready. Review it and start if you are happy.";
+export const CLARITY_OPEN_SUMMARY =
+  "One decision is still open. Answer the question in this session so I can finish the plan.";
+
+export function claritySummaryForScore(score: number): string {
+  return score >= CONFIDENCE_SCORE_MAX ? CLARITY_READY_SUMMARY : CLARITY_OPEN_SUMMARY;
+}
+
+/** Clarity check as the refine session writes it. Storybook drafts pair it with Confidence. */
+export function clarityCheck(orderId: string, score: number, updatedMinutesAgo = 4): FactoriesWorkOrderCheck {
+  return {
+    id: `check-clarity-${orderId}`,
+    key: CLARITY_CHECK_KEY,
+    name: CLARITY_CHECK_NAME,
+    score,
+    maxScore: CONFIDENCE_SCORE_MAX,
+    level: LEVEL_FOR_CHECK[confidenceCheckLevel(score)],
+    summary: claritySummaryForScore(score),
+    automation: { appId: "app-line-refine", appName: "Refine Task" },
+    runId: `run-refine-${orderId}`,
+    updatedAt: minutesAgo(updatedMinutesAgo),
+  };
+}
+
+/** Review candidates are refine drafts: a clear plan scores 5, one open answer scores 4. */
+function reviewCandidateClarityScore(confidenceScore: number): number {
+  return Math.min(CONFIDENCE_SCORE_MAX, confidenceScore + 1);
+}
+
 const REVIEW_CANDIDATE_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = Object.fromEntries(
   REVIEW_CANDIDATES.map((candidate) => [
     candidate.workOrderId,
     [
+      clarityCheck(candidate.workOrderId, reviewCandidateClarityScore(candidate.confidenceScore)),
       {
         id: `check-confidence-${candidate.workOrderId}`,
         key: "confidence",

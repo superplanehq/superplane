@@ -3,12 +3,10 @@ import { useCallback, useState } from "react";
 export const REFINE_LAYOUT_STORAGE_KEY = "sp:refine:layout";
 
 export type RefineLayoutPreference = {
-  clarityExpanded: boolean;
   planOpen: boolean;
 };
 
 const DEFAULT_LAYOUT: RefineLayoutPreference = {
-  clarityExpanded: true,
   planOpen: false,
 };
 
@@ -16,7 +14,10 @@ function isBoolean(value: unknown): value is boolean {
   return value === true || value === false;
 }
 
-/** Read the refine pane layout. Missing or invalid values use the defaults. */
+/**
+ * Read the refine pane layout. Missing or invalid values use the defaults.
+ * Older layouts also stored a score summary choice; those keys are ignored.
+ */
 export function readStoredRefineLayout(): RefineLayoutPreference {
   try {
     const stored = window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY);
@@ -29,7 +30,6 @@ export function readStoredRefineLayout(): RefineLayoutPreference {
     }
     const record = parsed as Record<string, unknown>;
     return {
-      clarityExpanded: isBoolean(record.clarityExpanded) ? record.clarityExpanded : DEFAULT_LAYOUT.clarityExpanded,
       planOpen: isBoolean(record.planOpen) ? record.planOpen : DEFAULT_LAYOUT.planOpen,
     };
   } catch {
@@ -45,22 +45,12 @@ function persistRefineLayout(layout: RefineLayoutPreference): void {
   }
 }
 
-/** Owns Clarity-summary and Plan-pane open state for refine chat. */
+/** Owns the Plan-pane open state for refine chat. */
 export function useRefineLayoutPreference(): {
-  clarityExpanded: boolean;
   planOpen: boolean;
-  toggleClarity: () => void;
   togglePlan: () => void;
 } {
   const [layout, setLayout] = useState<RefineLayoutPreference>(readStoredRefineLayout);
-
-  const toggleClarity = useCallback(() => {
-    setLayout((current) => {
-      const next = { ...current, clarityExpanded: !current.clarityExpanded };
-      persistRefineLayout(next);
-      return next;
-    });
-  }, []);
 
   const togglePlan = useCallback(() => {
     setLayout((current) => {
@@ -71,9 +61,7 @@ export function useRefineLayoutPreference(): {
   }, []);
 
   return {
-    clarityExpanded: layout.clarityExpanded,
     planOpen: layout.planOpen,
-    toggleClarity,
     togglePlan,
   };
 }

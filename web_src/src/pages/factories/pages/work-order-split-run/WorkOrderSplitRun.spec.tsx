@@ -969,13 +969,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(chips).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(chips).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
+    const card = screen.getByTestId("split-run-intent-status-card");
+    expect(card).toHaveAttribute("data-slot", "frame");
+    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     const archive = screen.getByTestId("popup-work-order-archive-button");
     const share = screen.getByTestId("popup-work-order-copy-link-button");
@@ -1025,14 +1025,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-plan-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
+    const card = screen.getByTestId("split-run-intent-status-card");
+    expect(card).toHaveAttribute("data-slot", "frame");
+    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(chips).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(chips).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });
@@ -1046,7 +1046,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
     expect(within(request).queryByTestId("split-run-intent-chat")).toBeNull();
     expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
@@ -1087,12 +1087,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).queryByRole("heading", { name: "Artifacts" })).not.toBeInTheDocument();
     expect(within(tab).queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
-    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(tab).queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(within(tab).queryByTestId("split-run-check-comment-wo-review-pay-842-confidence")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
+      within(screen.getByTestId("split-run-draft-action-group")).getByRole("button", { name: "Start" }),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Plan" }));
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
@@ -1105,22 +1106,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
   });
 
-  it("scores a review draft by how suitable the GitHub issue is for an agent", () => {
+  it("keeps the verdict and both score slots on the matrix while a review draft is analyzed", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
 
     const tab = screen.getByTestId("split-run-work-order-tab");
-    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(tab).queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(within(tab).getByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
-      "This issue is a good fit for an agent on this factory line.",
-    );
+    const verdict = within(tab).getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "analyzing");
+    expect(within(verdict).getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    const chips = within(tab).getByTestId("split-run-intent-composer-chips");
+    expect(within(chips).getByTestId("split-run-intent-composer-score-analyzing")).toBeInTheDocument();
+    expect(within(chips).getByTestId("split-run-intent-composer-confidence-analyzing")).toBeInTheDocument();
+    expect(within(chips).queryByTestId("split-run-intent-composer-confidence")).not.toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
-    expect(within(tab).getByTestId("split-run-intent-status-card")).toContainElement(
-      within(tab).getByTestId("split-run-intent-confidence-copy"),
-    );
-    expect(
-      within(tab).getByTestId("split-run-intent-confidence-copy").closest("[data-slot=frame-panel]"),
-    ).not.toBeNull();
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
@@ -1200,7 +1199,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("tab", { name: "Task" }));
     const tab = screen.getByTestId("split-run-work-order-tab");
-    expect(within(tab).queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(within(tab).queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(within(tab).queryByText(/fit for an agent on this factory line/)).toBeNull();
     expect(within(tab).getByText("Risk score")).toBeInTheDocument();
   });
@@ -1239,7 +1238,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
     expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
     expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
-    expect(screen.queryByTestId("split-run-intent-confidence-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
 
     await openLogTab(user);
     expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();

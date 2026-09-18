@@ -29,12 +29,14 @@ import {
 
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
+  clarityScoreFromChecks,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
+  isScoreCheckName,
 } from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
@@ -443,6 +445,7 @@ function reviewSurfaces(
         note: draftFooterNote(order),
         status: displayStatus,
         isAnalyzing: draftIsAnalyzing(input),
+        clarityScore: clarityScoreFromChecks(checks),
         confidenceScore: confidenceScoreFromChecks(checks),
       }),
       [],
@@ -580,7 +583,7 @@ function overviewChecks(
   if (presented.length === 0) {
     return phases.flatMap((phase) => phase.checks ?? []);
   }
-  const later = intake.length > 0 ? presented.filter((check) => check.name !== CONFIDENCE_CHECK_NAME) : presented;
+  const later = intake.length > 0 ? presented.filter((check) => !isScoreCheckName(check.name)) : presented;
   return [...intake, ...later];
 }
 
@@ -727,7 +730,7 @@ function analysisRunToPhase(
 }
 
 function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
-  const reported = (apiChecks ?? []).filter((check) => (check.name ?? "") === CONFIDENCE_CHECK_NAME);
+  const reported = (apiChecks ?? []).filter((check) => isScoreCheckName(check.name));
   if (reported.length === 0) {
     return undefined;
   }
@@ -1139,7 +1142,7 @@ function checksForLineExecution(
   const source = demoArtifacts ? (apiChecks ?? VERIFY_STEP_CHECKS) : (apiChecks ?? []);
   const verifyChecks = demoArtifacts
     ? source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? ""))
-    : source.filter((check) => (check.name ?? "") !== CONFIDENCE_CHECK_NAME);
+    : source.filter((check) => !isScoreCheckName(check.name));
   return presentWorkOrderChecks(verifyChecks);
 }
 
