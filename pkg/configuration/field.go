@@ -30,7 +30,6 @@ const (
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
 	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeRepositoryFile      = "repository-file"
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"

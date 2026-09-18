@@ -1,7 +1,6 @@
 package openrouter
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,18 +8,11 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/configuration/attachments"
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 const ChatCompletionPayloadType = "openrouter.chatCompletion.result"
-
-// maxAttachmentBytes caps the combined size of attachments on one request.
-// OpenRouter has no Files API, so attachments are inlined into the request body
-// as base64 data URLs — roughly a third larger again on the wire.
-const maxAttachmentBytes = 8 * 1024 * 1024
 
 // sortAuto leaves provider ranking to OpenRouter. It needs a non-empty value
 // because the select renderer cannot represent an empty option.
@@ -44,7 +36,6 @@ type ChatCompletionSpec struct {
 	Model         string               `json:"model" mapstructure:"model"`
 	Prompt        string               `json:"prompt" mapstructure:"prompt"`
 	SystemPrompt  string               `json:"systemPrompt" mapstructure:"systemPrompt"`
-	Files         []string             `json:"files" mapstructure:"files"`
 	MaxTokens     *int                 `json:"maxTokens" mapstructure:"maxTokens"`
 	Temperature   *float64             `json:"temperature" mapstructure:"temperature"`
 	Models        []string             `json:"models" mapstructure:"models"`
@@ -111,14 +102,12 @@ func (c *ChatCompletion) Documentation() string {
 - **Model comparison**: Run the same prompt against models from different vendors without changing integrations
 - **Cost control**: Route to the cheapest provider serving a model, or cap which providers may serve it
 - **Resilience**: Fall back to other models when the primary is rate limited or down
-- **Document analysis**: Attach PDFs, images, or text files from the Files tab alongside the prompt
 
 ## Configuration
 
 - **Model**: The model to prompt. Picked from the models OpenRouter currently lists.
 - **Prompt**: The user message (supports expressions)
 - **System Prompt**: (Optional) System-level instructions
-- **Files**: (Optional) Files from the Files tab to attach. Text files are added to the prompt directly. Images require a vision model. PDFs are parsed by OpenRouter and work with any model, but parsing is a paid feature and the request is rejected below a minimum account balance.
 - **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
 - **Temperature**: (Optional) Sampling temperature
 - **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
@@ -154,8 +143,6 @@ Returns the completion including:
 
 - Fallback models cover runtime failures such as rate limits and provider outages. An invalid model ID still fails the request outright.
 - Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
-- Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
-- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
 - Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
 - Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, overriding that setting in Provider Routing. This can make a request fail outright rather than silently return prose, which is the intended trade: an unparseable reply is harder to notice than an error.
 - The schema is validated before the request and sent in strict mode. Strict mode marks every property required, so express optional fields by making their type nullable.
@@ -206,22 +193,6 @@ func (c *ChatCompletion) Configuration() []configuration.Field {
 			Togglable:   true,
 			Placeholder: "Optional system-level instructions",
 			Description: "System-level instructions sent ahead of the prompt",
-		},
-		{
-			Name:        "files",
-			Label:       "Files",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Description: "Files from the Files tab to attach to the prompt (images, PDFs, or text). Images require a vision model; PDFs work with any model.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "File path",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeRepositoryFile,
-					},
-				},
-			},
 		},
 		{
 			Name:        "maxTokens",
@@ -396,41 +367,6 @@ func (c *ChatCompletion) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if len(spec.Files) > 0 {
-		if ctx.Files == nil {
-			return fmt.Errorf("files configured but file access is not available")
-		}
-		available, err := ctx.Files.List()
-		if err != nil {
-			return fmt.Errorf("failed to list repository files: %v", err)
-		}
-		fileSet := make(map[string]bool, len(available))
-		for _, f := range available {
-			if norm, err := gitprovider.NormalizePath(f); err == nil {
-				fileSet[norm] = true
-			}
-		}
-		for _, f := range spec.Files {
-			norm, err := gitprovider.ValidateUserPath(f)
-			if err != nil {
-				return fmt.Errorf("invalid file path %q: %v", f, err)
-			}
-			if !fileSet[norm] {
-				return fmt.Errorf("file %q not found in app repository", f)
-			}
-		}
-
-		// Read the files now so unsupported types, empty files, and the inline
-		// size limit are caught at config time rather than on every execution.
-		atts, err := attachments.Read(ctx.Files, spec.Files)
-		if err != nil {
-			return err
-		}
-		if err := checkAttachmentSize(atts); err != nil {
-			return err
-		}
-	}
-
 	// The schema supports expressions (like the prompt), which resolve only at
 	// execution. Validate it as JSON when it has no unresolved expression;
 	// Execute re-parses the resolved value.
@@ -485,17 +421,6 @@ func validateRouting(routing *ProviderRoutingSpec) error {
 	return nil
 }
 
-func checkAttachmentSize(atts []attachments.Attachment) error {
-	total := 0
-	for _, att := range atts {
-		total += len(att.Data)
-	}
-	if total > maxAttachmentBytes {
-		return fmt.Errorf("attachments total %d bytes, which exceeds the %d byte limit for inlined files", total, maxAttachmentBytes)
-	}
-	return nil
-}
-
 func (c *ChatCompletion) Execute(ctx core.ExecutionContext) error {
 	spec := ChatCompletionSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
@@ -519,21 +444,13 @@ func (c *ChatCompletion) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	atts, err := attachments.Read(ctx.Files, spec.Files)
-	if err != nil {
-		return fmt.Errorf("failed to read attachments: %v", err)
-	}
-	if err := checkAttachmentSize(atts); err != nil {
-		return err
-	}
-
 	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
 		return err
 	}
 
 	req := ChatCompletionRequest{
-		Messages:    buildMessages(spec.SystemPrompt, spec.Prompt, atts),
+		Messages:    buildMessages(spec.SystemPrompt, spec.Prompt),
 		MaxTokens:   spec.MaxTokens,
 		Temperature: spec.Temperature,
 		Provider:    buildRouting(spec.Provider),
@@ -675,50 +592,14 @@ func buildRouting(spec *ProviderRoutingSpec) *ProviderRouting {
 	}
 }
 
-// buildMessages assembles the chat messages. Attachments are inlined into the
-// user message as base64 data URLs, since OpenRouter has no Files API.
-func buildMessages(systemPrompt, prompt string, atts []attachments.Attachment) []Message {
+func buildMessages(systemPrompt, prompt string) []Message {
 	messages := make([]Message, 0, 2)
 
 	if systemPrompt != "" {
 		messages = append(messages, Message{Role: "system", Content: systemPrompt})
 	}
 
-	if len(atts) == 0 {
-		return append(messages, Message{Role: "user", Content: prompt})
-	}
-
-	parts := make([]ContentPart, 0, len(atts)+1)
-	parts = append(parts, ContentPart{Type: "text", Text: prompt})
-	for _, att := range atts {
-		if att.IsImage() {
-			parts = append(parts, ContentPart{Type: "image_url", ImageURL: &ImageURL{URL: dataURL(att)}})
-			continue
-		}
-
-		if att.IsPDF() {
-			parts = append(parts, ContentPart{
-				Type: "file",
-				File: &FilePart{Filename: att.Name, FileData: dataURL(att)},
-			})
-			continue
-		}
-
-		// Text goes in as prompt text rather than a file part. File parts run
-		// through OpenRouter's document parser, which is a paid feature that
-		// rejects the request below a minimum balance, and text needs no parsing.
-		parts = append(parts, ContentPart{
-			Type: "text",
-			Text: fmt.Sprintf("--- %s ---\n%s", att.Name, att.Data),
-		})
-	}
-
-	return append(messages, Message{Role: "user", Content: parts})
-}
-
-// dataURL inlines an attachment, since OpenRouter has no Files API to upload to.
-func dataURL(att attachments.Attachment) string {
-	return "data:" + att.UploadMIME() + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
+	return append(messages, Message{Role: "user", Content: prompt})
 }
 
 // buildPayload flattens the first choice into the node output. Content is null
