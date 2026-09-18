@@ -100,6 +100,14 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		assert.Equal(t, uint8(0), ps.Repository[PermissionIssues])
 	})
 
+	t.Run("get file content requests contents read permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.getFileContent"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["contents"])
+	})
+
 	t.Run("write capability wins over read for same GitHub permission", func(t *testing.T) {
 		t.Parallel()
 
