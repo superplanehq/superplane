@@ -755,6 +755,8 @@ message CanvasNodeQueueItem {
   google.protobuf.Struct input = 4;
   CanvasEvent root_event = 5;
   google.protobuf.Timestamp created_at = 6;
+  repeated CanvasNodeExecutionRef blocking_executions = 7;
+  int32 concurrency_max = 8;
 }
 
 message InvokeNodeExecutionHookRequest {
