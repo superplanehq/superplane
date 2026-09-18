@@ -356,7 +356,11 @@ describe("Line board job popup", () => {
     );
 
     const card = await screen.findByTestId("work-order-card-wo-review-pay-842", {}, { timeout: 8000 });
-    await user.click(within(card).getByRole("button", { name: "Start" }));
+    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+    const dialog = await screen.findByTestId("work-order-split-run");
+    await user.click(within(dialog).getByRole("button", { name: "Start" }));
 
     await waitFor(() => {
       expect(

@@ -362,9 +362,8 @@ describe("LinesPage board", () => {
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
     );
-    const start = within(card).getByRole("button", { name: "Start" });
-    expect(start).toHaveClass("bg-primary");
-    expect(cardScore.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(card).queryByTestId("work-order-card-start-wo-review-pay-842")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 

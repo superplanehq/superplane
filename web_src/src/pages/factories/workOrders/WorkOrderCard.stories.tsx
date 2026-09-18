@@ -233,7 +233,7 @@ export const DraftAnalyzingWithScore: Story = {
   },
 };
 
-/** Refine finished with a mid Confidence: the card says Review and Start is an outline. */
+/** Refine finished with a mid Confidence: the card says Review. */
 export const DraftScoredPair: Story = {
   name: "Draft with Clarity and Confidence (Review)",
   args: {
@@ -254,7 +254,7 @@ export const DraftScoredPair: Story = {
   },
 };
 
-/** Both scores high: the card says Ready and Start is filled. */
+/** Both scores high: the card says Ready. */
 export const DraftScoredReady: Story = {
   name: "Draft ready to start",
   args: {
@@ -275,7 +275,7 @@ export const DraftScoredReady: Story = {
   },
 };
 
-/** Low Clarity: the card says Not ready. Start stays available as an outline. */
+/** Low Clarity: the card says Not ready. */
 export const DraftScoredBlocked: Story = {
   name: "Draft not ready",
   args: {
@@ -313,6 +313,28 @@ export const DraftScoredIntakeOnly: Story = {
     ),
     pullRequests: [],
     confidenceScore: 4,
+  },
+};
+
+/**
+ * Draft with no score yet. The footer keeps created time and does not
+ * leave an empty action area.
+ */
+export const DraftUnscored: Story = {
+  name: "Draft with no score",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-unscored",
+        number: "7",
+        title: "Triage inbound refund alerts",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
   },
 };
 
