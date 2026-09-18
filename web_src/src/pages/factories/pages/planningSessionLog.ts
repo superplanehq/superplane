@@ -1,5 +1,6 @@
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import type { ClaudeStepGroup } from "./work-order-split-run/PhaseLogCard";
+import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 import { streamNoteTextMatches } from "./work-order-split-run/streamNotesFromLiveLog";
 
 const PLANNING_SESSION_NOISE_PREFIXES = [
@@ -35,13 +36,21 @@ function isPlanningSessionNoiseLine(line: string): boolean {
 }
 
 function planningTalkWithoutNoise(text: string): string {
-  const kept = text
-    .split("\n")
-    .filter((line) => !line.trim() || !isPlanningSessionNoiseLine(line.trim()))
-    .join("\n")
-    .replace(/^(?:\n[^\S\n]*)+/u, "")
-    .replace(/(?:\n[^\S\n]*)+$/u, "");
-  return kept;
+  const lines = text.split("\n");
+  let start = 0;
+  let end = lines.length;
+  while (start < end && isBlankOrPlanningSessionNoiseLine(lines[start])) {
+    start += 1;
+  }
+  while (end > start && isBlankOrPlanningSessionNoiseLine(lines[end - 1])) {
+    end -= 1;
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+function isBlankOrPlanningSessionNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+  return !trimmed || isPlanningSessionNoiseLine(trimmed);
 }
 
 export function isPlanningSessionToolPayload(text: string): boolean {

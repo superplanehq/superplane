@@ -37,9 +37,32 @@ export function streamNoteTextMatches(haystack: string, needle: string): boolean
   if (!live) {
     return false;
   }
-  const extraPrefix = extra.slice(0, 48);
-  const livePrefix = live.slice(0, 48);
-  return live.includes(extraPrefix) || extra.includes(livePrefix);
+  return noteTextCovers(live, extra) || noteTextCovers(extra, live);
+}
+
+function noteTextCovers(container: string, part: string): boolean {
+  if (container === part) {
+    return true;
+  }
+  if (container.startsWith(part) && isLineBoundary(container, part.length)) {
+    return true;
+  }
+  let from = 0;
+  while (from < container.length) {
+    const embedded = container.indexOf(`\n${part}`, from);
+    if (embedded === -1) {
+      return false;
+    }
+    if (isLineBoundary(container, embedded + 1 + part.length)) {
+      return true;
+    }
+    from = embedded + 1;
+  }
+  return false;
+}
+
+function isLineBoundary(text: string, index: number): boolean {
+  return index === text.length || text.charAt(index) === "\n";
 }
 
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
