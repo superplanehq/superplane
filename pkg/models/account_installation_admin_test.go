@@ -26,7 +26,7 @@ func TestInstallationAdmin(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, account.IsInstallationAdmin())
 
-		err = PromoteToInstallationAdmin(account.ID.String())
+		err = PromoteToInstallationAdmin(database.Conn(), account.ID.String())
 		require.NoError(t, err)
 
 		// Re-fetch from database
@@ -39,10 +39,10 @@ func TestInstallationAdmin(t *testing.T) {
 		account, err := CreateAccount("Temp Admin", "temp-admin@example.com")
 		require.NoError(t, err)
 
-		err = PromoteToInstallationAdmin(account.ID.String())
+		err = PromoteToInstallationAdmin(database.Conn(), account.ID.String())
 		require.NoError(t, err)
 
-		err = DemoteFromInstallationAdmin(account.ID.String())
+		err = DemoteFromInstallationAdmin(database.Conn(), account.ID.String())
 		require.NoError(t, err)
 
 		refreshed, err := FindAccountByID(account.ID.String())
