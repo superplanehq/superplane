@@ -13,6 +13,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -106,6 +107,11 @@ export function SplitRunAttentionNote({
   compact = false,
   actionsOnly = false,
   startEmphasis = "filled",
+  organizationId,
+  factoryId,
+  orderId,
+  pullRequests,
+  canAct = true,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -121,6 +127,11 @@ export function SplitRunAttentionNote({
   actionsOnly?: boolean;
   /** Weight of Start on the refine strip. The verdict decides it. */
   startEmphasis?: StartEmphasis;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequestNote = WaitingPullRequestReview({
@@ -130,12 +141,62 @@ export function SplitRunAttentionNote({
     actionBusy,
     compact,
     actionsOnly,
+    organizationId,
+    factoryId,
+    orderId,
+    pullRequests,
+    canAct,
     onAction,
   });
   if (pullRequestNote) {
     return pullRequestNote;
   }
 
+  return (
+    <StandardAttentionNote
+      note={note}
+      tone={tone}
+      actions={actions}
+      runHref={runHref}
+      actionBusy={actionBusy}
+      startBusy={startBusy}
+      startDisabled={startDisabled}
+      modelSelect={modelSelect}
+      compact={compact}
+      actionsOnly={actionsOnly}
+      startEmphasis={startEmphasis}
+      onAction={onAction}
+    />
+  );
+}
+
+function StandardAttentionNote({
+  note,
+  tone = "waiting",
+  actions = [],
+  runHref,
+  actionBusy = false,
+  startBusy = false,
+  startDisabled = false,
+  modelSelect,
+  compact = false,
+  actionsOnly = false,
+  startEmphasis = "filled",
+  onAction,
+}: {
+  note: SplitRunFooterNote;
+  tone?: SplitRunDecisionTone;
+  actions?: SplitRunFooterAction[];
+  runHref?: string | null;
+  actionBusy?: boolean;
+  startBusy?: boolean;
+  startDisabled?: boolean;
+  modelSelect?: ReactNode;
+  compact?: boolean;
+  actionsOnly?: boolean;
+  startEmphasis?: StartEmphasis;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
   if (actionsOnly) {
     return (
       <StripActions

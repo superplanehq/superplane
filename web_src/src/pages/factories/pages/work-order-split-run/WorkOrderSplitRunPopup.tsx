@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
@@ -140,7 +141,9 @@ function AnalysisWorkOrderPopup({
     organizationId,
     factoryId,
     factoryKey,
+    orderId,
     orderNumber,
+    pullRequests: popupData.pullRequests,
     canUpdate,
     draftStart,
     mutations,
@@ -237,7 +240,9 @@ function analysisPopupReview(args: {
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
   canUpdate: boolean;
   draftStart: ReturnType<typeof draftStartAction>;
   mutations: ReturnType<typeof footerMutationHandlers>;
@@ -252,8 +257,11 @@ function analysisPopupReview(args: {
     <SplitRunReview
       footer={args.fixture.footer}
       organizationId={args.organizationId}
+      factoryId={args.factoryId}
       factoryKey={args.factoryKey}
+      orderId={args.orderId}
       orderNumber={args.orderNumber}
+      pullRequests={args.pullRequests}
       canAct={args.canUpdate}
       onStart={args.draftStart}
       onArchive={args.mutations.onArchive}
