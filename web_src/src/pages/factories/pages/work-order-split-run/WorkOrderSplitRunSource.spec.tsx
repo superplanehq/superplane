@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
 
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
@@ -25,6 +27,13 @@ const SUPERPLANE_SOURCE: SplitRunSource = {
   name: "SuperPlane",
   iconSrc: "/superplane.svg",
   iconAlt: "SuperPlane",
+};
+
+const SENTRY_SOURCE: SplitRunSource = {
+  kind: "intake",
+  name: "Sentry exceptions",
+  iconSrc: sentryIcon,
+  iconAlt: "Sentry",
 };
 
 describe("WorkOrderSplitRunSource", () => {
@@ -59,5 +68,21 @@ describe("WorkOrderSplitRunSource", () => {
 
     expect(screen.getByRole("img", { name: "Jira" })).not.toHaveClass("dark:brightness-0");
     expect(screen.getByRole("img", { name: "Jira" })).not.toHaveClass("dark:invert");
+  });
+
+  it("inverts a compact Sentry source logo in dark mode without bubble tint", () => {
+    render(<WorkOrderSplitRunSource compact source={SENTRY_SOURCE} />);
+
+    const icon = screen.getByRole("img", { name: "Sentry" });
+    expect(icon).toHaveClass("dark:brightness-0", "dark:invert");
+    expect(icon).not.toHaveClass("brightness-0");
+    expect(icon).not.toHaveClass("invert");
+    expect(icon).not.toHaveClass("dark:invert-0");
+  });
+
+  it("inverts a Sentry card source logo in dark mode", () => {
+    render(<WorkOrderSplitRunSource source={SENTRY_SOURCE} />);
+
+    expect(screen.getByRole("img", { name: "Sentry" })).toHaveClass("dark:brightness-0", "dark:invert");
   });
 });

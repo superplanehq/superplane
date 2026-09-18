@@ -89,6 +89,8 @@ describe("WorkOrderCard source icon", () => {
     expect(icon.tagName).toBe("SPAN");
     expect(icon).not.toHaveAttribute("href");
     expect(icon.querySelector("img")).toHaveAttribute("src", sentryIcon);
+    expect(icon.querySelector("img")?.className).toContain("dark:brightness-0");
+    expect(icon.querySelector("img")?.className).toContain("dark:invert");
     expect(icon).toHaveAttribute("aria-label", "Sentry exceptions");
   });
 

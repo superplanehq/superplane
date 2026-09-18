@@ -1,3 +1,4 @@
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Plus, Radio, Settings } from "lucide-react";
 
@@ -84,6 +85,7 @@ function LaneListenerRow({ listener }: { listener: LaneListener }) {
         className={cn(
           "size-3.5 shrink-0 object-contain",
           listener.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+          logoDarkInvertClass(listener.iconSrc),
         )}
       />
       <span className="min-w-0 flex-1 truncate text-[12px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors group-hover/listener:text-foreground">
