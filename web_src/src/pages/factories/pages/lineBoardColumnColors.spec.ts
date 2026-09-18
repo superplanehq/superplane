@@ -9,16 +9,18 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses the same fill for the swatch and the lane", () => {
+  it("lists six colours and uses a dim dark-mode wash on the lane", () => {
     expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
+    expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
   });
 
   it("resolves a lane class from a colour id", () => {
     expect(lineBoardColumnColorById("lime")?.label).toBe("Lime");
-    expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.className);
+    expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.laneClassName);
     expect(lineBoardColumnLaneClassName("lime")).toContain("lime");
+    expect(lineBoardColumnLaneClassName("lime")).toContain("dark:bg-lime-950/40");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
   });
 
