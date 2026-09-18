@@ -18,9 +18,8 @@ describe("PlanningSessionSurveyForm", () => {
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toHaveClass("sp-survey-accent");
-    expect(screen.getByTestId("create-with-agent-survey-card")).toHaveClass("sp-survey-card");
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-survey-card")).toHaveClass("border", "bg-card");
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 2")).toBeInTheDocument();
@@ -29,6 +28,8 @@ describe("PlanningSessionSurveyForm", () => {
     const high = screen.getByRole("button", { name: /High/ });
     await user.click(high);
     expect(high).toHaveAttribute("aria-pressed", "true");
+    expect(high).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(screen.getByRole("button", { name: /Low/ })).toHaveClass("bg-background");
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
     expect(onSubmit).not.toHaveBeenCalled();

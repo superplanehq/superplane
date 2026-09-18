@@ -341,7 +341,7 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 });
 
 describe("WorkOrderCard scores", () => {
-  it("shows a score and a Start button to the right of the score", () => {
+  it("shows a verdict word and a Start button to the right of it", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft-scored",
@@ -370,7 +370,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={5}
+            clarityScore={5}
+            confidenceScore={3}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -378,16 +379,18 @@ describe("WorkOrderCard scores", () => {
     );
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
-    expect(score).toHaveAttribute("aria-valuenow", "5");
-    expect(score).toHaveAttribute("aria-valuemax", "5");
-    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
-    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
+    expect(score).toHaveAttribute("data-tone", "caution");
+    expect(score).toHaveTextContent("Clarity5Confidence3");
+    expect(score).toHaveAttribute(
+      "aria-label",
+      "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
+    );
     const start = screen.getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
     expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("shows the check name and score when the bars are hovered", async () => {
+  it("shows the verdict headline when the score badges are hovered", async () => {
     const user = userEvent.setup();
     const draft = buildWorkOrderListEntry(
       {
@@ -417,7 +420,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={4}
+            clarityScore={4}
+            confidenceScore={2}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -426,12 +430,12 @@ describe("WorkOrderCard scores", () => {
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
     expect(effectivePointerEvents(score)).toBe("auto");
+    expect(score).toHaveTextContent("Clarity4Confidence2");
 
     await user.hover(score);
 
     const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("Clarity score");
-    expect(tip).toHaveTextContent("4/5");
+    expect(tip).toHaveTextContent("Review before you start");
   });
 });
 

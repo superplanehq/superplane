@@ -1,4 +1,5 @@
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
+import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { draftStartModelPayload } from "./draftStartModel";
 import type { SplitRunFixture } from "./splitRunMocks";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -8,6 +9,20 @@ export function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, 
     return window.location.href;
   }
   return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
+}
+
+/**
+ * Permalink builder for tasks the agent splits off the open draft. It keeps
+ * the board line so the new task opens on the same board. Returns nothing
+ * when the popup has no factory context or the task has no number yet.
+ */
+export function createdTaskHref(organizationId?: string, factoryKey?: string, lineId?: string): CreatedTaskHref {
+  return (task) => {
+    if (!organizationId || !factoryKey || !task.number) {
+      return undefined;
+    }
+    return workOrderDetailPath(organizationId, factoryKey, task.number, lineId);
+  };
 }
 
 export function footerMutationHandlers(

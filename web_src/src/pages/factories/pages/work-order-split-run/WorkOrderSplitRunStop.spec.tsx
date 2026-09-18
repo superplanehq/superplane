@@ -265,10 +265,16 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const note = screen.getByTestId("split-run-attention-note");
-    await user.click(within(note).getByRole("button", { name: "Model: Auto" }));
+    const strip = screen.getByTestId("split-run-intent-status-card");
+    const settings = within(strip).getByTestId("split-run-intent-settings");
+    const model = within(settings).getByRole("button", { name: "Model: Auto" });
+    expect(model).toHaveTextContent("Auto");
+    await user.click(model);
     await user.click(await screen.findByRole("menuitemradio", { name: "claude-opus-4-6" }));
-    await user.click(within(note).getByRole("button", { name: "Start" }));
+    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6" })).toBeInTheDocument();
+    const actions = within(strip).getByTestId("split-run-draft-action-group");
+    expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+    await user.click(within(actions).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
 

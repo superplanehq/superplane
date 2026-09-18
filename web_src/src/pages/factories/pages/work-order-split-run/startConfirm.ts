@@ -1,5 +1,6 @@
+import { draftReadiness, type DraftReadinessInput, type DraftReadinessTone } from "../../lib/draftReadiness";
+
 export const START_CONFIRM_STORAGE_KEY = "sp:refine:skip-start-confirm";
-const READY_SCORE = 5;
 
 export const START_CONFIRM_COPY = {
   title: "Start implementation?",
@@ -8,27 +9,28 @@ export const START_CONFIRM_COPY = {
   confirm: "Start anyway",
   missing:
     "The agent did not finish the analysis and did not create a plan. Wait for the analysis to finish for better results.",
-  low: "This request is not clear enough, and the agent could not create a plan. Consider adding more context in the chat before you start for better results.",
-  mid: "Even though this task is clear enough to start, a few more refinements in the chat will improve the result.",
+  low: "This task is not clear enough for an agent to plan it. Add more context in the chat before you start for better results.",
+  mid: "This task is clear enough to start, but an agent may need steering. Refine the task in the chat, or start if you accept the risk.",
 } as const;
 
 export type StartConfirmTone = "missing" | "low" | "mid";
 
-export function startConfirmTone(score?: number): StartConfirmTone | undefined {
-  if (score == null) {
-    return "missing";
-  }
-  if (score < 3) {
-    return "low";
-  }
-  if (score < READY_SCORE) {
-    return "mid";
-  }
-  return undefined;
+export type StartConfirmScores = Pick<DraftReadinessInput, "clarity" | "confidence">;
+
+const CONFIRM_TONE: Record<DraftReadinessTone, StartConfirmTone | undefined> = {
+  analyzing: "missing",
+  pending: "missing",
+  blocked: "low",
+  caution: "mid",
+  ready: undefined,
+};
+
+export function startConfirmTone(scores: StartConfirmScores): StartConfirmTone | undefined {
+  return CONFIRM_TONE[draftReadiness(scores).tone];
 }
 
-export function startConfirmBody(score?: number): string | undefined {
-  const tone = startConfirmTone(score);
+export function startConfirmBody(scores: StartConfirmScores): string | undefined {
+  const tone = startConfirmTone(scores);
   return tone ? START_CONFIRM_COPY[tone] : undefined;
 }
 
@@ -48,9 +50,9 @@ export function persistSkipStartConfirm(): void {
   }
 }
 
-export function needsStartConfirm(score?: number): boolean {
+export function needsStartConfirm(scores: StartConfirmScores): boolean {
   if (readSkipStartConfirm()) {
     return false;
   }
-  return startConfirmTone(score) != null;
+  return startConfirmTone(scores) != null;
 }

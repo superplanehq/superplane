@@ -217,13 +217,23 @@ describe("createWithAgentViewFromSession", () => {
     expect(planningSessionIsWorking(ended)).toBe(false);
   });
 
-  it("keeps thinking states for follow-up work after a score exists", () => {
-    const running = { state: "running" };
-    const waiting = { state: "running", waitState: "pending" };
-    expect(draftCardAgentIsWorking(running, false)).toBe(true);
+  it("keeps the card thinking while the session machine starts or runs, like the refine strip", () => {
+    const starting = { state: "running" };
+    const running = { state: "running", executionId: "exec-1" };
+    const waiting = { state: "running", executionId: "exec-1", waitState: "pending" };
+    const ended = { state: "ended", executionId: "exec-1" };
+    expect(draftCardAgentIsWorking(starting, false, 4)).toBe(true);
+    expect(draftCardAgentIsWorking(running, false, 4)).toBe(true);
     expect(draftCardAgentIsWorking(waiting, false)).toBe(false);
-    expect(draftCardAgentIsWorking(waiting, true)).toBe(false);
+    expect(draftCardAgentIsWorking(ended, false)).toBe(false);
+  });
+
+  it("counts a Backlog analysis only until the first score arrives", () => {
+    const waiting = { state: "running", executionId: "exec-1", waitState: "pending" };
     expect(draftCardAgentIsWorking(null, true)).toBe(true);
+    expect(draftCardAgentIsWorking(null, true, 3)).toBe(false);
+    expect(draftCardAgentIsWorking(waiting, true)).toBe(true);
+    expect(draftCardAgentIsWorking(waiting, true, 3)).toBe(false);
     expect(draftCardAgentIsWorking(null, false)).toBe(false);
   });
 
