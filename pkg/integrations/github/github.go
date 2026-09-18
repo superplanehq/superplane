@@ -1463,6 +1463,8 @@ func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.Integra
 		Values: map[string][]byte{
 			integrationSecretGitHubToken: []byte(token),
 		},
-		Usage: githubSecretUsage,
+		Usage:     githubSecretUsage,
+		Setup:     githubSetupScript,
+		SetupName: githubSetupName,
 	}, nil
 }
