@@ -74,6 +74,73 @@ export function formatUsdCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+export type WorkOrderUsageByModel = {
+  provider?: string;
+  model?: string;
+  totalTokens?: string | number;
+  costCents?: string | number;
+};
+
+export type WorkOrderUsageByMachineType = {
+  machineType?: string;
+  durationSeconds?: string | number;
+  costCents?: string | number;
+};
+
+export type WorkOrderSpendBreakdownRow = {
+  label: string;
+  detail: string;
+  spend: string;
+};
+
+function usageModelDisplayName(provider?: string, model?: string): string {
+  const raw = (model ?? "").trim() || (provider ?? "").trim();
+  const slash = raw.lastIndexOf("/");
+  if (slash >= 0 && slash < raw.length - 1) {
+    return raw.slice(slash + 1);
+  }
+  return raw;
+}
+
+/** Model and machine-time rows that have spend. Empty when there is nothing to show. */
+export function workOrderSpendBreakdownRows(
+  byModel: WorkOrderUsageByModel[] | undefined,
+  byMachine: WorkOrderUsageByMachineType[] | undefined,
+): WorkOrderSpendBreakdownRow[] {
+  const rows: WorkOrderSpendBreakdownRow[] = [];
+  for (const row of byModel ?? []) {
+    const cents = parseWorkOrderMetric(row.costCents);
+    if (cents <= 0) {
+      continue;
+    }
+    const label = usageModelDisplayName(row.provider, row.model);
+    if (!label) {
+      continue;
+    }
+    const tokens = parseWorkOrderMetric(row.totalTokens);
+    rows.push({
+      label,
+      detail: tokens > 0 ? formatCompactTokens(tokens) : "",
+      spend: formatUsdCents(cents),
+    });
+  }
+
+  let machineCents = 0;
+  let machineSeconds = 0;
+  for (const row of byMachine ?? []) {
+    machineCents += parseWorkOrderMetric(row.costCents);
+    machineSeconds += parseWorkOrderMetric(row.durationSeconds);
+  }
+  if (machineCents > 0) {
+    rows.push({
+      label: "Machine time",
+      detail: machineSeconds > 0 ? formatDurationSeconds(machineSeconds) : "",
+      spend: formatUsdCents(machineCents),
+    });
+  }
+  return rows;
+}
+
 export function formatUsdMicros(micros: number): string {
   if (!Number.isFinite(micros) || micros <= 0) {
     return formatUsdCents(0);

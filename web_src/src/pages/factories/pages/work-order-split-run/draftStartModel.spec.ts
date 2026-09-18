@@ -33,6 +33,12 @@ describe("displayRunnerModel", () => {
   it("keeps the last path segment of a hosted SuperPlane id", () => {
     expect(displayRunnerModel("hosted::openrouter::x-ai/grok-4.6")).toBe("grok-4.6");
   });
+
+  it("shortens each id in a joined list", () => {
+    expect(displayRunnerModel("anthropic/claude-opus-4-6 · anthropic/claude-sonnet-4-6")).toBe(
+      "claude-opus-4-6 · claude-sonnet-4-6",
+    );
+  });
 });
 
 describe("runnerModelsFromCanvasNodes", () => {

@@ -14,6 +14,9 @@ export function displayRunnerModel(id: string): string {
   if (trimmed === "") {
     return "";
   }
+  if (trimmed.includes(" · ")) {
+    return joinRunnerModels(trimmed.split(" · ").map(displayRunnerModel));
+  }
   const slash = trimmed.lastIndexOf("/");
   if (slash >= 0 && slash < trimmed.length - 1) {
     return trimmed.slice(slash + 1);
