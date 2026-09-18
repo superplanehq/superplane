@@ -161,7 +161,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     sideTargetNodeIds: ctx.sideTargetNodeIds,
     edgeRouteGutters: ctx.edgeRouteGutters,
   });
-  routeForwardTrunkEdges({
+  const trunkRight = routeForwardTrunkEdges({
     trunkEdges,
     positions: ctx.positions,
     nodeById: ctx.nodeById,
@@ -193,7 +193,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     spineSourceNodeIds: ctx.spineSourceNodeIds,
   });
 
-  return maxRight + COMPONENT_GAP_X;
+  return Math.max(maxRight + COMPONENT_GAP_X, trunkRight + GUTTER_PAD);
 }
 
 function emptyFactoryRunLeafLayoutResult(): FactoryRunLeafLayoutResult {

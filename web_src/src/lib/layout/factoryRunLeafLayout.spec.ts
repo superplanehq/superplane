@@ -155,6 +155,38 @@ describe("layoutFactoryRunLeafGraph", () => {
     });
   });
 
+  it("keeps a following component to the right of extra merge lanes", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        ...twoColumnIfMergeNodes,
+        { id: "ifC", position: { x: 900, y: 0 } },
+        { id: "cTrue" },
+        { id: "cJoin" },
+        { id: "other", position: { x: 1400, y: 0 } },
+      ],
+      [
+        ...twoColumnIfMergeEdges,
+        { source: "ifC", target: "cTrue", sourceHandle: "true" },
+        { source: "cTrue", target: "cJoin", sourceHandle: "default" },
+        { source: "ifC", target: "cJoin", sourceHandle: "false" },
+        { source: "cJoin", target: "shared", sourceHandle: "default" },
+      ],
+    );
+
+    const mergeKeys = [
+      factoryRunLeafEdgeKey("ifA", "aJoin", "false"),
+      factoryRunLeafEdgeKey("ifB", "bJoin", "false"),
+      factoryRunLeafEdgeKey("ifC", "cJoin", "false"),
+    ];
+    const gutters = mergeKeys.map((key) => result.edgeRouteGutters.get(key));
+    const lastGutter = Math.max(...gutters.map((gutter) => gutter ?? 0));
+    const other = result.positions.get("other")!;
+
+    expect(new Set(gutters).size).toBe(3);
+    expect(other.x).toBeGreaterThanOrEqual(lastGutter + 48);
+    expectNoOverlaps(result.positions);
+  });
+
   it("reuses a forward gutter when vertical intervals do not overlap", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "if1" }, { id: "t1" }, { id: "t2" }, { id: "if2" }, { id: "u1" }, { id: "u2" }],

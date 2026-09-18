@@ -56,9 +56,10 @@ type RouteForwardTrunkEdgesOptions = {
   edgeRouteOffsetsY: Map<string, number>;
 };
 
-export function routeForwardTrunkEdges(options: RouteForwardTrunkEdgesOptions): void {
+export function routeForwardTrunkEdges(options: RouteForwardTrunkEdgesOptions): number {
   const lanes: ForwardInterval[][] = [];
   const sortedEdges = [...options.trunkEdges].sort((a, b) => compareForwardEdges(a, b, options.positions));
+  let trunkRight = 0;
 
   for (const edge of sortedEdges) {
     const interval = forwardInterval(edge, options.positions, options.nodeById);
@@ -71,7 +72,11 @@ export function routeForwardTrunkEdges(options: RouteForwardTrunkEdgesOptions): 
     lanes[laneIndex].push(interval);
 
     const key = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
-    options.edgeRouteGutters.set(key, options.graphRight + laneIndex * EDGE_ROUTE_LANE_SPACING);
+    const gutter = options.graphRight + laneIndex * EDGE_ROUTE_LANE_SPACING;
+    options.edgeRouteGutters.set(key, gutter);
     options.edgeRouteOffsetsY.set(key, laneIndex * FORWARD_TRUNK_ROUTE_Y_SPACING);
+    trunkRight = Math.max(trunkRight, gutter);
   }
+
+  return trunkRight;
 }
