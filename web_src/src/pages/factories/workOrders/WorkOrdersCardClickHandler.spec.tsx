@@ -238,7 +238,7 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(owner).getByText("Arnold")).toBeInTheDocument();
   });
 
-  it("shows a Start button on a draft backlog card", () => {
+  it("does not render a Start button on a draft backlog card", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft",
@@ -257,39 +257,9 @@ describe("WorkOrdersBoardView layout", () => {
       factoryLines: [{ id: "line-a", name: "hotfix" }],
     });
 
-    const start = within(row).getByRole("button", { name: "Start" });
-    expect(start).toBeInTheDocument();
-    expect(effectivePointerEvents(start)).toBe("auto");
+    expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("work-order-card-start-wo-draft")).not.toBeInTheDocument();
     expect(within(row).queryByTestId("work-order-row-assignees-wo-draft")).not.toBeInTheDocument();
-  });
-
-  it("starts a draft on the preferred line without opening the card", async () => {
-    const user = userEvent.setup();
-    const draft = buildWorkOrderListEntry(
-      {
-        id: "wo-draft",
-        number: "5",
-        title: "Draft: rework refund telemetry",
-        state: "STATE_DRAFT",
-        createdAt: "2024-06-01T00:00:00Z",
-        updatedAt: "2024-06-02T00:00:00Z",
-        lineDispatches: [],
-      },
-      factory,
-    );
-
-    const { router, onDispatch, row } = renderView(WorkOrdersBoardView, [draft], {
-      factoryLines: [
-        { id: "line-a", name: "plan-and-implement" },
-        { id: "line-b", name: "hotfix" },
-      ],
-      preferredLineName: "plan-and-implement",
-    });
-
-    await user.click(within(row).getByRole("button", { name: "Start" }));
-
-    expect(router.state.location.pathname).toBe("/");
-    expect(onDispatch).toHaveBeenCalledWith("wo-draft", { lineName: "plan-and-implement" });
   });
 });
 
@@ -341,7 +311,7 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 });
 
 describe("WorkOrderCard scores", () => {
-  it("shows a verdict word and a Start button to the right of it", () => {
+  it("shows a verdict word and no Start button", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft-scored",
@@ -385,9 +355,8 @@ describe("WorkOrderCard scores", () => {
       "aria-label",
       "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
     );
-    const start = screen.getByRole("button", { name: "Start" });
-    expect(start).toBeInTheDocument();
-    expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-start-wo-draft-scored")).not.toBeInTheDocument();
   });
 
   it("shows the verdict headline when the score badges are hovered", async () => {
