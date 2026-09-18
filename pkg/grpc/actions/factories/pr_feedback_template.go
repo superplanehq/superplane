@@ -335,7 +335,7 @@ func prFeedbackVisualEvidenceCommentConfiguration() map[string]any {
 		"body": strings.Join([]string{
 			"## Visual evidence",
 			"",
-			"Captured for commit `{{ substring(previous(2).data.result.headSha, 0, 7) }}`.",
+			"Captured for commit `{{ previous(2).data.result.headSha[:7] }}`.",
 			"",
 			"{{ fromBase64(previous(2).data.result.visualEvidence.markdown) }}",
 		}, "\n"),
