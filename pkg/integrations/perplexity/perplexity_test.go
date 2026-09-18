@@ -39,6 +39,7 @@ func TestSync_Success(t *testing.T) {
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 	assert.Contains(t, httpCtx.Requests[0].URL.String(), "/v1/models")
+	assert.Equal(t, "superplane", httpCtx.Requests[0].Header.Get("X-Pplx-Integration"))
 }
 
 func TestSync_InvalidKey(t *testing.T) {
