@@ -111,7 +111,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
   layoutDraftWorkflowRef.current = layoutDraftWorkflow;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
+  const { allowNextConfigureEnter, configureVisitIdRef } = useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -169,12 +169,14 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
             if (!current) {
               return;
             }
+            const requestedVisitId = configureVisitIdRef.current;
             const requestedVersionId = activeCanvasVersionIdRef.current;
             const requestedEditSessionActive = editSessionActiveRef.current;
             const merged = { ...current, spec };
             const layout = layoutDraftWorkflowRef.current;
             const nextWorkflow = layout ? await layout(merged) : merged;
             if (
+              configureVisitIdRef.current !== requestedVisitId ||
               activeCanvasVersionIdRef.current !== requestedVersionId ||
               editSessionActiveRef.current !== requestedEditSessionActive
             ) {

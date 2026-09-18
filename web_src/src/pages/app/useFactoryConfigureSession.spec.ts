@@ -102,6 +102,35 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
   });
 
+  it("does not apply a layout result after Configure visit changes", async () => {
+    const applyLocalWorkflowUpdate = vi.fn();
+    let releaseLayout: (workflow: CanvasesCanvas) => void = () => {};
+    const layoutDraftWorkflow = vi.fn(
+      () =>
+        new Promise<CanvasesCanvas>((resolve) => {
+          releaseLayout = resolve;
+        }),
+    );
+    const options = baseOptions({ applyLocalWorkflowUpdate, layoutDraftWorkflow });
+    const { rerender } = renderHook((props: ReturnType<typeof baseOptions>) => useFactoryConfigureSession(props), {
+      initialProps: options,
+    });
+
+    const pending = options.factoryConfigureActionsRef.current?.applyDraftSpec({
+      nodes: [{ id: "new-node" }],
+      edges: [],
+    });
+    rerender({ ...options, factoryConfigure: false, editSessionActive: false });
+    rerender({ ...options, factoryConfigure: true, editSessionActive: true });
+    releaseLayout({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "laid-out" }], edges: [] },
+    });
+    await pending;
+
+    expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
+  });
+
   it("does nothing without a current workflow snapshot", async () => {
     const applyLocalWorkflowUpdate = vi.fn();
     const options = baseOptions({
