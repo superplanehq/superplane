@@ -620,6 +620,7 @@ func materializePRFeedbackDefaults(
 		Repository:             settings.Repository,
 		Mention:                settings.Mention,
 		IgnoreBots:             settings.IgnoreBots,
+		IncludeVisualEvidence:  prFeedbackVisualEvidenceEnabled(graph, spec),
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,
 		MaximumAttempts:        prFeedbackResetMaximumAttempts(handler),
@@ -647,6 +648,16 @@ func materializePRFeedbackDefaults(
 		templateID: templateID,
 		canvasYAML: string(encoded),
 	}, nil
+}
+
+func prFeedbackVisualEvidenceEnabled(graph prFeedbackGraph, spec models.LiveCanvasSpec) bool {
+	for nodeID := range graph.discussionRunnerNodeIDs(spec) {
+		node := findIntakeNode(spec.Nodes, nodeID)
+		if prFeedbackNodeBool(node, "includeVisualEvidence", false) {
+			return true
+		}
+	}
+	return false
 }
 
 func prFeedbackResetMaximumAttempts(handler *models.FactoryPRFeedbackHandler) int {

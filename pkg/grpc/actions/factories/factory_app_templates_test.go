@@ -106,6 +106,43 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
 }
 
+func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
+	canvasID := uuid.New()
+	current := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository: "acme/app",
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+	for _, nodeID := range []string{
+		prFeedbackRunnerNodeID,
+		prFeedbackReviewRunnerNodeID,
+		prFeedbackReplyRunnerNodeID,
+	} {
+		findYAMLNode(t, current, nodeID).Configuration["includeVisualEvidence"] = true
+	}
+
+	result, err := materializePRFeedbackDefaults(
+		nil,
+		&models.Factory{},
+		&models.Canvas{ID: canvasID, Name: "Address PR feedback"},
+		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
+		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion},
+	)
+	require.NoError(t, err)
+
+	defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	for _, nodeID := range []string{
+		prFeedbackRunnerNodeID,
+		prFeedbackReviewRunnerNodeID,
+		prFeedbackReplyRunnerNodeID,
+	} {
+		assert.Equal(t, true, findYAMLNode(t, defaults, nodeID).Configuration["includeVisualEvidence"])
+	}
+}
+
 func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
 		appID:   "app-1",
