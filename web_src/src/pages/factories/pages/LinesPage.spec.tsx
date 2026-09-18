@@ -27,9 +27,11 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryHomePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
+  firstFactoryLineId,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -494,6 +496,27 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("redirects to the first board when a missing line id is opened", async () => {
+    const user = userEvent.setup();
+    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/line-missing`;
+    render(
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        factory={REFUND_FACTORY}
+        navigateTo={missingLinePath}
+      />,
+    );
+
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-test-navigate"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY)),
+    );
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
   });
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {
