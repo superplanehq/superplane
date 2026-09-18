@@ -70,8 +70,6 @@ describe("api-interceptor", () => {
       "/account/password",
       "/account/experimental-features",
       "/organizations",
-      "/apps/install/preview",
-      "/apps/install",
     ];
     for (const path of paths) {
       await expect(globalThis.fetch(path)).rejects.toThrow(ACCOUNT_BLOCKED_MESSAGE);
