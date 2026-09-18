@@ -39,6 +39,15 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		localFiles = append(localFiles, *c.files...)
 	}
 
+	var stagedFiles []common.RepositoryFileStaging
+	if len(localFiles) > 0 {
+		prepared, err := prepareCreateRepositoryFiles(localFiles)
+		if err != nil {
+			return err
+		}
+		stagedFiles = prepared
+	}
+
 	request := openapi_client.NewCanvasesCreateCanvasRequest()
 	request.SetName(name)
 	if description != "" {
@@ -59,16 +68,11 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	canvasID := resp.Canvas.Metadata.GetId()
-	if len(localFiles) == 0 {
+	if len(stagedFiles) == 0 {
 		return printCreateResponse(ctx, *resp.Canvas, nil)
 	}
 
 	commitMessage, err := resolveCreateCommitMessage(c.message, name)
-	if err != nil {
-		return err
-	}
-
-	stagedFiles, err := prepareCreateRepositoryFiles(localFiles)
 	if err != nil {
 		return err
 	}

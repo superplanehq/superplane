@@ -22,39 +22,35 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 
 	userID := uuid.MustParse(user)
 
-	//
-	// Find the base version id for the staging update.
-	//
-	baseVersionID, err := findBaseVersionIDForStagingUpdate(db, canvas, userID)
+	validated, err := validatedStagedSpecOperations(operations)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-
-		normalized, err := requireStagedSpecFilePath(operation.GetPath())
+	err = db.Transaction(func(tx *gorm.DB) error {
+		baseVersionID, err := findBaseVersionIDForStagingUpdate(tx, canvas, userID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		if operation.GetDelete() {
-			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		for _, operation := range validated {
+			if _, err := models.UpsertStagedFile(
+				tx,
+				canvas.ID,
+				userID,
+				*baseVersionID,
+				canvas.OrganizationID,
+				operation.path,
+				operation.content,
+			); err != nil {
+				return grpcerrors.Internal(err, "failed to stage")
+			}
 		}
 
-		if _, err := models.UpsertStagedFile(
-			db,
-			canvas.ID,
-			userID,
-			*baseVersionID,
-			canvas.OrganizationID,
-			normalized,
-			string(operation.GetContent()),
-		); err != nil {
-			return nil, grpcerrors.Internal(err, "failed to stage")
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
@@ -96,4 +92,34 @@ func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userI
 	// Otherwise, use the live version id.
 	//
 	return &liveVersion.ID, nil
+}
+
+type stagedSpecOperation struct {
+	path    string
+	content string
+}
+
+func validatedStagedSpecOperations(operations []*pb.CanvasRepositoryFileOperation) ([]stagedSpecOperation, error) {
+	validated := make([]stagedSpecOperation, 0, len(operations))
+	for _, operation := range operations {
+		if operation == nil {
+			continue
+		}
+
+		normalized, err := requireStagedSpecFilePath(operation.GetPath())
+		if err != nil {
+			return nil, err
+		}
+
+		if operation.GetDelete() {
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		validated = append(validated, stagedSpecOperation{
+			path:    normalized,
+			content: string(operation.GetContent()),
+		})
+	}
+
+	return validated, nil
 }

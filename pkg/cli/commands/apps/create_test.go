@@ -120,7 +120,11 @@ spec:
 }
 
 func TestCreateCommandRejectsNonSpecFiles(t *testing.T) {
-	server := newCreateOnlyServer(t, "canvas-1", "My App", "org-1")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(server.Close)
+
 	dir := t.TempDir()
 	readmePath := filepath.Join(dir, "README.md")
 	require.NoError(t, os.WriteFile(readmePath, []byte("# My App\n"), 0o600))
