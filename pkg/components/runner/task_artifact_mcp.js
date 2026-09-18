@@ -168,12 +168,9 @@ function resolveArtifactFile(inputPath, env = process.env) {
   };
 }
 
-async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
-  const file = resolveArtifactFile(input && input.path, env);
-  requireInspectedScreenshot(file, env);
+async function uploadFile(file, title, env, fetchImpl) {
   const baseURL = requiredEnv("SUPERPLANE_BASE_URL", env).replace(/\/$/, "");
   const token = requiredEnv("SUPERPLANE_ARTIFACT_TOKEN", env);
-  const title = String((input && input.title) || "").trim();
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: "application/json",
@@ -202,12 +199,97 @@ async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
     );
   }
 
+  return result;
+}
+
+function recordArtifact(result, env = process.env) {
   const manifest = readManifest(env);
   const artifacts = manifest.artifacts.filter(
     (item) => item.file_id !== result.file_id,
   );
   artifacts.push(result);
+  const partial = manifest.status === "partial";
+  writeManifest(
+    {
+      status: partial ? "partial" : "captured",
+      reason: partial ? manifest.reason : "",
+      artifacts,
+    },
+    env,
+  );
+}
+
+function markdownLabel(value) {
+  return String(value || "Evidence")
+    .replace(/\\/g, "\\\\")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
+
+async function uploadVideoWithPoster(file, poster, title, env, fetchImpl) {
+  if (!SCREENSHOT_CONTENT_TYPES.has(poster.contentType)) {
+    throw new Error("poster must be a PNG, JPEG, or WebP file");
+  }
+  requireInspectedScreenshot(poster, env);
+
+  const posterTitle = title ? `${title} poster` : "Video poster";
+  const posterResult = await uploadFile(poster, posterTitle, env, fetchImpl);
+  let videoResult;
+  try {
+    videoResult = await uploadFile(file, title, env, fetchImpl);
+  } catch (error) {
+    const manifest = readManifest(env);
+    const artifacts = manifest.artifacts.filter(
+      (item) => item.file_id !== posterResult.file_id,
+    );
+    artifacts.push(posterResult);
+    writeManifest(
+      {
+        status: "partial",
+        reason: `Video upload failed: ${error.message}`,
+        artifacts,
+      },
+      env,
+    );
+    throw error;
+  }
+  const label = markdownLabel(title || file.filename);
+  const linkedPoster = {
+    ...posterResult,
+    video_file_id: videoResult.file_id,
+    markdown: `[![${label}](${posterResult.public_url})](${videoResult.public_url})`,
+  };
+  const linkedVideo = {
+    ...videoResult,
+    poster_file_id: posterResult.file_id,
+    markdown: `[Watch video: ${label}](${videoResult.public_url})`,
+  };
+
+  const manifest = readManifest(env);
+  const artifacts = manifest.artifacts.filter(
+    (item) => item.file_id !== posterResult.file_id && item.file_id !== videoResult.file_id,
+  );
+  artifacts.push(linkedPoster, linkedVideo);
   writeManifest({ status: "captured", reason: "", artifacts }, env);
+  return linkedVideo;
+}
+
+async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
+  const file = resolveArtifactFile(input && input.path, env);
+  const title = String((input && input.title) || "").trim();
+  const posterPath = String((input && input.posterPath) || "").trim();
+  const isVideo = file.contentType.startsWith("video/");
+  if (posterPath && !isVideo) {
+    throw new Error("posterPath is only supported for video artifacts");
+  }
+  requireInspectedScreenshot(file, env);
+  if (posterPath) {
+    const poster = resolveArtifactFile(posterPath, env);
+    return uploadVideoWithPoster(file, poster, title, env, fetchImpl);
+  }
+
+  const result = await uploadFile(file, title, env, fetchImpl);
+  recordArtifact(result, env);
   return result;
 }
 
@@ -217,7 +299,12 @@ function reportVisualEvidenceUnavailable(input, env = process.env) {
   const attempts = normalizeEvidenceAttempts(input && input.attempts);
   const manifest = readManifest(env);
   const result = {
-    status: "unavailable",
+    status:
+      manifest.artifacts.length > 0
+        ? manifest.status === "partial"
+          ? "partial"
+          : "captured"
+        : "unavailable",
     reason,
     attempts,
     artifacts: manifest.artifacts,
@@ -275,7 +362,15 @@ const TOOLS = [
       "Upload a screenshot or video from the task evidence directory and attach it to the work order.",
     inputSchema: {
       type: "object",
-      properties: { path: { type: "string" }, title: { type: "string" } },
+      properties: {
+        path: { type: "string" },
+        title: { type: "string" },
+        posterPath: {
+          type: "string",
+          description:
+            "Inspected PNG, JPEG, or WebP poster to show inline for a video artifact.",
+        },
+      },
       required: ["path"],
     },
   },

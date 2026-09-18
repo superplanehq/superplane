@@ -182,6 +182,102 @@ test("uploadArtifact uploads videos without screenshot inspection", async () => 
   assert.equal(result.file_id, "video-1");
 });
 
+test("uploadArtifact uploads an inspected poster before a video", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  inspectScreenshot({ path: value.file }, value.env);
+  const calls = [];
+
+  const result = await uploadArtifact(
+    { path: video, posterPath: value.file, title: "Checkout flow" },
+    value.env,
+    async (_url, options) => {
+      calls.push(options.headers["Content-Type"]);
+      const isPoster = options.headers["Content-Type"] === "image/png";
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify(
+            isPoster
+              ? { file_id: "poster-1", public_url: "https://app.example/poster.png", markdown: "![Checkout](poster)" }
+              : { file_id: "video-1", public_url: "https://app.example/demo.webm", markdown: "[Checkout](video)" },
+          ),
+      };
+    },
+  );
+
+  assert.equal(result.file_id, "video-1");
+  assert.deepEqual(calls, ["image/png", "video/webm"]);
+  const manifest = readManifest(value.env);
+  assert.equal(manifest.status, "captured");
+  assert.equal(manifest.artifacts.length, 2);
+  assert.equal(manifest.artifacts[0].video_file_id, "video-1");
+  assert.equal(manifest.artifacts[1].poster_file_id, "poster-1");
+  assert.equal(
+    manifest.artifacts[0].markdown,
+    "[![Checkout flow](https://app.example/poster.png)](https://app.example/demo.webm)",
+  );
+  assert.equal(manifest.artifacts[1].markdown, "[Watch video: Checkout flow](https://app.example/demo.webm)");
+});
+
+test("uploadArtifact records a partial result when the video upload fails", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  inspectScreenshot({ path: value.file }, value.env);
+  let request = 0;
+
+  await assert.rejects(
+    uploadArtifact(
+      { path: video, posterPath: value.file, title: "Checkout flow" },
+      value.env,
+      async () => {
+        request += 1;
+        if (request === 1) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({ file_id: "poster-1", public_url: "https://app.example/poster.png", markdown: "![Checkout](poster)" }),
+          };
+        }
+        return { ok: false, status: 503, text: async () => JSON.stringify({ message: "storage unavailable" }) };
+      },
+    ),
+    /storage unavailable/,
+  );
+
+  assert.deepEqual(readManifest(value.env), {
+    status: "partial",
+    reason: "Video upload failed: storage unavailable",
+    artifacts: [
+      { file_id: "poster-1", public_url: "https://app.example/poster.png", markdown: "![Checkout](poster)" },
+    ],
+  });
+});
+
+test("uploadArtifact validates video posters as inspected screenshots", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  const otherVideo = path.join(value.evidence, "poster.webm");
+  fs.writeFileSync(video, "video");
+  fs.writeFileSync(otherVideo, "video");
+  const upload = async () => ({ ok: true, text: async () => JSON.stringify({ file_id: "artifact-1" }) });
+
+  await assert.rejects(
+    uploadArtifact({ path: video, posterPath: value.file }, value.env, upload),
+    /inspect_screenshot before upload_artifact/,
+  );
+  await assert.rejects(
+    uploadArtifact({ path: video, posterPath: otherVideo }, value.env, upload),
+    /poster must be a PNG, JPEG, or WebP file/,
+  );
+  await assert.rejects(
+    uploadArtifact({ path: value.file, posterPath: value.file }, value.env, upload),
+    /posterPath is only supported for video artifacts/,
+  );
+});
+
 test("reportVisualEvidenceUnavailable requires documented attempts", () => {
   const value = fixture();
 
@@ -252,6 +348,78 @@ test("reportVisualEvidenceUnavailable requires documented attempts", () => {
     ],
     artifacts: [],
   });
+});
+
+test("reportVisualEvidenceUnavailable keeps captured evidence available", () => {
+  const value = fixture();
+  inspectScreenshot({ path: value.file }, value.env);
+  return uploadArtifact({ path: value.file }, value.env, async () => ({
+    ok: true,
+    text: async () => JSON.stringify({ file_id: "poster-1", markdown: "![Poster](poster)" }),
+  })).then(() => {
+    const result = reportVisualEvidenceUnavailable(
+      {
+        reason: "The video upload failed.",
+        attempts: [
+          { type: "preview", command: "npm run storybook", outcome: "The preview started." },
+          { type: "playwright", command: "playwright video-start", outcome: "The video was captured." },
+          { type: "upload", command: "upload_artifact", outcome: "The video upload failed." },
+        ],
+      },
+      value.env,
+    );
+
+    assert.equal(result.status, "captured");
+    assert.equal(result.artifacts.length, 1);
+    assert.equal(result.reason, "The video upload failed.");
+  });
+});
+
+test("reportVisualEvidenceUnavailable preserves a partial video result", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  inspectScreenshot({ path: value.file }, value.env);
+  let request = 0;
+
+  await assert.rejects(
+    uploadArtifact(
+      { path: video, posterPath: value.file, title: "Checkout flow" },
+      value.env,
+      async () => {
+        request += 1;
+        if (request === 1) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({ file_id: "poster-1", markdown: "![Checkout](poster)" }),
+          };
+        }
+        return {
+          ok: false,
+          status: 503,
+          text: async () => JSON.stringify({ message: "storage unavailable" }),
+        };
+      },
+    ),
+    /storage unavailable/,
+  );
+
+  const result = reportVisualEvidenceUnavailable(
+    {
+      reason: "The video upload failed.",
+      attempts: [
+        { type: "preview", command: "npm run storybook", outcome: "The preview started." },
+        { type: "playwright", command: "playwright video-start", outcome: "The video was captured." },
+        { type: "upload", command: "upload_artifact", outcome: "The video upload failed." },
+      ],
+    },
+    value.env,
+  );
+
+  assert.equal(result.status, "partial");
+  assert.equal(result.reason, "The video upload failed.");
+  assert.equal(result.artifacts.length, 1);
 });
 
 test("lists artifact tools over newline-delimited JSON-RPC", () => {

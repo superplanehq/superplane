@@ -219,6 +219,22 @@ describe("ColumnAutomationViewPopup", () => {
     ).toHaveAttribute("href", EDIT_HREF);
   });
 
+  it("shows visual evidence only when the agent slot enables it", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      agent: {
+        draft: PLANNING_REVIEW_DRAFT,
+        organizationId: "org-1",
+        onSave: vi.fn(),
+        showVisualEvidenceSetting: true,
+      },
+    });
+
+    expect(screen.getByRole("switch", { name: "Include visual evidence" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+  });
+
   it("puts General first when a form and an agent exist", () => {
     renderPopup({
       general: <p data-testid="column-automation-view-general">Name and filters</p>,

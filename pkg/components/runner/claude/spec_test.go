@@ -20,7 +20,8 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
-		"machineType": testRunnerMachineType,
+		"machineType":           testRunnerMachineType,
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
 		},
@@ -31,6 +32,7 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	assert.True(t, spec.IncludeVisualEvidence)
 	require.Len(t, spec.Steps, 1)
 	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
 	assert.Equal(t, runner.AgentStepPrompt, spec.Steps[0].Type)

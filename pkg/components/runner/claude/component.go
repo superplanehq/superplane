@@ -162,12 +162,13 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
-	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 
 	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
+	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
 	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
