@@ -353,6 +353,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
   });
 
+  it("underlines header spend and shows a model breakdown on hover", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+
+    const trigger = screen.getByTestId("popup-spend-breakdown-trigger");
+    expect(trigger).toHaveClass("underline");
+    await user.hover(trigger);
+    const card = await screen.findByTestId("popup-spend-breakdown");
+    expect(card).toHaveTextContent("claude-sonnet-4-6");
+    expect(card).toHaveTextContent("2.7k tokens · $0.45");
+    expect(card).toHaveTextContent("Machine time");
+    expect(card).toHaveTextContent("1 min 30 s · $0.28");
+  });
+
   it("does not show a model on a draft that has not started", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
@@ -361,6 +375,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row).toHaveTextContent("0 tokens");
     expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(row).not.toHaveTextContent("grok-4.6");
+    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-spend-breakdown")).not.toBeInTheDocument();
   });
 
   it("opens the Task tab when no automation is running", () => {

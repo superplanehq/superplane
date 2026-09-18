@@ -1466,6 +1466,11 @@ message WorkOrder {
   // Canvas run that created this task, when Create Task produced it.
   // Empty for tasks opened in the UI or imported without a source run.
   string source_run_id = 19;
+  // Model spend for this task, one row per model. UI hides empty rows.
+  repeated UsageByModel usage_by_model = 20;
+  // Runner machine time for this task, one row per machine type.
+  // UI hides empty rows and may collapse them into one machine-time line.
+  repeated UsageByMachineType usage_by_machine_type = 21;
 }
 
 message WorkOrderOrigin {
@@ -1610,6 +1615,9 @@ message WorkOrderExecution {
   // When the execution finished (set for finished executions only).
   google.protobuf.Timestamp finished_at = 11;
   int64 duration_seconds = 12;
+  // Models that recorded spend on this step. Distinct ledger model ids,
+  // oldest first. UI prefers these over the Start override.
+  repeated string models = 13;
 }
 
 message WorkOrderExecutionStep {

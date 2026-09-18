@@ -486,14 +486,69 @@ func SumUsageForWorkOrdersByKind(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uui
 	return result, nil
 }
 
-// SumUsageForRunTrees returns ledger totals for each root run, including
-// spend recorded on descendant runs.
-func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageTotals, error) {
-	result := make(map[uuid.UUID]UsageTotals, len(rootIDs))
-	if len(rootIDs) == 0 {
-		return result, nil
+type usageModelNameRow struct {
+	ID       uuid.UUID
+	Provider string
+	Model    string
+}
+
+func formatUsageModelName(provider, model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ""
+	}
+	provider = strings.TrimSpace(provider)
+	if provider == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return provider + "/" + model
+}
+
+func scanUsageModelNames(rows []usageModelNameRow) map[uuid.UUID][]string {
+	result := make(map[uuid.UUID][]string)
+	seen := make(map[uuid.UUID]map[string]struct{})
+	for _, row := range rows {
+		name := formatUsageModelName(row.Provider, row.Model)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[row.ID]; !ok {
+			seen[row.ID] = map[string]struct{}{}
+		}
+		if _, dup := seen[row.ID][name]; dup {
+			continue
+		}
+		seen[row.ID][name] = struct{}{}
+		result[row.ID] = append(result[row.ID], name)
+	}
+	return result
+}
+
+// ListModelsForWorkOrderExecutions returns distinct ledger models keyed by
+// step execution. Missing IDs are absent from the map.
+func ListModelsForWorkOrderExecutions(tx *gorm.DB, executionIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	if len(executionIDs) == 0 {
+		return map[uuid.UUID][]string{}, nil
 	}
 
+	var rows []usageModelNameRow
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("work_order_execution_id AS id, provider, model").
+		Where("work_order_execution_id IN ?", executionIDs).
+		Where("usage_kind = ?", UsageKindModel).
+		Where("model <> ''").
+		Group("work_order_execution_id, provider, model").
+		Order("work_order_execution_id ASC").
+		Order("provider ASC").
+		Order("model ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return scanUsageModelNames(rows), nil
+}
+
+func collectRunTreeIDs(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]uuid.UUID, []uuid.UUID, error) {
 	rootOf := make(map[uuid.UUID]uuid.UUID, len(rootIDs))
 	treeIDs := make([]uuid.UUID, 0, len(rootIDs))
 	for _, id := range rootIDs {
@@ -506,7 +561,7 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 		var children []CanvasRun
 		err := tx.Select("id", "parent_run_id").Where("parent_run_id IN ?", frontier).Find(&children).Error
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		frontier = frontier[:0]
@@ -527,9 +582,73 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 			frontier = append(frontier, child.ID)
 		}
 	}
+	return rootOf, treeIDs, nil
+}
+
+// ListModelsForRunTrees returns distinct ledger models for each root run,
+// including spend recorded on descendant runs.
+func ListModelsForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	result := make(map[uuid.UUID][]string, len(rootIDs))
+	if len(rootIDs) == 0 {
+		return result, nil
+	}
+
+	rootOf, treeIDs, err := collectRunTreeIDs(tx, rootIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []usageModelNameRow
+	err = tx.Model(&WorkspaceUsageEvent{}).
+		Select("canvas_run_id AS id, provider, model").
+		Where("canvas_run_id IN ?", treeIDs).
+		Where("usage_kind = ?", UsageKindModel).
+		Where("model <> ''").
+		Group("canvas_run_id, provider, model").
+		Order("provider ASC").
+		Order("model ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[uuid.UUID]map[string]struct{})
+	for _, row := range rows {
+		rootID, ok := rootOf[row.ID]
+		if !ok {
+			continue
+		}
+		name := formatUsageModelName(row.Provider, row.Model)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[rootID]; !ok {
+			seen[rootID] = map[string]struct{}{}
+		}
+		if _, dup := seen[rootID][name]; dup {
+			continue
+		}
+		seen[rootID][name] = struct{}{}
+		result[rootID] = append(result[rootID], name)
+	}
+	return result, nil
+}
+
+// SumUsageForRunTrees returns ledger totals for each root run, including
+// spend recorded on descendant runs.
+func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageTotals, error) {
+	result := make(map[uuid.UUID]UsageTotals, len(rootIDs))
+	if len(rootIDs) == 0 {
+		return result, nil
+	}
+
+	rootOf, treeIDs, err := collectRunTreeIDs(tx, rootIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	var rows []usageSumRow
-	err := tx.Model(&WorkspaceUsageEvent{}).
+	err = tx.Model(&WorkspaceUsageEvent{}).
 		Select("canvas_run_id AS id, "+usageSumSelect).
 		Where("canvas_run_id IN ?", treeIDs).
 		Group("canvas_run_id").

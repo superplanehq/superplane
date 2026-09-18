@@ -41,6 +41,8 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import type { WorkOrderUsageByMachineType, WorkOrderUsageByModel } from "../../lib/workOrderUsage";
+import { joinRunnerModels } from "./draftStartModel";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import {
   analysisResultDeliveredForRun,
@@ -173,6 +175,8 @@ export interface SplitRunFixture {
   startedLabel: string;
   costUsd: string;
   tokensLabel: string;
+  usageByModel?: WorkOrderUsageByModel[];
+  usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
@@ -387,6 +391,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
+    usageByModel: order.usageByModel,
+    usageByMachineType: order.usageByMachineType,
     lineName:
       options?.lineName?.trim() ||
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
@@ -726,6 +732,9 @@ function analysisRunToPhase(
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: entry.canvasId,
     runId: entry.run.id,
+    costCents: entry.run.costCents,
+    totalTokens: entry.run.totalTokens,
+    model: joinRunnerModels(entry.run.models ?? []),
   };
 }
 
@@ -1127,7 +1136,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
-    model: dispatchModelForExecution(order, execution),
+    model: modelsForExecution(order, execution),
   };
 }
 
@@ -1248,6 +1257,14 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function modelsForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): string | undefined {
+  const reported = joinRunnerModels(execution.models ?? []);
+  if (reported) {
+    return reported;
+  }
+  return dispatchModelForExecution(order, execution);
 }
 
 function dispatchModelForExecution(

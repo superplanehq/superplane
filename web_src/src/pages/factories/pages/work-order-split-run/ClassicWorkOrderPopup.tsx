@@ -136,6 +136,8 @@ export function ClassicWorkOrderPopup({
               fixture={{ ...classicFixture, owner: edits.owner }}
               modelLabel={modelLabel}
               assigneeIds={edits.assigneeIds}
+              usageByModel={classicFixture.usageByModel}
+              usageByMachineType={classicFixture.usageByMachineType}
             />
           </PopupHeader>
         )}
