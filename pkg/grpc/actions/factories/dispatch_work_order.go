@@ -68,6 +68,9 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		if err != nil {
 			return err
 		}
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
 
 		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
 		if !order.IsDispatchable() {

@@ -1,11 +1,14 @@
 import { Ellipsis, ExternalLink, GitPullRequest } from "lucide-react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
   PULL_REQUEST_REVIEW_COPY,
+  pullRequestForReviewHref,
   pullRequestReviewNote,
   type PullRequestReviewTarget,
 } from "./splitRunPullRequestReview";
@@ -22,14 +25,34 @@ const MARK_CLASSNAME = "flex shrink-0 items-center justify-center rounded-full b
 export function SplitRunPullRequestReviewNote({
   ctaLabel,
   pullRequest,
+  trackedPullRequest,
+  organizationId,
+  factoryId,
+  orderId,
+  canAct = true,
   compact = false,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
+  trackedPullRequest?: FactoriesFactoryPullRequest;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canAct?: boolean;
   compact?: boolean;
 }) {
   if (compact) {
-    return <CompactPullRequestReviewNote ctaLabel={ctaLabel} pullRequest={pullRequest} />;
+    return (
+      <CompactPullRequestReviewNote
+        ctaLabel={ctaLabel}
+        pullRequest={pullRequest}
+        trackedPullRequest={trackedPullRequest}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        canAct={canAct}
+      />
+    );
   }
 
   return (
@@ -59,6 +82,13 @@ export function SplitRunPullRequestReviewNote({
                 <ExternalLink className="size-4" aria-hidden />
               </a>
             </Button>
+            <SplitRunPullRequestMergeAction
+              organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
+              pullRequest={trackedPullRequest}
+              canAct={canAct}
+            />
             <p className="text-[13px] leading-5 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
           </div>
         </div>
@@ -70,9 +100,19 @@ export function SplitRunPullRequestReviewNote({
 function CompactPullRequestReviewNote({
   ctaLabel,
   pullRequest,
+  trackedPullRequest,
+  organizationId,
+  factoryId,
+  orderId,
+  canAct,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
+  trackedPullRequest?: FactoriesFactoryPullRequest;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canAct: boolean;
 }) {
   return (
     <div
@@ -83,16 +123,22 @@ function CompactPullRequestReviewNote({
       <div className="min-w-0">
         <h3 className="text-[14px] font-semibold leading-5 text-foreground">{PULL_REQUEST_REVIEW_COPY.headline}</h3>
         <p className="mt-1 text-[12px] leading-4 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
-        <Button
-          asChild
-          size="sm"
-          className="mt-3 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700"
-        >
-          <a href={pullRequest.href} target="_blank" rel="noreferrer" data-testid="split-run-pull-request-cta">
-            {ctaLabel}
-            <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        </Button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" className="bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700">
+            <a href={pullRequest.href} target="_blank" rel="noreferrer" data-testid="split-run-pull-request-cta">
+              {ctaLabel}
+              <ExternalLink className="size-3.5" aria-hidden />
+            </a>
+          </Button>
+          <SplitRunPullRequestMergeAction
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
+            pullRequest={trackedPullRequest}
+            canAct={canAct}
+            compact
+          />
+        </div>
       </div>
     </div>
   );
@@ -147,6 +193,11 @@ export function WaitingPullRequestReview({
   actionBusy,
   compact = false,
   actionsOnly = false,
+  organizationId,
+  factoryId,
+  orderId,
+  pullRequests,
+  canAct = true,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -155,6 +206,11 @@ export function WaitingPullRequestReview({
   actionBusy: boolean;
   compact?: boolean;
   actionsOnly?: boolean;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
@@ -164,5 +220,16 @@ export function WaitingPullRequestReview({
   if (actionsOnly) {
     return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
   }
-  return <SplitRunPullRequestReviewNote ctaLabel={note.cta.label} pullRequest={pullRequest} compact={compact} />;
+  return (
+    <SplitRunPullRequestReviewNote
+      ctaLabel={note.cta.label}
+      pullRequest={pullRequest}
+      trackedPullRequest={pullRequestForReviewHref(pullRequests, pullRequest.href)}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={orderId}
+      canAct={canAct}
+      compact={compact}
+    />
+  );
 }

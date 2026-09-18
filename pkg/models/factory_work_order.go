@@ -495,6 +495,19 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	return o, nil
 }
 
+func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
+	var locked FactoryWorkOrder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", o.ID).
+		First(&locked).
+		Error
+	if err != nil {
+		return err
+	}
+	*o = locked
+	return nil
+}
+
 // TransitionOnDispatch promotes a draft order to open; open is a no-op.
 // Any other state rejects the dispatch.
 func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
