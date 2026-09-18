@@ -15,6 +15,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
+import type { AgentResourceSkillDraft } from "./AgentResourceSkillDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
@@ -130,6 +131,37 @@ function useAgentResourceActions({
     }
   };
 
+  const saveSkill = async (draft: AgentResourceSkillDraft) => {
+    try {
+      if (editResource?.id) {
+        await updateResource.mutateAsync({
+          resourceId: editResource.id,
+          name: draft.name,
+          markdown: draft.markdown,
+        });
+        showSuccessToast(AGENT_RESOURCES_COPY.skillUpdated);
+        setEditResource(undefined);
+        return;
+      }
+      await createResource.mutateAsync({
+        kind: "KIND_SKILL",
+        name: draft.name,
+        enabled: true,
+        markdown: draft.markdown,
+      });
+      showSuccessToast(AGENT_RESOURCES_COPY.skillCreated);
+      setAddDialogOpen(false);
+    } catch (error) {
+      showErrorToast(
+        getApiErrorMessage(
+          error,
+          editResource ? AGENT_RESOURCES_COPY.skillUpdateFailed : AGENT_RESOURCES_COPY.skillCreateFailed,
+        ),
+      );
+      throw error;
+    }
+  };
+
   const disconnectResource = (resource: FactoriesFactoryAgentResource) => {
     if (!resource.id) {
       return;
@@ -145,7 +177,12 @@ function useAgentResourceActions({
       return;
     }
     void updateResource.mutateAsync({ resourceId: resource.id, enabled }).catch((error) => {
-      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.updateFailed));
+      showErrorToast(
+        getApiErrorMessage(
+          error,
+          resource.kind === "KIND_SKILL" ? AGENT_RESOURCES_COPY.skillUpdateFailed : AGENT_RESOURCES_COPY.updateFailed,
+        ),
+      );
     });
   };
 
@@ -153,11 +190,14 @@ function useAgentResourceActions({
     if (!pendingDelete?.id) {
       return;
     }
+    const isSkill = pendingDelete.kind === "KIND_SKILL";
     try {
       await deleteResource.mutateAsync(pendingDelete.id);
-      showSuccessToast(AGENT_RESOURCES_COPY.deleted);
+      showSuccessToast(isSkill ? AGENT_RESOURCES_COPY.skillDeleted : AGENT_RESOURCES_COPY.deleted);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.deleteFailed));
+      showErrorToast(
+        getApiErrorMessage(error, isSkill ? AGENT_RESOURCES_COPY.skillDeleteFailed : AGENT_RESOURCES_COPY.deleteFailed),
+      );
       throw error;
     }
   };
@@ -167,6 +207,7 @@ function useAgentResourceActions({
     isDeleting: deleteResource.isPending,
     startOAuthRedirect,
     saveConnection,
+    saveSkill,
     disconnectResource,
     toggleEnabled,
     confirmDelete,

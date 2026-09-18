@@ -31,11 +31,13 @@ export function connectionNeedsOAuthAction(
   return resource.oauthStatus !== "OAUTH_STATUS_CONNECTED";
 }
 
-export function skillSourceLabel(resource: Pick<FactoriesFactoryAgentResource, "repository" | "ref">): string {
+export function skillSourceLabel(
+  resource: Pick<FactoriesFactoryAgentResource, "repository" | "ref" | "markdown">,
+): string {
   const repository = resource.repository?.trim() ?? "";
-  if (!repository) {
-    return "";
+  if (repository) {
+    const ref = resource.ref?.trim();
+    return ref ? `${repository}@${ref}` : repository;
   }
-  const ref = resource.ref?.trim();
-  return ref ? `${repository}@${ref}` : repository;
+  return AGENT_RESOURCES_COPY.skillSourceInline;
 }

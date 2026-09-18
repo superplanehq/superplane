@@ -517,6 +517,9 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
           if (Array.isArray(request.headers)) {
             resource.headers = request.headers;
           }
+          if (typeof request.markdown === "string") {
+            resource.markdown = request.markdown;
+          }
           resource.updatedAt = new Date().toISOString();
           return { json: { resource } };
         }
@@ -530,7 +533,18 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
         if (method === "POST") {
           const request = (body ?? {}) as FactoriesFactoryAgentResource;
           if (request.kind === "KIND_SKILL") {
-            return { json: {} };
+            const resource: FactoriesFactoryAgentResource = {
+              id: `resource-${resources.length + 1}`,
+              factoryId: match[1],
+              kind: "KIND_SKILL",
+              name: typeof request.name === "string" ? request.name.trim() : "skill",
+              enabled: request.enabled !== false,
+              markdown: typeof request.markdown === "string" ? request.markdown : "",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            resources.push(resource);
+            return { json: { resource } };
           }
           const resource: FactoriesFactoryAgentResource = {
             id: `resource-${resources.length + 1}`,

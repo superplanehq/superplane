@@ -53,6 +53,17 @@ export const OAUTH_VENDOR_REJECTED_RESOURCE: FactoriesFactoryAgentResource = {
     "This vendor does not allow SuperPlane as an OAuth client. Use header authentication if the vendor ships an API key.",
 };
 
+export const INLINE_SKILL: FactoriesFactoryAgentResource = {
+  id: "resource-review-copy",
+  factoryId: PRIMARY_FACTORY_ID,
+  kind: "KIND_SKILL",
+  name: "review-copy",
+  enabled: true,
+  markdown: "# Review copy\n\nWrite STE UI copy.",
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
 export const UI_UX_PRO_MAX_SKILL: FactoriesFactoryAgentResource = {
   id: "resource-ui-ux-pro-max",
   factoryId: PRIMARY_FACTORY_ID,

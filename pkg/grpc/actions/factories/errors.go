@@ -145,7 +145,11 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, models.ErrFactoryAgentResourceHeaderInvalid):
 		return grpcerrors.InvalidArgument(err, "each header needs a name, secret, and key")
 	case errors.Is(err, models.ErrFactoryAgentResourceKindNotSupported):
-		return grpcerrors.FailedPrecondition(err, "skills are not available yet")
+		return grpcerrors.FailedPrecondition(err, "GitHub skill packages are not available yet")
+	case errors.Is(err, models.ErrFactoryAgentResourceMarkdownRequired):
+		return grpcerrors.InvalidArgument(err, "SKILL.md content is required")
+	case errors.Is(err, models.ErrFactoryAgentResourceMarkdownTooLarge):
+		return grpcerrors.InvalidArgument(err, "SKILL.md must be 64 KiB or smaller")
 	case errors.Is(err, models.ErrFactoryAgentResourceMCPCapReached):
 		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 enabled MCP connections")
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):

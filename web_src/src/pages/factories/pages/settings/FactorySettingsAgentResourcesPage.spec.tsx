@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
-import { HEADER_MCP_RESOURCE, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
+import { HEADER_MCP_RESOURCE, INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -117,10 +117,42 @@ describe("FactorySettingsAgentResourcesPage", () => {
 
     await screen.findByTestId("factory-settings-agent-resources", {}, { timeout: 8000 });
     await user.click(screen.getByTestId("agent-resources-tab-skills"));
-    expect(await screen.findByTestId("agent-resources-skills-empty")).toHaveTextContent(
-      "Skills are not available yet.",
+    expect(await screen.findByTestId("agent-resources-skills-empty")).toHaveTextContent("No skills yet.");
+    expect(screen.getByTestId("agent-resources-add-skill")).toBeEnabled();
+    expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add skill");
+  }, 10000);
+
+  it("opens the add skill dialog from the query string", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`${connectionsPath}?tab=skills&dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
     );
-    expect(screen.getByTestId("agent-resources-add-skill")).toBeDisabled();
+
+    expect(await screen.findByTestId("agent-resource-skill-dialog", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("agent-resource-skill-name")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-resource-skill-markdown")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-connection-dialog")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("lists an inline skill", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`${connectionsPath}?tab=skills`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
+    );
+
+    expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByText("review-copy")).toBeInTheDocument();
+    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
   }, 10000);
 
   it("lists a GitHub skill package", async () => {

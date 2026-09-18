@@ -5,6 +5,7 @@ import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   HEADER_MCP_RESOURCE,
+  INLINE_SKILL,
   MIXED_AGENT_RESOURCES,
   OAUTH_CONNECTED_RESOURCE,
   OAUTH_NEEDS_RECONNECT_RESOURCE,
@@ -32,6 +33,7 @@ type Story = StoryObj<typeof meta>;
 const connectionsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`;
 const skillsPath = `${connectionsPath}?tab=skills`;
 const addDialogPath = `${connectionsPath}?dialog=add`;
+const addSkillDialogPath = `${connectionsPath}?tab=skills&dialog=add`;
 
 function withResources(resources: typeof MIXED_AGENT_RESOURCES, pathSuffix = connectionsPath) {
   return (
@@ -84,6 +86,14 @@ export const SkillsEmpty: Story = {
   render: () => withResources([], skillsPath),
 };
 
+export const SkillsInline: Story = {
+  render: () => withResources([INLINE_SKILL], skillsPath),
+};
+
 export const SkillsGitHub: Story = {
   render: () => withResources([UI_UX_PRO_MAX_SKILL], skillsPath),
+};
+
+export const AddSkillDialog: Story = {
+  render: () => withResources([], addSkillDialogPath),
 };

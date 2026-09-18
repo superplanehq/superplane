@@ -21,6 +21,8 @@ const (
 	FactoryAgentResourceAuthHeaders = "headers"
 	FactoryAgentResourceAuthOAuth   = "oauth"
 
+	FactoryAgentResourceSourceInline = "inline"
+
 	FactoryAgentResourceOAuthNotConnected   = "not_connected"
 	FactoryAgentResourceOAuthConnected      = "connected"
 	FactoryAgentResourceOAuthNeedsReconnect = "needs_reconnect"
@@ -34,6 +36,8 @@ const (
 	ReservedFactoryAgentResourceName = "superplane"
 
 	MaxEnabledFactoryMCPServers = 20
+
+	MaxFactoryAgentSkillMarkdownBytes = 64 * 1024
 
 	factoryAgentResourceNameUniqueConstraint = "idx_factory_agent_resources_factory_name"
 )
@@ -50,6 +54,8 @@ var (
 	ErrFactoryAgentResourceKindNotSupported = errors.New("factory agent resource kind is not supported yet")
 	ErrFactoryAgentResourceMCPCapReached    = errors.New("workspace already has the maximum number of enabled MCP connections")
 	ErrFactoryAgentResourceSecretNotFound   = errors.New("factory agent resource secret not found")
+	ErrFactoryAgentResourceMarkdownRequired = errors.New("skill markdown is required")
+	ErrFactoryAgentResourceMarkdownTooLarge = errors.New("skill markdown is too large")
 )
 
 var factoryAgentResourceNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
@@ -83,6 +89,7 @@ type FactoryAgentResourceConfig struct {
 	Repository string                       `json:"repository,omitempty"`
 	Ref        string                       `json:"ref,omitempty"`
 	Path       string                       `json:"path,omitempty"`
+	Markdown   string                       `json:"markdown,omitempty"`
 }
 
 type FactoryAgentResourceHeader struct {
@@ -179,6 +186,31 @@ func (c FactoryAgentResourceConfig) ValidateMCP() error {
 	return nil
 }
 
+func (c FactoryAgentResourceConfig) ValidateSkill() error {
+	source := strings.TrimSpace(c.Source)
+	if source != "" && source != FactoryAgentResourceSourceInline {
+		return ErrFactoryAgentResourceKindNotSupported
+	}
+	markdown := strings.TrimSpace(c.Markdown)
+	if markdown == "" {
+		return ErrFactoryAgentResourceMarkdownRequired
+	}
+	if len(markdown) > MaxFactoryAgentSkillMarkdownBytes {
+		return ErrFactoryAgentResourceMarkdownTooLarge
+	}
+	return nil
+}
+
+func (c FactoryAgentResourceConfig) NormalizedSkill() FactoryAgentResourceConfig {
+	c.Source = FactoryAgentResourceSourceInline
+	c.Markdown = strings.TrimSpace(c.Markdown)
+	c.Transport = ""
+	c.URL = ""
+	c.Auth = ""
+	c.Headers = nil
+	return c
+}
+
 func (r *FactoryAgentResource) OAuthState() string {
 	if strings.TrimSpace(r.OAuthStatus) == "" {
 		if r.Config.Data().MCPAuth() == FactoryAgentResourceAuthOAuth {
@@ -205,14 +237,19 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 	if err := ValidateFactoryAgentResourceKind(kind); err != nil {
 		return nil, err
 	}
-	if kind != FactoryAgentResourceKindMCPServer {
-		return nil, ErrFactoryAgentResourceKindNotSupported
-	}
 	if err := ValidateFactoryAgentResourceName(name); err != nil {
 		return nil, err
 	}
-	if err := config.ValidateMCP(); err != nil {
-		return nil, err
+	switch kind {
+	case FactoryAgentResourceKindSkill:
+		if err := config.ValidateSkill(); err != nil {
+			return nil, err
+		}
+		config = config.NormalizedSkill()
+	default:
+		if err := config.ValidateMCP(); err != nil {
+			return nil, err
+		}
 	}
 	now := time.Now()
 	resource := &FactoryAgentResource{
@@ -226,12 +263,12 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if config.MCPAuth() == FactoryAgentResourceAuthOAuth {
+	if kind == FactoryAgentResourceKindMCPServer && config.MCPAuth() == FactoryAgentResourceAuthOAuth {
 		resource.OAuthStatus = FactoryAgentResourceOAuthNotConnected
 	}
 
 	err := tx.Transaction(func(inner *gorm.DB) error {
-		if enabled {
+		if enabled && kind == FactoryAgentResourceKindMCPServer {
 			if err := f.ensureEnabledMCPCapacity(inner, uuid.Nil); err != nil {
 				return err
 			}
@@ -286,6 +323,21 @@ func (f *Factory) ListEnabledMCPServers(tx *gorm.DB) ([]FactoryAgentResource, er
 	return resources, nil
 }
 
+func (f *Factory) ListEnabledSkills(tx *gorm.DB) ([]FactoryAgentResource, error) {
+	var resources []FactoryAgentResource
+	err := tx.Where(
+		"organization_id = ? AND factory_id = ? AND kind = ? AND enabled = ?",
+		f.OrganizationID,
+		f.ID,
+		FactoryAgentResourceKindSkill,
+		true,
+	).Order("name asc").Find(&resources).Error
+	if err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
 func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, config *FactoryAgentResourceConfig) error {
 	return tx.Transaction(func(inner *gorm.DB) error {
 		updates := map[string]any{
@@ -300,7 +352,7 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 			r.Name = normalized
 		}
 		if enabled != nil {
-			if *enabled {
+			if *enabled && r.Kind == FactoryAgentResourceKindMCPServer {
 				factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
 				if err := factory.ensureEnabledMCPCapacity(inner, r.ID); err != nil {
 					return err
@@ -310,24 +362,28 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 			r.Enabled = *enabled
 		}
 		if config != nil {
-			if r.Kind == FactoryAgentResourceKindMCPServer {
-				if err := config.ValidateMCP(); err != nil {
+			if r.Kind == FactoryAgentResourceKindSkill {
+				if err := config.ValidateSkill(); err != nil {
 					return err
 				}
+				normalized := config.NormalizedSkill()
+				config = &normalized
+			} else if err := config.ValidateMCP(); err != nil {
+				return err
 			}
-			if r.Config.Data().InvalidatesOAuth(*config) {
+			if r.Kind == FactoryAgentResourceKindMCPServer && r.Config.Data().InvalidatesOAuth(*config) {
 				if err := r.DeleteSecrets(inner); err != nil {
 					return err
 				}
 				for key, value := range r.oauthResetUpdates(config.MCPAuth()) {
 					updates[key] = value
 				}
-			} else if config.MCPAuth() != FactoryAgentResourceAuthOAuth {
+			} else if r.Kind == FactoryAgentResourceKindMCPServer && config.MCPAuth() != FactoryAgentResourceAuthOAuth {
 				updates["oauth_status"] = ""
 				updates["oauth_error"] = ""
 				r.OAuthStatus = ""
 				r.OAuthError = ""
-			} else if r.OAuthStatus == "" {
+			} else if r.Kind == FactoryAgentResourceKindMCPServer && r.OAuthStatus == "" {
 				updates["oauth_status"] = FactoryAgentResourceOAuthNotConnected
 				r.OAuthStatus = FactoryAgentResourceOAuthNotConnected
 			}

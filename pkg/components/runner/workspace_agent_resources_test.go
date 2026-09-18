@@ -188,3 +188,63 @@ func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
 	assert.Empty(t, environment)
 	assert.Empty(t, files)
 }
+
+func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Review copy\n\nWrite STE UI copy.",
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "off", false, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Disabled",
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	assert.Empty(t, environment)
+	require.Len(t, files, 2)
+	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[0].Path)
+	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[1].Path)
+	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.\n", files[0].Content)
+	assert.Equal(t, files[0].Content, files[1].Content)
+}
+
+func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.deepwiki.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Review copy",
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	require.Len(t, environment, 1)
+	require.Len(t, files, 3)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[1].Path)
+	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[2].Path)
+}

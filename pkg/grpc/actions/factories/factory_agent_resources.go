@@ -55,7 +55,7 @@ func CreateFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 
-	config, err := protoMCPConfig(req.GetUrl(), req.GetAuth(), req.GetHeaders())
+	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -107,7 +107,14 @@ func UpdateFactoryAgentResource(
 		enabled = &value
 	}
 	var config *models.FactoryAgentResourceConfig
-	if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 {
+	if resource.Kind == models.FactoryAgentResourceKindSkill {
+		if req.Markdown != nil {
+			merged := resource.Config.Data()
+			merged.Markdown = req.GetMarkdown()
+			merged.Source = models.FactoryAgentResourceSourceInline
+			config = &merged
+		}
+	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 {
 		merged := resource.Config.Data()
 		if req.Url != nil {
 			merged.URL = req.GetUrl()
@@ -188,6 +195,7 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 		out.Repository = config.Repository
 		out.Ref = config.Ref
 		out.Path = config.Path
+		out.Markdown = config.Markdown
 	}
 	if resource.OAuthConnectedBy != nil {
 		out.OauthConnectedByUserId = resource.OAuthConnectedBy.String()
@@ -196,6 +204,22 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 		out.OauthConnectedAt = timestamppb.New(*resource.OAuthConnectedAt)
 	}
 	return out
+}
+
+func protoAgentResourceConfig(
+	kind pb.FactoryAgentResource_Kind,
+	rawURL string,
+	auth pb.FactoryAgentResource_Auth,
+	headers []*pb.FactoryAgentResource_Header,
+	markdown string,
+) (models.FactoryAgentResourceConfig, error) {
+	if kind == pb.FactoryAgentResource_KIND_SKILL {
+		return models.FactoryAgentResourceConfig{
+			Source:   models.FactoryAgentResourceSourceInline,
+			Markdown: markdown,
+		}, nil
+	}
+	return protoMCPConfig(rawURL, auth, headers)
 }
 
 func protoMCPConfig(rawURL string, auth pb.FactoryAgentResource_Auth, headers []*pb.FactoryAgentResource_Header) (models.FactoryAgentResourceConfig, error) {

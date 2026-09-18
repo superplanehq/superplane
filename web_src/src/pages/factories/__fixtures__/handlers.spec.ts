@@ -385,4 +385,28 @@ describe("factory agent resources fixture", () => {
       }),
     });
   });
+
+  it("creates an inline skill", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "KIND_SKILL",
+          name: "review-copy",
+          markdown: "# Review copy",
+        }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      resource: expect.objectContaining({
+        kind: "KIND_SKILL",
+        name: "review-copy",
+        markdown: "# Review copy",
+      }),
+    });
+  });
 });

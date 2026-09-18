@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,6 +21,8 @@ const (
 	WorkspaceMCPConfigPath          = "workspace_mcp.json"
 	EnvSuperplaneWorkspaceMCPConfig = "SUPERPLANE_WORKSPACE_MCP_CONFIG"
 	workspaceMCPConfigEnvValue      = "$SUPERPLANE_TASK_DIR/" + WorkspaceMCPConfigPath
+	workspaceClaudeSkillPath        = ".claude/skills/%s/SKILL.md"
+	workspaceAgentsSkillPath        = ".agents/skills/%s/SKILL.md"
 )
 
 type workspaceMCPServer struct {
@@ -32,8 +35,9 @@ type workspaceMCPFile struct {
 	Servers []workspaceMCPServer `json:"servers"`
 }
 
-// AttachWorkspaceAgentResources ships enabled workspace MCP connections on
-// the broker task. It is a no-op when the canvas is not factory-owned.
+// AttachWorkspaceAgentResources ships enabled workspace MCP connections and
+// inline skills on the broker task. It is a no-op when the canvas is not
+// factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
@@ -69,15 +73,33 @@ func AttachWorkspaceAgentResources(
 		return environment, files
 	}
 
-	resources, err := factory.ListEnabledMCPServers(db)
+	mcpServers, err := factory.ListEnabledMCPServers(db)
 	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: list failed")
+		logger.WithError(err).Warn("skip workspace agent resources: list MCP failed")
 		return environment, files
 	}
-	if len(resources) == 0 {
+	skills, err := factory.ListEnabledSkills(db)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: list skills failed")
 		return environment, files
 	}
 
+	environment, files = attachWorkspaceMCPServers(ctx, db, mcpServers, environment, files)
+	files = appendWorkspaceSkillFiles(skills, files)
+	return environment, files
+}
+
+func attachWorkspaceMCPServers(
+	ctx core.ExecutionContext,
+	db *gorm.DB,
+	resources []models.FactoryAgentResource,
+	environment []BrokerEnvironmentVariable,
+	files []BrokerTaskFile,
+) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+	if len(resources) == 0 {
+		return environment, files
+	}
+	logger := workspaceAgentResourcesLogger(ctx)
 	encryptor, _ := crypto.FromEnv()
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
 	servers := make([]workspaceMCPServer, 0, len(resources))
@@ -108,6 +130,24 @@ func AttachWorkspaceAgentResources(
 		Value: workspaceMCPConfigEnvValue,
 	})
 	return environment, files
+}
+
+func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+	for i := range resources {
+		markdown := strings.TrimSpace(resources[i].Config.Data().Markdown)
+		if markdown == "" || resources[i].Name == models.ReservedFactoryAgentResourceName {
+			continue
+		}
+		if err := resources[i].Config.Data().ValidateSkill(); err != nil {
+			continue
+		}
+		content := markdown + "\n"
+		files = append(files,
+			BrokerTaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+			BrokerTaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+		)
+	}
+	return files
 }
 
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {

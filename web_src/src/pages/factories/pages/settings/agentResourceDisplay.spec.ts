@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   HEADER_MCP_RESOURCE,
+  INLINE_SKILL,
   OAUTH_CONNECTED_RESOURCE,
   OAUTH_NEEDS_RECONNECT_RESOURCE,
   OAUTH_NOT_CONNECTED_RESOURCE,
@@ -47,5 +48,9 @@ describe("connectionNeedsOAuthAction", () => {
 describe("skillSourceLabel", () => {
   it("formats a GitHub package as owner/repo@ref", () => {
     expect(skillSourceLabel(UI_UX_PRO_MAX_SKILL)).toBe("nextlevelbuilder/ui-ux-pro-max-skill@v1.2.0");
+  });
+
+  it("labels an inline skill as SKILL.md", () => {
+    expect(skillSourceLabel(INLINE_SKILL)).toBe("SKILL.md");
   });
 });

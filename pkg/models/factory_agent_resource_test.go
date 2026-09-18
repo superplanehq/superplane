@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -58,7 +59,30 @@ func Test__FactoryAgentResource(t *testing.T) {
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceNameTaken)
 	})
 
-	t.Run("rejects skill kind in v1", func(t *testing.T) {
+	t.Run("creates an inline skill", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "Review-Copy", true, models.FactoryAgentResourceConfig{
+			Source:   models.FactoryAgentResourceSourceInline,
+			Markdown: "# Review copy\n\nWrite STE UI copy.",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "review-copy", resource.Name)
+		assert.Equal(t, models.FactoryAgentResourceKindSkill, resource.Kind)
+		assert.Equal(t, models.FactoryAgentResourceSourceInline, resource.Config.Data().Source)
+		assert.Equal(t, "# Review copy\n\nWrite STE UI copy.", resource.Config.Data().Markdown)
+
+		enabled, err := factory.ListEnabledSkills(db)
+		require.NoError(t, err)
+		require.Len(t, enabled, 1)
+		assert.Equal(t, resource.ID, enabled[0].ID)
+
+		found, err := factory.FindAgentResource(db, resource.ID)
+		require.NoError(t, err)
+		assert.Equal(t, resource.ID, found.ID)
+	})
+
+	t.Run("rejects GitHub skill packages", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "ui-ux", true, models.FactoryAgentResourceConfig{
@@ -67,6 +91,25 @@ func Test__FactoryAgentResource(t *testing.T) {
 			Ref:        "main",
 		})
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceKindNotSupported)
+	})
+
+	t.Run("rejects empty skill markdown", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "empty", true, models.FactoryAgentResourceConfig{
+			Source: models.FactoryAgentResourceSourceInline,
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceMarkdownRequired)
+	})
+
+	t.Run("rejects oversized skill markdown", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "huge", true, models.FactoryAgentResourceConfig{
+			Source:   models.FactoryAgentResourceSourceInline,
+			Markdown: strings.Repeat("a", models.MaxFactoryAgentSkillMarkdownBytes+1),
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceMarkdownTooLarge)
 	})
 
 	t.Run("oauth row starts not connected", func(t *testing.T) {

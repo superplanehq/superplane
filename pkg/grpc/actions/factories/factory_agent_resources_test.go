@@ -158,3 +158,38 @@ func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, secret.Value)
 }
+
+func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_SKILL,
+		Name:      "review-copy",
+		Enabled:   true,
+		Markdown:  "# Review copy\n\nWrite STE UI copy.",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, response.GetResource())
+	assert.Equal(t, pb.FactoryAgentResource_KIND_SKILL, response.GetResource().GetKind())
+	assert.Equal(t, "review-copy", response.GetResource().GetName())
+	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.", response.GetResource().GetMarkdown())
+}
+
+func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_SKILL,
+		Name:      "ui-ux",
+		Enabled:   true,
+	})
+	require.Error(t, err)
+}

@@ -2384,6 +2384,7 @@ message FactoryAgentResource {
   string repository = 15;
   string ref = 16;
   string path = 17;
+  string markdown = 18;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2403,6 +2404,7 @@ message CreateFactoryAgentResourceRequest {
   string url = 5;
   FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
+  string markdown = 8;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -2417,6 +2419,7 @@ message UpdateFactoryAgentResourceRequest {
   optional string url = 5;
   optional FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
+  optional string markdown = 8;
 }
 
 message UpdateFactoryAgentResourceResponse {
