@@ -1,7 +1,6 @@
 package openrouter
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
