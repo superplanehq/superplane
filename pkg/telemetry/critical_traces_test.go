@@ -12,7 +12,7 @@ func TestIsCriticalHTTPRoute(t *testing.T) {
 	t.Run("critical canvas endpoints", func(t *testing.T) {
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/runs"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/versions"))
-		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/repository/file"))
+		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/file"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/memory"))
 	})
 
@@ -50,6 +50,10 @@ func TestMayTraceHTTPRequest(t *testing.T) {
 		assert.True(t, MayTraceHTTPRequest(&http.Request{
 			Method: http.MethodGet,
 			URL:    mustParseURL("/api/v1/canvases/4fc1e729-3e55-4347-b15a-47048be5d9f4/runs?limit=25"),
+		}))
+		assert.True(t, MayTraceHTTPRequest(&http.Request{
+			Method: http.MethodGet,
+			URL:    mustParseURL("/api/v1/canvases/4fc1e729-3e55-4347-b15a-47048be5d9f4/file?path=canvas.yaml"),
 		}))
 		assert.True(t, MayTraceHTTPRequest(&http.Request{
 			Method: http.MethodGet,
