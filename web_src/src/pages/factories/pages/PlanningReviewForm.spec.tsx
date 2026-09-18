@@ -69,11 +69,19 @@ function superPlaneDraft(): PlanningReviewDraft {
   };
 }
 
-function renderForm(draft: PlanningReviewDraft) {
+function renderForm(
+  draft: PlanningReviewDraft,
+  props: { onChange?: (draft: PlanningReviewDraft) => void; showVisualEvidenceSetting?: boolean } = {},
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
-        <PlanningReviewForm draft={draft} onChange={vi.fn()} organizationId="org-1" />
+        <PlanningReviewForm
+          draft={draft}
+          onChange={props.onChange ?? vi.fn()}
+          organizationId="org-1"
+          showVisualEvidenceSetting={props.showVisualEvidenceSetting}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -140,5 +148,34 @@ describe("PlanningReviewForm model options", () => {
     expect(screen.getByRole("option", { name: "Claude Sonnet" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Claude Opus" })).toBeInTheDocument();
     expect(screen.queryByTestId("field-model-hosted-model")).not.toBeInTheDocument();
+  });
+
+  it("shows and saves the visual evidence setting when enabled for the automation", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    renderForm(PLANNING_REVIEW_DRAFT, { onChange, showVisualEvidenceSetting: true });
+
+    const settings = screen.getByTestId("planning-review-settings");
+    expect(settings.className).toContain("grid-cols-3");
+    const toggle = screen.getByRole("switch", { name: "Include visual evidence" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [
+          expect.objectContaining({
+            configuration: expect.objectContaining({ includeVisualEvidence: true }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("hides the visual evidence setting for other automations", () => {
+    renderForm(PLANNING_REVIEW_DRAFT);
+
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-settings").className).toContain("grid-cols-2");
   });
 });

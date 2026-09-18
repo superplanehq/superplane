@@ -1,6 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useComponent } from "@/hooks/useComponentData";
+import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
@@ -17,10 +19,12 @@ export function PlanningReviewForm({
   draft,
   onChange,
   organizationId,
+  showVisualEvidenceSetting = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
   organizationId?: string;
+  showVisualEvidenceSetting?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -36,6 +40,7 @@ export function PlanningReviewForm({
           key={component.id}
           component={component}
           organizationId={organizationId}
+          showVisualEvidenceSetting={showVisualEvidenceSetting}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -46,10 +51,12 @@ export function PlanningReviewForm({
 function AgentPanel({
   component,
   organizationId,
+  showVisualEvidenceSetting,
   onChange,
 }: {
   component: PlanningReviewComponent;
   organizationId?: string;
+  showVisualEvidenceSetting: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const setConfigurationField = (name: string, value: unknown) => {
@@ -64,7 +71,10 @@ function AgentPanel({
   return (
     <div className="flex flex-col gap-4" data-testid={`planning-review-component-${component.id}`}>
       <section
-        className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
+        className={cn(
+          "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
+          showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
+        )}
         data-testid="planning-review-settings"
       >
         <div className="flex flex-col gap-2">
@@ -95,6 +105,18 @@ function AgentPanel({
             autocompleteExampleObj={EXPRESSION_CONTEXT}
             fieldPath="model"
           />
+        ) : null}
+        {showVisualEvidenceSetting ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`planning-review-visual-evidence-${component.id}`}>Include visual evidence</Label>
+            <div className="flex h-9 items-center">
+              <Switch
+                id={`planning-review-visual-evidence-${component.id}`}
+                checked={component.configuration.includeVisualEvidence === true}
+                onCheckedChange={(checked) => setConfigurationField("includeVisualEvidence", checked)}
+              />
+            </div>
+          </div>
         ) : null}
       </section>
       <PlanningReviewStepList
