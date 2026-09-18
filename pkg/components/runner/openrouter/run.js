@@ -399,13 +399,13 @@ function ensureXdgDirs(taskDir) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -607,20 +607,22 @@ async function runPrompt(promptFile, model, helpers = {}) {
     payload.total_cost_usd = lastCost;
   }
   telemetry.attachToResult(payload, { name: promptSeriesName(promptFile) });
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await recordAgentMessage(payload.result);
+    await recordAgentMessage(safePayload.result);
   }
   formatTurnResult({
     is_error: failed,
     num_turns:
-      payload.telemetry && payload.telemetry.num_turns
-        ? payload.telemetry.num_turns
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
         : 1,
     duration_ms: Date.now() - startedAt,
-    total_cost_usd: payload.total_cost_usd,
+    total_cost_usd: safePayload.total_cost_usd,
   });
   return failed ? exitCode || 1 : 0;
 }
@@ -708,12 +710,30 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       resolve();
       return;
     }
+    let pending = "";
+    let finished = false;
+    const flush = () => {
+      if (pending) {
+        writeStderr(pending);
+        pending = "";
+      }
+    };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      flush();
+      resolve();
+    };
     child.stderr.on("data", (chunk) => {
-      stderrText += String(chunk);
-      process.stderr.write(chunk);
+      const text = String(chunk);
+      stderrText += text;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() || "";
+      for (const line of lines) writeStderr(`${line}\n`);
     });
-    child.stderr.on("end", resolve);
-    child.stderr.on("error", resolve);
+    child.stderr.on("end", finish);
+    child.stderr.on("error", finish);
   });
 
   const stdout = child.stdout;
@@ -1299,10 +1319,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function promptSeriesName(promptFile) {
@@ -1317,7 +1343,15 @@ function promptSeriesName(promptFile) {
 }
 
 function writeStdout(chunk) {
-  fs.writeSync(1, chunk);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(1, safe);
+}
+
+function writeStderr(chunk) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(2, safe);
 }
 
 function writeLiveLogRecord(rec) {
@@ -1783,7 +1817,9 @@ function toolInputDetail(name, rawInput) {
 }
 
 function truncateText(text) {
-  let lines = String(text || "").split(/\r?\n/);
+  const activity = loadActivityStreamModule();
+  text = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text || "");
+  let lines = text.split(/\r?\n/);
   if (lines.length > TOOL_RESULT_MAX_LINES) {
     const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);
     const omitted = lines.length - TOOL_RESULT_MAX_LINES;
@@ -1817,7 +1853,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatOpenCodeJsonLines(rawLines) {

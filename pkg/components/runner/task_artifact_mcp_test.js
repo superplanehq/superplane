@@ -8,6 +8,8 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  MAX_INSPECTABLE_SCREENSHOT_BYTES,
+  inspectScreenshot,
   readManifest,
   reportVisualEvidenceUnavailable,
   resolveArtifactFile,
@@ -81,6 +83,8 @@ test("resolveArtifactFile rejects unsupported extensions", () => {
 
 test("uploadArtifact streams metadata and records the returned artifact", async () => {
   const value = fixture();
+  const inspected = inspectScreenshot({ path: value.file }, value.env);
+  assert.equal(inspected.structuredContent.filename, "screen.png");
   const calls = [];
   const title = "Checkout → success";
   const result = await uploadArtifact(
@@ -115,6 +119,67 @@ test("uploadArtifact streams metadata and records the returned artifact", async 
       JSON.stringify({ file_id: "file-1", markdown: "![Checkout](url)" }),
   }));
   assert.equal(readManifest(value.env).artifacts.length, 1);
+});
+
+test("inspectScreenshot returns an image block and records its hash", () => {
+  const value = fixture();
+  const result = inspectScreenshot({ path: value.file }, value.env);
+
+  assert.equal(result.content[0].type, "text");
+  assert.deepEqual(result.content[1], {
+    type: "image",
+    data: Buffer.from("png").toString("base64"),
+    mimeType: "image/png",
+  });
+  assert.match(result.structuredContent.sha256, /^[a-f0-9]{64}$/);
+  const inspections = JSON.parse(fs.readFileSync(path.join(value.taskDir, "visual-evidence-inspections.json"), "utf8"));
+  assert.equal(inspections.inspections[0].path, "screen.png");
+  assert.equal(inspections.inspections[0].sha256, result.structuredContent.sha256);
+});
+
+test("inspectScreenshot rejects unsupported and oversized files", () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  assert.throws(() => inspectScreenshot({ path: video }, value.env), /PNG, JPEG, or WebP/);
+
+  const oversized = path.join(value.evidence, "large.png");
+  const descriptor = fs.openSync(oversized, "w");
+  fs.ftruncateSync(descriptor, MAX_INSPECTABLE_SCREENSHOT_BYTES + 1);
+  fs.closeSync(descriptor);
+  assert.throws(() => inspectScreenshot({ path: oversized }, value.env), /smaller or more focused image/);
+});
+
+test("inspectScreenshot rejects traversal and symlinks", () => {
+  const value = fixture();
+  const outside = path.join(value.taskDir, "outside.png");
+  fs.writeFileSync(outside, "png");
+  assert.throws(() => inspectScreenshot({ path: outside }, value.env), /inside the task evidence directory/);
+
+  const link = path.join(value.evidence, "linked.png");
+  fs.symlinkSync(value.file, link);
+  assert.throws(() => inspectScreenshot({ path: link }, value.env), /regular file/);
+});
+
+test("uploadArtifact rejects uninspected and modified screenshots", async () => {
+  const value = fixture();
+  const upload = async () => ({ ok: true, text: async () => JSON.stringify({ file_id: "file-1" }) });
+
+  await assert.rejects(uploadArtifact({ path: value.file }, value.env, upload), /inspect_screenshot before upload_artifact/);
+  inspectScreenshot({ path: value.file }, value.env);
+  fs.appendFileSync(value.file, "changed");
+  await assert.rejects(uploadArtifact({ path: value.file }, value.env, upload), /changed after inspection/);
+});
+
+test("uploadArtifact uploads videos without screenshot inspection", async () => {
+  const value = fixture();
+  const video = path.join(value.evidence, "demo.webm");
+  fs.writeFileSync(video, "video");
+  const result = await uploadArtifact({ path: video }, value.env, async () => ({
+    ok: true,
+    text: async () => JSON.stringify({ file_id: "video-1" }),
+  }));
+  assert.equal(result.file_id, "video-1");
 });
 
 test("reportVisualEvidenceUnavailable requires documented attempts", () => {
@@ -212,6 +277,29 @@ test("lists artifact tools over newline-delimited JSON-RPC", () => {
     .map((line) => JSON.parse(line));
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["upload_artifact", "report_visual_evidence_unavailable"],
+    ["inspect_screenshot", "upload_artifact", "report_visual_evidence_unavailable"],
   );
+});
+
+test("returns image content over JSON-RPC without copying base64 into structured content", () => {
+  const value = fixture();
+  const input = [
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "inspect_screenshot", arguments: { path: value.file } },
+    }),
+    "",
+  ].join("\n");
+  const result = spawnSync(process.execPath, [path.join(__dirname, "task_artifact_mcp.js")], {
+    input,
+    encoding: "utf8",
+    env: { ...process.env, ...value.env },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const reply = JSON.parse(result.stdout.trim());
+  assert.equal(reply.result.content[1].type, "image");
+  assert.equal(reply.result.content[1].data, Buffer.from("png").toString("base64"));
+  assert.equal(reply.result.structuredContent.data, undefined);
 });
