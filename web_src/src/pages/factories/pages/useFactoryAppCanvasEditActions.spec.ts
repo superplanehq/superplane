@@ -169,7 +169,7 @@ describe("useFactoryAppCanvasEditActions reset to factory defaults", () => {
     expect(applyDraftSpec).toHaveBeenCalledTimes(1);
     expect(materializeDefaults).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { factoryId: "factory-1", appId: "app-1" },
+        path: { factoryId: "factory-1", automationId: "app-1" },
         body: {},
       }),
     );
