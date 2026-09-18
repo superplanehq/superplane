@@ -66,6 +66,8 @@ test("persistAnalysisContinuation writes a wait continuation for the next rewind
     fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
     "Continue this SuperPlane analysis session.\n",
   );
+  persistAnalysisContinuation(dir, { status: "message", text: "ok" });
+  assert.equal(fs.existsSync(path.join(dir, "analysis_continuation.md")), false);
 });
 
 test("runLoop writes wait continuation before the follow-up prompt", async () => {

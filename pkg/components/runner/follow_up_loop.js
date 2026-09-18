@@ -115,11 +115,20 @@ async function waitOnce() {
 }
 
 function persistAnalysisContinuation(taskDir, result) {
-  const text = String((result && result.continuation) || "").trim();
-  if (!taskDir || !text) {
+  if (!taskDir) {
     return;
   }
-  fs.writeFileSync(path.join(taskDir, "analysis_continuation.md"), `${text}\n`);
+  const file = path.join(taskDir, "analysis_continuation.md");
+  const text = String((result && result.continuation) || "").trim();
+  if (!text) {
+    try {
+      fs.unlinkSync(file);
+    } catch (_err) {
+      // No previous rewind file.
+    }
+    return;
+  }
+  fs.writeFileSync(file, `${text}\n`);
 }
 
 function writePrompt(taskDir, text) {
