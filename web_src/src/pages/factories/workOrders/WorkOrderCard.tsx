@@ -9,8 +9,9 @@ import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { CLARITY_CHECK_NAME } from "../lib/confidenceScore";
-import { ConfidenceAnalyzingIndicator, ConfidenceMeter, ScorePairMeter } from "./ConfidenceMeter";
+import { draftReadiness, startEmphasisForTone } from "../lib/draftReadiness";
+import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
+import { CardScoreBadges } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
@@ -344,6 +345,9 @@ function WorkOrderCardMetaRow({
                 canDispatch={canDispatch}
                 isDispatching={isDispatching}
                 onDispatch={onDispatch}
+                emphasis={startEmphasisForTone(
+                  draftReadiness({ clarity: clarityScore, confidence: confidenceScore }).tone,
+                )}
               />
             ) : null}
           </>
@@ -361,8 +365,9 @@ function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQu
 
 /**
  * Thinking states while the agent still works, even after a score exists.
- * The meters return when the agent waits for the user. Both scores show as
- * a stacked pair. Intake-only drafts have Confidence alone, so one meter.
+ * When the agent waits for the user the card shows one verdict word with a
+ * tone dot. The two scores stay in the tooltip. Intake-only drafts have
+ * Confidence alone; the verdict uses the scores that exist.
  */
 function CardScores({
   entryId,
@@ -385,28 +390,8 @@ function CardScores({
       />
     );
   }
-  if (clarity != null && confidence != null) {
-    return (
-      <ScorePairMeter
-        clarity={clarity}
-        confidence={confidence}
-        className="shrink-0"
-        testId={`work-order-card-score-${entryId}`}
-      />
-    );
+  if (clarity == null && confidence == null) {
+    return null;
   }
-  if (clarity != null) {
-    return (
-      <ConfidenceMeter
-        score={clarity}
-        label={CLARITY_CHECK_NAME}
-        className="shrink-0"
-        testId={`work-order-card-score-${entryId}`}
-      />
-    );
-  }
-  if (confidence != null) {
-    return <ConfidenceMeter score={confidence} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
-  }
-  return null;
+  return <CardScoreBadges clarity={clarity} confidence={confidence} testId={`work-order-card-score-${entryId}`} />;
 }

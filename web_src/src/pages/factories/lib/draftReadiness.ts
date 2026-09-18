@@ -51,8 +51,32 @@ export const DRAFT_READINESS_NOTES = {
   },
 } as const satisfies Record<string, DraftReadinessNote>;
 
+/** One or two words for the board card. The full headline is in the tooltip. */
+export const DRAFT_READINESS_SHORT_LABEL: Record<DraftReadinessTone, string> = {
+  analyzing: "Analyzing",
+  pending: "Ready",
+  blocked: "Not ready",
+  caution: "Review",
+  ready: "Ready",
+};
+
+export type StartEmphasis = "filled" | "outline";
+
+/** Start is filled only when the verdict says go. Other tones keep it available but quiet. */
+export function startEmphasisForTone(tone: DraftReadinessTone): StartEmphasis {
+  return tone === "ready" || tone === "pending" ? "filled" : "outline";
+}
+
 function withTone(tone: DraftReadinessTone, note: DraftReadinessNote): DraftReadiness {
   return { tone, ...note };
+}
+
+/** While the agent works the verdict says so, even when older scores exist. */
+export function liveDraftReadiness(input: DraftReadinessInput): DraftReadiness {
+  if (input.isAnalyzing) {
+    return withTone("analyzing", DRAFT_READINESS_NOTES.analyzing);
+  }
+  return draftReadiness(input);
 }
 
 /** Intake drafts have Confidence only, so the verdict uses the scores that exist. */

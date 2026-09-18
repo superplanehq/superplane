@@ -49,6 +49,8 @@ export type IntentAnalysisChat = {
   planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
+  /** Model select for Start. The strip shows it on the settings row. */
+  modelSelect?: ReactNode;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -221,6 +223,7 @@ function AnalysisComposer({
             planStatus={analysis.planStatus}
             onToggle={analysis.onTogglePlan}
             actions={analysis.closedDecision}
+            modelSelect={analysis.modelSelect}
           />
           <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
             <InputGroupTextarea

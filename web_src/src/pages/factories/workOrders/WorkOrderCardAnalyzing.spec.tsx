@@ -99,30 +99,55 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows one Confidence meter after an intake-only analysis", () => {
+  it("calls an intake-only draft ready and fills Start", () => {
     renderCard({ confidenceScore: 4 });
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
-    const meter = screen.getByTestId("work-order-card-score-wo-1");
-    expect(meter).toHaveAttribute("aria-valuenow", "4");
-    expect(meter).toHaveAttribute("aria-label", "Confidence score");
-    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "ready");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveTextContent("Clarity–");
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "This task is ready to start. Clarity score no score yet. Confidence score 4 of 5",
+    );
+    expect(screen.getByRole("button", { name: "Start" })).toHaveClass("bg-primary");
   });
 
-  it("shows one Clarity meter when only Clarity exists", () => {
+  it("asks for a review when only a mid Clarity exists", () => {
     renderCard({ clarityScore: 3 });
 
-    const meter = screen.getByTestId("work-order-card-score-wo-1");
-    expect(meter).toHaveAttribute("aria-valuenow", "3");
-    expect(meter).toHaveAttribute("aria-label", "Clarity score");
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveClass("text-orange-700");
   });
 
-  it("stacks both meters after a refine session scores twice", () => {
+  it("shows both scores as badges after a refine session scores twice", () => {
     renderCard({ clarityScore: 5, confidenceScore: 3 });
 
-    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("role", "group");
-    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveAttribute("aria-valuenow", "5");
-    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveAttribute("aria-valuenow", "3");
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    const clarity = screen.getByTestId("work-order-card-score-wo-1-clarity");
+    const confidence = screen.getByTestId("work-order-card-score-wo-1-confidence");
+    expect(clarity).toHaveTextContent("Clarity5");
+    expect(clarity).toHaveClass("text-emerald-700");
+    expect(confidence).toHaveTextContent("Confidence3");
+    expect(confidence).toHaveClass("text-orange-700");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
+    );
+  });
+
+  it("quiets Start to an outline when the verdict is not ready", () => {
+    renderCard({ clarityScore: 2, confidenceScore: 5 });
+
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "blocked");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveClass("text-red-700");
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).not.toHaveClass("bg-primary");
+    expect(start).toHaveClass("border");
+    expect(start).toBeEnabled();
   });
 
   it("stays quiet when no automation analyzes the task", () => {
@@ -143,7 +168,7 @@ describe("Confidence score on a backlog card", () => {
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "ready");
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 

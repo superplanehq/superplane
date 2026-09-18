@@ -6,13 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import {
-  DRAFT_READINESS_NOTES,
-  draftReadiness,
-  type DraftReadiness,
-  type DraftReadinessTone,
-} from "../../lib/draftReadiness";
+import { liveDraftReadiness, type DraftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
+import { ReadinessDot } from "../../workOrders/ReadinessMark";
 import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
@@ -24,28 +20,13 @@ const SCORE_TEST_IDS = {
   confidence: "split-run-intent-composer-confidence",
 } as const;
 
-const VERDICT_DOT: Record<DraftReadinessTone, string> = {
-  analyzing: "text-[color:var(--status-draft-dot)]",
-  pending: "text-[color:var(--status-draft-dot)]",
-  blocked: "text-[color:var(--status-failed-dot)]",
-  caution: "text-[color:var(--status-waiting-dot)]",
-  ready: "text-[color:var(--status-completed-dot)]",
-};
-
 /** The verdict text repeats the button for pending and ready, so only warnings keep it. */
 const VERDICT_WITH_TEXT: readonly DraftReadinessTone[] = ["blocked", "caution"];
 
-/** While the agent works the strip says so, even when older scores exist. */
-function stripReadiness(clarity?: ComposerScore, confidence?: ComposerScore, isAnalyzing = false): DraftReadiness {
-  if (isAnalyzing) {
-    return { tone: "analyzing", ...DRAFT_READINESS_NOTES.analyzing };
-  }
-  return draftReadiness({ clarity: clarity?.score, confidence: confidence?.score });
-}
-
 /**
- * Decision strip above the refine composer. Row one is the verdict and the
- * draft actions. Row two is the evidence: both scores and the Plan toggle.
+ * Decision strip above the refine composer. Row one is the verdict alone.
+ * Row two is the evidence, both scores, then the controls in the order the
+ * user reads them: Plan, model, Start.
  */
 export function ComposerPlanStack({
   open,
@@ -56,6 +37,7 @@ export function ComposerPlanStack({
   planStatus,
   onToggle,
   actions,
+  modelSelect,
 }: {
   open: boolean;
   clarity?: ComposerScore;
@@ -65,17 +47,14 @@ export function ComposerPlanStack({
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
   actions?: ReactNode;
+  modelSelect?: ReactNode;
 }) {
-  const readiness = stripReadiness(clarity, confidence, isAnalyzing);
+  const readiness = liveDraftReadiness({ clarity: clarity?.score, confidence: confidence?.score, isAnalyzing });
+  const showControls = canTogglePlan || Boolean(modelSelect) || Boolean(actions);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FramePanel fit className="flex flex-col gap-1.5 px-3 py-2" data-testid="split-run-intent-plan-updated">
-        <div className="flex min-w-0 items-center gap-3">
-          <Verdict readiness={readiness} />
-          {actions ? (
-            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
-          ) : null}
-        </div>
+        <Verdict readiness={readiness} />
         <div className="flex min-w-0 items-center gap-2" data-testid="split-run-intent-composer-chips">
           <ScoreEvidenceRow
             clarity={clarity}
@@ -83,14 +62,14 @@ export function ComposerPlanStack({
             isAnalyzing={isAnalyzing}
             testIds={SCORE_TEST_IDS}
           />
-          {canTogglePlan ? (
-            <PlanToggle
-              open={open}
-              isAnalyzing={isAnalyzing}
-              planStatus={planStatus}
-              onToggle={onToggle}
-              className="ml-auto"
-            />
+          {showControls ? (
+            <div className="ml-auto flex shrink-0 items-center gap-1" data-testid="split-run-intent-settings">
+              {canTogglePlan ? (
+                <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
+              ) : null}
+              {modelSelect}
+              {actions ? <div className="ml-1 flex items-center">{actions}</div> : null}
+            </div>
           ) : null}
         </div>
       </FramePanel>
@@ -127,9 +106,7 @@ function VerdictMark({ tone }: { tone: DraftReadinessTone }) {
       />
     );
   }
-  return (
-    <span className={cn("mt-1.5 inline-flex size-2 shrink-0 rounded-full bg-current", VERDICT_DOT[tone])} aria-hidden />
-  );
+  return <ReadinessDot tone={tone} className="mt-1.5" />;
 }
 
 function PlanToggle({

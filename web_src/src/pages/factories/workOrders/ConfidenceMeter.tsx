@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { prefersReducedMotion } from "@/lib/streamWords";
@@ -6,13 +6,11 @@ import { cn } from "@/lib/utils";
 
 import {
   clampConfidenceScore,
-  CLARITY_CHECK_NAME,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   type ConfidenceBand,
 } from "../lib/confidenceScore";
-import { draftReadiness } from "../lib/draftReadiness";
 
 import "./confidence-analyzing.css";
 
@@ -22,12 +20,11 @@ const FILLED_TONE: Record<ConfidenceBand, string> = {
   Low: "bg-red-500",
 };
 
-type MeterSize = "sm" | "lg" | "xs";
+type MeterSize = "sm" | "lg";
 
 const BAR_CLASS: Record<MeterSize, string> = {
   lg: "h-2.5 w-2 rounded-[2px]",
   sm: "h-2 w-1.5 rounded-[1px]",
-  xs: "h-[3px] w-1.5 rounded-[1px]",
 };
 
 function MeterBars({ value, size }: { value: number; size: MeterSize }) {
@@ -98,83 +95,6 @@ export function ConfidenceMeter({
 }
 
 export const SCORE_PAIR_LABEL = "Clarity and Confidence";
-
-/**
- * Two stacked 5-bar rows in the footprint of one meter: Clarity on top,
- * Confidence below. Board cards use this left of Start. One tooltip lists
- * both scores.
- */
-export function ScorePairMeter({
-  clarity,
-  confidence,
-  className,
-  testId,
-  showTooltip = true,
-}: {
-  clarity?: number;
-  confidence?: number;
-  className?: string;
-  testId?: string;
-  showTooltip?: boolean;
-}) {
-  const rows: Array<{ key: string; label: string; score?: number }> = [
-    { key: "clarity", label: CLARITY_CHECK_NAME, score: clarity },
-    { key: "confidence", label: CONFIDENCE_CHECK_NAME, score: confidence },
-  ];
-  const verdict = draftReadiness({ clarity, confidence }).headline;
-  const meter = (
-    <span
-      role="group"
-      aria-label={`${SCORE_PAIR_LABEL}. ${verdict}`}
-      data-testid={testId}
-      className={cn("pointer-events-auto inline-flex flex-col items-start justify-center gap-[3px]", className)}
-    >
-      {rows.map((row) => {
-        const value = row.score == null ? undefined : clampConfidenceScore(row.score);
-        return (
-          <span
-            key={row.key}
-            role="meter"
-            aria-label={row.label}
-            aria-valuemin={0}
-            aria-valuemax={CONFIDENCE_SCORE_MAX}
-            aria-valuenow={value}
-            aria-valuetext={value == null ? "No score yet" : `${value} of ${CONFIDENCE_SCORE_MAX}`}
-            data-testid={testId ? `${testId}-${row.key}` : undefined}
-            className="inline-flex items-center gap-0.5"
-          >
-            <MeterBars value={value ?? 0} size="xs" />
-          </span>
-        );
-      })}
-    </span>
-  );
-
-  if (!showTooltip) {
-    return meter;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{meter}</TooltipTrigger>
-      <TooltipContent>
-        <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
-          {verdict}
-        </span>
-        <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
-          {rows.map((row) => (
-            <Fragment key={row.key}>
-              <span>{row.label}</span>
-              <span className="tabular-nums">
-                {row.score == null ? "–" : `${clampConfidenceScore(row.score)}/${CONFIDENCE_SCORE_MAX}`}
-              </span>
-            </Fragment>
-          ))}
-        </span>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
 
 export const CONFIDENCE_ANALYZING_LABEL = "Analyzing";
 export const CONFIDENCE_ANALYZING_TOOLTIP = "Agent is analyzing, refining, and planning this task.";

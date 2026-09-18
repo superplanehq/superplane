@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from "react";
+import { Bot, ChevronDown, Play } from "lucide-react";
 
 import { Alert, AlertAction, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
 
+import { liveDraftReadiness, startEmphasisForTone, type StartEmphasis } from "../../lib/draftReadiness";
 import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { ComposerPlanStack } from "./ComposerPlanControls";
@@ -111,6 +113,7 @@ function ChipStrip({
   isAnalyzing?: boolean;
   onToggle?: () => void;
 }) {
+  const tone = liveDraftReadiness({ clarity, confidence, isAnalyzing }).tone;
   return (
     <ComposerPlanStack
       open={open}
@@ -119,8 +122,35 @@ function ChipStrip({
       isAnalyzing={isAnalyzing}
       planStatus={open ? undefined : "updated"}
       onToggle={onToggle}
-      actions={<DraftActions />}
+      actions={<StripStart emphasis={startEmphasisForTone(tone)} />}
+      modelSelect={<FakeModelSelect />}
     />
+  );
+}
+
+/** Start alone on the verdict row. Filled only when the verdict says go. */
+function StripStart({ emphasis }: { emphasis: StartEmphasis }) {
+  return (
+    <Button type="button" size="sm" variant={emphasis === "filled" ? "default" : "outline"}>
+      <Play className="size-3.5" aria-hidden />
+      Start
+    </Button>
+  );
+}
+
+function FakeModelSelect() {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      aria-label="Model: Auto"
+      className="gap-1.5 text-muted-foreground hover:text-foreground"
+    >
+      <Bot className="size-4" aria-hidden />
+      Auto
+      <ChevronDown className="size-3 opacity-60" aria-hidden />
+    </Button>
   );
 }
 

@@ -233,9 +233,9 @@ export const DraftAnalyzingWithScore: Story = {
   },
 };
 
-/** Refine finished: Clarity on top, Confidence below, in one meter footprint. */
+/** Refine finished with a mid Confidence: the card says Review and Start is an outline. */
 export const DraftScoredPair: Story = {
-  name: "Draft with Clarity and Confidence",
+  name: "Draft with Clarity and Confidence (Review)",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -254,7 +254,49 @@ export const DraftScoredPair: Story = {
   },
 };
 
-/** Intake only: one Confidence meter until a refine session scores Clarity. */
+/** Both scores high: the card says Ready and Start is filled. */
+export const DraftScoredReady: Story = {
+  name: "Draft ready to start",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-ready",
+        number: "5",
+        title: "Show the model name on the task card",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 4,
+  },
+};
+
+/** Low Clarity: the card says Not ready. Start stays available as an outline. */
+export const DraftScoredBlocked: Story = {
+  name: "Draft not ready",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-blocked",
+        number: "6",
+        title: "Make it better",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 2,
+    confidenceScore: 4,
+  },
+};
+
+/** Intake only: the verdict uses Confidence alone until a refine session scores Clarity. */
 export const DraftScoredIntakeOnly: Story = {
   name: "Draft with Confidence only",
   args: {

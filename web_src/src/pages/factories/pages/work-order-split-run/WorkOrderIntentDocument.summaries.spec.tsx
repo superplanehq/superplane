@@ -2,8 +2,11 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { SplitRunReview } from "./SplitRunReview";
+import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import {
   analysisChat,
   HIGH_CLARITY,
@@ -111,6 +114,55 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(verdict).toHaveAttribute("data-tone", "caution");
     expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.agentFit.headline);
     expect(verdict).toHaveTextContent(DRAFT_READINESS_NOTES.agentFit.text);
+  });
+
+  it("fills Start when the verdict is ready and orders the controls Plan, model, Start", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={HIGH_CONFIDENCE}
+        resultFooter={<SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} compact />}
+        analysis={analysisChat({
+          view: WAITING_WITH_PLAN,
+          modelSelect: <button type="button">Model: Auto</button>,
+        })}
+      />,
+    );
+
+    const card = screen.getByTestId("split-run-intent-status-card");
+    const verdict = within(card).getByTestId("split-run-intent-verdict");
+    expect(within(verdict).queryByRole("button")).not.toBeInTheDocument();
+    const settings = within(card).getByTestId("split-run-intent-settings");
+    const plan = within(settings).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan });
+    const model = within(settings).getByRole("button", { name: "Model: Auto" });
+    const start = within(settings).getByRole("button", { name: "Start" });
+    expect(plan.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(model.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(start).toHaveClass("bg-primary");
+    expect(within(card).getByTestId("split-run-draft-action-group")).not.toHaveClass("border");
+    expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+  });
+
+  it("quiets Start to an outline when the verdict warns, but keeps it enabled", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={{ ...HIGH_CONFIDENCE, score: 2 }}
+        resultFooter={<SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} compact />}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "caution");
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).not.toHaveClass("bg-primary");
+    expect(start).toHaveClass("border");
+    expect(start).toBeEnabled();
+    expect(screen.queryByTestId("split-run-intent-settings")).toBeInTheDocument();
   });
 
   it("peeks a score summary on hover and pins it on click", async () => {
