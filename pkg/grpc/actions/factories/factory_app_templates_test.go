@@ -60,6 +60,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, "Open the Storybook story iframe directly.")
 	assert.Contains(t, result.canvasYAML, "A signed-in application is not required when an isolated preview can show the change.")
 	assert.Contains(t, result.canvasYAML, "Unit tests do not replace visual evidence.")
+	assert.Contains(t, result.canvasYAML, "Set each attempt type to preview, playwright, or upload.")
 	assert.Contains(t, result.canvasYAML, "report_visual_evidence_unavailable")
 	assert.Contains(t, result.canvasYAML, "$SUPERPLANE_TASK_DIR/evidence")
 	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")

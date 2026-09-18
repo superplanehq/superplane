@@ -129,12 +129,43 @@ test("reportVisualEvidenceUnavailable requires documented attempts", () => {
     /attempts is required/,
   );
 
+  assert.throws(
+    () =>
+      reportVisualEvidenceUnavailable(
+        {
+          reason: "The preview did not start.",
+          attempts: [
+            {
+              type: "preview",
+              command: "npm run storybook",
+              outcome: "The command exited with status 1.",
+            },
+            {
+              type: "preview",
+              command: "npm run storybook -- --port 6007",
+              outcome: "The command exited with status 1.",
+            },
+          ],
+        },
+        value.env,
+      ),
+    /one preview and one playwright attempt/,
+  );
+
   reportVisualEvidenceUnavailable(
     {
       reason: "The preview did not start.",
       attempts: [
-        "npm run storybook failed with exit code 1.",
-        "playwright screenshot could not connect to localhost:6006.",
+        {
+          type: "preview",
+          command: "npm run storybook",
+          outcome: "The command exited with status 1.",
+        },
+        {
+          type: "playwright",
+          command: "playwright screenshot http://localhost:6006",
+          outcome: "The command could not connect to localhost:6006.",
+        },
       ],
     },
     value.env,
@@ -143,8 +174,16 @@ test("reportVisualEvidenceUnavailable requires documented attempts", () => {
     status: "unavailable",
     reason: "The preview did not start.",
     attempts: [
-      "npm run storybook failed with exit code 1.",
-      "playwright screenshot could not connect to localhost:6006.",
+      {
+        type: "preview",
+        command: "npm run storybook",
+        outcome: "The command exited with status 1.",
+      },
+      {
+        type: "playwright",
+        command: "playwright screenshot http://localhost:6006",
+        outcome: "The command could not connect to localhost:6006.",
+      },
     ],
     artifacts: [],
   });
