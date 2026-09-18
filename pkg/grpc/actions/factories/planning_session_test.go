@@ -323,6 +323,68 @@ func Test__AnswerPlanningSessionSurvey__StoresSenderUserID(t *testing.T) {
 	assert.Equal(t, r.User.String(), answered.Session.Messages[0].UserId)
 }
 
+func Test__SendPlanningSessionMessage__AssignsSenderAndKeepsOtherOwners(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	other := support.CreateUser(t, r, r.Organization.ID)
+	order := planningSessionDraft(t, db, session)
+	require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{other.ID}, r.User))
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Use the current retry form.",
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []uuid.UUID{other.ID, r.User}, draftAssigneeIDs(t, db, session))
+
+	// A second message from the same person does not duplicate the row.
+	_, err = SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Keep the dark theme.",
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []uuid.UUID{other.ID, r.User}, draftAssigneeIDs(t, db, session))
+}
+
+func Test__AnswerPlanningSessionSurvey__AssignsSender(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.Empty(t, draftAssigneeIDs(t, db, session))
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "What is the priority? High",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{r.User}, draftAssigneeIDs(t, db, session))
+}
+
+func planningSessionDraft(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) *models.FactoryWorkOrder {
+	t.Helper()
+	require.NotNil(t, session.DraftWorkOrderID)
+	var order models.FactoryWorkOrder
+	require.NoError(t, db.Where("id = ?", *session.DraftWorkOrderID).First(&order).Error)
+	return &order
+}
+
+func draftAssigneeIDs(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) []uuid.UUID {
+	t.Helper()
+	assignees, err := planningSessionDraft(t, db, session).ListAssignees(db)
+	require.NoError(t, err)
+	ids := make([]uuid.UUID, 0, len(assignees))
+	for _, assignee := range assignees {
+		ids = append(ids, assignee.UserID)
+	}
+	return ids
+}
+
 func openAnalysisSession(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.FactoryPlanningSession {
 	t.Helper()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")

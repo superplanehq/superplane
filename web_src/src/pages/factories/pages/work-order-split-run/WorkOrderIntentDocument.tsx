@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, type PointerEvent, type ReactElement, typ
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { cn } from "@/lib/utils";
 
+import { liveDraftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { useRefineDocumentModel } from "./useRefineDocumentModel";
@@ -27,6 +28,7 @@ type WorkOrderIntentDocumentProps = {
   title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing?: boolean;
   files?: FilesFile[];
@@ -43,6 +45,7 @@ export function WorkOrderIntentDocument({
   title,
   description,
   artifacts,
+  clarity,
   confidence,
   isAnalyzing = false,
   files,
@@ -70,6 +73,7 @@ export function WorkOrderIntentDocument({
     title,
     description,
     artifacts,
+    clarity,
     confidence,
     isAnalyzing,
     resultFooter,
@@ -106,6 +110,7 @@ export function WorkOrderIntentDocument({
             isAnalyzing={isAnalyzing}
             resultAfterBody={resultAfterBody}
             resultFooter={resultFooter}
+            clarity={clarity}
             confidence={confidence}
             refineOpen={refineOpen}
             collapsed={chatSolo}
@@ -121,6 +126,10 @@ export function WorkOrderIntentDocument({
   );
 }
 
+/**
+ * The strip verdict and the Start weight read the same scores, so the button
+ * agrees with the headline above it.
+ */
 function withClosedDecision(
   analysisChat: IntentAnalysisChat | undefined,
   showClosedDecision: boolean,
@@ -129,9 +138,17 @@ function withClosedDecision(
   if (!analysisChat) {
     return undefined;
   }
+  if (!showClosedDecision) {
+    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
+  }
+  const startTone = liveDraftReadiness({
+    clarity: analysisChat.clarity?.score,
+    confidence: analysisChat.confidence?.score,
+    isAnalyzing: analysisChat.isAnalyzing,
+  }).tone;
   return {
     ...analysisChat,
-    closedDecision: showClosedDecision ? <ClosedPlanActions resultFooter={resultFooter} /> : undefined,
+    closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }
 
@@ -195,10 +212,13 @@ function IntentRequestPane({
   );
 }
 
-function ClosedPlanActions({ resultFooter }: { resultFooter?: ReactNode }) {
+function ClosedPlanActions({ resultFooter, startTone }: { resultFooter?: ReactNode; startTone: DraftReadinessTone }) {
   const actions =
     isValidElement(resultFooter) && typeof resultFooter.type !== "string"
-      ? cloneElement(resultFooter as ReactElement<{ actionsOnly?: boolean }>, { actionsOnly: true })
+      ? cloneElement(resultFooter as ReactElement<{ actionsOnly?: boolean; startTone?: DraftReadinessTone }>, {
+          actionsOnly: true,
+          startTone,
+        })
       : resultFooter;
   return <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>;
 }
@@ -211,6 +231,7 @@ function IntentSpecColumn({
   isAnalyzing,
   resultAfterBody,
   resultFooter,
+  clarity,
   confidence,
   refineOpen,
   collapsed = false,
@@ -227,6 +248,7 @@ function IntentSpecColumn({
   isAnalyzing: boolean;
   resultAfterBody?: ReactNode;
   resultFooter?: ReactNode;
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   refineOpen: boolean;
   collapsed?: boolean;
@@ -284,6 +306,7 @@ function IntentSpecColumn({
         </div>
         {refineOpen ? null : (
           <IntentSpecFooter
+            clarity={clarity}
             confidence={confidence}
             isAnalyzing={isAnalyzing}
             resultFooter={resultFooter}
@@ -296,11 +319,13 @@ function IntentSpecColumn({
 }
 
 function IntentSpecFooter({
+  clarity,
   confidence,
   isAnalyzing,
   resultFooter,
   contextSidebar,
 }: {
+  clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
@@ -311,7 +336,7 @@ function IntentSpecFooter({
   }
   return (
     <>
-      <WorkOrderIntentConfidenceFooter confidence={confidence} isAnalyzing={isAnalyzing} />
+      <WorkOrderIntentConfidenceFooter clarity={clarity} confidence={confidence} isAnalyzing={isAnalyzing} />
       {resultFooter}
     </>
   );

@@ -10,8 +10,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -96,8 +98,10 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	db := database.DB(ctx)
+	assigned := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := lockAnalysisSessionAndDraft(tx, session); err != nil {
+		draft, err := lockAnalysisSessionAndDraft(tx, session)
+		if err != nil {
 			return err
 		}
 		restartAnalysis := session.NeedsAnalysisRestart(tx)
@@ -112,6 +116,10 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
 			return err
 		}
+		// Taking part in the refinement makes the sender an owner of the draft.
+		if assigned, err = draft.AddAssignee(tx, userID, userID); err != nil {
+			return err
+		}
 		if !restartAnalysis {
 			return nil
 		}
@@ -121,6 +129,9 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return restartAnalysisCanvasRun(tx, factoryModel, session)
 	}); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
+	}
+	if assigned {
+		publishDraftAssigneesUpdated(session)
 	}
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
@@ -141,15 +152,31 @@ func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req
 	return &pb.AnswerPlanningSessionSurveyResponse{Session: response.Session}, nil
 }
 
-func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSession) error {
+// publishDraftAssigneesUpdated tells open boards that the draft has a new owner.
+func publishDraftAssigneesUpdated(session *models.FactoryPlanningSession) {
+	if session.DraftWorkOrderID == nil {
+		return
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		session.FactoryID.String(),
+		session.DraftWorkOrderID.String(),
+		factoryevents.EventTypeOrderAssigneesUpdated,
+	); err != nil {
+		log.WithError(err).Warnf("Failed to publish factory work order updated for draft %s", *session.DraftWorkOrderID)
+	}
+}
+
+// lockAnalysisSessionAndDraft locks the session and its draft for update and
+// returns the draft, so the caller can change it in the same transaction.
+func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSession) (*models.FactoryWorkOrder, error) {
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", session.ID).First(session).Error; err != nil {
-		return err
+		return nil, err
 	}
 	if err := requireAnalysisPlanningSession(session); err != nil {
-		return err
+		return nil, err
 	}
 	if session.DraftWorkOrderID == nil {
-		return models.ErrFactoryPlanningSessionInvalid
+		return nil, models.ErrFactoryPlanningSessionInvalid
 	}
 	var order models.FactoryWorkOrder
 	if err := tx.
@@ -162,12 +189,12 @@ func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSes
 		).
 		First(&order).
 		Error; err != nil {
-		return err
+		return nil, err
 	}
 	if order.State != models.FactoryWorkOrderStateDraft {
-		return models.ErrFactoryPlanningSessionInvalid
+		return nil, models.ErrFactoryPlanningSessionInvalid
 	}
-	return nil
+	return &order, nil
 }
 
 func restartAnalysisCanvasRun(db *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) error {
@@ -286,6 +313,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 			Key:         factoryModel.WorkOrderKey(order.Number),
 			Title:       order.Title,
 			Description: order.Description,
+			Number:      order.Number,
 		})
 	}
 
