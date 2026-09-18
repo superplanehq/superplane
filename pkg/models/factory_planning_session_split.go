@@ -158,28 +158,28 @@ func (s *FactoryPlanningSession) SplitSiblings(tx *gorm.DB) ([]SplitSibling, err
 	return siblings, nil
 }
 
-// splitParentSession finds the session that created this session's draft as
-// a split part. A draft is linked to its own session too, so that link is
-// skipped. Nil when no other session created the draft.
+// splitParentSession finds the analysis session that split this session's
+// draft off its own draft. Only an analysis session can split, and its draft
+// never changes, so the parent is the analysis session linked to this draft
+// whose own draft is a different task. Links from this session, from other
+// sessions that refined the same draft, and from task-creation sessions
+// (which link every task they create) do not count. Nil when there is none.
 func (s *FactoryPlanningSession) splitParentSession(tx *gorm.DB) (*FactoryPlanningSession, error) {
-	var link FactoryPlanningSessionWorkOrder
+	var parent FactoryPlanningSession
 	err := tx.
-		Where("work_order_id = ? AND session_id <> ?", *s.DraftWorkOrderID, s.ID).
-		Order("created_at ASC").
-		First(&link).Error
+		Joins("JOIN factory_planning_session_work_orders links ON links.session_id = factory_planning_sessions.id").
+		Where("links.work_order_id = ?", *s.DraftWorkOrderID).
+		Where("factory_planning_sessions.id <> ?", s.ID).
+		Where("factory_planning_sessions.kind = ?", PlanningSessionKindWorkOrderAnalysis).
+		Where("factory_planning_sessions.draft_work_order_id IS NOT NULL").
+		Where("factory_planning_sessions.draft_work_order_id <> ?", *s.DraftWorkOrderID).
+		Order("links.created_at ASC").
+		First(&parent).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
-	}
-	var parent FactoryPlanningSession
-	if err := tx.Where("id = ?", link.SessionID).First(&parent).Error; err != nil {
-		return nil, err
-	}
-	if parent.DraftWorkOrderID != nil && *parent.DraftWorkOrderID == *s.DraftWorkOrderID {
-		// Another session refined this same draft; that is not a split.
-		return nil, nil
 	}
 	return &parent, nil
 }

@@ -283,6 +283,40 @@ func TestAnalysisContinuationTextNamesSplitSiblingsForANewPart(t *testing.T) {
 	assert.NotContains(t, parentText, "This task is one part of a split.", "the parent lists the parts it created instead")
 }
 
+func TestAnalysisContinuationTextIgnoresTaskCreationSessionsAsSplitParents(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-creation-parent")
+	db := database.DB(t.Context())
+	planningCanvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	creation, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        planningCanvas.ID,
+		Entrypoint:      entrypoint,
+	})
+	require.NoError(t, err)
+	first, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	second, err := factoryModel.CreateWorkOrder(db, "Add the audit log", "Track refunds.", &userID, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, creation.attachCreatedWorkOrder(db, first.ID))
+	require.NoError(t, creation.attachRefineDraft(db, second))
+
+	run, err := CreateCanvasRunInTransaction(db, planningCanvas.ID, entrypoint, CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    planningCanvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: first.ID,
+	})
+	require.NoError(t, err)
+
+	text, err := AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	assert.Empty(t, text, "tasks created together in one planning session are not a split")
+}
+
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {
 	messages := []PlanningSessionMessage{
 		{Role: PlanningSessionMessageRoleUser, Text: "oldest context"},
