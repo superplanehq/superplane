@@ -129,6 +129,38 @@ describe("PhaseLogCard title line", () => {
     vi.useRealTimers();
   });
 
+  it("keeps a waiting timeout duration fixed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", duration: "2m", durationRunning: false }}
+        expanded
+        stream={[
+          line({
+            id: "timed-out-analysis",
+            componentName: "Analysis",
+            status: "running",
+            duration: "2m",
+            durationRunning: false,
+          }),
+        ]}
+      />,
+    );
+
+    const phaseDuration = screen.getByTestId("split-run-phase-duration-plan");
+    const streamDuration = screen.getByTestId("split-run-stream-duration-timed-out-analysis");
+    expect(phaseDuration).toHaveTextContent("2m");
+    expect(streamDuration).toHaveTextContent("02:00");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(phaseDuration).toHaveTextContent("2m");
+    expect(streamDuration).toHaveTextContent("02:00");
+  });
+
   it("keeps bold artifacts on the automation header when the card is expanded", () => {
     const phase = {
       ...PHASE,
