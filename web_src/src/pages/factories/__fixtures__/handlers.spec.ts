@@ -14,6 +14,7 @@ import {
   REFUND_LINE_PLAN_ID,
   RUNNING_WORK_ORDER,
 } from "./factoryPageResponses";
+import { HEADER_MCP_RESOURCE } from "./agentResourceFixtures";
 import { BUSINESS_ORGANIZATION_BILLING } from "./usageReportFixtures";
 
 describe("matchFactoryPageFixture", () => {
@@ -344,5 +345,68 @@ describe("matchFactoryPageFixture", () => {
 
     expect(next.session?.survey).toBeNull();
     expect(next.session?.messages?.at(-1)?.text).toContain("Reactions on the task header only");
+  });
+});
+
+describe("factory agent resources fixture", () => {
+  it("lists MCP connections and creates a header connection", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+    };
+
+    const listed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources?kind=KIND_MCP_SERVER`,
+      undefined,
+      fixture,
+    );
+    await expect(listed.json()).resolves.toMatchObject({
+      resources: [expect.objectContaining({ name: "docs", auth: "AUTH_HEADERS" })],
+    });
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "KIND_MCP_SERVER",
+          name: "mobbin",
+          url: "https://api.mobbin.com/mcp",
+          auth: "AUTH_OAUTH",
+        }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      resource: expect.objectContaining({
+        name: "mobbin",
+        auth: "AUTH_OAUTH",
+        oauthStatus: "OAUTH_STATUS_NOT_CONNECTED",
+      }),
+    });
+  });
+
+  it("creates an inline skill", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "KIND_SKILL",
+          name: "review-copy",
+          markdown: "# Review copy",
+        }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      resource: expect.objectContaining({
+        kind: "KIND_SKILL",
+        name: "review-copy",
+        markdown: "# Review copy",
+      }),
+    });
   });
 });

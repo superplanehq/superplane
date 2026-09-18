@@ -176,6 +176,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
