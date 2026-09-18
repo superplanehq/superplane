@@ -9,7 +9,7 @@ to the CLI for common app operations.
 Prefer adding an action to `superplane_app` when the capability is app-related:
 
 - reading app/canvas or Console YAML (served from the effective staged content the UI editor reads: the user's pending staged edits when present, otherwise the live version)
-- listing, reading, staging, or deleting normal app repository files such as `README.md`, `AGENTS.md`, or scripts used by file-backed components
+- listing, reading, staging, or deleting normal app repository files such as `README.md` and `AGENTS.md`
 - updating the app (`patch_staging` saves graph, Console, and layout edits as pending staged changes against the live canvas, exactly like edits made in the UI editor, so the user reviews and commits them)
 - inspecting agent token permissions (`access`) and runtime state (`read_runtime`)
 - listing connected integrations for the current app context
@@ -74,8 +74,7 @@ Action rules:
 ## App Repository Context Files
 
 The app repository can contain additional files beyond `canvas.yaml` and
-`console.yaml`. Examples include `README.md`, scripts referenced by file-backed
-components, and AI context files.
+`console.yaml`. Examples include `README.md` and AI context files.
 
 Managed agents treat these repository file names as context candidates:
 
