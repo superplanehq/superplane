@@ -82,7 +82,7 @@ export function AutomationsPage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Automations"
-        subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
+        subtitle="Automations are one-step lines. Each one listens for a trigger and runs its steps when it fires."
         actions={
           <PermissionTooltip
             allowed={model.canCreateApp || model.permissionsLoading}

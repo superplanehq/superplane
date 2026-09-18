@@ -179,6 +179,13 @@ describe("ColumnAutomationViewPopup", () => {
     expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("The automation is loading.");
   });
 
+  it("shows empty copy when the automation has no steps", () => {
+    renderPopup({ graph: { nodes: [], edges: [] }, editHref: undefined });
+
+    expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("This automation has no steps yet.");
+    expect(screen.getByTestId("column-automation-view-canvas")).not.toHaveTextContent("canvas");
+  });
+
   it("hides tabs when the automation has no form and no agent", () => {
     renderPopup();
 
