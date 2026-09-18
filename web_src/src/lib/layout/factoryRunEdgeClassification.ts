@@ -8,8 +8,9 @@ import {
   factoryRunLeafEdgeKey,
 } from "./factoryRunLeafLayoutHelpers";
 
-type ResolveEdgeGutterOptions = {
-  key: string;
+type LongEdgeRoute = "direct" | "trunk" | "leftward";
+
+function longEdgeRoute(options: {
   isSide: boolean;
   sourcePos: FactoryRunLayoutPosition;
   targetPos: FactoryRunLayoutPosition;
@@ -17,33 +18,20 @@ type ResolveEdgeGutterOptions = {
   targetLayer: number;
   sourceCol: number;
   targetCol: number;
-  graphRight: number;
-  edgeRouteGutters: Map<string, number>;
-};
+}): LongEdgeRoute {
+  const layerSkip = options.targetLayer - options.sourceLayer > 1;
+  const crossColumn = Math.abs(options.sourceCol - options.targetCol) > 0;
+  if (options.isSide || (!layerSkip && !crossColumn)) return "direct";
+  if (options.sourcePos.x > options.targetPos.x + SIDE_X_THRESHOLD) return "leftward";
+  return "trunk";
+}
 
-function resolveEdgeGutter(options: ResolveEdgeGutterOptions): void {
-  const {
-    key,
-    isSide,
-    sourcePos,
-    targetPos,
-    sourceLayer,
-    targetLayer,
-    sourceCol,
-    targetCol,
-    graphRight,
-    edgeRouteGutters,
-  } = options;
-  const layerSkip = targetLayer - sourceLayer > 1;
-  const crossColumn = Math.abs(sourceCol - targetCol) > 0;
-  if (isSide || (!layerSkip && !crossColumn)) return;
-
-  const leftwardMerge = sourcePos.x > targetPos.x + SIDE_X_THRESHOLD;
-  if (!leftwardMerge) {
-    edgeRouteGutters.set(key, graphRight);
-    return;
-  }
-
+function resolveLeftwardMergeGutter(
+  key: string,
+  sourcePos: FactoryRunLayoutPosition,
+  targetPos: FactoryRunLayoutPosition,
+  edgeRouteGutters: Map<string, number>,
+): void {
   const nearby = targetPos.y - sourcePos.y < (DEFAULT_NODE_HEIGHT + VERTICAL_GAP) * 3;
   if (!nearby) {
     edgeRouteGutters.set(key, sourcePos.x + DEFAULT_NODE_WIDTH + GUTTER_PAD);
@@ -55,7 +43,6 @@ type ClassifyComponentEdgesOptions = {
   positions: Map<string, FactoryRunLayoutPosition>;
   layer: Map<string, number>;
   column: Map<string, number>;
-  graphRight: number;
   leafEdgeKeys: Set<string>;
   spineEdgeKeys: Set<string>;
   sideHandleNodeIds: Set<string>;
@@ -63,19 +50,19 @@ type ClassifyComponentEdgesOptions = {
   edgeRouteGutters: Map<string, number>;
 };
 
-export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): void {
+export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): FactoryRunLayoutEdge[] {
   const {
     componentEdges,
     positions,
     layer,
     column,
-    graphRight,
     leafEdgeKeys,
     spineEdgeKeys,
     sideHandleNodeIds,
     sideTargetNodeIds,
     edgeRouteGutters,
   } = options;
+  const trunkEdges: FactoryRunLayoutEdge[] = [];
   for (const edge of componentEdges) {
     const sourcePos = positions.get(edge.source);
     const targetPos = positions.get(edge.target);
@@ -90,19 +77,22 @@ export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): 
     } else {
       spineEdgeKeys.add(key);
     }
-    resolveEdgeGutter({
-      key,
+    const route = longEdgeRoute({
       isSide,
       sourcePos,
       targetPos,
-      graphRight,
-      edgeRouteGutters,
       sourceLayer: layer.get(edge.source) ?? 0,
       targetLayer: layer.get(edge.target) ?? 0,
       sourceCol: column.get(edge.source) ?? 0,
       targetCol: column.get(edge.target) ?? 0,
     });
+    if (route === "trunk") {
+      trunkEdges.push(edge);
+    } else if (route === "leftward") {
+      resolveLeftwardMergeGutter(key, sourcePos, targetPos, edgeRouteGutters);
+    }
   }
+  return trunkEdges;
 }
 
 type MarkDisplaySourceNodesOptions = {

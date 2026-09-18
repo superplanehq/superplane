@@ -27,6 +27,7 @@ import {
 } from "./factoryRunLeafLayoutHelpers";
 import { classifyComponentEdges, markDisplaySourceNodes } from "./factoryRunEdgeClassification";
 import { routeFeedbackEdges } from "./factoryRunFeedbackRouting";
+import { routeForwardTrunkEdges } from "./factoryRunForwardRouting";
 
 export { factoryRunLeafEdgeKey } from "./factoryRunLeafLayoutHelpers";
 
@@ -66,7 +67,7 @@ export type FactoryRunLeafLayoutResult = {
   sideTargetNodeIds: Set<string>;
   /** Optional vertical-gutter X for long, cross-column, and feedback edges. */
   edgeRouteGutters: Map<string, number>;
-  /** Small endpoint-turn Y stagger for feedback edges that use adjacent gutters. */
+  /** Small endpoint-turn Y stagger for long, merge, and feedback gutter routes. */
   edgeRouteOffsetsY: Map<string, number>;
   /** Edges removed from the DAG for ranking but preserved for display routing. */
   feedbackEdgeKeys: Set<string>;
@@ -149,28 +150,36 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
   const componentForwardEdges = ctx.forwardEdges.filter(
     (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
   );
-  classifyComponentEdges({
+  const trunkEdges = classifyComponentEdges({
     componentEdges: componentForwardEdges,
     positions: ctx.positions,
     layer,
     column,
-    graphRight: maxRight + GUTTER_PAD,
     leafEdgeKeys: ctx.leafEdgeKeys,
     spineEdgeKeys: ctx.spineEdgeKeys,
     sideHandleNodeIds: ctx.sideHandleNodeIds,
     sideTargetNodeIds: ctx.sideTargetNodeIds,
     edgeRouteGutters: ctx.edgeRouteGutters,
   });
+  const graphLeft = Math.min(...component.map((id) => ctx.positions.get(id)?.x ?? componentOriginX));
+  const { trunkRight, leftGraphLanes } = routeForwardTrunkEdges({
+    trunkEdges,
+    positions: ctx.positions,
+    nodeById: ctx.nodeById,
+    graphLeft,
+    edgeRouteGutters: ctx.edgeRouteGutters,
+    edgeRouteOffsetsY: ctx.edgeRouteOffsetsY,
+  });
 
   const componentFeedbackEdges = ctx.feedbackEdges.filter(
     (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
   );
-  const graphLeft = Math.min(...component.map((id) => ctx.positions.get(id)?.x ?? componentOriginX));
   routeFeedbackEdges({
     feedbackEdges: componentFeedbackEdges,
     positions: ctx.positions,
     nodeById: ctx.nodeById,
     graphLeft,
+    occupiedLeftLanes: leftGraphLanes,
     feedbackEdgeKeys: ctx.feedbackEdgeKeys,
     spineEdgeKeys: ctx.spineEdgeKeys,
     edgeRouteGutters: ctx.edgeRouteGutters,
@@ -185,7 +194,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     spineSourceNodeIds: ctx.spineSourceNodeIds,
   });
 
-  return maxRight + COMPONENT_GAP_X;
+  return Math.max(maxRight + COMPONENT_GAP_X, trunkRight + GUTTER_PAD);
 }
 
 function emptyFactoryRunLeafLayoutResult(): FactoryRunLeafLayoutResult {
