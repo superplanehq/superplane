@@ -1140,27 +1140,26 @@
   animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Same violet / amber pair as the first-run sphere. */
 .sp-survey-accent,
 .sp-user-note-label {
-  color: #4c2a94;
+  color: var(--muted-foreground);
 }
 
 .dark .sp-survey-accent,
 .dark .sp-user-note-label {
-  color: #f6a821;
+  color: var(--muted-foreground);
 }
 
 .sp-survey-card,
 .sp-user-note {
-  border-color: rgb(91 51 173 / 28%);
-  background: color-mix(in oklab, #f3ecff 82%, transparent);
+  border-color: var(--border);
+  background: var(--muted);
 }
 
 .dark .sp-survey-card,
 .dark .sp-user-note {
-  border-color: rgb(246 168 33 / 34%);
-  background: color-mix(in oklab, #f6a821 10%, transparent);
+  border-color: var(--border);
+  background: var(--muted);
 }
 
 .sp-user-note textarea {
@@ -1168,14 +1167,22 @@
 }
 
 .sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f3ecff 82%, white), transparent);
+  background-image: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--muted), var(--background)),
+    transparent
+  );
 }
 
 .dark .sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f6a821 10%, var(--background)), transparent);
+  background-image: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--muted), var(--background)),
+    transparent
+  );
 }
 
-/* Selected Task / Automations pill. Same violet / amber pair as user notes. */
+/* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */
 [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
   border-color: rgb(91 51 173 / 28%);
   background: color-mix(in oklab, #f3ecff 82%, transparent);
