@@ -248,6 +248,11 @@ func combinedStatusGate(combined *github.CombinedStatus) (unfinished bool, faile
 	if combined == nil {
 		return false, false
 	}
+	// GitHub sets combined state to "pending" when the commit has no statuses.
+	// That rollup is not an unfinished check.
+	if len(combined.Statuses) == 0 {
+		return false, false
+	}
 	stateUnfinished, stateFailed := classifyCommitStatus(combined.GetState())
 	unfinished = stateUnfinished
 	failed = stateFailed

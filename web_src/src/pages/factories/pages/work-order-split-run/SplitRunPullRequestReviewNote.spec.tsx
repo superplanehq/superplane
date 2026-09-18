@@ -147,7 +147,8 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
   });
 
-  it("disables merge and shows the reason when automation is running", () => {
+  it("disables merge and shows the reason on hover when automation is running", async () => {
+    const user = userEvent.setup();
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
@@ -158,10 +159,14 @@ describe("SplitRunAttentionNote for a pull request", () => {
     renderNote({ pullRequests: [GITHUB_PR] });
 
     expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.getByTestId("split-run-merge-reason")).toHaveTextContent("Automation is still running.");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
   });
 
-  it("disables merge and shows the reason when checks are still running", () => {
+  it("disables merge and shows the reason on hover when checks are still running", async () => {
+    const user = userEvent.setup();
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
@@ -172,7 +177,10 @@ describe("SplitRunAttentionNote for a pull request", () => {
     renderNote({ pullRequests: [GITHUB_PR], compact: true });
 
     expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.getByTestId("split-run-merge-reason")).toHaveTextContent("Checks are still running.");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Checks are still running.");
   });
 
   it("lists only allowed merge methods", async () => {
@@ -186,6 +194,34 @@ describe("SplitRunAttentionNote for a pull request", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
     ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
+  });
+
+  it("merges with the method the person picks in the menu", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    await user.click(await screen.findByTestId("split-run-merge-method-MERGE_METHOD_MERGE"));
+
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-6812",
+      mergeMethod: "MERGE_METHOD_MERGE",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("does not offer merge methods while merge is blocked", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
+      message: "A check failed.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
   });
 
   it("sends the selected method once on click", async () => {

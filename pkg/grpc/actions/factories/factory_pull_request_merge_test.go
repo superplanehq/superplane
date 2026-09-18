@@ -122,7 +122,14 @@ func allMethodsRepository() *github.Repository {
 }
 
 func successChecks() (*github.CombinedStatus, *github.ListCheckRunsResults) {
-	return &github.CombinedStatus{State: github.Ptr("success")}, &github.ListCheckRunsResults{}
+	return emptyCombinedStatus(), &github.ListCheckRunsResults{}
+}
+
+func emptyCombinedStatus() *github.CombinedStatus {
+	return &github.CombinedStatus{
+		State:      github.Ptr("pending"),
+		TotalCount: github.Ptr(0),
+	}
 }
 
 func Test__FactoryPullRequestMerge(t *testing.T) {
@@ -541,6 +548,63 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 			checkRuns: &github.ListCheckRunsResults{
 				CheckRuns: []*github.CheckRun{{Status: github.Ptr("queued")}},
 			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedChecksUnfinished, got.GetMessage())
+	})
+
+	t.Run("allows merge when GitHub has no commit statuses", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    emptyCombinedStatus(),
+			checkRuns:   &github.ListCheckRunsResults{},
+			repository:  allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.True(t, got.GetCanMerge())
+		assert.Equal(t, headSHA, got.GetHeadSha())
+	})
+
+	t.Run("allows merge when only check runs passed", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    emptyCombinedStatus(),
+			checkRuns: &github.ListCheckRunsResults{
+				CheckRuns: []*github.CheckRun{{
+					Status:     github.Ptr("completed"),
+					Conclusion: github.Ptr("success"),
+				}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.True(t, got.GetCanMerge())
+	})
+
+	t.Run("reports unfinished when a commit status is pending", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined: &github.CombinedStatus{
+				State:      github.Ptr("pending"),
+				TotalCount: github.Ptr(1),
+				Statuses: []*github.RepoStatus{{
+					Context: github.Ptr("ci"),
+					State:   github.Ptr("pending"),
+				}},
+			},
+			checkRuns:  &github.ListCheckRunsResults{},
 			repository: allMethodsRepository(),
 		})
 

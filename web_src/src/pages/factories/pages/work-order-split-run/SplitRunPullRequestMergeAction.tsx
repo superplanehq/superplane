@@ -9,6 +9,7 @@ import type {
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFactoryPullRequestMergeability, useMergeFactoryPullRequest } from "@/hooks/useFactoryPullRequestMerge";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -148,43 +149,56 @@ export function SplitRunPullRequestMergeControls({
     }
   }, [method, selectedMethod]);
 
-  const requestMerge = () => {
-    if (!canMerge || !method || !mergeability?.headSha || merging) {
+  const mergeWith = (chosen: FactoryPullRequestMergeMethodChoice | undefined) => {
+    if (!canMerge || !chosen || !mergeability?.headSha || merging) {
       return;
     }
-    onMerge(method, mergeability.headSha);
+    onMerge(chosen, mergeability.headSha);
   };
+
+  const mergeControls = (
+    <ButtonGroup>
+      <Button
+        type="button"
+        variant="outline"
+        size={compact ? "sm" : "lg"}
+        className={compact ? undefined : "h-11 px-5 text-[15px] font-semibold"}
+        disabled={!canMerge || merging}
+        onClick={() => mergeWith(method)}
+        data-testid="split-run-merge-button"
+      >
+        {PULL_REQUEST_REVIEW_COPY.merge}
+      </Button>
+      <ButtonGroupSeparator />
+      <MergeMethodMenu
+        allowedMethods={allowedMethods}
+        method={method}
+        compact={compact}
+        disabled={!canMerge || merging}
+        onSelect={(chosen) => {
+          setSelectedMethod(chosen);
+          mergeWith(chosen);
+        }}
+      />
+    </ButtonGroup>
+  );
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <PermissionTooltip allowed={canAct} message={PULL_REQUEST_REVIEW_COPY.permission}>
-        <ButtonGroup>
-          <Button
-            type="button"
-            variant="outline"
-            size={compact ? "sm" : "lg"}
-            className={compact ? undefined : "h-11 px-5 text-[15px] font-semibold"}
-            disabled={!canMerge || merging}
-            onClick={requestMerge}
-            data-testid="split-run-merge-button"
-          >
-            {PULL_REQUEST_REVIEW_COPY.merge}
-          </Button>
-          <ButtonGroupSeparator />
-          <MergeMethodMenu
-            allowedMethods={allowedMethods}
-            method={method}
-            compact={compact}
-            disabled={merging || allowedMethods.length === 0 || !canAct}
-            onSelect={setSelectedMethod}
-          />
-        </ButtonGroup>
+        {canAct && reason ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-flex" data-testid="split-run-merge-reason">
+                {mergeControls}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">{reason}</TooltipContent>
+          </Tooltip>
+        ) : (
+          mergeControls
+        )}
       </PermissionTooltip>
-      {reason ? (
-        <p className={mergedClassName(compact)} data-testid="split-run-merge-reason">
-          {reason}
-        </p>
-      ) : null}
     </div>
   );
 }
