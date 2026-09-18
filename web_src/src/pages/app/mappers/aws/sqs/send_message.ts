@@ -21,7 +21,7 @@ interface SendMessageConfiguration {
   region?: string;
   queue?: string;
   format?: string;
-  json?: any;
+  json?: unknown;
   xml?: string;
   text?: string;
 }

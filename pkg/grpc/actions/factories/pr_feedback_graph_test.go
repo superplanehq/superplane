@@ -20,6 +20,26 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		assert.Equal(t, prFeedbackFindNodeID, graph.FindNodeID)
 		assert.Equal(t, prFeedbackActivityNodeID, graph.ActivityNodeID)
 		assert.Equal(t, prFeedbackRunnerNodeID, graph.RunnerNodeID)
+		assert.Equal(t, []resolvedPRFeedbackDiscussionFlow{
+			{
+				TriggerNodeID:  prFeedbackCommentTriggerNodeID,
+				FindNodeID:     prFeedbackFindNodeID,
+				ActivityNodeID: prFeedbackActivityNodeID,
+				RunnerNodeID:   prFeedbackRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReviewTriggerNodeID,
+				FindNodeID:     prFeedbackReviewFindNodeID,
+				ActivityNodeID: prFeedbackReviewActivityNodeID,
+				RunnerNodeID:   prFeedbackReviewRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReplyTriggerNodeID,
+				FindNodeID:     prFeedbackReplyFindNodeID,
+				ActivityNodeID: prFeedbackReplyActivityNodeID,
+				RunnerNodeID:   prFeedbackReplyRunnerNodeID,
+			},
+		}, graph.discussionFlows(spec))
 		assert.True(t, graph.Healthy(spec))
 	})
 
@@ -83,10 +103,14 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		assert.Equal(t, []string{
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
+			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
+			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
+			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
+			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
+			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
+			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -102,7 +126,18 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
 		assert.Equal(t, `{{ $["Find Pull Request"].data.pullRequest.id }}`, activity.Configuration["pullRequestId"])
-		assert.Equal(t, prFeedbackActivityDescriptionExpression(), activity.Configuration["description"])
+		assert.Equal(t, prFeedbackCommentActivityTitleExpression(), activity.Configuration["title"])
+		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), activity.Configuration["description"])
+
+		reviewActivity := findSpecNode(t, canvas, prFeedbackReviewActivityNodeID)
+		assert.Equal(t, `{{ $["Find Pull Request For Review"].data.pullRequest.id }}`, reviewActivity.Configuration["pullRequestId"])
+		assert.Equal(t, prFeedbackReviewActivityTitleExpression(), reviewActivity.Configuration["title"])
+		assert.Equal(t, prFeedbackReviewActivityDescriptionExpression(), reviewActivity.Configuration["description"])
+
+		replyActivity := findSpecNode(t, canvas, prFeedbackReplyActivityNodeID)
+		assert.Equal(t, `{{ $["Find Pull Request For Review Reply"].data.pullRequest.id }}`, replyActivity.Configuration["pullRequestId"])
+		assert.Equal(t, prFeedbackReplyActivityTitleExpression(), replyActivity.Configuration["title"])
+		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), replyActivity.Configuration["description"])
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -255,12 +290,22 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
 		assert.Equal(t, "concurrent", activity.Configuration["access"])
 		assert.Equal(t, prFeedbackPRHeadSHAExpression(), activity.Configuration["revision"])
+		assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), activity.Configuration["title"])
+		assert.Nil(t, activity.Configuration["description"])
+
+		passed := findSpecNode(t, canvas, prFeedbackMarkPassedNodeID)
+		assert.Equal(t, prFeedbackChecksPassedTitleExpression(), passed.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), passed.Configuration["description"])
+
+		repair := findSpecNode(t, canvas, prFeedbackStartRepairNodeID)
+		assert.Equal(t, prFeedbackChecksRepairTitleExpression(), repair.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), repair.Configuration["description"])
 
 		wait := findSpecNode(t, canvas, prFeedbackWaitChecksNodeID)
 		assert.Equal(t, []any{"lint", "unit"}, wait.Configuration["checkNames"])
 
 		pause := findSpecNode(t, canvas, prFeedbackPauseFixesNodeID)
-		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["description"])
+		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["title"])
 
 		note := findSpecNode(t, canvas, prFeedbackAnnounceLimitNodeID)
 		assert.Equal(t, prFeedbackSetStatusNoteComponent, note.Component)

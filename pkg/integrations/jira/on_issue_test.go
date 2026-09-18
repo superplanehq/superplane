@@ -13,6 +13,22 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func TestNewIssueEvent(t *testing.T) {
+	issue := &Issue{Key: "ENG-42"}
+
+	t.Run("sets the browse address when the site is known", func(t *testing.T) {
+		event := NewIssueEvent("created", issue, nil, nil, "https://acme.atlassian.net")
+		assert.Equal(t, "created", event.Action)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-42", event.URL)
+		assert.Equal(t, "ENG-42", event.Issue.Key)
+	})
+
+	t.Run("omits the browse address when the site is unknown", func(t *testing.T) {
+		event := NewIssueEvent("created", issue, nil, nil, "")
+		assert.Empty(t, event.URL)
+	})
+}
+
 func Test__OnIssue__Setup(t *testing.T) {
 	trigger := &OnIssue{}
 
@@ -103,6 +119,25 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "ENG-42", event.Issue.Key)
 		require.NotNil(t, event.User)
 		assert.Equal(t, "Alice", event.User.DisplayName)
+		assert.Empty(t, event.URL)
+	})
+
+	t.Run("emits the issue page address when the site is known", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+			Integration:   newAuthorizedIntegration(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(IssueEvent)
+		assert.Equal(t, testSiteURL+"/browse/ENG-42", event.URL)
 	})
 
 	t.Run("ignores events for a different project", func(t *testing.T) {

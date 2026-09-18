@@ -1222,10 +1222,11 @@ message DeleteFactoryPRFeedbackHandlerRequest {
 message DeleteFactoryPRFeedbackHandlerResponse {}
 
 message FactoryPullRequestRun {
-  string description = 1;
-  int64 total_tokens = 2;
-  int64 cost_cents = 3;
-  Superplane.Canvases.CanvasRunRef run = 4;
+  string title = 1;
+  string description = 2;
+  int64 total_tokens = 3;
+  int64 cost_cents = 4;
+  Superplane.Canvases.CanvasRunRef run = 5;
 }
 
 message FactoryPullRequestRevision {
@@ -1236,14 +1237,15 @@ message FactoryPullRequestRevision {
 
 message FactoryPullRequestActivity {
   Superplane.Canvases.CanvasRunRef run = 1;
-  string description = 2;
-  optional FactoryPullRequestRevision revision = 3;
-  string access = 4;
-  string state = 5;
-  optional int32 attempt = 6;
-  optional int32 attempt_limit = 7;
-  int64 total_tokens = 8;
-  int64 cost_cents = 9;
+  string title = 2;
+  string description = 3;
+  optional FactoryPullRequestRevision revision = 4;
+  string access = 5;
+  string state = 6;
+  optional int32 attempt = 7;
+  optional int32 attempt_limit = 8;
+  int64 total_tokens = 9;
+  int64 cost_cents = 10;
 }
 
 message FactoryPullRequest {
@@ -1761,6 +1763,7 @@ message WorkOrderArtifact {
     TYPE_MARKDOWN = 1;
     TYPE_BRANCH = 2;
     TYPE_LINK = 3;
+    TYPE_FILE = 4;
   }
 
   string id = 1;

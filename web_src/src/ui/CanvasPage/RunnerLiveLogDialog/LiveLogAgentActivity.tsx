@@ -1,6 +1,6 @@
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus, AgentToolItem } from "@/lib/agentActivity";
+import { agentToolLabel, agentToolOutputPreview } from "@/lib/agentToolLabels";
 import { formatDuration } from "@/lib/duration";
-import { commandDisplayText } from "@/pages/factories/pages/work-order-split-run/agentActivitySummary";
 
 export function LiveLogAgentActivity({ activities }: { activities: AgentActivity[] }) {
   const items = activities.flatMap((activity) => activity.items);
@@ -39,17 +39,31 @@ function ActivityRow({ item }: { item: AgentActivityItem }) {
 }
 
 function ToolRow({ tool }: { tool: AgentToolItem }) {
-  const command = commandDisplayText(tool.input) ?? tool.name;
+  const label = agentToolLabel(tool);
+  const preview = agentToolOutputPreview(tool);
   return (
-    <p>
-      <span className="font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{tool.kind}</span>{" "}
-      <span>{command}</span>
-      <span className="text-gray-500 dark:text-gray-400">
-        {" "}
-        {activityStatusLabel(tool.status)}
-        {tool.durationMs != null ? ` ${formatDuration(tool.durationMs)}` : ""}
-      </span>
-    </p>
+    <div>
+      <p>
+        <span>{label.action}</span>
+        {label.detail ? (
+          <>
+            {" "}
+            <span>{label.detail}</span>
+          </>
+        ) : null}
+        <span className="text-gray-500 dark:text-gray-400">
+          {" "}
+          {activityStatusLabel(tool.status)}
+          {tool.durationMs != null ? ` ${formatDuration(tool.durationMs)}` : ""}
+        </span>
+      </p>
+      {preview.lines.map((line, index) => (
+        <p key={`${tool.id}-out-${index}`} className="truncate pl-4 text-gray-600 dark:text-gray-400">
+          {line}
+        </p>
+      ))}
+      {preview.hasMore ? <p className="pl-4 text-gray-500 dark:text-gray-400">More output is available.</p> : null}
+    </div>
   );
 }
 

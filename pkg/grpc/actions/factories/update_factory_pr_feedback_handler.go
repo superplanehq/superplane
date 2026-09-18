@@ -128,6 +128,20 @@ func applyPRFeedbackSettings(
 			return invalidArgument("PR feedback automation has no GitHub triggers to update")
 		}
 
+		runnerIDs := map[string]bool{graph.RunnerNodeID: true}
+		if !graph.isChecks() {
+			runnerIDs = graph.discussionRunnerNodeIDs(spec)
+		}
+		factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
+		if err != nil {
+			return err
+		}
+		runnerEnvironmentFrom := prFeedbackEnvironmentFrom(
+			resolvePRFeedbackBinding(tx, factory, updated.Repository),
+			updated.RunnerIntegrationNames,
+		)
+		independentDiscussionFlows := graph.hasIndependentDiscussionFlows(spec)
+
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
 			if triggerIDs[nodes[i].ID] {
@@ -154,19 +168,12 @@ func applyPRFeedbackSettings(
 				nodes[i].Configuration = configuration
 				continue
 			}
-			if nodes[i].ID == graph.RunnerNodeID {
+			if runnerIDs[nodes[i].ID] {
 				configuration := maps.Clone(nodes[i].Configuration)
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
-				if err != nil {
-					return err
-				}
-				configuration["environmentFrom"] = prFeedbackEnvironmentFrom(
-					resolvePRFeedbackBinding(tx, factory, updated.Repository),
-					updated.RunnerIntegrationNames,
-				)
+				configuration["environmentFrom"] = runnerEnvironmentFrom
 				nodes[i].Configuration = configuration
 				continue
 			}
@@ -175,13 +182,30 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["description"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
+				configuration["title"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
+				delete(configuration, "description")
 				nodes[i].Configuration = configuration
 				continue
 			}
 			if nodes[i].ID == graph.AnnounceLimitNodeID {
 				nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
 				continue
+			}
+			if graph.isChecks() {
+				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
+					configuration := maps.Clone(nodes[i].Configuration)
+					if configuration == nil {
+						configuration = map[string]any{}
+					}
+					configuration["title"] = title
+					if description == "" {
+						delete(configuration, "description")
+					} else {
+						configuration["description"] = description
+					}
+					nodes[i].Configuration = configuration
+					continue
+				}
 			}
 			if nodes[i].ID != graph.ActivityNodeID && nodes[i].ComponentName() != prFeedbackActivityComponent {
 				continue
@@ -190,8 +214,14 @@ func applyPRFeedbackSettings(
 			if configuration == nil {
 				configuration = map[string]any{}
 			}
-			if !graph.isChecks() {
-				configuration["description"] = prFeedbackActivityDescriptionExpression()
+			if !graph.isChecks() && independentDiscussionFlows {
+				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID)
+				if !ok {
+					nodes[i].Configuration = configuration
+					continue
+				}
+				configuration["title"] = title
+				configuration["description"] = description
 			}
 			nodes[i].Configuration = configuration
 		}

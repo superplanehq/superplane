@@ -104,6 +104,34 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
+func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__inspect_screenshot")
+	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
+	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
+func TestFormatStreamJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-claude-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("a", 2048)
+	output := runClaudeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q},{"type":"thinking","thinking":%q},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":%q}}]}}`, token, token, "git remote set-url origin https://x-access-token:"+token+"@github.com/acme/app.git"),
+		fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"image","data":%q,"mimeType":"image/png"},{"type":"text","text":%q}]}]}}`, image, token),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "[image: image/png; content omitted from logs]")
+}
+
 func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {
 	// Planning sessions must use "default" (not "plan"): plan mode blocks the
 	// planning MCP tools. Read-only is enforced

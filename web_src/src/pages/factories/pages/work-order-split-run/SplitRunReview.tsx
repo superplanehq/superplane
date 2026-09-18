@@ -144,7 +144,7 @@ export function SplitRunReview({
   return (
     <div
       className={cn(compact && !actionsOnly ? "min-w-0 flex-1" : "shrink-0", className)}
-      data-testid="split-run-review"
+      data-testid={actionsOnly ? undefined : "split-run-review"}
     >
       <SplitRunAttentionNote
         note={footer.note}

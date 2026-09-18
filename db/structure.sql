@@ -38,29 +38,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: account_choice_states; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.account_choice_states (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    token_hash character varying(64) NOT NULL,
-    provider character varying(64) NOT NULL,
-    provider_id text NOT NULL,
-    redirect text DEFAULT ''::text NOT NULL,
-    email text DEFAULT ''::text NOT NULL,
-    name text DEFAULT ''::text NOT NULL,
-    nickname text DEFAULT ''::text NOT NULL,
-    avatar_url text DEFAULT ''::text NOT NULL,
-    access_token bytea,
-    refresh_token bytea,
-    token_expires_at timestamp with time zone,
-    expires_at timestamp with time zone NOT NULL,
-    used_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: account_linked_accounts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -586,6 +563,7 @@ CREATE TABLE public.factory_pull_request_runs (
     access_requested_at timestamp with time zone,
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -864,6 +842,9 @@ CREATE TABLE public.files (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    purpose character varying(32) DEFAULT 'attachment'::character varying NOT NULL,
+    public_id uuid,
+    CONSTRAINT files_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['attachment'::character varying, 'artifact'::character varying])::text[]))),
     CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
     CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
     CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
@@ -1535,22 +1516,6 @@ ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
--- Name: account_choice_states account_choice_states_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_choice_states
-    ADD CONSTRAINT account_choice_states_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_choice_states account_choice_states_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_choice_states
-    ADD CONSTRAINT account_choice_states_token_hash_key UNIQUE (token_hash);
-
-
---
 -- Name: account_linked_accounts account_linked_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1596,6 +1561,14 @@ ALTER TABLE ONLY public.account_providers
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
 
 
 --
@@ -2375,13 +2348,6 @@ ALTER TABLE ONLY public.workspace_usage_events
 
 
 --
--- Name: account_providers_non_github_provider_id_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX account_providers_non_github_provider_id_key ON public.account_providers USING btree (provider, provider_id) WHERE ((provider)::text <> 'github'::text);
-
-
---
 -- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2424,10 +2390,10 @@ CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_
 
 
 --
--- Name: idx_account_choice_states_expires_at; Type: INDEX; Schema: public; Owner: -
+-- Name: files_public_id_unique; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_account_choice_states_expires_at ON public.account_choice_states USING btree (expires_at);
+CREATE UNIQUE INDEX files_public_id_unique ON public.files USING btree (public_id) WHERE (public_id IS NOT NULL);
 
 
 --
@@ -2484,13 +2450,6 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
-
-
---
--- Name: idx_account_providers_provider_provider_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_account_providers_provider_provider_id ON public.account_providers USING btree (provider, provider_id);
 
 
 --
@@ -4593,7 +4552,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260917153127	f
+20260918030151	f
 \.
 
 

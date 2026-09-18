@@ -8,6 +8,8 @@ const {
   createActivityStream,
   normalizeTerminalText,
   redactSensitiveText,
+  sanitizeLogText,
+  sanitizeLogValue,
 } = require("./activity_stream");
 
 function analysisEnvironment() {
@@ -114,6 +116,57 @@ test("redacts the planning session runner token from activity text", () => {
 
   assert.equal(output.includes(token), false);
   assert.equal(output, "SUPERPLANE_RUN_TOKEN=[REDACTED]\n[REDACTED]");
+});
+
+test("sanitizes secrets in structured live-log values", () => {
+  const token = "github-token-for-redaction-test";
+  const value = sanitizeLogValue(
+    {
+      assistant: token,
+      tool: {
+        input: `git clone https://x-access-token:${token}@github.com/acme/app.git`,
+        stderr: `Bearer ${token}`,
+      },
+    },
+    { GITHUB_TOKEN: token },
+  );
+  const encoded = JSON.stringify(value);
+  assert.equal(encoded.includes(token), false);
+  assert.equal(encoded.includes("x-access-token:"), false);
+  assert.match(encoded, /\[REDACTED\]/);
+});
+
+test("summarizes MCP image blocks without serializing base64 data", () => {
+  const encodedImage = "a".repeat(2048);
+  const value = sanitizeLogValue({ content: [{ type: "image", data: encodedImage, mimeType: "image/png" }] });
+  assert.deepEqual(value, {
+    content: [{ type: "image", mimeType: "image/png", summary: "[image content omitted from logs]" }],
+  });
+  assert.equal(sanitizeLogText(JSON.stringify({ content: value.content })).includes(encodedImage), false);
+});
+
+test("omits MCP image data from activity tool output", () => {
+  const records = [];
+  const encodedImage = "a".repeat(2048);
+  const stream = createActivityStream({
+    provider: "codex",
+    activityId: "image-output",
+    env: analysisEnvironment(),
+    writeRecord: (record) => records.push(record),
+  });
+
+  stream.startTool({ id: "tool-1", kind: "mcp", input: "inspect_screenshot" });
+  stream.appendToolOutput(
+    "tool-1",
+    JSON.stringify({ content: [{ type: "image", data: encodedImage, mimeType: "image/png" }] }),
+  );
+  stream.endTool("tool-1", { status: "passed" });
+
+  const encodedRecords = JSON.stringify(records);
+  const encodedSnapshot = JSON.stringify(stream.snapshot());
+  assert.equal(encodedRecords.includes(encodedImage), false);
+  assert.equal(encodedSnapshot.includes(encodedImage), false);
+  assert.match(encodedRecords, /image content omitted from logs/);
 });
 
 test("keeps the first and last output when a tool exceeds its limit", () => {

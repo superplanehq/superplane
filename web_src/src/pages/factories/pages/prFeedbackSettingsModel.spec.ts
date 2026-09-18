@@ -72,6 +72,16 @@ describe("oldestActivePRFeedbackRun", () => {
 });
 
 describe("prFeedbackActivityLabel", () => {
+  it("removes the legacy addressing suffix from persisted titles", () => {
+    expect(
+      prFeedbackActivityLabel({
+        state: "finished",
+        title:
+          "[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/42#review) - addressing",
+      }),
+    ).toBe("[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/42#review)");
+  });
+
   it("shows waiting and limit labels", () => {
     expect(
       prFeedbackActivityLabel({
@@ -79,7 +89,7 @@ describe("prFeedbackActivityLabel", () => {
         state: "active",
         description: "Fixing failed checks on a82fd91",
       }),
-    ).toBe("Waiting for another pull request activity");
+    ).toBe("Fixing failed checks on a82fd91");
     expect(prFeedbackActivityLabel({ state: "finished", description: "Waiting for checks on d1209da" })).toBe(
       "Waiting for checks on d1209da",
     );
@@ -98,7 +108,7 @@ describe("prFeedbackActivityLabel", () => {
 
 describe("prFeedbackActivityAttemptLabel", () => {
   it("shows the attempt count when an attempt exists", () => {
-    expect(prFeedbackActivityAttemptLabel({ attempt: 2, attemptLimit: 3 })).toBe("Attempt 2 of 3");
+    expect(prFeedbackActivityAttemptLabel({ attempt: 2, attemptLimit: 3 })).toBe("· 2/3");
     expect(prFeedbackActivityAttemptLabel({ attempt: 0, attemptLimit: 3 })).toBeUndefined();
     expect(prFeedbackActivityAttemptLabel({})).toBeUndefined();
   });

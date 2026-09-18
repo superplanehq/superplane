@@ -16,7 +16,10 @@ const SESSION_FILE = "codex_session";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
   for (const file of candidates) {
     if (file && fs.existsSync(file)) {
       return require(file);
@@ -44,7 +47,10 @@ function createDisabledActivityStream() {
 }
 
 function loadAnalysisProtocolModule() {
-  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
   for (const file of candidates) {
     try {
       return require(file);
@@ -57,7 +63,9 @@ function loadAnalysisProtocolModule() {
 
 function loadAnalysisProtocol() {
   const mod = loadAnalysisProtocolModule();
-  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol()
+    : "";
 }
 
 function withoutEmbeddedAnalysisProtocol(prompt) {
@@ -84,11 +92,18 @@ function envFlag(env, name) {
 }
 
 function planningEnabled(env = process.env) {
-  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
 }
 
 function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function artifactEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
 function planningSystemPrompt(env = process.env) {
@@ -98,18 +113,32 @@ function planningSystemPrompt(env = process.env) {
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
-function codexExecArgs(env = process.env, model, mcpScriptPath, sessionID = "") {
+function codexExecArgs(
+  env = process.env,
+  model,
+  mcpScriptPath,
+  sessionID = "",
+) {
   const args = ["exec"];
   if (sessionID) {
     args.push("resume", sessionID);
   }
   args.push("--json", "--skip-git-repo-check");
   if (planningEnabled(env)) {
-    args.push("-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"");
+    args.push(
+      "-c",
+      'sandbox_mode="read-only"',
+      "-c",
+      'approval_policy="never"',
+    );
     args.push(...mcpConfigOverrides(mcpScriptPath));
-    args.push("-c", `developer_instructions=${tomlString(loadAnalysisProtocol())}`);
+    args.push(
+      "-c",
+      `developer_instructions=${tomlString(loadAnalysisProtocol())}`,
+    );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
+    if (artifactEnabled(env)) args.push(...mcpConfigOverrides(mcpScriptPath));
   }
   if (model) {
     args.push("-m", model);
@@ -144,7 +173,9 @@ function codexSessionForPrompt(promptCount, sessionID) {
 }
 
 function codexSessionIDFromEvent(event) {
-  return String((event && (event.thread_id || (event.thread && event.thread.id))) || "").trim();
+  return String(
+    (event && (event.thread_id || (event.thread && event.thread.id))) || "",
+  ).trim();
 }
 
 function mcpConfigOverrides(mcpScriptPath) {
@@ -171,13 +202,13 @@ function tomlStringArray(values) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -193,34 +224,58 @@ async function runPrompt(promptFile, model) {
   }
 
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(
+    sp,
+    promptCount,
+    fs.readFileSync(promptFile, "utf8"),
+  );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
   const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
+  if (artifactEnabled()) {
+    const outputDir = path.join(sp, "evidence");
+    fs.mkdirSync(outputDir, { recursive: true });
+    process.env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+    process.env.PLAYWRIGHT_MCP_BROWSER =
+      process.env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+  }
   const planning = planningEnabled();
-  const activity = loadActivityStreamModule().createActivityStream({ provider: "codex", turn: promptCount + 1 });
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "codex",
+    turn: promptCount + 1,
+  });
   activity.start();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"), sessionID);
+  const mcpScript = path.join(
+    sp,
+    planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
+  );
+  const codexArgs = codexExecArgs(process.env, model, mcpScript, sessionID);
   if (planning) {
-    process.stdout.write("Planning session tools enabled\n");
-    process.stdout.write("sandbox: read-only\n");
+    writeStdout("Planning session tools enabled\n");
+    writeStdout("sandbox: read-only\n");
   }
   if (promptCount > 0) {
-    process.stdout.write("Continuing Codex session in the current directory\n");
+    writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
 
-  const child = spawn("codex", codexArgs, { stdio: ["ignore", "pipe", "pipe"] });
-  child.stderr.pipe(process.stderr);
+  const child = spawn("codex", codexArgs, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
   const formatter = createCodexFormatter(telemetry, activity);
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  const rl = readline.createInterface({
+    input: child.stdout,
+    crlfDelay: Infinity,
+  });
   rl.on("line", (raw) => {
     const line = raw.trim();
     if (!line) {
@@ -236,8 +291,15 @@ async function runPrompt(promptFile, model) {
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
         }
-        if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "result") {
-          if (!lastResult.usage && !(lastResult.item && lastResult.item.usage)) {
+        if (
+          event.type === "item.completed" ||
+          event.type === "turn.completed" ||
+          event.type === "result"
+        ) {
+          if (
+            !lastResult.usage &&
+            !(lastResult.item && lastResult.item.usage)
+          ) {
             lastResult = event;
           }
         }
@@ -245,7 +307,7 @@ async function runPrompt(promptFile, model) {
         return;
       }
     } catch (_err) {
-      process.stdout.write(`${line}\n`);
+      writeStdout(`${line}\n`);
     }
   });
 
@@ -255,6 +317,7 @@ async function runPrompt(promptFile, model) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
   ]).then(([code]) => code);
 
   formatter.flush(exitCode !== 0);
@@ -271,15 +334,22 @@ async function runPrompt(promptFile, model) {
     usage,
   };
   telemetry.attachToResult(payload);
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(payload.result);
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      safePayload.result,
+    );
   }
   formatTurnResult({
     is_error: exitCode !== 0,
-    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    num_turns:
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
+        : 1,
     duration_ms: Date.now() - startedAt,
   });
   return exitCode;
@@ -306,18 +376,28 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
   return {
     input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
-    output_tokens: Number(source.output_tokens || source.completion_tokens || 0),
-    cache_read_input_tokens: Number(source.cached_input_tokens || source.cache_read_input_tokens || 0),
+    output_tokens: Number(
+      source.output_tokens || source.completion_tokens || 0,
+    ),
+    cache_read_input_tokens: Number(
+      source.cached_input_tokens || source.cache_read_input_tokens || 0,
+    ),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
 }
@@ -335,12 +415,36 @@ function accumulateLLMUsage(payload) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogValue ? activity.sanitizeLogValue(rec) : rec;
+  process.stdout.write(`${JSON.stringify(safe)}\n`);
+}
+
+function writeStdout(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stdout.write(safe);
+}
+
+function writeStderr(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stderr.write(safe);
+}
+
+function pipeRedactedStderr(stream) {
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    writeStderr(`${line}\n`);
+  });
+  return new Promise((resolve) => lines.on("close", resolve));
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
-  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "codex" });
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "codex" });
   const open = new Map();
   const anonQueue = [];
   const contentText = new Map();
@@ -389,7 +493,9 @@ function createCodexFormatter(telemetry, activityOverride) {
       return;
     }
     const previous = contentText.get(id) || "";
-    const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
+    const delta = text.startsWith(previous)
+      ? text.slice(previous.length)
+      : text;
     activity.appendContent(contentKind, id, delta);
     contentText.set(id, text);
   }
@@ -440,12 +546,19 @@ function createCodexFormatter(telemetry, activityOverride) {
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
       if (activity.enabled) {
-        activity.appendToolOutput(id, output.replace(/\s+$/, ""), toolFailed(item) ? "stderr" : "stdout");
+        activity.appendToolOutput(
+          id,
+          output.replace(/\s+$/, ""),
+          toolFailed(item) ? "stderr" : "stdout",
+        );
       } else {
-        process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+        writeStdout(`${output.replace(/\s+$/, "")}\n`);
       }
     }
-    const tracked = open.get(id) || { kind: normalizeCodexToolKind(item), startedAt: Date.now() };
+    const tracked = open.get(id) || {
+      kind: normalizeCodexToolKind(item),
+      startedAt: Date.now(),
+    };
     open.delete(id);
     const anonIndex = anonQueue.indexOf(id);
     if (anonIndex >= 0) {
@@ -487,7 +600,10 @@ function createCodexFormatter(telemetry, activityOverride) {
           const text = item.text || item.result || "";
           if (!roundOpen) {
             tracker.beginTurn(item.usage || event.usage, {
-              message: typeof text === "string" && type !== "reasoning" ? text : undefined,
+              message:
+                typeof text === "string" && type !== "reasoning"
+                  ? text
+                  : undefined,
             });
           }
           roundOpen = false;
@@ -498,7 +614,7 @@ function createCodexFormatter(telemetry, activityOverride) {
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
             lastText = text.replace(/\s+$/, "");
             if (!activity.enabled) {
-              process.stdout.write(`${lastText}\n`);
+              writeStdout(`${lastText}\n`);
             }
           }
         }
@@ -551,7 +667,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 }
 
 function isMessageItem(type) {
-  return type === "agent_message" || type === "assistant_message" || type === "reasoning";
+  return (
+    type === "agent_message" ||
+    type === "assistant_message" ||
+    type === "reasoning"
+  );
 }
 
 function isToolItem(type) {
@@ -590,7 +710,9 @@ function normalizeCodexToolKind(item) {
 
 function fileChangeKind(item) {
   const changes = Array.isArray(item.changes) ? item.changes : [];
-  const kinds = changes.map((change) => String((change && change.kind) || "").toLowerCase());
+  const kinds = changes.map((change) =>
+    String((change && change.kind) || "").toLowerCase(),
+  );
   if (kinds.includes("add") && !kinds.includes("update")) {
     return "write";
   }
@@ -607,10 +729,16 @@ function toolTextForItem(item) {
   }
   if (type === "file_change") {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const paths = changes.map((change) => change && change.path).filter(Boolean);
-    return paths.length > 0 ? paths.map(String).join("\n") : String(item.path || "file");
+    const paths = changes
+      .map((change) => change && change.path)
+      .filter(Boolean);
+    return paths.length > 0
+      ? paths.map(String).join("\n")
+      : String(item.path || "file");
   }
-  return String(item.command || item.path || item.query || item.name || type || "tool");
+  return String(
+    item.command || item.path || item.query || item.name || type || "tool",
+  );
 }
 
 function stripBashLc(command) {
@@ -642,7 +770,11 @@ function formatTurnResult(event) {
   }
   if (event && event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event && event.duration_ms != null) {
     const ms = Number(event.duration_ms);
@@ -650,7 +782,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatCodexJsonLines(rawLines) {
@@ -663,7 +795,7 @@ function formatCodexJsonLines(rawLines) {
     try {
       formatter.handleEvent(JSON.parse(trimmed));
     } catch (_err) {
-      process.stdout.write(`${trimmed}\n`);
+      writeStdout(`${trimmed}\n`);
     }
   }
   formatter.flush();

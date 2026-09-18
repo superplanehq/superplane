@@ -62,7 +62,7 @@ export const cloudDNSMapper: ComponentBaseMapper = {
 
 function cloudDNSMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const config = node.configuration as any;
+  const config = node.configuration as { managedZone?: string; name?: string; type?: string } | undefined;
 
   if (config?.managedZone) {
     metadata.push({ icon: "globe", label: String(config.managedZone) });

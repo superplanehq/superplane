@@ -23,7 +23,7 @@ export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrde
           <p className="text-[13px] text-muted-foreground">Loading artifacts…</p>
         ) : visibleArtifacts.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">
-            No artifacts yet. Automation nodes will attach notes and links here as they run.
+            No artifacts yet. Automation nodes will attach notes, files, and links here as they run.
           </p>
         ) : (
           <ul>

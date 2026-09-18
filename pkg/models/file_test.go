@@ -14,6 +14,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 )
 
+func TestArtifactFilePolicyAllowsEvidenceAndUsesLargerLimit(t *testing.T) {
+	assert.True(t, IsAllowedArtifactContentType("image/png"))
+	assert.True(t, IsAllowedArtifactContentType("video/webm"))
+	assert.False(t, IsAllowedArtifactContentType("application/pdf"))
+	assert.Equal(t, int64(MaxArtifactFileBytes), File{Purpose: FilePurposeArtifact}.MaxBytes())
+	assert.Equal(t, int64(MaxFileBytes), File{Purpose: FilePurposeAttachment}.MaxBytes())
+}
+
 func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-type")
@@ -308,6 +316,7 @@ func insertPendingTaskFileBypassingQuota(
 		ContentType:    "image/png",
 		StorageKey:     storageKey,
 		State:          FileStatePending,
+		Purpose:        FilePurposeAttachment,
 		CreatedByID:    &createdBy,
 		CreatedAt:      now,
 		UpdatedAt:      now,

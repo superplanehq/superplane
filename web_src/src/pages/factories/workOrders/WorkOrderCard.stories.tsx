@@ -89,13 +89,15 @@ export const ReviewPullRequest: Story = {
 };
 
 /**
- * Review pill plus the compact checks-passed mark. The mark keeps the
- * meaning through its color, icon, tooltip, and accessible name.
+ * Review pill plus the completed check-wait title.
  */
 export const ChecksPassedWithReview: Story = {
   name: "Review #2323 + checks passed",
   args: {
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -172,6 +174,9 @@ export const ChecksPassedLongTitle: Story = {
       factory,
     ),
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -259,5 +264,22 @@ export const GitHubOrigin: Story = {
       }),
       factory,
     ),
+  },
+};
+
+/**
+ * Manual origin on the card. The product logo sits first in the pill
+ * row and is not a link.
+ */
+export const ManualOrigin: Story = {
+  name: "Manual origin",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        createdBy: { user: { id: "user-1", name: "Ada Lovelace" } },
+      }),
+      factory,
+    ),
+    pullRequests: [],
   },
 };

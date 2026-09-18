@@ -2,6 +2,7 @@ package codex
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,17 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, args, "--sandbox")
 	assert.NotContains(t, args, "read-only")
 	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
+}
+
+func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	}, "gpt-5", "/task/task_artifact_mcp.js")
+
+	joined := strings.Join(args, " ")
+	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
 }
 
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
@@ -172,6 +184,25 @@ func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "pkg/foo.go\npkg/bar.go", records[2]["text"])
 	assert.Equal(t, float64(2), records[2]["turn"])
 	assert.Contains(t, output, `"type":"turn"`)
+}
+
+func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-codex-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("b", 2048)
+	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
+	output := runCodexFormatter(t, []string{
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"item.started","item":{"id":"item-1","type":"command_execution","command":%q}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git"),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"item-1","type":"command_execution","command":"true","aggregated_output":%q,"exit_code":0}}`, imageResult),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":%q}}`, token),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "image content omitted from logs")
 }
 
 func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {

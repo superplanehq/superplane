@@ -108,6 +108,8 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   )}
                   expanded
                   collapsible={false}
+                  markdownName
+                  showMarkdownDescription
                   stream={model.stream}
                   streamLoading={model.streamLoading}
                   selectedNodeId={model.nodeId}

@@ -19,7 +19,10 @@ const SESSION_FILE = "opencode_session";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
   for (const file of candidates) {
     if (file && fs.existsSync(file)) {
       return require(file);
@@ -49,7 +52,10 @@ const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
 function loadAnalysisProtocolModule() {
-  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
   for (const file of candidates) {
     try {
       return require(file);
@@ -62,7 +68,9 @@ function loadAnalysisProtocolModule() {
 
 function loadAnalysisProtocol() {
   const mod = loadAnalysisProtocolModule();
-  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol()
+    : "";
 }
 
 function withoutEmbeddedAnalysisProtocol(prompt) {
@@ -73,7 +81,12 @@ function withoutEmbeddedAnalysisProtocol(prompt) {
   return prompt;
 }
 
-function applyAnalysisContinuation(taskDir, promptCount, prompt, env = process.env) {
+function applyAnalysisContinuation(
+  taskDir,
+  promptCount,
+  prompt,
+  env = process.env,
+) {
   if (!planningAnalysisEnabled(env)) {
     return prompt;
   }
@@ -89,11 +102,18 @@ function envFlag(env, name) {
 }
 
 function planningEnabled(env = process.env) {
-  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
 }
 
 function planningAnalysisEnabled(env = process.env) {
   return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function artifactEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
 function planningSystemPrompt(env = process.env) {
@@ -128,7 +148,9 @@ function classifyOpenRouterError(text) {
     return "hard";
   }
   if (
-    /new-account-rpm|rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(lower) ||
+    /new-account-rpm|rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
     /too many requests/.test(lower)
   ) {
     return "rate_limit";
@@ -269,7 +291,12 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
   return args;
 }
 
-function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
+function buildOpenCodeConfig({
+  taskDir,
+  env = process.env,
+  planning = false,
+  models = [],
+} = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     permission: planning
@@ -306,11 +333,17 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       config.provider.openrouter.models = modelEntries;
     }
   }
-  if (planning && taskDir) {
+  if ((planning || artifactEnabled(env)) && taskDir) {
     config.mcp = {
       superplane: {
         type: "local",
-        command: ["node", path.join(taskDir, "planning_session_mcp.js")],
+        command: [
+          "node",
+          path.join(
+            taskDir,
+            planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
+          ),
+        ],
         enabled: true,
       },
     };
@@ -335,7 +368,10 @@ function writeOpenCodeConfig(taskDir, env, models) {
     planning: planningEnabled(env),
     models,
   });
-  fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(taskDir, "opencode.json"),
+    `${JSON.stringify(config, null, 2)}\n`,
+  );
 }
 
 function openCodeProcessEnv(taskDir, baseEnv = process.env) {
@@ -363,13 +399,13 @@ function ensureXdgDirs(taskDir) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -386,8 +422,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
   }
 
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"), env);
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  let prompt = applyAnalysisContinuation(
+    sp,
+    promptCount,
+    fs.readFileSync(promptFile, "utf8"),
+    env,
+  );
   if (planningAnalysisEnabled(env)) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
@@ -396,9 +438,23 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
   const recordAgentMessage =
-    helpers.recordAgentMessage || ((text) => require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(text));
+    helpers.recordAgentMessage ||
+    ((text) =>
+      require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+        text,
+      ));
   const planning = planningEnabled(env);
-  const activity = loadActivityStreamModule().createActivityStream({ provider: "openrouter", env, turn: promptCount + 1 });
+  if (artifactEnabled(env)) {
+    const outputDir = path.join(sp, "evidence");
+    fs.mkdirSync(outputDir, { recursive: true });
+    env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+    env.PLAYWRIGHT_MCP_BROWSER = env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+  }
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "openrouter",
+    env,
+    turn: promptCount + 1,
+  });
   activity.start();
   if (planning) {
     printLiveLogLine("Planning session tools enabled");
@@ -417,7 +473,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let sessionID = readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
-    printLiveLogLine(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
+    printLiveLogLine(
+      `Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`,
+    );
   } else {
     const startModel = openRouterModelId(currentModel) || model;
     if (startModel) {
@@ -428,10 +486,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
   }
 
   const telemetry = loadTurnTelemetry();
-  const formatter = createOpenCodeFormatter(telemetry, (id) => {
-    sessionID = id || sessionID;
-    writeSessionID(sp, sessionID);
-  }, activity);
+  const formatter = createOpenCodeFormatter(
+    telemetry,
+    (id) => {
+      sessionID = id || sessionID;
+      writeSessionID(sp, sessionID);
+    },
+    activity,
+  );
   const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
   const sessionUsageBefore = loadSessionUsage(sp);
   const sessionStepsBefore = readSessionStepUsages(sp);
@@ -451,7 +513,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
       prompt,
       cwd,
     });
-    const spawnResult = await spawnOpenCodeTurn(args, childEnv, cwd, formatter, helpers);
+    const spawnResult = await spawnOpenCodeTurn(
+      args,
+      childEnv,
+      cwd,
+      formatter,
+      helpers,
+    );
     if (spawnResult.sessionID) {
       sessionID = spawnResult.sessionID;
       writeSessionID(sp, sessionID);
@@ -488,7 +556,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
-      printRetryOutcome(lastErrorText, stoppedAfterAttemptsLine(classKind, currentModel));
+      printRetryOutcome(
+        lastErrorText,
+        stoppedAfterAttemptsLine(classKind, currentModel),
+      );
       break;
     }
     const waitMs = retryWaitMs(lastErrorText, attempt);
@@ -499,7 +570,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
-    printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    printRetryOutcome(
+      lastErrorText,
+      retryWaitLine(classKind, currentModel, waitMs, attempt + 1),
+    );
     activity.notice("retry", `OpenRouter request retry ${attempt + 1}`);
     await sleep(waitMs);
     attempt += 1;
@@ -508,7 +582,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
   formatter.flush(failed);
   activity.end(failed ? "failed" : "passed");
   await activity.flush();
-  const sessionSteps = newSessionStepUsages(readSessionStepUsages(sp), sessionStepsBefore);
+  const sessionSteps = newSessionStepUsages(
+    readSessionStepUsages(sp),
+    sessionStepsBefore,
+  );
   const recorded = preferRecordedUsage(
     usageWithCost(lastUsage, lastCost),
     subtractUsage(loadSessionUsage(sp), sessionUsageBefore),
@@ -530,23 +607,30 @@ async function runPrompt(promptFile, model, helpers = {}) {
     payload.total_cost_usd = lastCost;
   }
   telemetry.attachToResult(payload, { name: promptSeriesName(promptFile) });
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await recordAgentMessage(payload.result);
+    await recordAgentMessage(safePayload.result);
   }
   formatTurnResult({
     is_error: failed,
-    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    num_turns:
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
+        : 1,
     duration_ms: Date.now() - startedAt,
-    total_cost_usd: payload.total_cost_usd,
+    total_cost_usd: safePayload.total_cost_usd,
   });
   return failed ? exitCode || 1 : 0;
 }
 
 function waitDeadlineMs(env, now) {
-  const seconds = Number((env && env.SUPERPLANE_EXECUTION_TIMEOUT_SECONDS) || 0);
+  const seconds = Number(
+    (env && env.SUPERPLANE_EXECUTION_TIMEOUT_SECONDS) || 0,
+  );
   if (!Number.isFinite(seconds) || seconds <= 0) {
     return now() + DEFAULT_WAIT_CAP_MS;
   }
@@ -560,7 +644,9 @@ function defaultSleep(ms) {
 }
 
 function commandExists(name) {
-  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], {
+    encoding: "utf8",
+  });
   return result.status === 0;
 }
 
@@ -579,7 +665,10 @@ function defaultSpawnOpenCode(args, options) {
 }
 
 function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
-  const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
+  const text =
+    formatter && typeof formatter.lastText === "function"
+      ? formatter.lastText()
+      : "";
   if (!String(text || "").trim()) {
     return false;
   }
@@ -621,16 +710,36 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       resolve();
       return;
     }
+    let pending = "";
+    let finished = false;
+    const flush = () => {
+      if (pending) {
+        writeStderr(pending);
+        pending = "";
+      }
+    };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      flush();
+      resolve();
+    };
     child.stderr.on("data", (chunk) => {
-      stderrText += String(chunk);
-      process.stderr.write(chunk);
+      const text = String(chunk);
+      stderrText += text;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() || "";
+      for (const line of lines) writeStderr(`${line}\n`);
     });
-    child.stderr.on("end", resolve);
-    child.stderr.on("error", resolve);
+    child.stderr.on("end", finish);
+    child.stderr.on("error", finish);
   });
 
   const stdout = child.stdout;
-  const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
+  const rl = stdout
+    ? readline.createInterface({ input: stdout, crlfDelay: Infinity })
+    : null;
   if (rl) {
     rl.on("line", (raw) => formatter.handleLine(raw));
   }
@@ -710,15 +819,25 @@ function tokenTotal(usage) {
 
 function mergeUsage(left, right) {
   const merged = {
-    input_tokens: Number((left && left.input_tokens) || 0) + Number((right && right.input_tokens) || 0),
-    output_tokens: Number((left && left.output_tokens) || 0) + Number((right && right.output_tokens) || 0),
+    input_tokens:
+      Number((left && left.input_tokens) || 0) +
+      Number((right && right.input_tokens) || 0),
+    output_tokens:
+      Number((left && left.output_tokens) || 0) +
+      Number((right && right.output_tokens) || 0),
     cache_read_input_tokens:
-      Number((left && left.cache_read_input_tokens) || 0) + Number((right && right.cache_read_input_tokens) || 0),
+      Number((left && left.cache_read_input_tokens) || 0) +
+      Number((right && right.cache_read_input_tokens) || 0),
     cache_creation_input_tokens:
-      Number((left && left.cache_creation_input_tokens) || 0) + Number((right && right.cache_creation_input_tokens) || 0),
-    reasoning_tokens: Number((left && left.reasoning_tokens) || 0) + Number((right && right.reasoning_tokens) || 0),
+      Number((left && left.cache_creation_input_tokens) || 0) +
+      Number((right && right.cache_creation_input_tokens) || 0),
+    reasoning_tokens:
+      Number((left && left.reasoning_tokens) || 0) +
+      Number((right && right.reasoning_tokens) || 0),
   };
-  const cost = Number((left && left.total_cost_usd) || 0) + Number((right && right.total_cost_usd) || 0);
+  const cost =
+    Number((left && left.total_cost_usd) || 0) +
+    Number((right && right.total_cost_usd) || 0);
   if (cost) {
     merged.total_cost_usd = cost;
   }
@@ -736,14 +855,20 @@ function usageWithCost(usage, cost) {
 
 function subtractUsage(after, before) {
   const delta = {
-    input_tokens: Math.max(0, Number((after && after.input_tokens) || 0) - Number((before && before.input_tokens) || 0)),
+    input_tokens: Math.max(
+      0,
+      Number((after && after.input_tokens) || 0) -
+        Number((before && before.input_tokens) || 0),
+    ),
     output_tokens: Math.max(
       0,
-      Number((after && after.output_tokens) || 0) - Number((before && before.output_tokens) || 0),
+      Number((after && after.output_tokens) || 0) -
+        Number((before && before.output_tokens) || 0),
     ),
     cache_read_input_tokens: Math.max(
       0,
-      Number((after && after.cache_read_input_tokens) || 0) - Number((before && before.cache_read_input_tokens) || 0),
+      Number((after && after.cache_read_input_tokens) || 0) -
+        Number((before && before.cache_read_input_tokens) || 0),
     ),
     cache_creation_input_tokens: Math.max(
       0,
@@ -752,12 +877,14 @@ function subtractUsage(after, before) {
     ),
     reasoning_tokens: Math.max(
       0,
-      Number((after && after.reasoning_tokens) || 0) - Number((before && before.reasoning_tokens) || 0),
+      Number((after && after.reasoning_tokens) || 0) -
+        Number((before && before.reasoning_tokens) || 0),
     ),
   };
   const cost = Math.max(
     0,
-    Number((after && after.total_cost_usd) || 0) - Number((before && before.total_cost_usd) || 0),
+    Number((after && after.total_cost_usd) || 0) -
+      Number((before && before.total_cost_usd) || 0),
   );
   if (cost) {
     delta.total_cost_usd = cost;
@@ -767,8 +894,14 @@ function subtractUsage(after, before) {
 
 function preferRecordedUsage(left, right) {
   const usage = {
-    input_tokens: Math.max(Number((left && left.input_tokens) || 0), Number((right && right.input_tokens) || 0)),
-    output_tokens: Math.max(Number((left && left.output_tokens) || 0), Number((right && right.output_tokens) || 0)),
+    input_tokens: Math.max(
+      Number((left && left.input_tokens) || 0),
+      Number((right && right.input_tokens) || 0),
+    ),
+    output_tokens: Math.max(
+      Number((left && left.output_tokens) || 0),
+      Number((right && right.output_tokens) || 0),
+    ),
     cache_read_input_tokens: Math.max(
       Number((left && left.cache_read_input_tokens) || 0),
       Number((right && right.cache_read_input_tokens) || 0),
@@ -782,7 +915,10 @@ function preferRecordedUsage(left, right) {
       Number((right && right.reasoning_tokens) || 0),
     ),
   };
-  const cost = Math.max(Number((left && left.total_cost_usd) || 0), Number((right && right.total_cost_usd) || 0));
+  const cost = Math.max(
+    Number((left && left.total_cost_usd) || 0),
+    Number((right && right.total_cost_usd) || 0),
+  );
   if (cost) {
     usage.total_cost_usd = cost;
   }
@@ -790,7 +926,10 @@ function preferRecordedUsage(left, right) {
 }
 
 function telemetryUsageTotal(telemetry) {
-  const snapshot = telemetry && typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const snapshot =
+    telemetry && typeof telemetry.snapshot === "function"
+      ? telemetry.snapshot()
+      : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   let total = emptyUsage();
   for (const turn of turns) {
@@ -808,7 +947,8 @@ function applyRecordedUsageToTelemetry(telemetry, recorded) {
   if (tokenTotal(gap) <= 0 && !(Number(gap.total_cost_usd) > 0)) {
     return;
   }
-  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const snapshot =
+    typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
   telemetry.mergeCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
@@ -820,7 +960,8 @@ function newSessionStepUsages(after, before) {
 }
 
 function promptTurnNumbers(telemetry, firstTurn) {
-  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const snapshot =
+    typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   return turns
     .map((item) => Number(item && item.turn))
@@ -911,7 +1052,10 @@ function sessionStepUsage(key, raw) {
 }
 
 function readSessionStepUsagesFromJsonParts(openCodeHome) {
-  const roots = [path.join(openCodeHome, "storage", "part"), path.join(openCodeHome, "storage", "session", "part")];
+  const roots = [
+    path.join(openCodeHome, "storage", "part"),
+    path.join(openCodeHome, "storage", "session", "part"),
+  ];
   const steps = [];
   for (const root of roots) {
     for (const file of collectJsonFiles(root).sort()) {
@@ -940,13 +1084,16 @@ function openCodeDatabasePaths(openCodeHome) {
   } catch {
     return [];
   }
-  return entries.filter((name) => /^opencode.*\.db$/.test(name)).map((name) => path.join(openCodeHome, name));
+  return entries
+    .filter((name) => /^opencode.*\.db$/.test(name))
+    .map((name) => path.join(openCodeHome, name));
 }
 
 function stepUsagesFromRows(dbPath, rows) {
   const steps = [];
   for (const row of rows || []) {
-    const data = row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
+    const data =
+      row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
     const id = row && row.id != null ? String(row.id) : String(steps.length);
     const step = sessionStepUsage(`${dbPath}:${id}`, data);
     if (step) {
@@ -1049,7 +1196,9 @@ function readSessionStepUsagesFromSqlite(dbPath) {
 }
 
 function preferSessionSteps(left, right) {
-  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left)) ? right : left;
+  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left))
+    ? right
+    : left;
 }
 
 function readSessionStepUsages(taskDir) {
@@ -1061,7 +1210,10 @@ function readSessionStepUsages(taskDir) {
   for (const dbPath of openCodeDatabasePaths(openCodeHome)) {
     steps = preferSessionSteps(steps, readSessionStepUsagesFromSqlite(dbPath));
   }
-  return preferSessionSteps(steps, readSessionStepUsagesFromJsonParts(openCodeHome));
+  return preferSessionSteps(
+    steps,
+    readSessionStepUsagesFromJsonParts(openCodeHome),
+  );
 }
 
 function readSessionUsage(taskDir) {
@@ -1088,7 +1240,11 @@ function collectErrorText(value, parts, depth) {
   if (value == null || depth > 5) {
     return;
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
     const text = String(value).trim();
     if (text) {
       parts.push(text);
@@ -1098,7 +1254,15 @@ function collectErrorText(value, parts, depth) {
   if (typeof value !== "object") {
     return;
   }
-  for (const key of ["message", "name", "code", "status", "statusCode", "type", "responseBody"]) {
+  for (const key of [
+    "message",
+    "name",
+    "code",
+    "status",
+    "statusCode",
+    "type",
+    "responseBody",
+  ]) {
     if (value[key] != null && value[key] !== value) {
       collectErrorText(value[key], parts, depth + 1);
     }
@@ -1155,10 +1319,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function promptSeriesName(promptFile) {
@@ -1167,11 +1337,21 @@ function promptSeriesName(promptFile) {
   if (words.length === 0) {
     return "";
   }
-  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function writeStdout(chunk) {
-  fs.writeSync(1, chunk);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(1, safe);
+}
+
+function writeStderr(chunk) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(2, safe);
 }
 
 function writeLiveLogRecord(rec) {
@@ -1201,7 +1381,9 @@ function println(text = "") {
 
 function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
-  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "openrouter" });
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "openrouter" });
   const tools = createToolTracker(tracker);
   const contentText = new Map();
   const toolOutputText = new Map();
@@ -1216,7 +1398,11 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   let announcedStart = false;
 
   function rememberSession(event) {
-    const id = String((event && event.sessionID) || (event && event.part && event.part.sessionID) || "").trim();
+    const id = String(
+      (event && event.sessionID) ||
+        (event && event.part && event.part.sessionID) ||
+        "",
+    ).trim();
     if (!id) {
       return;
     }
@@ -1263,7 +1449,8 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
       rememberSession(event);
       lastEvent = event;
       const type = String(event.type || "");
-      const part = event.part && typeof event.part === "object" ? event.part : {};
+      const part =
+        event.part && typeof event.part === "object" ? event.part : {};
       switch (type) {
         case "step_start":
           if (!announcedStart) {
@@ -1279,8 +1466,16 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
             if (!roundOpen) {
               beginRound(undefined, { message: lastText });
             }
-            const contentID = emitOpenCodeContent(activity, contentText, "assistant", part, lastText);
-            activity.endContent(contentID, { endedAt: openCodePartTime(part, "end") });
+            const contentID = emitOpenCodeContent(
+              activity,
+              contentText,
+              "assistant",
+              part,
+              lastText,
+            );
+            activity.endContent(contentID, {
+              endedAt: openCodePartTime(part, "end"),
+            });
             if (!activity.enabled) {
               println(lastText);
             }
@@ -1290,8 +1485,16 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         case "reasoning": {
           const thinking = typeof part.text === "string" ? part.text : "";
           if (thinking.trim()) {
-            const contentID = emitOpenCodeContent(activity, contentText, "reasoning", part, thinking);
-            activity.endContent(contentID, { endedAt: openCodePartTime(part, "end") });
+            const contentID = emitOpenCodeContent(
+              activity,
+              contentText,
+              "reasoning",
+              part,
+              thinking,
+            );
+            activity.endContent(contentID, {
+              endedAt: openCodePartTime(part, "end"),
+            });
             if (!activity.enabled) {
               println("Thinking");
               println(truncateText(thinking.trim()));
@@ -1365,8 +1568,12 @@ function emitOpenCodeContent(activity, seenText, kind, part, nextText) {
     return id;
   }
   const previous = seenText.get(id) || "";
-  const delta = nextText.startsWith(previous) ? nextText.slice(previous.length) : nextText;
-  activity.startContent(kind, id, { startedAt: openCodePartTime(part, "start") });
+  const delta = nextText.startsWith(previous)
+    ? nextText.slice(previous.length)
+    : nextText;
+  activity.startContent(kind, id, {
+    startedAt: openCodePartTime(part, "start"),
+  });
   activity.appendContent(kind, id, delta);
   seenText.set(id, nextText);
   return id;
@@ -1403,7 +1610,12 @@ function createToolTracker(telemetry) {
         return key;
       }
       const startedAt = Date.now();
-      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+      openTools.set(key, {
+        kind,
+        text: text || kind,
+        startedAt,
+        emitted: false,
+      });
       return key;
     },
     emitStart(id) {
@@ -1460,18 +1672,34 @@ function createToolTracker(telemetry) {
   };
 }
 
-function formatToolUse(part, tools, activity = createDisabledActivityStream(), seenOutput = new Map()) {
+function formatToolUse(
+  part,
+  tools,
+  activity = createDisabledActivityStream(),
+  seenOutput = new Map(),
+) {
   const name = String(part.tool || part.name || "tool");
   const kind = name.toLowerCase();
   const state = part.state && typeof part.state === "object" ? part.state : {};
   const id = part.callID || part.id || "";
-  const started = tools.start(kind, toolInputDetail(name, state.input) || kind, id);
+  const started = tools.start(
+    kind,
+    toolInputDetail(name, state.input) || kind,
+    id,
+  );
   tools.emitStart(started);
-  activity.startTool({ id: started, kind: normalizeOpenCodeToolKind(kind), name, input: toolInputDetail(name, state.input) });
+  activity.startTool({
+    id: started,
+    kind: normalizeOpenCodeToolKind(kind),
+    name,
+    input: toolInputDetail(name, state.input),
+  });
   const output = typeof state.output === "string" ? state.output : "";
   if (output.trim()) {
     const previous = seenOutput.get(started) || "";
-    const outputDelta = output.startsWith(previous) ? output.slice(previous.length) : output;
+    const outputDelta = output.startsWith(previous)
+      ? output.slice(previous.length)
+      : output;
     seenOutput.set(started, output);
     if (activity.enabled) {
       activity.appendToolOutput(started, outputDelta, "stdout");
@@ -1479,10 +1707,15 @@ function formatToolUse(part, tools, activity = createDisabledActivityStream(), s
       println(truncateText(output.replace(/\s+$/, "")));
     }
   } else if (state.error) {
-    const errText = typeof state.error === "string" ? state.error : JSON.stringify(state.error);
+    const errText =
+      typeof state.error === "string"
+        ? state.error
+        : JSON.stringify(state.error);
     if (errText.trim()) {
       const previous = seenOutput.get(started) || "";
-      const outputDelta = errText.startsWith(previous) ? errText.slice(previous.length) : errText;
+      const outputDelta = errText.startsWith(previous)
+        ? errText.slice(previous.length)
+        : errText;
       seenOutput.set(started, errText);
       if (activity.enabled) {
         activity.appendToolOutput(started, outputDelta, "stderr");
@@ -1496,7 +1729,9 @@ function formatToolUse(part, tools, activity = createDisabledActivityStream(), s
     return;
   }
   const failed = stateStatus === "error" || Boolean(state.error);
-  activity.endTool(started, { status: openCodeToolStatus(stateStatus, failed) });
+  activity.endTool(started, {
+    status: openCodeToolStatus(stateStatus, failed),
+  });
   tools.end(failed, started);
   seenOutput.delete(started);
 }
@@ -1506,8 +1741,10 @@ function normalizeOpenCodeToolKind(kind) {
   if (normalized.startsWith("superplane_")) return "mcp";
   if (normalized === "grep" || normalized === "glob") return "search";
   if (normalized === "notebookedit") return "edit";
-  if (normalized === "websearch" || normalized === "web_search") return "web_search";
-  if (normalized === "webfetch" || normalized === "web_fetch") return "web_fetch";
+  if (normalized === "websearch" || normalized === "web_search")
+    return "web_search";
+  if (normalized === "webfetch" || normalized === "web_fetch")
+    return "web_fetch";
   return normalized;
 }
 
@@ -1519,7 +1756,11 @@ function openCodeToolStatus(status, failed) {
 }
 
 function toolInputDetail(name, rawInput) {
-  if (rawInput == null || typeof rawInput !== "object" || Array.isArray(rawInput)) {
+  if (
+    rawInput == null ||
+    typeof rawInput !== "object" ||
+    Array.isArray(rawInput)
+  ) {
     if (rawInput == null) {
       return "";
     }
@@ -1533,11 +1774,20 @@ function toolInputDetail(name, rawInput) {
     }
   }
   if (["read", "write", "edit", "notebookedit"].includes(lowered)) {
-    for (const key of ["filePath", "file_path", "path", "notebookPath", "notebook_path"]) {
+    for (const key of [
+      "filePath",
+      "file_path",
+      "path",
+      "notebookPath",
+      "notebook_path",
+    ]) {
       const value = rawInput[key];
       if (typeof value === "string" && value.trim()) {
         let detail = value.trim();
-        if ((lowered === "write" || lowered === "edit") && typeof rawInput.content === "string") {
+        if (
+          (lowered === "write" || lowered === "edit") &&
+          typeof rawInput.content === "string"
+        ) {
           detail += ` (${rawInput.content.length} chars)`;
         }
         return detail;
@@ -1567,7 +1817,9 @@ function toolInputDetail(name, rawInput) {
 }
 
 function truncateText(text) {
-  let lines = String(text || "").split(/\r?\n/);
+  const activity = loadActivityStreamModule();
+  text = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text || "");
+  let lines = text.split(/\r?\n/);
   if (lines.length > TOOL_RESULT_MAX_LINES) {
     const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);
     const omitted = lines.length - TOOL_RESULT_MAX_LINES;
@@ -1589,7 +1841,11 @@ function formatTurnResult(event) {
   }
   if (event && event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event && event.duration_ms != null) {
     const ms = Number(event.duration_ms);
@@ -1597,7 +1853,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatOpenCodeJsonLines(rawLines) {

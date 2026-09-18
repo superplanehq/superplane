@@ -155,8 +155,8 @@ export const runWorkflowMapper: ComponentBaseMapper = {
 
 function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
+  const configuration = node.configuration as { ref?: string; workflowFile?: string } | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
     metadata.push({ icon: "book", label: nodeMetadata.repository.name });
@@ -175,7 +175,7 @@ function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
 
 function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { inputs?: unknown } | undefined;
 
   const inputs = Array.isArray(configuration?.inputs)
     ? configuration.inputs.filter((input: unknown): input is { name: string; value: string } => {

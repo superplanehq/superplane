@@ -96,10 +96,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    const moreActions = screen.getByRole("button", { name: "More actions" });
+    expect(moreActions.closest("header")).not.toBeNull();
+    await user.click(moreActions);
     await user.click(await screen.findByRole("menuitem", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
-    await user.click(within(note).getByRole("button", { name: "More actions" }));
+    await user.click(moreActions);
     await user.click(await screen.findByRole("menuitem", { name: "Approve" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "completed",

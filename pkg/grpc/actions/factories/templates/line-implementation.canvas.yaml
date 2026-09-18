@@ -25,12 +25,30 @@ spec:
       targetId: attach-pr-artifact
     - channel: default
       sourceId: attach-pr-artifact
+      targetId: has-visual-evidence
+    - channel: "true"
+      sourceId: has-visual-evidence
+      targetId: comment-visual-evidence
+    - channel: "false"
+      sourceId: has-visual-evidence
+      targetId: set-pr-closure-note
+    - channel: default
+      sourceId: comment-visual-evidence
       targetId: set-pr-closure-note
     - channel: default
       sourceId: update-pr
       targetId: attach-pr-artifact-updated
     - channel: default
       sourceId: attach-pr-artifact-updated
+      targetId: has-visual-evidence-updated
+    - channel: "true"
+      sourceId: has-visual-evidence-updated
+      targetId: comment-visual-evidence-updated
+    - channel: "false"
+      sourceId: has-visual-evidence-updated
+      targetId: set-pr-closure-note-updated
+    - channel: default
+      sourceId: comment-visual-evidence-updated
       targetId: set-pr-closure-note-updated
     - channel: failed
       sourceId: implementation-agent-no-issue
@@ -43,7 +61,7 @@ spec:
       configuration: {}
       position:
         x: 1542
-        'y': 144
+        "y": 144
       isCollapsed: true
     - id: implementation-agent-no-issue
       name: Implement From Task Description
@@ -62,10 +80,10 @@ spec:
               name: github
         environment:
           - name: REPO_URL
-            value: '{{ task().repository_url }}'
+            value: "{{ task().repository_url }}"
             valueSource: literal
           - name: BASE
-            value: '{{ task().default_branch }}'
+            value: "{{ task().default_branch }}"
             valueSource: literal
           - name: COAUTHORS
             value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
@@ -82,9 +100,6 @@ spec:
               # Identify commits as SuperPlane Agent.
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
-
-              # Authenticate canonical GitHub URLs with the integration token.
-              git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
               # Shallow clone of the default branch into ./repo.
               git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo && cd repo
@@ -125,6 +140,8 @@ spec:
               1/ Focus on clean code.
               2/ Make long term fixes, not fast patches.
               3/ Add tests where it makes sense.
+
+              {{ task().visual_evidence_enabled ? "Visual evidence:\n\n- Changes that are not related to the UI do not require visual evidence.\n- Rendered markup, styles, layout, and interaction behavior are UI changes. Unit tests do not replace visual evidence.\n- For a visual-only change, capture and upload at least one screenshot.\n- If an interaction was added or changed, record and upload a short WebM video that shows the interaction works. A screenshot is optional.\n- Save screenshots and videos in $SUPERPLANE_TASK_DIR/evidence. Do not add them to the repository.\n- For a named Playwright output, use an absolute path under $SUPERPLANE_TASK_DIR/evidence. Automatic Playwright outputs already use this directory.\n- Read repository setup instructions and package scripts before starting a preview.\n- Start Storybook or the project preview according to the repository instructions. Run it in the repository container when required. Retain its server log.\n- Poll the preview URL with a bounded timeout before starting Playwright.\n- Run the installed `playwright cli` on the runner host, not in the repository container.\n- A signed-in application is not required when an isolated preview can show the change.\n- Use an existing Storybook story or component preview first. If it does not show the changed state, create a focused temporary story or fixture.\n- Open the direct Storybook iframe or the focused preview route. Render the actual component instead of recreating it as static HTML.\n- Use `snapshot` or `find`, then use the returned element references instead of guessed selectors.\n- Use `eval` to verify computed styles or state when the change has a testable visual property.\n- Check the browser console for errors before capture.\n- Capture the changed element or a focused viewport. Do not capture a mostly empty full page.\n- Call `inspect_screenshot` for every screenshot. Review the returned image and verify that the intended state is visible.\n- Upload the unchanged inspected file with `upload_artifact`. Video uploads do not require image inspection.\n- Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.\n- Upload the smallest useful set. Usually, use one focused image for each affected theme or state.\n- If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.\n- Remove temporary preview files before committing unless they are useful regression coverage.\n- Close the Playwright session and stop temporary preview processes after capture.\n- Do not report evidence as unavailable only because the main application requires authentication or production data.\n- Before reporting evidence as unavailable, attempt at least one isolated preview and one Playwright capture. Include each command and concrete outcome in the report_visual_evidence_unavailable attempts field. Set each attempt type to preview, playwright, or upload.\n- Keep the evidence focused. Do not capture secrets or unrelated user data.\n- If preview, capture, inspection, or upload still fails after these attempts, call report_visual_evidence_unavailable with the reason and attempts. Continue the task." : "" }}
           - name: Commit and Push
             type: bash
             workingDirectory: repo
@@ -176,15 +193,44 @@ spec:
 
               echo "Title and description found. Using as output"
               BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+              COMMIT_SHA="$(git rev-parse '@{upstream}')"
+
+              EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"
+              if [ ! -s "$EVIDENCE_FILE" ]; then
+                EVIDENCE_TMP="${EVIDENCE_FILE}.$$"
+                printf '%s\n' '{"status":"not_applicable","reason":"","artifacts":[]}' > "$EVIDENCE_TMP"
+                mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"
+              fi
+
+              EVIDENCE_COMMENT="$(jq -r --arg commit "$COMMIT_SHA" '
+                if .status == "captured" and (.artifacts | length) > 0 then
+                  "## Visual evidence\n\nCaptured for commit `" + $commit + "`.\n\n" + ([.artifacts[].markdown] | join("\n\n"))
+                else
+                  ""
+                end
+              ' "$EVIDENCE_FILE")"
               jq -n \
                 --arg branch "$BRANCH" \
                 --rawfile title /tmp/TITLE \
                 --rawfile description /tmp/DESCRIPTION.md \
-                '{branch: $branch, title: ($title | @base64), description: ($description | @base64)}' \
+                --slurpfile evidence "$EVIDENCE_FILE" \
+                --arg evidenceComment "$EVIDENCE_COMMENT" \
+                '{
+                  branch: $branch,
+                  title: ($title | gsub("[\\r\\n]"; "") | @base64),
+                  description: ($description | @base64),
+                  visualEvidence: {
+                    status: $evidence[0].status,
+                    reason: ($evidence[0].reason // ""),
+                    attempts: ($evidence[0].attempts // []),
+                    artifacts: $evidence[0].artifacts,
+                    comment: ($evidenceComment | @base64)
+                  }
+                }' \
                 > "$SUPERPLANE_RESULT_FILE"
       position:
         x: 1475
-        'y': 312
+        "y": 312
       isCollapsed: false
     - id: add-branch-artifact
       name: Add Branch Artifact
@@ -195,11 +241,11 @@ spec:
       configuration:
         artifactType: branch
         name: '{{ $["Implement From Task Description"].data.result.branch }}'
-        orderId: '{{ task().id }}'
-        repository: '{{ task().repository }}'
+        orderId: "{{ task().id }}"
+        repository: "{{ task().repository }}"
       position:
         x: 1495
-        'y': 648
+        "y": 648
       isCollapsed: true
     - id: find-pr
       name: Find Pull Request
@@ -208,13 +254,13 @@ spec:
       concurrency:
         max: 100
       configuration:
-        repository: '{{ task().repository }}'
+        repository: "{{ task().repository }}"
         head: '{{ $["Implement From Task Description"].data.result.branch }}'
-        base: '{{ task().default_branch }}'
+        base: "{{ task().default_branch }}"
         state: open
       position:
         x: 1442
-        'y': 816
+        "y": 816
       isCollapsed: true
     - id: create-pr
       name: Create Pull Request
@@ -223,7 +269,7 @@ spec:
       concurrency:
         max: 100
       configuration:
-        base: '{{ task().default_branch }}'
+        base: "{{ task().default_branch }}"
         body: |-
           {{ task().origin != nil ? "Closes " + task().origin.label : "" }}
 
@@ -236,11 +282,11 @@ spec:
           Created via [SuperPlane](https://superplane.com).
         draft: false
         head: '{{ $["Implement From Task Description"].data.result.branch }}'
-        repository: '{{ task().repository }}'
+        repository: "{{ task().repository }}"
         title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
       position:
         x: 1160
-        'y': 984
+        "y": 984
       isCollapsed: true
     - id: update-pr
       name: Update Pull Request
@@ -249,7 +295,7 @@ spec:
       concurrency:
         max: 100
       configuration:
-        repository: '{{ task().repository }}'
+        repository: "{{ task().repository }}"
         pullNumber: '{{ $["Find Pull Request"].data.number }}'
         title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
         body: |-
@@ -264,7 +310,7 @@ spec:
           Created via [SuperPlane](https://superplane.com).
       position:
         x: 1724
-        'y': 984
+        "y": 984
       isCollapsed: true
     - id: attach-pr-artifact
       name: Attach PR to Task
@@ -273,9 +319,9 @@ spec:
       concurrency:
         max: 100
       configuration:
-        orderId: '{{ task().id }}'
+        orderId: "{{ task().id }}"
         provider: github
-        repository: '{{ task().repository }}'
+        repository: "{{ task().repository }}"
         number: '{{ $["Create Pull Request"].data.number }}'
         url: '{{ $["Create Pull Request"].data._links.html.href }}'
         title: '{{ $["Create Pull Request"].data.title }}'
@@ -283,14 +329,14 @@ spec:
         externalId: '{{ $["Create Pull Request"].data.id }}'
       position:
         x: 1160
-        'y': 1152
+        "y": 1152
       isCollapsed: true
     - id: set-pr-closure-note
       name: Set Closure Note
       type: TYPE_ACTION
       component: setWorkOrderStatusNote
       configuration:
-        orderId: '{{ task().id }}'
+        orderId: "{{ task().id }}"
         noteKey: pr-closure
         headline: Waiting for user review
         body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
@@ -299,7 +345,31 @@ spec:
         showOnlyWhenWaiting: true
       position:
         x: 1160
-        'y': 1320
+        "y": 1320
+      isCollapsed: true
+    - id: has-visual-evidence
+      name: Has Visual Evidence?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+      position:
+        x: 1160
+        "y": 1320
+      isCollapsed: true
+    - id: comment-visual-evidence
+      name: Comment Visual Evidence
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        issueNumber: '{{ $["Create Pull Request"].data.number }}'
+        body: '{{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.comment) }}'
+      position:
+        x: 1000
+        "y": 1488
       isCollapsed: true
     - id: attach-pr-artifact-updated
       name: Attach Updated PR to Task
@@ -308,9 +378,9 @@ spec:
       concurrency:
         max: 100
       configuration:
-        orderId: '{{ task().id }}'
+        orderId: "{{ task().id }}"
         provider: github
-        repository: '{{ task().repository }}'
+        repository: "{{ task().repository }}"
         number: '{{ $["Update Pull Request"].data.number }}'
         url: '{{ $["Update Pull Request"].data._links.html.href }}'
         title: '{{ $["Update Pull Request"].data.title }}'
@@ -318,14 +388,14 @@ spec:
         externalId: '{{ $["Update Pull Request"].data.id }}'
       position:
         x: 1724
-        'y': 1152
+        "y": 1152
       isCollapsed: true
     - id: set-pr-closure-note-updated
       name: Set Closure Note (Updated PR)
       type: TYPE_ACTION
       component: setWorkOrderStatusNote
       configuration:
-        orderId: '{{ task().id }}'
+        orderId: "{{ task().id }}"
         noteKey: pr-closure
         headline: Waiting for user review
         body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
@@ -334,7 +404,31 @@ spec:
         showOnlyWhenWaiting: true
       position:
         x: 1724
-        'y': 1320
+        "y": 1320
+      isCollapsed: true
+    - id: has-visual-evidence-updated
+      name: Has Visual Evidence for Updated PR?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+      position:
+        x: 1724
+        "y": 1320
+      isCollapsed: true
+    - id: comment-visual-evidence-updated
+      name: Comment Visual Evidence on Updated PR
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        issueNumber: '{{ $["Update Pull Request"].data.number }}'
+        body: '{{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.comment) }}'
+      position:
+        x: 1884
+        "y": 1488
       isCollapsed: true
     - id: add-run-error
       name: Record Implementation Failure
@@ -344,5 +438,5 @@ spec:
         message: The implementation agent failed. Open the agent logs to find the cause.
       position:
         x: 1770
-        'y': 648
+        "y": 648
       isCollapsed: true
