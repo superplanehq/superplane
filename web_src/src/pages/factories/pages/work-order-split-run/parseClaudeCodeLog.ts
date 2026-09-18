@@ -35,6 +35,9 @@ export function parseClaudeCodeLog(
   for (const rawLine of text.split(/\r?\n/)) {
     const stepName = rawLine.match(STEP_LINE)?.[1]?.trim();
     if (stepName) {
+      if (current) {
+        closeOpenNoteCommand(current);
+      }
       current = startStep(steps, stepName, configured);
       continue;
     }
@@ -44,6 +47,7 @@ export function parseClaudeCodeLog(
 
     const tool = rawLine.match(TOOL_LINE);
     if (tool) {
+      closeOpenNoteCommand(current);
       current.agentStream = true;
       current.commands.push({
         type: tool[1].trim().toLowerCase(),
@@ -54,9 +58,11 @@ export function parseClaudeCodeLog(
     }
 
     if (!rawLine.trim()) {
+      appendAgentNoteLine(current, "");
       continue;
     }
     if (STEP_FAILED.test(rawLine)) {
+      closeOpenNoteCommand(current);
       markFailed(current);
       continue;
     }
@@ -72,14 +78,14 @@ export function parseClaudeCodeLog(
       continue;
     }
     if (current.agentStream) {
-      current.commands.push({
-        type: "note",
-        name: cleanCommandDetail(rawLine.trim()),
-        status: "passed",
-      });
+      appendAgentNoteLine(current, rawLine);
       continue;
     }
     appendOutput(current, rawLine.trim());
+  }
+
+  if (current) {
+    closeOpenNoteCommand(current);
   }
 
   return steps
@@ -122,6 +128,36 @@ function typeForStep(step: ClaudeCodeLogStep, configured: Array<{ name: string; 
 
 function lastCommand(step: OpenStep): ClaudeCodeLogCommand | undefined {
   return step.commands.at(-1);
+}
+
+function appendAgentNoteLine(step: OpenStep, line: string) {
+  if (!step.agentStream) {
+    return;
+  }
+  const last = lastCommand(step);
+  if (last?.type === "note") {
+    last.name = `${last.name}\n${line}`;
+    return;
+  }
+  if (!line.trim()) {
+    return;
+  }
+  step.commands.push({
+    type: "note",
+    name: line,
+    status: "passed",
+  });
+}
+
+function closeOpenNoteCommand(step: OpenStep) {
+  const last = lastCommand(step);
+  if (last?.type !== "note") {
+    return;
+  }
+  last.name = last.name.replace(/(?:\n[^\S\n]*)+$/u, "");
+  if (!last.name.trim()) {
+    step.commands.pop();
+  }
 }
 
 function markFailed(step: OpenStep) {
