@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -658,26 +659,11 @@ func TestAppAgentTool_ReadOmitsCanvasYAMLByDefault(t *testing.T) {
 	assert.Equal(t, liveVersion.ID.String(), read.VersionID)
 }
 
-func TestAppAgentTool_ListFilesReportsContextFiles(t *testing.T) {
+func TestAppAgentTool_ListFilesWithoutRepositoryReturnsSpecFiles(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-	require.NoError(t, err)
-	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: head,
-		Message:         "Add context",
-		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
-		Operations: []gitprovider.FileOperation{
-			{Path: "AGENTS.md", Content: strings.NewReader("Use pnpm.\n"), SizeBytes: int64(len("Use pnpm.\n"))},
-			{Path: "scripts/run.py", Content: strings.NewReader("print('ok')\n"), SizeBytes: int64(len("print('ok')\n"))},
-		},
-	})
-	require.NoError(t, err)
-
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
 	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
 		SessionID:      "session-1",
@@ -689,10 +675,7 @@ func TestAppAgentTool_ListFilesReportsContextFiles(t *testing.T) {
 	require.NoError(t, err)
 	list, ok := result.(fileListResult)
 	require.True(t, ok)
-	assert.Contains(t, list.Files, "AGENTS.md")
-	assert.Contains(t, list.Files, "README.md")
-	assert.Contains(t, list.ContextFiles, "AGENTS.md")
-	assert.Contains(t, list.ContextFiles, "README.md")
+	assert.Equal(t, []string{files.CanvasYAMLPath, files.ConsoleYAMLPath}, list.Files)
 }
 
 func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {

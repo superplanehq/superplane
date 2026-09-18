@@ -27,7 +27,7 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 		return nil, fmt.Errorf("api client config is required")
 	}
 
-	baseURL, err := config.ServerURLWithContext(ctx.Context, "CanvasRepositoryAPIService.CanvasesListCanvasRepositoryFiles")
+	baseURL, err := config.ServerURLWithContext(ctx.Context, "CanvasAPIService.CanvasesDescribeCanvas")
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 	}
 
 	endpoint := fmt.Sprintf(
-		"%s/api/v1/canvases/%s/repository/file?%s",
+		"%s/api/v1/canvases/%s/file?%s",
 		strings.TrimRight(baseURL, "/"),
 		url.PathEscape(canvasID),
 		values.Encode(),

@@ -194,7 +194,7 @@ func createIntakeCanvas(
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build intake automation")
 	}
 
-	response, err := canvases.CreateCanvasWithSeedFiles(
+	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
 		deps.Encryptor,
@@ -208,7 +208,6 @@ func createIntakeCanvas(
 		nodes,
 		edges,
 		deps.UsageService,
-		nil,
 	)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")

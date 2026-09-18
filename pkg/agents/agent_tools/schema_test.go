@@ -70,7 +70,7 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.NotContains(t, schema.Properties, "use_draft")
 	assert.NotContains(t, schema.Properties, "display_name")
 	assert.NotContains(t, schema.Properties, "message")
-	assert.Contains(t, schema.Properties["path"].Description, "AGENTS.md")
+	assert.Contains(t, schema.Properties["path"].Description, "canvas.yaml")
 	assert.Contains(t, schema.Properties["content"].Description, "write_file")
 	assert.Contains(t, schema.Properties["run_id"].Description, "runner_logs")
 	assert.Contains(t, schema.Properties["include_canvas_yaml"].Description, "Defaults to false")

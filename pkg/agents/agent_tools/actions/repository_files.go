@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -25,23 +24,17 @@ const (
 	deleteFileActionName = "delete_file"
 )
 
-type listFilesAction struct {
-	gitProvider gitprovider.Provider
-}
+type listFilesAction struct{}
 
-func newListFilesAction(deps Dependencies) listFilesAction {
-	return listFilesAction{gitProvider: deps.GitProvider}
+func newListFilesAction() listFilesAction {
+	return listFilesAction{}
 }
 
 func (listFilesAction) Name() string {
 	return listFilesActionName
 }
 
-func (a listFilesAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.gitProvider == nil {
-		return fileListResult{}, fmt.Errorf("git provider is not configured")
-	}
-
+func (listFilesAction) Execute(_ context.Context, session agents.AgentSessionContext, input Input) (any, error) {
 	orgID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
 		return fileListResult{}, fmt.Errorf("invalid session organization id: %w", err)
@@ -52,32 +45,23 @@ func (a listFilesAction) Execute(ctx context.Context, session agents.AgentSessio
 		return fileListResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
+	if _, err := models.FindCanvas(orgID, canvasID); err != nil {
 		return fileListResult{}, fmt.Errorf("find canvas: %w", err)
 	}
 
-	response, err := canvasRepository.ListCanvasRepositoryFiles(ctx, a.gitProvider, canvas)
-	if err != nil {
-		return fileListResult{}, err
-	}
-
 	query := strings.ToLower(strings.TrimSpace(input.Query))
-	files := make([]string, 0, len(response.GetFiles()))
-	for _, file := range response.GetFiles() {
-		path := file.GetPath()
+	listed := make([]string, 0, 2)
+	for _, path := range []string{files.CanvasYAMLPath, files.ConsoleYAMLPath} {
 		if query != "" && !strings.Contains(strings.ToLower(path), query) {
 			continue
 		}
-		files = append(files, path)
+		listed = append(listed, path)
 	}
-	sort.Strings(files)
 
 	return fileListResult{
-		Action:       listFilesActionName,
-		CanvasID:     session.CanvasID,
-		Files:        files,
-		ContextFiles: contextFilePaths(files),
+		Action:   listFilesActionName,
+		CanvasID: session.CanvasID,
+		Files:    listed,
 	}, nil
 }
 
@@ -397,28 +381,5 @@ func serializeStagingSummary(summary *pb.StagingSummary) stagingSummary {
 	return stagingSummary{
 		HasStaging:  summary.GetHasStaging(),
 		StagedPaths: append([]string(nil), summary.GetStagedPaths()...),
-	}
-}
-
-func contextFilePaths(paths []string) []string {
-	matches := []string{}
-	for _, path := range paths {
-		if isContextFilePath(path) {
-			matches = append(matches, path)
-		}
-	}
-	return matches
-}
-
-func isContextFilePath(path string) bool {
-	base := strings.ToLower(path)
-	if index := strings.LastIndex(base, "/"); index >= 0 {
-		base = base[index+1:]
-	}
-	switch base {
-	case "agents.md", "agent.md", "claude.md", "readme.md":
-		return true
-	default:
-		return strings.HasSuffix(base, ".agents.md")
 	}
 }

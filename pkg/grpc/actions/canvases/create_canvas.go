@@ -38,6 +38,8 @@ func CreateCanvas(
 	name string,
 	description string,
 	factoryID *uuid.UUID,
+	nodes []models.Node,
+	edges []models.Edge,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
 	name = strings.TrimSpace(name)
@@ -45,44 +47,6 @@ func CreateCanvas(
 		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 
-	return CreateCanvasWithSeedFiles(
-		ctx,
-		registry,
-		encryptor,
-		authService,
-		gitProvider,
-		webhookBaseURL,
-		organizationID,
-		name,
-		description,
-		factoryID,
-		[]models.Node{},
-		[]models.Edge{},
-		usageService,
-		nil,
-	)
-}
-
-// CreateCanvasWithSeedFiles persists the provided files alongside the canvas's
-// pending repository row so the repository provisioner can commit them as the
-// repo's initial content. Factory canvas creation uses this. A nil or empty
-// seedFiles slice is equivalent to calling CreateCanvas.
-func CreateCanvasWithSeedFiles(
-	ctx context.Context,
-	registry *registry.Registry,
-	encryptor crypto.Encryptor,
-	authService authorization.Authorization,
-	gitProvider git.Provider,
-	webhookBaseURL string,
-	organizationID uuid.UUID,
-	name string,
-	description string,
-	factoryID *uuid.UUID,
-	nodes []models.Node,
-	edges []models.Edge,
-	usageService usage.Service,
-	seedFiles []models.RepositorySeedFile,
-) (*pb.CreateCanvasResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -154,21 +118,6 @@ func CreateCanvasWithSeedFiles(
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
 			return err
-		}
-
-		repository, err := canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
-			OrganizationID: organizationID,
-			CanvasID:       canvasID,
-		}))
-
-		if err != nil {
-			return err
-		}
-
-		if len(seedFiles) > 0 {
-			if err := models.CreateRepositorySeedFilesInTransaction(tx, repository.ID, seedFiles); err != nil {
-				return err
-			}
 		}
 
 		//
