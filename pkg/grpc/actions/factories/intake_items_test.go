@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 )
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
@@ -188,4 +189,48 @@ func TestUnsupportedIntakeItemSource_DoesNotSearch(t *testing.T) {
 	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
 	_, err = source.Get(t.Context(), "1")
 	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
+}
+
+func TestSentryIssueItem_UsesShortIDAndPermalink(t *testing.T) {
+	issue := sentry.Issue{
+		ID:        "123",
+		ShortID:   "PAYMENTS-1",
+		Title:     "TypeError: boom",
+		Permalink: "https://acme.sentry.io/issues/123/",
+		WebURL:    "https://sentry.io/issues/123/",
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "123",
+		Key:   "PAYMENTS-1",
+		Title: "TypeError: boom",
+		URL:   "https://acme.sentry.io/issues/123/",
+	}, sentryIssueItem(issue))
+}
+
+func TestSentryIssueItem_FallsBackToWebURL(t *testing.T) {
+	issue := sentry.Issue{
+		ID:      "123",
+		ShortID: "PAYMENTS-1",
+		Title:   "TypeError: boom",
+		WebURL:  "https://sentry.io/issues/123/",
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "123",
+		Key:   "PAYMENTS-1",
+		Title: "TypeError: boom",
+		URL:   "https://sentry.io/issues/123/",
+	}, sentryIssueItem(issue))
+}
+
+func TestSentryIntakeItemSource_StaysInsideItsProject(t *testing.T) {
+	source := &sentryIntakeItemSource{project: "payments"}
+
+	assert.True(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "payments"}}))
+	assert.True(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "PAYMENTS"}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "billing"}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{}))
+	assert.False(t, source.ownsIssue(nil))
 }
