@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 
+import type { FilesFile } from "@/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 
@@ -40,6 +41,89 @@ type SplitRunPopupTabsProps = {
   header: (views: ReactNode) => ReactNode;
 };
 
+function SplitRunPopupOverview({
+  mode,
+  fixture,
+  edits,
+  popupData,
+  organizationId,
+  factoryId,
+  factoryKey,
+  orderId,
+  orderNumber,
+  files,
+  resultFooter,
+  sidebarNote,
+  analysis,
+  sessionLookupError,
+}: Pick<
+  SplitRunPopupTabsProps,
+  | "mode"
+  | "fixture"
+  | "edits"
+  | "popupData"
+  | "organizationId"
+  | "factoryId"
+  | "factoryKey"
+  | "orderId"
+  | "orderNumber"
+  | "resultFooter"
+  | "sidebarNote"
+  | "analysis"
+  | "sessionLookupError"
+> & { files?: FilesFile[] }) {
+  if (mode === "classic") {
+    return (
+      <ClassicWorkOrderSplitRunOverview
+        description={edits.description}
+        artifacts={popupData.artifacts}
+        artifactsLoading={popupData.artifactsLoading}
+        pullRequests={popupData.pullRequests}
+        pullRequestsLoading={popupData.pullRequestsLoading}
+        pullRequestsError={popupData.pullRequestsError}
+        checks={fixture.checks}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={orderId}
+        orderNumber={orderNumber}
+        files={files}
+        expandFirstCheck={fixture.footer.kind === "draft"}
+        canEditDescription={edits.canEditDescription}
+        descriptionBusy={edits.descriptionBusy}
+        onDescriptionSave={edits.saveDescription}
+        source={fixture.source}
+        sessionLookupError={sessionLookupError}
+        sidebarNote={sidebarNote}
+      />
+    );
+  }
+  return (
+    <WorkOrderSplitRunOverview
+      title={edits.title}
+      description={edits.description}
+      artifacts={popupData.artifacts}
+      artifactsLoading={popupData.artifactsLoading}
+      pullRequests={popupData.pullRequests}
+      pullRequestsLoading={popupData.pullRequestsLoading}
+      pullRequestsError={popupData.pullRequestsError}
+      checks={fixture.checks}
+      isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+      orderId={orderId}
+      orderNumber={orderNumber}
+      files={files}
+      expandFirstCheck={fixture.footer.kind === "draft"}
+      resultFooter={resultFooter}
+      analysis={analysis}
+      source={fixture.source}
+      showContextSidebar={fixture.footer.kind !== "draft"}
+      sidebarNote={sidebarNote}
+    />
+  );
+}
+
 export function SplitRunPopupTabs({
   mode = "analysis",
   fixture,
@@ -67,54 +151,24 @@ export function SplitRunPopupTabs({
   const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
     resumeOnBottom: true,
   });
-  const description =
-    mode === "classic" ? (
-      <ClassicWorkOrderSplitRunOverview
-        description={edits.description}
-        artifacts={popupData.artifacts}
-        artifactsLoading={popupData.artifactsLoading}
-        pullRequests={popupData.pullRequests}
-        pullRequestsLoading={popupData.pullRequestsLoading}
-        pullRequestsError={popupData.pullRequestsError}
-        checks={fixture.checks}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        files={files}
-        expandFirstCheck={fixture.footer.kind === "draft"}
-        canEditDescription={edits.canEditDescription}
-        descriptionBusy={edits.descriptionBusy}
-        onDescriptionSave={edits.saveDescription}
-        source={fixture.source}
-        sessionLookupError={sessionLookupError}
-        sidebarNote={sidebarNote}
-      />
-    ) : (
-      <WorkOrderSplitRunOverview
-        title={edits.title}
-        description={edits.description}
-        artifacts={popupData.artifacts}
-        artifactsLoading={popupData.artifactsLoading}
-        pullRequests={popupData.pullRequests}
-        pullRequestsLoading={popupData.pullRequestsLoading}
-        pullRequestsError={popupData.pullRequestsError}
-        checks={fixture.checks}
-        isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        files={files}
-        expandFirstCheck={fixture.footer.kind === "draft"}
-        resultFooter={resultFooter}
-        analysis={analysis}
-        source={fixture.source}
-        showContextSidebar={fixture.footer.kind !== "draft"}
-        sidebarNote={sidebarNote}
-      />
-    );
+  const description = (
+    <SplitRunPopupOverview
+      mode={mode}
+      fixture={fixture}
+      edits={edits}
+      popupData={popupData}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      orderId={orderId}
+      orderNumber={orderNumber}
+      files={files}
+      resultFooter={resultFooter}
+      sidebarNote={sidebarNote}
+      analysis={analysis}
+      sessionLookupError={sessionLookupError}
+    />
+  );
   const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind });
   if (!showAutomations) {
     return (

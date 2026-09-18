@@ -446,6 +446,74 @@ function phaseExpectsUsage(groups: StreamNodeGroup[]): boolean {
   return groups.some((group) => isRunnerComponent(group.line.component) && Boolean(group.line.executionId));
 }
 
+function useScrollSelectedStreamNode(selectedNodeId?: string) {
+  useEffect(() => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const row = document.querySelector(`[data-testid="split-run-stream-line-${selectedNodeId}"]`);
+    if (row instanceof HTMLElement && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedNodeId]);
+}
+
+function phaseExpandClick(onToggle?: () => void) {
+  if (!onToggle) {
+    return undefined;
+  }
+  return (event: { target: EventTarget | null }) => {
+    if (!isNestedHeaderControl(event.target)) {
+      onToggle();
+    }
+  };
+}
+
+function phaseMarkdownDescription(phase: SplitRunPhase, files: FilesFile[] | undefined, visible: boolean) {
+  if (!visible || !phase.description) {
+    return undefined;
+  }
+  return (
+    <MarkdownContent
+      content={phase.description}
+      files={files}
+      variant="workspace"
+      openLinksInNewTab
+      linkClassName={ACTIVITY_MARKDOWN_LINK}
+      className={cn(
+        "max-w-none pt-1 leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+        ACTIVITY_MARKDOWN_TEXT,
+      )}
+      data-testid={`split-run-phase-description-${phase.id}`}
+    />
+  );
+}
+
+function phaseCardLayout(args: {
+  phase: SplitRunPhase;
+  expanded: boolean;
+  showExpandedStream: boolean;
+  showMarkdownDescription: boolean;
+  collapsible: boolean;
+  onToggle?: () => void;
+}) {
+  const canToggle = args.collapsible && Boolean(args.onToggle);
+  return {
+    followRunning: args.phase.status === "running" && args.showExpandedStream,
+    showStream: args.expanded && args.showExpandedStream,
+    current: args.expanded ? ("step" as const) : undefined,
+    className: cn(
+      "rounded-md bg-muted",
+      !args.expanded && LOG_ROW_HOVER,
+      args.expanded ? "pb-2" : "py-2",
+      canToggle && !args.expanded && "cursor-pointer",
+    ),
+    expandTestId: canToggle ? `split-run-phase-expand-${args.phase.id}` : undefined,
+    onExpandClick: phaseExpandClick(canToggle ? args.onToggle : undefined),
+    showDescription: args.showMarkdownDescription && (args.expanded || !args.collapsible),
+  };
+}
+
 export function PhaseLogCard({
   phase,
   expanded,
@@ -472,30 +540,21 @@ export function PhaseLogCard({
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
   const producedPullRequests = pullRequestsProducedBySteps(groups);
+  const layout = phaseCardLayout({
+    phase,
+    expanded,
+    showExpandedStream,
+    showMarkdownDescription,
+    collapsible,
+    onToggle,
+  });
   const rootRef = useRef<HTMLDivElement>(null);
-  useLastRunningLine(rootRef, phase.status === "running" && showExpandedStream);
-  const expectUsage = phaseExpectsUsage(groups);
-
-  useEffect(() => {
-    if (!selectedNodeId) {
-      return;
-    }
-    const row = document.querySelector(`[data-testid="split-run-stream-line-${selectedNodeId}"]`);
-    if (row instanceof HTMLElement && typeof row.scrollIntoView === "function") {
-      row.scrollIntoView({ block: "nearest" });
-    }
-  }, [selectedNodeId]);
-
-  const canToggleFromHeader = collapsible && Boolean(onToggle);
+  useLastRunningLine(rootRef, layout.followRunning);
+  useScrollSelectedStreamNode(selectedNodeId);
 
   return (
-    <div
-      ref={rootRef}
-      className="min-w-0"
-      data-testid={`split-run-phase-${phase.id}`}
-      aria-current={expanded ? "step" : undefined}
-    >
-      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={expectUsage}>
+    <div ref={rootRef} className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={layout.current}>
+      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={phaseExpectsUsage(groups)}>
         <PhaseCollapsedUsageCollectors
           groups={groups}
           expanded={expanded}
@@ -503,86 +562,185 @@ export function PhaseLogCard({
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
         />
-        <div
-          className={cn(
-            "rounded-md bg-muted",
-            !expanded && LOG_ROW_HOVER,
-            expanded ? "pb-2" : "py-2",
-            canToggleFromHeader && !expanded && "cursor-pointer",
-          )}
-          data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
-          onClick={
-            canToggleFromHeader
-              ? (event) => {
-                  if (isNestedHeaderControl(event.target)) {
-                    return;
-                  }
-                  onToggle?.();
-                }
-              : undefined
-          }
-        >
+        <div className={layout.className} data-testid={layout.expandTestId} onClick={layout.onExpandClick}>
           {compactSessionLog ? null : (
-            <>
-              <AutomationHeader
-                phase={phase}
-                expanded={expanded}
-                collapsible={collapsible}
-                headerLeading={headerLeading}
-                markdownName={markdownName}
-                producedArtifacts={producedArtifacts}
-                producedPullRequests={producedPullRequests}
-                onToggle={onToggle}
-                onStop={onStop}
-                onRerun={onRerun}
-                runHref={runHref}
-                actionBusy={actionBusy}
-                onUsageOpenChange={onUsageOpenChange}
-                files={files}
-                showExpandedStream={showExpandedStream}
-                description={
-                  showMarkdownDescription && (expanded || !collapsible) && phase.description ? (
-                    <MarkdownContent
-                      content={phase.description}
-                      files={files}
-                      variant="workspace"
-                      openLinksInNewTab
-                      linkClassName={ACTIVITY_MARKDOWN_LINK}
-                      className={cn(
-                        "max-w-none pt-1 leading-5 text-foreground/80 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
-                        ACTIVITY_MARKDOWN_TEXT,
-                      )}
-                      data-testid={`split-run-phase-description-${phase.id}`}
-                    />
-                  ) : undefined
-                }
-              />
-            </>
+            <AutomationHeader
+              phase={phase}
+              expanded={expanded}
+              collapsible={collapsible}
+              headerLeading={headerLeading}
+              markdownName={markdownName}
+              producedArtifacts={producedArtifacts}
+              producedPullRequests={producedPullRequests}
+              onToggle={onToggle}
+              onStop={onStop}
+              onRerun={onRerun}
+              runHref={runHref}
+              actionBusy={actionBusy}
+              onUsageOpenChange={onUsageOpenChange}
+              files={files}
+              showExpandedStream={showExpandedStream}
+              description={phaseMarkdownDescription(phase, files, layout.showDescription)}
+            />
           )}
-
-          {expanded && showExpandedStream ? (
-            <ol
-              className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
-              data-testid={`split-run-stream-${phase.id}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              {groups.map((group) => (
-                <StreamNode
-                  key={group.line.id}
-                  group={group}
-                  highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
-                  onSelect={onSelectNode}
-                  organizationId={organizationId}
-                  canvasId={canvasId ?? phase.appId}
-                  compactSessionLog={compactSessionLog}
-                  files={files}
-                />
-              ))}
-            </ol>
+          {layout.showStream ? (
+            <PhaseLogCardStream
+              phase={phase}
+              groups={groups}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              organizationId={organizationId}
+              canvasId={canvasId}
+              compactSessionLog={compactSessionLog}
+              files={files}
+            />
           ) : null}
         </div>
       </PhaseAgentUsageProvider>
     </div>
+  );
+}
+
+function PhaseLogCardStream({
+  phase,
+  groups,
+  selectedNodeId,
+  onSelectNode,
+  organizationId,
+  canvasId,
+  compactSessionLog,
+  files,
+}: {
+  phase: SplitRunPhase;
+  groups: StreamNodeGroup[];
+  selectedNodeId?: string;
+  onSelectNode?: (nodeId: string) => void;
+  organizationId?: string;
+  canvasId?: string;
+  compactSessionLog: boolean;
+  files?: FilesFile[];
+}) {
+  return (
+    <ol
+      className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
+      data-testid={`split-run-stream-${phase.id}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {groups.map((group) => (
+        <StreamNode
+          key={group.line.id}
+          group={group}
+          highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
+          onSelect={onSelectNode}
+          organizationId={organizationId}
+          canvasId={canvasId ?? phase.appId}
+          compactSessionLog={compactSessionLog}
+          files={files}
+        />
+      ))}
+    </ol>
+  );
+}
+
+function AutomationPhaseName({
+  phase,
+  expanded,
+  collapsible,
+  markdownName,
+  files,
+  onToggle,
+}: {
+  phase: SplitRunPhase;
+  expanded: boolean;
+  collapsible: boolean;
+  markdownName: boolean;
+  files?: FilesFile[];
+  onToggle?: () => void;
+}) {
+  const name = markdownName ? (
+    <MarkdownContent
+      content={phase.name}
+      files={files}
+      variant="workspace"
+      openLinksInNewTab
+      linkClassName={ACTIVITY_MARKDOWN_LINK}
+      className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
+    />
+  ) : (
+    <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+  );
+  if (collapsible && markdownName) {
+    return (
+      <div className={PHASE_NAME_FACE}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${phase.name}`}
+          className="shrink-0"
+        >
+          <PhaseStatusGlyph phase={phase} />
+        </button>
+        {name}
+      </div>
+    );
+  }
+  if (collapsible) {
+    return (
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
+        <PhaseStatusGlyph phase={phase} />
+        {name}
+      </button>
+    );
+  }
+  return (
+    <div className={PHASE_NAME_FACE}>
+      <PhaseStatusGlyph phase={phase} />
+      {name}
+    </div>
+  );
+}
+
+function AutomationHeaderActions({
+  phase,
+  producedArtifacts,
+  producedPullRequests,
+  onUsageOpenChange,
+  expanded,
+  collapsible,
+  runHref,
+}: {
+  phase: SplitRunPhase;
+  producedArtifacts: FactoriesWorkOrderArtifact[];
+  producedPullRequests: FactoriesFactoryPullRequest[];
+  onUsageOpenChange?: (open: boolean) => void;
+  expanded: boolean;
+  collapsible: boolean;
+  runHref?: string;
+}) {
+  return (
+    <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden">
+      {phase.checks && phase.checks.length > 0 ? (
+        <span className="shrink-0">
+          <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+        </span>
+      ) : null}
+      {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
+        <span
+          data-testid={`split-run-phase-artifacts-${phase.id}`}
+          className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+        >
+          {producedPullRequests.map((pullRequest) => (
+            <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
+          ))}
+          {producedArtifacts.map((artifact) => (
+            <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+          ))}
+        </span>
+      ) : null}
+      <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
+      {expanded || !collapsible ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
+    </span>
   );
 }
 
@@ -624,77 +782,29 @@ function AutomationHeader({
   const alignDescriptionWithTitle = Boolean(description && headerLeading);
   const content = (
     <>
-      {collapsible && markdownName ? (
-        <div className={PHASE_NAME_FACE}>
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            aria-label={`${expanded ? "Collapse" : "Expand"} ${phase.name}`}
-            className="shrink-0"
-          >
-            <PhaseStatusGlyph phase={phase} />
-          </button>
-          <MarkdownContent
-            content={phase.name}
-            files={files}
-            variant="workspace"
-            openLinksInNewTab
-            linkClassName={ACTIVITY_MARKDOWN_LINK}
-            className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
-          />
-        </div>
-      ) : collapsible ? (
-        <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
-          <PhaseStatusGlyph phase={phase} />
-          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-        </button>
-      ) : markdownName ? (
-        <div className={PHASE_NAME_FACE}>
-          <PhaseStatusGlyph phase={phase} />
-          <MarkdownContent
-            content={phase.name}
-            files={files}
-            variant="workspace"
-            openLinksInNewTab
-            linkClassName={ACTIVITY_MARKDOWN_LINK}
-            className={cn("min-w-0 truncate text-foreground [&_p]:m-0 [&_p]:inline", ACTIVITY_MARKDOWN_TEXT)}
-          />
-        </div>
-      ) : (
-        <div className={PHASE_NAME_FACE}>
-          <PhaseStatusGlyph phase={phase} />
-          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-        </div>
-      )}
+      <AutomationPhaseName
+        phase={phase}
+        expanded={expanded}
+        collapsible={collapsible}
+        markdownName={markdownName}
+        files={files}
+        onToggle={onToggle}
+      />
       {phase.status === "running" && onStop ? (
         <PhaseStopButton phaseId={phase.id} busy={actionBusy} onStop={onStop} />
       ) : null}
       {phase.status === "failed" && onRerun ? (
         <PhaseRerunButton phaseId={phase.id} busy={actionBusy} onRerun={onRerun} />
       ) : null}
-      <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden">
-        {phase.checks && phase.checks.length > 0 ? (
-          <span className="shrink-0">
-            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-          </span>
-        ) : null}
-        {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
-          <span
-            data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-          >
-            {producedPullRequests.map((pullRequest) => (
-              <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
-            ))}
-            {producedArtifacts.map((artifact) => (
-              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-            ))}
-          </span>
-        ) : null}
-        <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
-        {expanded || !collapsible ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
-      </span>
+      <AutomationHeaderActions
+        phase={phase}
+        producedArtifacts={producedArtifacts}
+        producedPullRequests={producedPullRequests}
+        onUsageOpenChange={onUsageOpenChange}
+        expanded={expanded}
+        collapsible={collapsible}
+        runHref={runHref}
+      />
     </>
   );
 

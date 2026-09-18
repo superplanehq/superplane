@@ -90,6 +90,39 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.getByText("Needs attention")).toBeInTheDocument();
   });
 
+  it("shows the completed check-wait title after checks pass", () => {
+    renderCard({
+      checksPassedOrderIds: new Set(["wo-waiting"]),
+      checksPassedLabels: new Map([
+        ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+      ]),
+    });
+
+    expect(screen.getByText(/Checks passed on/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "2e46445" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/commit/2e46445",
+    );
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+  });
+
+  it("shows the check-fix activity on the card while the fixer runs", () => {
+    renderCard({
+      addressingFeedbackOrderIds: new Set(["wo-waiting"]),
+      addressingFeedbackLabels: new Map([
+        ["wo-waiting", "Fixing failed checks on [d8b80c2](https://github.com/acme/app/commit/d8b80c2)"],
+      ]),
+    });
+
+    expect(screen.getByText(/Fixing failed checks on/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "d8b80c2" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/commit/d8b80c2",
+    );
+    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+  });
+
   it("keeps the checks-passed title next to the pull request pill", () => {
     renderCard({
       pullRequests: [openPullRequest],

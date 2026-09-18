@@ -518,30 +518,6 @@ describe("WorkOrderCard attention", () => {
     expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
   });
 
-  it("shows the completed check-wait title after checks pass", () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <WorkOrderCard
-            entry={buildWorkOrderListEntry(waitingOrder, factory)}
-            {...cardProps}
-            checksPassedOrderIds={new Set(["wo-waiting"])}
-            checksPassedLabels={
-              new Map([["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"]])
-            }
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    expect(screen.getByText(/Checks passed on/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "2e46445" })).toHaveAttribute(
-      "href",
-      "https://github.com/acme/app/commit/2e46445",
-    );
-    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
-  });
-
   it("shows Automatic fixes paused after the check handler hits the attempt limit", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -574,31 +550,6 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
-  });
-
-  it("shows the check-fix activity on the card while the fixer runs", () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <WorkOrderCard
-            entry={buildWorkOrderListEntry(waitingOrder, factory)}
-            {...cardProps}
-            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
-            addressingFeedbackLabels={
-              new Map([["wo-waiting", "Fixing failed checks on [d8b80c2](https://github.com/acme/app/commit/d8b80c2)"]])
-            }
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    expect(screen.getByText(/Fixing failed checks on/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "d8b80c2" })).toHaveAttribute(
-      "href",
-      "https://github.com/acme/app/commit/d8b80c2",
-    );
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });
