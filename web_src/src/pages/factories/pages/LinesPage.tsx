@@ -43,6 +43,10 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
+import {
+  useLineBoardColumnColorViewPreference,
+  type LineBoardColumnColorView,
+} from "../lib/lineBoardColumnColorViewPreference";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
@@ -191,7 +195,7 @@ import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./us
 import {
   normalizeColumnColors,
   serializeColumnColors,
-  lineBoardColumnLaneClassName,
+  lineBoardColumnLaneProps,
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
@@ -241,6 +245,7 @@ export function LinesPage() {
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
   const { view: columnAutomationView, setView: setColumnAutomationView } = useColumnAutomationViewPreference();
+  const { view: columnColorView, setView: setColumnColorView } = useLineBoardColumnColorViewPreference();
   const showAutomationRows = canChooseAutomationView && columnAutomationView === "names";
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
@@ -589,6 +594,8 @@ export function LinesPage() {
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
+            colorView={columnColorView}
+            onColorViewChange={setColumnColorView}
           />
           <NextStepsPanel
             steps={nextSteps}
@@ -651,6 +658,7 @@ export function LinesPage() {
             githubIntegrationId={githubIntegrationId}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
+            colorView={columnColorView}
             workOrderCardContext={{
               organizationId,
               factoryId,
@@ -691,6 +699,8 @@ function LineDetailHeader({
   hostedCreditEmptyBanner,
   automationView,
   onAutomationViewChange,
+  colorView,
+  onColorViewChange,
 }: {
   organizationId: string;
   factoryId: string;
@@ -704,6 +714,8 @@ function LineDetailHeader({
   hostedCreditEmptyBanner?: ReactNode;
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
+  colorView: LineBoardColumnColorView;
+  onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -762,9 +774,12 @@ function LineDetailHeader({
             onChange={state.setSearch}
             onClose={state.closeSearch}
           />
-          {automationView && onAutomationViewChange ? (
-            <LineBoardViewMenu view={automationView} onViewChange={onAutomationViewChange} />
-          ) : null}
+          <LineBoardViewMenu
+            view={automationView}
+            onViewChange={onAutomationViewChange}
+            colorView={colorView}
+            onColorViewChange={onColorViewChange}
+          />
         </>
       }
       belowRow={
@@ -803,6 +818,7 @@ function LineDetail({
   githubIntegrationId,
   showColumnAutomations,
   showAutomationRows,
+  colorView,
   workOrderCardContext,
   peekOrder,
   onOpenWorkOrder,
@@ -831,6 +847,7 @@ function LineDetail({
   githubIntegrationId: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
+  colorView: LineBoardColumnColorView;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
@@ -933,6 +950,7 @@ function LineDetail({
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
+          colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
@@ -1179,6 +1197,7 @@ function PhaseBoard({
   analyzingOrderIds,
   showColumnAutomations,
   showAutomationRows,
+  colorView,
   automationsFor,
   onAutomationRowAction,
   onAddVerifyAutomation,
@@ -1206,6 +1225,7 @@ function PhaseBoard({
   analyzingOrderIds: ReadonlySet<string>;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
+  colorView: LineBoardColumnColorView;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
@@ -1329,6 +1349,7 @@ function PhaseBoard({
             setBacklogSettingsOpen(false);
           }}
           colorId={columnColors.backlog ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canRename}
@@ -1365,6 +1386,7 @@ function PhaseBoard({
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
+              colorView={colorView}
               onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
               onRename={(title) => setColumnTitle(columnKey, title)}
@@ -1385,6 +1407,7 @@ function PhaseBoard({
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("verify", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("verify", title)}
@@ -1402,6 +1425,7 @@ function PhaseBoard({
           orders={doneOrders}
           title={doneTitle}
           colorId={columnColors.done ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
@@ -1423,6 +1447,7 @@ function VerifyColumn({
   listeners,
   onAdd,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1438,6 +1463,7 @@ function VerifyColumn({
   listeners: LaneListener[];
   onAdd?: () => void;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1448,7 +1474,7 @@ function VerifyColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
 }) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
 
   return (
     <WorkOrderBoardLane
@@ -1459,9 +1485,9 @@ function VerifyColumn({
       titleTestId="lines-column-title-verify"
       count={orders.length}
       tone="neutral"
-      surfaceClassName={surfaceClassName}
+      surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Verify."
-      className={surfaceClassName ? undefined : "bg-muted"}
+      className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
           {automationRowCount ? null : (
@@ -1523,6 +1549,7 @@ function DoneColumn({
   orders,
   title,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1536,6 +1563,7 @@ function DoneColumn({
   orders: FactoriesWorkOrder[];
   title: string;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1546,7 +1574,7 @@ function DoneColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
 }) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
 
   return (
     <WorkOrderBoardLane
@@ -1557,9 +1585,9 @@ function DoneColumn({
       titleTestId="lines-column-title-done"
       count={orders.length}
       tone="done"
-      surfaceClassName={surfaceClassName}
+      surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Done."
-      className={surfaceClassName ? undefined : "bg-muted"}
+      className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
           {automationRowCount ? null : (
@@ -1624,6 +1652,7 @@ function PhaseColumn({
   parallelism,
   onSaveParallelism,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1641,6 +1670,7 @@ function PhaseColumn({
   parallelism: number;
   onSaveParallelism: (value: number) => void;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1684,7 +1714,7 @@ function PhaseColumn({
       ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
       : null;
   const glyph = resolveColumnGlyph(column);
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView);
 
   return (
     <>
@@ -1693,7 +1723,8 @@ function PhaseColumn({
         label={`${title} phase`}
         count={totalRuns}
         tone={PHASE_LANE_TONE[glyph]}
-        surfaceClassName={surfaceClassName}
+        surfaceClassName={lane.surfaceClassName}
+        className={lane.className}
         emptyDescription="Nothing here."
         canRename={canRename}
         onRename={onRename}
