@@ -1,15 +1,20 @@
-import type { FactoryRunLayoutEdge, FactoryRunLayoutPosition } from "./factoryRunLeafLayout";
+import type { FactoryRunLayoutEdge, FactoryRunLayoutNode, FactoryRunLayoutPosition } from "./factoryRunLeafLayout";
 import {
   DEFAULT_NODE_HEIGHT,
-  DEFAULT_NODE_WIDTH,
-  GUTTER_PAD,
+  FORWARD_GUTTER_LANE_SPACING,
   SIDE_X_THRESHOLD,
   VERTICAL_GAP,
+  factoryRunChannelPriority,
   factoryRunLeafEdgeKey,
+  nodeSize,
 } from "./factoryRunLeafLayoutHelpers";
 
-type ResolveEdgeGutterOptions = {
-  key: string;
+const FORWARD_GUTTER_INTERVAL_GAP = 32;
+const FORWARD_GUTTER_ROUTE_Y_SPACING = 16;
+
+type GutterInterval = { start: number; end: number };
+
+type ResolveForwardGutterCandidateOptions = {
   isSide: boolean;
   sourcePos: FactoryRunLayoutPosition;
   targetPos: FactoryRunLayoutPosition;
@@ -17,36 +22,84 @@ type ResolveEdgeGutterOptions = {
   targetLayer: number;
   sourceCol: number;
   targetCol: number;
-  graphRight: number;
-  edgeRouteGutters: Map<string, number>;
 };
 
-function resolveEdgeGutter(options: ResolveEdgeGutterOptions): void {
-  const {
-    key,
-    isSide,
-    sourcePos,
-    targetPos,
-    sourceLayer,
-    targetLayer,
-    sourceCol,
-    targetCol,
-    graphRight,
-    edgeRouteGutters,
-  } = options;
+function isForwardGutterCandidate(options: ResolveForwardGutterCandidateOptions): boolean {
+  const { isSide, sourcePos, targetPos, sourceLayer, targetLayer, sourceCol, targetCol } = options;
   const layerSkip = targetLayer - sourceLayer > 1;
   const crossColumn = Math.abs(sourceCol - targetCol) > 0;
-  if (isSide || (!layerSkip && !crossColumn)) return;
+  if (isSide || (!layerSkip && !crossColumn)) return false;
 
   const leftwardMerge = sourcePos.x > targetPos.x + SIDE_X_THRESHOLD;
-  if (!leftwardMerge) {
-    edgeRouteGutters.set(key, graphRight);
-    return;
-  }
+  if (!leftwardMerge) return true;
 
   const nearby = targetPos.y - sourcePos.y < (DEFAULT_NODE_HEIGHT + VERTICAL_GAP) * 3;
-  if (!nearby) {
-    edgeRouteGutters.set(key, sourcePos.x + DEFAULT_NODE_WIDTH + GUTTER_PAD);
+  return !nearby;
+}
+
+function forwardGutterInterval(
+  edge: FactoryRunLayoutEdge,
+  positions: Map<string, FactoryRunLayoutPosition>,
+  nodeById: Map<string, FactoryRunLayoutNode>,
+): GutterInterval | null {
+  const sourcePosition = positions.get(edge.source);
+  const targetPosition = positions.get(edge.target);
+  const sourceNode = nodeById.get(edge.source);
+  if (!sourcePosition || !targetPosition || !sourceNode) return null;
+
+  const sourceY = sourcePosition.y + nodeSize(sourceNode).height;
+  const targetY = targetPosition.y;
+  return { start: Math.min(sourceY, targetY), end: Math.max(sourceY, targetY) };
+}
+
+function forwardGutterIntervalsOverlap(a: GutterInterval, b: GutterInterval): boolean {
+  return a.start < b.end + FORWARD_GUTTER_INTERVAL_GAP && b.start < a.end + FORWARD_GUTTER_INTERVAL_GAP;
+}
+
+function compareForwardGutterEdges(
+  a: FactoryRunLayoutEdge,
+  b: FactoryRunLayoutEdge,
+  positions: Map<string, FactoryRunLayoutPosition>,
+): number {
+  const sourceA = positions.get(a.source);
+  const sourceB = positions.get(b.source);
+  const bySourceX = (sourceA?.x ?? 0) - (sourceB?.x ?? 0);
+  if (bySourceX !== 0) return bySourceX;
+  const bySourceY = (sourceA?.y ?? 0) - (sourceB?.y ?? 0);
+  if (bySourceY !== 0) return bySourceY;
+  const byChannel = factoryRunChannelPriority(a.sourceHandle) - factoryRunChannelPriority(b.sourceHandle);
+  if (byChannel !== 0) return byChannel;
+  return (a.id ?? factoryRunLeafEdgeKey(a.source, a.target, a.sourceHandle)).localeCompare(
+    b.id ?? factoryRunLeafEdgeKey(b.source, b.target, b.sourceHandle),
+  );
+}
+
+type RouteForwardGutterEdgesOptions = {
+  edges: FactoryRunLayoutEdge[];
+  positions: Map<string, FactoryRunLayoutPosition>;
+  nodeById: Map<string, FactoryRunLayoutNode>;
+  graphRight: number;
+  edgeRouteGutters: Map<string, number>;
+  edgeRouteOffsetsY: Map<string, number>;
+};
+
+export function routeForwardGutterEdges(options: RouteForwardGutterEdgesOptions): void {
+  const lanes: GutterInterval[][] = [];
+  const sortedEdges = [...options.edges].sort((a, b) => compareForwardGutterEdges(a, b, options.positions));
+
+  for (const edge of sortedEdges) {
+    const interval = forwardGutterInterval(edge, options.positions, options.nodeById);
+    if (!interval) continue;
+    let laneIndex = lanes.findIndex((lane) => lane.every((placed) => !forwardGutterIntervalsOverlap(interval, placed)));
+    if (laneIndex < 0) {
+      laneIndex = lanes.length;
+      lanes.push([]);
+    }
+    lanes[laneIndex].push(interval);
+
+    const key = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
+    options.edgeRouteGutters.set(key, options.graphRight + laneIndex * FORWARD_GUTTER_LANE_SPACING);
+    options.edgeRouteOffsetsY.set(key, laneIndex * FORWARD_GUTTER_ROUTE_Y_SPACING);
   }
 }
 
@@ -55,12 +108,11 @@ type ClassifyComponentEdgesOptions = {
   positions: Map<string, FactoryRunLayoutPosition>;
   layer: Map<string, number>;
   column: Map<string, number>;
-  graphRight: number;
   leafEdgeKeys: Set<string>;
   spineEdgeKeys: Set<string>;
   sideHandleNodeIds: Set<string>;
   sideTargetNodeIds: Set<string>;
-  edgeRouteGutters: Map<string, number>;
+  forwardGutterEdges: FactoryRunLayoutEdge[];
 };
 
 export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): void {
@@ -69,12 +121,11 @@ export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): 
     positions,
     layer,
     column,
-    graphRight,
     leafEdgeKeys,
     spineEdgeKeys,
     sideHandleNodeIds,
     sideTargetNodeIds,
-    edgeRouteGutters,
+    forwardGutterEdges,
   } = options;
   for (const edge of componentEdges) {
     const sourcePos = positions.get(edge.source);
@@ -90,18 +141,19 @@ export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): 
     } else {
       spineEdgeKeys.add(key);
     }
-    resolveEdgeGutter({
-      key,
-      isSide,
-      sourcePos,
-      targetPos,
-      graphRight,
-      edgeRouteGutters,
-      sourceLayer: layer.get(edge.source) ?? 0,
-      targetLayer: layer.get(edge.target) ?? 0,
-      sourceCol: column.get(edge.source) ?? 0,
-      targetCol: column.get(edge.target) ?? 0,
-    });
+    if (
+      isForwardGutterCandidate({
+        isSide,
+        sourcePos,
+        targetPos,
+        sourceLayer: layer.get(edge.source) ?? 0,
+        targetLayer: layer.get(edge.target) ?? 0,
+        sourceCol: column.get(edge.source) ?? 0,
+        targetCol: column.get(edge.target) ?? 0,
+      })
+    ) {
+      forwardGutterEdges.push(edge);
+    }
   }
 }
 

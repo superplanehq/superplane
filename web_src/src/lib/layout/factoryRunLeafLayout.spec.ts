@@ -14,6 +14,55 @@ function expectNoOverlaps(positions: Map<string, { x: number; y: number }>, widt
   }
 }
 
+function twoIfMergeGraph() {
+  return {
+    nodes: [
+      { id: "if-left", position: { x: 100, y: 0 } },
+      { id: "if-right", position: { x: 500, y: 0 } },
+      { id: "left-true-1" },
+      { id: "left-true-2" },
+      { id: "left-true-3" },
+      { id: "left-true-4" },
+      { id: "left-false" },
+      { id: "right-true-1" },
+      { id: "right-true-2" },
+      { id: "right-false" },
+      { id: "join" },
+    ],
+    edges: [
+      { source: "if-left", target: "left-true-1", sourceHandle: "true" },
+      { source: "left-true-1", target: "left-true-2", sourceHandle: "default" },
+      { source: "left-true-2", target: "left-true-3", sourceHandle: "default" },
+      { source: "left-true-3", target: "left-true-4", sourceHandle: "default" },
+      { source: "left-true-4", target: "join", sourceHandle: "default" },
+      { source: "if-left", target: "left-false", sourceHandle: "false" },
+      { source: "left-false", target: "join", sourceHandle: "default" },
+      { source: "if-right", target: "right-true-1", sourceHandle: "true" },
+      { source: "right-true-1", target: "right-true-2", sourceHandle: "default" },
+      { source: "right-true-2", target: "join", sourceHandle: "default" },
+      { source: "if-right", target: "right-false", sourceHandle: "false" },
+      { source: "right-false", target: "join", sourceHandle: "default" },
+    ],
+  };
+}
+
+function verticalSpan(
+  positions: Map<string, { x: number; y: number }>,
+  source: string,
+  target: string,
+  height = 104,
+): { start: number; end: number } {
+  const sourcePos = positions.get(source)!;
+  const targetPos = positions.get(target)!;
+  const sourceY = sourcePos.y + height;
+  const targetY = targetPos.y;
+  return { start: Math.min(sourceY, targetY), end: Math.max(sourceY, targetY) };
+}
+
+function spansOverlap(a: { start: number; end: number }, b: { start: number; end: number }, gap = 32): boolean {
+  return a.start < b.end + gap && b.start < a.end + gap;
+}
+
 describe("layoutFactoryRunLeafGraph", () => {
   it("keeps multiple roots and their branches in separate saved-position lanes", () => {
     const result = layoutFactoryRunLeafGraph(
@@ -46,6 +95,83 @@ describe("layoutFactoryRunLeafGraph", () => {
     expect(merge.x).toBe(leftFilter.x);
     expect(merge.y).toBeGreaterThan(leftFilter.y);
     expectNoOverlaps(result.positions);
+  });
+
+  it("assigns overlapping merge edges to separate right gutters", () => {
+    const graph = twoIfMergeGraph();
+    const result = layoutFactoryRunLeafGraph(graph.nodes, graph.edges);
+
+    const mergeEdges = [
+      { source: "left-false", target: "join", handle: "default" },
+      { source: "right-false", target: "join", handle: "default" },
+      { source: "right-true-2", target: "join", handle: "default" },
+    ];
+    const routed = mergeEdges
+      .map((edge) => {
+        const key = factoryRunLeafEdgeKey(edge.source, edge.target, edge.handle);
+        return {
+          key,
+          gutter: result.edgeRouteGutters.get(key),
+          offsetY: result.edgeRouteOffsetsY.get(key),
+          span: verticalSpan(result.positions, edge.source, edge.target),
+        };
+      })
+      .filter((edge) => edge.gutter != null);
+
+    expect(routed.length).toBeGreaterThanOrEqual(2);
+
+    for (let i = 0; i < routed.length; i++) {
+      for (let j = i + 1; j < routed.length; j++) {
+        if (!spansOverlap(routed[i].span, routed[j].span)) continue;
+        expect(routed[i].gutter, `${routed[i].key} vs ${routed[j].key}`).not.toBe(routed[j].gutter);
+        expect(routed[i].offsetY, `${routed[i].key} y vs ${routed[j].key}`).not.toBe(routed[j].offsetY);
+      }
+    }
+
+    const graphRight = Math.max(...[...result.positions.values()].map((position) => position.x)) + 280;
+    expect(routed.every((edge) => edge.gutter != null && edge.gutter >= graphRight)).toBe(true);
+    expectNoOverlaps(result.positions);
+  });
+
+  it("keeps node positions unchanged when merge edges get separate gutters", () => {
+    const graph = twoIfMergeGraph();
+    const result = layoutFactoryRunLeafGraph(graph.nodes, graph.edges);
+
+    expect(Object.fromEntries(result.positions)).toEqual({
+      "if-left": { x: 120, y: 0 },
+      "if-right": { x: 496, y: 0 },
+      "left-true-1": { x: 120, y: 208 },
+      "left-true-2": { x: 120, y: 416 },
+      "left-true-3": { x: 120, y: 624 },
+      "left-true-4": { x: 120, y: 832 },
+      "left-false": { x: 872, y: 0 },
+      "right-true-1": { x: 496, y: 208 },
+      "right-true-2": { x: 496, y: 416 },
+      "right-false": { x: 872, y: 296 },
+      join: { x: 120, y: 1040 },
+    });
+  });
+
+  it("reuses a forward gutter when vertical intervals do not overlap", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [{ id: "root" }, { id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }, { id: "e" }, { id: "f" }],
+      [
+        { source: "root", target: "a", sourceHandle: "default" },
+        { source: "a", target: "b", sourceHandle: "default" },
+        { source: "b", target: "c", sourceHandle: "default" },
+        { source: "c", target: "d", sourceHandle: "default" },
+        { source: "d", target: "e", sourceHandle: "default" },
+        { source: "e", target: "f", sourceHandle: "default" },
+        { source: "root", target: "b", sourceHandle: "skip" },
+        { source: "d", target: "f", sourceHandle: "skip" },
+      ],
+    );
+
+    const firstGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("root", "b", "skip"));
+    const secondGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("d", "f", "skip"));
+
+    expect(firstGutter).toBeDefined();
+    expect(secondGutter).toBe(firstGutter);
   });
 
   it("assigns overlapping feedback edges to separate left gutters", () => {

@@ -38,7 +38,7 @@ export type CanvasEdgePathParams = {
   targetPosition: Position;
   /** When set, route via this X gutter (factory run long, cross-column, or feedback edges). */
   routeGutterX?: number;
-  /** Feedback-only Y stagger for the horizontal turns beside shared endpoints. */
+  /** Per-lane Y stagger for the horizontal turns beside shared endpoints. */
   routeOffsetY?: number;
 };
 

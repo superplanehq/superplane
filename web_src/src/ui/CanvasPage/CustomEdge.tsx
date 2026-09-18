@@ -23,7 +23,7 @@ interface CustomEdgeData {
   channelLabel?: string;
   /** Factory run long, cross-column, or feedback edge: route clear of node cards. */
   routeGutterX?: number;
-  /** Feedback-only Y stagger for adjacent return routes. */
+  /** Per-lane Y stagger for adjacent gutter routes. */
   routeOffsetY?: number;
   /** Factory run: this edge geometrically touches/crosses another. */
   touchesOtherEdge?: boolean;
