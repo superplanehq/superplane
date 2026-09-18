@@ -246,7 +246,8 @@ func prFeedbackChecksRunnerSteps() []any {
 			"type": "bash",
 			"command": strings.Join([]string{
 				"set -euo pipefail",
-				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
+				"gh auth setup-git --hostname github.com --force",
+				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
 				"cd repo",
 				`if [ -z "${PR_HEAD:-}" ]; then`,
 				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,

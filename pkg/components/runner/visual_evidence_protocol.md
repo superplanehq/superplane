@@ -21,6 +21,7 @@
 - Upload an unchanged inspected screenshot with `upload_artifact`. For video evidence, call `upload_artifact` once with the video `path` and inspected screenshot `posterPath`.
 - Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.
 - Upload the smallest useful set. Usually, use one focused image for each affected theme or state.
+- Capture evidence after the requested UI changes and verification are complete. If later edits change the shown UI, recapture and upload the evidence.
 - If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.
 - Remove temporary preview files before you commit unless they are useful regression coverage.
 - Close the Playwright session and stop temporary preview processes after capture.
