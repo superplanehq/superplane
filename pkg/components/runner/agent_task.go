@@ -194,25 +194,35 @@ func WrapPromptCommandInWorkingDirectory(dir, command string) string {
 }
 
 // InstallWorkspaceSkillFilesCommand copies attached SKILL.md files from the
-// task dir into the current working directory and excludes them from git.
+// task dir into the current working directory. A skill directory that already
+// exists in the project is left unchanged so workspace skills cannot replace
+// or later commit over project-owned instructions.
 func InstallWorkspaceSkillFilesCommand() string {
-	return `if [ -d "$SUPERPLANE_TASK_DIR/.claude/skills" ]; then
-  mkdir -p .claude/skills
-  cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/
-fi
-if [ -d "$SUPERPLANE_TASK_DIR/.agents/skills" ]; then
-  mkdir -p .agents/skills
-  cp -a "$SUPERPLANE_TASK_DIR/.agents/skills/." .agents/skills/
-fi
-if [ -d .git ]; then
-  mkdir -p .git/info
-  if [ ! -f .git/info/exclude ] || ! grep -qxF '.claude/skills/' .git/info/exclude; then
-    printf '%s\n' '.claude/skills/' >> .git/info/exclude
+	return `_sp_install_workspace_skills() {
+  _sp_src=$1
+  _sp_dest=$2
+  if [ ! -d "$_sp_src" ]; then
+    return 0
   fi
-  if [ ! -f .git/info/exclude ] || ! grep -qxF '.agents/skills/' .git/info/exclude; then
-    printf '%s\n' '.agents/skills/' >> .git/info/exclude
-  fi
-fi
+  mkdir -p "$_sp_dest"
+  for _sp_skill in "$_sp_src"/*; do
+    [ -d "$_sp_skill" ] || continue
+    _sp_name=$(basename "$_sp_skill")
+    if [ -e "$_sp_dest/$_sp_name" ]; then
+      continue
+    fi
+    cp -a "$_sp_skill" "$_sp_dest/$_sp_name"
+    if [ -d .git ]; then
+      mkdir -p .git/info
+      _sp_pattern="$_sp_dest/$_sp_name/"
+      if [ ! -f .git/info/exclude ] || ! grep -qxF "$_sp_pattern" .git/info/exclude; then
+        printf '%s\n' "$_sp_pattern" >> .git/info/exclude
+      fi
+    fi
+  done
+}
+_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills
+_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.agents/skills" .agents/skills
 `
 }
 

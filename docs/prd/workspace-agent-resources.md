@@ -210,7 +210,8 @@ Each runner component already calls `ResolveEnvironment` and
 6. Write each inline skill to `.claude/skills/<name>/SKILL.md` and
    `.agents/skills/<name>/SKILL.md` under `SUPERPLANE_TASK_DIR`. Prompt
    steps copy those files into the agent working directory before the
-   CLI starts.
+   CLI starts. If the repository already has that skill directory, keep
+   the project files and skip the workspace copy.
 
 | CLI | Merge |
 | --- | --- |
