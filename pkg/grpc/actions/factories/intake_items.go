@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -52,6 +53,7 @@ func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
+	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
 }
 
 type gitHubIntakeItemSource struct {
@@ -75,6 +77,11 @@ type productiveIntakeItemSource struct {
 	organizationID        string
 	projectProbe          sync.Once
 	projectReadabilityErr error
+}
+
+type sentryIntakeItemSource struct {
+	sentry  *sentry.Client
+	project string
 }
 
 type unsupportedIntakeItemSource struct{}
@@ -339,6 +346,27 @@ func newProductiveIntakeItemSource(
 	}, nil
 }
 
+func newSentryIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	project, _ := trigger.Configuration["project"].(string)
+	project = strings.TrimSpace(project)
+	if project == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeSentryClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &sentryIntakeItemSource{sentry: client, project: project}, nil
+}
+
 func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
 	return nil, errIntakeSearchUnsupported
 }
@@ -489,6 +517,66 @@ func productiveTaskItem(task productive.Task, organizationID string) IntakeItem 
 		Title: task.Title,
 		Body:  task.Description,
 		URL:   fmt.Sprintf("https://app.productive.io/%s/tasks/%s", organizationID, task.ID),
+	}
+}
+
+func (s *sentryIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
+	issues, err := s.sentry.SearchUnresolvedIssues(s.project, query, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(issues))
+	for _, issue := range issues {
+		items = append(items, sentryIssueItem(issue))
+	}
+	return items, nil
+}
+
+func (s *sentryIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
+	issueID := strings.TrimSpace(id)
+	if issueID == "" {
+		return nil, errIntakeItemNotFound
+	}
+
+	issue, err := s.sentry.GetIssue(issueID)
+	if err != nil {
+		return nil, err
+	}
+	if !s.ownsIssue(issue) {
+		return nil, errIntakeItemNotFound
+	}
+
+	item := sentryIssueItem(*issue)
+	event, err := s.sentry.GetPreferredIssueEvent(issueID)
+	if err != nil {
+		event = nil
+	}
+	item.Body = sentry.IssueDescription(issue, event)
+	return &item, nil
+}
+
+// ownsIssue reports whether the issue belongs to the project this intake
+// listens on. An issue without a readable project slug is rejected, so a
+// missing field cannot widen the boundary.
+func (s *sentryIntakeItemSource) ownsIssue(issue *sentry.Issue) bool {
+	if issue == nil || issue.Project == nil {
+		return false
+	}
+	slug := strings.TrimSpace(issue.Project.Slug)
+	return slug != "" && strings.EqualFold(slug, s.project)
+}
+
+func sentryIssueItem(issue sentry.Issue) IntakeItem {
+	issueURL := strings.TrimSpace(issue.Permalink)
+	if issueURL == "" {
+		issueURL = strings.TrimSpace(issue.WebURL)
+	}
+	return IntakeItem{
+		ID:    issue.ID,
+		Key:   issue.ShortID,
+		Title: issue.Title,
+		URL:   issueURL,
 	}
 }
 
