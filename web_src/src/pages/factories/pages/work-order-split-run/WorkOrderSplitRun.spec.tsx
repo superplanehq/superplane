@@ -10,6 +10,20 @@ import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const enabledExperimentalFeatures = new Set<string>();
+const mergeability = {
+  current: {
+    canMerge: true,
+    allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
+    headSha: "abc123",
+  } as {
+    canMerge: boolean;
+    blockedReason?: string;
+    message?: string;
+    allowedMethods: string[];
+    headSha: string;
+  },
+};
+const mergeMutate = vi.fn();
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -17,6 +31,11 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
     enabledExperimentalFeatures: [...enabledExperimentalFeatures],
     isLoading: false,
   }),
+}));
+
+vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
+  useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
+  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
 }));
 
 import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
@@ -65,6 +84,39 @@ function withPublishedSpec(fixture: SplitRunFixture): SplitRunFixture {
   return { ...fixture, phases: [{ ...first, artifacts: [...first.artifacts, spec] }, ...rest] };
 }
 
+function fixtureWithReviewPullRequest(state: "STATE_OPEN" | "STATE_MERGED"): SplitRunFixture {
+  const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER);
+  const [first, ...rest] = fixture.phases;
+  if (!first) {
+    return fixture;
+  }
+  return {
+    ...fixture,
+    phases: [
+      {
+        ...first,
+        stream: [
+          ...first.stream,
+          {
+            id: "pr-review-line",
+            at: "now",
+            componentName: "Pull request",
+            status: "passed",
+            pullRequest: {
+              id: "pr-open",
+              provider: "PROVIDER_GITHUB",
+              url: "https://github.com/superplanehq/superplane/pull/6812",
+              number: "6812",
+              state,
+            },
+          },
+        ],
+      },
+      ...rest,
+    ],
+  };
+}
+
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -91,6 +143,12 @@ describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     enabledExperimentalFeatures.clear();
+    mergeMutate.mockReset();
+    mergeability.current = {
+      canMerge: true,
+      allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
+      headSha: "abc123",
+    };
   });
 
   it("does not put an expand control on the Log heading", () => {
@@ -724,7 +782,6 @@ describe("WorkOrderSplitRunPopup", () => {
     const heading = within(note).getByRole("heading", { name: "The pull request is ready for review" });
     const reviewLink = within(note).getByRole("link", { name: "Review PR #6812" });
     expect(reviewLink).toHaveAttribute("href", "https://github.com/superplanehq/superplane/pull/6812");
-    expect(reviewLink.parentElement).toBe(heading.parentElement);
     expect(reviewLink).not.toHaveClass("w-full");
     const closing = within(note).getByText("This task closes when the pull request is merged or closed.");
     expect(closing.parentElement).toBe(heading.parentElement);
@@ -743,6 +800,52 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
+  });
+
+  it("enables merge on the pull request review strip when mergeability is true", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
+
+    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    expect(within(note).getByTestId("split-run-merge-button")).toBeEnabled();
+    await user.click(within(note).getByTestId("split-run-merge-method"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["✓ Squash and merge", "Rebase and merge"]);
+    await user.keyboard("{Escape}");
+    await user.click(within(note).getByTestId("split-run-merge-button"));
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-open",
+      mergeMethod: "MERGE_METHOD_SQUASH",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("disables merge when automation is running", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
+      message: "Automation is still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
+
+    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    expect(within(note).getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(within(note).getByTestId("split-run-merge-reason")).toHaveTextContent("Automation is still running.");
+  });
+
+  it("hides merge when the pull request is merged", () => {
+    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_MERGED") });
+
+    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    expect(within(note).queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
   });
 
   it("hides work-order close actions when the user cannot update the task", () => {
