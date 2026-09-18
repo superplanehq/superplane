@@ -8,13 +8,16 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export type JiraSetupStep = "connection" | "project" | "complete";
+import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
-export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean, selectIntegrationId = "") {
+export type JiraSetupStep = "connection" | "project";
+
+export function useJiraIntakeSetup(organizationId: string, factoryId: string, selectIntegrationId = "") {
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
+  const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
   const pickedReturnedConnection = useRef(false);
 
@@ -22,42 +25,58 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
     useJiraConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project");
+  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
+    enabled: Boolean(integrationId),
+  });
 
   useEffect(() => {
-    if (!open) {
-      pickedReturnedConnection.current = false;
+    pickedReturnedConnection.current = false;
+  }, [selectIntegrationId]);
+
+  useEffect(() => {
+    if (!selectIntegrationId || pickedReturnedConnection.current) {
       return;
     }
-    setStep("connection");
-    setIntegrationId("");
-    setProjectId("");
-    setError(undefined);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !selectIntegrationId || pickedReturnedConnection.current) return;
 
     const returned = jiraConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
-    if (!returned || returned.status?.state !== "ready") return;
+    if (!returned || returned.status?.state !== "ready") {
+      return;
+    }
 
     pickedReturnedConnection.current = true;
     setIntegrationId(selectIntegrationId);
+    setConnectOpen(false);
     setStep("project");
-  }, [open, selectIntegrationId, jiraConnections]);
+    void connectedQuery.refetch();
+  }, [selectIntegrationId, jiraConnections, connectedQuery]);
 
   useEffect(() => {
-    if (selectIntegrationId) return;
-    if (!integrationId && jiraIntegrations.length === 1) {
-      setIntegrationId(jiraIntegrations[0].metadata?.id ?? "");
+    if (stayOnConnection || step !== "connection") {
+      return;
     }
-  }, [integrationId, jiraIntegrations, selectIntegrationId]);
+    if (selectIntegrationId) {
+      return;
+    }
+    const readyId = readyJiraConnectionId(jiraIntegrations, integrationId);
+    if (!readyId) {
+      return;
+    }
+    setIntegrationId(readyId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [stayOnConnection, step, selectIntegrationId, jiraIntegrations, integrationId, connectedQuery]);
 
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
     setConnectOpen(false);
     setStep("project");
     void connectedQuery.refetch();
+  };
+
+  const returnToConnection = () => {
+    setStayOnConnection(true);
+    setStep("connection");
   };
 
   const createBoundIntake = async () => {
@@ -69,9 +88,10 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
         integrationId,
         resourceId: projectId,
       });
-      setStep("complete");
+      return true;
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "SuperPlane could not create the Jira intake."));
+      setError(getApiErrorMessage(cause, JIRA_INTAKE_SETUP_COPY.wizardCreateError));
+      return false;
     }
   };
 
@@ -93,8 +113,16 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
     jiraDefinition,
     existingNames,
     completeConnection,
+    returnToConnection,
     createBoundIntake,
   };
+}
+
+export function readyJiraConnectionId(integrations: Array<{ metadata?: { id?: string } }>, selectedId: string): string {
+  if (selectedId && integrations.some((integration) => integration.metadata?.id === selectedId)) {
+    return selectedId;
+  }
+  return integrations[0]?.metadata?.id ?? "";
 }
 
 function useJiraConnections(organizationId: string) {

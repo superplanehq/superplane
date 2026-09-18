@@ -132,7 +132,6 @@ import {
   isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
   jiraIntakeIntegrationIdFromSearch,
-  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -155,11 +154,12 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
+  addIntakeTemplatesForOrg,
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
+  isAddIntakeSoon,
   isLineIntakeSourceId,
   type AddIntakeTemplate,
 } from "./lineIntakeModel";
@@ -230,7 +230,7 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { pathname, search, state: locationState } = useLocation();
+  const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -261,10 +261,9 @@ export function LinesPage() {
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
   );
+  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
-  const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
-  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -338,6 +337,17 @@ export function LinesPage() {
     return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
   }
 
+  if (isJiraIntakeSetupSearchOpen(search) && selectedLine.id) {
+    return (
+      <Navigate
+        to={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id, {
+          integrationId: jiraIntakeIntegrationIdFromSearch(search) || undefined,
+        })}
+        replace
+      />
+    );
+  }
+
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
 
   const intakePanel: BacklogIntakePanel | undefined = showColumnAutomations
@@ -402,7 +412,7 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
-    if (template.soon || takenIntakeSourceIds.includes(template.id)) {
+    if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
       return;
     }
     if (template.id === "sentry-exceptions") {
@@ -416,7 +426,9 @@ export function LinesPage() {
       return;
     }
     if (template.id === "jira-issues") {
-      navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      if (selectedLine.id) {
+        navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
       return;
     }
     if (!isLineIntakeSourceId(template.id)) {
@@ -496,6 +508,7 @@ export function LinesPage() {
         open={addIntakeOpen}
         onClose={() => setAddIntakeOpen(false)}
         onSelect={createIntakeFromTemplate}
+        templates={addIntakeTemplates}
         takenSourceIds={takenIntakeSourceIds}
       />
       <ProductiveIntakeSetupDialog
@@ -503,14 +516,6 @@ export function LinesPage() {
         organizationId={organizationId}
         factoryId={factoryId}
         onClose={() => setProductiveIntakeSetupOpen(false)}
-      />
-      <JiraIntakeSetupDialog
-        open={jiraIntakeSetupOpen}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
-        selectIntegrationId={returnedJiraIntegrationId}
-        onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}

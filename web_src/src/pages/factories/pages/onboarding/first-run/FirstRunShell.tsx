@@ -69,17 +69,19 @@ function FirstRunTopBar({ chrome, disabled }: { chrome?: FirstRunChrome; disable
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 py-5">
       <div className="pointer-events-auto flex items-center gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground"
-          onClick={chrome?.onLogOut}
-          disabled={disabled}
-          data-testid="first-run-log-out"
-        >
-          {FIRST_RUN_COPY.chrome.logOut}
-        </Button>
+        {chrome?.onLogOut ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={chrome.onLogOut}
+            disabled={disabled}
+            data-testid="first-run-log-out"
+          >
+            {FIRST_RUN_COPY.chrome.logOut}
+          </Button>
+        ) : null}
         <FirstRunOrganizationSwitch organizationSwitch={chrome?.organizationSwitch} disabled={disabled} />
       </div>
       {identity ? (

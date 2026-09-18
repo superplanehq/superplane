@@ -11,7 +11,12 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT, FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CREATE_WITH_AGENT,
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -23,6 +28,7 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -258,10 +264,6 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
 vi.mock("./ProductiveIntakeSetupDialog", () => ({
   ProductiveIntakeSetupDialog: ({ open }: { open: boolean }) =>
     open ? <div data-testid="productive-intake-setup" /> : null,
-}));
-
-vi.mock("./JiraIntakeSetupDialog", () => ({
-  JiraIntakeSetupDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="jira-intake-setup" /> : null),
 }));
 
 async function resetLinesBoardMocks() {
@@ -1030,7 +1032,28 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 
+  it("marks flagged intake sources as coming soon when the organization feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
+    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
+
+    expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
+  });
+
   it("opens guided Sentry setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_SENTRY_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1039,7 +1062,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
@@ -1075,6 +1098,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1090,11 +1114,11 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1`,
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
   });
 
-  it("reopens Jira intake setup when the OAuth return query is present", () => {
+  it("sends a legacy Jira OAuth return to the setup page", () => {
     renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
       vi.fn(),
@@ -1103,6 +1127,9 @@ describe("LinesPage board extras", () => {
     );
 
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, { integrationId: "int-new" }),
+    );
   });
 
   it("shows only declared intakes", () => {

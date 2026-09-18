@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
+import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+
 import {
   ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
   apiIntakeSource,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
@@ -301,6 +304,26 @@ describe("lineIntakeModel", () => {
       "datadog",
       "notion",
     ]);
+  });
+
+  it("marks Jira and Sentry as coming soon when their organization features are off", () => {
+    const templates = addIntakeTemplatesForOrg(() => false);
+
+    expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
+  });
+
+  it("keeps Jira and Sentry live when their organization features are on", () => {
+    const templates = addIntakeTemplatesForOrg((featureId) =>
+      [FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE].includes(featureId),
+    );
+
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
   });
 
   it("maps every intake template id to an API source the picker can create", () => {

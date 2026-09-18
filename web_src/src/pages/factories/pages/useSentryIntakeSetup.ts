@@ -28,13 +28,6 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
-  const issuesQuery = useIntegrationResources(
-    organizationId,
-    integrationId,
-    "unresolved-issue",
-    projectId ? { project: projectId } : undefined,
-    { enabled: Boolean(integrationId && projectId) },
-  );
 
   useEffect(() => {
     if (!integrationId && sentryIntegrations.length === 1) {
@@ -111,7 +104,6 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     createIntegration,
     createIntake,
     projectsQuery,
-    issuesQuery,
     sentryIntegrations,
     sentryDefinition,
     existingNames,

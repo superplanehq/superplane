@@ -1,0 +1,19 @@
+export const JIRA_INTAKE_SETUP_COPY = {
+  pageTitle: "How should Jira issues become tasks?",
+  wizardStepConnect: "Connect Jira",
+  wizardStepConnectHelper: "Connect Jira so SuperPlane can read issues and listen for new ones.",
+  wizardStepConnectExisting: "Choose the Jira site that SuperPlane will monitor.",
+  wizardStepProject: "Which Jira project should create tasks?",
+  wizardStepProjectHelper:
+    "SuperPlane adds the 10 newest unresolved issues of this project. SuperPlane also listens for new issues.",
+  wizardConnect: "Connect Jira",
+  wizardContinue: "Continue",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
+  wizardProjectsLoading: "Loading Jira projects...",
+  wizardProjectsError: "SuperPlane could not load Jira projects.",
+  wizardProjectsEmpty: "This connection has no available projects.",
+  wizardRetry: "Try again",
+  wizardCreateError: "SuperPlane could not create the Jira intake.",
+  wizardConnectionsLoading: "Loading Jira connections...",
+} as const;

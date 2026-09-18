@@ -3,6 +3,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
   id: string;
@@ -12,6 +13,8 @@ export interface AddIntakeTemplate {
   iconSrc?: string;
   /** True when SuperPlane does not create this intake yet. */
   soon?: boolean;
+  /** Organization experimental feature that must be on for this source to be live. */
+  featureId?: string;
 }
 
 export const ADD_INTAKE_COPY = {
@@ -35,14 +38,16 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "jira-issues",
     name: "Jira issues",
-    description: "Creates tasks from Jira issues.",
+    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: jiraIcon,
+    featureId: FEATURE_FACTORY_JIRA_INTAKE,
   },
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
     description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: sentryIcon,
+    featureId: FEATURE_FACTORY_SENTRY_INTAKE,
   },
   {
     id: "datadog",
@@ -59,3 +64,20 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     soon: true,
   },
 ];
+
+export function isAddIntakeSoon(template: AddIntakeTemplate, hasFeature: (featureId: string) => boolean): boolean {
+  if (template.soon) {
+    return true;
+  }
+  if (!template.featureId) {
+    return false;
+  }
+  return !hasFeature(template.featureId);
+}
+
+/** Catalog with Coming soon applied when the organization feature is off. */
+export function addIntakeTemplatesForOrg(hasFeature: (featureId: string) => boolean): AddIntakeTemplate[] {
+  return ADD_INTAKE_TEMPLATES.map((template) =>
+    isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template,
+  );
+}

@@ -8,6 +8,7 @@ const CANVAS_SIZE = 300;
 export type FirstRunSphereChip = { label: string; value: string; tone?: "ghost" | "amber" };
 
 export type FirstRunSphereProps = {
+  testId?: string;
   /** 0..1 — sphere density and brightness. */
   level: number;
   caption: string;
@@ -88,6 +89,7 @@ function SphereChip({ chip, side }: { chip: FirstRunSphereChip; side: "left" | "
 }
 
 export function FirstRunSpherePane({
+  testId,
   level,
   caption,
   captionHighlight,
@@ -119,6 +121,7 @@ export function FirstRunSpherePane({
 
   return (
     <div
+      data-testid={testId}
       className={cn(
         "relative hidden overflow-hidden border-l border-border lg:flex lg:w-[44%]",
         "bg-[radial-gradient(ellipse_at_50%_45%,#faf9fd_0%,#f1eff7_70%)]",

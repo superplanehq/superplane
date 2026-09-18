@@ -34,7 +34,13 @@ import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvase
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
-export { ADD_INTAKE_COPY, ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./addIntakeTemplates";
+export {
+  ADD_INTAKE_COPY,
+  ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
+  isAddIntakeSoon,
+  type AddIntakeTemplate,
+} from "./addIntakeTemplates";
 
 export type LineIntakeSourceId =
   | "github-issues"
@@ -95,7 +101,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "jira-issues",
     name: "Jira issues",
-    description: "Creates tasks from Jira issues.",
+    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
     iconSrc: jiraIcon,
     iconAlt: "Jira",
     listen: {
