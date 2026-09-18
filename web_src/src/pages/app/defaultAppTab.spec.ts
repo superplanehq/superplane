@@ -13,13 +13,11 @@ import {
 const CANVAS_FLAGS: UrlViewFlags = {
   isRunInspectionMode: false,
   isMemoryMode: false,
-  isFilesMode: false,
   isConsoleMode: false,
 };
 
 const CONSOLE_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isConsoleMode: true };
 const MEMORY_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isMemoryMode: true };
-const FILES_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isFilesMode: true };
 const RUN_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isRunInspectionMode: true };
 
 function consoleLoaded(panelCount: number): ConsoleQueryLike {
@@ -42,7 +40,6 @@ describe("urlViewFlagsToTab", () => {
     expect(urlViewFlagsToTab(CANVAS_FLAGS)).toBe("canvas");
     expect(urlViewFlagsToTab(CONSOLE_FLAGS)).toBe("console");
     expect(urlViewFlagsToTab(MEMORY_FLAGS)).toBe("memory");
-    expect(urlViewFlagsToTab(FILES_FLAGS)).toBe("files");
   });
 });
 
@@ -51,14 +48,14 @@ describe("urlPinsNavigation", () => {
     expect(urlPinsNavigation(new URLSearchParams())).toBe(false);
   });
 
-  it.each(["console", "dashboard", "memory", "files"])(
+  it.each(["console", "dashboard", "memory"])(
     "pins on tab-selecting view=%s (dashboard is the legacy Console alias)",
     (view) => {
       expect(urlPinsNavigation(new URLSearchParams(`view=${view}`))).toBe(true);
     },
   );
 
-  it.each(["runs", "versions"])(
+  it.each(["runs", "versions", "files"])(
     "does not pin on legacy view=%s — those values select no tab and are cleaned up on mount",
     (view) => {
       expect(urlPinsNavigation(new URLSearchParams(`view=${view}`))).toBe(false);

@@ -4,16 +4,16 @@ import { type AppTabId, isAppTabId } from "@/lib/lastVisitedAppTab";
 export type UrlViewFlags = {
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   isConsoleMode: boolean;
 };
 
 /**
  * Query params that pin the URL to a destination. A tab-selecting `view` and
  * `run` select a destination directly; `version` (version preview), `edit`
- * (edit-session entry), `sidebar`/`node` (node selection), and `file` (file
- * selection) deep-link into a specific spot. A default-tab redirect must not
- * pull the user away from any of them.
+ * (edit-session entry), and `sidebar`/`node` (node selection) deep-link into a
+ * specific spot. Leftover `file` pins from the retired Files tab stay pinned
+ * so a default-tab redirect does not move the user. A default-tab redirect
+ * must not pull the user away from any of them.
  */
 const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const;
 
@@ -24,7 +24,7 @@ const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const
  * useWorkflowViewSearchParams, so they must not pin navigation: the stored-tab
  * redirect and the Console fallback should still apply for that visit.
  */
-const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory", "files"] as const;
+const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory"] as const;
 
 function hasAnyParam(searchParams: URLSearchParams, params: readonly string[]): boolean {
   return params.some((param) => (searchParams.get(param) ?? "") !== "");
@@ -40,7 +40,6 @@ export function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   if (flags.isRunInspectionMode) return null;
   if (flags.isConsoleMode) return "console";
   if (flags.isMemoryMode) return "memory";
-  if (flags.isFilesMode) return "files";
   return "canvas";
 }
 
