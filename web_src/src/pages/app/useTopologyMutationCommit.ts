@@ -65,6 +65,17 @@ export function removeWorkflowEdges(workflow: CanvasesCanvas, removedEdges: Edge
   };
 }
 
+export function applyFactoryCanvasLayout(
+  workflow: CanvasesCanvas,
+  components: ActionsAction[],
+): Promise<CanvasesCanvas> {
+  return DefaultLayoutEngine.apply(workflow, {
+    scope: "full-canvas",
+    components,
+    direction: "vertical",
+  });
+}
+
 export function useTopologyMutationCommit({
   factoryAutoLayout,
   autoLayoutOnUpdate,
@@ -89,11 +100,7 @@ export function useTopologyMutationCommit({
   const applyRequiredLayout = useCallback(
     async (workflow: CanvasesCanvas, options?: CommitOptions) => {
       if (factoryAutoLayout) {
-        return DefaultLayoutEngine.apply(workflow, {
-          scope: "full-canvas",
-          components,
-          direction: "vertical",
-        });
+        return applyFactoryCanvasLayout(workflow, components);
       }
       if (!autoLayoutOnUpdate || !options?.addedNodeId) {
         return workflow;

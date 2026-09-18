@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { generateUniqueNodeName } from "./utils";
-import { appendWorkflowFragment, useTopologyMutationCommit } from "./useTopologyMutationCommit";
+import {
+  appendWorkflowFragment,
+  applyFactoryCanvasLayout,
+  useTopologyMutationCommit,
+} from "./useTopologyMutationCommit";
 
 function workflowWith(nodes: SuperplaneComponentsNode[] = []): CanvasesCanvas {
   return { metadata: { factoryId: "factory" }, spec: { nodes, edges: [] } };
@@ -138,6 +142,22 @@ describe("useTopologyMutationCommit", () => {
     expect(layoutSpy).not.toHaveBeenCalled();
     expect(applyLocalWorkflow).not.toHaveBeenCalled();
     expect(saveWorkflow).not.toHaveBeenCalled();
+    layoutSpy.mockRestore();
+  });
+});
+
+describe("applyFactoryCanvasLayout", () => {
+  it("applies a full-canvas vertical layout", async () => {
+    const workflow = workflowWith();
+    const layoutSpy = vi.spyOn(DefaultLayoutEngine, "apply").mockResolvedValue(workflow);
+
+    await applyFactoryCanvasLayout(workflow, []);
+
+    expect(layoutSpy).toHaveBeenCalledWith(workflow, {
+      scope: "full-canvas",
+      components: [],
+      direction: "vertical",
+    });
     layoutSpy.mockRestore();
   });
 });
