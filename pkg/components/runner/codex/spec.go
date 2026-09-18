@@ -16,6 +16,7 @@ type RunCodexSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 }
 
 func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
