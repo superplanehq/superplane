@@ -110,6 +110,21 @@ describe("SentryIntakeSetupDialog", () => {
     expect(screen.getAllByText(SENTRY_INTAKE_SETUP_COPY.wizardPreviewImporting)).toHaveLength(SENTRY_INTAKE_SEED_SIZE);
   });
 
+  it("shows imported issue titles without Sentry short IDs", async () => {
+    mocks.issues.splice(0, mocks.issues.length, {
+      id: "98",
+      name: "PRODUCTION-98 · HTTP 500 /api/v1/refunds",
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+
+    const preview = screen.getByTestId("sentry-setup-preview-issue-issue-1");
+    expect(preview).toHaveTextContent("HTTP 500 /api/v1/refunds");
+    expect(preview).not.toHaveTextContent("PRODUCTION-98");
+  });
+
   it("creates a bound intake after a project is chosen", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();

@@ -3,7 +3,6 @@ import { describe, expect, it } from "bun:test";
 import {
   ADD_INTAKE_TEMPLATES,
   apiIntakeSource,
-  filterAddIntakeTemplates,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
@@ -290,10 +289,18 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists eight add-intake templates including CI and page performance", () => {
-    expect(ADD_INTAKE_TEMPLATES).toHaveLength(8);
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-ci-runtime");
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-page-performance");
+  it("lists GitHub, Jira, Sentry, and coming-soon DataDog and Notion add-intake sources", () => {
+    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
+      "github-issues",
+      "jira-issues",
+      "sentry-exceptions",
+      "datadog",
+      "notion",
+    ]);
+    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual([
+      "datadog",
+      "notion",
+    ]);
   });
 
   it("maps every intake template id to an API source the picker can create", () => {
@@ -305,12 +312,5 @@ describe("lineIntakeModel", () => {
     }
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
-  });
-
-  it("filters add-intake templates by name or description", () => {
-    expect(filterAddIntakeTemplates("unresolved").map((template) => template.id)).toEqual(["sentry-exceptions"]);
-    expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
-    expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("")).toHaveLength(8);
   });
 });

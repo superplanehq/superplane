@@ -2,7 +2,6 @@ export const SENTRY_INTAKE_SEED_SIZE = 10;
 
 export const SENTRY_INTAKE_SETUP_COPY = {
   pageTitle: "How should Sentry issues become tasks?",
-  setupButton: "Setup Sentry",
   wizardBackToBoard: "Back to board",
   wizardBack: "Back",
   wizardStepConnect: "Connect Sentry",
